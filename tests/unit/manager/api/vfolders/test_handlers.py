@@ -82,6 +82,10 @@ async def client(
 class TestCreateDownloadArchiveSession:
     """Tests for create_download_archive_session handler via aiohttp client."""
 
+    EXPECTED_TOKEN = "test-token"
+    EXPECTED_URL = "https://storage/download-archive"
+    REQUEST_FILES = ["a.txt", "b/c.txt"]
+
     async def test_constructs_action_and_returns_token(
         self,
         client: Any,
@@ -90,7 +94,7 @@ class TestCreateDownloadArchiveSession:
     ) -> None:
         """Test that handler returns token/url from processor result."""
         mock_processor = AsyncMock(
-            return_value=MagicMock(token="test-token", url="https://storage/download-archive"),
+            return_value=MagicMock(token=self.EXPECTED_TOKEN, url=self.EXPECTED_URL),
         )
         mock_root_ctx.processors.vfolder_file.download_archive_file.wait_for_complete = (
             mock_processor
@@ -98,14 +102,14 @@ class TestCreateDownloadArchiveSession:
 
         resp = await client.post(
             "/folders/test-vfolder/request-download-archive",
-            json={"files": ["a.txt", "b/c.txt"]},
+            json={"files": self.REQUEST_FILES},
         )
 
         assert resp.status == 200
         body = await resp.json()
-        assert body == {"token": "test-token", "url": "https://storage/download-archive"}
+        assert body == {"token": self.EXPECTED_TOKEN, "url": self.EXPECTED_URL}
 
         action = mock_processor.call_args.args[0]
         assert isinstance(action, CreateArchiveDownloadSessionAction)
         assert action.vfolder_uuid == sample_vfolder_row["id"]
-        assert action.files == ["a.txt", "b/c.txt"]
+        assert action.files == self.REQUEST_FILES
