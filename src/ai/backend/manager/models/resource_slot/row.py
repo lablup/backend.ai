@@ -72,7 +72,7 @@ class ResourceSlotTypeRow(Base):  # type: ignore[misc]
         PydanticColumn(NumberFormat),
         nullable=False,
         default=NumberFormat(),
-        server_default=sa.text('\'{"binary":false,"round_length":0}\'::jsonb'),
+        server_default=sa.text(r"""'{"binary"\:false,"round_length"\:0}'::jsonb"""),
     )
     rank: Mapped[int] = mapped_column(
         "rank", sa.Integer, nullable=False, server_default=sa.text("0")
