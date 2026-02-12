@@ -731,9 +731,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 ssh_dir.mkdir(parents=True, exist_ok=True)
                 paths_to_chown: list[Path] = []
 
-                # Generate dropbear host key for SSH server identity.
-                # This key is mounted read-only into container to prevent user deletion.
-                # Use dropbearkey from krunner to generate key in Dropbear native format.
+                # Generate dropbear host key for container SSH server
                 host_key_path = ssh_dir / "dropbear_rsa_host_key"
                 arch = get_arch_name()
                 dropbearmulti_path = self.resolve_krunner_filepath(
@@ -756,7 +754,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 host_key_path.chmod(0o600)
                 paths_to_chown.append(host_key_path)
 
-                # Write cluster SSH keypair if provided
                 if sshkey is not None:
                     cluster_priv_key_path = ssh_dir / "id_cluster"
                     cluster_pub_key_path = ssh_dir / "id_cluster.pub"
