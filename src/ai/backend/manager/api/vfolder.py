@@ -1174,7 +1174,6 @@ async def create_download_archive_session(
     )
     result = await root_ctx.processors.vfolder_file.download_archive_file.wait_for_complete(
         CreateArchiveDownloadSessionAction(
-            user_uuid=request["user"]["uuid"],
             keypair_resource_policy=request["keypair"]["resource_policy"],
             vfolder_uuid=row["id"],
             files=params["files"],

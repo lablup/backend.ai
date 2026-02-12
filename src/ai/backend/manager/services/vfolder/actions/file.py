@@ -82,7 +82,6 @@ class CreateDownloadSessionActionResult(BaseActionResult):
 @dataclass
 class CreateArchiveDownloadSessionAction(VFolderFileAction):
     keypair_resource_policy: Mapping[str, Any]
-    user_uuid: uuid.UUID
 
     vfolder_uuid: uuid.UUID
 
