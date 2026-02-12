@@ -7739,7 +7739,7 @@ type PermissionGQL implements Node
   role: RoleGQL
 
   """The scope this permission applies to."""
-  scope: EntityNode!
+  scope: EntityNode
 }
 
 """An edge in a connection."""
