@@ -7,7 +7,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Self,
-    cast,
 )
 
 import graphene
@@ -16,9 +15,8 @@ import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
-from sqlalchemy.orm import load_only
 
-from ai.backend.common.types import AccessKey, AgentId, ResourceSlot
+from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentStatus
@@ -342,31 +340,30 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
             return None
         from ai.backend.manager.data.agent.types import AgentStatus
         from ai.backend.manager.models.agent.row import AgentRow
+        from ai.backend.manager.models.resource_slot import AgentResourceRow
 
         graph_ctx = info.context
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            query_stmt = (
-                sa.select(AgentRow)
+            j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id)
+            query = (
+                sa.select(
+                    AgentResourceRow.slot_name,
+                    sa.func.sum(AgentResourceRow.capacity).label("total_capacity"),
+                    sa.func.sum(AgentResourceRow.used).label("total_used"),
+                )
+                .select_from(j)
                 .where(
                     (AgentRow.scaling_group == self.name) & (AgentRow.status == AgentStatus[status])
                 )
-                .options(load_only(AgentRow.available_slots))
+                .group_by(AgentResourceRow.slot_name)
             )
-            result = (await db_session.scalars(query_stmt)).all()
-            agent_rows = cast(list[AgentRow], result)
+            result = await db_session.execute(query)
 
             total_occupied_slots = ResourceSlot()
             total_available_slots = ResourceSlot()
-
-            known_slot_types = (
-                await graph_ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
-            )
-            for agent_row in agent_rows:
-                occupied_slots = await agent_row.get_occupied_slots(
-                    graph_ctx.db, AgentId(agent_row.id), known_slot_types
-                )
-                total_occupied_slots += occupied_slots
-                total_available_slots += agent_row.available_slots
+            for row in result:
+                total_available_slots[row.slot_name] = row.total_capacity
+                total_occupied_slots[row.slot_name] = row.total_used
 
             return {
                 "occupied_slots": total_occupied_slots.to_json(),
@@ -403,30 +400,35 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
         self, info: graphene.ResolveInfo
     ) -> Mapping[str, Any]:
         from ai.backend.manager.models.agent.row import AgentRow
-        from ai.backend.manager.models.kernel import (
-            AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-            KernelRow,
-        )
+        from ai.backend.manager.models.kernel import KernelRow
+        from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 
         graph_ctx: GraphQueryContext = info.context
         user = graph_ctx.user
-        async with graph_ctx.db.begin_readonly_session() as db_session:
-            query = (
-                sa.select(KernelRow)
-                .join(KernelRow.agent_row)
-                .where(
-                    sa.and_(
-                        KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES),
-                        KernelRow.user_uuid == user["uuid"],
-                        AgentRow.scaling_group == self.name,
-                    )
+        j = sa.join(
+            ResourceAllocationRow, KernelRow, ResourceAllocationRow.kernel_id == KernelRow.id
+        ).join(AgentRow, KernelRow.agent == AgentRow.id)
+        query = (
+            sa.select(
+                ResourceAllocationRow.slot_name,
+                sa.func.sum(ResourceAllocationRow.used).label("total"),
+            )
+            .select_from(j)
+            .where(
+                sa.and_(
+                    ResourceAllocationRow.free_at.is_(None),
+                    KernelRow.user_uuid == user["uuid"],
+                    AgentRow.scaling_group == self.name,
                 )
             )
-            result = await db_session.scalars(query)
-        kernel_rows = cast(list[KernelRow], result.all())
+            .group_by(ResourceAllocationRow.slot_name)
+        )
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            result = await db_session.execute(query)
         occupied_slots = ResourceSlot()
-        for kernel in kernel_rows:
-            occupied_slots += kernel.occupied_slots
+        for row in result:
+            if row.total is not None:
+                occupied_slots[row.slot_name] = row.total
         return occupied_slots.to_json()
 
     async def resolve_accelerator_quantum_size(self, info: graphene.ResolveInfo) -> float | None:

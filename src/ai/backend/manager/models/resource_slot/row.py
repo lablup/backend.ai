@@ -18,7 +18,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.manager.models.base import (
     GUID,
     Base,
+    PydanticColumn,
 )
+from ai.backend.manager.models.resource_slot.types import NumberFormat
 
 __all__ = (
     "ResourceSlotTypeRow",
@@ -37,8 +39,40 @@ class ResourceSlotTypeRow(Base):  # type: ignore[misc]
 
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     slot_type: Mapped[str] = mapped_column("slot_type", sa.String(length=16), nullable=False)
-    display_name: Mapped[str | None] = mapped_column(
-        "display_name", sa.String(length=128), nullable=True
+    display_name: Mapped[str] = mapped_column(
+        "display_name",
+        sa.String(length=128),
+        nullable=False,
+        default="",
+        server_default=sa.text("''"),
+    )
+    description: Mapped[str] = mapped_column(
+        "description",
+        sa.String(length=256),
+        nullable=False,
+        default="",
+        server_default=sa.text("''"),
+    )
+    display_unit: Mapped[str] = mapped_column(
+        "display_unit",
+        sa.String(length=32),
+        nullable=False,
+        default="",
+        server_default=sa.text("''"),
+    )
+    display_icon: Mapped[str] = mapped_column(
+        "display_icon",
+        sa.String(length=64),
+        nullable=False,
+        default="",
+        server_default=sa.text("''"),
+    )
+    number_format: Mapped[NumberFormat] = mapped_column(
+        "number_format",
+        PydanticColumn(NumberFormat),
+        nullable=False,
+        default=NumberFormat(),
+        server_default=sa.text(r"""'{"binary"\:false,"round_length"\:0}'::jsonb"""),
     )
     rank: Mapped[int] = mapped_column(
         "rank", sa.Integer, nullable=False, server_default=sa.text("0")

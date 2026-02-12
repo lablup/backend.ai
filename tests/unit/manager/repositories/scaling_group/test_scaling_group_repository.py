@@ -447,7 +447,9 @@ class TestScalingGroupRepositoryDB:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ScalingGroupRepository, None]:
         """Create ScalingGroupRepository instance with database"""
-        repo = ScalingGroupRepository(db=db_with_cleanup)
+        repo = ScalingGroupRepository(
+            db=db_with_cleanup,
+        )
         yield repo
 
     @pytest.fixture

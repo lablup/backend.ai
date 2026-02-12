@@ -16,7 +16,6 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
     selectinload,
-    with_loader_criteria,
 )
 from sqlalchemy.sql.expression import false, true
 
@@ -27,14 +26,13 @@ from ai.backend.manager.data.agent.types import (
     AgentDataForHeartbeatUpdate,
     AgentStatus,
 )
-from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.base import (
     Base,
     CurvePublicKeyColumn,
     EnumType,
     ResourceSlotColumn,
 )
-from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
@@ -47,6 +45,7 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission, ScalingGroupPermission
+from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
@@ -57,7 +56,6 @@ __all__: Sequence[str] = (
     "AgentRow",
     "agents",
     "list_schedulable_agents_by_sgroup",
-    "recalc_agent_resource_occupancy",
 )
 
 
@@ -116,22 +114,16 @@ class AgentRow(Base):  # type: ignore[misc]
     )
 
     kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="agent_row")
+    agent_resource_rows: Mapped[list[AgentResourceRow]] = relationship("AgentResourceRow")
     scaling_group_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow", back_populates="agents"
     )
 
     def actual_occupied_slots(self) -> ResourceSlot:
-        resource_occupied_kernel_rows = cast(
-            list[KernelRow],
-            [
-                kernel
-                for kernel in self.kernels
-                if kernel.status in KernelStatus.resource_occupied_statuses()
-            ],
-        )
-        return sum(
-            (kernel.occupied_slots for kernel in resource_occupied_kernel_rows), ResourceSlot()
-        )
+        occupied = ResourceSlot()
+        for resource_row in self.agent_resource_rows:
+            occupied[resource_row.slot_name] = resource_row.used
+        return occupied
 
     def to_data(self) -> AgentData:
         return AgentData(
@@ -205,16 +197,13 @@ class AgentRow(Base):  # type: ignore[misc]
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> ResourceSlot:
         async with db.begin_readonly_session() as db_session:
-            query = sa.select(KernelRow.occupied_slots).where(
-                sa.and_(
-                    KernelRow.agent == agent_id,
-                    KernelRow.status == KernelStatus.RUNNING,
-                )
+            query = sa.select(AgentResourceRow.slot_name, AgentResourceRow.used).where(
+                AgentResourceRow.agent_id == agent_id,
             )
-            kernel_slots = (await db_session.scalars(query)).all()
+            result = await db_session.execute(query)
             occupied_slots = ResourceSlot.from_known_slots(known_slot_types)
-            for slots in kernel_slots:
-                occupied_slots += slots
+            for row in result:
+                occupied_slots[row.slot_name] = row.used
             return occupied_slots
 
 
@@ -268,50 +257,6 @@ async def list_schedulable_agents_by_sgroup(
 
     result = await db_sess.execute(query)
     return result.scalars().all()
-
-
-async def recalc_agent_resource_occupancy(db_session: SASession, agent_id: AgentId) -> None:
-    _stmt = (
-        sa.select(KernelRow)
-        .where(
-            (KernelRow.agent == agent_id)
-            & (KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-        )
-        .options(load_only(KernelRow.occupied_slots))
-    )
-    kernel_rows = cast(list[KernelRow], (await db_session.scalars(_stmt)).all())
-    occupied_slots = ResourceSlot()
-    for row in kernel_rows:
-        occupied_slots += row.occupied_slots
-
-    _update_stmt = (
-        sa.update(AgentRow).values(occupied_slots=occupied_slots).where(AgentRow.id == agent_id)
-    )
-    await db_session.execute(_update_stmt)
-
-
-async def recalc_agent_resource_occupancy_using_orm(
-    db_session: SASession, agent_id: AgentId
-) -> None:
-    agent_query = (
-        sa.select(AgentRow)
-        .where(AgentRow.id == agent_id)
-        .options(
-            selectinload(AgentRow.kernels),
-            with_loader_criteria(
-                KernelRow, KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)
-            ),
-        )
-    )
-    occupied_slots = ResourceSlot()
-    agent_row = await db_session.scalar(agent_query)
-    if agent_row is None:
-        return
-    kernel_rows = agent_row.kernels
-    for kernel in kernel_rows:
-        if kernel.status in AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES:
-            occupied_slots += kernel.occupied_slots
-    agent_row.occupied_slots = occupied_slots
 
 
 type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList

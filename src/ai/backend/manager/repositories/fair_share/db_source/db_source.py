@@ -39,6 +39,7 @@ from ai.backend.manager.models.fair_share import (
     UserFairShareRow,
 )
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
     ProjectUsageBucketRow,
@@ -1254,24 +1255,33 @@ class FairShareDBSource:
     ) -> ResourceSlot:
         """Fetch total available slots from all ALIVE schedulable agents.
 
+        Uses normalized agent_resources table to sum capacity per slot.
+
         Args:
             db_sess: Database session
             resource_group: Scaling group name
 
         Returns:
-            Sum of available_slots from all ALIVE schedulable agents
+            Sum of capacity from all ALIVE schedulable agents
         """
-        result = await db_sess.execute(
-            sa.select(AgentRow.available_slots).where(
+        j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id)
+        query = (
+            sa.select(
+                AgentResourceRow.slot_name,
+                sa.func.sum(AgentResourceRow.capacity).label("total_capacity"),
+            )
+            .select_from(j)
+            .where(
                 AgentRow.scaling_group == resource_group,
                 AgentRow.status == AgentStatus.ALIVE,
                 AgentRow.schedulable.is_(True),
             )
+            .group_by(AgentResourceRow.slot_name)
         )
+        result = await db_sess.execute(query)
         total_slots = ResourceSlot()
         for row in result:
-            if row.available_slots:
-                total_slots += row.available_slots
+            total_slots[row.slot_name] = row.total_capacity
         return total_slots
 
     def _create_default_fair_share_data(
@@ -1419,31 +1429,37 @@ class FairShareDBSource:
         db_sess: SASession,
         scaling_group: str,
     ) -> ResourceSlot:
-        """Fetch total available slots from ALIVE schedulable agents in scaling group.
+        """Fetch total capacity from ALIVE schedulable agents in scaling group.
+
+        Uses normalized agent_resources table to sum capacity per slot.
 
         Args:
             db_sess: Database session
             scaling_group: The scaling group name
 
         Returns:
-            Sum of available_slots from all ALIVE schedulable agents
+            Sum of capacity from all ALIVE schedulable agents
         """
-        query = sa.select(AgentRow.available_slots).where(
-            sa.and_(
-                AgentRow.scaling_group == scaling_group,
-                AgentRow.status == AgentStatus.ALIVE,
-                AgentRow.schedulable == sa.true(),
+        j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id)
+        query = (
+            sa.select(
+                AgentResourceRow.slot_name,
+                sa.func.sum(AgentResourceRow.capacity).label("total_capacity"),
             )
+            .select_from(j)
+            .where(
+                sa.and_(
+                    AgentRow.scaling_group == scaling_group,
+                    AgentRow.status == AgentStatus.ALIVE,
+                    AgentRow.schedulable == sa.true(),
+                )
+            )
+            .group_by(AgentResourceRow.slot_name)
         )
         result = await db_sess.execute(query)
-        available_slots_list = result.scalars().all()
-
-        # Sum all available_slots in Python (JSONB aggregation not straightforward in SQL)
         total_capacity = ResourceSlot()
-        for slots in available_slots_list:
-            if slots:
-                total_capacity = total_capacity + slots
-
+        for row in result:
+            total_capacity[row.slot_name] = row.total_capacity
         return total_capacity
 
     async def _fetch_cluster_capacities_batch(
@@ -1451,36 +1467,42 @@ class FairShareDBSource:
         db_sess: SASession,
         scaling_groups: Sequence[str],
     ) -> dict[str, ResourceSlot]:
-        """Fetch total available slots for multiple scaling groups.
+        """Fetch total capacity for multiple scaling groups.
+
+        Uses normalized agent_resources table to sum capacity per slot per scaling group.
 
         Args:
             db_sess: Database session
             scaling_groups: List of scaling group names
 
         Returns:
-            Mapping from scaling group name to its cluster capacity (sum of available_slots)
+            Mapping from scaling group name to its cluster capacity (sum of capacity)
         """
         if not scaling_groups:
             return {}
 
-        # Query all agents in the given scaling groups
-        query = sa.select(
-            AgentRow.scaling_group,
-            AgentRow.available_slots,
-        ).where(
-            sa.and_(
-                AgentRow.scaling_group.in_(scaling_groups),
-                AgentRow.status == AgentStatus.ALIVE,
-                AgentRow.schedulable == sa.true(),
+        j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id)
+        query = (
+            sa.select(
+                AgentRow.scaling_group,
+                AgentResourceRow.slot_name,
+                sa.func.sum(AgentResourceRow.capacity).label("total_capacity"),
             )
+            .select_from(j)
+            .where(
+                sa.and_(
+                    AgentRow.scaling_group.in_(scaling_groups),
+                    AgentRow.status == AgentStatus.ALIVE,
+                    AgentRow.schedulable == sa.true(),
+                )
+            )
+            .group_by(AgentRow.scaling_group, AgentResourceRow.slot_name)
         )
         result = await db_sess.execute(query)
 
-        # Group by scaling_group and sum available_slots
         capacities: dict[str, ResourceSlot] = {sg: ResourceSlot() for sg in scaling_groups}
         for row in result:
-            if row.available_slots:
-                capacities[row.scaling_group] = capacities[row.scaling_group] + row.available_slots
+            capacities[row.scaling_group][row.slot_name] = row.total_capacity
 
         return capacities
 

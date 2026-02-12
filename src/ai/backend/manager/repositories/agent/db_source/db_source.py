@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.orm import selectinload, with_loader_criteria
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common.exception import AgentNotFound
 from ai.backend.common.types import AgentId, ImageID
@@ -17,15 +17,15 @@ from ai.backend.manager.data.agent.types import (
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
-from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
 from ai.backend.manager.models.agent import AgentRow, agents
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
+from ai.backend.manager.repositories.base import BulkUpserter, execute_bulk_upserter
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
@@ -80,7 +80,7 @@ class AgentDBSource:
             agent_row: AgentRow | None = await db_session.scalar(
                 sa.select(AgentRow)
                 .where(AgentRow.id == agent_id)
-                .options(selectinload(AgentRow.kernels))
+                .options(selectinload(AgentRow.agent_resource_rows))
             )
             if agent_row is None:
                 log.error("Agent with id {} not found", agent_id)
@@ -150,11 +150,7 @@ class AgentDBSource:
 
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(AgentRow).options(
-                selectinload(AgentRow.kernels),
-                with_loader_criteria(
-                    KernelRow,
-                    KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
-                ),
+                selectinload(AgentRow.agent_resource_rows),
             )
 
             result = await execute_batch_querier(
@@ -176,3 +172,23 @@ class AgentDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    async def upsert_agent_resource_capacity(
+        self,
+        bulk_upserter: BulkUpserter[AgentResourceRow],
+    ) -> int:
+        """Bulk UPSERT agent resource capacity rows.
+
+        On INSERT: sets capacity (used defaults to 0).
+        On CONFLICT: updates capacity only.
+
+        Returns:
+            Number of rows upserted.
+        """
+        async with self._db.begin_session_read_committed() as db_sess:
+            result = await execute_bulk_upserter(
+                db_sess,
+                bulk_upserter,
+                index_elements=["agent_id", "slot_name"],
+            )
+            return result.upserted_count

@@ -16,6 +16,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
+    NumberFormat,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
@@ -63,7 +64,7 @@ class TestResourceSlotTypeRow:
                 db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="bytes"))
                 await db_sess.flush()
 
-    async def test_nullable_display_fields(
+    async def test_default_display_fields(
         self,
         database_with_resource_slot_tables: ExtendedAsyncSAEngine,
     ) -> None:
@@ -79,7 +80,11 @@ class TestResourceSlotTypeRow:
         async with database_with_resource_slot_tables.begin_session() as db_sess:
             row = await db_sess.get(ResourceSlotTypeRow, "custom.device")
             assert row is not None
-            assert row.display_name is None
+            assert row.display_name == ""
+            assert row.description == ""
+            assert row.display_unit == ""
+            assert row.display_icon == ""
+            assert row.number_format == NumberFormat()
 
     async def test_server_defaults(
         self,

@@ -7,7 +7,6 @@ from .row import (
     AgentRow,
     agents,
     list_schedulable_agents_by_sgroup,
-    recalc_agent_resource_occupancy,
 )
 from .row import (
     get_permission_ctx as get_permission_ctx,
@@ -20,5 +19,4 @@ __all__ = (
     "AgentStatus",
     "agents",
     "list_schedulable_agents_by_sgroup",
-    "recalc_agent_resource_occupancy",
 )

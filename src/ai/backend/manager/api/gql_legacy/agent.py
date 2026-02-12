@@ -15,7 +15,6 @@ import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.orm import contains_eager
 
 from ai.backend.common.types import (
     AccessKey,
@@ -35,7 +34,6 @@ from ai.backend.manager.models.agent import (
     get_permission_ctx,
 )
 from ai.backend.manager.models.group import AssocGroupUserRow
-from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
@@ -735,19 +733,8 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[Self | None]:
         query = (
             sa.select(AgentRow)
-            .select_from(
-                sa.join(
-                    AgentRow,
-                    KernelRow,
-                    sa.and_(
-                        AgentRow.id == KernelRow.agent,
-                        KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
-                    ),
-                    isouter=True,
-                )
-            )
             .where(AgentRow.id.in_(agent_ids))
-            .options(contains_eager(AgentRow.kernels))
+            .options(sa.orm.selectinload(AgentRow.agent_resource_rows))
             .order_by(
                 AgentRow.id,
             )
