@@ -621,8 +621,13 @@ class TestAgentDBSourceKernelFiltering:
                 KernelRow,
                 RoutingRow,
                 ResourcePresetRow,
+                ResourceSlotTypeRow,
+                AgentResourceRow,
             ],
         ):
+            # Seed default resource slot types
+            async with database_connection.begin_session() as db_sess:
+                db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count", rank=0))
             yield database_connection
 
     @pytest.fixture
@@ -744,6 +749,18 @@ class TestAgentDBSourceKernelFiltering:
                 auto_terminate_abusing_kernel=False,
             )
             db_sess.add(agent)
+            await db_sess.flush()
+
+            # Seed AgentResourceRow with expected occupied value
+            expected_used = test_case.cpu_per_kernel * test_case.occupied_kernel_count
+            db_sess.add(
+                AgentResourceRow(
+                    agent_id=actual_agent_id,
+                    slot_name="cpu",
+                    capacity=Decimal("16"),
+                    used=expected_used,
+                )
+            )
             await db_sess.flush()
 
             # Create session for all kernels

@@ -31,6 +31,7 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForProjectRow,
@@ -93,6 +94,8 @@ class TestFairShareRepository:
                 SessionRow,
                 KernelRow,
                 ResourcePresetRow,
+                ResourceSlotTypeRow,
+                AgentResourceRow,
                 # Fair Share rows (no FK constraints but need mapper registration)
                 DomainFairShareRow,
                 ProjectFairShareRow,

@@ -36,6 +36,7 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForProjectRow,
@@ -90,6 +91,8 @@ class TestSearchDomainFairSharesEntityBased:
                 ScalingGroupForProjectRow,
                 AssocGroupUserRow,
                 AgentRow,  # Required for _fetch_available_slots()
+                ResourceSlotTypeRow,
+                AgentResourceRow,
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
@@ -495,6 +498,8 @@ class TestSearchProjectFairSharesEntityBased:
                 ScalingGroupForProjectRow,
                 AssocGroupUserRow,
                 AgentRow,  # Required for _fetch_available_slots()
+                ResourceSlotTypeRow,
+                AgentResourceRow,
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
@@ -777,6 +782,8 @@ class TestSearchUserFairSharesEntityBased:
                 ScalingGroupForProjectRow,
                 AssocGroupUserRow,
                 AgentRow,  # Required for _fetch_available_slots()
+                ResourceSlotTypeRow,
+                AgentResourceRow,
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,

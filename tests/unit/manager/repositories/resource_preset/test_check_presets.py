@@ -55,6 +55,11 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_slot import (
+    AgentResourceRow,
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupOpts,
@@ -112,12 +117,21 @@ class TestCheckPresetsOccupiedSlots:
                 KernelRow,
                 RoutingRow,
                 ResourcePresetRow,
+                ResourceSlotTypeRow,
+                AgentResourceRow,
+                ResourceAllocationRow,
                 sgroups_for_domains,  # association table
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
                 association_groups_users,  # association table
             ],
         ):
+            # Seed default resource slot types (FK target for normalized tables)
+            async with database_connection.begin_session() as db_sess:
+                for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
+                    db_sess.add(
+                        ResourceSlotTypeRow(slot_name=slot_name, slot_type=slot_type, rank=0)
+                    )
             yield database_connection
 
     @pytest.fixture
@@ -376,6 +390,14 @@ class TestCheckPresetsOccupiedSlots:
     ) -> AgentId:
         """Helper method to create an agent with specified status and resources."""
         agent_id = AgentId(f"agent-{status.name.lower()}-{uuid.uuid4().hex[:8]}")
+        _available = available_slots or ResourceSlot({
+            "cpu": Decimal("16"),
+            "mem": Decimal("32768"),
+        })
+        _occupied = occupied_slots or ResourceSlot({
+            "cpu": Decimal("0"),
+            "mem": Decimal("0"),
+        })
         async with db.begin_session() as db_sess:
             agent = AgentRow(
                 id=agent_id,
@@ -384,15 +406,24 @@ class TestCheckPresetsOccupiedSlots:
                 region="test-region",
                 scaling_group=scaling_group_name,
                 schedulable=schedulable,
-                available_slots=available_slots
-                or ResourceSlot({"cpu": Decimal("16"), "mem": Decimal("32768")}),
-                occupied_slots=occupied_slots
-                or ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
+                available_slots=_available,
+                occupied_slots=_occupied,
                 addr=addr,
                 version="v25.03.0",
                 architecture="x86_64",
             )
             db_sess.add(agent)
+            await db_sess.flush()
+            # Seed normalized agent_resources rows
+            for slot_name, capacity in _available.items():
+                db_sess.add(
+                    AgentResourceRow(
+                        agent_id=agent_id,
+                        slot_name=slot_name,
+                        capacity=Decimal(str(capacity)),
+                        used=Decimal(str(_occupied.get(slot_name, 0))),
+                    )
+                )
             await db_sess.flush()
         return agent_id
 
@@ -608,6 +639,27 @@ class TestCheckPresetsOccupiedSlots:
             db_sess.add(session)
             db_sess.add(kernel)
             await db_sess.flush()
+            # Seed normalized resource_allocations for this kernel
+            for slot_name, value in kernel.occupied_slots.items():
+                db_sess.add(
+                    ResourceAllocationRow(
+                        kernel_id=kernel.id,
+                        slot_name=slot_name,
+                        requested=Decimal(str(value)),
+                        used=Decimal(str(value)),
+                    )
+                )
+            # Update AgentResourceRow.used to match kernel occupied slots
+            for slot_name, value in kernel.occupied_slots.items():
+                await db_sess.execute(
+                    sa.update(AgentResourceRow)
+                    .where(
+                        (AgentResourceRow.agent_id == test_agent_id)
+                        & (AgentResourceRow.slot_name == slot_name)
+                    )
+                    .values(used=Decimal(str(value)))
+                )
+            await db_sess.flush()
 
         # Test: Repository.check_presets should calculate from kernel (cache miss → DB)
         # Get group name for the API call
@@ -720,6 +772,25 @@ class TestCheckPresetsOccupiedSlots:
             db_sess.add(session)
             db_sess.add(kernel)
             await db_sess.flush()
+            for slot_name, value in kernel.occupied_slots.items():
+                db_sess.add(
+                    ResourceAllocationRow(
+                        kernel_id=kernel.id,
+                        slot_name=slot_name,
+                        requested=Decimal(str(value)),
+                        used=Decimal(str(value)),
+                    )
+                )
+            for slot_name, value in kernel.occupied_slots.items():
+                await db_sess.execute(
+                    sa.update(AgentResourceRow)
+                    .where(
+                        (AgentResourceRow.agent_id == test_agent_id)
+                        & (AgentResourceRow.slot_name == slot_name)
+                    )
+                    .values(used=Decimal(str(value)))
+                )
+            await db_sess.flush()
 
         # Test: Repository.check_presets should include TERMINATING kernels
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -831,6 +902,17 @@ class TestCheckPresetsOccupiedSlots:
             db_sess.add(session)
             db_sess.add(kernel)
             await db_sess.flush()
+            # PENDING kernel: allocation exists with requested but no used
+            for slot_name, value in kernel.requested_slots.items():
+                db_sess.add(
+                    ResourceAllocationRow(
+                        kernel_id=kernel.id,
+                        slot_name=slot_name,
+                        requested=Decimal(str(value)),
+                        used=None,
+                    )
+                )
+            await db_sess.flush()
 
         # Test: Repository.check_presets should ignore PENDING kernels
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -910,6 +992,17 @@ class TestCheckPresetsOccupiedSlots:
             )
             db_sess.add(agent)
             await db_sess.flush()
+            # Seed normalized agent_resources (ACTUAL occupied = 3 CPU, 6144 mem)
+            for slot_name, capacity in agent.available_slots.items():
+                db_sess.add(
+                    AgentResourceRow(
+                        agent_id=agent_id,
+                        slot_name=slot_name,
+                        capacity=Decimal(str(capacity)),
+                        used=Decimal("0"),
+                    )
+                )
+            await db_sess.flush()
 
             # Create session and RUNNING kernel with ACTUAL occupied slots
             session_id = SessionId(uuid.uuid4())
@@ -968,6 +1061,26 @@ class TestCheckPresetsOccupiedSlots:
 
             db_sess.add(session)
             db_sess.add(kernel)
+            await db_sess.flush()
+            for slot_name, value in kernel.occupied_slots.items():
+                db_sess.add(
+                    ResourceAllocationRow(
+                        kernel_id=kernel.id,
+                        slot_name=slot_name,
+                        requested=Decimal(str(value)),
+                        used=Decimal(str(value)),
+                    )
+                )
+            # Update AgentResourceRow.used to match ACTUAL kernel occupied (3 CPU, 6144 mem)
+            for slot_name, value in kernel.occupied_slots.items():
+                await db_sess.execute(
+                    sa.update(AgentResourceRow)
+                    .where(
+                        (AgentResourceRow.agent_id == agent_id)
+                        & (AgentResourceRow.slot_name == slot_name)
+                    )
+                    .values(used=Decimal(str(value)))
+                )
             await db_sess.flush()
 
         # Test: Repository.check_presets should use ACTUAL kernel occupied slots, not cached agent value
