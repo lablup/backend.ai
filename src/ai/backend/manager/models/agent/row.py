@@ -26,7 +26,6 @@ from ai.backend.manager.data.agent.types import (
     AgentDataForHeartbeatUpdate,
     AgentStatus,
 )
-from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.base import (
     Base,
     CurvePublicKeyColumn,
@@ -46,6 +45,7 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission, ScalingGroupPermission
+from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
@@ -114,22 +114,16 @@ class AgentRow(Base):  # type: ignore[misc]
     )
 
     kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="agent_row")
+    agent_resource_rows: Mapped[list[AgentResourceRow]] = relationship("AgentResourceRow")
     scaling_group_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow", back_populates="agents"
     )
 
     def actual_occupied_slots(self) -> ResourceSlot:
-        resource_occupied_kernel_rows = cast(
-            list[KernelRow],
-            [
-                kernel
-                for kernel in self.kernels
-                if kernel.status in KernelStatus.resource_occupied_statuses()
-            ],
-        )
-        return sum(
-            (kernel.occupied_slots for kernel in resource_occupied_kernel_rows), ResourceSlot()
-        )
+        occupied = ResourceSlot()
+        for resource_row in self.agent_resource_rows:
+            occupied[resource_row.slot_name] = resource_row.used
+        return occupied
 
     def to_data(self) -> AgentData:
         return AgentData(
@@ -203,16 +197,13 @@ class AgentRow(Base):  # type: ignore[misc]
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> ResourceSlot:
         async with db.begin_readonly_session() as db_session:
-            query = sa.select(KernelRow.occupied_slots).where(
-                sa.and_(
-                    KernelRow.agent == agent_id,
-                    KernelRow.status == KernelStatus.RUNNING,
-                )
+            query = sa.select(AgentResourceRow.slot_name, AgentResourceRow.used).where(
+                AgentResourceRow.agent_id == agent_id,
             )
-            kernel_slots = (await db_session.scalars(query)).all()
+            result = await db_session.execute(query)
             occupied_slots = ResourceSlot.from_known_slots(known_slot_types)
-            for slots in kernel_slots:
-                occupied_slots += slots
+            for row in result:
+                occupied_slots[row.slot_name] = row.used
             return occupied_slots
 
 

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.orm import selectinload, with_loader_criteria
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common.exception import AgentNotFound
 from ai.backend.common.types import AgentId, ImageID
@@ -17,12 +17,10 @@ from ai.backend.manager.data.agent.types import (
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
-from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
 from ai.backend.manager.models.agent import AgentRow, agents
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -82,7 +80,7 @@ class AgentDBSource:
             agent_row: AgentRow | None = await db_session.scalar(
                 sa.select(AgentRow)
                 .where(AgentRow.id == agent_id)
-                .options(selectinload(AgentRow.kernels))
+                .options(selectinload(AgentRow.agent_resource_rows))
             )
             if agent_row is None:
                 log.error("Agent with id {} not found", agent_id)
@@ -152,11 +150,7 @@ class AgentDBSource:
 
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(AgentRow).options(
-                selectinload(AgentRow.kernels),
-                with_loader_criteria(
-                    KernelRow,
-                    KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
-                ),
+                selectinload(AgentRow.agent_resource_rows),
             )
 
             result = await execute_batch_querier(

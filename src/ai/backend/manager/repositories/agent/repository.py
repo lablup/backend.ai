@@ -3,7 +3,6 @@ from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
 import sqlalchemy as sa
-from sqlalchemy.orm import contains_eager
 
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
@@ -24,9 +23,7 @@ from ai.backend.manager.data.agent.types import (
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
-from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
@@ -195,22 +192,8 @@ class AgentRepository:
         conditions: Sequence[QueryCondition],
         order_by: Sequence[QueryOrder] = tuple(),
     ) -> list[AgentData]:
-        stmt: sa.sql.Select[Any] = (
-            sa.select(AgentRow)
-            .select_from(
-                sa.join(
-                    AgentRow,
-                    KernelRow,
-                    sa.and_(
-                        AgentRow.id == KernelRow.agent,
-                        KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
-                    ),
-                    isouter=True,
-                )
-            )
-            .options(
-                contains_eager(AgentRow.kernels),
-            )
+        stmt: sa.sql.Select[Any] = sa.select(AgentRow).options(
+            sa.orm.selectinload(AgentRow.agent_resource_rows),
         )
         for cond in conditions:
             stmt = stmt.where(cond())
