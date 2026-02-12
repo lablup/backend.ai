@@ -7,6 +7,8 @@ from .entity import (
 )
 from .permission import (
     CreatePermissionInput,
+    DeletePermissionInput,
+    DeletePermissionPayload,
     EntityTypeGQL,
     OperationTypeGQL,
     PermissionConnection,
@@ -19,6 +21,10 @@ from .permission import (
 from .role import (
     AssignRoleInput,
     CreateRoleInput,
+    DeleteRoleInput,
+    DeleteRolePayload,
+    PurgeRoleInput,
+    PurgeRolePayload,
     RevokeRoleInput,
     RoleAssignmentConnection,
     RoleAssignmentEdge,
@@ -57,10 +63,17 @@ __all__ = [
     "RoleOrderBy",
     # Inputs
     "CreatePermissionInput",
+    "DeletePermissionInput",
     "CreateRoleInput",
     "UpdateRoleInput",
+    "DeleteRoleInput",
+    "PurgeRoleInput",
     "AssignRoleInput",
     "RevokeRoleInput",
+    # Payloads
+    "DeletePermissionPayload",
+    "DeleteRolePayload",
+    "PurgeRolePayload",
     # Connections
     "PermissionConnection",
     "PermissionEdge",

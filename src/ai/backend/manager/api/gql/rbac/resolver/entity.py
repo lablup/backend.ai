@@ -9,7 +9,9 @@ from ai.backend.manager.api.gql.rbac.types import EntityConnection, EntityTypeGQ
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
-@strawberry.field(description="Added in 26.3.0. Search entities by type (admin only).")  # type: ignore[misc]
+@strawberry.field(
+    description="Added in 26.3.0. Search entities by type (admin only). Only entity_type selection and pagination are supported. Use each entity's dedicated query for detailed options."
+)  # type: ignore[misc]
 async def admin_entities(
     info: Info[StrawberryGQLContext],
     entity_type: EntityTypeGQL,
@@ -20,4 +22,11 @@ async def admin_entities(
     limit: int | None = None,
     offset: int | None = None,
 ) -> EntityConnection:
+    """Search entities by type with pagination only.
+
+    Per-entity filtering and ordering are not provided because EntityNode
+    is a union of 15+ types, making a common filter schema impractical.
+    Use dedicated root queries (e.g., admin_users, admin_projects) for
+    detailed options including filtering and ordering.
+    """
     raise NotImplementedError

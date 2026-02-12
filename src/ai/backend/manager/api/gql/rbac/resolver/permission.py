@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import uuid
-
 import strawberry
 from strawberry import Info
 
 from ai.backend.manager.api.gql.rbac.types import (
     CreatePermissionInput,
+    DeletePermissionInput,
+    DeletePermissionPayload,
     EntityTypeGQL,
     PermissionConnection,
     PermissionFilter,
@@ -65,6 +65,6 @@ async def admin_create_permission(
 @strawberry.mutation(description="Added in 26.3.0. Delete a scoped permission (admin only).")  # type: ignore[misc]
 async def admin_delete_permission(
     info: Info[StrawberryGQLContext],
-    id: uuid.UUID,
-) -> PermissionGQL:
+    input: DeletePermissionInput,
+) -> DeletePermissionPayload:
     raise NotImplementedError

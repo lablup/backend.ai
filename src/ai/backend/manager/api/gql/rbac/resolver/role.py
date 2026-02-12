@@ -10,6 +10,10 @@ from strawberry import Info
 from ai.backend.manager.api.gql.rbac.types import (
     AssignRoleInput,
     CreateRoleInput,
+    DeleteRoleInput,
+    DeleteRolePayload,
+    PurgeRoleInput,
+    PurgeRolePayload,
     RevokeRoleInput,
     RoleAssignmentConnection,
     RoleAssignmentFilter,
@@ -88,16 +92,16 @@ async def admin_update_role(
 @strawberry.mutation(description="Added in 26.3.0. Soft-delete a role (admin only).")  # type: ignore[misc]
 async def admin_delete_role(
     info: Info[StrawberryGQLContext],
-    id: uuid.UUID,
-) -> RoleGQL:
+    input: DeleteRoleInput,
+) -> DeleteRolePayload:
     raise NotImplementedError
 
 
 @strawberry.mutation(description="Added in 26.3.0. Permanently remove a role (admin only).")  # type: ignore[misc]
 async def admin_purge_role(
     info: Info[StrawberryGQLContext],
-    id: uuid.UUID,
-) -> RoleGQL:
+    input: PurgeRoleInput,
+) -> PurgeRolePayload:
     raise NotImplementedError
 
 

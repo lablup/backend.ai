@@ -19,6 +19,7 @@ from ai.backend.manager.api.gql.rbac.types import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.permission_controller.options import (
     AssignedUserConditions,
     AssignedUserOrders,
@@ -66,6 +67,7 @@ async def fetch_roles(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
+    base_conditions: list[QueryCondition] | None = None,
 ) -> RoleConnection:
     raise NotImplementedError
 
@@ -79,5 +81,6 @@ async def fetch_role_assignments(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
+    base_conditions: list[QueryCondition] | None = None,
 ) -> RoleAssignmentConnection:
     raise NotImplementedError

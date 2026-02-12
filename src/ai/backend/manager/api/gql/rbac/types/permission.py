@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 # ==================== Enums ====================
 
 
-@strawberry.enum(name="EntityType", description="RBAC entity type")
+@strawberry.enum(name="EntityType", description="Added in 26.3.0. RBAC entity type")
 class EntityTypeGQL(StrEnum):
     USER = "user"
     PROJECT = "project"
@@ -74,7 +74,7 @@ class EntityTypeGQL(StrEnum):
         return ScopeType(self.value)
 
 
-@strawberry.enum(name="OperationType", description="RBAC operation type")
+@strawberry.enum(name="OperationType", description="Added in 26.3.0. RBAC operation type")
 class OperationTypeGQL(StrEnum):
     CREATE = "create"
     READ = "read"
@@ -95,7 +95,7 @@ class OperationTypeGQL(StrEnum):
         return OperationType(self.value)
 
 
-@strawberry.enum
+@strawberry.enum(description="Added in 26.3.0. Permission ordering field")
 class PermissionOrderField(StrEnum):
     ID = "id"
     ENTITY_TYPE = "entity_type"
@@ -104,7 +104,7 @@ class PermissionOrderField(StrEnum):
 # ==================== Node Types ====================
 
 
-@strawberry.type(description="RBAC scoped permission")
+@strawberry.type(description="Added in 26.3.0. RBAC scoped permission")
 class PermissionGQL(Node):
     id: NodeID[str]
     role_id: uuid.UUID
@@ -160,7 +160,7 @@ class PermissionGQL(Node):
 # ==================== Filter Types ====================
 
 
-@strawberry.input(description="Filter for scoped permissions")
+@strawberry.input(description="Added in 26.3.0. Filter for scoped permissions")
 class PermissionFilter(GQLFilter):
     role_id: uuid.UUID | None = None
     scope_type: EntityTypeGQL | None = None
@@ -189,7 +189,7 @@ class PermissionFilter(GQLFilter):
 # ==================== OrderBy Types ====================
 
 
-@strawberry.input(description="Order by specification for permissions")
+@strawberry.input(description="Added in 26.3.0. Order by specification for permissions")
 class PermissionOrderBy(GQLOrderBy):
     field: PermissionOrderField
     direction: OrderDirection = OrderDirection.DESC
@@ -207,7 +207,7 @@ class PermissionOrderBy(GQLOrderBy):
 # ==================== Input Types ====================
 
 
-@strawberry.input(description="Input for creating a scoped permission")
+@strawberry.input(description="Added in 26.3.0. Input for creating a scoped permission")
 class CreatePermissionInput:
     role_id: uuid.UUID
     scope_type: EntityTypeGQL
@@ -227,13 +227,26 @@ class CreatePermissionInput:
         )
 
 
+@strawberry.input(description="Added in 26.3.0. Input for deleting a scoped permission")
+class DeletePermissionInput:
+    id: uuid.UUID
+
+
+# ==================== Payload Types ====================
+
+
+@strawberry.type(description="Added in 26.3.0. Payload for delete permission mutation")
+class DeletePermissionPayload:
+    id: ID
+
+
 # ==================== Connection Types ====================
 
 
 PermissionEdge = Edge[PermissionGQL]
 
 
-@strawberry.type(description="Permission connection")
+@strawberry.type(description="Added in 26.3.0. Permission connection")
 class PermissionConnection(Connection[PermissionGQL]):
     count: int
 

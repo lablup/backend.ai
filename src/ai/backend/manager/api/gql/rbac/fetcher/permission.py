@@ -14,6 +14,7 @@ from ai.backend.manager.api.gql.rbac.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.permission_controller.options import (
     ScopedPermissionConditions,
     ScopedPermissionOrders,
@@ -41,5 +42,6 @@ async def fetch_permissions(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
+    base_conditions: list[QueryCondition] | None = None,
 ) -> PermissionConnection:
     raise NotImplementedError

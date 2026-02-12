@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 # ==================== Enums ====================
 
 
-@strawberry.enum(name="RoleSource", description="Role definition source")
+@strawberry.enum(name="RoleSource", description="Added in 26.3.0. Role definition source")
 class RoleSourceGQL(StrEnum):
     SYSTEM = "system"
     CUSTOM = "custom"
@@ -59,7 +59,7 @@ class RoleSourceGQL(StrEnum):
         return RoleSource(self.value)
 
 
-@strawberry.enum(name="RoleStatus", description="Role status")
+@strawberry.enum(name="RoleStatus", description="Added in 26.3.0. Role status")
 class RoleStatusGQL(StrEnum):
     ACTIVE = "active"
     INACTIVE = "inactive"
@@ -73,7 +73,7 @@ class RoleStatusGQL(StrEnum):
         return RoleStatus(self.value)
 
 
-@strawberry.enum
+@strawberry.enum(description="Added in 26.3.0. Role ordering field")
 class RoleOrderField(StrEnum):
     NAME = "name"
     CREATED_AT = "created_at"
@@ -83,7 +83,7 @@ class RoleOrderField(StrEnum):
 # ==================== Node Types ====================
 
 
-@strawberry.type(description="RBAC role")
+@strawberry.type(description="Added in 26.3.0. RBAC role")
 class RoleGQL(Node):
     id: NodeID[str]
     name: str
@@ -118,7 +118,7 @@ class RoleGQL(Node):
         )
 
 
-@strawberry.type(description="RBAC role assignment (user-role association)")
+@strawberry.type(description="Added in 26.3.0. RBAC role assignment (user-role association)")
 class RoleAssignmentGQL(Node):
     id: NodeID[str]
     user_id: uuid.UUID = strawberry.field(description="The assigned user ID.")
@@ -188,7 +188,7 @@ class RoleAssignmentGQL(Node):
 # ==================== Filter Types ====================
 
 
-@strawberry.input(description="Filter for roles")
+@strawberry.input(description="Added in 26.3.0. Filter for roles")
 class RoleFilter(GQLFilter):
     name: StringFilter | None = None
     source: list[RoleSourceGQL] | None = None
@@ -224,7 +224,7 @@ class RoleFilter(GQLFilter):
 # TODO: Add user_id filter (requires AssignedUserConditions.by_user_id)
 
 
-@strawberry.input(description="Filter for role assignments")
+@strawberry.input(description="Added in 26.3.0. Filter for role assignments")
 class RoleAssignmentFilter(GQLFilter):
     role_id: uuid.UUID | None = None
 
@@ -241,7 +241,7 @@ class RoleAssignmentFilter(GQLFilter):
 # ==================== OrderBy Types ====================
 
 
-@strawberry.input(description="Order by specification for roles")
+@strawberry.input(description="Added in 26.3.0. Order by specification for roles")
 class RoleOrderBy(GQLOrderBy):
     field: RoleOrderField
     direction: OrderDirection = OrderDirection.DESC
@@ -261,7 +261,7 @@ class RoleOrderBy(GQLOrderBy):
 # ==================== Input Types ====================
 
 
-@strawberry.input(description="Input for creating a role")
+@strawberry.input(description="Added in 26.3.0. Input for creating a role")
 class CreateRoleInput:
     name: str
     description: str | None = None
@@ -278,7 +278,7 @@ class CreateRoleInput:
         )
 
 
-@strawberry.input(description="Input for updating a role")
+@strawberry.input(description="Added in 26.3.0. Input for updating a role")
 class UpdateRoleInput:
     id: uuid.UUID
     name: str | None = None
@@ -296,7 +296,7 @@ class UpdateRoleInput:
         return Updater(spec=spec, pk_value=self.id)
 
 
-@strawberry.input(description="Input for assigning a role to a user")
+@strawberry.input(description="Added in 26.3.0. Input for assigning a role to a user")
 class AssignRoleInput:
     user_id: uuid.UUID
     role_id: uuid.UUID
@@ -308,7 +308,7 @@ class AssignRoleInput:
         )
 
 
-@strawberry.input(description="Input for revoking a role from a user")
+@strawberry.input(description="Added in 26.3.0. Input for revoking a role from a user")
 class RevokeRoleInput:
     user_id: uuid.UUID
     role_id: uuid.UUID
@@ -320,13 +320,36 @@ class RevokeRoleInput:
         )
 
 
+@strawberry.input(description="Added in 26.3.0. Input for soft-deleting a role")
+class DeleteRoleInput:
+    id: uuid.UUID
+
+
+@strawberry.input(description="Added in 26.3.0. Input for purging a role")
+class PurgeRoleInput:
+    id: uuid.UUID
+
+
+# ==================== Payload Types ====================
+
+
+@strawberry.type(description="Added in 26.3.0. Payload for delete role mutation")
+class DeleteRolePayload:
+    id: ID
+
+
+@strawberry.type(description="Added in 26.3.0. Payload for purge role mutation")
+class PurgeRolePayload:
+    id: ID
+
+
 # ==================== Connection Types ====================
 
 
 RoleEdge = Edge[RoleGQL]
 
 
-@strawberry.type(description="Role connection")
+@strawberry.type(description="Added in 26.3.0. Role connection")
 class RoleConnection(Connection[RoleGQL]):
     count: int
 
@@ -338,7 +361,7 @@ class RoleConnection(Connection[RoleGQL]):
 RoleAssignmentEdge = Edge[RoleAssignmentGQL]
 
 
-@strawberry.type(description="Role assignment connection")
+@strawberry.type(description="Added in 26.3.0. Role assignment connection")
 class RoleAssignmentConnection(Connection[RoleAssignmentGQL]):
     count: int
 
