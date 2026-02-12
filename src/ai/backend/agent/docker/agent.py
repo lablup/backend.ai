@@ -10,6 +10,7 @@ import secrets
 import shutil
 import signal
 import struct
+import subprocess
 import sys
 from collections.abc import AsyncGenerator, Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
@@ -99,6 +100,7 @@ from ai.backend.agent.types import (
 from ai.backend.agent.utils import (
     closing_async,
     container_pid_to_host_pid,
+    get_arch_name,
     get_kernel_id_from_container,
     get_safe_ulimit,
     host_pid_to_container_pid,
@@ -722,43 +724,66 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     @override
     async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
         sshkey = cluster_info["ssh_keypair"]
-        if sshkey is None:
-            return
 
         def _write_config() -> None:
             try:
-                priv_key_path = self.config_dir / "ssh" / "id_cluster"
-                pub_key_path = self.config_dir / "ssh" / "id_cluster.pub"
-                priv_key_path.parent.mkdir(parents=True, exist_ok=True)
-                priv_key_path.write_text(sshkey["private_key"])
-                pub_key_path.write_text(sshkey["public_key"])
+                ssh_dir = self.config_dir / "ssh"
+                ssh_dir.mkdir(parents=True, exist_ok=True)
+                paths_to_chown: list[Path] = []
 
-                def chown_keyfile(uid: int | None, gid: int | None) -> None:
-                    self._chown_paths_if_root([priv_key_path, pub_key_path], uid, gid)
+                # Generate dropbear host key for SSH server identity.
+                # This key is mounted read-only into container to prevent user deletion.
+                # Use dropbearkey from krunner to generate key in Dropbear native format.
+                host_key_path = ssh_dir / "dropbear_rsa_host_key"
+                arch = get_arch_name()
+                dropbearmulti_path = self.resolve_krunner_filepath(
+                    f"runner/dropbearmulti.{arch}.bin"
+                )
+                subprocess.run(
+                    [
+                        str(dropbearmulti_path),
+                        "dropbearkey",
+                        "-t",
+                        "rsa",
+                        "-s",
+                        "2048",
+                        "-f",
+                        str(host_key_path),
+                    ],
+                    check=True,
+                    capture_output=True,
+                )
+                host_key_path.chmod(0o600)
+                paths_to_chown.append(host_key_path)
 
-                do_override = False
-                if (ouid := self.get_overriding_uid()) is not None:
-                    do_override = True
+                # Write cluster SSH keypair if provided
+                if sshkey is not None:
+                    cluster_priv_key_path = ssh_dir / "id_cluster"
+                    cluster_pub_key_path = ssh_dir / "id_cluster.pub"
+                    cluster_priv_key_path.write_text(sshkey["private_key"])
+                    cluster_pub_key_path.write_text(sshkey["public_key"])
+                    cluster_priv_key_path.chmod(0o600)
+                    paths_to_chown.extend([cluster_priv_key_path, cluster_pub_key_path])
 
-                if (ogid := self.get_overriding_gid()) is not None:
-                    do_override = True
+                    if cluster_ssh_port_mapping := cluster_info["cluster_ssh_port_mapping"]:
+                        port_mapping_json_path = ssh_dir / "port-mapping.json"
+                        port_mapping_json_path.write_bytes(dump_json(cluster_ssh_port_mapping))
 
-                if do_override:
-                    chown_keyfile(ouid, ogid)
-                else:
-                    if KernelFeatures.UID_MATCH in self.kernel_features:
-                        chown_keyfile(
-                            self.local_config.container.kernel_uid,
-                            self.local_config.container.kernel_gid,
-                        )
-                priv_key_path.chmod(0o600)
-                if cluster_ssh_port_mapping := cluster_info["cluster_ssh_port_mapping"]:
-                    port_mapping_json_path = self.config_dir / "ssh" / "port-mapping.json"
-                    port_mapping_json_path.write_bytes(dump_json(cluster_ssh_port_mapping))
+                # Set ownership for all created files
+                ouid = self.get_overriding_uid()
+                ogid = self.get_overriding_gid()
+                if ouid is not None or ogid is not None:
+                    self._chown_paths_if_root(paths_to_chown, ouid, ogid)
+                elif KernelFeatures.UID_MATCH in self.kernel_features:
+                    self._chown_paths_if_root(
+                        paths_to_chown,
+                        self.local_config.container.kernel_uid,
+                        self.local_config.container.kernel_gid,
+                    )
             except Exception:
-                log.exception("error while writing cluster keypair")
+                log.exception("error while writing SSH keys")
 
-        current_loop().run_in_executor(None, _write_config)  # ???
+        await current_loop().run_in_executor(None, _write_config)
 
     @override
     async def process_mounts(self, mounts: Sequence[Mount]) -> None:
