@@ -1098,6 +1098,14 @@ type ArtifactVerifierResultEntry
   result: ArtifactVerifierResult!
 }
 
+"""Input for assigning a role to a user"""
+input AssignRoleInput
+  @join__type(graph: STRAWBERRY)
+{
+  userId: UUID!
+  roleId: UUID!
+}
+
 """Added in 24.03.9."""
 type AssociateScalingGroupsWithDomain
   @join__type(graph: GRAPHENE)
@@ -2334,6 +2342,17 @@ type CreateObjectStoragePayload
   objectStorage: ObjectStorage!
 }
 
+"""Input for creating a scoped permission"""
+input CreatePermissionInput
+  @join__type(graph: STRAWBERRY)
+{
+  roleId: UUID!
+  scopeType: ScopeType!
+  scopeId: String!
+  entityType: EntityType!
+  operation: OperationType!
+}
+
 type CreateProjectResourcePolicy
   @join__type(graph: GRAPHENE)
 {
@@ -2420,6 +2439,15 @@ type CreateRevisionPayload
   @join__type(graph: STRAWBERRY)
 {
   revision: ModelRevision!
+}
+
+"""Input for creating a role"""
+input CreateRoleInput
+  @join__type(graph: STRAWBERRY)
+{
+  name: String!
+  description: String = null
+  source: RoleSource = null
 }
 
 type CreateScalingGroup
@@ -4091,6 +4119,24 @@ type EntityTimestamps
 
   """Timestamp when this entity was last modified."""
   modifiedAt: DateTime
+}
+
+"""RBAC entity type"""
+enum EntityType
+  @join__type(graph: STRAWBERRY)
+{
+  USER @join__enumValue(graph: STRAWBERRY)
+  PROJECT @join__enumValue(graph: STRAWBERRY)
+  DOMAIN @join__enumValue(graph: STRAWBERRY)
+  VFOLDER @join__enumValue(graph: STRAWBERRY)
+  IMAGE @join__enumValue(graph: STRAWBERRY)
+  SESSION @join__enumValue(graph: STRAWBERRY)
+  ARTIFACT @join__enumValue(graph: STRAWBERRY)
+  ARTIFACT_REGISTRY @join__enumValue(graph: STRAWBERRY)
+  APP_CONFIG @join__enumValue(graph: STRAWBERRY)
+  NOTIFICATION_CHANNEL @join__enumValue(graph: STRAWBERRY)
+  NOTIFICATION_RULE @join__enumValue(graph: STRAWBERRY)
+  MODEL_DEPLOYMENT @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -7247,6 +7293,30 @@ type Mutation
   Added in 26.2.0. Permanently delete multiple users (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted.
   """
   adminPurgeUsers(input: PurgeUsersV2Input!): PurgeUsersV2Payload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. Create a new role (admin only)."""
+  adminCreateRole(input: CreateRoleInput!): RoleGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. Update an existing role (admin only)."""
+  adminUpdateRole(input: UpdateRoleInput!): RoleGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. Soft-delete a role (admin only)."""
+  adminDeleteRole(id: UUID!): RoleGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. Permanently remove a role (admin only)."""
+  adminPurgeRole(id: UUID!): RoleGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. Create a scoped permission (admin only)."""
+  adminCreatePermission(input: CreatePermissionInput!): PermissionGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. Delete a scoped permission (admin only)."""
+  adminDeletePermission(id: UUID!): PermissionGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. Assign a role to a user (admin only)."""
+  adminAssignRole(input: AssignRoleInput!): RoleAssignmentGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. Revoke a role from a user (admin only)."""
+  adminRevokeRole(input: RevokeRoleInput!): RoleAssignmentGQL! @join__field(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0."""
@@ -7511,6 +7581,22 @@ type ObjectStorageEdge
   node: ObjectStorage!
 }
 
+"""RBAC operation type"""
+enum OperationType
+  @join__type(graph: STRAWBERRY)
+{
+  CREATE @join__enumValue(graph: STRAWBERRY)
+  READ @join__enumValue(graph: STRAWBERRY)
+  UPDATE @join__enumValue(graph: STRAWBERRY)
+  SOFT_DELETE @join__enumValue(graph: STRAWBERRY)
+  HARD_DELETE @join__enumValue(graph: STRAWBERRY)
+  GRANT_ALL @join__enumValue(graph: STRAWBERRY)
+  GRANT_READ @join__enumValue(graph: STRAWBERRY)
+  GRANT_UPDATE @join__enumValue(graph: STRAWBERRY)
+  GRANT_SOFT_DELETE @join__enumValue(graph: STRAWBERRY)
+  GRANT_HARD_DELETE @join__enumValue(graph: STRAWBERRY)
+}
+
 enum OrderDirection
   @join__type(graph: STRAWBERRY)
 {
@@ -7543,6 +7629,69 @@ interface PaginatedList
 {
   items: [Item]!
   total_count: Int!
+}
+
+"""Permission connection"""
+type PermissionConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [PermissionGQLEdge!]!
+  count: Int!
+}
+
+"""Filter for scoped permissions"""
+input PermissionFilter
+  @join__type(graph: STRAWBERRY)
+{
+  roleId: UUID = null
+  scopeType: ScopeType = null
+  entityType: EntityType = null
+}
+
+"""RBAC scoped permission"""
+type PermissionGQL implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  scopeType: ScopeType!
+  scopeId: String!
+  entityType: EntityType!
+  operation: OperationType!
+
+  """The role ID this permission belongs to."""
+  roleId: ID!
+}
+
+"""An edge in a connection."""
+type PermissionGQLEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: PermissionGQL!
+}
+
+"""Order by specification for permissions"""
+input PermissionOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: PermissionOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum PermissionOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  ID @join__enumValue(graph: STRAWBERRY)
+  ENTITY_TYPE @join__enumValue(graph: STRAWBERRY)
 }
 
 type PredefinedAtomicPermission
@@ -8987,6 +9136,30 @@ type Query
   """
   adminImageAliases(filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection @join__field(graph: STRAWBERRY)
 
+  """Added in 26.2.0. Get a single role by ID (admin only)."""
+  adminRole(id: UUID!): RoleGQL @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. List roles with filtering and pagination (admin only).
+  """
+  adminRoles(filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. List scoped permissions with filtering and pagination (admin only).
+  """
+  adminPermissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. List role assignments with filtering and pagination (admin only).
+  """
+  adminRoleAssignments(filter: RoleAssignmentFilter = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. List available scope types."""
+  scopeTypes: [ScopeType!]! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. List available entity types."""
+  entityTypes: [EntityType!]! @join__field(graph: STRAWBERRY)
+
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection @join__field(graph: STRAWBERRY)
 
@@ -9831,6 +10004,147 @@ type RestoreArtifactsPayload
   artifacts: [Artifact!]!
 }
 
+"""Input for revoking a role from a user"""
+input RevokeRoleInput
+  @join__type(graph: STRAWBERRY)
+{
+  userId: UUID!
+  roleId: UUID!
+}
+
+"""Role assignment connection"""
+type RoleAssignmentConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RoleAssignmentGQLEdge!]!
+  count: Int!
+}
+
+"""Filter for role assignments"""
+input RoleAssignmentFilter
+  @join__type(graph: STRAWBERRY)
+{
+  roleId: UUID = null
+}
+
+"""RBAC role assignment (user-role association)"""
+type RoleAssignmentGQL implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  grantedAt: DateTime!
+
+  """The assigned user ID."""
+  userId: ID!
+
+  """The assigned role ID."""
+  roleId: ID!
+
+  """The user who granted this assignment."""
+  grantedBy: ID
+}
+
+"""An edge in a connection."""
+type RoleAssignmentGQLEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RoleAssignmentGQL!
+}
+
+"""Role connection"""
+type RoleConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RoleGQLEdge!]!
+  count: Int!
+}
+
+"""Filter for roles"""
+input RoleFilter
+  @join__type(graph: STRAWBERRY)
+{
+  name: StringFilter = null
+  source: [RoleSource!] = null
+  status: [RoleStatus!] = null
+  AND: [RoleFilter!] = null
+  OR: [RoleFilter!] = null
+  NOT: RoleFilter = null
+}
+
+"""RBAC role"""
+type RoleGQL implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  description: String
+  source: RoleSource!
+  status: RoleStatus!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  deletedAt: DateTime
+}
+
+"""An edge in a connection."""
+type RoleGQLEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RoleGQL!
+}
+
+"""Order by specification for roles"""
+input RoleOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: RoleOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum RoleOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Role definition source"""
+enum RoleSource
+  @join__type(graph: STRAWBERRY)
+{
+  SYSTEM @join__enumValue(graph: STRAWBERRY)
+  CUSTOM @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Role status"""
+enum RoleStatus
+  @join__type(graph: STRAWBERRY)
+{
+  ACTIVE @join__enumValue(graph: STRAWBERRY)
+  INACTIVE @join__enumValue(graph: STRAWBERRY)
+  DELETED @join__enumValue(graph: STRAWBERRY)
+}
+
 """Added in 25.19.0. Configuration for rolling update strategy."""
 input RollingUpdateConfigInput
   @join__type(graph: STRAWBERRY)
@@ -10295,6 +10609,16 @@ Added in 24.12.0. A string value in the format '<SCOPE_TYPE>:<SCOPE_ID>'. <SCOPE
 """
 scalar ScopeField
   @join__type(graph: GRAPHENE)
+
+"""RBAC scope type"""
+enum ScopeType
+  @join__type(graph: STRAWBERRY)
+{
+  DOMAIN @join__enumValue(graph: STRAWBERRY)
+  PROJECT @join__enumValue(graph: STRAWBERRY)
+  USER @join__enumValue(graph: STRAWBERRY)
+  GLOBAL @join__enumValue(graph: STRAWBERRY)
+}
 
 """Added in 25.8.0."""
 type ServiceConfigConnection
@@ -11055,6 +11379,15 @@ type UpdateResourceGroupPayload
 {
   """The updated resource group with new configuration."""
   resourceGroup: ResourceGroup!
+}
+
+"""Input for updating a role"""
+input UpdateRoleInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: UUID!
+  name: String = null
+  description: String = null
 }
 
 """Added in 25.19.0. Input for updating route traffic status."""
