@@ -434,11 +434,26 @@ async def web_handler_with_jwt(
                 )
                 await frontend_resp.prepare(frontend_rqst)
                 try:
+                    chunks: list[bytes] = []
                     while True:
                         chunk = await backend_resp.read(CHUNK_SIZE)
                         if not chunk:
                             break
+                        chunks.append(chunk)
                         await frontend_resp.write(chunk)
+                    # Debug logging for GraphQL responses
+                    if path and "gql" in path:
+                        try:
+                            response_body = b"".join(chunks).decode("utf-8")
+                            if "DataLoader" in response_body or "error" in response_body.lower():
+                                log.warning(
+                                    "web_handler_with_jwt: GraphQL response (path={}, status={}): {}",
+                                    path,
+                                    backend_resp.status,
+                                    response_body[:2000],
+                                )
+                        except Exception as e:
+                            log.warning("web_handler_with_jwt: Failed to decode response: {}", e)
                 finally:
                     await frontend_resp.write_eof()
                 return frontend_resp
