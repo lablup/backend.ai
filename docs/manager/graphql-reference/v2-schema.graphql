@@ -2453,283 +2453,13 @@ type HuggingFaceRegistryEdge {
   node: HuggingFaceRegistry!
 }
 
-"""
-Added in 26.2.0.
-
-Represents an alias for a container image.
-Aliases provide alternative names for images.
-"""
-type ImageAlias implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-
-  """The alias string for the image."""
-  alias: String!
-}
-
-"""
-Added in 26.2.0.
-
-Relay-style connection for paginated image alias queries.
-Includes total count for pagination UI.
-"""
-type ImageAliasConnection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [ImageAliasEdge!]!
-
-  """Total count of aliases matching the query."""
-  count: Int!
-}
-
-"""An edge in a connection."""
-type ImageAliasEdge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: ImageAlias!
-}
-
-"""
-Added in 26.2.0.
-
-Filter options for image aliases.
-Supports filtering by alias string.
-"""
-input ImageAliasFilterGQL {
-  alias: StringFilter = null
-}
-
-"""
-Added in 26.2.0.
-
-Specifies the field and direction for ordering image aliases in queries.
-"""
-input ImageAliasOrderByGQL {
-  field: ImageAliasOrderField!
-  direction: OrderDirection! = ASC
-}
-
-"""
-Added in 26.2.0.
-
-Fields available for ordering image alias queries.
-"""
-enum ImageAliasOrderField {
-  ALIAS
-}
-
-"""
-Added in 26.2.0.
-
-Relay-style connection for paginated image queries.
-Includes total count for pagination UI.
-"""
-type ImageConnectionV2 {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [ImageV2Edge!]!
-
-  """Total count of images matching the query."""
-  count: Int!
-}
-
-"""
-Added in 26.2.0.
-
-Filter options for images based on various criteria such as status,
-name, and architecture.
-
-Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
-"""
-input ImageFilterGQL {
-  status: [ImageStatus!] = null
-  name: StringFilter = null
-  architecture: StringFilter = null
-  AND: [ImageFilterGQL!] = null
-  OR: [ImageFilterGQL!] = null
-  NOT: [ImageFilterGQL!] = null
-}
-
-"""
-Added in 26.2.0.
-
-Identity information for an image.
-Contains the canonical name, namespace, and architecture.
-"""
-type ImageIdentityInfo {
-  """Full canonical name (e.g., 'cr.backend.ai/stable/python:3.9')."""
-  canonicalName: String!
-
-  """Image namespace/path within the registry (e.g., 'stable/python')."""
-  namespace: String!
-
-  """CPU architecture (e.g., 'x86_64', 'aarch64')."""
-  architecture: String!
-}
-
 """Added in 25.19.0"""
 input ImageInput {
   id: ID!
 }
 
-"""
-Added in 26.2.0.
-
-A key-value pair representing a Docker label on the image.
-Labels contain metadata about the image such as maintainer, version, etc.
-"""
-type ImageLabelEntry {
-  """The label key (e.g., 'maintainer')."""
-  key: String!
-
-  """The label value."""
-  value: String!
-}
-
-"""
-Added in 26.2.0.
-
-Metadata information for an image.
-Contains tags, labels, digest, size, status, and creation timestamp.
-"""
-type ImageMetadataInfo {
-  """
-  Parsed tag components from the image reference (e.g., python=3.11, cuda=12.1).
-  """
-  tags: [ImageTagEntry!]!
-
-  """Docker labels."""
-  labels: [ImageLabelEntry!]!
-
-  """Config digest (image hash) for verification."""
-  digest: String
-
-  """Image size in bytes."""
-  sizeBytes: Int!
-
-  """Image status (ALIVE or DELETED)."""
-  status: ImageStatus!
-
-  """Timestamp when the image was created/registered."""
-  createdAt: DateTime
-}
-
 extend type ImageNode @key(fields: "id") {
   id: ID! @external
-}
-
-"""
-Added in 26.2.0.
-
-Specifies the field and direction for ordering images in queries.
-"""
-input ImageOrderByGQL {
-  field: ImageOrderField!
-  direction: OrderDirection! = ASC
-}
-
-"""
-Added in 26.2.0.
-
-Fields available for ordering image queries.
-"""
-enum ImageOrderField {
-  NAME
-  CREATED_AT
-}
-
-"""
-Added in 26.2.0.
-
-Permission types for image operations.
-"""
-enum ImagePermission {
-  READ_ATTRIBUTE
-  UPDATE_ATTRIBUTE
-  CREATE_CONTAINER
-  FORGET_IMAGE
-}
-
-"""
-Added in 26.2.0.
-
-Permission information for an image.
-Contains the list of permissions the current user has on this image.
-"""
-type ImagePermissionInfo {
-  """List of permissions the user has on this image."""
-  permissions: [ImagePermission!]!
-}
-
-"""
-Added in 26.2.0.
-
-Runtime requirements information for an image.
-Contains resource limits and supported accelerators.
-"""
-type ImageRequirementsInfo {
-  """Resource slot limits (cpu, memory, accelerators, etc.)."""
-  resourceLimits: [ImageResourceLimit!]!
-
-  """List of supported accelerator types (e.g., 'cuda', 'rocm')."""
-  supportedAccelerators: [String!]!
-}
-
-"""
-Added in 26.2.0.
-
-Resource limit specification for an image.
-Defines minimum and maximum values for a resource slot.
-"""
-type ImageResourceLimit {
-  """Resource slot name (e.g., 'cpu', 'mem', 'cuda.shares')."""
-  key: String!
-
-  """Minimum required amount."""
-  min: String!
-
-  """Maximum allowed amount."""
-  max: String!
-}
-
-"""
-Added in 26.2.0.
-
-Scope for querying aliases within a specific image.
-"""
-input ImageScope {
-  """UUID of the image to scope the query to."""
-  imageId: UUID!
-}
-
-"""
-Added in 26.2.0.
-
-Status of an image in the system.
-"""
-enum ImageStatus {
-  ALIVE
-  DELETED
-}
-
-"""
-Added in 26.2.0.
-
-A key-value pair representing a parsed tag component.
-Tags are extracted from the image reference (e.g., py311, cuda12.1).
-"""
-type ImageTagEntry {
-  """The tag key (e.g., 'python', 'cuda')."""
-  key: String!
-
-  """The tag value (e.g., '3.11', '12.1')."""
-  value: String!
 }
 
 """
@@ -2749,22 +2479,108 @@ type ImageV2 implements Node {
   id: ID!
 
   """Image identity information (name, architecture)."""
-  identity: ImageIdentityInfo!
+  identity: ImageV2IdentityInfo!
 
   """Image metadata (labels, digest, size, status, created_at)."""
-  metadata: ImageMetadataInfo!
+  metadata: ImageV2MetadataInfo!
 
   """Runtime requirements (supported_accelerators)."""
-  requirements: ImageRequirementsInfo!
+  requirements: ImageV2RequirementsInfo!
 
   """Permission info for the current user. May be null."""
-  permission: ImagePermissionInfo
+  permission: ImageV2PermissionInfo
 
   """UUID of the container registry where this image is stored."""
   registryId: UUID!
 
   """Added in 26.2.0. Aliases for this image."""
-  aliases(filter: ImageAliasFilterGQL = null, orderBy: [ImageAliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageAliasConnection!
+  aliases(filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageV2AliasConnection!
+}
+
+"""
+Added in 26.2.0.
+
+Represents an alias for a container image.
+Aliases provide alternative names for images.
+"""
+type ImageV2Alias implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The alias string for the image."""
+  alias: String!
+}
+
+"""
+Added in 26.2.0.
+
+Relay-style connection for paginated image alias queries.
+Includes total count for pagination UI.
+"""
+type ImageV2AliasConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ImageV2AliasEdge!]!
+
+  """Total count of aliases matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ImageV2AliasEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ImageV2Alias!
+}
+
+"""
+Added in 26.2.0.
+
+Filter options for image aliases.
+Supports filtering by alias string.
+"""
+input ImageV2AliasFilterGQL {
+  alias: StringFilter = null
+}
+
+"""
+Added in 26.2.0.
+
+Specifies the field and direction for ordering image aliases in queries.
+"""
+input ImageV2AliasOrderByGQL {
+  field: ImageV2AliasOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.2.0.
+
+Fields available for ordering image alias queries.
+"""
+enum ImageV2AliasOrderField {
+  ALIAS
+}
+
+"""
+Added in 26.2.0.
+
+Relay-style connection for paginated image queries.
+Includes total count for pagination UI.
+"""
+type ImageV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ImageV2Edge!]!
+
+  """Total count of images matching the query."""
+  count: Int!
 }
 
 """An edge in a connection."""
@@ -2774,6 +2590,190 @@ type ImageV2Edge {
 
   """The item at the end of the edge"""
   node: ImageV2!
+}
+
+"""
+Added in 26.2.0.
+
+Filter options for images based on various criteria such as status,
+name, and architecture.
+
+Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
+"""
+input ImageV2FilterGQL {
+  status: [ImageV2Status!] = null
+  name: StringFilter = null
+  architecture: StringFilter = null
+  AND: [ImageV2FilterGQL!] = null
+  OR: [ImageV2FilterGQL!] = null
+  NOT: [ImageV2FilterGQL!] = null
+}
+
+"""
+Added in 26.2.0.
+
+Identity information for an image.
+Contains the canonical name, namespace, and architecture.
+"""
+type ImageV2IdentityInfo {
+  """Full canonical name (e.g., 'cr.backend.ai/stable/python:3.9')."""
+  canonicalName: String!
+
+  """Image namespace/path within the registry (e.g., 'stable/python')."""
+  namespace: String!
+
+  """CPU architecture (e.g., 'x86_64', 'aarch64')."""
+  architecture: String!
+}
+
+"""
+Added in 26.2.0.
+
+A key-value pair representing a Docker label on the image.
+Labels contain metadata about the image such as maintainer, version, etc.
+"""
+type ImageV2LabelEntry {
+  """The label key (e.g., 'maintainer')."""
+  key: String!
+
+  """The label value."""
+  value: String!
+}
+
+"""
+Added in 26.2.0.
+
+Metadata information for an image.
+Contains tags, labels, digest, size, status, and creation timestamp.
+"""
+type ImageV2MetadataInfo {
+  """
+  Parsed tag components from the image reference (e.g., python=3.11, cuda=12.1).
+  """
+  tags: [ImageV2TagEntry!]!
+
+  """Docker labels."""
+  labels: [ImageV2LabelEntry!]!
+
+  """Config digest (image hash) for verification."""
+  digest: String
+
+  """Image size in bytes."""
+  sizeBytes: Int!
+
+  """Image status (ALIVE or DELETED)."""
+  status: ImageV2Status!
+
+  """Timestamp when the image was created/registered."""
+  createdAt: DateTime
+}
+
+"""
+Added in 26.2.0.
+
+Specifies the field and direction for ordering images in queries.
+"""
+input ImageV2OrderByGQL {
+  field: ImageV2OrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.2.0.
+
+Fields available for ordering image queries.
+"""
+enum ImageV2OrderField {
+  NAME
+  CREATED_AT
+}
+
+"""
+Added in 26.2.0.
+
+Permission types for image operations.
+"""
+enum ImageV2Permission {
+  READ_ATTRIBUTE
+  UPDATE_ATTRIBUTE
+  CREATE_CONTAINER
+  FORGET_IMAGE
+}
+
+"""
+Added in 26.2.0.
+
+Permission information for an image.
+Contains the list of permissions the current user has on this image.
+"""
+type ImageV2PermissionInfo {
+  """List of permissions the user has on this image."""
+  permissions: [ImageV2Permission!]!
+}
+
+"""
+Added in 26.2.0.
+
+Runtime requirements information for an image.
+Contains resource limits and supported accelerators.
+"""
+type ImageV2RequirementsInfo {
+  """Resource slot limits (cpu, memory, accelerators, etc.)."""
+  resourceLimits: [ImageV2ResourceLimit!]!
+
+  """List of supported accelerator types (e.g., 'cuda', 'rocm')."""
+  supportedAccelerators: [String!]!
+}
+
+"""
+Added in 26.2.0.
+
+Resource limit specification for an image.
+Defines minimum and maximum values for a resource slot.
+"""
+type ImageV2ResourceLimit {
+  """Resource slot name (e.g., 'cpu', 'mem', 'cuda.shares')."""
+  key: String!
+
+  """Minimum required amount."""
+  min: String!
+
+  """Maximum allowed amount."""
+  max: String!
+}
+
+"""
+Added in 26.2.0.
+
+Scope for querying aliases within a specific image.
+"""
+input ImageV2Scope {
+  """UUID of the image to scope the query to."""
+  imageId: UUID!
+}
+
+"""
+Added in 26.2.0.
+
+Status of an image in the system.
+"""
+enum ImageV2Status {
+  ALIVE
+  DELETED
+}
+
+"""
+Added in 26.2.0.
+
+A key-value pair representing a parsed tag component.
+Tags are extracted from the image reference (e.g., py311, cuda12.1).
+"""
+type ImageV2TagEntry {
+  """The tag key (e.g., 'python', 'cuda')."""
+  key: String!
+
+  """The tag value (e.g., '3.11', '12.1')."""
+  value: String!
 }
 
 """
@@ -4697,7 +4697,7 @@ type Query {
   
   Returns the alias information including the alias string.
   """
-  imageAlias(id: ID!): ImageAlias
+  imageAlias(id: ID!): ImageV2Alias
 
   """Added in 26.2.0. List resource groups (admin only)"""
   adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection!
@@ -4771,7 +4771,7 @@ type Query {
   Use filters to narrow down results by status, name, or architecture.
   Supports both cursor-based and offset-based pagination.
   """
-  adminImagesV2(filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2!
+  adminImagesV2(filter: ImageV2FilterGQL = null, orderBy: [ImageV2OrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection!
 
   """
   Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
@@ -4787,7 +4787,7 @@ type Query {
   Use filters to search by alias string.
   Supports both cursor-based and offset-based pagination.
   """
-  adminImageAliases(filter: ImageAliasFilterGQL = null, orderBy: [ImageAliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageAliasConnection!
+  adminImageAliases(filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection!
 
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2!
@@ -4839,7 +4839,7 @@ type Query {
   Use filters to narrow down results by status, name, or architecture.
   Supports both cursor-based and offset-based pagination.
   """
-  containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2!
+  containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageV2FilterGQL = null, orderBy: [ImageV2OrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection!
 
   """
   Added in 26.2.0.
@@ -4850,7 +4850,7 @@ type Query {
   Returns image aliases that belong to the specified image.
   Supports both cursor-based and offset-based pagination.
   """
-  imageScopedAliases(scope: ImageScope!, filter: ImageAliasFilterGQL = null, orderBy: [ImageAliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageAliasConnection!
+  imageScopedAliases(scope: ImageV2Scope!, filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection!
 
   """Added in 26.2.0. Get scheduling history for a specific session."""
   sessionScopedSchedulingHistories(scope: SessionScope!, filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection!

@@ -22,16 +22,16 @@ from ai.backend.manager.services.image.actions.search_aliases import SearchAlias
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 
 from .types import (
-    ImageAliasConnectionGQL,
-    ImageAliasEdgeGQL,
-    ImageAliasFilterGQL,
-    ImageAliasGQL,
-    ImageAliasOrderByGQL,
-    ImageConnectionV2GQL,
-    ImageEdgeGQL,
-    ImageFilterGQL,
-    ImageOrderByGQL,
+    ImageV2AliasConnectionGQL,
+    ImageV2AliasEdgeGQL,
+    ImageV2AliasFilterGQL,
+    ImageV2AliasGQL,
+    ImageV2AliasOrderByGQL,
+    ImageV2ConnectionGQL,
+    ImageV2EdgeGQL,
+    ImageV2FilterGQL,
     ImageV2GQL,
+    ImageV2OrderByGQL,
 )
 
 
@@ -49,8 +49,8 @@ def _get_image_pagination_spec() -> PaginationSpec:
 
 async def fetch_images(
     info: Info[StrawberryGQLContext],
-    filter: ImageFilterGQL | None = None,
-    order_by: list[ImageOrderByGQL] | None = None,
+    filter: ImageV2FilterGQL | None = None,
+    order_by: list[ImageV2OrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -58,7 +58,7 @@ async def fetch_images(
     limit: int | None = None,
     offset: int | None = None,
     base_conditions: list[QueryCondition] | None = None,
-) -> ImageConnectionV2GQL:
+) -> ImageV2ConnectionGQL:
     """Fetch images with optional filtering, ordering, and pagination.
 
     Args:
@@ -92,7 +92,7 @@ async def fetch_images(
     for image_data in action_result.data:
         image = ImageV2GQL.from_data(image_data)
         cursor = encode_cursor(image_data.id)
-        edges.append(ImageEdgeGQL(node=image, cursor=cursor))
+        edges.append(ImageV2EdgeGQL(node=image, cursor=cursor))
 
     page_info = strawberry.relay.PageInfo(
         has_next_page=action_result.has_next_page,
@@ -101,7 +101,7 @@ async def fetch_images(
         end_cursor=edges[-1].cursor if edges else None,
     )
 
-    return ImageConnectionV2GQL(
+    return ImageV2ConnectionGQL(
         count=action_result.total_count,
         edges=edges,
         page_info=page_info,
@@ -135,7 +135,7 @@ async def fetch_image(
 async def fetch_image_alias(
     info: Info[StrawberryGQLContext],
     alias_id: uuid.UUID,
-) -> ImageAliasGQL | None:
+) -> ImageV2AliasGQL | None:
     """Fetch a single image alias by ID using dataloader.
 
     Args:
@@ -143,12 +143,12 @@ async def fetch_image_alias(
         alias_id: The UUID of the alias to fetch
 
     Returns:
-        ImageAliasGQL if found, None otherwise
+        ImageV2AliasGQL if found, None otherwise
     """
     alias_data = await info.context.data_loaders.image_alias_loader.load(alias_id)
     if alias_data is None:
         return None
-    return ImageAliasGQL.from_data(alias_data)
+    return ImageV2AliasGQL.from_data(alias_data)
 
 
 @lru_cache(maxsize=1)
@@ -165,8 +165,8 @@ def _get_image_alias_pagination_spec() -> PaginationSpec:
 
 async def fetch_image_aliases(
     info: Info[StrawberryGQLContext],
-    filter: ImageAliasFilterGQL | None = None,
-    order_by: list[ImageAliasOrderByGQL] | None = None,
+    filter: ImageV2AliasFilterGQL | None = None,
+    order_by: list[ImageV2AliasOrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -174,7 +174,7 @@ async def fetch_image_aliases(
     limit: int | None = None,
     offset: int | None = None,
     base_conditions: list[QueryCondition] | None = None,
-) -> ImageAliasConnectionGQL:
+) -> ImageV2AliasConnectionGQL:
     """Fetch image aliases with optional filtering, ordering, and pagination.
 
     Args:
@@ -206,9 +206,9 @@ async def fetch_image_aliases(
 
     edges = []
     for alias_data in action_result.data:
-        alias_node = ImageAliasGQL.from_data(alias_data)
+        alias_node = ImageV2AliasGQL.from_data(alias_data)
         cursor = encode_cursor(alias_data.id)
-        edges.append(ImageAliasEdgeGQL(node=alias_node, cursor=cursor))
+        edges.append(ImageV2AliasEdgeGQL(node=alias_node, cursor=cursor))
 
     page_info = strawberry.relay.PageInfo(
         has_next_page=action_result.has_next_page,
@@ -217,7 +217,7 @@ async def fetch_image_aliases(
         end_cursor=edges[-1].cursor if edges else None,
     )
 
-    return ImageAliasConnectionGQL(
+    return ImageV2AliasConnectionGQL(
         count=action_result.total_count,
         edges=edges,
         page_info=page_info,
