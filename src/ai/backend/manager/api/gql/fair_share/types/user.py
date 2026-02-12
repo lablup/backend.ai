@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, override
+from typing import TYPE_CHECKING, Annotated, Any, Self, override
 from uuid import UUID
 
 import strawberry
@@ -187,6 +188,44 @@ class UserFairShareGQL(Node):
                 else data.data.calculation_snapshot.last_calculated_at
             ),
         )
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[UserFairShareGQL | None]:
+        """Resolve multiple UserFairShare nodes by their composite IDs.
+
+        ID format: {resource_group}:{project_id}:{user_uuid}
+        """
+        from ai.backend.manager.services.fair_share.actions import GetUserFairShareAction
+
+        processors = info.context.processors
+        results: list[UserFairShareGQL | None] = []
+
+        for node_id in node_ids:
+            try:
+                parts = node_id.split(":")
+                if len(parts) != 3:
+                    results.append(None)
+                    continue
+
+                resource_group, project_id_str, user_uuid_str = parts
+                action_result = await processors.fair_share.get_user_fair_share.wait_for_complete(
+                    GetUserFairShareAction(
+                        resource_group=resource_group,
+                        project_id=UUID(project_id_str),
+                        user_uuid=UUID(user_uuid_str),
+                    )
+                )
+                results.append(cls.from_dataclass(action_result.data))
+            except Exception:
+                results.append(None)
+
+        return results
 
 
 UserFairShareEdge = Edge[UserFairShareGQL]
