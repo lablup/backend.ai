@@ -206,6 +206,7 @@ from .scheduling_history import (
     session_scheduling_histories,
     session_scoped_scheduling_histories,
 )
+from .session.resolver import admin_sessions_v2
 from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
@@ -327,6 +328,7 @@ class Query:
     inference_runtime_config = inference_runtime_config
     route = route
     routes = routes
+    admin_sessions_v2 = admin_sessions_v2
     session_scheduling_histories = session_scheduling_histories
     deployment_histories = deployment_histories
     route_histories = route_histories
