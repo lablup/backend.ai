@@ -554,6 +554,36 @@ type AliasImage
   msg: String
 }
 
+"""
+Added in 26.2.0.
+
+Input for creating an alias for an image by ID.
+"""
+input AliasImageInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the image to alias."""
+  imageId: ID!
+
+  """The alias to create."""
+  alias: String!
+}
+
+"""
+Added in 26.2.0.
+
+Result of creating an alias for an image.
+"""
+type AliasImageResult
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the aliased image."""
+  imageId: ID!
+
+  """The created alias."""
+  alias: String!
+}
+
 """Added in 25.3.0."""
 input AllowedGroups
   @join__type(graph: GRAPHENE)
@@ -1607,6 +1637,30 @@ type ClearImageCustomResourceLimitPayload
   image_node: ImageNode
 }
 
+"""
+Added in 26.2.0.
+
+Input for clearing custom resource limits for an image.
+"""
+input ClearImageResourceLimitInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the image to clear resource limits for."""
+  imageId: ID!
+}
+
+"""
+Added in 26.2.0.
+
+Result of clearing custom resource limits for an image.
+"""
+type ClearImageResourceLimitResult
+  @join__type(graph: STRAWBERRY)
+{
+  """The image with cleared resource limits."""
+  image: ImageV2!
+}
+
 type ClearImages
   @join__type(graph: GRAPHENE)
 {
@@ -2607,6 +2661,33 @@ type DealiasImage
 {
   ok: Boolean
   msg: String
+}
+
+"""
+Added in 26.2.0.
+
+Input for removing an alias from an image.
+"""
+input DealiasImageInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The alias to remove."""
+  alias: String!
+}
+
+"""
+Added in 26.2.0.
+
+Result of removing an alias from an image.
+"""
+type DealiasImageResult
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the image that had the alias."""
+  imageId: ID!
+
+  """The removed alias."""
+  alias: String!
 }
 
 """Decimal (fixed-point)"""
@@ -4333,6 +4414,31 @@ type ForgetImageById
   image: ImageNode
 }
 
+"""
+Added in 26.2.0.
+
+Input for forgetting an image by ID.
+"""
+input ForgetImageInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the image to forget."""
+  imageId: ID!
+}
+
+"""
+Added in 26.2.0.
+
+Result of forgetting an image by ID. The image is marked as DELETED
+but not removed from the database.
+"""
+type ForgetImageResult
+  @join__type(graph: STRAWBERRY)
+{
+  """The forgotten image."""
+  image: ImageV2!
+}
+
 """Added in 25.14.0"""
 input GetPresignedDownloadURLInput
   @join__type(graph: STRAWBERRY)
@@ -4579,6 +4685,21 @@ input ImageInput
   @join__type(graph: STRAWBERRY)
 {
   id: ID!
+}
+
+"""
+Added in 26.2.0.
+
+Input for an image label (key-value pair).
+"""
+input ImageLabelInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The key of the label."""
+  key: String!
+
+  """The value of the label."""
+  value: String!
 }
 
 type ImageNode implements Node
@@ -6225,6 +6346,78 @@ input ModifyImageInput
   resource_limits: [ResourceLimitInput]
 }
 
+"""
+Added in 26.2.0.
+
+Input for modifying an image by ID.
+"""
+input ModifyImageInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the image to modify."""
+  imageId: ID!
+
+  """The properties to modify."""
+  props: ModifyImagePropsInputGQL!
+}
+
+"""
+Added in 26.2.0.
+
+Input for modifying an image's properties.
+"""
+input ModifyImagePropsInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The new name for the image."""
+  name: String = null
+
+  """The new registry for the image."""
+  registry: String = null
+
+  """The new image name for the image."""
+  image: String = null
+
+  """The new tag for the image."""
+  tag: String = null
+
+  """The new architecture for the image."""
+  architecture: String = null
+
+  """Whether the image is local."""
+  isLocal: Boolean = null
+
+  """The size of the image in bytes."""
+  sizeBytes: Int = null
+
+  """The type of the image (compute, system, service)."""
+  type: String = null
+
+  """The config digest of the image."""
+  digest: String = null
+
+  """The labels for the image."""
+  labels: [ImageLabelInputGQL!] = null
+
+  """The supported accelerators for the image. Set to empty list to clear."""
+  supportedAccelerators: [String!] = null
+
+  """The resource limits for the image."""
+  resourceLimits: [ResourceLimitModifyInputGQL!] = null
+}
+
+"""
+Added in 26.2.0.
+
+Result of modifying an image.
+"""
+type ModifyImageResult
+  @join__type(graph: STRAWBERRY)
+{
+  """The modified image."""
+  image: ImageV2!
+}
+
 type ModifyKeyPair
   @join__type(graph: GRAPHENE)
 {
@@ -7247,6 +7440,81 @@ type Mutation
   Added in 26.2.0. Permanently delete multiple users (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted.
   """
   adminPurgeUsers(input: PurgeUsersV2Input!): PurgeUsersV2Payload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Mark an image as deleted by its ID.
+  
+  The image is not removed from the database but its status changes to DELETED.
+  This is a soft delete operation.
+  """
+  forgetImage(input: ForgetImageInputGQL!): ForgetImageResult! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Completely purge an image by its ID.
+  
+  The image is permanently removed from the database. Optionally, the image
+  can also be untagged from the container registry (HarborV2 only).
+  """
+  purgeImage(input: PurgeImageInputGQL!): PurgeImageResult! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Create an alias for an image by its ID.
+  
+  An alias is an alternative name that can be used to reference the image.
+  Multiple aliases can be created for the same image.
+  """
+  aliasImage(input: AliasImageInputGQL!): AliasImageResult! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Remove an alias from an image.
+  """
+  dealiasImage(input: DealiasImageInputGQL!): DealiasImageResult! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Clear custom resource limits for an image by its ID.
+  
+  This removes any user-defined resource limits and reverts to the defaults
+  specified in the image labels.
+  """
+  clearImageResourceLimit(input: ClearImageResourceLimitInputGQL!): ClearImageResourceLimitResult! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Set custom resource limits for an image by its ID.
+  
+  This allows overriding the default resource limits specified in the image labels.
+  """
+  setImageResourceLimit(input: SetImageResourceLimitInputGQL!): SetImageResourceLimitResult! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Untag an image from its container registry by its ID.
+  
+  This removes the image tag from the registry. Only available for HarborV2 registries.
+  """
+  untagImageFromRegistry(input: UntagImageFromRegistryInputGQL!): UntagImageFromRegistryResult! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Modify an image's properties by its ID.
+  
+  This allows updating various image metadata such as labels, resource limits,
+  and supported accelerators.
+  """
+  modifyImage(input: ModifyImageInputGQL!): ModifyImageResult! @join__field(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0."""
@@ -8272,6 +8540,21 @@ type PurgeImageById
   image: ImageNode
 }
 
+"""
+Added in 26.2.0.
+
+Input for purging an image by ID.
+"""
+input PurgeImageInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the image to purge."""
+  imageId: ID!
+
+  """Options for purging the image."""
+  options: PurgeImageOptionsGQL = null
+}
+
 """Added in 25.10.0."""
 input PurgeImageOptions
   @join__type(graph: GRAPHENE)
@@ -8280,6 +8563,33 @@ input PurgeImageOptions
   Untag the deleted image from the registry. Only available in the HarborV2 registry.
   """
   remove_from_registry: Boolean = false
+}
+
+"""
+Added in 26.2.0.
+
+Options for purging an image.
+"""
+input PurgeImageOptionsGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Untag the deleted image from the registry. Only available for HarborV2 registries.
+  """
+  removeFromRegistry: Boolean! = false
+}
+
+"""
+Added in 26.2.0.
+
+Result of purging an image by ID. The image is completely removed
+from the database.
+"""
+type PurgeImageResult
+  @join__type(graph: STRAWBERRY)
+{
+  """The purged image data."""
+  image: ImageV2!
 }
 
 """Added in 25.6.0."""
@@ -9654,6 +9964,46 @@ input ResourceLimitInput
 }
 
 """
+Added in 26.2.0.
+
+Input for a single resource limit specification.
+"""
+input ResourceLimitInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The name of the resource slot (e.g., 'cpu', 'mem')."""
+  slotName: String!
+
+  """
+  The minimum value for this resource. Use string to represent decimal values.
+  """
+  minValue: String = null
+
+  """
+  The maximum value for this resource. Use string to represent decimal values.
+  """
+  maxValue: String = null
+}
+
+"""
+Added in 26.2.0.
+
+Resource limit input for modifying image resource limits.
+"""
+input ResourceLimitModifyInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The resource slot name."""
+  key: String!
+
+  """The minimum value."""
+  min: String = null
+
+  """The maximum value."""
+  max: String = null
+}
+
+"""
 Added in 26.1.0. A collection of additional resource options for a deployment. Contains key-value pairs for resource configuration like shared memory.
 """
 type ResourceOpts
@@ -10521,6 +10871,33 @@ enum SessionTypes
   SYSTEM @join__enumValue(graph: STRAWBERRY)
 }
 
+"""
+Added in 26.2.0.
+
+Input for setting custom resource limits for an image.
+"""
+input SetImageResourceLimitInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the image to set resource limits for."""
+  imageId: ID!
+
+  """The resource limit to set."""
+  resourceLimit: ResourceLimitInputGQL!
+}
+
+"""
+Added in 26.2.0.
+
+Result of setting custom resource limits for an image.
+"""
+type SetImageResourceLimitResult
+  @join__type(graph: STRAWBERRY)
+{
+  """The image with updated resource limits."""
+  image: ImageV2!
+}
+
 type SetQuotaScope
   @join__type(graph: GRAPHENE)
 {
@@ -10799,6 +11176,30 @@ type UntagImageFromRegistry
 
   """Added since 24.03.1."""
   image: ImageNode
+}
+
+"""
+Added in 26.2.0.
+
+Input for untagging an image from its container registry.
+"""
+input UntagImageFromRegistryInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the image to untag from registry."""
+  imageId: ID!
+}
+
+"""
+Added in 26.2.0.
+
+Result of untagging an image from its container registry.
+"""
+type UntagImageFromRegistryResult
+  @join__type(graph: STRAWBERRY)
+{
+  """The untagged image."""
+  image: ImageV2!
 }
 
 """

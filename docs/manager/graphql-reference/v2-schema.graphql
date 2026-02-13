@@ -339,6 +339,32 @@ type AgentV2Edge {
   node: AgentV2!
 }
 
+"""
+Added in 26.2.0.
+
+Input for creating an alias for an image by ID.
+"""
+input AliasImageInputGQL {
+  """The ID of the image to alias."""
+  imageId: ID!
+
+  """The alias to create."""
+  alias: String!
+}
+
+"""
+Added in 26.2.0.
+
+Result of creating an alias for an image.
+"""
+type AliasImageResult {
+  """The ID of the aliased image."""
+  imageId: ID!
+
+  """The created alias."""
+  alias: String!
+}
+
 """Added in 25.16.0. App configuration data"""
 type AppConfig {
   extraConfig: JSON!
@@ -1030,6 +1056,26 @@ type CleanupArtifactRevisionsPayload {
   artifactRevisions: ArtifactRevisionConnection!
 }
 
+"""
+Added in 26.2.0.
+
+Input for clearing custom resource limits for an image.
+"""
+input ClearImageResourceLimitInputGQL {
+  """The ID of the image to clear resource limits for."""
+  imageId: ID!
+}
+
+"""
+Added in 26.2.0.
+
+Result of clearing custom resource limits for an image.
+"""
+type ClearImageResourceLimitResult {
+  """The image with cleared resource limits."""
+  image: ImageV2!
+}
+
 type ClusterConfig {
   """The clustering mode (e.g., SINGLE_NODE)."""
   mode: ClusterMode!
@@ -1313,6 +1359,29 @@ input DateTimeFilter {
   after: DateTime = null
   equals: DateTime = null
   notEquals: DateTime = null
+}
+
+"""
+Added in 26.2.0.
+
+Input for removing an alias from an image.
+"""
+input DealiasImageInputGQL {
+  """The alias to remove."""
+  alias: String!
+}
+
+"""
+Added in 26.2.0.
+
+Result of removing an alias from an image.
+"""
+type DealiasImageResult {
+  """The ID of the image that had the alias."""
+  imageId: ID!
+
+  """The removed alias."""
+  alias: String!
 }
 
 """Decimal (fixed-point)"""
@@ -2397,6 +2466,27 @@ type FairShareSpec {
   resourceWeights: [ResourceWeightEntry!]!
 }
 
+"""
+Added in 26.2.0.
+
+Input for forgetting an image by ID.
+"""
+input ForgetImageInputGQL {
+  """The ID of the image to forget."""
+  imageId: ID!
+}
+
+"""
+Added in 26.2.0.
+
+Result of forgetting an image by ID. The image is marked as DELETED
+but not removed from the database.
+"""
+type ForgetImageResult {
+  """The forgotten image."""
+  image: ImageV2!
+}
+
 """Added in 25.14.0"""
 input GetPresignedDownloadURLInput {
   artifactRevisionId: ID!
@@ -2456,6 +2546,19 @@ type HuggingFaceRegistryEdge {
 """Added in 25.19.0"""
 input ImageInput {
   id: ID!
+}
+
+"""
+Added in 26.2.0.
+
+Input for an image label (key-value pair).
+"""
+input ImageLabelInputGQL {
+  """The key of the label."""
+  key: String!
+
+  """The value of the label."""
+  value: String!
 }
 
 extend type ImageNode @key(fields: "id") {
@@ -3277,6 +3380,72 @@ input ModelTarget {
   revision: String = null
 }
 
+"""
+Added in 26.2.0.
+
+Input for modifying an image by ID.
+"""
+input ModifyImageInputGQL {
+  """The ID of the image to modify."""
+  imageId: ID!
+
+  """The properties to modify."""
+  props: ModifyImagePropsInputGQL!
+}
+
+"""
+Added in 26.2.0.
+
+Input for modifying an image's properties.
+"""
+input ModifyImagePropsInputGQL {
+  """The new name for the image."""
+  name: String = null
+
+  """The new registry for the image."""
+  registry: String = null
+
+  """The new image name for the image."""
+  image: String = null
+
+  """The new tag for the image."""
+  tag: String = null
+
+  """The new architecture for the image."""
+  architecture: String = null
+
+  """Whether the image is local."""
+  isLocal: Boolean = null
+
+  """The size of the image in bytes."""
+  sizeBytes: Int = null
+
+  """The type of the image (compute, system, service)."""
+  type: String = null
+
+  """The config digest of the image."""
+  digest: String = null
+
+  """The labels for the image."""
+  labels: [ImageLabelInputGQL!] = null
+
+  """The supported accelerators for the image. Set to empty list to clear."""
+  supportedAccelerators: [String!] = null
+
+  """The resource limits for the image."""
+  resourceLimits: [ResourceLimitModifyInputGQL!] = null
+}
+
+"""
+Added in 26.2.0.
+
+Result of modifying an image.
+"""
+type ModifyImageResult {
+  """The modified image."""
+  image: ImageV2!
+}
+
 type Mutation {
   """
   Added in 25.14.0.
@@ -3740,6 +3909,81 @@ type Mutation {
   Added in 26.2.0. Permanently delete multiple users (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted.
   """
   adminPurgeUsers(input: PurgeUsersV2Input!): PurgeUsersV2Payload!
+
+  """
+  Added in 26.2.0.
+  
+  Mark an image as deleted by its ID.
+  
+  The image is not removed from the database but its status changes to DELETED.
+  This is a soft delete operation.
+  """
+  forgetImage(input: ForgetImageInputGQL!): ForgetImageResult!
+
+  """
+  Added in 26.2.0.
+  
+  Completely purge an image by its ID.
+  
+  The image is permanently removed from the database. Optionally, the image
+  can also be untagged from the container registry (HarborV2 only).
+  """
+  purgeImage(input: PurgeImageInputGQL!): PurgeImageResult!
+
+  """
+  Added in 26.2.0.
+  
+  Create an alias for an image by its ID.
+  
+  An alias is an alternative name that can be used to reference the image.
+  Multiple aliases can be created for the same image.
+  """
+  aliasImage(input: AliasImageInputGQL!): AliasImageResult!
+
+  """
+  Added in 26.2.0.
+  
+  Remove an alias from an image.
+  """
+  dealiasImage(input: DealiasImageInputGQL!): DealiasImageResult!
+
+  """
+  Added in 26.2.0.
+  
+  Clear custom resource limits for an image by its ID.
+  
+  This removes any user-defined resource limits and reverts to the defaults
+  specified in the image labels.
+  """
+  clearImageResourceLimit(input: ClearImageResourceLimitInputGQL!): ClearImageResourceLimitResult!
+
+  """
+  Added in 26.2.0.
+  
+  Set custom resource limits for an image by its ID.
+  
+  This allows overriding the default resource limits specified in the image labels.
+  """
+  setImageResourceLimit(input: SetImageResourceLimitInputGQL!): SetImageResourceLimitResult!
+
+  """
+  Added in 26.2.0.
+  
+  Untag an image from its container registry by its ID.
+  
+  This removes the image tag from the registry. Only available for HarborV2 registries.
+  """
+  untagImageFromRegistry(input: UntagImageFromRegistryInputGQL!): UntagImageFromRegistryResult!
+
+  """
+  Added in 26.2.0.
+  
+  Modify an image's properties by its ID.
+  
+  This allows updating various image metadata such as labels, resource limits,
+  and supported accelerators.
+  """
+  modifyImage(input: ModifyImageInputGQL!): ModifyImageResult!
 }
 
 """An object with a Globally Unique ID"""
@@ -4520,6 +4764,42 @@ input ProjectWeightInputItem {
   Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
   """
   weight: Decimal = null
+}
+
+"""
+Added in 26.2.0.
+
+Input for purging an image by ID.
+"""
+input PurgeImageInputGQL {
+  """The ID of the image to purge."""
+  imageId: ID!
+
+  """Options for purging the image."""
+  options: PurgeImageOptionsGQL = null
+}
+
+"""
+Added in 26.2.0.
+
+Options for purging an image.
+"""
+input PurgeImageOptionsGQL {
+  """
+  Untag the deleted image from the registry. Only available for HarborV2 registries.
+  """
+  removeFromRegistry: Boolean! = false
+}
+
+"""
+Added in 26.2.0.
+
+Result of purging an image by ID. The image is completely removed
+from the database.
+"""
+type PurgeImageResult {
+  """The purged image data."""
+  image: ImageV2!
 }
 
 """
@@ -5333,6 +5613,42 @@ type ResourceInfo {
 }
 
 """
+Added in 26.2.0.
+
+Input for a single resource limit specification.
+"""
+input ResourceLimitInputGQL {
+  """The name of the resource slot (e.g., 'cpu', 'mem')."""
+  slotName: String!
+
+  """
+  The minimum value for this resource. Use string to represent decimal values.
+  """
+  minValue: String = null
+
+  """
+  The maximum value for this resource. Use string to represent decimal values.
+  """
+  maxValue: String = null
+}
+
+"""
+Added in 26.2.0.
+
+Resource limit input for modifying image resource limits.
+"""
+input ResourceLimitModifyInputGQL {
+  """The resource slot name."""
+  key: String!
+
+  """The minimum value."""
+  min: String = null
+
+  """The maximum value."""
+  max: String = null
+}
+
+"""
 Added in 26.1.0. A collection of additional resource options for a deployment. Contains key-value pairs for resource configuration like shared memory.
 """
 type ResourceOpts {
@@ -5889,6 +6205,29 @@ enum SessionTypes {
 }
 
 """
+Added in 26.2.0.
+
+Input for setting custom resource limits for an image.
+"""
+input SetImageResourceLimitInputGQL {
+  """The ID of the image to set resource limits for."""
+  imageId: ID!
+
+  """The resource limit to set."""
+  resourceLimit: ResourceLimitInputGQL!
+}
+
+"""
+Added in 26.2.0.
+
+Result of setting custom resource limits for an image.
+"""
+type SetImageResourceLimitResult {
+  """The image with updated resource limits."""
+  image: ImageV2!
+}
+
+"""
 Added in 25.14.0.
 
 Information about the source or registry of an artifact.
@@ -6060,6 +6399,26 @@ Payload returned after storage namespace unregistration.
 """
 type UnregisterStorageNamespacePayload {
   id: UUID!
+}
+
+"""
+Added in 26.2.0.
+
+Input for untagging an image from its container registry.
+"""
+input UntagImageFromRegistryInputGQL {
+  """The ID of the image to untag from registry."""
+  imageId: ID!
+}
+
+"""
+Added in 26.2.0.
+
+Result of untagging an image from its container registry.
+"""
+type UntagImageFromRegistryResult {
+  """The untagged image."""
+  image: ImageV2!
 }
 
 """
