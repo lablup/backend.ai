@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import uuid
+from collections import defaultdict
 from collections.abc import Sequence
 
 from ai.backend.common.types import ImageID
 from ai.backend.manager.data.image.types import ImageAliasData
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.image.options import ImageAliasConditions
-from ai.backend.manager.services.image.actions.get_aliases_by_image_ids import (
-    GetAliasesByImageIdsAction,
-)
 from ai.backend.manager.services.image.actions.search_aliases import SearchAliasesAction
 from ai.backend.manager.services.image.processors import ImageProcessors
 
@@ -44,21 +42,29 @@ async def load_alias_by_ids(
 
 async def load_aliases_by_image_ids(
     processor: ImageProcessors,
-    image_ids: Sequence[ImageID],
+    image_ids: Sequence[uuid.UUID],
 ) -> list[list[str]]:
-    """Batch load image aliases by image IDs.
+    """Batch load image alias strings grouped by image IDs.
 
     Args:
         processor: ImageProcessors instance.
         image_ids: List of image IDs to load aliases for.
 
     Returns:
-        List of alias lists in the same order as image_ids.
+        List of alias string lists in the same order as image_ids.
     """
     if not image_ids:
         return []
 
-    action = GetAliasesByImageIdsAction(image_ids=list(image_ids))
-    result = await processor.get_aliases_by_image_ids.wait_for_complete(action)
+    querier = BatchQuerier(
+        pagination=NoPagination(),
+        conditions=[ImageAliasConditions.by_image_ids([ImageID(iid) for iid in image_ids])],
+    )
+    action = SearchAliasesAction(querier=querier)
+    result = await processor.search_aliases.wait_for_complete(action)
 
-    return [result.aliases_map.get(image_id, []) for image_id in image_ids]
+    aliases_map: dict[uuid.UUID, list[str]] = defaultdict(list)
+    for alias_data, image_id in zip(result.data, result.image_ids, strict=False):
+        aliases_map[image_id].append(alias_data.alias)
+
+    return [aliases_map.get(iid, []) for iid in image_ids]

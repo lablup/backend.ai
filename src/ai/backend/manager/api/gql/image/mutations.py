@@ -7,7 +7,6 @@ This module provides GraphQL mutation fields for ImageV2.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 
 import strawberry
@@ -85,7 +84,7 @@ class PurgeImageOptionsGQL:
 )
 class PurgeImageInputGQL:
     image_id: ID = strawberry.field(description="The ID of the image to purge.")
-    options: Optional[PurgeImageOptionsGQL] = strawberry.field(
+    options: PurgeImageOptionsGQL | None = strawberry.field(
         default=None,
         description="Options for purging the image.",
     )
@@ -147,11 +146,11 @@ class ResourceLimitInputGQL:
     slot_name: str = strawberry.field(
         description="The name of the resource slot (e.g., 'cpu', 'mem')."
     )
-    min_value: Optional[str] = strawberry.field(
+    min_value: str | None = strawberry.field(
         default=None,
         description="The minimum value for this resource. Use string to represent decimal values.",
     )
-    max_value: Optional[str] = strawberry.field(
+    max_value: str | None = strawberry.field(
         default=None,
         description="The maximum value for this resource. Use string to represent decimal values.",
     )
@@ -192,8 +191,8 @@ class ImageLabelInputGQL:
 )
 class ResourceLimitModifyInputGQL:
     key: str = strawberry.field(description="The resource slot name.")
-    min: Optional[str] = strawberry.field(default=None, description="The minimum value.")
-    max: Optional[str] = strawberry.field(default=None, description="The maximum value.")
+    min: str | None = strawberry.field(default=None, description="The minimum value.")
+    max: str | None = strawberry.field(default=None, description="The maximum value.")
 
 
 @strawberry.input(
@@ -204,37 +203,37 @@ class ResourceLimitModifyInputGQL:
     """)
 )
 class ModifyImagePropsInputGQL:
-    name: Optional[str] = strawberry.field(default=None, description="The new name for the image.")
-    registry: Optional[str] = strawberry.field(
+    name: str | None = strawberry.field(default=None, description="The new name for the image.")
+    registry: str | None = strawberry.field(
         default=None, description="The new registry for the image."
     )
-    image: Optional[str] = strawberry.field(
+    image: str | None = strawberry.field(
         default=None, description="The new image name for the image."
     )
-    tag: Optional[str] = strawberry.field(default=None, description="The new tag for the image.")
-    architecture: Optional[str] = strawberry.field(
+    tag: str | None = strawberry.field(default=None, description="The new tag for the image.")
+    architecture: str | None = strawberry.field(
         default=None, description="The new architecture for the image."
     )
-    is_local: Optional[bool] = strawberry.field(
+    is_local: bool | None = strawberry.field(
         default=None, description="Whether the image is local."
     )
-    size_bytes: Optional[int] = strawberry.field(
+    size_bytes: int | None = strawberry.field(
         default=None, description="The size of the image in bytes."
     )
-    type: Optional[str] = strawberry.field(
+    type: str | None = strawberry.field(
         default=None, description="The type of the image (compute, system, service)."
     )
-    digest: Optional[str] = strawberry.field(
+    digest: str | None = strawberry.field(
         default=None, description="The config digest of the image."
     )
-    labels: Optional[list[ImageLabelInputGQL]] = strawberry.field(
+    labels: list[ImageLabelInputGQL] | None = strawberry.field(
         default=None, description="The labels for the image."
     )
-    supported_accelerators: Optional[list[str]] = strawberry.field(
+    supported_accelerators: list[str] | None = strawberry.field(
         default=None,
         description="The supported accelerators for the image. Set to empty list to clear.",
     )
-    resource_limits: Optional[list[ResourceLimitModifyInputGQL]] = strawberry.field(
+    resource_limits: list[ResourceLimitModifyInputGQL] | None = strawberry.field(
         default=None, description="The resource limits for the image."
     )
 
@@ -423,7 +422,7 @@ class ModifyImageResultGQL:
     The image is not removed from the database but its status changes to DELETED.
     This is a soft delete operation.
     """)
-)
+)  # type: ignore[misc]
 async def forget_image(
     input: ForgetImageInputGQL,
     info: Info[StrawberryGQLContext],
@@ -446,7 +445,7 @@ async def forget_image(
     The image is permanently removed from the database. Optionally, the image
     can also be untagged from the container registry (HarborV2 only).
     """)
-)
+)  # type: ignore[misc]
 async def purge_image(
     input: PurgeImageInputGQL,
     info: Info[StrawberryGQLContext],
@@ -475,7 +474,7 @@ async def purge_image(
     An alias is an alternative name that can be used to reference the image.
     Multiple aliases can be created for the same image.
     """)
-)
+)  # type: ignore[misc]
 async def alias_image(
     input: AliasImageInputGQL,
     info: Info[StrawberryGQLContext],
@@ -501,7 +500,7 @@ async def alias_image(
 
     Remove an alias from an image.
     """)
-)
+)  # type: ignore[misc]
 async def dealias_image(
     input: DealiasImageInputGQL,
     info: Info[StrawberryGQLContext],
@@ -527,7 +526,7 @@ async def dealias_image(
     This removes any user-defined resource limits and reverts to the defaults
     specified in the image labels.
     """)
-)
+)  # type: ignore[misc]
 async def clear_image_resource_limit(
     input: ClearImageResourceLimitInputGQL,
     info: Info[StrawberryGQLContext],
@@ -549,7 +548,7 @@ async def clear_image_resource_limit(
 
     This removes the image tag from the registry. Only available for HarborV2 registries.
     """)
-)
+)  # type: ignore[misc]
 async def untag_image_from_registry(
     input: UntagImageFromRegistryInputGQL,
     info: Info[StrawberryGQLContext],
@@ -571,7 +570,7 @@ async def untag_image_from_registry(
 
     This allows overriding the default resource limits specified in the image labels.
     """)
-)
+)  # type: ignore[misc]
 async def set_image_resource_limit(
     input: SetImageResourceLimitInputGQL,
     info: Info[StrawberryGQLContext],
@@ -607,7 +606,7 @@ async def set_image_resource_limit(
     This allows updating various image metadata such as labels, resource limits,
     and supported accelerators.
     """)
-)
+)  # type: ignore[misc]
 async def modify_image(
     input: ModifyImageInputGQL,
     info: Info[StrawberryGQLContext],

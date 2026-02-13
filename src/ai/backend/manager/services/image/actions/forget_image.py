@@ -57,26 +57,3 @@ class ForgetImageByIdActionResult(BaseActionResult):
     @override
     def entity_id(self) -> str | None:
         return str(self.image.id)
-
-
-@dataclass
-class ForgetImageByIdAction(ImageAction):
-    image_id: ImageID
-
-    @override
-    def entity_id(self) -> Optional[str]:
-        return str(self.image_id)
-
-    @override
-    @classmethod
-    def operation_type(cls) -> str:
-        return "forget_by_id"
-
-
-@dataclass
-class ForgetImageByIdActionResult(BaseActionResult):
-    image: ImageData
-
-    @override
-    def entity_id(self) -> Optional[str]:
-        return str(self.image.id)
