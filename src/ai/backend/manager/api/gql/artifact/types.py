@@ -6,9 +6,7 @@ from datetime import datetime
 from typing import Any, Self
 
 import strawberry
-from aiotools import apartial
 from strawberry import ID, UNSET, Info
-from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID
 from strawberry.scalars import JSON
 
@@ -17,7 +15,6 @@ from ai.backend.common.data.artifact.types import (
     VerifierResult,
 )
 from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
-from ai.backend.manager.api.gql.artifact_registry_meta import ArtifactRegistryMeta
 from ai.backend.manager.api.gql.base import (
     ByteSize,
     IntFilter,
@@ -904,6 +901,8 @@ class ArtifactRevision(Node):
 
     @strawberry.field
     async def artifact(self, info: Info[StrawberryGQLContext]) -> Artifact:
+        from ai.backend.manager.api.gql.artifact.fetcher import get_registry_url
+
         revision_action_result = (
             await info.context.processors.artifact_revision.get.wait_for_complete(
                 GetArtifactRevisionAction(artifact_revision_id=uuid.UUID(self.id))
@@ -916,18 +915,19 @@ class ArtifactRevision(Node):
             GetArtifactAction(artifact_id=artifact_id)
         )
 
-        registry_meta_loader = DataLoader(
-            apartial(ArtifactRegistryMeta.load_by_id, info.context),
+        data_loaders = info.context.data_loaders
+        registry_url = await get_registry_url(
+            data_loaders,
+            artifact_action_result.result.registry_id,
+            artifact_action_result.result.registry_type,
+        )
+        source_url = await get_registry_url(
+            data_loaders,
+            artifact_action_result.result.source_registry_id,
+            artifact_action_result.result.source_registry_type,
         )
 
-        registry_data = await registry_meta_loader.load(artifact_action_result.result.registry_id)
-        source_registry_data = await registry_meta_loader.load(
-            artifact_action_result.result.source_registry_id
-        )
-
-        return Artifact.from_dataclass(
-            artifact_action_result.result, registry_data.url, source_registry_data.url
-        )
+        return Artifact.from_dataclass(artifact_action_result.result, registry_url, source_url)
 
 
 ArtifactEdge = Edge[Artifact]

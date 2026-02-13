@@ -21,7 +21,6 @@ from strawberry.aiohttp.views import GraphQLView
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
-from ai.backend.manager.api.gql.data_loader.registry import DataLoaderRegistry
 from ai.backend.manager.api.gql.schema import schema as strawberry_schema
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.errors.api import GraphQLError as BackendGQLError
@@ -77,7 +76,6 @@ class CustomGraphQLView(GraphQLView):
             config_provider=root_context.config_provider,
             event_hub=root_context.event_hub,
             event_fetcher=root_context.event_fetcher,
-            dataloader_registry=DataLoaderRegistry(),  # TODO: Remove this.
             gql_adapter=root_context.gql_adapter,
             data_loaders=DataLoaders(root_context.processors),
         )
