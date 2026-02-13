@@ -9,8 +9,9 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
+from ai.backend.common.dto.manager.query import StringFilter
 
-from .types import AgentOrderField, AgentStatusFilter, OrderDirection
+from .types import AgentOrderField, AgentStatusEnumFilter, OrderDirection
 
 __all__ = (
     "AgentFilter",
@@ -22,10 +23,18 @@ __all__ = (
 class AgentFilter(BaseRequestModel):
     """Filter for agents."""
 
-    statuses: list[AgentStatusFilter] | None = Field(
-        default=None, description="Filter by agent statuses"
+    status: AgentStatusEnumFilter | None = Field(
+        default=None,
+        description="Filter by agent status. Supports equals, in, not_equals, and not_in operations.",
     )
-    scaling_group: str | None = Field(default=None, description="Filter by scaling group")
+    scaling_group: StringFilter | None = Field(
+        default=None,
+        description=(
+            "Filter by scaling group name. "
+            "Supports equals, contains, starts_with, ends_with, "
+            "and their case-insensitive and negated variants."
+        ),
+    )
 
 
 class AgentOrder(BaseRequestModel):

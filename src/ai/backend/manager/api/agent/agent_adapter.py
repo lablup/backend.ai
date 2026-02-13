@@ -69,12 +69,34 @@ class AgentAdapter(BaseFilterAdapter):
         """Convert agent filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.statuses is not None and len(filter.statuses) > 0:
-            agent_statuses = [AgentStatus[s.value] for s in filter.statuses]
-            conditions.append(QueryConditions.by_statuses(agent_statuses))
+        if filter.status is not None:
+            if filter.status.equals is not None:
+                conditions.append(
+                    QueryConditions.by_status_equals(AgentStatus[filter.status.equals.value])
+                )
+            if filter.status.in_ is not None and len(filter.status.in_) > 0:
+                agent_statuses = [AgentStatus[s.value] for s in filter.status.in_]
+                conditions.append(QueryConditions.by_statuses(agent_statuses))
+            if filter.status.not_equals is not None:
+                conditions.append(
+                    QueryConditions.by_status_not_equals(
+                        AgentStatus[filter.status.not_equals.value]
+                    )
+                )
+            if filter.status.not_in is not None and len(filter.status.not_in) > 0:
+                agent_statuses = [AgentStatus[s.value] for s in filter.status.not_in]
+                conditions.append(QueryConditions.by_status_not_in(agent_statuses))
 
         if filter.scaling_group is not None:
-            conditions.append(QueryConditions.by_scaling_group(filter.scaling_group))
+            condition = self.convert_string_filter(
+                filter.scaling_group,
+                contains_factory=QueryConditions.by_scaling_group_contains,
+                equals_factory=QueryConditions.by_scaling_group_equals,
+                starts_with_factory=QueryConditions.by_scaling_group_starts_with,
+                ends_with_factory=QueryConditions.by_scaling_group_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
 
         return conditions
 

@@ -14,7 +14,8 @@ from .response import (
 )
 from .types import (
     AgentOrderField,
-    AgentStatusFilter,
+    AgentStatusEnum,
+    AgentStatusEnumFilter,
     OrderDirection,
 )
 
@@ -29,6 +30,7 @@ __all__ = (
     "SearchAgentsResponse",
     # Types
     "AgentOrderField",
-    "AgentStatusFilter",
+    "AgentStatusEnum",
+    "AgentStatusEnumFilter",
     "OrderDirection",
 )

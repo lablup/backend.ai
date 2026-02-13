@@ -18,9 +18,11 @@ from ai.backend.common.dto.manager.agent.request import (
 from ai.backend.common.dto.manager.agent.response import AgentDTO
 from ai.backend.common.dto.manager.agent.types import (
     AgentOrderField,
-    AgentStatusFilter,
+    AgentStatusEnum,
+    AgentStatusEnumFilter,
     OrderDirection,
 )
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.types import AgentId, ResourceSlot
 from ai.backend.manager.api.agent.agent_adapter import AgentAdapter
 from ai.backend.manager.data.agent.types import AgentData, AgentDetailData, AgentStatus
@@ -54,11 +56,11 @@ class TestAgentAdapterBuildQuerier:
         assert querier.pagination.limit == limit
         assert querier.pagination.offset == offset
 
-    def test_build_querier_with_status_filter(self, adapter: AgentAdapter) -> None:
-        """Test building querier with status filter."""
+    def test_build_querier_with_status_equals_filter(self, adapter: AgentAdapter) -> None:
+        """Test building querier with status equals filter."""
         request = SearchAgentsRequest(
             filter=AgentFilter(
-                statuses=[AgentStatusFilter.ALIVE],
+                status=AgentStatusEnumFilter(equals=AgentStatusEnum.ALIVE),
             ),
             order=None,
             limit=50,
@@ -70,11 +72,13 @@ class TestAgentAdapterBuildQuerier:
         assert len(querier.conditions) == 1
         assert callable(querier.conditions[0])
 
-    def test_build_querier_with_multiple_status_filter(self, adapter: AgentAdapter) -> None:
-        """Test building querier with multiple status filters."""
+    def test_build_querier_with_status_in_filter(self, adapter: AgentAdapter) -> None:
+        """Test building querier with status in filter."""
         request = SearchAgentsRequest(
             filter=AgentFilter(
-                statuses=[AgentStatusFilter.ALIVE, AgentStatusFilter.LOST],
+                status=AgentStatusEnumFilter(
+                    in_=[AgentStatusEnum.ALIVE, AgentStatusEnum.LOST],
+                ),
             ),
             order=None,
             limit=50,
@@ -86,11 +90,97 @@ class TestAgentAdapterBuildQuerier:
         assert len(querier.conditions) == 1
         assert callable(querier.conditions[0])
 
-    def test_build_querier_with_scaling_group_filter(self, adapter: AgentAdapter) -> None:
-        """Test building querier with scaling group filter."""
+    def test_build_querier_with_status_not_equals_filter(self, adapter: AgentAdapter) -> None:
+        """Test building querier with status not_equals filter."""
         request = SearchAgentsRequest(
             filter=AgentFilter(
-                scaling_group="default",
+                status=AgentStatusEnumFilter(not_equals=AgentStatusEnum.TERMINATED),
+            ),
+            order=None,
+            limit=50,
+            offset=0,
+        )
+
+        querier = adapter.build_querier(request)
+
+        assert len(querier.conditions) == 1
+        assert callable(querier.conditions[0])
+
+    def test_build_querier_with_status_not_in_filter(self, adapter: AgentAdapter) -> None:
+        """Test building querier with status not_in filter."""
+        request = SearchAgentsRequest(
+            filter=AgentFilter(
+                status=AgentStatusEnumFilter(
+                    not_in=[AgentStatusEnum.TERMINATED, AgentStatusEnum.LOST],
+                ),
+            ),
+            order=None,
+            limit=50,
+            offset=0,
+        )
+
+        querier = adapter.build_querier(request)
+
+        assert len(querier.conditions) == 1
+        assert callable(querier.conditions[0])
+
+    def test_build_querier_with_scaling_group_equals_filter(self, adapter: AgentAdapter) -> None:
+        """Test building querier with scaling group equals filter."""
+        request = SearchAgentsRequest(
+            filter=AgentFilter(
+                scaling_group=StringFilter(equals="default"),
+            ),
+            order=None,
+            limit=50,
+            offset=0,
+        )
+
+        querier = adapter.build_querier(request)
+
+        assert len(querier.conditions) == 1
+        assert callable(querier.conditions[0])
+
+    def test_build_querier_with_scaling_group_contains_filter(self, adapter: AgentAdapter) -> None:
+        """Test building querier with scaling group contains filter."""
+        request = SearchAgentsRequest(
+            filter=AgentFilter(
+                scaling_group=StringFilter(contains="gpu"),
+            ),
+            order=None,
+            limit=50,
+            offset=0,
+        )
+
+        querier = adapter.build_querier(request)
+
+        assert len(querier.conditions) == 1
+        assert callable(querier.conditions[0])
+
+    def test_build_querier_with_scaling_group_starts_with_filter(
+        self, adapter: AgentAdapter
+    ) -> None:
+        """Test building querier with scaling group starts_with filter."""
+        request = SearchAgentsRequest(
+            filter=AgentFilter(
+                scaling_group=StringFilter(starts_with="prod"),
+            ),
+            order=None,
+            limit=50,
+            offset=0,
+        )
+
+        querier = adapter.build_querier(request)
+
+        assert len(querier.conditions) == 1
+        assert callable(querier.conditions[0])
+
+    def test_build_querier_with_scaling_group_i_contains_filter(
+        self, adapter: AgentAdapter
+    ) -> None:
+        """Test building querier with scaling group case-insensitive contains filter."""
+        request = SearchAgentsRequest(
+            filter=AgentFilter(
+                scaling_group=StringFilter(i_contains="GPU"),
             ),
             order=None,
             limit=50,
@@ -106,8 +196,10 @@ class TestAgentAdapterBuildQuerier:
         """Test building querier with both status and scaling group filters."""
         request = SearchAgentsRequest(
             filter=AgentFilter(
-                statuses=[AgentStatusFilter.ALIVE],
-                scaling_group="gpu-group",
+                status=AgentStatusEnumFilter(
+                    in_=[AgentStatusEnum.ALIVE],
+                ),
+                scaling_group=StringFilter(equals="gpu-group"),
             ),
             order=None,
             limit=50,
@@ -190,11 +282,11 @@ class TestAgentAdapterBuildQuerier:
         assert querier.pagination.limit == limit
         assert querier.pagination.offset == offset
 
-    def test_build_querier_with_empty_statuses(self, adapter: AgentAdapter) -> None:
-        """Test building querier with empty statuses list does not add condition."""
+    def test_build_querier_with_empty_status_in_filter(self, adapter: AgentAdapter) -> None:
+        """Test building querier with empty status in_ list does not add condition."""
         request = SearchAgentsRequest(
             filter=AgentFilter(
-                statuses=[],
+                status=AgentStatusEnumFilter(in_=[]),
             ),
             order=None,
             limit=50,
