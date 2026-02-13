@@ -108,10 +108,8 @@ class RunningTransitionHook(StatusTransitionHook):
                 occupying_slots=total_occupied_slots,
             )
         ]
-        await self._deps.scheduler_repository.update_sessions_to_running(running_data)
 
         # Record allocations in normalized resource_allocations / agent_resources tables.
-        # Use batch method for single-transaction all-or-nothing semantics.
         allocations: list[tuple[KernelId, str, list[SlotQuantity]]] = []
         for kernel_info in session.kernel_infos:
             agent_id = kernel_info.resource.agent
@@ -119,8 +117,11 @@ class RunningTransitionHook(StatusTransitionHook):
                 quantities = resource_slot_to_quantities(kernel_info.resource.occupied_slots)
                 if quantities:
                     allocations.append((kernel_info.id, agent_id, quantities))
-        if allocations:
-            await self._deps.scheduler_repository.allocate_session_kernel_resources(allocations)
+
+        # Single transaction: session update + resource allocation are atomic.
+        await self._deps.scheduler_repository.update_running_and_allocate_resources(
+            running_data, allocations
+        )
 
         log.debug(
             "Updated occupied_slots for session {} transitioning to RUNNING",

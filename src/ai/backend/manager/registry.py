@@ -2220,7 +2220,7 @@ class AgentRegistry:
             for r in released:
                 if r.used is None:
                     continue
-                new_used = ar.c.used - r.used
+                new_used = sa.func.greatest(ar.c.used - r.used, 0)
                 await db_sess.execute(
                     sa.update(ar)
                     .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)

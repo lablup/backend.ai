@@ -3274,6 +3274,67 @@ class ScheduleDBSource:
                     total_allocated += 1
             return total_allocated
 
+    async def update_running_and_allocate_resources(
+        self,
+        sessions_data: list[SessionRunningData],
+        allocations: Sequence[tuple[UUID, str, Sequence[SlotQuantity]]],
+    ) -> int:
+        """Atomically update session occupying_slots AND allocate kernel resources.
+
+        Single transaction guarantees:
+        - If allocation fails, session update is also rolled back.
+        - Idempotent per kernel (used_at IS NULL guard).
+
+        Returns:
+            Total number of slots allocated across all kernels.
+
+        Raises:
+            AgentResourceCapacityExceeded: If any slot would exceed agent capacity.
+        """
+        ar = AgentResourceRow.__table__
+        total_allocated = 0
+        async with self._begin_session_read_committed() as db_sess:
+            # Phase 1: Update session occupying_slots
+            for session_data in sessions_data:
+                stmt = (
+                    sa.update(SessionRow)
+                    .where(SessionRow.id == session_data.session_id)
+                    .values(occupying_slots=session_data.occupying_slots)
+                )
+                await db_sess.execute(stmt)
+
+            # Phase 2: Allocate kernel resources (same transaction)
+            for kernel_id, agent_id, slots in allocations:
+                for s in slots:
+                    alloc_result = await db_sess.execute(
+                        sa.update(ResourceAllocationRow)
+                        .where(
+                            ResourceAllocationRow.kernel_id == kernel_id,
+                            ResourceAllocationRow.slot_name == s.slot_name,
+                            ResourceAllocationRow.free_at.is_(None),
+                            ResourceAllocationRow.used_at.is_(None),
+                        )
+                        .values(used=s.quantity, used_at=sa.func.now())
+                    )
+                    if cast(CursorResult[Any], alloc_result).rowcount == 0:
+                        continue
+                    new_used = ar.c.used + s.quantity
+                    result = await db_sess.execute(
+                        sa.update(ar)
+                        .where(
+                            ar.c.agent_id == agent_id,
+                            ar.c.slot_name == s.slot_name,
+                            new_used <= ar.c.capacity,
+                        )
+                        .values(used=new_used)
+                    )
+                    if cast(CursorResult[Any], result).rowcount == 0:
+                        raise AgentResourceCapacityExceeded(
+                            f"Agent {agent_id}: capacity exceeded for slot '{s.slot_name}'"
+                        )
+                    total_allocated += 1
+            return total_allocated
+
     async def free_kernel_resources(
         self,
         kernel_id: UUID,
@@ -3302,7 +3363,7 @@ class ScheduleDBSource:
             for r in released:
                 if r.used is None:
                     continue
-                new_used = ar.c.used - r.used
+                new_used = sa.func.greatest(ar.c.used - r.used, 0)
                 await db_sess.execute(
                     sa.update(ar)
                     .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)

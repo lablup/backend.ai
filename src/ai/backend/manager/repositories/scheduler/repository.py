@@ -376,6 +376,20 @@ class SchedulerRepository:
         return await self._db_source.allocate_session_kernel_resources(allocations)
 
     @scheduler_repository_resilience.apply()
+    async def update_running_and_allocate_resources(
+        self,
+        sessions_data: list[SessionRunningData],
+        allocations: Sequence[tuple[UUID, str, Sequence[SlotQuantity]]],
+    ) -> int:
+        """Atomically update session occupying_slots and allocate kernel resources.
+
+        Single transaction: if allocation fails, session update is also rolled back.
+        """
+        return await self._db_source.update_running_and_allocate_resources(
+            sessions_data, allocations
+        )
+
+    @scheduler_repository_resilience.apply()
     async def free_kernel_resources(
         self,
         kernel_id: UUID,
