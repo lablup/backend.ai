@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any, Self
 
 from pydantic import BaseModel, Field
@@ -9,17 +10,30 @@ from pydantic import BaseModel, Field
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 
 
+@dataclass
+class HuggingFaceRegistryData:
+    id: uuid.UUID
+    name: str
+    url: str
+    token: str | None
+
+
+@dataclass
+class ReservoirRegistryData:
+    id: uuid.UUID
+    name: str
+    endpoint: str
+    access_key: str
+    secret_key: str
+    api_version: str
+
+
 class ArtifactRegistryStatefulData(BaseModel):
-    """Base class for artifact registry stateful data."""
+    """Base class for stateful data stored in Valkey for artifact registries."""
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> Self:
-        """Create instance from dictionary with Pydantic validation."""
+    def from_mapping(cls, data: Mapping[str, Any]) -> Self:
         return cls.model_validate(data)
-
-    def to_dict(self) -> Mapping[str, Any]:
-        """Convert instance to dictionary with JSON-compatible types."""
-        return self.model_dump(mode="json")
 
 
 class _CommonArtifactRegistryStatefulData(ArtifactRegistryStatefulData):
