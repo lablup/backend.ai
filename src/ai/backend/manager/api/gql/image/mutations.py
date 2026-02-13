@@ -59,7 +59,7 @@ from .types import ImageV2GQL
     Input for forgetting an image by ID.
     """)
 )
-class ForgetImageInputGQL:
+class ForgetImageV2InputGQL:
     image_id: ID = strawberry.field(description="The ID of the image to forget.")
 
 
@@ -70,7 +70,7 @@ class ForgetImageInputGQL:
     Options for purging an image.
     """)
 )
-class PurgeImageOptionsGQL:
+class PurgeImageV2OptionsGQL:
     remove_from_registry: bool = strawberry.field(
         default=False,
         description="Untag the deleted image from the registry. Only available for HarborV2 registries.",
@@ -84,9 +84,9 @@ class PurgeImageOptionsGQL:
     Input for purging an image by ID.
     """)
 )
-class PurgeImageInputGQL:
+class PurgeImageV2InputGQL:
     image_id: ID = strawberry.field(description="The ID of the image to purge.")
-    options: PurgeImageOptionsGQL | None = strawberry.field(
+    options: PurgeImageV2OptionsGQL | None = strawberry.field(
         default=None,
         description="Options for purging the image.",
     )
@@ -99,7 +99,7 @@ class PurgeImageInputGQL:
     Input for creating an alias for an image by ID.
     """)
 )
-class AliasImageInputGQL:
+class AliasImageV2InputGQL:
     image_id: ID = strawberry.field(description="The ID of the image to alias.")
     alias: str = strawberry.field(description="The alias to create.")
 
@@ -111,7 +111,7 @@ class AliasImageInputGQL:
     Input for removing an alias from an image.
     """)
 )
-class DealiasImageInputGQL:
+class DealiasImageV2InputGQL:
     alias: str = strawberry.field(description="The alias to remove.")
 
 
@@ -122,7 +122,7 @@ class DealiasImageInputGQL:
     Input for clearing custom resource limits for an image.
     """)
 )
-class ClearImageResourceLimitInputGQL:
+class ClearImageV2ResourceLimitInputGQL:
     image_id: ID = strawberry.field(description="The ID of the image to clear resource limits for.")
 
 
@@ -133,7 +133,7 @@ class ClearImageResourceLimitInputGQL:
     Input for untagging an image from its container registry.
     """)
 )
-class UntagImageFromRegistryInputGQL:
+class UntagImageV2FromRegistryInputGQL:
     image_id: ID = strawberry.field(description="The ID of the image to untag from registry.")
 
 
@@ -165,7 +165,7 @@ class ResourceLimitInputGQL:
     Input for setting custom resource limits for an image.
     """)
 )
-class SetImageResourceLimitInputGQL:
+class SetImageV2ResourceLimitInputGQL:
     image_id: ID = strawberry.field(description="The ID of the image to set resource limits for.")
     resource_limit: ResourceLimitInputGQL = strawberry.field(
         description="The resource limit to set.",
@@ -179,7 +179,7 @@ class SetImageResourceLimitInputGQL:
     Input for an image label (key-value pair).
     """)
 )
-class ImageLabelInputGQL:
+class ImageV2LabelInputGQL:
     key: str = strawberry.field(description="The key of the label.")
     value: str = strawberry.field(description="The value of the label.")
 
@@ -204,7 +204,7 @@ class ResourceLimitModifyInputGQL:
     Input for modifying an image's properties.
     """)
 )
-class ModifyImagePropsInputGQL:
+class ModifyImageV2PropsInputGQL:
     name: str | None = strawberry.field(default=None, description="The new name for the image.")
     registry: str | None = strawberry.field(
         default=None, description="The new registry for the image."
@@ -228,7 +228,7 @@ class ModifyImagePropsInputGQL:
     digest: str | None = strawberry.field(
         default=None, description="The config digest of the image."
     )
-    labels: list[ImageLabelInputGQL] | None = strawberry.field(
+    labels: list[ImageV2LabelInputGQL] | None = strawberry.field(
         default=None, description="The labels for the image."
     )
     supported_accelerators: list[str] | None = strawberry.field(
@@ -300,9 +300,9 @@ class ModifyImagePropsInputGQL:
     Input for modifying an image by ID.
     """)
 )
-class ModifyImageInputGQL:
+class ModifyImageV2InputGQL:
     image_id: ID = strawberry.field(description="The ID of the image to modify.")
-    props: ModifyImagePropsInputGQL = strawberry.field(description="The properties to modify.")
+    props: ModifyImageV2PropsInputGQL = strawberry.field(description="The properties to modify.")
 
 
 # =============================================================================
@@ -311,7 +311,7 @@ class ModifyImageInputGQL:
 
 
 @strawberry.type(
-    name="ForgetImageResult",
+    name="ForgetImageV2Result",
     description=dedent_strip("""
     Added in 26.2.0.
 
@@ -319,12 +319,12 @@ class ModifyImageInputGQL:
     but not removed from the database.
     """),
 )
-class ForgetImageResultGQL:
+class ForgetImageV2ResultGQL:
     image: ImageV2GQL = strawberry.field(description="The forgotten image.")
 
 
 @strawberry.type(
-    name="PurgeImageResult",
+    name="PurgeImageV2Result",
     description=dedent_strip("""
     Added in 26.2.0.
 
@@ -332,81 +332,81 @@ class ForgetImageResultGQL:
     from the database.
     """),
 )
-class PurgeImageResultGQL:
+class PurgeImageV2ResultGQL:
     image: ImageV2GQL = strawberry.field(description="The purged image data.")
 
 
 @strawberry.type(
-    name="AliasImageResult",
+    name="AliasImageV2Result",
     description=dedent_strip("""
     Added in 26.2.0.
 
     Result of creating an alias for an image.
     """),
 )
-class AliasImageResultGQL:
+class AliasImageV2ResultGQL:
     image_id: ID = strawberry.field(description="The ID of the aliased image.")
     alias: str = strawberry.field(description="The created alias.")
 
 
 @strawberry.type(
-    name="DealiasImageResult",
+    name="DealiasImageV2Result",
     description=dedent_strip("""
     Added in 26.2.0.
 
     Result of removing an alias from an image.
     """),
 )
-class DealiasImageResultGQL:
+class DealiasImageV2ResultGQL:
     image_id: ID = strawberry.field(description="The ID of the image that had the alias.")
     alias: str = strawberry.field(description="The removed alias.")
 
 
 @strawberry.type(
-    name="ClearImageResourceLimitResult",
+    name="ClearImageV2ResourceLimitResult",
     description=dedent_strip("""
     Added in 26.2.0.
 
     Result of clearing custom resource limits for an image.
     """),
 )
-class ClearImageResourceLimitResultGQL:
+class ClearImageV2ResourceLimitResultGQL:
     image: ImageV2GQL = strawberry.field(description="The image with cleared resource limits.")
 
 
 @strawberry.type(
-    name="UntagImageFromRegistryResult",
+    name="UntagImageV2FromRegistryResult",
     description=dedent_strip("""
     Added in 26.2.0.
 
     Result of untagging an image from its container registry.
     """),
 )
-class UntagImageFromRegistryResultGQL:
+class UntagImageV2FromRegistryResultGQL:
     image: ImageV2GQL = strawberry.field(description="The untagged image.")
 
 
 @strawberry.type(
-    name="SetImageResourceLimitResult",
+    name="SetImageV2ResourceLimitResult",
     description=dedent_strip("""
     Added in 26.2.0.
 
     Result of setting custom resource limits for an image.
     """),
 )
-class SetImageResourceLimitResultGQL:
+class SetImageV2ResourceLimitResultGQL:
     image: ImageV2GQL = strawberry.field(description="The image with updated resource limits.")
 
 
 @strawberry.type(
-    name="ModifyImageResult",
+    name="ModifyImageV2Result",
     description=dedent_strip("""
     Added in 26.2.0.
 
     Result of modifying an image.
     """),
 )
-class ModifyImageResultGQL:
+class ModifyImageV2ResultGQL:
     image: ImageV2GQL = strawberry.field(description="The modified image.")
 
 
@@ -425,10 +425,10 @@ class ModifyImageResultGQL:
     This is a soft delete operation.
     """)
 )  # type: ignore[misc]
-async def admin_forget_image(
-    input: ForgetImageInputGQL,
+async def admin_forget_image_v2(
+    input: ForgetImageV2InputGQL,
     info: Info[StrawberryGQLContext],
-) -> ForgetImageResultGQL:
+) -> ForgetImageV2ResultGQL:
     check_admin_only()
     ctx = info.context
 
@@ -436,7 +436,7 @@ async def admin_forget_image(
         ForgetImageByIdAction(image_id=ImageID(UUID(input.image_id)))
     )
 
-    return ForgetImageResultGQL(image=ImageV2GQL.from_data(result.image))
+    return ForgetImageV2ResultGQL(image=ImageV2GQL.from_data(result.image))
 
 
 @strawberry.mutation(
@@ -449,10 +449,10 @@ async def admin_forget_image(
     This is a soft delete operation.
     """)
 )  # type: ignore[misc]
-async def user_forget_image(
-    input: ForgetImageInputGQL,
+async def user_forget_image_v2(
+    input: ForgetImageV2InputGQL,
     info: Info[StrawberryGQLContext],
-) -> ForgetImageResultGQL:
+) -> ForgetImageV2ResultGQL:
     me = current_user()
     if me is None:
         raise InsufficientPrivilege("Authentication required")
@@ -462,7 +462,7 @@ async def user_forget_image(
         ForgetImageByIdAction(image_id=ImageID(UUID(input.image_id)))
     )
 
-    return ForgetImageResultGQL(image=ImageV2GQL.from_data(result.image))
+    return ForgetImageV2ResultGQL(image=ImageV2GQL.from_data(result.image))
 
 
 @strawberry.mutation(
@@ -475,10 +475,10 @@ async def user_forget_image(
     can also be untagged from the container registry (HarborV2 only).
     """)
 )  # type: ignore[misc]
-async def admin_purge_image(
-    input: PurgeImageInputGQL,
+async def admin_purge_image_v2(
+    input: PurgeImageV2InputGQL,
     info: Info[StrawberryGQLContext],
-) -> PurgeImageResultGQL:
+) -> PurgeImageV2ResultGQL:
     check_admin_only()
     ctx = info.context
     image_uuid = UUID(input.image_id)
@@ -492,7 +492,7 @@ async def admin_purge_image(
             UntagImageFromRegistryAction(image_id=ImageID(image_uuid))
         )
 
-    return PurgeImageResultGQL(image=ImageV2GQL.from_data(result.image))
+    return PurgeImageV2ResultGQL(image=ImageV2GQL.from_data(result.image))
 
 
 @strawberry.mutation(
@@ -505,10 +505,10 @@ async def admin_purge_image(
     can also be untagged from the container registry (HarborV2 only).
     """)
 )  # type: ignore[misc]
-async def user_purge_image(
-    input: PurgeImageInputGQL,
+async def user_purge_image_v2(
+    input: PurgeImageV2InputGQL,
     info: Info[StrawberryGQLContext],
-) -> PurgeImageResultGQL:
+) -> PurgeImageV2ResultGQL:
     me = current_user()
     if me is None:
         raise InsufficientPrivilege("Authentication required")
@@ -524,7 +524,7 @@ async def user_purge_image(
             UntagImageFromRegistryAction(image_id=ImageID(image_uuid))
         )
 
-    return PurgeImageResultGQL(image=ImageV2GQL.from_data(result.image))
+    return PurgeImageV2ResultGQL(image=ImageV2GQL.from_data(result.image))
 
 
 @strawberry.mutation(
@@ -537,10 +537,10 @@ async def user_purge_image(
     Multiple aliases can be created for the same image.
     """)
 )  # type: ignore[misc]
-async def admin_alias_image(
-    input: AliasImageInputGQL,
+async def admin_alias_image_v2(
+    input: AliasImageV2InputGQL,
     info: Info[StrawberryGQLContext],
-) -> AliasImageResultGQL:
+) -> AliasImageV2ResultGQL:
     check_admin_only()
     ctx = info.context
 
@@ -551,7 +551,7 @@ async def admin_alias_image(
         )
     )
 
-    return AliasImageResultGQL(
+    return AliasImageV2ResultGQL(
         image_id=ID(str(result.image_id)),
         alias=result.image_alias.alias,
     )
@@ -564,10 +564,10 @@ async def admin_alias_image(
     Remove an alias from an image.
     """)
 )  # type: ignore[misc]
-async def admin_dealias_image(
-    input: DealiasImageInputGQL,
+async def admin_dealias_image_v2(
+    input: DealiasImageV2InputGQL,
     info: Info[StrawberryGQLContext],
-) -> DealiasImageResultGQL:
+) -> DealiasImageV2ResultGQL:
     check_admin_only()
     ctx = info.context
 
@@ -575,7 +575,7 @@ async def admin_dealias_image(
         DealiasImageAction(alias=input.alias)
     )
 
-    return DealiasImageResultGQL(
+    return DealiasImageV2ResultGQL(
         image_id=ID(str(result.image_id)),
         alias=result.image_alias.alias,
     )
@@ -591,10 +591,10 @@ async def admin_dealias_image(
     specified in the image labels.
     """)
 )  # type: ignore[misc]
-async def admin_clear_image_resource_limit(
-    input: ClearImageResourceLimitInputGQL,
+async def admin_clear_image_v2_resource_limit(
+    input: ClearImageV2ResourceLimitInputGQL,
     info: Info[StrawberryGQLContext],
-) -> ClearImageResourceLimitResultGQL:
+) -> ClearImageV2ResourceLimitResultGQL:
     check_admin_only()
     ctx = info.context
 
@@ -602,7 +602,7 @@ async def admin_clear_image_resource_limit(
         ClearImageCustomResourceLimitByIdAction(image_id=ImageID(UUID(input.image_id)))
     )
 
-    return ClearImageResourceLimitResultGQL(image=ImageV2GQL.from_data(result.image_data))
+    return ClearImageV2ResourceLimitResultGQL(image=ImageV2GQL.from_data(result.image_data))
 
 
 @strawberry.mutation(
@@ -614,10 +614,10 @@ async def admin_clear_image_resource_limit(
     This removes the image tag from the registry. Only available for HarborV2 registries.
     """)
 )  # type: ignore[misc]
-async def admin_untag_image_from_registry(
-    input: UntagImageFromRegistryInputGQL,
+async def admin_untag_image_v2_from_registry(
+    input: UntagImageV2FromRegistryInputGQL,
     info: Info[StrawberryGQLContext],
-) -> UntagImageFromRegistryResultGQL:
+) -> UntagImageV2FromRegistryResultGQL:
     check_admin_only()
     ctx = info.context
 
@@ -625,7 +625,7 @@ async def admin_untag_image_from_registry(
         UntagImageFromRegistryAction(image_id=ImageID(UUID(input.image_id)))
     )
 
-    return UntagImageFromRegistryResultGQL(image=ImageV2GQL.from_data(result.image))
+    return UntagImageV2FromRegistryResultGQL(image=ImageV2GQL.from_data(result.image))
 
 
 @strawberry.mutation(
@@ -637,10 +637,10 @@ async def admin_untag_image_from_registry(
     This removes the image tag from the registry. Only available for HarborV2 registries.
     """)
 )  # type: ignore[misc]
-async def user_untag_image_from_registry(
-    input: UntagImageFromRegistryInputGQL,
+async def user_untag_image_v2_from_registry(
+    input: UntagImageV2FromRegistryInputGQL,
     info: Info[StrawberryGQLContext],
-) -> UntagImageFromRegistryResultGQL:
+) -> UntagImageV2FromRegistryResultGQL:
     me = current_user()
     if me is None:
         raise InsufficientPrivilege("Authentication required")
@@ -650,7 +650,7 @@ async def user_untag_image_from_registry(
         UntagImageFromRegistryAction(image_id=ImageID(UUID(input.image_id)))
     )
 
-    return UntagImageFromRegistryResultGQL(image=ImageV2GQL.from_data(result.image))
+    return UntagImageV2FromRegistryResultGQL(image=ImageV2GQL.from_data(result.image))
 
 
 @strawberry.mutation(
@@ -662,10 +662,10 @@ async def user_untag_image_from_registry(
     This allows overriding the default resource limits specified in the image labels.
     """)
 )  # type: ignore[misc]
-async def admin_set_image_resource_limit(
-    input: SetImageResourceLimitInputGQL,
+async def admin_set_image_v2_resource_limit(
+    input: SetImageV2ResourceLimitInputGQL,
     info: Info[StrawberryGQLContext],
-) -> SetImageResourceLimitResultGQL:
+) -> SetImageV2ResourceLimitResultGQL:
     check_admin_only()
     ctx = info.context
 
@@ -686,7 +686,7 @@ async def admin_set_image_resource_limit(
         )
     )
 
-    return SetImageResourceLimitResultGQL(image=ImageV2GQL.from_data(result.image_data))
+    return SetImageV2ResourceLimitResultGQL(image=ImageV2GQL.from_data(result.image_data))
 
 
 @strawberry.mutation(
@@ -699,10 +699,10 @@ async def admin_set_image_resource_limit(
     and supported accelerators.
     """)
 )  # type: ignore[misc]
-async def admin_modify_image(
-    input: ModifyImageInputGQL,
+async def admin_modify_image_v2(
+    input: ModifyImageV2InputGQL,
     info: Info[StrawberryGQLContext],
-) -> ModifyImageResultGQL:
+) -> ModifyImageV2ResultGQL:
     check_admin_only()
     ctx = info.context
 
@@ -713,4 +713,4 @@ async def admin_modify_image(
         )
     )
 
-    return ModifyImageResultGQL(image=ImageV2GQL.from_data(result.image))
+    return ModifyImageV2ResultGQL(image=ImageV2GQL.from_data(result.image))

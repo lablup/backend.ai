@@ -117,23 +117,23 @@ from .huggingface_registry import (
     update_huggingface_registry,
 )
 from .image import (
-    admin_alias_image,
-    admin_clear_image_resource_limit,
-    admin_dealias_image,
-    admin_forget_image,
+    admin_alias_image_v2,
+    admin_clear_image_v2_resource_limit,
+    admin_dealias_image_v2,
+    admin_forget_image_v2,
     admin_image_aliases,
     admin_images_v2,
-    admin_modify_image,
-    admin_purge_image,
-    admin_set_image_resource_limit,
-    admin_untag_image_from_registry,
+    admin_modify_image_v2,
+    admin_purge_image_v2,
+    admin_set_image_v2_resource_limit,
+    admin_untag_image_v2_from_registry,
     container_registry_images_v2,
     image_alias,
     image_scoped_aliases,
     image_v2,
-    user_forget_image,
-    user_purge_image,
-    user_untag_image_from_registry,
+    user_forget_image_v2,
+    user_purge_image_v2,
+    user_untag_image_v2_from_registry,
 )
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
 from .notification import (
@@ -455,18 +455,18 @@ class Mutation:
     admin_purge_user = admin_purge_user
     admin_purge_users = admin_purge_users
     # Image - Admin APIs
-    admin_forget_image = admin_forget_image
-    admin_purge_image = admin_purge_image
-    admin_untag_image_from_registry = admin_untag_image_from_registry
-    admin_alias_image = admin_alias_image
-    admin_dealias_image = admin_dealias_image
-    admin_clear_image_resource_limit = admin_clear_image_resource_limit
-    admin_set_image_resource_limit = admin_set_image_resource_limit
-    admin_modify_image = admin_modify_image
+    admin_forget_image_v2 = admin_forget_image_v2
+    admin_purge_image_v2 = admin_purge_image_v2
+    admin_untag_image_v2_from_registry = admin_untag_image_v2_from_registry
+    admin_alias_image_v2 = admin_alias_image_v2
+    admin_dealias_image_v2 = admin_dealias_image_v2
+    admin_clear_image_v2_resource_limit = admin_clear_image_v2_resource_limit
+    admin_set_image_v2_resource_limit = admin_set_image_v2_resource_limit
+    admin_modify_image_v2 = admin_modify_image_v2
     # Image - User APIs
-    user_forget_image = user_forget_image
-    user_purge_image = user_purge_image
-    user_untag_image_from_registry = user_untag_image_from_registry
+    user_forget_image_v2 = user_forget_image_v2
+    user_purge_image_v2 = user_purge_image_v2
+    user_untag_image_v2_from_registry = user_untag_image_v2_from_registry
 
 
 @strawberry.type
