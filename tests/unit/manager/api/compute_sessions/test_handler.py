@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.compute_session import (
     OrderDirection,
     SearchComputeSessionsRequest,
 )
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.types import (
     ClusterMode,
     KernelId,
@@ -248,6 +249,81 @@ class TestComputeSessionsAdapter:
         querier = self.adapter.build_session_querier(request)
 
         assert len(querier.orders) == 1
+
+    def test_build_session_querier_with_name_filter(self) -> None:
+        """Build querier with name filter should produce a condition."""
+        request = SearchComputeSessionsRequest(
+            filter=ComputeSessionFilter(name=StringFilter(contains="my-session"))
+        )
+        querier = self.adapter.build_session_querier(request)
+
+        assert len(querier.conditions) == 1
+        assert callable(querier.conditions[0])
+
+    def test_build_session_querier_with_access_key_filter(self) -> None:
+        """Build querier with access_key filter should produce a condition."""
+        request = SearchComputeSessionsRequest(
+            filter=ComputeSessionFilter(access_key=StringFilter(equals="TESTKEY"))
+        )
+        querier = self.adapter.build_session_querier(request)
+
+        assert len(querier.conditions) == 1
+        assert callable(querier.conditions[0])
+
+    def test_build_session_querier_with_domain_name_filter(self) -> None:
+        """Build querier with domain_name filter should produce a condition."""
+        request = SearchComputeSessionsRequest(
+            filter=ComputeSessionFilter(domain_name=StringFilter(starts_with="prod"))
+        )
+        querier = self.adapter.build_session_querier(request)
+
+        assert len(querier.conditions) == 1
+        assert callable(querier.conditions[0])
+
+    def test_build_session_querier_with_scaling_group_filter(self) -> None:
+        """Build querier with scaling_group_name filter should produce a condition."""
+        request = SearchComputeSessionsRequest(
+            filter=ComputeSessionFilter(scaling_group_name=StringFilter(equals="default"))
+        )
+        querier = self.adapter.build_session_querier(request)
+
+        assert len(querier.conditions) == 1
+        assert callable(querier.conditions[0])
+
+    def test_build_session_querier_with_multiple_filters(self) -> None:
+        """Build querier with multiple filter fields should produce multiple conditions."""
+        request = SearchComputeSessionsRequest(
+            filter=ComputeSessionFilter(
+                status=["RUNNING"],
+                name=StringFilter(contains="test"),
+                access_key=StringFilter(equals="TESTKEY"),
+                domain_name=StringFilter(i_contains="default"),
+            )
+        )
+        querier = self.adapter.build_session_querier(request)
+
+        # 1 status + 1 name + 1 access_key + 1 domain_name
+        assert len(querier.conditions) == 4
+
+    def test_build_session_querier_with_case_insensitive_name_filter(self) -> None:
+        """Build querier with case-insensitive name filter should produce a condition."""
+        request = SearchComputeSessionsRequest(
+            filter=ComputeSessionFilter(name=StringFilter(i_equals="My-Session"))
+        )
+        querier = self.adapter.build_session_querier(request)
+
+        assert len(querier.conditions) == 1
+        assert callable(querier.conditions[0])
+
+    def test_build_session_querier_with_negated_filter(self) -> None:
+        """Build querier with negated filter should produce a condition."""
+        request = SearchComputeSessionsRequest(
+            filter=ComputeSessionFilter(name=StringFilter(not_contains="debug"))
+        )
+        querier = self.adapter.build_session_querier(request)
+
+        assert len(querier.conditions) == 1
+        assert callable(querier.conditions[0])
 
     def test_build_kernel_querier_for_sessions(self) -> None:
         """Build kernel querier should use NoPagination and session_id condition."""

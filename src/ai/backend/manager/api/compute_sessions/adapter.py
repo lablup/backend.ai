@@ -36,8 +36,6 @@ from ai.backend.manager.repositories.scheduler.options import (
     SessionOrders,
 )
 
-__all__ = ("ComputeSessionsAdapter",)
-
 
 class ComputeSessionsAdapter(BaseFilterAdapter):
     """Adapter for converting compute session requests to repository queries."""
@@ -112,6 +110,39 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
         if filter.status is not None and len(filter.status) > 0:
             statuses = [SessionStatus(s) for s in filter.status]
             conditions.append(SessionConditions.by_statuses(statuses))
+
+        if filter.name is not None:
+            condition = self.convert_string_filter(
+                filter.name,
+                contains_factory=SessionConditions.by_name_contains,
+                equals_factory=SessionConditions.by_name_equals,
+                starts_with_factory=SessionConditions.by_name_starts_with,
+                ends_with_factory=SessionConditions.by_name_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter.access_key is not None:
+            condition = self.convert_string_filter(
+                filter.access_key,
+                contains_factory=SessionConditions.by_access_key_contains,
+                equals_factory=SessionConditions.by_access_key_equals,
+                starts_with_factory=SessionConditions.by_access_key_starts_with,
+                ends_with_factory=SessionConditions.by_access_key_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter.domain_name is not None:
+            condition = self.convert_string_filter(
+                filter.domain_name,
+                contains_factory=SessionConditions.by_domain_name_contains,
+                equals_factory=SessionConditions.by_domain_name_equals,
+                starts_with_factory=SessionConditions.by_domain_name_starts_with,
+                ends_with_factory=SessionConditions.by_domain_name_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
 
         if filter.scaling_group_name is not None:
             condition = self.convert_string_filter(

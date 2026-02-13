@@ -29,6 +29,9 @@ class ComputeSessionFilter(BaseRequestModel):
     """Filter for compute sessions."""
 
     status: list[str] | None = Field(default=None, description="Filter by session status")
+    name: StringFilter | None = Field(default=None, description="Filter by session name")
+    access_key: StringFilter | None = Field(default=None, description="Filter by access key")
+    domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
     scaling_group_name: StringFilter | None = Field(
         default=None, description="Filter by scaling group name"
     )
