@@ -30,6 +30,7 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
     SlotName,
+    SlotQuantity,
     SlotTypes,
     ValkeyTarget,
 )
@@ -79,6 +80,14 @@ from ai.backend.manager.repositories.resource_preset.types import (
     CheckPresetsResult,
 )
 from ai.backend.testutils.db import with_tables
+
+
+def _qty(slots: list[SlotQuantity], name: str) -> Decimal:
+    """Find a SlotQuantity by slot_name and return its quantity."""
+    return next(
+        (sq.quantity for sq in slots if sq.slot_name == name),
+        Decimal("0"),
+    )
 
 
 class TestCheckPresetsOccupiedSlots:
@@ -693,10 +702,10 @@ class TestCheckPresetsOccupiedSlots:
 
         # Verify: available (16 CPU, 32GB) - occupied (4 CPU, 8GB) = remaining (12 CPU, 24GB)
         sg_data = result.scaling_groups[test_scaling_group_name]
-        assert sg_data.remaining["cpu"] == Decimal("12")
-        assert sg_data.remaining["mem"] == Decimal("24576")
-        assert sg_data.using["cpu"] == Decimal("4")
-        assert sg_data.using["mem"] == Decimal("8192")
+        assert _qty(sg_data.remaining, "cpu") == Decimal("12")
+        assert _qty(sg_data.remaining, "mem") == Decimal("24576")
+        assert _qty(sg_data.using, "cpu") == Decimal("4")
+        assert _qty(sg_data.using, "mem") == Decimal("8192")
 
     async def test_terminating_kernels_count_towards_occupied_slots(
         self,
@@ -823,10 +832,10 @@ class TestCheckPresetsOccupiedSlots:
 
         # Verify: available (16 CPU, 32GB) - occupied (2 CPU, 4GB) = remaining (14 CPU, 28GB)
         sg_data = result.scaling_groups[test_scaling_group_name]
-        assert sg_data.remaining["cpu"] == Decimal("14")
-        assert sg_data.remaining["mem"] == Decimal("28672")
-        assert sg_data.using["cpu"] == Decimal("2")
-        assert sg_data.using["mem"] == Decimal("4096")
+        assert _qty(sg_data.remaining, "cpu") == Decimal("14")
+        assert _qty(sg_data.remaining, "mem") == Decimal("28672")
+        assert _qty(sg_data.using, "cpu") == Decimal("2")
+        assert _qty(sg_data.using, "mem") == Decimal("4096")
 
     async def test_pending_kernels_do_not_count_towards_occupied_slots(
         self,
@@ -945,10 +954,10 @@ class TestCheckPresetsOccupiedSlots:
 
         # Verify: available (16 CPU, 32GB) - occupied (0) = remaining (16 CPU, 32GB)
         sg_data = result.scaling_groups[test_scaling_group_name]
-        assert sg_data.remaining["cpu"] == Decimal("16")
-        assert sg_data.remaining["mem"] == Decimal("32768")
-        assert sg_data.using["cpu"] == Decimal("0")
-        assert sg_data.using["mem"] == Decimal("0")
+        assert _qty(sg_data.remaining, "cpu") == Decimal("16")
+        assert _qty(sg_data.remaining, "mem") == Decimal("32768")
+        assert _qty(sg_data.using, "cpu") == Decimal("0")
+        assert _qty(sg_data.using, "mem") == Decimal("0")
 
     async def test_ignores_cached_occupied_slots_in_agent_row(
         self,
@@ -1115,10 +1124,10 @@ class TestCheckPresetsOccupiedSlots:
         # Verify: Should use actual kernel occupied (3 CPU, 6GB) NOT cached (10 CPU, 20GB)
         # available (16 CPU, 32GB) - actual occupied (3 CPU, 6GB) = remaining (13 CPU, 26GB)
         sg_data = result.scaling_groups[test_scaling_group_name]
-        assert sg_data.remaining["cpu"] == Decimal("13")
-        assert sg_data.remaining["mem"] == Decimal("26624")
-        assert sg_data.using["cpu"] == Decimal("3")
-        assert sg_data.using["mem"] == Decimal("6144")
+        assert _qty(sg_data.remaining, "cpu") == Decimal("13")
+        assert _qty(sg_data.remaining, "mem") == Decimal("26624")
+        assert _qty(sg_data.using, "cpu") == Decimal("3")
+        assert _qty(sg_data.using, "mem") == Decimal("6144")
 
     async def test_non_alive_agents_excluded_from_remaining_calculation(
         self,
@@ -1147,5 +1156,5 @@ class TestCheckPresetsOccupiedSlots:
         # Verify: Only ALIVE agents (2 x 16 CPU, 2 x 32GB) should be counted
         # Non-ALIVE agents (3 x 100 CPU) should be excluded
         sg_data = result.scaling_groups[test_scaling_group_name]
-        assert sg_data.remaining["cpu"] == Decimal("32")
-        assert sg_data.remaining["mem"] == Decimal("65536")
+        assert _qty(sg_data.remaining, "cpu") == Decimal("32")
+        assert _qty(sg_data.remaining, "mem") == Decimal("65536")

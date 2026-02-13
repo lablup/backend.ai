@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, cast
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     DomainFairShareSearchResult,
@@ -39,7 +39,7 @@ from ai.backend.manager.models.fair_share import (
     UserFairShareRow,
 )
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
-from ai.backend.manager.models.resource_slot import AgentResourceRow
+from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
     ProjectUsageBucketRow,
@@ -280,7 +280,7 @@ class FairShareDBSource:
         domain_name: str,
         fair_share_row: DomainFairShareRow | None,
         spec: FairShareScalingGroupSpec,
-        available_slots: ResourceSlot,
+        available_slots: list[SlotQuantity],
         now: datetime,
     ) -> DomainFairShareData:
         """Build domain fair share data with complete information.
@@ -501,7 +501,7 @@ class FairShareDBSource:
         domain_name: str,
         fair_share_row: ProjectFairShareRow | None,
         spec: FairShareScalingGroupSpec,
-        available_slots: ResourceSlot,
+        available_slots: list[SlotQuantity],
         now: datetime,
     ) -> ProjectFairShareData:
         """Build project fair share data with complete information.
@@ -864,7 +864,7 @@ class FairShareDBSource:
         domain_name: str,
         fair_share_row: UserFairShareRow | None,
         spec: FairShareScalingGroupSpec,
-        available_slots: ResourceSlot,
+        available_slots: list[SlotQuantity],
         now: datetime,
     ) -> UserFairShareData:
         """Build user fair share data with complete information.
@@ -1252,19 +1252,22 @@ class FairShareDBSource:
         self,
         db_sess: SASession,
         resource_group: str,
-    ) -> ResourceSlot:
+    ) -> list[SlotQuantity]:
         """Fetch total available slots from all ALIVE schedulable agents.
 
-        Uses normalized agent_resources table to sum capacity per slot.
+        Uses normalized agent_resources table to sum capacity per slot,
+        ordered by resource_slot_types.rank.
 
         Args:
             db_sess: Database session
             resource_group: Scaling group name
 
         Returns:
-            Sum of capacity from all ALIVE schedulable agents
+            Sum of capacity from all ALIVE schedulable agents, rank-ordered
         """
-        j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id)
+        j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id).join(
+            ResourceSlotTypeRow, AgentResourceRow.slot_name == ResourceSlotTypeRow.slot_name
+        )
         query = (
             sa.select(
                 AgentResourceRow.slot_name,
@@ -1276,18 +1279,16 @@ class FairShareDBSource:
                 AgentRow.status == AgentStatus.ALIVE,
                 AgentRow.schedulable.is_(True),
             )
-            .group_by(AgentResourceRow.slot_name)
+            .group_by(AgentResourceRow.slot_name, ResourceSlotTypeRow.rank)
+            .order_by(ResourceSlotTypeRow.rank)
         )
         result = await db_sess.execute(query)
-        total_slots = ResourceSlot()
-        for row in result:
-            total_slots[row.slot_name] = row.total_capacity
-        return total_slots
+        return [SlotQuantity(row.slot_name, row.total_capacity) for row in result]
 
     def _create_default_fair_share_data(
         self,
         scaling_group_spec: FairShareScalingGroupSpec,
-        available_slots: ResourceSlot,
+        available_slots: list[SlotQuantity],
         now: datetime,
     ) -> FairShareData:
         """Create default FairShareData from scaling group spec.
@@ -1313,7 +1314,9 @@ class FairShareDBSource:
             ),
             metadata=None,  # No metadata for default-generated records
             use_default=True,  # Explicitly mark as default
-            uses_default_resources=frozenset(available_slots.keys()),  # All resources use defaults
+            uses_default_resources=frozenset(
+                sq.slot_name for sq in available_slots
+            ),  # All resources use defaults
         )
 
     def _create_default_domain_fair_share(
@@ -1321,7 +1324,7 @@ class FairShareDBSource:
         resource_group: str,
         domain_name: str,
         scaling_group_spec: FairShareScalingGroupSpec,
-        available_slots: ResourceSlot,
+        available_slots: list[SlotQuantity],
         now: datetime,
     ) -> DomainFairShareData:
         """Create default DomainFairShareData.
@@ -1345,7 +1348,7 @@ class FairShareDBSource:
         project_id: uuid.UUID,
         domain_name: str,
         scaling_group_spec: FairShareScalingGroupSpec,
-        available_slots: ResourceSlot,
+        available_slots: list[SlotQuantity],
         now: datetime,
     ) -> ProjectFairShareData:
         """Create default ProjectFairShareData.
@@ -1372,7 +1375,7 @@ class FairShareDBSource:
         project_id: uuid.UUID,
         domain_name: str,
         scaling_group_spec: FairShareScalingGroupSpec,
-        available_slots: ResourceSlot,
+        available_slots: list[SlotQuantity],
         now: datetime,
     ) -> UserFairShareData:
         """Create default UserFairShareData.
@@ -1428,19 +1431,22 @@ class FairShareDBSource:
         self,
         db_sess: SASession,
         scaling_group: str,
-    ) -> ResourceSlot:
+    ) -> list[SlotQuantity]:
         """Fetch total capacity from ALIVE schedulable agents in scaling group.
 
-        Uses normalized agent_resources table to sum capacity per slot.
+        Uses normalized agent_resources table to sum capacity per slot,
+        ordered by resource_slot_types.rank.
 
         Args:
             db_sess: Database session
             scaling_group: The scaling group name
 
         Returns:
-            Sum of capacity from all ALIVE schedulable agents
+            Sum of capacity from all ALIVE schedulable agents, rank-ordered
         """
-        j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id)
+        j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id).join(
+            ResourceSlotTypeRow, AgentResourceRow.slot_name == ResourceSlotTypeRow.slot_name
+        )
         query = (
             sa.select(
                 AgentResourceRow.slot_name,
@@ -1454,22 +1460,21 @@ class FairShareDBSource:
                     AgentRow.schedulable == sa.true(),
                 )
             )
-            .group_by(AgentResourceRow.slot_name)
+            .group_by(AgentResourceRow.slot_name, ResourceSlotTypeRow.rank)
+            .order_by(ResourceSlotTypeRow.rank)
         )
         result = await db_sess.execute(query)
-        total_capacity = ResourceSlot()
-        for row in result:
-            total_capacity[row.slot_name] = row.total_capacity
-        return total_capacity
+        return [SlotQuantity(row.slot_name, row.total_capacity) for row in result]
 
     async def _fetch_cluster_capacities_batch(
         self,
         db_sess: SASession,
         scaling_groups: Sequence[str],
-    ) -> dict[str, ResourceSlot]:
+    ) -> dict[str, list[SlotQuantity]]:
         """Fetch total capacity for multiple scaling groups.
 
-        Uses normalized agent_resources table to sum capacity per slot per scaling group.
+        Uses normalized agent_resources table to sum capacity per slot per scaling group,
+        ordered by resource_slot_types.rank.
 
         Args:
             db_sess: Database session
@@ -1481,7 +1486,9 @@ class FairShareDBSource:
         if not scaling_groups:
             return {}
 
-        j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id)
+        j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id).join(
+            ResourceSlotTypeRow, AgentResourceRow.slot_name == ResourceSlotTypeRow.slot_name
+        )
         query = (
             sa.select(
                 AgentRow.scaling_group,
@@ -1496,13 +1503,14 @@ class FairShareDBSource:
                     AgentRow.schedulable == sa.true(),
                 )
             )
-            .group_by(AgentRow.scaling_group, AgentResourceRow.slot_name)
+            .group_by(AgentRow.scaling_group, AgentResourceRow.slot_name, ResourceSlotTypeRow.rank)
+            .order_by(AgentRow.scaling_group, ResourceSlotTypeRow.rank)
         )
         result = await db_sess.execute(query)
 
-        capacities: dict[str, ResourceSlot] = {sg: ResourceSlot() for sg in scaling_groups}
+        capacities: dict[str, list[SlotQuantity]] = {sg: [] for sg in scaling_groups}
         for row in result:
-            capacities[row.scaling_group][row.slot_name] = row.total_capacity
+            capacities[row.scaling_group].append(SlotQuantity(row.slot_name, row.total_capacity))
 
         return capacities
 
@@ -1511,7 +1519,7 @@ class FairShareDBSource:
         db_sess: SASession,
         scaling_group: str,
         default_weight: Decimal,
-        available_slots: ResourceSlot,
+        available_slots: list[SlotQuantity],
     ) -> FairSharesByLevel:
         """Fetch all fair share records for a resource group with merged resource weights."""
         # Get domain fair shares

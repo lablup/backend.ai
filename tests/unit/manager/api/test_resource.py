@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from decimal import Decimal
 from http import HTTPStatus
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
@@ -18,6 +19,7 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
+from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.resource import (
     admin_month_stats,
@@ -676,26 +678,28 @@ class TestCheckPresets:
         req.__setitem__ = lambda _, key, value: storage.__setitem__(key, value)
         return req
 
-    def _create_mock_result(self) -> tuple[MagicMock, MagicMock]:
-        """Create a mock CheckResourcePresetsResult with mock slot."""
-        mock_slot = MagicMock()
-        mock_slot.to_json.return_value = {"cpu": "1", "mem": "1073741824"}
+    def _create_mock_result(self) -> tuple[MagicMock, list[SlotQuantity]]:
+        """Create a mock CheckResourcePresetsResult with SlotQuantity list."""
+        slot_quantities = [
+            SlotQuantity(slot_name="cpu", quantity=Decimal("1")),
+            SlotQuantity(slot_name="mem", quantity=Decimal("1073741824")),
+        ]
         mock_result = MagicMock()
         mock_result.presets = [{"name": "small"}]
-        mock_result.keypair_limits = mock_slot
-        mock_result.keypair_using = mock_slot
-        mock_result.keypair_remaining = mock_slot
-        mock_result.group_limits = mock_slot
-        mock_result.group_using = mock_slot
-        mock_result.group_remaining = mock_slot
-        mock_result.scaling_group_remaining = mock_slot
+        mock_result.keypair_limits = slot_quantities
+        mock_result.keypair_using = slot_quantities
+        mock_result.keypair_remaining = slot_quantities
+        mock_result.group_limits = slot_quantities
+        mock_result.group_using = slot_quantities
+        mock_result.group_remaining = slot_quantities
+        mock_result.scaling_group_remaining = slot_quantities
         mock_result.scaling_groups = {
             "sg-test": {
-                ResourceSlotState.OCCUPIED: mock_slot,
-                ResourceSlotState.AVAILABLE: mock_slot,
+                ResourceSlotState.OCCUPIED: slot_quantities,
+                ResourceSlotState.AVAILABLE: slot_quantities,
             }
         }
-        return mock_result, mock_slot
+        return mock_result, slot_quantities
 
     @pytest.mark.asyncio
     async def test_passes_params_to_action_and_returns_response(
@@ -710,7 +714,7 @@ class TestCheckPresets:
         )
         mock_request["keypair"] = {"access_key": "AKTEST", "resource_policy": "default"}
         mock_request["user"] = {"uuid": user_uuid, "domain_name": "default"}
-        mock_result, mock_slot = self._create_mock_result()
+        mock_result, _ = self._create_mock_result()
         mock_root_ctx.processors.resource_preset.check_presets.wait_for_complete = AsyncMock(
             return_value=mock_result
         )
@@ -732,13 +736,15 @@ class TestCheckPresets:
         assert response._body is not None
         response_body = json.loads(cast(bytes, response._body))
         assert response_body["presets"] == [{"name": "small"}]
-        assert response_body["keypair_limits"] == mock_slot.to_json()
-        assert response_body["keypair_using"] == mock_slot.to_json()
-        assert response_body["keypair_remaining"] == mock_slot.to_json()
-        assert response_body["group_limits"] == mock_slot.to_json()
-        assert response_body["group_using"] == mock_slot.to_json()
-        assert response_body["group_remaining"] == mock_slot.to_json()
-        assert response_body["scaling_group_remaining"] == mock_slot.to_json()
+        # quantities_to_json returns a JSON string, so we need to compare with the expected JSON string
+        expected_json = '{"cpu": "1", "mem": "1073741824"}'
+        assert response_body["keypair_limits"] == expected_json
+        assert response_body["keypair_using"] == expected_json
+        assert response_body["keypair_remaining"] == expected_json
+        assert response_body["group_limits"] == expected_json
+        assert response_body["group_using"] == expected_json
+        assert response_body["group_remaining"] == expected_json
+        assert response_body["scaling_group_remaining"] == expected_json
 
     @pytest.mark.asyncio
     async def test_converts_resource_slots_to_json(
@@ -746,22 +752,36 @@ class TestCheckPresets:
         mock_request: MagicMock,
         mock_root_ctx: MagicMock,
     ) -> None:
-        """Verify ResourceSlot.to_json() is called for response conversion."""
+        """Verify list[SlotQuantity] is converted to JSON string in response."""
         user_uuid = uuid.uuid4()
         mock_request.text = AsyncMock(
             return_value=json.dumps({"scaling_group": "sg-test", "group": "default"})
         )
         mock_request["keypair"] = {"access_key": "AKTEST", "resource_policy": "default"}
         mock_request["user"] = {"uuid": user_uuid, "domain_name": "default"}
-        mock_result, mock_slot = self._create_mock_result()
+        mock_result, _ = self._create_mock_result()
         mock_root_ctx.processors.resource_preset.check_presets.wait_for_complete = AsyncMock(
             return_value=mock_result
         )
 
-        await check_presets(mock_request)
+        response = await check_presets(mock_request)
 
-        # to_json() should be called for multiple fields (keypair_limits, keypair_using, etc.)
-        assert mock_slot.to_json.call_count >= 7
+        # Verify all resource slot fields are converted to JSON strings
+        response_body = json.loads(cast(bytes, response._body))
+        resource_slot_fields = [
+            "keypair_limits",
+            "keypair_using",
+            "keypair_remaining",
+            "group_limits",
+            "group_using",
+            "group_remaining",
+            "scaling_group_remaining",
+        ]
+        for field in resource_slot_fields:
+            assert isinstance(response_body[field], str)
+            # Verify it's valid JSON that can be parsed
+            parsed = json.loads(response_body[field])
+            assert isinstance(parsed, dict)
 
     @pytest.mark.asyncio
     async def test_rejects_unauthorized_request(

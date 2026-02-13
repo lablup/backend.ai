@@ -245,9 +245,9 @@ class ResourceInfoGQL:
     def from_resource_info(cls, info: ResourceInfo) -> Self:
         """Convert from ResourceInfo dataclass to GQL type."""
         return cls(
-            capacity=ResourceSlotGQL.from_resource_slot(info.capacity),
-            used=ResourceSlotGQL.from_resource_slot(info.used),
-            free=ResourceSlotGQL.from_resource_slot(info.free),
+            capacity=ResourceSlotGQL.from_slot_quantities(info.capacity),
+            used=ResourceSlotGQL.from_slot_quantities(info.used),
+            free=ResourceSlotGQL.from_slot_quantities(info.free),
         )
 
 
@@ -346,7 +346,8 @@ class ResourceGroupGQL(Node):
         merged = {}
         uses_default = []
 
-        for resource_type in capacity.data.keys():
+        capacity_keys = {sq.slot_name for sq in capacity}
+        for resource_type in capacity_keys:
             if resource_type in self._fair_share_spec_data.resource_weights.data:
                 merged[resource_type] = self._fair_share_spec_data.resource_weights.data[
                     resource_type

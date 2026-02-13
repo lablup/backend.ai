@@ -10,7 +10,7 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import FairShareData
 from ai.backend.manager.models.fair_share.row import (
     DomainFairShareRow,
@@ -45,11 +45,11 @@ class TestDomainFairShareRowToData:
         )
 
         default_weight = Decimal("1.0")
-        available_slots = ResourceSlot({
-            "cpu": Decimal("100"),
-            "mem": Decimal("1000"),
-            "cuda.device": Decimal("8"),
-        })
+        available_slots = [
+            SlotQuantity("cpu", Decimal("100")),
+            SlotQuantity("mem", Decimal("1000")),
+            SlotQuantity("cuda.device", Decimal("8")),
+        ]
 
         # When
         result = row.to_data(default_weight, available_slots)
@@ -92,7 +92,10 @@ class TestDomainFairShareRowToData:
         )
 
         default_weight = Decimal("1.0")
-        available_slots = ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000")})
+        available_slots = [
+            SlotQuantity("cpu", Decimal("100")),
+            SlotQuantity("mem", Decimal("1000")),
+        ]
 
         # When
         result = row.to_data(default_weight, available_slots)
@@ -136,11 +139,11 @@ class TestProjectFairShareRowToData:
         )
 
         default_weight = Decimal("1.0")
-        available_slots = ResourceSlot({
-            "cpu": Decimal("100"),
-            "mem": Decimal("1000"),
-            "cuda.shares": Decimal("4.0"),
-        })
+        available_slots = [
+            SlotQuantity("cpu", Decimal("100")),
+            SlotQuantity("mem", Decimal("1000")),
+            SlotQuantity("cuda.shares", Decimal("4.0")),
+        ]
 
         # When
         result = row.to_data(default_weight, available_slots)
@@ -181,7 +184,10 @@ class TestUserFairShareRowToData:
         )
 
         default_weight = Decimal("1.0")
-        available_slots = ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000")})
+        available_slots = [
+            SlotQuantity("cpu", Decimal("100")),
+            SlotQuantity("mem", Decimal("1000")),
+        ]
 
         # When
         result = row.to_data(default_weight, available_slots)
@@ -219,10 +225,10 @@ class TestResourceWeightMergingEdgeCases:
         )
 
         default_weight = Decimal("1.0")
-        available_slots = ResourceSlot({
-            "cpu": Decimal("100"),
-            "new.accelerator": Decimal("4"),  # New resource type
-        })
+        available_slots = [
+            SlotQuantity("cpu", Decimal("100")),
+            SlotQuantity("new.accelerator", Decimal("4")),  # New resource type
+        ]
 
         # When
         result = row.to_data(default_weight, available_slots)

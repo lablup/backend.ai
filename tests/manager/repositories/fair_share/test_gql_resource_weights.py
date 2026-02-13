@@ -146,7 +146,7 @@ class TestDomainFairShareGQLConversion:
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=Decimal("1.0"),
-                    total_decayed_usage=ResourceSlot({}),
+                    total_decayed_usage=[],
                     normalized_usage=Decimal("0.0"),
                     lookback_start=datetime.now(UTC).date(),
                     lookback_end=datetime.now(UTC).date(),
@@ -199,7 +199,7 @@ class TestProjectFairShareGQLConversion:
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=Decimal("1.0"),
-                    total_decayed_usage=ResourceSlot({}),
+                    total_decayed_usage=[],
                     normalized_usage=Decimal("0.0"),
                     lookback_start=datetime.now(UTC).date(),
                     lookback_end=datetime.now(UTC).date(),
@@ -250,7 +250,7 @@ class TestUserFairShareGQLConversion:
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=Decimal("1.0"),
-                    total_decayed_usage=ResourceSlot({}),
+                    total_decayed_usage=[],
                     normalized_usage=Decimal("0.0"),
                     lookback_start=datetime.now(UTC).date(),
                     lookback_end=datetime.now(UTC).date(),

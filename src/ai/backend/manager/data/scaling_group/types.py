@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
-from ai.backend.common.types import AgentSelectionStrategy, ResourceSlot, SessionTypes
+from ai.backend.common.types import AgentSelectionStrategy, SessionTypes, SlotQuantity
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
@@ -120,11 +120,11 @@ class ResourceInfo:
     - free: capacity - used
     """
 
-    capacity: ResourceSlot
+    capacity: list[SlotQuantity]
     """Total available resources from ALIVE, schedulable agents."""
 
-    used: ResourceSlot
+    used: list[SlotQuantity]
     """Currently occupied resources from active kernels."""
 
-    free: ResourceSlot
+    free: list[SlotQuantity]
     """Available resources (capacity - used)."""

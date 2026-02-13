@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.models.fair_share.row import _merge_resource_weights
 
 
@@ -20,11 +20,11 @@ class TestMergeResourceWeights:
             "cuda.device": Decimal("5.0"),
         })
         default_weight = Decimal("1.0")
-        available_slots = ResourceSlot({
-            "cpu": Decimal("100"),
-            "mem": Decimal("1000"),
-            "cuda.device": Decimal("8"),
-        })
+        available_slots = [
+            SlotQuantity("cpu", Decimal("100")),
+            SlotQuantity("mem", Decimal("1000")),
+            SlotQuantity("cuda.device", Decimal("8")),
+        ]
 
         # When
         merged, uses_default = _merge_resource_weights(row_weights, default_weight, available_slots)
@@ -40,11 +40,11 @@ class TestMergeResourceWeights:
         # Given
         row_weights = ResourceSlot({"cuda.device": Decimal("5.0")})
         default_weight = Decimal("1.0")
-        available_slots = ResourceSlot({
-            "cpu": Decimal("100"),
-            "mem": Decimal("1000"),
-            "cuda.device": Decimal("8"),
-        })
+        available_slots = [
+            SlotQuantity("cpu", Decimal("100")),
+            SlotQuantity("mem", Decimal("1000")),
+            SlotQuantity("cuda.device", Decimal("8")),
+        ]
 
         # When
         merged, uses_default = _merge_resource_weights(row_weights, default_weight, available_slots)
@@ -60,7 +60,10 @@ class TestMergeResourceWeights:
         # Given
         row_weights = ResourceSlot({})  # Empty
         default_weight = Decimal("1.0")
-        available_slots = ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000")})
+        available_slots = [
+            SlotQuantity("cpu", Decimal("100")),
+            SlotQuantity("mem", Decimal("1000")),
+        ]
 
         # When
         merged, uses_default = _merge_resource_weights(row_weights, default_weight, available_slots)
@@ -75,11 +78,11 @@ class TestMergeResourceWeights:
         # Given
         row_weights = ResourceSlot({})
         default_weight = Decimal("2.0")  # Different default
-        available_slots = ResourceSlot({
-            "cpu": Decimal("100"),
-            "mem": Decimal("1000"),
-            "new.accelerator": Decimal("4"),
-        })
+        available_slots = [
+            SlotQuantity("cpu", Decimal("100")),
+            SlotQuantity("mem", Decimal("1000")),
+            SlotQuantity("new.accelerator", Decimal("4")),
+        ]
 
         # When
         merged, uses_default = _merge_resource_weights(row_weights, default_weight, available_slots)
@@ -95,7 +98,7 @@ class TestMergeResourceWeights:
         # Given
         row_weights = ResourceSlot({"cpu": Decimal("2.0")})
         default_weight = Decimal("1.0")
-        available_slots = ResourceSlot({})  # Empty cluster
+        available_slots: list[SlotQuantity] = []  # Empty cluster
 
         # When
         merged, uses_default = _merge_resource_weights(row_weights, default_weight, available_slots)
@@ -112,13 +115,13 @@ class TestMergeResourceWeights:
             "rocm.device": Decimal("8.0"),
         })
         default_weight = Decimal("1.0")
-        available_slots = ResourceSlot({
-            "cpu": Decimal("100"),
-            "mem": Decimal("1000"),
-            "cuda.device": Decimal("8"),
-            "cuda.shares": Decimal("4.0"),
-            "rocm.device": Decimal("8"),
-        })
+        available_slots = [
+            SlotQuantity("cpu", Decimal("100")),
+            SlotQuantity("mem", Decimal("1000")),
+            SlotQuantity("cuda.device", Decimal("8")),
+            SlotQuantity("cuda.shares", Decimal("4.0")),
+            SlotQuantity("rocm.device", Decimal("8")),
+        ]
 
         # When
         merged, uses_default = _merge_resource_weights(row_weights, default_weight, available_slots)

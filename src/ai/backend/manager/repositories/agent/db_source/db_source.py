@@ -98,7 +98,7 @@ class AgentDBSource:
             raise ScalingGroupNotFound(scaling_group_name)
 
     async def upsert_agent_with_state(self, upsert_data: AgentHeartbeatUpsert) -> UpsertResult:
-        async with self._db.begin_session() as session:
+        async with self._db.begin_session_read_committed() as session:
             await self._check_scaling_group_exists(session, upsert_data.metadata.scaling_group)
 
             query = (

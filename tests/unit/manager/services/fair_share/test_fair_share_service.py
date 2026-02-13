@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     DomainFairShareSearchResult,
@@ -109,10 +109,10 @@ class TestGetDomainFairShare:
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=Decimal("1.0"),
-                    total_decayed_usage=ResourceSlot({
-                        "cpu": Decimal("0.0"),
-                        "mem": Decimal("0.0"),
-                    }),
+                    total_decayed_usage=[
+                        SlotQuantity("cpu", Decimal("0.0")),
+                        SlotQuantity("mem", Decimal("0.0")),
+                    ],
                     normalized_usage=Decimal("0.0"),
                     lookback_start=today,
                     lookback_end=today,
@@ -187,10 +187,10 @@ class TestGetDomainFairShare:
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=Decimal("1.0"),
-                    total_decayed_usage=ResourceSlot({
-                        "cpu": Decimal("0.0"),
-                        "mem": Decimal("0.0"),
-                    }),
+                    total_decayed_usage=[
+                        SlotQuantity("cpu", Decimal("0.0")),
+                        SlotQuantity("mem", Decimal("0.0")),
+                    ],
                     normalized_usage=Decimal("0.0"),
                     lookback_start=today,
                     lookback_end=today,
@@ -334,10 +334,10 @@ class TestGetProjectFairShare:
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=Decimal("1.0"),
-                    total_decayed_usage=ResourceSlot({
-                        "cpu": Decimal("0.0"),
-                        "mem": Decimal("0.0"),
-                    }),
+                    total_decayed_usage=[
+                        SlotQuantity("cpu", Decimal("0.0")),
+                        SlotQuantity("mem", Decimal("0.0")),
+                    ],
                     normalized_usage=Decimal("0.0"),
                     lookback_start=today,
                     lookback_end=today,
@@ -416,10 +416,10 @@ class TestGetProjectFairShare:
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=Decimal("1.0"),
-                    total_decayed_usage=ResourceSlot({
-                        "cpu": Decimal("0.0"),
-                        "mem": Decimal("0.0"),
-                    }),
+                    total_decayed_usage=[
+                        SlotQuantity("cpu", Decimal("0.0")),
+                        SlotQuantity("mem", Decimal("0.0")),
+                    ],
                     normalized_usage=Decimal("0.0"),
                     lookback_start=today,
                     lookback_end=today,
@@ -568,10 +568,10 @@ class TestGetUserFairShare:
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=Decimal("1.0"),
-                    total_decayed_usage=ResourceSlot({
-                        "cpu": Decimal("0.0"),
-                        "mem": Decimal("0.0"),
-                    }),
+                    total_decayed_usage=[
+                        SlotQuantity("cpu", Decimal("0.0")),
+                        SlotQuantity("mem", Decimal("0.0")),
+                    ],
                     normalized_usage=Decimal("0.0"),
                     lookback_start=today,
                     lookback_end=today,
@@ -657,10 +657,10 @@ class TestGetUserFairShare:
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=Decimal("1.0"),
-                    total_decayed_usage=ResourceSlot({
-                        "cpu": Decimal("0.0"),
-                        "mem": Decimal("0.0"),
-                    }),
+                    total_decayed_usage=[
+                        SlotQuantity("cpu", Decimal("0.0")),
+                        SlotQuantity("mem", Decimal("0.0")),
+                    ],
                     normalized_usage=Decimal("0.0"),
                     lookback_start=today,
                     lookback_end=today,

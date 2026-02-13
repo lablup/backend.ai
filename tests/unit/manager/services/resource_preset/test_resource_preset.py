@@ -18,6 +18,7 @@ from ai.backend.common.types import (
     BinarySize,
     ResourceSlot,
     SlotName,
+    SlotQuantity,
     SlotTypes,
     current_resource_slots,
 )
@@ -476,13 +477,40 @@ class TestResourcePresetServiceCompatibility:
         # Create mock result that the repository would return
         mock_check_result = CheckPresetsResult(
             presets=[PresetAllocatabilityData(preset=preset_data, allocatable=True)],
-            keypair_limits=ResourceSlot({"cpu": "100", "mem": "100G", "gpu": "10"}),
-            keypair_using=ResourceSlot({"cpu": "10", "mem": "10G", "gpu": "1"}),
-            keypair_remaining=ResourceSlot({"cpu": "90", "mem": "90G", "gpu": "9"}),
-            group_limits=ResourceSlot({"cpu": "100", "mem": "100G", "gpu": "10"}),
-            group_using=ResourceSlot({"cpu": "5", "mem": "5G"}),
-            group_remaining=ResourceSlot({"cpu": "95", "mem": "95G", "gpu": "10"}),
-            scaling_group_remaining=ResourceSlot({"cpu": "1000", "mem": "1000G", "gpu": "100"}),
+            keypair_limits=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("107374182400")),
+                SlotQuantity("gpu", Decimal("10")),
+            ],
+            keypair_using=[
+                SlotQuantity("cpu", Decimal("10")),
+                SlotQuantity("mem", Decimal("10737418240")),
+                SlotQuantity("gpu", Decimal("1")),
+            ],
+            keypair_remaining=[
+                SlotQuantity("cpu", Decimal("90")),
+                SlotQuantity("mem", Decimal("96636764160")),
+                SlotQuantity("gpu", Decimal("9")),
+            ],
+            group_limits=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("107374182400")),
+                SlotQuantity("gpu", Decimal("10")),
+            ],
+            group_using=[
+                SlotQuantity("cpu", Decimal("5")),
+                SlotQuantity("mem", Decimal("5368709120")),
+            ],
+            group_remaining=[
+                SlotQuantity("cpu", Decimal("95")),
+                SlotQuantity("mem", Decimal("102005473280")),
+                SlotQuantity("gpu", Decimal("10")),
+            ],
+            scaling_group_remaining=[
+                SlotQuantity("cpu", Decimal("1000")),
+                SlotQuantity("mem", Decimal("1073741824000")),
+                SlotQuantity("gpu", Decimal("100")),
+            ],
             scaling_groups={},
         )
 

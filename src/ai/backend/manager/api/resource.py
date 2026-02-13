@@ -25,6 +25,7 @@ from ai.backend.common import validators as tx
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.repositories.resource_slot.types import quantities_to_json
 from ai.backend.manager.services.agent.actions.get_watcher_status import GetWatcherStatusAction
 from ai.backend.manager.services.agent.actions.recalculate_usage import RecalculateUsageAction
 from ai.backend.manager.services.agent.actions.watcher_agent_restart import (
@@ -120,23 +121,23 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         )
     )
 
-    # Convert ResourceSlot objects to JSON for API response
+    # Convert list[SlotQuantity] to JSON for API response
     scaling_groups_json = {}
     for sgname, sg_data in result.scaling_groups.items():
         scaling_groups_json[sgname] = {
-            ResourceSlotState.OCCUPIED: sg_data[ResourceSlotState.OCCUPIED].to_json(),
-            ResourceSlotState.AVAILABLE: sg_data[ResourceSlotState.AVAILABLE].to_json(),
+            ResourceSlotState.OCCUPIED: quantities_to_json(sg_data[ResourceSlotState.OCCUPIED]),
+            ResourceSlotState.AVAILABLE: quantities_to_json(sg_data[ResourceSlotState.AVAILABLE]),
         }
 
     resp = {
         "presets": result.presets,
-        "keypair_limits": result.keypair_limits.to_json(),
-        "keypair_using": result.keypair_using.to_json(),
-        "keypair_remaining": result.keypair_remaining.to_json(),
-        "group_limits": result.group_limits.to_json(),
-        "group_using": result.group_using.to_json(),
-        "group_remaining": result.group_remaining.to_json(),
-        "scaling_group_remaining": result.scaling_group_remaining.to_json(),
+        "keypair_limits": quantities_to_json(result.keypair_limits),
+        "keypair_using": quantities_to_json(result.keypair_using),
+        "keypair_remaining": quantities_to_json(result.keypair_remaining),
+        "group_limits": quantities_to_json(result.group_limits),
+        "group_using": quantities_to_json(result.group_using),
+        "group_remaining": quantities_to_json(result.group_remaining),
+        "scaling_group_remaining": quantities_to_json(result.scaling_group_remaining),
         "scaling_groups": scaling_groups_json,
     }
 

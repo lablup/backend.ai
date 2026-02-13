@@ -16,6 +16,7 @@ from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
     SlotName,
+    SlotQuantity,
     SlotTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -33,13 +34,24 @@ from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
+from ai.backend.manager.models.resource_slot import (
+    AgentResourceRow,
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
+from ai.backend.manager.repositories.resource_slot.types import (
+    add_quantities,
+    min_quantities,
+    quantities_ge,
+    resource_slot_to_quantities,
+    subtract_quantities,
+)
 
 from .types import (
     AccessKeyFilter,
@@ -268,13 +280,14 @@ class ResourcePresetDBSource:
             "total_resource_slots": domain_resource_slots,
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         }
-        limits = ResourceSlot.from_policy(
+        limits_slot = ResourceSlot.from_policy(
             domain_resource_policy, cast(Mapping[str, Any], known_slot_types)
         )
+        limits = resource_slot_to_quantities(limits_slot)
         occupied = await self._get_resource_occupancy(
             db_sess, known_slot_types, filters=[DomainNameFilter(domain_name)]
         )
-        remaining = limits - occupied
+        remaining = subtract_quantities(limits, occupied)
         return ResourceUsageData(
             limits=limits,
             occupied=occupied,
@@ -287,11 +300,12 @@ class ResourcePresetDBSource:
         user_id: UUID,
         sgroup_names: list[str],
         known_slot_types: Mapping[SlotName, SlotTypes],
-    ) -> dict[str, ResourceSlot]:
+    ) -> dict[str, list[SlotQuantity]]:
         """
         Get user's session resource occupancy per scaling group.
 
-        Uses normalized resource_allocations table joined with kernels and sessions.
+        Uses normalized resource_allocations table joined with kernels, sessions,
+        and resource_slot_types for rank ordering.
 
         :param db_sess: Database session
         :param user_id: User ID
@@ -299,13 +313,14 @@ class ResourcePresetDBSource:
         :param known_slot_types: Known slot types for initialization
         :return: Dictionary of scaling group name to occupied resources
         """
-        per_sgroup_occupancy: dict[str, ResourceSlot] = {
-            sgname: ResourceSlot.from_known_slots(known_slot_types) for sgname in sgroup_names
-        }
-
-        j = sa.join(
-            ResourceAllocationRow, KernelRow, ResourceAllocationRow.kernel_id == KernelRow.id
-        ).join(SessionRow, KernelRow.session_id == SessionRow.id)
+        rst = ResourceSlotTypeRow.__table__
+        j = (
+            sa.join(
+                ResourceAllocationRow, KernelRow, ResourceAllocationRow.kernel_id == KernelRow.id
+            )
+            .join(SessionRow, KernelRow.session_id == SessionRow.id)
+            .join(rst, ResourceAllocationRow.slot_name == rst.c.slot_name)
+        )
         query = (
             sa.select(
                 SessionRow.scaling_group_name,
@@ -318,12 +333,17 @@ class ResourcePresetDBSource:
                 & (ResourceAllocationRow.free_at.is_(None))
                 & (SessionRow.scaling_group_name.in_(sgroup_names))
             )
-            .group_by(SessionRow.scaling_group_name, ResourceAllocationRow.slot_name)
+            .group_by(SessionRow.scaling_group_name, ResourceAllocationRow.slot_name, rst.c.rank)
+            .order_by(SessionRow.scaling_group_name, rst.c.rank)
         )
         result = await db_sess.execute(query)
+
+        per_sgroup_occupancy: dict[str, list[SlotQuantity]] = {sg: [] for sg in sgroup_names}
         for row in result:
             if row.total is not None:
-                per_sgroup_occupancy[row.scaling_group_name][row.slot_name] = row.total
+                per_sgroup_occupancy[row.scaling_group_name].append(
+                    SlotQuantity(row.slot_name, row.total)
+                )
 
         return per_sgroup_occupancy
 
@@ -332,19 +352,23 @@ class ResourcePresetDBSource:
         db_sess: SASession,
         sgroup_names: list[str],
         known_slot_types: Mapping[SlotName, SlotTypes],
-    ) -> tuple[dict[str, ResourceSlot], list[ResourceSlot]]:
+    ) -> tuple[dict[str, list[SlotQuantity]], list[list[SlotQuantity]]]:
         """
         Get available resources from agents in given scaling groups.
 
-        Uses normalized agent_resources table to calculate remaining resources
-        (capacity - used) per agent, then aggregates per scaling group.
+        Uses normalized agent_resources table joined with resource_slot_types
+        for rank ordering. Calculates remaining resources (capacity - used)
+        per agent, then aggregates per scaling group.
 
         :param db_sess: Database session
         :param sgroup_names: List of scaling group names
         :param known_slot_types: Known slot types for initialization
         :return: Tuple of (per_sgroup_remaining, agent_slots_list)
         """
-        j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id)
+        rst = ResourceSlotTypeRow.__table__
+        j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id).join(
+            rst, AgentResourceRow.slot_name == rst.c.slot_name
+        )
         query = (
             sa.select(
                 AgentRow.id.label("agent_id"),
@@ -352,6 +376,7 @@ class ResourcePresetDBSource:
                 AgentResourceRow.slot_name,
                 AgentResourceRow.capacity,
                 AgentResourceRow.used,
+                rst.c.rank,
             )
             .select_from(j)
             .where(
@@ -361,41 +386,32 @@ class ResourcePresetDBSource:
                     AgentRow.status == AgentStatus.ALIVE,
                 )
             )
-            .order_by(AgentRow.id)
+            .order_by(AgentRow.id, rst.c.rank)
         )
         result = await db_sess.execute(query)
         rows = result.all()
 
         if not rows:
-            return (
-                {
-                    sgname: ResourceSlot.from_known_slots(known_slot_types)
-                    for sgname in sgroup_names
-                },
-                [],
-            )
+            return ({sg: [] for sg in sgroup_names}, [])
 
-        # Build remaining ResourceSlot per agent, track scaling group
-        agent_data: dict[str, tuple[str, ResourceSlot]] = {}
+        # Build remaining list[SlotQuantity] per agent, track scaling group
+        agent_data: dict[str, tuple[str, list[SlotQuantity]]] = {}
         for row in rows:
             aid = row.agent_id
             if aid not in agent_data:
-                agent_data[aid] = (
-                    row.scaling_group,
-                    ResourceSlot.from_known_slots(known_slot_types),
-                )
-            agent_data[aid][1][row.slot_name] = row.capacity - row.used
+                agent_data[aid] = (row.scaling_group, [])
+            agent_data[aid][1].append(SlotQuantity(row.slot_name, row.capacity - row.used))
 
         # Aggregate per scaling group
-        per_sgroup_remaining: dict[str, ResourceSlot] = {
-            sgname: ResourceSlot.from_known_slots(known_slot_types) for sgname in sgroup_names
-        }
-        agent_slots: list[ResourceSlot] = []
+        per_sgroup_remaining: dict[str, list[SlotQuantity]] = {sg: [] for sg in sgroup_names}
+        agent_slots: list[list[SlotQuantity]] = []
 
         for _aid, (scaling_group, remaining) in agent_data.items():
             agent_slots.append(remaining)
             if scaling_group:
-                per_sgroup_remaining[scaling_group] += remaining
+                per_sgroup_remaining[scaling_group] = add_quantities(
+                    per_sgroup_remaining[scaling_group], remaining
+                )
 
         return per_sgroup_remaining, agent_slots
 
@@ -404,17 +420,18 @@ class ResourcePresetDBSource:
         db_sess: SASession,
         known_slot_types: Mapping[SlotName, SlotTypes],
         filters: list[ResourceOccupancyFilter] | None = None,
-    ) -> ResourceSlot:
+    ) -> list[SlotQuantity]:
         """
         Get resource occupancy with filters.
 
-        Uses normalized resource_allocations table joined with kernels.
+        Uses normalized resource_allocations table joined with kernels and
+        resource_slot_types for rank ordering.
         Active allocations are identified by free_at IS NULL.
 
         :param db_sess: Database session
         :param known_slot_types: Known slot types for initialization
         :param filters: List of filter objects to apply
-        :return: Total occupied resources
+        :return: Total occupied resources, rank-ordered
         """
         conditions: list[Any] = [ResourceAllocationRow.free_at.is_(None)]
 
@@ -422,9 +439,10 @@ class ResourcePresetDBSource:
             for filter_obj in filters:
                 conditions.append(filter_obj.get_condition())
 
+        rst = ResourceSlotTypeRow.__table__
         j = sa.join(
             ResourceAllocationRow, KernelRow, ResourceAllocationRow.kernel_id == KernelRow.id
-        )
+        ).join(rst, ResourceAllocationRow.slot_name == rst.c.slot_name)
         query = (
             sa.select(
                 ResourceAllocationRow.slot_name,
@@ -432,15 +450,12 @@ class ResourcePresetDBSource:
             )
             .select_from(j)
             .where(sa.and_(*conditions))
-            .group_by(ResourceAllocationRow.slot_name)
+            .group_by(ResourceAllocationRow.slot_name, rst.c.rank)
+            .order_by(rst.c.rank)
         )
 
         result = await db_sess.execute(query)
-        total = ResourceSlot.from_known_slots(known_slot_types)
-        for row in result:
-            if row.total is not None:
-                total[row.slot_name] = row.total
-        return total
+        return [SlotQuantity(row.slot_name, row.total) for row in result if row.total is not None]
 
     async def _get_keypair_resource_usage(
         self,
@@ -450,13 +465,14 @@ class ResourcePresetDBSource:
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> ResourceUsageData:
         """Get keypair resource usage (limits, occupied, remaining)."""
-        limits = ResourceSlot.from_policy(
+        limits_slot = ResourceSlot.from_policy(
             resource_policy, cast(Mapping[str, Any], known_slot_types)
         )
+        limits = resource_slot_to_quantities(limits_slot)
         occupied = await self._get_resource_occupancy(
             db_sess, known_slot_types, filters=[AccessKeyFilter(access_key)]
         )
-        remaining = limits - occupied
+        remaining = subtract_quantities(limits, occupied)
 
         return ResourceUsageData(
             limits=limits,
@@ -476,13 +492,14 @@ class ResourcePresetDBSource:
             "total_resource_slots": group_resource_slots,
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         }
-        limits = ResourceSlot.from_policy(
+        limits_slot = ResourceSlot.from_policy(
             group_resource_policy, cast(Mapping[str, Any], known_slot_types)
         )
+        limits = resource_slot_to_quantities(limits_slot)
         occupied = await self._get_resource_occupancy(
             db_sess, known_slot_types, filters=[GroupIdFilter(group_id)]
         )
-        remaining = limits - occupied
+        remaining = subtract_quantities(limits, occupied)
 
         return ResourceUsageData(
             limits=limits,
@@ -520,13 +537,11 @@ class ResourcePresetDBSource:
         # Get domain resource slots and usage
         domain_usage = await self._get_domain_resource_slots(conn, domain_name, known_slot_types)
         # Take minimum remaining resources across all scopes
-        final_remaining = ResourceSlot.from_known_slots(known_slot_types)
-        for slot in known_slot_types:
-            final_remaining[slot] = min(
-                keypair_usage.remaining[slot],
-                group_usage.remaining[slot],
-                domain_usage.remaining[slot],
-            )
+        final_remaining = min_quantities(
+            keypair_usage.remaining,
+            group_usage.remaining,
+            domain_usage.remaining,
+        )
 
         # Get scaling groups
         # query_allowed_sgroups expects AsyncConnection, get it from session
@@ -551,27 +566,24 @@ class ResourcePresetDBSource:
         )
 
         # Build per scaling group data
-        per_sgroup = {}
-        empty_slot = ResourceSlot.from_known_slots(known_slot_types)
+        per_sgroup: dict[str, PerScalingGroupResourceData] = {}
+        empty_quantities: list[SlotQuantity] = []
         for sgname in sgroup_names:
             per_sgroup[sgname] = PerScalingGroupResourceData(
-                using=per_sgroup_occupancy.get(sgname, empty_slot),
-                remaining=per_sgroup_agent_remaining.get(sgname, empty_slot),
+                using=per_sgroup_occupancy.get(sgname, empty_quantities),
+                remaining=per_sgroup_agent_remaining.get(sgname, empty_quantities),
             )
 
         # Calculate total scaling group remaining
-        sgroup_remaining = ResourceSlot.from_known_slots(known_slot_types)
+        sgroup_remaining: list[SlotQuantity] = []
         for remaining in per_sgroup_agent_remaining.values():
-            sgroup_remaining += remaining
+            sgroup_remaining = add_quantities(sgroup_remaining, remaining)
 
         # Apply final remaining limits to per scaling group remaining
         for sgname, sg_data in per_sgroup.items():
-            for slot in known_slot_types.keys():
-                if slot in sg_data.remaining:
-                    sg_data.remaining[slot] = min(final_remaining[slot], sg_data.remaining[slot])
+            sg_data.remaining = min_quantities(final_remaining, sg_data.remaining)
 
-        for slot in known_slot_types.keys():
-            sgroup_remaining[slot] = min(final_remaining[slot], sgroup_remaining[slot])
+        sgroup_remaining = min_quantities(final_remaining, sgroup_remaining)
 
         # Fetch resource presets
         preset_data_list = await self.list_presets(scaling_group)
@@ -580,9 +592,13 @@ class ResourcePresetDBSource:
         presets = []
         for preset_data in preset_data_list:
             allocatable = False
-            preset_slots = preset_data.resource_slots.normalize_slots(ignore_unknown=True)
+            preset_slots = resource_slot_to_quantities(
+                preset_data.resource_slots.normalize_slots(ignore_unknown=True)
+            )
             for agent_slot in agent_slots:
-                if agent_slot >= preset_slots and final_remaining >= preset_slots:
+                if quantities_ge(agent_slot, preset_slots) and quantities_ge(
+                    final_remaining, preset_slots
+                ):
                     allocatable = True
                     break
 

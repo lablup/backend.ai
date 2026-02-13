@@ -357,8 +357,37 @@ class SchedulerRepository:
         agent_id: str,
         slots: Sequence[SlotQuantity],
     ) -> int:
-        """Set used values on allocations and increment agent_resources.used."""
+        """Set used values on allocations and increment agent_resources.used.
+
+        Idempotent: re-calling with the same kernel_id will not double-increment.
+        """
         return await self._db_source.allocate_kernel_resources(kernel_id, agent_id, slots)
+
+    @scheduler_repository_resilience.apply()
+    async def allocate_session_kernel_resources(
+        self,
+        allocations: Sequence[tuple[UUID, str, Sequence[SlotQuantity]]],
+    ) -> int:
+        """Allocate resources for multiple kernels in a single transaction.
+
+        All-or-nothing: if any kernel fails, all allocations are rolled back.
+        Idempotent per kernel (used_at IS NULL guard).
+        """
+        return await self._db_source.allocate_session_kernel_resources(allocations)
+
+    @scheduler_repository_resilience.apply()
+    async def update_running_and_allocate_resources(
+        self,
+        sessions_data: list[SessionRunningData],
+        allocations: Sequence[tuple[UUID, str, Sequence[SlotQuantity]]],
+    ) -> int:
+        """Atomically update session occupying_slots and allocate kernel resources.
+
+        Single transaction: if allocation fails, session update is also rolled back.
+        """
+        return await self._db_source.update_running_and_allocate_resources(
+            sessions_data, allocations
+        )
 
     @scheduler_repository_resilience.apply()
     async def free_kernel_resources(

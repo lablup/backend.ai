@@ -13,6 +13,7 @@ from ai.backend.common.types import (
     BinarySize,
     ResourceSlot,
     SlotName,
+    SlotQuantity,
     SlotTypes,
 )
 from ai.backend.common.types import (
@@ -20,50 +21,54 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.repositories.resource_slot.types import (
+    quantities_from_json,
+    quantities_to_json,
+)
 
 
 @dataclass
 class ResourceUsageData:
     """Resource usage data with limits, occupied, and remaining."""
 
-    limits: ResourceSlot
-    occupied: ResourceSlot
-    remaining: ResourceSlot
+    limits: list[SlotQuantity]
+    occupied: list[SlotQuantity]
+    remaining: list[SlotQuantity]
 
 
 @dataclass
 class KeypairResourceData:
     """Resource data for a keypair."""
 
-    limits: ResourceSlot
-    occupied: ResourceSlot
-    remaining: ResourceSlot
-    group_limits: ResourceSlot
-    group_occupied: ResourceSlot
-    group_remaining: ResourceSlot
-    scaling_group_remaining: ResourceSlot
+    limits: list[SlotQuantity]
+    occupied: list[SlotQuantity]
+    remaining: list[SlotQuantity]
+    group_limits: list[SlotQuantity]
+    group_occupied: list[SlotQuantity]
+    group_remaining: list[SlotQuantity]
+    scaling_group_remaining: list[SlotQuantity]
 
 
 @dataclass
 class PerScalingGroupResourceData:
     """Resource data per scaling group."""
 
-    using: ResourceSlot
-    remaining: ResourceSlot
+    using: list[SlotQuantity]
+    remaining: list[SlotQuantity]
 
     def to_cache(self) -> dict[str, Any]:
         """Serialize to cache-friendly format."""
         return {
-            str(ResourceSlotState.OCCUPIED): self.using.to_json(),
-            str(ResourceSlotState.AVAILABLE): self.remaining.to_json(),
+            str(ResourceSlotState.OCCUPIED): quantities_to_json(self.using),
+            str(ResourceSlotState.AVAILABLE): quantities_to_json(self.remaining),
         }
 
     @classmethod
     def from_cache(cls, data: dict[str, Any]) -> PerScalingGroupResourceData:
         """Deserialize from cache format."""
         return cls(
-            using=ResourceSlot.from_json(data[ResourceSlotState.OCCUPIED]),
-            remaining=ResourceSlot.from_json(data[ResourceSlotState.AVAILABLE]),
+            using=quantities_from_json(data[ResourceSlotState.OCCUPIED]),
+            remaining=quantities_from_json(data[ResourceSlotState.AVAILABLE]),
         )
 
 
