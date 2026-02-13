@@ -169,7 +169,7 @@ from ai.backend.manager.sokovan.scheduling_controller import SchedulingControlle
 from ai.backend.manager.utils import query_userinfo
 
 from .agent_cache import AgentRPCCache
-from .clients.agent.client import AgentClient
+from .clients.agent import AgentClient, AgentClientPool, AgentPoolSpec
 from .clients.wsproxy.client import AppProxyClient
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
 from .errors.api import InvalidAPIParameters
@@ -313,29 +313,15 @@ class AgentRegistry:
             self,
         )
         self._client_pool = ClientPool(tcp_client_session_factory)
-
-    def _get_agent_client(
-        self,
-        agent_id: AgentId,
-        *,
-        invoke_timeout: Optional[float] = None,
-        order_key: Optional[str] = None,
-    ) -> AgentClient:
-        """Get an AgentClient for the given agent ID.
-
-        Args:
-            agent_id: The agent ID to get the client for
-
-        Returns:
-            AgentClient instance for the agent
-        """
-        # TODO: Apply AgentClient Pool
-        return AgentClient(
-            self.agent_cache,
-            agent_id,
-            invoke_timeout=invoke_timeout,
-            order_key=order_key,
+        self.agent_client_pool = AgentClientPool(
+            agent_cache,
+            AgentPoolSpec(
+                health_check_interval=30.0,
+                failure_threshold=3,
+                recovery_timeout=60.0,
+            ),
         )
+
 
     async def init(self) -> None:
         self.heartbeat_lock = asyncio.Lock()
@@ -345,6 +331,7 @@ class AgentRegistry:
         self.webhook_ptask_group = aiotools.PersistentTaskGroup()
 
     async def shutdown(self) -> None:
+        await self.agent_client_pool.close()
         await cancel_tasks(self.pending_waits)
         await self.database_ptask_group.shutdown()
         await self.webhook_ptask_group.shutdown()
@@ -388,8 +375,8 @@ class AgentRegistry:
 
     async def gather_agent_hwinfo(self, instance_id: AgentId) -> Mapping[str, HardwareMetadata]:
         agent = await self.get_instance(instance_id, agents.c.addr)
-        agent_client = self._get_agent_client(agent["id"])
-        result = await agent_client.gather_hwinfo()
+        async with self.agent_client_pool.acquire(agent["id"]) as agent_client:
+            result = await agent_client.gather_hwinfo()
         return {k: check_type(v, HardwareMetadata) for k, v in result.items()}
 
     async def gather_storage_hwinfo(self, vfolder_host: str) -> HardwareMetadata:
@@ -400,8 +387,8 @@ class AgentRegistry:
 
     async def scan_gpu_alloc_map(self, instance_id: AgentId) -> Mapping[str, Any]:
         agent = await self.get_instance(instance_id, agents.c.addr)
-        agent_client = self._get_agent_client(agent["id"])
-        return await agent_client.scan_gpu_alloc_map()
+        async with self.agent_client_pool.acquire(agent["id"]) as agent_client:
+            return await agent_client.scan_gpu_alloc_map()
 
     async def _wait_for_session_running(
         self,
@@ -1578,8 +1565,8 @@ class AgentRegistry:
         """
         assert agent_alloc_ctx.agent_id is not None
 
-        agent_client = self._get_agent_client(agent_alloc_ctx.agent_id)
-        resp = await agent_client.check_and_pull(image_configs)
+        async with self.agent_client_pool.acquire(agent_alloc_ctx.agent_id) as agent_client:
+            resp = await agent_client.check_and_pull(image_configs)
         resp = cast(dict[str, str], resp)
         return {img: uuid.UUID(hex=bgtask_id) for img, bgtask_id in resp.items()}
 
@@ -1732,11 +1719,10 @@ class AgentRegistry:
                     assert agent_alloc_ctx.agent_id is not None
                     assert scheduled_session.id is not None
                     try:
-                        agent_client = self._get_agent_client(
-                            agent_alloc_ctx.agent_id,
-                            order_key=str(scheduled_session.main_kernel.id),
-                        )
-                        await agent_client.create_local_network(network_name)
+                        async with self.agent_client_pool.acquire(
+                            agent_alloc_ctx.agent_id
+                        ) as agent_client:
+                            await agent_client.create_local_network(network_name)
                     except Exception:
                         log.exception(f"Failed to create an agent-local network {network_name}")
                         raise
@@ -1774,11 +1760,10 @@ class AgentRegistry:
                     ):
                         for index, item in enumerate(group_iterator):
                             assert item.agent_alloc_ctx.agent_id is not None
-                            agent_client = self._get_agent_client(
-                                item.agent_alloc_ctx.agent_id,
-                                order_key=str(scheduled_session.id),
-                            )
-                            port = await agent_client.assign_port()
+                            async with self.agent_client_pool.acquire(
+                                item.agent_alloc_ctx.agent_id
+                            ) as agent_client:
+                                port = await agent_client.assign_port()
                             agent_addr = item.agent_alloc_ctx.agent_addr.replace(
                                 "tcp://", ""
                             ).split(":", maxsplit=1)[0]
@@ -2026,17 +2011,16 @@ class AgentRegistry:
 
             # Issue a batched RPC call to create kernels on this agent
             # created_infos = await agent_client.create_kernels(
-            agent_client = self._get_agent_client(
-                agent_alloc_ctx.agent_id,
-                order_key=str(scheduled_session.id),
-            )
-            await agent_client.create_kernels(
-                str(scheduled_session.id),
-                raw_kernel_ids,
-                raw_configs,
-                cluster_info,
-                kernel_image_refs,
-            )
+            async with self.agent_client_pool.acquire(
+                agent_alloc_ctx.agent_id
+            ) as agent_client:
+                await agent_client.create_kernels(
+                    str(scheduled_session.id),
+                    raw_kernel_ids,
+                    raw_configs,
+                    cluster_info,
+                    kernel_image_refs,
+                )
             log.debug(
                 "start_session(s:{}, ak:{}, k:{}) -> created on ag:{}",
                 scheduled_session.name,
@@ -2175,8 +2159,8 @@ class AgentRegistry:
 
     async def update_scaling_group(self, id, scaling_group) -> None:
         agent = await self.get_instance(id, agents.c.addr)
-        agent_client = self._get_agent_client(agent["id"])
-        await agent_client.update_scaling_group(scaling_group)
+        async with self.agent_client_pool.acquire(agent["id"]) as agent_client:
+            await agent_client.update_scaling_group(scaling_group)
 
     async def settle_agent_alloc(
         self,
@@ -2386,15 +2370,15 @@ class AgentRegistry:
             for kernel in destroyed_kernels:
 
                 async def destory_kernel() -> None:
-                    agent_client = self._get_agent_client(
-                        destroyed_kernels[0]["agent"], order_key=str(session_id)
-                    )
-                    await agent_client.destroy_kernel(
-                        str(kernel["id"]),
-                        str(session_id),
-                        reason,
-                        suppress_events=True,
-                    )
+                    async with self.agent_client_pool.acquire(
+                        destroyed_kernels[0]["agent"]
+                    ) as agent_client:
+                        await agent_client.destroy_kernel(
+                            str(kernel["id"]),
+                            str(session_id),
+                            reason,
+                            suppress_events=True,
+                        )
 
                 # internally it enqueues a "destroy" lifecycle event.
                 rpc_coros.append(destory_kernel())
@@ -2738,16 +2722,15 @@ class AgentRegistry:
                         if kernel.status != KernelStatus.SCHEDULED:
 
                             async def destroy_kernel() -> None:
-                                agent_client = self._get_agent_client(
-                                    destroyed_kernels[0].agent,
-                                    order_key=str(session.id),
-                                )
-                                await agent_client.destroy_kernel(
-                                    str(kernel.id),
-                                    str(session.id),
-                                    reason,
-                                    suppress_events=True,
-                                )
+                                async with self.agent_client_pool.acquire(
+                                    destroyed_kernels[0].agent
+                                ) as agent_client:
+                                    await agent_client.destroy_kernel(
+                                        str(kernel.id),
+                                        str(session.id),
+                                        reason,
+                                        suppress_events=True,
+                                    )
 
                             rpc_coros.append(destroy_kernel())
                     try:
@@ -2825,11 +2808,10 @@ class AgentRegistry:
             if ClusterMode(session.cluster_mode) == ClusterMode.SINGLE_NODE:
                 if network_ref_name is not None:
                     try:
-                        agent_client = self._get_agent_client(
-                            session.main_kernel.agent,
-                            order_key=str(session.main_kernel.session_id),
-                        )
-                        await agent_client.destroy_local_network(network_ref_name)
+                        async with self.agent_client_pool.acquire(
+                            session.main_kernel.agent
+                        ) as agent_client:
+                            await agent_client.destroy_local_network(network_ref_name)
                     except Exception:
                         log.exception(
                             f"Failed to destroy the agent-local network {network_ref_name}"
@@ -2888,13 +2870,13 @@ class AgentRegistry:
                         db_sess, [ImageIdentifier(kernel.image, kernel.architecture)]
                     )
 
-                agent_client = self._get_agent_client(kernel.agent)
-                kernel_info = await agent_client.restart_kernel(
-                    str(kernel.session_id),
-                    str(kernel.id),
-                    image_row.image_ref,
-                    updated_config,
-                )
+                async with self.agent_client_pool.acquire(kernel.agent) as agent_client:
+                    kernel_info = await agent_client.restart_kernel(
+                        str(kernel.session_id),
+                        str(kernel.id),
+                        image_row.image_ref,
+                        updated_config,
+                    )
 
                 now = datetime.now(tzutc())
                 update_data = {
@@ -2958,12 +2940,9 @@ class AgentRegistry:
             major_api_version = api_version[0]
             if major_api_version == 4:  # manager-agent protocol is same.
                 major_api_version = 3
-            agent_client = self._get_agent_client(
-                session.main_kernel.agent,
-                invoke_timeout=30,
-                order_key=session.main_kernel.id,
-            )
-            return await agent_client.execute(
+            async with self.agent_client_pool.acquire(
+                session.main_kernel.agent) as agent_client:
+                return await agent_client.execute(
                 str(session.id),
                 str(session.main_kernel.id),
                 major_api_version,
@@ -2979,12 +2958,9 @@ class AgentRegistry:
         session: SessionRow,
     ) -> None:
         async with handle_session_exception(self.db, "trigger_batch_execution", session.id):
-            agent_client = self._get_agent_client(
-                session.main_kernel.agent,
-                invoke_timeout=30,
-                order_key=session.main_kernel.id,
-            )
-            return await agent_client.trigger_batch_execution(
+            async with self.agent_client_pool.acquire(
+                session.main_kernel.agent) as agent_client:
+                return await agent_client.trigger_batch_execution(
                 str(session.id),
                 str(session.main_kernel.id),
                 session.main_kernel.startup_command or "",
@@ -2996,12 +2972,9 @@ class AgentRegistry:
         session: SessionRow,
     ) -> Mapping[str, Any]:
         async with handle_session_exception(self.db, "execute", session.id):
-            agent_client = self._get_agent_client(
-                session.main_kernel.agent,
-                invoke_timeout=30,
-                order_key=session.main_kernel.id,
-            )
-            return await agent_client.interrupt_kernel(str(session.main_kernel.id))
+            async with self.agent_client_pool.acquire(
+                session.main_kernel.agent) as agent_client:
+                return await agent_client.interrupt_kernel(str(session.main_kernel.id))
 
     async def get_completions(
         self,
@@ -3011,12 +2984,10 @@ class AgentRegistry:
     ) -> CodeCompletionResp:
         async with handle_session_exception(self.db, "execute", session.id):
             # NOTE: Callosum serialize all inputs to dict and upack all array inputs to tuples
-            agent_client = self._get_agent_client(
-                session.main_kernel.agent,
-                invoke_timeout=10,
-                order_key=session.main_kernel.id,
-            )
-            result = await agent_client.get_completions(str(session.main_kernel.id), text, opts)
+            async with self.agent_client_pool.acquire(
+                session.main_kernel.agent
+            ) as agent_client:
+                result = await agent_client.get_completions(str(session.main_kernel.id), text, opts)
             return CodeCompletionResp.from_dict(result)
 
     async def start_service(
@@ -3026,11 +2997,9 @@ class AgentRegistry:
         opts: Mapping[str, Any],
     ) -> Mapping[str, Any]:
         async with handle_session_exception(self.db, "execute", session.id):
-            agent_client = self._get_agent_client(
-                session.main_kernel.agent,
-                order_key=session.main_kernel.id,
-            )
-            return await agent_client.start_service(str(session.main_kernel.id), service, opts)
+            async with self.agent_client_pool.acquire(
+                session.main_kernel.agent) as agent_client:
+                return await agent_client.start_service(str(session.main_kernel.id), service, opts)
 
     async def shutdown_service(
         self,
@@ -3038,11 +3007,9 @@ class AgentRegistry:
         service: str,
     ) -> None:
         async with handle_session_exception(self.db, "shutdown_service", session.id):
-            agent_client = self._get_agent_client(
-                session.main_kernel.agent,
-                order_key=session.main_kernel.id,
-            )
-            return await agent_client.shutdown_service(str(session.main_kernel.id), service)
+            async with self.agent_client_pool.acquire(
+                session.main_kernel.agent) as agent_client:
+                return await agent_client.shutdown_service(str(session.main_kernel.id), service)
 
     async def upload_file(
         self,
@@ -3051,11 +3018,9 @@ class AgentRegistry:
         payload: bytes,
     ) -> Mapping[str, Any]:
         async with handle_session_exception(self.db, "upload_file", session.id):
-            agent_client = self._get_agent_client(
-                session.main_kernel.agent,
-                order_key=session.main_kernel.id,
-            )
-            return await agent_client.upload_file(str(session.main_kernel.id), filename, payload)
+            async with self.agent_client_pool.acquire(
+                session.main_kernel.agent) as agent_client:
+                return await agent_client.upload_file(str(session.main_kernel.id), filename, payload)
 
     async def download_file(
         self,
@@ -3064,11 +3029,9 @@ class AgentRegistry:
     ) -> bytes:
         kernel = session.main_kernel
         async with handle_session_exception(self.db, "download_file", kernel.session_id):
-            agent_client = self._get_agent_client(
-                session.main_kernel.agent,
-                order_key=kernel.id,
-            )
-            return await agent_client.download_file(str(kernel.id), filepath)
+            async with self.agent_client_pool.acquire(
+                session.main_kernel.agent) as agent_client:
+                return await agent_client.download_file(str(kernel.id), filepath)
 
     async def download_single(
         self,
@@ -3078,8 +3041,8 @@ class AgentRegistry:
     ) -> bytes:
         kernel = session.main_kernel
         async with handle_session_exception(self.db, "download_single", kernel.session_id):
-            agent_client = self._get_agent_client(kernel.agent, order_key=kernel.id)
-            return await agent_client.download_single(str(kernel.id), filepath)
+            async with self.agent_client_pool.acquire(kernel.agent) as agent_client:
+                return await agent_client.download_single(str(kernel.id), filepath)
 
     async def list_files(
         self,
@@ -3087,12 +3050,9 @@ class AgentRegistry:
         path: str,
     ) -> Mapping[str, Any]:
         async with handle_session_exception(self.db, "list_files", session.id):
-            agent_client = self._get_agent_client(
-                session.main_kernel.agent,
-                invoke_timeout=30,
-                order_key=session.main_kernel.id,
-            )
-            return await agent_client.list_files(str(session.main_kernel.id), path)
+            async with self.agent_client_pool.acquire(
+                session.main_kernel.agent) as agent_client:
+                return await agent_client.list_files(str(session.main_kernel.id), path)
 
     async def get_logs_from_agent(
         self,
@@ -3109,12 +3069,8 @@ class AgentRegistry:
                 raise InstanceNotFound(
                     "Kernel has not been assigned to an agent.", extra_data={"kernel_id": kernel_id}
                 )
-            agent_client = self._get_agent_client(
-                agent_id=kernel.agent,
-                invoke_timeout=30,
-                order_key=kernel.id,
-            )
-            reply = await agent_client.get_logs(str(kernel.id))
+            async with self.agent_client_pool.acquire(kernel.agent) as agent_client:
+                reply = await agent_client.get_logs(str(kernel.id))
             return reply["logs"]
 
     async def increment_session_usage(
@@ -3225,8 +3181,8 @@ class AgentRegistry:
             key=keyfunc,
         ):
             grouped_kernels = [*group_iterator]
-            agent_client = self._get_agent_client(agent_id)
-            return await agent_client.sync_kernel_registry([
+            async with self.agent_client_pool.acquire(agent_id) as agent_client:
+                return await agent_client.sync_kernel_registry([
                 (str(kernel.id), str(kernel.session_id)) for kernel in grouped_kernels
             ])
 
@@ -3505,13 +3461,13 @@ class AgentRegistry:
             )
         email = await self._get_user_email(kernel)
         async with handle_session_exception(self.db, "commit_session", session.id):
-            agent_client = self._get_agent_client(kernel.agent, order_key=kernel.id)
-            resp = await agent_client.commit(
-                str(kernel.id),
-                email,
-                canonical=new_image_ref.canonical,
-                extra_labels=extra_labels,
-            )
+            async with self.agent_client_pool.acquire(kernel.agent) as agent_client:
+                resp = await agent_client.commit(
+                    str(kernel.id),
+                    email,
+                    canonical=new_image_ref.canonical,
+                    extra_labels=extra_labels,
+                )
         return resp
 
     async def push_image(
@@ -3523,8 +3479,8 @@ class AgentRegistry:
         """
         Commit a main kernel's container of the given session.
         """
-        agent_client = self._get_agent_client(agent)
-        return await agent_client.push_image(
+        async with self.agent_client_pool.acquire(agent) as agent_client:
+            return await agent_client.push_image(
             image_ref,
             {**registry, "url": str(registry["url"])},
         )
@@ -3553,14 +3509,14 @@ class AgentRegistry:
         filename = f"{now}_{shortend_sname}_{image_name}.tar.gz"
         filename = filename.replace(":", "-")
         async with handle_session_exception(self.db, "commit_session_to_file", session.id):
-            agent_client = self._get_agent_client(kernel.agent, order_key=kernel.id)
-            resp = await agent_client.commit(
-                str(kernel.id),
-                email,
-                filename=filename,
-                extra_labels=extra_labels,
-                canonical=ImageRef.parse_image_str(kernel.image, registry).canonical,
-            )
+            async with self.agent_client_pool.acquire(kernel.agent) as agent_client:
+                resp = await agent_client.commit(
+                    str(kernel.id),
+                    email,
+                    filename=filename,
+                    extra_labels=extra_labels,
+                    canonical=ImageRef.parse_image_str(kernel.image, registry).canonical,
+                )
         return resp
 
     async def get_agent_local_config(
@@ -3568,12 +3524,12 @@ class AgentRegistry:
         agent_id: AgentId,
         agent_addr: str,
     ) -> Mapping[str, str]:
-        agent_client = self._get_agent_client(agent_id)
-        return await agent_client.get_local_config()
+        async with self.agent_client_pool.acquire(agent_id) as agent_client:
+            return await agent_client.get_local_config()
 
     async def purge_images(self, agent_id: AgentId, request: PurgeImagesReq) -> PurgeImagesResp:
-        agent_client = self._get_agent_client(agent_id)
-        result = await agent_client.purge_images(request.images, request.force, request.noprune)
+        async with self.agent_client_pool.acquire(agent_id) as agent_client:
+            result = await agent_client.purge_images(request.images, request.force, request.noprune)
 
         return PurgeImagesResp(
             responses=[
@@ -3720,8 +3676,8 @@ class AgentRegistry:
         serialized = [entry.serialize() for entry in container_kernel_ids]
         if not serialized:
             return
-        agent_client = self._get_agent_client(agent_id)
-        await agent_client.purge_containers(serialized)
+        async with self.agent_client_pool.acquire(agent_id) as agent_client:
+            await agent_client.purge_containers(serialized)
 
     async def drop_kernel_registry(
         self,
@@ -3731,8 +3687,8 @@ class AgentRegistry:
         kernel_id_list = list(kernel_ids)  # Parse the iterable to a list for serialization
         if not kernel_id_list:
             return
-        agent_client = self._get_agent_client(agent_id)
-        await agent_client.drop_kernel_registry(kernel_id_list)
+        async with self.agent_client_pool.acquire(agent_id) as agent_client:
+            await agent_client.drop_kernel_registry(kernel_id_list)
 
 
 async def handle_image_pull_started(

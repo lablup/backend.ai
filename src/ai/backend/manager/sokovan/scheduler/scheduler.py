@@ -31,7 +31,7 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.clients.agent import AgentPool
+from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -108,7 +108,7 @@ class SchedulerArgs:
     deployment_repository: DeploymentRepository
     config_provider: ManagerConfigProvider
     lock_factory: DistributedLockFactory
-    agent_pool: AgentPool
+    agent_pool: AgentClientPool
     network_plugin_ctx: NetworkPluginContext
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
@@ -122,7 +122,7 @@ class Scheduler:
     _repository: SchedulerRepository
     _config_provider: ManagerConfigProvider
     _lock_factory: DistributedLockFactory
-    _agent_pool: AgentPool
+    _agent_pool: AgentClientPool
     _network_plugin_ctx: NetworkPluginContext
     _sequencer_pool: Mapping[str, WorkloadSequencer]
     _agent_selector_pool: Mapping[AgentSelectionStrategy, AgentSelector]
@@ -647,10 +647,9 @@ class Scheduler:
         :return: KernelTerminationResult with success status
         """
         try:
-            agent_client = self._agent_pool.get_agent_client(agent_id)
-
-            # Call agent's destroy_kernel RPC method with correct parameters
-            await agent_client.destroy_kernel(kernel_id, session_id, reason, suppress_events=False)
+            async with self._agent_pool.acquire(agent_id) as agent_client:
+                # Call agent's destroy_kernel RPC method with correct parameters
+                await agent_client.destroy_kernel(kernel_id, session_id, reason, suppress_events=False)
             return KernelTerminationResult(
                 kernel_id=kernel_id,
                 agent_id=agent_id,
@@ -1005,10 +1004,15 @@ class Scheduler:
                         agent_image_configs[agent_id][canonical] = image_config
 
         # Trigger image checking and pulling on each agent
+        async def pull_images_for_agent(
+            agent_id: AgentId, agent_images: dict[str, ImageConfig]
+        ) -> Mapping[str, str]:
+            async with self._agent_pool.acquire(agent_id) as agent_client:
+                return await agent_client.check_and_pull(agent_images)
+
         pull_tasks: list[Coroutine[Any, Any, Mapping[str, str]]] = []
         for agent_id, agent_images in agent_image_configs.items():
-            agent_client = self._agent_pool.get_agent_client(agent_id)
-            pull_tasks.append(agent_client.check_and_pull(agent_images))
+            pull_tasks.append(pull_images_for_agent(agent_id, agent_images))
 
         if pull_tasks:
             await asyncio.gather(*pull_tasks, return_exceptions=True)
@@ -1158,119 +1162,119 @@ class Scheduler:
                 image_configs_by_canonical[image_key] = image_config
 
             # Create kernels on each agent
-            create_tasks: list[Awaitable[Any]] = []
-            for agent_id, agent_kernels in kernels_by_agent.items():
-                agent_client = self._agent_pool.get_agent_client(
-                    agent_id, order_key=str(session.session_id)
-                )
+            async def create_kernels_on_agent(
+                agent_id: AgentId, agent_kernels: list[KernelBindingData]
+            ) -> Any:
+                async with self._agent_pool.acquire(agent_id) as agent_client:
+                    # Prepare kernel creation configs
+                    kernel_ids = [str(k.kernel_id) for k in agent_kernels]
+                    kernel_configs: list[KernelCreationConfig] = []
+                    kernel_image_refs: dict[KernelId, ImageRef] = {}
 
-                # Prepare kernel creation configs
-                kernel_ids = [str(k.kernel_id) for k in agent_kernels]
-                kernel_configs: list[KernelCreationConfig] = []
-                kernel_image_refs: dict[KernelId, ImageRef] = {}
+                    for idx, k in enumerate(agent_kernels):
+                        kernel_id_str = str(k.kernel_id)
+                        image_str = k.image
 
-                for idx, k in enumerate(agent_kernels):
-                    kernel_id_str = str(k.kernel_id)
-                    image_str = k.image
+                        # Use resolved image config or fallback
+                        if image_str not in image_configs_by_canonical:
+                            # This should not happen - all images should be resolved by precondition check
+                            log.error(
+                                "Image {} not found in resolved configs - this indicates precondition check failed",
+                                image_str,
+                            )
+                            raise ValueError(
+                                f"Image {image_str} not found in database - session start failed"
+                            )
 
-                    # Use resolved image config or fallback
-                    if image_str not in image_configs_by_canonical:
-                        # This should not happen - all images should be resolved by precondition check
-                        log.error(
-                            "Image {} not found in resolved configs - this indicates precondition check failed",
+                        kernel_image_config = image_configs_by_canonical[image_str]
+
+                        # Use cluster configuration from kernel data
+                        cluster_role = k.cluster_role
+                        cluster_idx = k.cluster_idx
+                        local_rank = k.local_rank
+                        cluster_hostname = k.cluster_hostname or f"{cluster_role}{cluster_idx}"
+
+                        # Build proper KernelCreationConfig matching registry.py format
+                        kernel_config: KernelCreationConfig = {
+                            "image": kernel_image_config,
+                            "kernel_id": kernel_id_str,
+                            "session_id": str(session.session_id),
+                            "owner_user_id": str(session.user_uuid),
+                            "owner_project_id": None,  # TODO: Implement project-owned sessions
+                            "network_id": str(session.session_id),
+                            "session_type": session.session_type,
+                            "cluster_mode": session.cluster_mode,
+                            "cluster_role": cluster_role,
+                            "cluster_idx": cluster_idx,
+                            "cluster_hostname": cluster_hostname,
+                            "local_rank": local_rank,
+                            "uid": k.uid,
+                            "main_gid": k.main_gid,
+                            "supplementary_gids": k.gids or [],
+                            "resource_slots": k.requested_slots.to_json(),
+                            "resource_opts": k.resource_opts or {},
+                            "environ": {
+                                **environ,
+                                "BACKENDAI_KERNEL_ID": kernel_id_str,
+                                "BACKENDAI_KERNEL_IMAGE": image_str,
+                                "BACKENDAI_CLUSTER_ROLE": cluster_role,
+                                "BACKENDAI_CLUSTER_IDX": str(cluster_idx),
+                                "BACKENDAI_CLUSTER_LOCAL_RANK": str(local_rank),
+                                "BACKENDAI_CLUSTER_HOST": cluster_hostname,
+                                "BACKENDAI_SERVICE_PORTS": str(
+                                    kernel_image_config.get("labels", {}).get(
+                                        "ai.backend.service-ports", ""
+                                    )
+                                ),
+                            },
+                            "mounts": [
+                                m.to_json() if hasattr(m, "to_json") else m for m in k.vfolder_mounts
+                            ],
+                            "package_directory": tuple(),
+                            "idle_timeout": int(idle_timeout),
+                            "bootstrap_script": k.bootstrap_script,
+                            "startup_command": k.startup_command,
+                            "internal_data": k.internal_data,
+                            "auto_pull": kernel_image_config.get("auto_pull", AutoPullBehavior.DIGEST),
+                            "preopen_ports": k.preopen_ports or [],
+                            "allocated_host_ports": [],  # Will be populated by agent
+                            "agent_addr": k.agent_addr or "",
+                            "scaling_group": k.scaling_group,
+                            "endpoint_id": None,  # For inference endpoints
+                        }
+                        kernel_configs.append(kernel_config)
+
+                        # Create image ref for this kernel
+                        kernel_image_refs[KernelId(k.kernel_id)] = ImageRef.from_image_str(
                             image_str,
+                            project=kernel_image_config["project"],
+                            registry=kernel_image_config["registry"]["name"],
+                            architecture=k.architecture,
+                            is_local=kernel_image_config["is_local"],
                         )
-                        raise ValueError(
-                            f"Image {image_str} not found in database - session start failed"
-                        )
 
-                    kernel_image_config = image_configs_by_canonical[image_str]
-
-                    # Use cluster configuration from kernel data
-                    cluster_role = k.cluster_role
-                    cluster_idx = k.cluster_idx
-                    local_rank = k.local_rank
-                    cluster_hostname = k.cluster_hostname or f"{cluster_role}{cluster_idx}"
-
-                    # Build proper KernelCreationConfig matching registry.py format
-                    kernel_config: KernelCreationConfig = {
-                        "image": kernel_image_config,
-                        "kernel_id": kernel_id_str,
-                        "session_id": str(session.session_id),
-                        "owner_user_id": str(session.user_uuid),
-                        "owner_project_id": None,  # TODO: Implement project-owned sessions
-                        "network_id": str(session.session_id),
-                        "session_type": session.session_type,
-                        "cluster_mode": session.cluster_mode,
-                        "cluster_role": cluster_role,
-                        "cluster_idx": cluster_idx,
-                        "cluster_hostname": cluster_hostname,
-                        "local_rank": local_rank,
-                        "uid": k.uid,
-                        "main_gid": k.main_gid,
-                        "supplementary_gids": k.gids or [],
-                        "resource_slots": k.requested_slots.to_json(),
-                        "resource_opts": k.resource_opts or {},
-                        "environ": {
-                            **environ,
-                            "BACKENDAI_KERNEL_ID": kernel_id_str,
-                            "BACKENDAI_KERNEL_IMAGE": image_str,
-                            "BACKENDAI_CLUSTER_ROLE": cluster_role,
-                            "BACKENDAI_CLUSTER_IDX": str(cluster_idx),
-                            "BACKENDAI_CLUSTER_LOCAL_RANK": str(local_rank),
-                            "BACKENDAI_CLUSTER_HOST": cluster_hostname,
-                            "BACKENDAI_SERVICE_PORTS": str(
-                                kernel_image_config.get("labels", {}).get(
-                                    "ai.backend.service-ports", ""
-                                )
-                            ),
-                        },
-                        "mounts": [
-                            m.to_json() if hasattr(m, "to_json") else m for m in k.vfolder_mounts
-                        ],
-                        "package_directory": tuple(),
-                        "idle_timeout": int(idle_timeout),
-                        "bootstrap_script": k.bootstrap_script,
-                        "startup_command": k.startup_command,
-                        "internal_data": k.internal_data,
-                        "auto_pull": kernel_image_config.get("auto_pull", AutoPullBehavior.DIGEST),
-                        "preopen_ports": k.preopen_ports or [],
-                        "allocated_host_ports": [],  # Will be populated by agent
-                        "agent_addr": k.agent_addr or "",
-                        "scaling_group": k.scaling_group,
-                        "endpoint_id": None,  # For inference endpoints
+                    # Create cluster info with network and SSH configuration
+                    cluster_info: ClusterInfo = {
+                        "mode": session.cluster_mode,
+                        "size": len(session.kernels),
+                        "replicas": replicas,
+                        "network_config": network_setup.network_config,
+                        "ssh_keypair": ssh_keypair,
+                        "cluster_ssh_port_mapping": network_setup.cluster_ssh_port_mapping,
                     }
-                    kernel_configs.append(kernel_config)
 
-                    # Create image ref for this kernel
-                    kernel_image_refs[KernelId(k.kernel_id)] = ImageRef.from_image_str(
-                        image_str,
-                        project=kernel_image_config["project"],
-                        registry=kernel_image_config["registry"]["name"],
-                        architecture=k.architecture,
-                        is_local=kernel_image_config["is_local"],
-                    )
-
-                # Create cluster info with network and SSH configuration
-                cluster_info: ClusterInfo = {
-                    "mode": session.cluster_mode,
-                    "size": len(session.kernels),
-                    "replicas": replicas,
-                    "network_config": network_setup.network_config,
-                    "ssh_keypair": ssh_keypair,
-                    "cluster_ssh_port_mapping": network_setup.cluster_ssh_port_mapping,
-                }
-
-                # Create the kernels
-                create_tasks.append(
-                    agent_client.create_kernels(
+                    # Create the kernels
+                    return await agent_client.create_kernels(
                         str(session.session_id),
                         kernel_ids,
                         kernel_configs,
                         cluster_info,
                         kernel_image_refs,
                     )
-                )
+
+            create_tasks: list[Awaitable[Any]] = []
+            for agent_id, agent_kernels in kernels_by_agent.items():
+                create_tasks.append(create_kernels_on_agent(agent_id, agent_kernels))
 
             if create_tasks:
                 await asyncio.gather(*create_tasks, return_exceptions=True)
@@ -1314,11 +1318,9 @@ class Scheduler:
                 first_kernel = session.kernels[0]
                 if not first_kernel.agent_id:
                     raise ValueError(f"No agent assigned for kernel {first_kernel.kernel_id}")
-                agent_client = self._agent_pool.get_agent_client(
-                    first_kernel.agent_id, order_key=str(session.session_id)
-                )
                 try:
-                    await agent_client.create_local_network(network_name)
+                    async with self._agent_pool.acquire(first_kernel.agent_id) as agent_client:
+                        await agent_client.create_local_network(network_name)
                 except Exception:
                     log.exception(f"Failed to create agent-local network {network_name}")
                     raise
@@ -1369,10 +1371,8 @@ class Scheduler:
                             f"No agent assigned for kernel {kernel.kernel_id}, skipping port mapping"
                         )
                         continue
-                    agent_client = self._agent_pool.get_agent_client(
-                        kernel.agent_id, order_key=str(session.session_id)
-                    )
-                    port = await agent_client.assign_port()
+                    async with self._agent_pool.acquire(kernel.agent_id) as agent_client:
+                        port = await agent_client.assign_port()
                     # Extract host from agent_addr
                     agent_addr = kernel.agent_addr or ""
                     agent_host = (
@@ -1483,21 +1483,21 @@ class Scheduler:
         # Check pulling status for each agent
         agent_pulling_status: dict[AgentId, dict[str, bool]] = {}
         for agent_id, images in agent_images.items():
-            agent_client = self._agent_pool.get_agent_client(agent_id)
             pulling_status = {}
-            for image in images:
-                try:
-                    is_pulling = await agent_client.check_pulling(image)
-                    pulling_status[image] = is_pulling
-                except Exception as e:
-                    log.warning(
-                        "Failed to check pulling status for image {} on agent {}: {}",
-                        image,
-                        agent_id,
-                        e,
-                    )
-                    # If we can't check, assume it's stuck
-                    pulling_status[image] = False
+            async with self._agent_pool.acquire(agent_id) as agent_client:
+                for image in images:
+                    try:
+                        is_pulling = await agent_client.check_pulling(image)
+                        pulling_status[image] = is_pulling
+                    except Exception as e:
+                        log.warning(
+                            "Failed to check pulling status for image {} on agent {}: {}",
+                            image,
+                            agent_id,
+                            e,
+                        )
+                        # If we can't check, assume it's stuck
+                        pulling_status[image] = False
             agent_pulling_status[agent_id] = pulling_status
 
         # Determine truly stuck sessions
@@ -1649,10 +1649,10 @@ class Scheduler:
             any_active = False
             for kernel in session.kernels:
                 if kernel.agent_id:
-                    agent_client = self._agent_pool.get_agent_client(kernel.agent_id)
                     try:
-                        # Check if kernel is being created or already exists
-                        is_active = await agent_client.check_creating(str(kernel.kernel_id))
+                        async with self._agent_pool.acquire(kernel.agent_id) as agent_client:
+                            # Check if kernel is being created or already exists
+                            is_active = await agent_client.check_creating(str(kernel.kernel_id))
                         if is_active:
                             any_active = True
                             break

@@ -2,7 +2,7 @@
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.manager.clients.agent import AgentPool
+from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
@@ -47,7 +47,7 @@ def create_default_scheduler(
     deployment_repository: DeploymentRepository,
     config_provider: ManagerConfigProvider,
     lock_factory: DistributedLockFactory,
-    agent_pool: AgentPool,
+    agent_pool: AgentClientPool,
     network_plugin_ctx: NetworkPluginContext,
     event_producer: EventProducer,
     valkey_schedule: ValkeyScheduleClient,

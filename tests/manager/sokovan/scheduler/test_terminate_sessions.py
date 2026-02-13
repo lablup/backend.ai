@@ -18,7 +18,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.clients.agent import AgentClient, AgentPool
+from ai.backend.manager.clients.agent import AgentClient, AgentClientPool
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.repositories.schedule.repository import (
@@ -31,8 +31,8 @@ from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler, SchedulerA
 
 @pytest.fixture
 def mock_agent_pool():
-    """Mock AgentPool for testing."""
-    mock_pool = MagicMock(spec=AgentPool)
+    """Mock AgentClientPool for testing."""
+    mock_pool = MagicMock(spec=AgentClientPool)
 
     # Create a dictionary to store agent clients
     agent_clients = {}
