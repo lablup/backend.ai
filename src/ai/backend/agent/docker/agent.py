@@ -10,7 +10,6 @@ import secrets
 import shutil
 import signal
 import struct
-import subprocess
 import sys
 from collections.abc import AsyncGenerator, Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
@@ -20,6 +19,7 @@ from http import HTTPStatus
 from io import StringIO
 from pathlib import Path
 from subprocess import CalledProcessError
+from subprocess import run as subprocess_run
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -737,21 +737,37 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 dropbearmulti_path = self.resolve_krunner_filepath(
                     f"runner/dropbearmulti.{arch}.bin"
                 )
-                subprocess.run(
-                    [
-                        str(dropbearmulti_path),
-                        "dropbearkey",
-                        "-t",
-                        "rsa",
-                        "-s",
-                        "2048",
-                        "-f",
-                        str(host_key_path),
-                    ],
-                    check=True,
-                    capture_output=True,
-                )
-                host_key_path.chmod(0o600)
+                if not dropbearmulti_path.exists():
+                    raise FileNotFoundError(
+                        f"dropbearmulti binary not found at {dropbearmulti_path}"
+                    )
+                if not host_key_path.is_file():
+                    try:
+                        subprocess_run(
+                            [
+                                str(dropbearmulti_path),
+                                "dropbearkey",
+                                "-t",
+                                "rsa",
+                                "-s",
+                                "2048",
+                                "-f",
+                                str(host_key_path),
+                            ],
+                            check=True,
+                            capture_output=True,
+                        )
+                    except CalledProcessError as e:
+                        stderr = e.stderr.decode("utf-8", "replace") if e.stderr else ""
+                        stdout = e.stdout.decode("utf-8", "replace") if e.stdout else ""
+                        log.error(
+                            "dropbearkey failed with return code {code}, stdout: {stdout}, stderr: {stderr}",
+                            code=e.returncode,
+                            stdout=stdout,
+                            stderr=stderr,
+                        )
+                        raise
+                    host_key_path.chmod(0o600)
                 paths_to_chown.append(host_key_path)
 
                 if sshkey is not None:
