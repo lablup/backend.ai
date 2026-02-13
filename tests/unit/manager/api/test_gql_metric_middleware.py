@@ -329,6 +329,47 @@ class TestGQLMetricMiddlewareSyncSpans:
         assert spans[0].attributes is not None
         assert spans[0].attributes["graphql.operation_name"] == "anonymous"
 
+    def test_sync_resolver_span_is_child_of_current_context(
+        self,
+        middleware: GQLMetricMiddleware,
+        resolve_info: MagicMock,
+        span_exporter: InMemorySpanExporter,
+    ) -> None:
+        def sync_resolver(root: Any, info: Any, **kwargs: Any) -> str:
+            return "child_result"
+
+        tracer = trace.get_tracer("test")
+
+        with tracer.start_as_current_span("parent_http_span"):
+            result = middleware.resolve(sync_resolver, None, resolve_info)
+
+        assert result == "child_result"
+        spans = span_exporter.get_finished_spans()
+        assert len(spans) == 2
+        parent = next(s for s in spans if s.name == "parent_http_span")
+        child = next(s for s in spans if s.name == "gql.TestQuery.test_field")
+        assert child.parent is not None
+        assert child.parent.span_id == parent.context.span_id
+        assert child.parent.trace_id == parent.context.trace_id
+
+    def test_sync_resolver_span_is_active_during_execution(
+        self,
+        middleware: GQLMetricMiddleware,
+        resolve_info: MagicMock,
+        span_exporter: InMemorySpanExporter,
+    ) -> None:
+        captured_span_context: list[trace.Span] = []
+
+        def sync_resolver(root: Any, info: Any, **kwargs: Any) -> str:
+            captured_span_context.append(trace.get_current_span())
+            return "result"
+
+        middleware.resolve(sync_resolver, None, resolve_info)
+
+        spans = span_exporter.get_finished_spans()
+        assert len(spans) == 1
+        assert captured_span_context[0].get_span_context() == spans[0].context
+
 
 class TestGQLMetricMiddlewareAsyncSpans:
     """Tests for async resolver OTel span behavior."""

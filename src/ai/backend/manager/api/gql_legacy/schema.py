@@ -3418,18 +3418,24 @@ class GQLMetricMiddleware:
                     raise
                 return result
 
-        start = time.perf_counter()
-        try:
-            res = next(root, info, **args)
-            if asyncio.iscoroutine(res):
-                return _observe_coroutine(res)
-            _set_span(end_span=True)
-            _observe(duration=time.perf_counter() - start)
-        except BaseException as e:
-            _set_span(error=e, end_span=True)
-            _observe(duration=time.perf_counter() - start, error=e)
-            raise
-        return res
+        with trace.use_span(
+            span,
+            end_on_exit=False,
+            record_exception=False,
+            set_status_on_exception=False,
+        ):
+            start = time.perf_counter()
+            try:
+                res = next(root, info, **args)
+                if asyncio.iscoroutine(res):
+                    return _observe_coroutine(res)
+                _set_span(end_span=True)
+                _observe(duration=time.perf_counter() - start)
+            except BaseException as e:
+                _set_span(error=e, end_span=True)
+                _observe(duration=time.perf_counter() - start, error=e)
+                raise
+            return res
 
 
 graphene_schema = graphene_federation.build_schema(
