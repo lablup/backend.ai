@@ -2161,6 +2161,175 @@
         "title": "ServeInfoModel",
         "type": "object"
       },
+      "SearchServicesRequestModel": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Name"
+          },
+          "offset": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          },
+          "limit": {
+            "default": 20,
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "SearchServicesRequestModel",
+        "type": "object"
+      },
+      "PaginationInfoModel": {
+        "properties": {
+          "status": {
+            "default": 200,
+            "exclusiveMaximum": 600,
+            "minimum": 100,
+            "title": "Status",
+            "type": "integer"
+          },
+          "total": {
+            "description": "Total number of items matching the query.",
+            "title": "Total",
+            "type": "integer"
+          },
+          "offset": {
+            "description": "Current offset.",
+            "title": "Offset",
+            "type": "integer"
+          },
+          "limit": {
+            "description": "Current limit.",
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "offset",
+          "limit"
+        ],
+        "title": "PaginationInfoModel",
+        "type": "object"
+      },
+      "ServiceSearchItemModel": {
+        "properties": {
+          "status": {
+            "default": 200,
+            "exclusiveMaximum": 600,
+            "minimum": 100,
+            "title": "Status",
+            "type": "integer"
+          },
+          "id": {
+            "description": "Service/endpoint UUID.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "description": "Service name.",
+            "title": "Name",
+            "type": "string"
+          },
+          "desired_session_count": {
+            "description": "Target replica count.",
+            "minimum": 0,
+            "title": "Desired Session Count",
+            "type": "integer"
+          },
+          "replicas": {
+            "description": "Target replica count.",
+            "minimum": 0,
+            "title": "Replicas",
+            "type": "integer"
+          },
+          "active_route_count": {
+            "description": "Number of active routing entries (HEALTHY status).",
+            "minimum": 0,
+            "title": "Active Route Count",
+            "type": "integer"
+          },
+          "service_endpoint": {
+            "anyOf": [
+              {
+                "format": "uri",
+                "maxLength": 2083,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Public URL of the service endpoint (nullable).",
+            "title": "Service Endpoint"
+          },
+          "resource_slots": {
+            "additionalProperties": true,
+            "description": "Resource allocation per replica.",
+            "title": "Resource Slots",
+            "type": "object"
+          },
+          "open_to_public": {
+            "description": "Whether the endpoint is publicly accessible.",
+            "title": "Open To Public",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "desired_session_count",
+          "replicas",
+          "active_route_count",
+          "resource_slots",
+          "open_to_public"
+        ],
+        "title": "ServiceSearchItemModel",
+        "type": "object"
+      },
+      "SearchServicesResponseModel": {
+        "properties": {
+          "status": {
+            "default": 200,
+            "exclusiveMaximum": 600,
+            "minimum": 100,
+            "title": "Status",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceSearchItemModel"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationInfoModel"
+          }
+        },
+        "required": [
+          "items",
+          "pagination"
+        ],
+        "title": "SearchServicesResponseModel",
+        "type": "object"
+      },
       "TryStartResponseModel": {
         "properties": {
           "status": {
@@ -11633,6 +11802,42 @@
         },
         "parameters": [],
         "description": "\nCreates a new model service. If `replicas` is greater than zero,\nthen inference sessions will be automatically scheduled upon successful creation of model service.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
+      }
+    },
+    "/services/_/search": {
+      "post": {
+        "operationId": "services.search_services",
+        "tags": [
+          "services"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchServicesResponseModel"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchServicesRequestModel"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/services/_/try": {
