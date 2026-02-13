@@ -17,7 +17,7 @@ class GPFSInitError(GPFSError):
     pass
 
 
-class GPFSAPIError(GPFSError, BackendAIError, web.HTTPInternalServerError):
+class GPFSAPIError(GPFSError, BackendAIError):
     error_type = "https://api.backend.ai/probs/gpfs-api-error"
     error_title = "GPFS API error."
 

@@ -22,9 +22,9 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors import ExternalStorageServiceError
 
 from .exceptions import (
-    GPFSAPIError,
     GPFSConflictError,
     GPFSForbiddenError,
+    GPFSInternalError,
     GPFSInvalidBodyError,
     GPFSJobCancelledError,
     GPFSJobFailedError,
@@ -78,7 +78,9 @@ async def base_response_handler(response: aiohttp.ClientResponse) -> aiohttp.Cli
                         extra_msg=f"status={response.status}, detail={msg_detail}"
                     )
                 case _:
-                    raise GPFSAPIError(extra_msg=f"status={response.status}, detail={msg_detail}")
+                    raise GPFSInternalError(
+                        extra_msg=f"status={response.status}, detail={msg_detail}"
+                    )
         case 5:
             msg_detail = ""
             exc_to_chain = None
@@ -135,7 +137,7 @@ class GPFSAPIClient:
             case "DELETE":
                 func = sess.delete
             case _:
-                raise GPFSAPIError(extra_msg=f"Unsupported request method {method}")
+                raise GPFSInternalError(extra_msg=f"Unsupported request method {method}")
         if method == "GET" or method == "DELETE":
             response = await func("/scalemgmt/v2" + path, headers=self._req_header, ssl=self.ssl)
         else:

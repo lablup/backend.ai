@@ -10,9 +10,9 @@ from pytest import FixtureRequest
 
 from ai.backend.storage.errors import ExternalStorageServiceError
 from ai.backend.storage.volumes.gpfs.exceptions import (
-    GPFSAPIError,
     GPFSConflictError,
     GPFSForbiddenError,
+    GPFSInternalError,
     GPFSInvalidBodyError,
     GPFSNotFoundError,
     GPFSUnauthorizedError,
@@ -61,7 +61,7 @@ class TestBaseResponseHandler:
                 409, {"status": {"code": 409, "message": "Conflict"}}, GPFSConflictError
             ),
             StatusErrorCase(
-                422, {"status": {"code": 422, "message": "Unprocessable"}}, GPFSAPIError
+                422, {"status": {"code": 422, "message": "Unprocessable"}}, GPFSInternalError
             ),
             StatusErrorCase(500, {"error": "server error"}, ExternalStorageServiceError),
         ],
