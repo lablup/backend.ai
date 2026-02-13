@@ -6349,6 +6349,31 @@ input ModifyImageInput
 """
 Added in 26.3.0.
 
+Input for modifying an image's identity information.
+Corresponds to the identity field of ImageV2.
+"""
+input ModifyImageV2IdentityInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The new canonical name for the image."""
+  name: String = null
+
+  """The new registry hostname for the image."""
+  registry: String = null
+
+  """The new namespace/path for the image."""
+  image: String = null
+
+  """The new tag for the image."""
+  tag: String = null
+
+  """The new CPU architecture for the image."""
+  architecture: String = null
+}
+
+"""
+Added in 26.3.0.
+
 Input for modifying an image by ID.
 """
 input ModifyImageV2InputGQL
@@ -6364,26 +6389,12 @@ input ModifyImageV2InputGQL
 """
 Added in 26.3.0.
 
-Input for modifying an image's properties.
+Input for modifying an image's metadata.
+Corresponds to the metadata field of ImageV2.
 """
-input ModifyImageV2PropsInputGQL
+input ModifyImageV2MetadataInputGQL
   @join__type(graph: STRAWBERRY)
 {
-  """The new name for the image."""
-  name: String = null
-
-  """The new registry for the image."""
-  registry: String = null
-
-  """The new image name for the image."""
-  image: String = null
-
-  """The new tag for the image."""
-  tag: String = null
-
-  """The new architecture for the image."""
-  architecture: String = null
-
   """Whether the image is local."""
   isLocal: Boolean = null
 
@@ -6398,7 +6409,40 @@ input ModifyImageV2PropsInputGQL
 
   """The labels for the image."""
   labels: [ImageV2LabelInputGQL!] = null
+}
 
+"""
+Added in 26.3.0.
+
+Input for modifying an image's properties.
+Structured to match the ImageV2 output type with identity, metadata, and requirements groups.
+"""
+input ModifyImageV2PropsInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Identity information to modify (name, registry, namespace, tag, architecture).
+  """
+  identity: ModifyImageV2IdentityInputGQL = null
+
+  """Metadata to modify (is_local, size_bytes, type, digest, labels)."""
+  metadata: ModifyImageV2MetadataInputGQL = null
+
+  """
+  Runtime requirements to modify (supported_accelerators, resource_limits).
+  """
+  requirements: ModifyImageV2RequirementsInputGQL = null
+}
+
+"""
+Added in 26.3.0.
+
+Input for modifying an image's runtime requirements.
+Corresponds to the requirements field of ImageV2.
+"""
+input ModifyImageV2RequirementsInputGQL
+  @join__type(graph: STRAWBERRY)
+{
   """The supported accelerators for the image. Set to empty list to clear."""
   supportedAccelerators: [String!] = null
 
@@ -7526,15 +7570,6 @@ type Mutation
   can also be untagged from the container registry (HarborV2 only).
   """
   userPurgeImageV2(input: PurgeImageV2InputGQL!): PurgeImageV2Result! @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 26.3.0.
-  
-  Untag an image from its container registry by its ID.
-  
-  This removes the image tag from the registry. Only available for HarborV2 registries.
-  """
-  userUntagImageV2FromRegistry(input: UntagImageV2FromRegistryInputGQL!): UntagImageV2FromRegistryResult! @join__field(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0."""
@@ -11196,30 +11231,6 @@ type UntagImageFromRegistry
 
   """Added since 24.03.1."""
   image: ImageNode
-}
-
-"""
-Added in 26.3.0.
-
-Input for untagging an image from its container registry.
-"""
-input UntagImageV2FromRegistryInputGQL
-  @join__type(graph: STRAWBERRY)
-{
-  """The ID of the image to untag from registry."""
-  imageId: ID!
-}
-
-"""
-Added in 26.3.0.
-
-Result of untagging an image from its container registry.
-"""
-type UntagImageV2FromRegistryResult
-  @join__type(graph: STRAWBERRY)
-{
-  """The untagged image."""
-  image: ImageV2!
 }
 
 """

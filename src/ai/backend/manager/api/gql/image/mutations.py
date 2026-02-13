@@ -201,21 +201,35 @@ class ResourceLimitModifyInputGQL:
     description=dedent_strip("""
     Added in 26.3.0.
 
-    Input for modifying an image's properties.
+    Input for modifying an image's identity information.
+    Corresponds to the identity field of ImageV2.
     """)
 )
-class ModifyImageV2PropsInputGQL:
-    name: str | None = strawberry.field(default=None, description="The new name for the image.")
+class ModifyImageV2IdentityInputGQL:
+    name: str | None = strawberry.field(
+        default=None, description="The new canonical name for the image."
+    )
     registry: str | None = strawberry.field(
-        default=None, description="The new registry for the image."
+        default=None, description="The new registry hostname for the image."
     )
     image: str | None = strawberry.field(
-        default=None, description="The new image name for the image."
+        default=None, description="The new namespace/path for the image."
     )
     tag: str | None = strawberry.field(default=None, description="The new tag for the image.")
     architecture: str | None = strawberry.field(
-        default=None, description="The new architecture for the image."
+        default=None, description="The new CPU architecture for the image."
     )
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Input for modifying an image's metadata.
+    Corresponds to the metadata field of ImageV2.
+    """)
+)
+class ModifyImageV2MetadataInputGQL:
     is_local: bool | None = strawberry.field(
         default=None, description="Whether the image is local."
     )
@@ -231,6 +245,17 @@ class ModifyImageV2PropsInputGQL:
     labels: list[ImageV2LabelInputGQL] | None = strawberry.field(
         default=None, description="The labels for the image."
     )
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Input for modifying an image's runtime requirements.
+    Corresponds to the requirements field of ImageV2.
+    """)
+)
+class ModifyImageV2RequirementsInputGQL:
     supported_accelerators: list[str] | None = strawberry.field(
         default=None,
         description="The supported accelerators for the image. Set to empty list to clear.",
@@ -239,54 +264,93 @@ class ModifyImageV2PropsInputGQL:
         default=None, description="The resource limits for the image."
     )
 
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Input for modifying an image's properties.
+    Structured to match the ImageV2 output type with identity, metadata, and requirements groups.
+    """)
+)
+class ModifyImageV2PropsInputGQL:
+    identity: ModifyImageV2IdentityInputGQL | None = strawberry.field(
+        default=None,
+        description="Identity information to modify (name, registry, namespace, tag, architecture).",
+    )
+    metadata: ModifyImageV2MetadataInputGQL | None = strawberry.field(
+        default=None, description="Metadata to modify (is_local, size_bytes, type, digest, labels)."
+    )
+    requirements: ModifyImageV2RequirementsInputGQL | None = strawberry.field(
+        default=None,
+        description="Runtime requirements to modify (supported_accelerators, resource_limits).",
+    )
+
     def to_updater_spec(self) -> ImageUpdaterSpec:
         """Convert input to ImageUpdaterSpec."""
 
         def _optional[T](value: T | None) -> OptionalState[T]:
             return OptionalState.update(value) if value is not None else OptionalState.nop()
 
-        # Handle resources
-        resources_data: dict[str, dict[str, str]] | None = None
-        if self.resource_limits is not None:
-            resources_data = {}
-            for limit in self.resource_limits:
-                limit_data: dict[str, str] = {}
-                if limit.min is not None:
-                    limit_data["min"] = limit.min
-                if limit.max is not None:
-                    limit_data["max"] = limit.max
-                resources_data[limit.key] = limit_data
+        # Identity fields
+        name: str | None = None
+        registry: str | None = None
+        image: str | None = None
+        tag: str | None = None
+        architecture: str | None = None
+        if self.identity is not None:
+            name = self.identity.name
+            registry = self.identity.registry
+            image = self.identity.image
+            tag = self.identity.tag
+            architecture = self.identity.architecture
 
-        # Handle accelerators
-        accelerators_state: TriState[str]
-        if self.supported_accelerators is not None:
-            if len(self.supported_accelerators) == 0:
-                accelerators_state = TriState.nullify()
-            else:
-                accelerators_state = TriState.update(",".join(self.supported_accelerators))
-        else:
-            accelerators_state = TriState.nop()
-
-        # Handle labels
-        labels: dict[str, str] | None = None
-        if self.labels is not None:
-            labels = {label.key: label.value for label in self.labels}
-
-        # Handle image type
+        # Metadata fields
+        is_local: bool | None = None
+        size_bytes: int | None = None
         image_type: ImageType | None = None
-        if self.type is not None:
-            image_type = ImageType(self.type)
+        config_digest: str | None = None
+        labels: dict[str, str] | None = None
+        if self.metadata is not None:
+            is_local = self.metadata.is_local
+            size_bytes = self.metadata.size_bytes
+            config_digest = self.metadata.digest
+            if self.metadata.type is not None:
+                image_type = ImageType(self.metadata.type)
+            if self.metadata.labels is not None:
+                labels = {label.key: label.value for label in self.metadata.labels}
+
+        # Requirements fields
+        resources_data: dict[str, dict[str, str]] | None = None
+        accelerators_state: TriState[str] = TriState.nop()
+        if self.requirements is not None:
+            if self.requirements.resource_limits is not None:
+                resources_data = {}
+                for limit in self.requirements.resource_limits:
+                    limit_data: dict[str, str] = {}
+                    if limit.min is not None:
+                        limit_data["min"] = limit.min
+                    if limit.max is not None:
+                        limit_data["max"] = limit.max
+                    resources_data[limit.key] = limit_data
+            if self.requirements.supported_accelerators is not None:
+                if len(self.requirements.supported_accelerators) == 0:
+                    accelerators_state = TriState.nullify()
+                else:
+                    accelerators_state = TriState.update(
+                        ",".join(self.requirements.supported_accelerators)
+                    )
 
         return ImageUpdaterSpec(
-            name=_optional(self.name),
-            registry=_optional(self.registry),
-            image=_optional(self.image),
-            tag=_optional(self.tag),
-            architecture=_optional(self.architecture),
-            is_local=_optional(self.is_local),
-            size_bytes=_optional(self.size_bytes),
+            name=_optional(name),
+            registry=_optional(registry),
+            image=_optional(image),
+            tag=_optional(tag),
+            architecture=_optional(architecture),
+            is_local=_optional(is_local),
+            size_bytes=_optional(size_bytes),
             image_type=_optional(image_type),
-            config_digest=_optional(self.digest),
+            config_digest=_optional(config_digest),
             labels=_optional(labels),
             accelerators=accelerators_state,
             resources=_optional(resources_data),
@@ -603,31 +667,6 @@ async def admin_clear_image_v2_resource_limit(
     )
 
     return ClearImageV2ResourceLimitResultGQL(image=ImageV2GQL.from_data(result.image_data))
-
-
-@strawberry.mutation(
-    description=dedent_strip("""
-    Added in 26.3.0.
-
-    Untag an image from its container registry by its ID.
-
-    This removes the image tag from the registry. Only available for HarborV2 registries.
-    """)
-)  # type: ignore[misc]
-async def user_untag_image_v2_from_registry(
-    input: UntagImageV2FromRegistryInputGQL,
-    info: Info[StrawberryGQLContext],
-) -> UntagImageV2FromRegistryResultGQL:
-    me = current_user()
-    if me is None:
-        raise InsufficientPrivilege("Authentication required")
-    ctx = info.context
-
-    result = await ctx.processors.image.untag_image_from_registry.wait_for_complete(
-        UntagImageFromRegistryAction(image_id=ImageID(UUID(input.image_id)))
-    )
-
-    return UntagImageV2FromRegistryResultGQL(image=ImageV2GQL.from_data(result.image))
 
 
 @strawberry.mutation(

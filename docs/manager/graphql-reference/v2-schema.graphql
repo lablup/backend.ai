@@ -3383,6 +3383,29 @@ input ModelTarget {
 """
 Added in 26.3.0.
 
+Input for modifying an image's identity information.
+Corresponds to the identity field of ImageV2.
+"""
+input ModifyImageV2IdentityInputGQL {
+  """The new canonical name for the image."""
+  name: String = null
+
+  """The new registry hostname for the image."""
+  registry: String = null
+
+  """The new namespace/path for the image."""
+  image: String = null
+
+  """The new tag for the image."""
+  tag: String = null
+
+  """The new CPU architecture for the image."""
+  architecture: String = null
+}
+
+"""
+Added in 26.3.0.
+
 Input for modifying an image by ID.
 """
 input ModifyImageV2InputGQL {
@@ -3396,24 +3419,10 @@ input ModifyImageV2InputGQL {
 """
 Added in 26.3.0.
 
-Input for modifying an image's properties.
+Input for modifying an image's metadata.
+Corresponds to the metadata field of ImageV2.
 """
-input ModifyImageV2PropsInputGQL {
-  """The new name for the image."""
-  name: String = null
-
-  """The new registry for the image."""
-  registry: String = null
-
-  """The new image name for the image."""
-  image: String = null
-
-  """The new tag for the image."""
-  tag: String = null
-
-  """The new architecture for the image."""
-  architecture: String = null
-
+input ModifyImageV2MetadataInputGQL {
   """Whether the image is local."""
   isLocal: Boolean = null
 
@@ -3428,7 +3437,36 @@ input ModifyImageV2PropsInputGQL {
 
   """The labels for the image."""
   labels: [ImageV2LabelInputGQL!] = null
+}
 
+"""
+Added in 26.3.0.
+
+Input for modifying an image's properties.
+Structured to match the ImageV2 output type with identity, metadata, and requirements groups.
+"""
+input ModifyImageV2PropsInputGQL {
+  """
+  Identity information to modify (name, registry, namespace, tag, architecture).
+  """
+  identity: ModifyImageV2IdentityInputGQL = null
+
+  """Metadata to modify (is_local, size_bytes, type, digest, labels)."""
+  metadata: ModifyImageV2MetadataInputGQL = null
+
+  """
+  Runtime requirements to modify (supported_accelerators, resource_limits).
+  """
+  requirements: ModifyImageV2RequirementsInputGQL = null
+}
+
+"""
+Added in 26.3.0.
+
+Input for modifying an image's runtime requirements.
+Corresponds to the requirements field of ImageV2.
+"""
+input ModifyImageV2RequirementsInputGQL {
   """The supported accelerators for the image. Set to empty list to clear."""
   supportedAccelerators: [String!] = null
 
@@ -3995,15 +4033,6 @@ type Mutation {
   can also be untagged from the container registry (HarborV2 only).
   """
   userPurgeImageV2(input: PurgeImageV2InputGQL!): PurgeImageV2Result!
-
-  """
-  Added in 26.3.0.
-  
-  Untag an image from its container registry by its ID.
-  
-  This removes the image tag from the registry. Only available for HarborV2 registries.
-  """
-  userUntagImageV2FromRegistry(input: UntagImageV2FromRegistryInputGQL!): UntagImageV2FromRegistryResult!
 }
 
 """An object with a Globally Unique ID"""
@@ -6419,26 +6448,6 @@ Payload returned after storage namespace unregistration.
 """
 type UnregisterStorageNamespacePayload {
   id: UUID!
-}
-
-"""
-Added in 26.3.0.
-
-Input for untagging an image from its container registry.
-"""
-input UntagImageV2FromRegistryInputGQL {
-  """The ID of the image to untag from registry."""
-  imageId: ID!
-}
-
-"""
-Added in 26.3.0.
-
-Result of untagging an image from its container registry.
-"""
-type UntagImageV2FromRegistryResult {
-  """The untagged image."""
-  image: ImageV2!
 }
 
 """

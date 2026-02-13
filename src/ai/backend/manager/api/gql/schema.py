@@ -132,7 +132,6 @@ from .image import (
     image_v2,
     user_forget_image_v2,
     user_purge_image_v2,
-    user_untag_image_v2_from_registry,
 )
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
 from .notification import (
@@ -464,7 +463,6 @@ class Mutation:
     # Image - User APIs
     user_forget_image_v2 = user_forget_image_v2
     user_purge_image_v2 = user_purge_image_v2
-    user_untag_image_v2_from_registry = user_untag_image_v2_from_registry
 
 
 @strawberry.type
