@@ -760,9 +760,12 @@
     "FairShareSettingDescription": "Perubahan tidak langsung tercermin dalam perhitungan Fair Share dan mungkin membutuhkan waktu sekitar 5 menit karena siklus perhitungannya.",
     "FairShareSettingTitleWithName": "Pengaturan Fair Share: {{name}}",
     "FairShareSettingsSuccessfullyUpdated": "Pengaturan fair share telah diperbarui.",
+    "GoBackToFirstStep": "Ke langkah pertama",
     "HalfLifeDays": "Waktu Paruh",
     "HalfLifeDaysDescription": "Periode di mana tingkat pencerminan penggunaan berkurang menjadi setengah. Jika diatur ke 7 hari, penggunaan dari 7 hari lalu dihitung 50%, dan penggunaan dari 14 hari lalu 25%. Disarankan mengatur nilai ini sebagai kelipatan unit peluruhan.",
     "Id": "ID",
+    "InvalidParameterDescription": "Kami tidak dapat menemukan apa yang Anda cari. Mungkin telah dihapus atau alamatnya salah.",
+    "InvalidParameterTitle": "Tidak ditemukan",
     "LookbackDays": "Periode mundur",
     "LookbackDaysDescription": "Rentang riwayat penggunaan yang diperhitungkan dalam perhitungan Fair Share. Penggunaan sebelum periode ini tidak diperhitungkan. Disarankan mengatur nilai ini sebagai kelipatan waktu paruh.",
     "ModifiedAt": "Diubah pada",
@@ -777,6 +780,8 @@
     "SchedulerDescription": "Fair Share Scheduler adalah metode penjadwalan yang menentukan prioritas eksekusi sesi berdasarkan penggunaan sumber daya di masa lalu. Metode ini memberikan prioritas lebih tinggi kepada pengguna yang telah menggunakan lebih sedikit sumber daya, memastikan semua pengguna dapat mengakses sumber daya secara adil dari waktu ke waktu.\n<br /> <br />\nAdministrator dapat mengonfigurasi bobot pada tingkat Domain, Proyek, dan Pengguna untuk mengalokasikan lebih banyak sumber daya ke grup tertentu. Prioritas dinyatakan sebagai nilai antara 0.0 dan 1.0, di mana nilai yang mendekati 1.0 menunjukkan prioritas lebih tinggi.",
     "SchedulerDoesNotAppliedToResourceGroup": "Fair Share Scheduler tidak diaktifkan untuk grup sumber daya yang dipilih ({{resourceGroup}}). Untuk menggunakan penjadwal ini, silakan perbarui pengaturan grup sumber daya.",
     "TotalUsage": "Total penggunaan",
+    "UnknownErrorDescription": "Terjadi kesalahan tak terduga. Silakan coba lagi nanti.",
+    "UnknownErrorOccurred": "Terjadi kesalahan",
     "UsageHistory": "Riwayat Penggunaan",
     "User": "Pengguna",
     "UserDescription": "Pengguna menentukan bobot yang dikonfigurasi dan penggunaan kumulatif selama periode agregasi. Bobot pengguna digunakan untuk menghitung koefisien prioritas bagi masing-masing pengguna.",
@@ -799,7 +804,6 @@
       "SelectDateRange": "Pilih Rentang Tanggal"
     }
   },
-  "fairShrae": {},
   "general": {
     "AccessKey": "Kunci Akses",
     "Active": "Aktif",

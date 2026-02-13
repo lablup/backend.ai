@@ -760,9 +760,12 @@
     "FairShareSettingDescription": "変更は Fair Share の計算にすぐには反映されません。計算サイクルのため、反映までに約5分かかる場合があります。",
     "FairShareSettingTitleWithName": "フェアシェア設定: {{name}}",
     "FairShareSettingsSuccessfullyUpdated": "フェアシェアの設定が更新されました。",
+    "GoBackToFirstStep": "最初のステップへ進む",
     "HalfLifeDays": "半減期",
     "HalfLifeDaysDescription": "使用量の反映率が半分になる期間です。例えば7日に設定すると、7日前の使用量は50%、14日前の使用量は25%として計算されます。減衰単位の倍数に設定することを推奨します。",
     "Id": "ID",
+    "InvalidParameterDescription": "お探しのものは見つかりませんでした。削除されたか、アドレスが正しくない可能性があります。",
+    "InvalidParameterTitle": "見つかりませんでした",
     "LookbackDays": "参照期間",
     "LookbackDaysDescription": "Fair Share の計算に反映される利用履歴の範囲。これより前の利用は計算から除外されます。半減期の倍数に設定することを推奨します。",
     "ModifiedAt": "更新日時",
@@ -777,6 +780,8 @@
     "SchedulerDescription": "フェアシェアスケジューラは、過去のリソース使用状況に基づいてセッションの実行優先度を決定するスケジューリング方式です。これまでのリソース消費が少ないユーザーに高い優先度を割り当て、すべてのユーザーが時間をかけて公平にリソースへアクセスできるようにします。\n<br /> <br />\n管理者はドメイン、プロジェクト、ユーザーの各レベルで重みを設定して特定のグループにより多くのリソースを割り当てることができます。優先度は0.0から1.0の範囲の値で表され、1.0に近いほど優先度が高くなります。",
     "SchedulerDoesNotAppliedToResourceGroup": "選択したリソースグループ（{{resourceGroup}}）ではフェアシェアスケジューラが有効になっていません。スケジューラを使用するには、リソースグループの設定を更新してください。",
     "TotalUsage": "総使用量",
+    "UnknownErrorDescription": "予期しないエラーが発生しました。しばらくしてからもう一度お試しください。",
+    "UnknownErrorOccurred": "エラーが発生しました",
     "UsageHistory": "利用履歴",
     "User": "ユーザー",
     "UserDescription": "ユーザーは集計期間中の設定済みウェイトと累積使用量を定義します。ユーザーウェイトは個々のユーザーの優先度係数を計算するために使用されます。",
@@ -799,7 +804,6 @@
       "SelectDateRange": "日付範囲を選択"
     }
   },
-  "fairShrae": {},
   "general": {
     "AccessKey": "アクセスキー",
     "Active": "アクティブ",

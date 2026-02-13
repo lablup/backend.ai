@@ -760,9 +760,12 @@
     "FairShareSettingDescription": "Les modifications ne sont pas prises en compte immédiatement dans les calculs de Fair Share et peuvent mettre environ 5 minutes en raison du cycle de calcul.",
     "FairShareSettingTitleWithName": "Configuration de Fair Share : {{name}}",
     "FairShareSettingsSuccessfullyUpdated": "Les paramètres de partage équitable ont été mis à jour.",
+    "GoBackToFirstStep": "Aller à la première étape",
     "HalfLifeDays": "Demi-vie",
     "HalfLifeDaysDescription": "La durée sur laquelle la pondération de l'utilisation diminue de moitié. Si elle est fixée à 7 jours, l'utilisation d'il y a 7 jours est pondérée à 50 % et celle d'il y a 14 jours à 25 %. Il est recommandé de définir cette durée comme un multiple de l'unité de décroissance.",
     "Id": "Identifiant",
+    "InvalidParameterDescription": "Nous n'avons pas trouvé ce que vous recherchez. Il se peut qu'il ait été supprimé ou que l'adresse soit incorrecte.",
+    "InvalidParameterTitle": "Introuvable",
     "LookbackDays": "Période d'historique",
     "LookbackDaysDescription": "Période de l'historique d'utilisation prise en compte dans les calculs de Fair Share. L'utilisation antérieure à cette période est exclue des calculs. Il est recommandé de définir cette valeur comme un multiple de la demi-vie.",
     "Name": "Nom",
@@ -776,6 +779,8 @@
     "SchedulerDescription": "L'Ordonnanceur Fair Share est une méthode d'ordonnancement qui détermine la priorité d'exécution des sessions en fonction de l'historique d'utilisation des ressources. Il attribue une priorité plus élevée aux utilisateurs ayant consommé moins de ressources, garantissant que tous les utilisateurs puissent accéder aux ressources de manière équitable au fil du temps.\n<br /> <br />\nLes administrateurs peuvent configurer des poids aux niveaux Domaine, Projet et Utilisateur pour allouer davantage de ressources à certains groupes. La priorité est exprimée par une valeur comprise entre 0.0 et 1.0, les valeurs proches de 1.0 indiquant une priorité plus élevée.",
     "SchedulerDoesNotAppliedToResourceGroup": "L'ordonnanceur Fair Share n'est pas activé pour le groupe de ressources sélectionné ({{resourceGroup}}). Pour l'utiliser, mettez à jour les paramètres du groupe de ressources.",
     "TotalUsage": "Utilisation totale",
+    "UnknownErrorDescription": "Une erreur inattendue est survenue. Veuillez réessayer plus tard.",
+    "UnknownErrorOccurred": "Une erreur est survenue",
     "UsageHistory": "Historique d'utilisation",
     "User": "Utilisateur",
     "UserDescription": "L'utilisateur définit le poids configuré et l'utilisation cumulée pendant la période d'agrégation. Le poids de l'utilisateur est utilisé pour calculer le coefficient de priorité pour les utilisateurs individuels.",
@@ -798,7 +803,6 @@
       "SelectDateRange": "Sélectionner une plage de dates"
     }
   },
-  "fairShrae": {},
   "general": {
     "AccessKey": "Clef d'accès",
     "Active": "Actif",

@@ -759,9 +759,12 @@
     "FairShareSettingDescription": "Le modifiche non vengono riflesse immediatamente nei calcoli di Fair Share e potrebbero richiedere circa 5 minuti a causa del ciclo di calcolo.",
     "FairShareSettingTitleWithName": "Configurazione Fair Share: {{name}}",
     "FairShareSettingsSuccessfullyUpdated": "Le impostazioni di Fair Share sono state aggiornate.",
+    "GoBackToFirstStep": "Vai al primo passo",
     "HalfLifeDays": "Emivita",
     "HalfLifeDaysDescription": "Il periodo in cui il tasso di ponderazione dell'utilizzo si dimezza. Se impostato a 7 giorni, l'utilizzo di 7 giorni fa viene calcolato al 50% e quello di 14 giorni fa al 25%. Si consiglia di impostarlo come multiplo dell'unità di decadimento.",
     "Id": "ID",
+    "InvalidParameterDescription": "Non abbiamo trovato ciò che stai cercando. Potrebbe essere stato rimosso o l'indirizzo potrebbe essere errato.",
+    "InvalidParameterTitle": "Non trovato",
     "LookbackDays": "Finestra temporale",
     "LookbackDaysDescription": "Intervallo della cronologia di utilizzo considerato nei calcoli di Fair Share. L'utilizzo precedente a questo intervallo viene escluso dai calcoli. Si consiglia di impostarlo come multiplo della mezza-vita.",
     "Name": "Nome",
@@ -775,6 +778,8 @@
     "SchedulerDescription": "Il Fair Share Scheduler è un metodo di pianificazione che determina la priorità di esecuzione delle sessioni basandosi sul consumo storico delle risorse. Attribuisce priorità più alta agli utenti che hanno consumato meno risorse, garantendo che tutti gli utenti possano accedere alle risorse in modo equo nel tempo.\n<br /> <br />\nGli amministratori possono configurare i pesi a livello di Dominio, Progetto e Utente per allocare più risorse a gruppi specifici. La priorità è espressa come valore compreso tra 0.0 e 1.0; valori più vicini a 1.0 indicano priorità maggiore.",
     "SchedulerDoesNotAppliedToResourceGroup": "Il Fair Share Scheduler non è abilitato per il gruppo di risorse selezionato ({{resourceGroup}}). Per abilitarlo, aggiorna le impostazioni del gruppo di risorse.",
     "TotalUsage": "Utilizzo totale",
+    "UnknownErrorDescription": "Si è verificato un errore imprevisto. Riprova più tardi.",
+    "UnknownErrorOccurred": "Si è verificato un errore",
     "UsageHistory": "Storico utilizzo",
     "User": "Utente",
     "UserDescription": "L'utente imposta il peso configurato e l'utilizzo cumulativo nel periodo di aggregazione. Il peso dell'utente viene utilizzato per calcolare il coefficiente di priorità di ciascun utente.",
@@ -797,7 +802,6 @@
       "SelectDateRange": "Seleziona intervallo di date"
     }
   },
-  "fairShrae": {},
   "general": {
     "AccessKey": "Chiave di accesso",
     "Active": "Attivo",

@@ -763,9 +763,12 @@
     "FairShareSettingDescription": "변경사항은 Fair Share 계산에 바로 반영되지 않으며, 계산 주기에 따라 약 5분정도 소요될 수 있습니다.",
     "FairShareSettingTitleWithName": "Fair Share 설정: {{name}}",
     "FairShareSettingsSuccessfullyUpdated": "Fair share 설정이 수정되었습니다.",
+    "GoBackToFirstStep": "첫번째 단계로 가기",
     "HalfLifeDays": "반감기",
     "HalfLifeDaysDescription": "과거 사용량의 반영 비율이 절반으로 줄어드는 기간입니다. 7일로 설정하면 7일 전 사용량은 50%, 14일 전 사용량은 25%의 비율로 계산됩니다. 집계 단위의 배수로 설정하는 것을 권장합니다.",
     "Id": "ID",
+    "InvalidParameterDescription": "요청하신 정보를 찾을 수 없습니다. 삭제되었거나 잘못된 접근일 수 있습니다.",
+    "InvalidParameterTitle": "검색 결과 없음",
     "LookbackDays": "집계 기간",
     "LookbackDaysDescription": "Fair Share 계산에 반영되는 사용량 기록의 조회 범위입니다. 이 기간 이전의 사용량은 계산에서 제외됩니다. 반감기의 배수로 설정하는 것을 권장합니다.",
     "ModifiedAt": "수정일",
@@ -780,6 +783,8 @@
     "SchedulerDescription": "Fair Share Scheduler는 과거 리소스 사용 이력을 기반으로 세션 실행 우선순위를 결정하는 스케줄링 방식입니다. 리소스를 적게 사용한 사용자에게 더 높은 우선순위를 부여하여 장기적으로 모든 사용자가 공정하게 리소스를 사용할 수 있도록 합니다.\n<br /> <br />\n관리자는 Domain, Project, User 단위로 가중치를 설정하여 특정 그룹에 더 많은 리소스 할당량을 부여할 수 있습니다. 우선순위는 0.0에서 1.0 사이의 값으로 표현되며, 1.0에 가까울수록 높은 우선순위를 의미합니다.",
     "SchedulerDoesNotAppliedToResourceGroup": "선택한 자원 그룹({{resourceGroup}})에 Fair Share 스케줄러가 적용되어 있지 않습니다. 스케줄러를 사용하시려면 자원 그룹 설정을 변경해 주세요.",
     "TotalUsage": "총 사용량",
+    "UnknownErrorDescription": "알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+    "UnknownErrorOccurred": "오류가 발생했습니다",
     "UsageHistory": "사용량 기록",
     "User": "사용자",
     "UserDescription": "사용자 에서는 프로젝트에 설정된 가중치와 집계 기간동안의 누적 사용량을 확인할 수 있습니다.\n사용자의 가중치는 해당 사용자의 우선순위 계수 계산에 사용됩니다.",
@@ -802,7 +807,6 @@
       "SelectDateRange": "기간 선택"
     }
   },
-  "fairShrae": {},
   "general": {
     "AccessKey": "접근키",
     "Active": "활성",

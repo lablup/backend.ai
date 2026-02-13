@@ -760,9 +760,12 @@
     "FairShareSettingDescription": "Muutokset eivät näy välittömästi Fair Share -laskelmissa, vaan niiden päivittyminen voi kestää noin 5 minuuttia laskentasyklin vuoksi.",
     "FairShareSettingTitleWithName": "Fair Share -konfiguraatio: {{name}}",
     "FairShareSettingsSuccessfullyUpdated": "Fair share -asetukset on päivitetty.",
+    "GoBackToFirstStep": "Siirry ensimmäiseen vaiheeseen",
     "HalfLifeDays": "Puoliintumisaika",
     "HalfLifeDaysDescription": "Ajanjakso, jonka aikana käytön painoarvo puolittuu. Jos asetetaan 7 päiväksi, 7 päivän takainen käyttö lasketaan 50 %:ksi ja 14 päivän takainen 25 %:ksi. Suositellaan asettamaan tämä vaimenemisyksikön monikerraksi.",
     "Id": "ID",
+    "InvalidParameterDescription": "Emme löytäneet etsimääsi. Se on ehkä poistettu tai osoite voi olla virheellinen.",
+    "InvalidParameterTitle": "Ei löytynyt",
     "LookbackDays": "Takautumisaika",
     "LookbackDaysDescription": "Käyttöhistorian ajanjakso, joka otetaan huomioon Fair Share -laskelmissa. Tätä ajanjaksoa edeltävä käyttö jätetään laskelmien ulkopuolelle. Suositellaan asettamaan tämä puoliintumisajan monikerraksi.",
     "Name": "Nimi",
@@ -776,6 +779,8 @@
     "SchedulerDescription": "Fair Share Scheduler on aikataulutusmenetelmä, joka määrittää istunnon suoritusprioriteetin aiemman resurssikäytön perusteella. Se antaa korkeamman prioriteetin käyttäjille, jotka ovat käyttäneet vähemmän resursseja, varmistaen, että kaikki käyttäjät pääsevät resursseihin tasapuolisesti ajan myötä.\n<br /> <br />\nJärjestelmänvalvojat voivat määrittää painot Domain-, Project- ja User-tasoilla kohdentamaan enemmän resursseja tietyille ryhmille. Prioriteetti ilmaistaan arvona välillä 0.0–1.0, jossa arvo lähellä 1.0 tarkoittaa korkeampaa prioriteettia.",
     "SchedulerDoesNotAppliedToResourceGroup": "Fair Share Scheduler ei ole käytössä valitussa resurssiryhmässä ({{resourceGroup}}). Ota se käyttöön päivittämällä resurssiryhmän asetukset.",
     "TotalUsage": "Kokonaiskäyttö",
+    "UnknownErrorDescription": "Tapahtui odottamaton virhe. Yritä uudelleen myöhemmin.",
+    "UnknownErrorOccurred": "Jotain meni pieleen",
     "UsageHistory": "Käyttöhistoria",
     "User": "Käyttäjä",
     "UserDescription": "Käyttäjä määrittää asetetun painon ja aggregointijakson aikana kertyneen käytön. Käyttäjän painoa käytetään yksittäisten käyttäjien prioriteettikertoimen laskemiseen.",
@@ -798,7 +803,6 @@
       "SelectDateRange": "Valitse päivämääräväli"
     }
   },
-  "fairShrae": {},
   "general": {
     "AccessKey": "Access Key",
     "Active": "Aktiivinen",
