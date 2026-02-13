@@ -16,6 +16,23 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.15.9 (2026-02-13)
+
+### Fixes
+* Read HTTP responses before connection closes in Agent Watcher APIs ([#7165](https://github.com/lablup/backend.ai/issues/7165))
+* Fix race condition in kernel metrics cleanup by removing automatic cleanup from `collect_container_stat()` ([#8250](https://github.com/lablup/backend.ai/issues/8250))
+* `agent_summary_list` pagination may skip agents due to JOIN with `KernelRow` ([#8351](https://github.com/lablup/backend.ai/issues/8351))
+* Add explicit `pycares` dependency to `backend.ai-common` to prevent version mismatch when installing from wheel ([#8357](https://github.com/lablup/backend.ai/issues/8357))
+* Prevent kernel status regression from TERMINATED to TERMINATING in `destroy_session()` which caused a livelock in model serving sessions ([#8406](https://github.com/lablup/backend.ai/issues/8406))
+* Add missing ordering when querying pending sessions ([#8419](https://github.com/lablup/backend.ai/issues/8419))
+* Add VNC and RDP protocol support for remote desktop service ports. ([#8431](https://github.com/lablup/backend.ai/issues/8431))
+* Handle missing constraint and index in permission tables migration downgrade ([#8446](https://github.com/lablup/backend.ai/issues/8446))
+* Make `group` parameter required in `check_presets` API. Previously, the default value "default" caused `ProjectNotFound` errors when the default group did not exist in the system. ([#8462](https://github.com/lablup/backend.ai/issues/8462))
+* Allow committing sessions whose base image has been deleted by resolving both ALIVE and DELETED images during session commit validation ([#8511](https://github.com/lablup/backend.ai/issues/8511))
+* Check vfolder permissions of requester's keypair rather when clone vfolder. This allows users with sufficient permission can clone vfolders from model store. ([#8569](https://github.com/lablup/backend.ai/issues/8569))
+* Fix Cartesian product warning in model serving repository by using `select_from()` pattern for JOIN queries, resolving SQLAlchemy warnings about missing join conditions between `users` and `keypairs` tables. ([#8813](https://github.com/lablup/backend.ai/issues/8813))
+
+
 ## 25.15.8 (2026-01-26)
 
 ### Fixes

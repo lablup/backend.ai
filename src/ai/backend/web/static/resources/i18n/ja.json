@@ -4,6 +4,9 @@
     "ActiveAgents": "アクティブなエージェント",
     "ActiveAgentsTooltip": "現在システムで実行されているすべてのエージェントの概要を示しています。"
   },
+  "adminSession": {
+    "PendingSessions": "保留中のセッション"
+  },
   "agent": {
     "AcceleratorAllocations": "アクセラレータの割り当て",
     "Agent": "代理店",
@@ -58,8 +61,8 @@
     "MetricName": "メトリック名",
     "MetricSource": "メトリックソース",
     "MinReplicas": "最小レプリカ",
-    "ScaleDown": "スケールダウン",
-    "ScaleUp": "スケールアップ",
+    "ScaleIn": "スケールイン",
+    "ScaleOut": "スケールアウト",
     "ScalingType": "タイプ",
     "StepSize": "ステップサイズ",
     "SuccessfullyCreated": "自動スケーリングルールが正常に作成されました。",
@@ -708,11 +711,14 @@
     "WrongAPIServerAddress": "APIサーバーのアドレスが間違っています。"
   },
   "errorBoundary": {
+    "DebugInfo": "デバッグ情報:",
     "DisplayOnlyDevEnv": "このエラーブロックはWebUI開発環境でのみ表示されます。",
+    "ErrorMessage": "エラーメッセージ：",
     "ExpiredLoginSessionReLogin": "ログイン",
     "ExpiredLoginSessionTitle": "ログインセッションの有効期限が切れました。",
     "ReloadPage": "ページの更新",
     "ResetErrorBoundary": "ErrorBoundaryの初期化",
+    "StackTrace": "スタックトレース:",
     "Title": "エラーが発生しました。"
   },
   "explorer": {
@@ -733,13 +739,80 @@
     "VFolder": "フォルダ",
     "ValueRequired": "ValueRequired"
   },
+  "fairShare": {
+    "ActiveStatus": "アクティブ状態",
+    "AllocationAverage": "リソース割り当て",
+    "AllocationAverageDescription": "設定された \"Lookback \" 期間中の平均リソース割り当て。",
+    "Allocations": "割り当て",
+    "CreatedAt": "作成日時",
+    "DayUnit": "日",
+    "Days": "日",
+    "DecayUnitDays": "減衰単位",
+    "DecayUnitDaysDescription": "利用状況を集計する期間（日数）",
+    "DefaultWeight": "既定の重み",
+    "DefaultWeightDescription": "重みが指定されていないドメイン、プロジェクト、ユーザーに適用されるデフォルト値。",
+    "Domain": "ドメイン",
+    "DomainDescription": "ドメインは、集計期間中の設定された重みと累積使用量を定義します。<br />ドメインの重みは、そのドメインに属するユーザーの優先度係数を計算するために使用されます。<br />異なるドメインのユーザーは互いの優先度計算に影響しません。",
+    "Email": "メール",
+    "FairShareFactor": "フェアシェア係数",
+    "FairShareFactorDescription": "フェアシェアスケジューラによって算出されたスケジューリング優先度。値が大きいほど優先度が高くなります。",
+    "FairShareSetting": "フェアシェア設定",
+    "FairShareSettingDescription": "変更は Fair Share の計算にすぐには反映されません。計算サイクルのため、反映までに約5分かかる場合があります。",
+    "FairShareSettingTitleWithName": "フェアシェア設定: {{name}}",
+    "FairShareSettingsSuccessfullyUpdated": "フェアシェアの設定が更新されました。",
+    "GoBackToFirstStep": "最初のステップへ進む",
+    "HalfLifeDays": "半減期",
+    "HalfLifeDaysDescription": "使用量の反映率が半分になる期間です。例えば7日に設定すると、7日前の使用量は50%、14日前の使用量は25%として計算されます。減衰単位の倍数に設定することを推奨します。",
+    "Id": "ID",
+    "InvalidParameterDescription": "お探しのものは見つかりませんでした。削除されたか、アドレスが正しくない可能性があります。",
+    "InvalidParameterTitle": "見つかりませんでした",
+    "LookbackDays": "参照期間",
+    "LookbackDaysDescription": "Fair Share の計算に反映される利用履歴の範囲。これより前の利用は計算から除外されます。半減期の倍数に設定することを推奨します。",
+    "ModifiedAt": "更新日時",
+    "Name": "名前",
+    "PleaseInputFieldWithFieldName": "{{field}}を入力してください",
+    "Project": "プロジェクト",
+    "ProjectDescription": "プロジェクトは、集計期間中の設定された重みと累積使用量を定義します。<br />プロジェクトの重みは、そのプロジェクトに属するユーザーの優先度係数を算出するために使用されます。<br />異なるプロジェクトのユーザーは互いの優先度計算に影響を与えません。",
+    "ResourceGroup": "リソースグループ",
+    "ResourceGroupDescription": "リソースグループはフェアシェアスケジューリングの適用範囲を定義します。<br />各リソースグループは、フェアシェアスケジューラがユーザーの優先度を評価・比較する独立した計算境界を保持します。<br />優先度の計算は同一グループ内のユーザーに限定され、異なるリソースグループのユーザーは互いのスケジューリング優先度に影響を与えません。",
+    "ResourceWeights": "リソース重み",
+    "ResourceWeightsDescription": "各リソースタイプの重み",
+    "SchedulerDescription": "フェアシェアスケジューラは、過去のリソース使用状況に基づいてセッションの実行優先度を決定するスケジューリング方式です。これまでのリソース消費が少ないユーザーに高い優先度を割り当て、すべてのユーザーが時間をかけて公平にリソースへアクセスできるようにします。\n<br /> <br />\n管理者はドメイン、プロジェクト、ユーザーの各レベルで重みを設定して特定のグループにより多くのリソースを割り当てることができます。優先度は0.0から1.0の範囲の値で表され、1.0に近いほど優先度が高くなります。",
+    "SchedulerDoesNotAppliedToResourceGroup": "選択したリソースグループ（{{resourceGroup}}）ではフェアシェアスケジューラが有効になっていません。スケジューラを使用するには、リソースグループの設定を更新してください。",
+    "TotalUsage": "総使用量",
+    "UnknownErrorDescription": "予期しないエラーが発生しました。しばらくしてからもう一度お試しください。",
+    "UnknownErrorOccurred": "エラーが発生しました",
+    "UsageHistory": "利用履歴",
+    "User": "ユーザー",
+    "UserDescription": "ユーザーは集計期間中の設定済みウェイトと累積使用量を定義します。ユーザーウェイトは個々のユーザーの優先度係数を計算するために使用されます。",
+    "UsingDefault": "デフォルト",
+    "Weight": "重み",
+    "WeightDescription": "Fair Shareスケジューリングの優先度を決定する基本倍率。値が大きいほど優先度が高くなります。デフォルトは '1.0'。重み '2.0' は '1.0' の2倍の優先度です。",
+    "step": {
+      "Description": "Fair Share設定はリソースグループごとに、ドメイン・プロジェクト・ユーザーの階層構造に従って行われます。下位設定に移動するには、テーブルの各項目をクリックしてください。",
+      "PleaseSelectDomain": "ドメインを選択してください。",
+      "PleaseSelectProject": "プロジェクトを選択してください。",
+      "ProjectDescription": "各プロジェクトのFair Share重みを設定・変更します。",
+      "UserDescription": "各ユーザーの Fair Share の重みを設定および変更します。"
+    },
+    "usageBucket": {
+      "AverageDailyUsage": "1日あたりの平均使用量",
+      "Last30Days": "過去30日間",
+      "Last7Days": "過去7日間",
+      "Last90Days": "過去90日間",
+      "NoDataAvailable": "選択した期間の使用状況データはありません。",
+      "SelectDateRange": "日付範囲を選択"
+    }
+  },
   "general": {
     "AccessKey": "アクセスキー",
     "Active": "アクティブ",
     "Add": "追加",
     "Advanced": "高度な",
     "All": "全体",
+    "Allow": "許可",
     "Auto": "自動",
+    "BulkEdit": "一括編集",
     "Change": "変更",
     "ConfirmPassword": "パスワードを認証する",
     "Control": "操作",
@@ -748,6 +821,7 @@
     "Days": "{{num}}日",
     "Disabled": "無効",
     "E-Mail": "Eメール",
+    "Enable": "有効にする",
     "Enabled": "有効",
     "ErrorOccurred": "何かがうまくいかなかった。\n後でもう一度やり直してください。",
     "ExtendLoginSession": "ログインセッションの延長",
@@ -773,6 +847,7 @@
     "ResourceGroup": "リソースグループ",
     "SecretKey": "シークレットキー",
     "Session": "セッション",
+    "ShowUsageGraph": "使用状況を表示",
     "StorageProxies": "ストレージ",
     "TotalItems": "合計{{total}}項目",
     "Username": "ユーザー名",
@@ -1068,6 +1143,7 @@
     "NimApiKey": "あなたのNGC APIキー",
     "NoExtraMounts": "余分なマウントはありません",
     "NoServiceEndpoint": "サービスエンドポイントがありません。",
+    "NotInProject": "このモデルサービスは別のプロジェクトに属しています。該当プロジェクトに移動してから編集してください。",
     "NumberOfReplicas": "レプリカ数",
     "OnlyAllowsNonNegativeIntegers": "0以上を入力してください。",
     "OpenToPublic": "アプリを外部公開",
@@ -1119,6 +1195,7 @@
     "StartingModelService": "モデルサービスの開始...",
     "Status": "ステータス",
     "Success": "成功",
+    "SwitchToProject": "'{{projectName}}' に移動",
     "SyncRoutes": "同期ルート",
     "SyncRoutesFailed": "ルート同期要求に失敗しました。",
     "SyncRoutesRequested": "ルート同期をリクエストしました。",
@@ -1184,7 +1261,7 @@
     "Visit": "訪問"
   },
   "pagination": {
-    "Total": "{{start}}  -  {{end}} of {{attol}}アイテム"
+    "Total": "{{start}} - {{end}} of {{attol}}アイテム"
   },
   "project": {
     "Active": "アクティブ",
@@ -1283,6 +1360,7 @@
     "Domain": "ドメイン",
     "Driver": "運転者",
     "DriverOptions": "ドライバーオプション",
+    "EnterAPIToken": "APIトークンを入力",
     "EnterValidResourceGroupName": "有効なリソースグループ名を入力してください",
     "Information": "情報",
     "ModifyResourceGroup": "リソースグループの変更",
@@ -1311,6 +1389,7 @@
     "SelectScheduler": "スケジューラを選択",
     "TimeoutSeconds": "秒",
     "TypeResourceGroupNameToDelete": "削除するリソースグループ名を入力します",
+    "WsproxyAPIToken": "WSProxy APIトークン",
     "WsproxyAddress": "WSProxy サーバアドレス"
   },
   "resourcePolicy": {
@@ -1459,7 +1538,7 @@
     "ForceTerminateWarningMsg2": "状態が不当に長時間変化しない場合にのみ実行してください。",
     "ForceTerminateWarningMsg3": "このアクションでは、エージェント上の実際のコンテナは削除されません。\n手動によるクリーンアップが必要な場合があります。",
     "ForceUseV1Proxy": "V1の強制使用",
-    "ForceUseV2Proxy": "V1の強制使用",
+    "ForceUseV2Proxy": "V2プロキシの強制使用",
     "GPU": "GPU",
     "GPU(MEM)": "GPU(メモリ)",
     "Gaudi2Enabled": "Gaudi 2 NPU 有効",
@@ -1939,7 +2018,7 @@
     "UsageHistoryNote": "ここに示す使用履歴は、終了した計算セッションに基づいています。",
     "description": {
       "CPUUtilization": "選択した期間中にセッションで使用されるCPU時間の量を表します。 \n\n単一のCPUコアは、最大100％に対応します。\n\n複数のコアが割り当てられている場合、各コアの最大使用量（100％）を合計することで計算されるため、合計使用量は100％を超える可能性があります。",
-      "NetworkRx": "ネットワーク転送率を示します。\n\nコンテナがネットワークデータを受信して​​いるレートを表します。",
+      "NetworkRx": "ネットワーク転送率を示します。\n\nコンテナがネットワークデータを受信して いるレートを表します。",
       "NetworkTx": "ネットワーク転送率を示します。\n\nコンテナがネットワークデータを送信しているレートを表します。"
     },
     "prometheus": {
@@ -2252,6 +2331,7 @@
       "Environments": "環境設定",
       "Environments&Presets": "環境とプリセット",
       "Experiments": "実験",
+      "FairShare": "公平配分",
       "FastTrack": "FastTrack",
       "FirstPageNameAlias": "最初",
       "FullName": "フルネーム",
