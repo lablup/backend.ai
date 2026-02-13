@@ -41,6 +41,8 @@ class ContainerBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
                 raise KernelRegistryNotFound
             environ = await config.get_kernel_environ()
             resource_spec = await config.get_kernel_resource_spec()
+        except KernelRegistryNotFound:
+            raise
         except FileNotFoundError as e:
             log.warning("Missing recovery file in scratch path {}: {}", str(config_path), e)
             raise KernelRegistryNotFound from e
