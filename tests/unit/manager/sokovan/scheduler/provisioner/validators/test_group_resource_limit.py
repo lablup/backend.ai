@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
+from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SlotQuantity
 from ai.backend.manager.sokovan.data import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
@@ -47,7 +47,9 @@ class TestGroupResourceLimitValidator:
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
                 by_user={},
-                by_group={group_id: ResourceSlot(cpu=Decimal("3"), mem=Decimal("3"))},
+                by_group={
+                    group_id: [SlotQuantity("cpu", Decimal("3")), SlotQuantity("mem", Decimal("3"))]
+                },
                 by_domain={},
                 by_agent={},
             ),
@@ -83,7 +85,9 @@ class TestGroupResourceLimitValidator:
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
                 by_user={},
-                by_group={group_id: ResourceSlot(cpu=Decimal("8"), mem=Decimal("8"))},
+                by_group={
+                    group_id: [SlotQuantity("cpu", Decimal("8")), SlotQuantity("mem", Decimal("8"))]
+                },
                 by_domain={},
                 by_agent={},
             ),
@@ -120,7 +124,12 @@ class TestGroupResourceLimitValidator:
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
                 by_user={},
-                by_group={group_id: ResourceSlot(cpu=Decimal("50"), mem=Decimal("50"))},
+                by_group={
+                    group_id: [
+                        SlotQuantity("cpu", Decimal("50")),
+                        SlotQuantity("mem", Decimal("50")),
+                    ]
+                },
                 by_domain={},
                 by_agent={},
             ),

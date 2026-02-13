@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
+from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SlotQuantity
 from ai.backend.manager.sokovan.data import (
     ConcurrencySnapshot,
     KeypairOccupancy,
@@ -145,12 +145,18 @@ class TestLIFOSequencer:
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={
                     AccessKey("user1"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("50"), mem=Decimal("50")),
+                        occupied_slots=[
+                            SlotQuantity("cpu", Decimal("50")),
+                            SlotQuantity("mem", Decimal("50")),
+                        ],
                         session_count=1,
                         sftp_session_count=0,
                     ),
                     AccessKey("user2"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("30"), mem=Decimal("30")),
+                        occupied_slots=[
+                            SlotQuantity("cpu", Decimal("30")),
+                            SlotQuantity("mem", Decimal("30")),
+                        ],
                         session_count=1,
                         sftp_session_count=0,
                     ),

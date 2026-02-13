@@ -12,7 +12,7 @@ from aiohttp import web
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.api.gql.fair_share.resolver import domain as domain_resolver
 from ai.backend.manager.api.gql.fair_share.types.domain import (
     DomainFairShareConnection,
@@ -86,10 +86,10 @@ def sample_domain_fair_share_data() -> DomainFairShareData:
             ),
             calculation_snapshot=FairShareCalculationSnapshot(
                 fair_share_factor=Decimal("1.5"),
-                total_decayed_usage=ResourceSlot({
-                    "cpu": Decimal("100.0"),
-                    "mem": Decimal("200.0"),
-                }),
+                total_decayed_usage=[
+                    SlotQuantity("cpu", Decimal("100.0")),
+                    SlotQuantity("mem", Decimal("200.0")),
+                ],
                 normalized_usage=Decimal("50.0"),
                 lookback_start=today,
                 lookback_end=today,

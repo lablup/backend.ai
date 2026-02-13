@@ -9,7 +9,7 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.api.gql.fair_share.resolver import project as project_resolver
 from ai.backend.manager.api.gql.fair_share.types import (
     ProjectFairShareGQL,
@@ -51,7 +51,7 @@ class TestRGProjectFairShare:
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=Decimal("0.5"),
-                    total_decayed_usage=ResourceSlot({"cpu": Decimal("50.0")}),
+                    total_decayed_usage=[SlotQuantity(slot_name="cpu", quantity=Decimal("50.0"))],
                     normalized_usage=Decimal("100.0"),
                     lookback_start=date(2024, 1, 1),
                     lookback_end=date(2024, 1, 31),

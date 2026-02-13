@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.resource_group.types import (
     ResourceGroupGQL,
@@ -34,9 +34,12 @@ class TestResourceInfoGQL:
         """Test that all fields are correctly converted to ResourceSlotGQL."""
         # Given
         resource_info = ResourceInfo(
-            capacity=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8589934592")}),
-            used=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
-            free=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
+            capacity=[
+                SlotQuantity("cpu", Decimal("4")),
+                SlotQuantity("mem", Decimal("8589934592")),
+            ],
+            used=[SlotQuantity("cpu", Decimal("2")), SlotQuantity("mem", Decimal("4294967296"))],
+            free=[SlotQuantity("cpu", Decimal("2")), SlotQuantity("mem", Decimal("4294967296"))],
         )
 
         # When
@@ -67,9 +70,9 @@ class TestResourceInfoGQL:
         """Test conversion when ResourceInfo has empty ResourceSlots."""
         # Given
         resource_info = ResourceInfo(
-            capacity=ResourceSlot(),
-            used=ResourceSlot(),
-            free=ResourceSlot(),
+            capacity=[],
+            used=[],
+            free=[],
         )
 
         # When
@@ -85,24 +88,24 @@ class TestResourceInfoGQL:
         """Test conversion with various resource types including accelerators."""
         # Given
         resource_info = ResourceInfo(
-            capacity=ResourceSlot({
-                "cpu": Decimal("8"),
-                "mem": Decimal("17179869184"),
-                "cuda.shares": Decimal("4"),
-                "rocm.devices": Decimal("2"),
-            }),
-            used=ResourceSlot({
-                "cpu": Decimal("4"),
-                "mem": Decimal("8589934592"),
-                "cuda.shares": Decimal("2"),
-                "rocm.devices": Decimal("1"),
-            }),
-            free=ResourceSlot({
-                "cpu": Decimal("4"),
-                "mem": Decimal("8589934592"),
-                "cuda.shares": Decimal("2"),
-                "rocm.devices": Decimal("1"),
-            }),
+            capacity=[
+                SlotQuantity("cpu", Decimal("8")),
+                SlotQuantity("mem", Decimal("17179869184")),
+                SlotQuantity("cuda.shares", Decimal("4")),
+                SlotQuantity("rocm.devices", Decimal("2")),
+            ],
+            used=[
+                SlotQuantity("cpu", Decimal("4")),
+                SlotQuantity("mem", Decimal("8589934592")),
+                SlotQuantity("cuda.shares", Decimal("2")),
+                SlotQuantity("rocm.devices", Decimal("1")),
+            ],
+            free=[
+                SlotQuantity("cpu", Decimal("4")),
+                SlotQuantity("mem", Decimal("8589934592")),
+                SlotQuantity("cuda.shares", Decimal("2")),
+                SlotQuantity("rocm.devices", Decimal("1")),
+            ],
         )
 
         # When
@@ -170,9 +173,12 @@ class TestResourceGroupGQLResourceInfoResolver:
     def sample_resource_info(self) -> ResourceInfo:
         """Create sample ResourceInfo for testing."""
         return ResourceInfo(
-            capacity=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8589934592")}),
-            used=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2147483648")}),
-            free=ResourceSlot({"cpu": Decimal("3"), "mem": Decimal("6442450944")}),
+            capacity=[
+                SlotQuantity("cpu", Decimal("4")),
+                SlotQuantity("mem", Decimal("8589934592")),
+            ],
+            used=[SlotQuantity("cpu", Decimal("1")), SlotQuantity("mem", Decimal("2147483648"))],
+            free=[SlotQuantity("cpu", Decimal("3")), SlotQuantity("mem", Decimal("6442450944"))],
         )
 
     @pytest.mark.asyncio

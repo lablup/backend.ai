@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
+from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SlotQuantity
 from ai.backend.manager.sokovan.data import (
     ConcurrencySnapshot,
     KeypairOccupancy,
@@ -63,17 +63,26 @@ class TestDRFSequencer:
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={
                     AccessKey("user1"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("20"), mem=Decimal("10")),
+                        occupied_slots=[
+                            SlotQuantity("cpu", Decimal("20")),
+                            SlotQuantity("mem", Decimal("10")),
+                        ],
                         session_count=1,
                         sftp_session_count=0,
                     ),  # dominant share: 20%
                     AccessKey("user2"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("30")),
+                        occupied_slots=[
+                            SlotQuantity("cpu", Decimal("10")),
+                            SlotQuantity("mem", Decimal("30")),
+                        ],
                         session_count=1,
                         sftp_session_count=0,
                     ),  # dominant share: 30%
                     AccessKey("user3"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("5"), mem=Decimal("5")),
+                        occupied_slots=[
+                            SlotQuantity("cpu", Decimal("5")),
+                            SlotQuantity("mem", Decimal("5")),
+                        ],
                         session_count=1,
                         sftp_session_count=0,
                     ),  # dominant share: 5%
@@ -294,7 +303,10 @@ class TestDRFSequencer:
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={
                     AccessKey("user1"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("50"), mem=Decimal("10")),
+                        occupied_slots=[
+                            SlotQuantity("cpu", Decimal("50")),
+                            SlotQuantity("mem", Decimal("10")),
+                        ],
                         session_count=1,
                         sftp_session_count=0,
                     ),
