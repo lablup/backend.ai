@@ -60,4 +60,4 @@ class AgentOrderField(StrEnum):
 
     ID = "id"
     STATUS = "status"
-    SCALING_GROUP = "scaling_group"
+    RESOURCE_GROUP = "resource_group"

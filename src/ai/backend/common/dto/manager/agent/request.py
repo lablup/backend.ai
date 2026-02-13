@@ -27,10 +27,10 @@ class AgentFilter(BaseRequestModel):
         default=None,
         description="Filter by agent status. Supports equals, in, not_equals, and not_in operations.",
     )
-    scaling_group: StringFilter | None = Field(
+    resource_group: StringFilter | None = Field(
         default=None,
         description=(
-            "Filter by scaling group name. "
+            "Filter by resource group name. "
             "Supports equals, contains, starts_with, ends_with, "
             "and their case-insensitive and negated variants."
         ),

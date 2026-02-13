@@ -22,7 +22,7 @@ class AgentDTO(BaseModel):
     id: str = Field(description="Agent ID")
     status: str = Field(description="Current agent status")
     region: str = Field(description="Region identifier")
-    scaling_group: str = Field(description="Assigned scaling group")
+    resource_group: str = Field(description="Assigned resource group")
     schedulable: bool = Field(description="Whether the agent accepts new sessions")
     available_slots: dict[str, str] = Field(description="Free resource slots")
     occupied_slots: dict[str, str] = Field(description="In-use resource slots")

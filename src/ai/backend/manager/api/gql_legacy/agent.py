@@ -550,7 +550,7 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[Agent]:
         conditions = []
         if scaling_group is not None:
-            conditions.append(QueryConditions.by_scaling_group(scaling_group))
+            conditions.append(QueryConditions.by_resource_group(scaling_group))
         if raw_status is not None:
             conditions.append(QueryConditions.by_statuses([AgentStatus[raw_status]]))
 

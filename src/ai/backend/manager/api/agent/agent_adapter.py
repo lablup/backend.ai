@@ -37,7 +37,7 @@ class AgentAdapter(BaseFilterAdapter):
             id=str(agent.id),
             status=agent.status.name,
             region=agent.region,
-            scaling_group=agent.scaling_group,
+            resource_group=agent.scaling_group,
             schedulable=agent.schedulable,
             available_slots=dict(agent.available_slots.to_json()),
             occupied_slots=dict(agent.cached_occupied_slots.to_json()),
@@ -87,13 +87,13 @@ class AgentAdapter(BaseFilterAdapter):
                 agent_statuses = [AgentStatus[s.value] for s in filter.status.not_in]
                 conditions.append(QueryConditions.by_status_not_in(agent_statuses))
 
-        if filter.scaling_group is not None:
+        if filter.resource_group is not None:
             condition = self.convert_string_filter(
-                filter.scaling_group,
-                contains_factory=QueryConditions.by_scaling_group_contains,
-                equals_factory=QueryConditions.by_scaling_group_equals,
-                starts_with_factory=QueryConditions.by_scaling_group_starts_with,
-                ends_with_factory=QueryConditions.by_scaling_group_ends_with,
+                filter.resource_group,
+                contains_factory=QueryConditions.by_resource_group_contains,
+                equals_factory=QueryConditions.by_resource_group_equals,
+                starts_with_factory=QueryConditions.by_resource_group_starts_with,
+                ends_with_factory=QueryConditions.by_resource_group_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -108,8 +108,8 @@ class AgentAdapter(BaseFilterAdapter):
             return QueryOrders.id(ascending=ascending)
         if order.field == AgentOrderField.STATUS:
             return QueryOrders.status(ascending=ascending)
-        if order.field == AgentOrderField.SCALING_GROUP:
-            return QueryOrders.scaling_group(ascending=ascending)
+        if order.field == AgentOrderField.RESOURCE_GROUP:
+            return QueryOrders.resource_group(ascending=ascending)
         raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:

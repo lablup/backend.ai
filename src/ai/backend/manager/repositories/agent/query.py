@@ -18,14 +18,14 @@ class QueryConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group(scaling_group: str) -> QueryCondition:
+    def by_resource_group(resource_group: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AgentRow.scaling_group == scaling_group
+            return AgentRow.scaling_group == resource_group
 
         return inner
 
     @staticmethod
-    def by_scaling_group_contains(spec: StringMatchSpec) -> QueryCondition:
+    def by_resource_group_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = AgentRow.scaling_group.ilike(f"%{spec.value}%")
@@ -38,7 +38,7 @@ class QueryConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group_equals(spec: StringMatchSpec) -> QueryCondition:
+    def by_resource_group_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = sa.func.lower(AgentRow.scaling_group) == spec.value.lower()
@@ -51,7 +51,7 @@ class QueryConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
+    def by_resource_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = AgentRow.scaling_group.ilike(f"{spec.value}%")
@@ -64,7 +64,7 @@ class QueryConditions:
         return inner
 
     @staticmethod
-    def by_scaling_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
+    def by_resource_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = AgentRow.scaling_group.ilike(f"%{spec.value}")
@@ -119,7 +119,7 @@ class QueryOrders:
         return AgentRow.status.desc()
 
     @staticmethod
-    def scaling_group(ascending: bool = True) -> QueryOrder:
+    def resource_group(ascending: bool = True) -> QueryOrder:
         if ascending:
             return AgentRow.scaling_group.asc()
         return AgentRow.scaling_group.desc()

@@ -7816,7 +7816,7 @@
             "default": null,
             "description": "Filter by agent status. Supports equals, in, not_equals, and not_in operations."
           },
-          "scaling_group": {
+          "resource_group": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/StringFilter"
@@ -7826,7 +7826,7 @@
               }
             ],
             "default": null,
-            "description": "Filter by scaling group name. Supports equals, contains, starts_with, ends_with, and their case-insensitive and negated variants."
+            "description": "Filter by resource group name. Supports equals, contains, starts_with, ends_with, and their case-insensitive and negated variants."
           }
         },
         "title": "AgentFilter",
@@ -7856,7 +7856,7 @@
         "enum": [
           "id",
           "status",
-          "scaling_group"
+          "resource_group"
         ],
         "title": "AgentOrderField",
         "type": "string"

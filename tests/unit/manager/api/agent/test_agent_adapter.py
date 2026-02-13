@@ -124,11 +124,11 @@ class TestAgentAdapterBuildQuerier:
         assert len(querier.conditions) == 1
         assert callable(querier.conditions[0])
 
-    def test_build_querier_with_scaling_group_equals_filter(self, adapter: AgentAdapter) -> None:
-        """Test building querier with scaling group equals filter."""
+    def test_build_querier_with_resource_group_equals_filter(self, adapter: AgentAdapter) -> None:
+        """Test building querier with resource group equals filter."""
         request = SearchAgentsRequest(
             filter=AgentFilter(
-                scaling_group=StringFilter(equals="default"),
+                resource_group=StringFilter(equals="default"),
             ),
             order=None,
             limit=50,
@@ -140,11 +140,11 @@ class TestAgentAdapterBuildQuerier:
         assert len(querier.conditions) == 1
         assert callable(querier.conditions[0])
 
-    def test_build_querier_with_scaling_group_contains_filter(self, adapter: AgentAdapter) -> None:
-        """Test building querier with scaling group contains filter."""
+    def test_build_querier_with_resource_group_contains_filter(self, adapter: AgentAdapter) -> None:
+        """Test building querier with resource group contains filter."""
         request = SearchAgentsRequest(
             filter=AgentFilter(
-                scaling_group=StringFilter(contains="gpu"),
+                resource_group=StringFilter(contains="gpu"),
             ),
             order=None,
             limit=50,
@@ -156,13 +156,13 @@ class TestAgentAdapterBuildQuerier:
         assert len(querier.conditions) == 1
         assert callable(querier.conditions[0])
 
-    def test_build_querier_with_scaling_group_starts_with_filter(
+    def test_build_querier_with_resource_group_starts_with_filter(
         self, adapter: AgentAdapter
     ) -> None:
-        """Test building querier with scaling group starts_with filter."""
+        """Test building querier with resource group starts_with filter."""
         request = SearchAgentsRequest(
             filter=AgentFilter(
-                scaling_group=StringFilter(starts_with="prod"),
+                resource_group=StringFilter(starts_with="prod"),
             ),
             order=None,
             limit=50,
@@ -174,13 +174,13 @@ class TestAgentAdapterBuildQuerier:
         assert len(querier.conditions) == 1
         assert callable(querier.conditions[0])
 
-    def test_build_querier_with_scaling_group_i_contains_filter(
+    def test_build_querier_with_resource_group_i_contains_filter(
         self, adapter: AgentAdapter
     ) -> None:
-        """Test building querier with scaling group case-insensitive contains filter."""
+        """Test building querier with resource group case-insensitive contains filter."""
         request = SearchAgentsRequest(
             filter=AgentFilter(
-                scaling_group=StringFilter(i_contains="GPU"),
+                resource_group=StringFilter(i_contains="GPU"),
             ),
             order=None,
             limit=50,
@@ -199,7 +199,7 @@ class TestAgentAdapterBuildQuerier:
                 status=AgentStatusEnumFilter(
                     in_=[AgentStatusEnum.ALIVE],
                 ),
-                scaling_group=StringFilter(equals="gpu-group"),
+                resource_group=StringFilter(equals="gpu-group"),
             ),
             order=None,
             limit=50,
@@ -247,13 +247,13 @@ class TestAgentAdapterBuildQuerier:
 
         assert len(querier.orders) == 1
 
-    def test_build_querier_with_ordering_scaling_group(self, adapter: AgentAdapter) -> None:
-        """Test building querier with scaling_group order."""
+    def test_build_querier_with_ordering_resource_group(self, adapter: AgentAdapter) -> None:
+        """Test building querier with resource_group order."""
         request = SearchAgentsRequest(
             filter=None,
             order=[
                 AgentOrder(
-                    field=AgentOrderField.SCALING_GROUP,
+                    field=AgentOrderField.RESOURCE_GROUP,
                     direction=OrderDirection.ASC,
                 )
             ],
@@ -358,7 +358,7 @@ class TestAgentAdapterConvertToDTO:
         assert dto.id == "i-test-agent-001"
         assert dto.status == "ALIVE"
         assert dto.region == "us-east-1"
-        assert dto.scaling_group == "default"
+        assert dto.resource_group == "default"
         assert dto.schedulable is True
         assert dto.addr == "tcp://127.0.0.1:6001"
         assert dto.architecture == "x86_64"
