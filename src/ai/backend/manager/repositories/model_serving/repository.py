@@ -506,8 +506,10 @@ class ModelServingRepository:
         Get user with their main access key.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
-            query = sa.select(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)).where(
-                UserRow.uuid == user_id
+            query = (
+                sa.select(UserRow, KeyPairRow)
+                .select_from(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid))
+                .where(UserRow.uuid == user_id)
             )
             result = await session.execute(query)
             return result.fetchone()
