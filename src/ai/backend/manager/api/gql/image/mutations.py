@@ -54,7 +54,7 @@ from .types import ImageV2GQL
 
 @strawberry.input(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Input for forgetting an image by ID.
     """)
@@ -65,7 +65,7 @@ class ForgetImageV2InputGQL:
 
 @strawberry.input(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Options for purging an image.
     """)
@@ -79,7 +79,7 @@ class PurgeImageV2OptionsGQL:
 
 @strawberry.input(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Input for purging an image by ID.
     """)
@@ -94,7 +94,7 @@ class PurgeImageV2InputGQL:
 
 @strawberry.input(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Input for creating an alias for an image by ID.
     """)
@@ -106,7 +106,7 @@ class AliasImageV2InputGQL:
 
 @strawberry.input(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Input for removing an alias from an image.
     """)
@@ -117,7 +117,7 @@ class DealiasImageV2InputGQL:
 
 @strawberry.input(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Input for clearing custom resource limits for an image.
     """)
@@ -128,7 +128,7 @@ class ClearImageV2ResourceLimitInputGQL:
 
 @strawberry.input(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Input for untagging an image from its container registry.
     """)
@@ -139,7 +139,7 @@ class UntagImageV2FromRegistryInputGQL:
 
 @strawberry.input(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Input for a single resource limit specification.
     """)
@@ -160,7 +160,7 @@ class ResourceLimitInputGQL:
 
 @strawberry.input(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Input for setting custom resource limits for an image.
     """)
@@ -174,7 +174,7 @@ class SetImageV2ResourceLimitInputGQL:
 
 @strawberry.input(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Input for an image label (key-value pair).
     """)
@@ -186,7 +186,7 @@ class ImageV2LabelInputGQL:
 
 @strawberry.input(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Resource limit input for modifying image resource limits.
     """)
@@ -199,7 +199,7 @@ class ResourceLimitModifyInputGQL:
 
 @strawberry.input(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Input for modifying an image's properties.
     """)
@@ -295,7 +295,7 @@ class ModifyImageV2PropsInputGQL:
 
 @strawberry.input(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Input for modifying an image by ID.
     """)
@@ -313,7 +313,7 @@ class ModifyImageV2InputGQL:
 @strawberry.type(
     name="ForgetImageV2Result",
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Result of forgetting an image by ID. The image is marked as DELETED
     but not removed from the database.
@@ -326,7 +326,7 @@ class ForgetImageV2ResultGQL:
 @strawberry.type(
     name="PurgeImageV2Result",
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Result of purging an image by ID. The image is completely removed
     from the database.
@@ -339,7 +339,7 @@ class PurgeImageV2ResultGQL:
 @strawberry.type(
     name="AliasImageV2Result",
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Result of creating an alias for an image.
     """),
@@ -352,7 +352,7 @@ class AliasImageV2ResultGQL:
 @strawberry.type(
     name="DealiasImageV2Result",
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Result of removing an alias from an image.
     """),
@@ -365,7 +365,7 @@ class DealiasImageV2ResultGQL:
 @strawberry.type(
     name="ClearImageV2ResourceLimitResult",
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Result of clearing custom resource limits for an image.
     """),
@@ -377,7 +377,7 @@ class ClearImageV2ResourceLimitResultGQL:
 @strawberry.type(
     name="UntagImageV2FromRegistryResult",
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Result of untagging an image from its container registry.
     """),
@@ -389,7 +389,7 @@ class UntagImageV2FromRegistryResultGQL:
 @strawberry.type(
     name="SetImageV2ResourceLimitResult",
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Result of setting custom resource limits for an image.
     """),
@@ -401,7 +401,7 @@ class SetImageV2ResourceLimitResultGQL:
 @strawberry.type(
     name="ModifyImageV2Result",
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Result of modifying an image.
     """),
@@ -417,7 +417,7 @@ class ModifyImageV2ResultGQL:
 
 @strawberry.mutation(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Mark an image as deleted by its ID. (superadmin only)
 
@@ -441,7 +441,7 @@ async def admin_forget_image_v2(
 
 @strawberry.mutation(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Mark an image as deleted by its ID.
 
@@ -467,7 +467,7 @@ async def user_forget_image_v2(
 
 @strawberry.mutation(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Completely purge an image by its ID. (superadmin only)
 
@@ -497,7 +497,7 @@ async def admin_purge_image_v2(
 
 @strawberry.mutation(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Completely purge an image by its ID.
 
@@ -529,7 +529,7 @@ async def user_purge_image_v2(
 
 @strawberry.mutation(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Create an alias for an image by its ID.
 
@@ -559,7 +559,7 @@ async def admin_alias_image_v2(
 
 @strawberry.mutation(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Remove an alias from an image.
     """)
@@ -583,7 +583,7 @@ async def admin_dealias_image_v2(
 
 @strawberry.mutation(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Clear custom resource limits for an image by its ID.
 
@@ -607,7 +607,7 @@ async def admin_clear_image_v2_resource_limit(
 
 @strawberry.mutation(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Untag an image from its container registry by its ID. (superadmin only)
 
@@ -630,7 +630,7 @@ async def admin_untag_image_v2_from_registry(
 
 @strawberry.mutation(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Untag an image from its container registry by its ID.
 
@@ -655,7 +655,7 @@ async def user_untag_image_v2_from_registry(
 
 @strawberry.mutation(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Set custom resource limits for an image by its ID.
 
@@ -691,7 +691,7 @@ async def admin_set_image_v2_resource_limit(
 
 @strawberry.mutation(
     description=dedent_strip("""
-    Added in 26.2.0.
+    Added in 26.3.0.
 
     Modify an image's properties by its ID.
 

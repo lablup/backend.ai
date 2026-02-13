@@ -340,7 +340,7 @@ type AgentV2Edge {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Input for creating an alias for an image by ID.
 """
@@ -353,7 +353,7 @@ input AliasImageV2InputGQL {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Result of creating an alias for an image.
 """
@@ -1057,7 +1057,7 @@ type CleanupArtifactRevisionsPayload {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Input for clearing custom resource limits for an image.
 """
@@ -1067,7 +1067,7 @@ input ClearImageV2ResourceLimitInputGQL {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Result of clearing custom resource limits for an image.
 """
@@ -1362,7 +1362,7 @@ input DateTimeFilter {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Input for removing an alias from an image.
 """
@@ -1372,7 +1372,7 @@ input DealiasImageV2InputGQL {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Result of removing an alias from an image.
 """
@@ -2467,7 +2467,7 @@ type FairShareSpec {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Input for forgetting an image by ID.
 """
@@ -2477,7 +2477,7 @@ input ForgetImageV2InputGQL {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Result of forgetting an image by ID. The image is marked as DELETED
 but not removed from the database.
@@ -2546,19 +2546,6 @@ type HuggingFaceRegistryEdge {
 """Added in 25.19.0"""
 input ImageInput {
   id: ID!
-}
-
-"""
-Added in 26.2.0.
-
-Input for an image label (key-value pair).
-"""
-input ImageV2LabelInputGQL {
-  """The key of the label."""
-  key: String!
-
-  """The value of the label."""
-  value: String!
 }
 
 extend type ImageNode @key(fields: "id") {
@@ -2740,6 +2727,19 @@ type ImageV2LabelEntry {
   key: String!
 
   """The label value."""
+  value: String!
+}
+
+"""
+Added in 26.3.0.
+
+Input for an image label (key-value pair).
+"""
+input ImageV2LabelInputGQL {
+  """The key of the label."""
+  key: String!
+
+  """The value of the label."""
   value: String!
 }
 
@@ -3381,7 +3381,7 @@ input ModelTarget {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Input for modifying an image by ID.
 """
@@ -3394,7 +3394,7 @@ input ModifyImageV2InputGQL {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Input for modifying an image's properties.
 """
@@ -3437,7 +3437,7 @@ input ModifyImageV2PropsInputGQL {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Result of modifying an image.
 """
@@ -3911,7 +3911,7 @@ type Mutation {
   adminPurgeUsers(input: PurgeUsersV2Input!): PurgeUsersV2Payload!
 
   """
-  Added in 26.2.0.
+  Added in 26.3.0.
   
   Mark an image as deleted by its ID. (superadmin only)
   
@@ -3921,7 +3921,7 @@ type Mutation {
   adminForgetImageV2(input: ForgetImageV2InputGQL!): ForgetImageV2Result!
 
   """
-  Added in 26.2.0.
+  Added in 26.3.0.
   
   Completely purge an image by its ID. (superadmin only)
   
@@ -3931,7 +3931,7 @@ type Mutation {
   adminPurgeImageV2(input: PurgeImageV2InputGQL!): PurgeImageV2Result!
 
   """
-  Added in 26.2.0.
+  Added in 26.3.0.
   
   Untag an image from its container registry by its ID. (superadmin only)
   
@@ -3940,7 +3940,7 @@ type Mutation {
   adminUntagImageV2FromRegistry(input: UntagImageV2FromRegistryInputGQL!): UntagImageV2FromRegistryResult!
 
   """
-  Added in 26.2.0.
+  Added in 26.3.0.
   
   Create an alias for an image by its ID.
   
@@ -3950,14 +3950,14 @@ type Mutation {
   adminAliasImageV2(input: AliasImageV2InputGQL!): AliasImageV2Result!
 
   """
-  Added in 26.2.0.
+  Added in 26.3.0.
   
   Remove an alias from an image.
   """
   adminDealiasImageV2(input: DealiasImageV2InputGQL!): DealiasImageV2Result!
 
   """
-  Added in 26.2.0.
+  Added in 26.3.0.
   
   Clear custom resource limits for an image by its ID.
   
@@ -3967,7 +3967,7 @@ type Mutation {
   adminClearImageV2ResourceLimit(input: ClearImageV2ResourceLimitInputGQL!): ClearImageV2ResourceLimitResult!
 
   """
-  Added in 26.2.0.
+  Added in 26.3.0.
   
   Set custom resource limits for an image by its ID.
   
@@ -3976,7 +3976,7 @@ type Mutation {
   adminSetImageV2ResourceLimit(input: SetImageV2ResourceLimitInputGQL!): SetImageV2ResourceLimitResult!
 
   """
-  Added in 26.2.0.
+  Added in 26.3.0.
   
   Modify an image's properties by its ID.
   
@@ -3986,7 +3986,7 @@ type Mutation {
   adminModifyImageV2(input: ModifyImageV2InputGQL!): ModifyImageV2Result!
 
   """
-  Added in 26.2.0.
+  Added in 26.3.0.
   
   Mark an image as deleted by its ID.
   
@@ -3996,7 +3996,7 @@ type Mutation {
   userForgetImageV2(input: ForgetImageV2InputGQL!): ForgetImageV2Result!
 
   """
-  Added in 26.2.0.
+  Added in 26.3.0.
   
   Completely purge an image by its ID.
   
@@ -4006,7 +4006,7 @@ type Mutation {
   userPurgeImageV2(input: PurgeImageV2InputGQL!): PurgeImageV2Result!
 
   """
-  Added in 26.2.0.
+  Added in 26.3.0.
   
   Untag an image from its container registry by its ID.
   
@@ -4796,7 +4796,7 @@ input ProjectWeightInputItem {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Input for purging an image by ID.
 """
@@ -4809,7 +4809,7 @@ input PurgeImageV2InputGQL {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Options for purging an image.
 """
@@ -4821,7 +4821,7 @@ input PurgeImageV2OptionsGQL {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Result of purging an image by ID. The image is completely removed
 from the database.
@@ -5642,7 +5642,7 @@ type ResourceInfo {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Input for a single resource limit specification.
 """
@@ -5662,7 +5662,7 @@ input ResourceLimitInputGQL {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Resource limit input for modifying image resource limits.
 """
@@ -6234,7 +6234,7 @@ enum SessionTypes {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Input for setting custom resource limits for an image.
 """
@@ -6247,7 +6247,7 @@ input SetImageV2ResourceLimitInputGQL {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Result of setting custom resource limits for an image.
 """
@@ -6431,7 +6431,7 @@ type UnregisterStorageNamespacePayload {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Input for untagging an image from its container registry.
 """
@@ -6441,7 +6441,7 @@ input UntagImageV2FromRegistryInputGQL {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0.
 
 Result of untagging an image from its container registry.
 """
