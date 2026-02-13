@@ -6,6 +6,17 @@ See BEP-1038 for detailed specifications.
 """
 
 from .fetcher import fetch_image, fetch_image_alias, fetch_image_aliases, fetch_images
+from .mutations import (
+    admin_alias_image_v2,
+    admin_clear_image_v2_resource_limit,
+    admin_dealias_image_v2,
+    admin_forget_image_v2,
+    admin_modify_image_v2,
+    admin_purge_image_v2,
+    admin_set_image_v2_resource_limit,
+    user_forget_image_v2,
+    user_purge_image_v2,
+)
 from .resolver import (
     admin_image_aliases,
     admin_images_v2,
@@ -81,4 +92,14 @@ __all__ = [
     "image_alias",
     "image_scoped_aliases",
     "admin_image_aliases",
+    # Mutation fields
+    "admin_forget_image_v2",
+    "user_forget_image_v2",
+    "admin_purge_image_v2",
+    "user_purge_image_v2",
+    "admin_alias_image_v2",
+    "admin_dealias_image_v2",
+    "admin_clear_image_v2_resource_limit",
+    "admin_set_image_v2_resource_limit",
+    "admin_modify_image_v2",
 ]

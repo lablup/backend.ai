@@ -257,9 +257,6 @@ class ImageRepository:
     async def scan_image_by_identifier(
         self, image_canonical: str, architecture: str
     ) -> RescanImagesResult:
-        """
-        Deprecated. Use scan_images_by_ids instead.
-        """
         return await self._db_source.scan_and_upsert_image(image_canonical, architecture)
 
     @image_repository_resilience.apply()

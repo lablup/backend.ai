@@ -268,10 +268,6 @@ class ImageDBSource:
     async def scan_and_upsert_image(
         self, image_canonical: str, architecture: str
     ) -> RescanImagesResult:
-        """
-        Deprecated. Use scan_images_by_ids instead.
-        """
-
         async with self._db.begin_session() as session:
             # Resolve the image first
             image_row = await self._resolve_image(

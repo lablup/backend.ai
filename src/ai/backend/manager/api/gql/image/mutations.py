@@ -1,0 +1,709 @@
+"""
+ImageV2 GQL mutations for Strawberry GraphQL.
+
+This module provides GraphQL mutation fields for ImageV2.
+"""
+
+from __future__ import annotations
+
+from decimal import Decimal
+from uuid import UUID
+
+import strawberry
+from strawberry import ID, Info
+
+from ai.backend.common.contexts.user import current_user
+from ai.backend.common.types import ImageID
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
+from ai.backend.manager.data.image.types import ImageType, ResourceLimitInput
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
+from ai.backend.manager.services.image.actions.alias_image import (
+    AliasImageByIdAction,
+)
+from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
+    ClearImageCustomResourceLimitByIdAction,
+)
+from ai.backend.manager.services.image.actions.dealias_image import (
+    DealiasImageAction,
+)
+from ai.backend.manager.services.image.actions.forget_image import (
+    ForgetImageByIdAction,
+)
+from ai.backend.manager.services.image.actions.modify_image import (
+    ModifyImageByIdAction,
+)
+from ai.backend.manager.services.image.actions.purge_images import (
+    PurgeImageByIdAction,
+)
+from ai.backend.manager.services.image.actions.set_image_resource_limit import (
+    SetImageResourceLimitByIdAction,
+)
+from ai.backend.manager.services.image.actions.untag_image_from_registry import (
+    UntagImageFromRegistryAction,
+)
+from ai.backend.manager.types import OptionalState, TriState
+
+from .types import ImageV2GQL
+
+# =============================================================================
+# Mutation Input Types
+# =============================================================================
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Input for forgetting an image by ID.
+    """)
+)
+class ForgetImageV2InputGQL:
+    image_id: ID = strawberry.field(description="The ID of the image to forget.")
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Options for purging an image.
+    """)
+)
+class PurgeImageV2OptionsGQL:
+    remove_from_registry: bool = strawberry.field(
+        default=False,
+        description="Untag the deleted image from the registry. Only available for HarborV2 registries.",
+    )
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Input for purging an image by ID.
+    """)
+)
+class PurgeImageV2InputGQL:
+    image_id: ID = strawberry.field(description="The ID of the image to purge.")
+    options: PurgeImageV2OptionsGQL | None = strawberry.field(
+        default=None,
+        description="Options for purging the image.",
+    )
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Input for creating an alias for an image by ID.
+    """)
+)
+class AliasImageV2InputGQL:
+    image_id: ID = strawberry.field(description="The ID of the image to alias.")
+    alias: str = strawberry.field(description="The alias to create.")
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Input for removing an alias from an image.
+    """)
+)
+class DealiasImageV2InputGQL:
+    alias: str = strawberry.field(description="The alias to remove.")
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Input for clearing custom resource limits for an image.
+    """)
+)
+class ClearImageV2ResourceLimitInputGQL:
+    image_id: ID = strawberry.field(description="The ID of the image to clear resource limits for.")
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Input for a single resource limit specification.
+    """)
+)
+class ResourceLimitInputGQL:
+    slot_name: str = strawberry.field(
+        description="The name of the resource slot (e.g., 'cpu', 'mem')."
+    )
+    min_value: str | None = strawberry.field(
+        default=None,
+        description="The minimum value for this resource. Use string to represent decimal values.",
+    )
+    max_value: str | None = strawberry.field(
+        default=None,
+        description="The maximum value for this resource. Use string to represent decimal values.",
+    )
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Input for setting custom resource limits for an image.
+    """)
+)
+class SetImageV2ResourceLimitInputGQL:
+    image_id: ID = strawberry.field(description="The ID of the image to set resource limits for.")
+    resource_limit: ResourceLimitInputGQL = strawberry.field(
+        description="The resource limit to set.",
+    )
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Input for an image label (key-value pair).
+    """)
+)
+class ImageV2LabelInputGQL:
+    key: str = strawberry.field(description="The key of the label.")
+    value: str = strawberry.field(description="The value of the label.")
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Resource limit input for modifying image resource limits.
+    """)
+)
+class ResourceLimitModifyInputGQL:
+    key: str = strawberry.field(description="The resource slot name.")
+    min: str | None = strawberry.field(default=None, description="The minimum value.")
+    max: str | None = strawberry.field(default=None, description="The maximum value.")
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Input for modifying an image's identity information.
+    Corresponds to the identity field of ImageV2.
+    """)
+)
+class ModifyImageV2IdentityInputGQL:
+    name: str | None = strawberry.field(
+        default=None, description="The new canonical name for the image."
+    )
+    registry: str | None = strawberry.field(
+        default=None, description="The new registry hostname for the image."
+    )
+    image: str | None = strawberry.field(
+        default=None, description="The new namespace/path for the image."
+    )
+    tag: str | None = strawberry.field(default=None, description="The new tag for the image.")
+    architecture: str | None = strawberry.field(
+        default=None, description="The new CPU architecture for the image."
+    )
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Input for modifying an image's metadata.
+    Corresponds to the metadata field of ImageV2.
+    """)
+)
+class ModifyImageV2MetadataInputGQL:
+    is_local: bool | None = strawberry.field(
+        default=None, description="Whether the image is local."
+    )
+    size_bytes: int | None = strawberry.field(
+        default=None, description="The size of the image in bytes."
+    )
+    type: str | None = strawberry.field(
+        default=None, description="The type of the image (compute, system, service)."
+    )
+    digest: str | None = strawberry.field(
+        default=None, description="The config digest of the image."
+    )
+    labels: list[ImageV2LabelInputGQL] | None = strawberry.field(
+        default=None, description="The labels for the image."
+    )
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Input for modifying an image's runtime requirements.
+    Corresponds to the requirements field of ImageV2.
+    """)
+)
+class ModifyImageV2RequirementsInputGQL:
+    supported_accelerators: list[str] | None = strawberry.field(
+        default=None,
+        description="The supported accelerators for the image. Set to empty list to clear.",
+    )
+    resource_limits: list[ResourceLimitModifyInputGQL] | None = strawberry.field(
+        default=None, description="The resource limits for the image."
+    )
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Input for modifying an image's properties.
+    Structured to match the ImageV2 output type with identity, metadata, and requirements groups.
+    """)
+)
+class ModifyImageV2PropsInputGQL:
+    identity: ModifyImageV2IdentityInputGQL | None = strawberry.field(
+        default=None,
+        description="Identity information to modify (name, registry, namespace, tag, architecture).",
+    )
+    metadata: ModifyImageV2MetadataInputGQL | None = strawberry.field(
+        default=None, description="Metadata to modify (is_local, size_bytes, type, digest, labels)."
+    )
+    requirements: ModifyImageV2RequirementsInputGQL | None = strawberry.field(
+        default=None,
+        description="Runtime requirements to modify (supported_accelerators, resource_limits).",
+    )
+
+    def to_updater_spec(self) -> ImageUpdaterSpec:
+        """Convert input to ImageUpdaterSpec."""
+
+        def _optional[T](value: T | None) -> OptionalState[T]:
+            return OptionalState.update(value) if value is not None else OptionalState.nop()
+
+        # Identity fields
+        name: str | None = None
+        registry: str | None = None
+        image: str | None = None
+        tag: str | None = None
+        architecture: str | None = None
+        if self.identity is not None:
+            name = self.identity.name
+            registry = self.identity.registry
+            image = self.identity.image
+            tag = self.identity.tag
+            architecture = self.identity.architecture
+
+        # Metadata fields
+        is_local: bool | None = None
+        size_bytes: int | None = None
+        image_type: ImageType | None = None
+        config_digest: str | None = None
+        labels: dict[str, str] | None = None
+        if self.metadata is not None:
+            is_local = self.metadata.is_local
+            size_bytes = self.metadata.size_bytes
+            config_digest = self.metadata.digest
+            if self.metadata.type is not None:
+                image_type = ImageType(self.metadata.type)
+            if self.metadata.labels is not None:
+                labels = {label.key: label.value for label in self.metadata.labels}
+
+        # Requirements fields
+        resources_data: dict[str, dict[str, str]] | None = None
+        accelerators_state: TriState[str] = TriState.nop()
+        if self.requirements is not None:
+            if self.requirements.resource_limits is not None:
+                resources_data = {}
+                for limit in self.requirements.resource_limits:
+                    limit_data: dict[str, str] = {}
+                    if limit.min is not None:
+                        limit_data["min"] = limit.min
+                    if limit.max is not None:
+                        limit_data["max"] = limit.max
+                    resources_data[limit.key] = limit_data
+            if self.requirements.supported_accelerators is not None:
+                if len(self.requirements.supported_accelerators) == 0:
+                    accelerators_state = TriState.nullify()
+                else:
+                    accelerators_state = TriState.update(
+                        ",".join(self.requirements.supported_accelerators)
+                    )
+
+        return ImageUpdaterSpec(
+            name=_optional(name),
+            registry=_optional(registry),
+            image=_optional(image),
+            tag=_optional(tag),
+            architecture=_optional(architecture),
+            is_local=_optional(is_local),
+            size_bytes=_optional(size_bytes),
+            image_type=_optional(image_type),
+            config_digest=_optional(config_digest),
+            labels=_optional(labels),
+            accelerators=accelerators_state,
+            resources=_optional(resources_data),
+        )
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Input for modifying an image by ID.
+    """)
+)
+class ModifyImageV2InputGQL:
+    image_id: ID = strawberry.field(description="The ID of the image to modify.")
+    props: ModifyImageV2PropsInputGQL = strawberry.field(description="The properties to modify.")
+
+
+# =============================================================================
+# Mutation Result Types
+# =============================================================================
+
+
+@strawberry.type(
+    name="ForgetImageV2Result",
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Result of forgetting an image by ID. The image is marked as DELETED
+    but not removed from the database.
+    """),
+)
+class ForgetImageV2ResultGQL:
+    image: ImageV2GQL = strawberry.field(description="The forgotten image.")
+
+
+@strawberry.type(
+    name="PurgeImageV2Result",
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Result of purging an image by ID. The image is completely removed
+    from the database.
+    """),
+)
+class PurgeImageV2ResultGQL:
+    image: ImageV2GQL = strawberry.field(description="The purged image data.")
+
+
+@strawberry.type(
+    name="AliasImageV2Result",
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Result of creating an alias for an image.
+    """),
+)
+class AliasImageV2ResultGQL:
+    image_id: ID = strawberry.field(description="The ID of the aliased image.")
+    alias: str = strawberry.field(description="The created alias.")
+
+
+@strawberry.type(
+    name="DealiasImageV2Result",
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Result of removing an alias from an image.
+    """),
+)
+class DealiasImageV2ResultGQL:
+    image_id: ID = strawberry.field(description="The ID of the image that had the alias.")
+    alias: str = strawberry.field(description="The removed alias.")
+
+
+@strawberry.type(
+    name="ClearImageV2ResourceLimitResult",
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Result of clearing custom resource limits for an image.
+    """),
+)
+class ClearImageV2ResourceLimitResultGQL:
+    image: ImageV2GQL = strawberry.field(description="The image with cleared resource limits.")
+
+
+@strawberry.type(
+    name="SetImageV2ResourceLimitResult",
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Result of setting custom resource limits for an image.
+    """),
+)
+class SetImageV2ResourceLimitResultGQL:
+    image: ImageV2GQL = strawberry.field(description="The image with updated resource limits.")
+
+
+@strawberry.type(
+    name="ModifyImageV2Result",
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Result of modifying an image.
+    """),
+)
+class ModifyImageV2ResultGQL:
+    image: ImageV2GQL = strawberry.field(description="The modified image.")
+
+
+# =============================================================================
+# Mutation Functions
+# =============================================================================
+
+
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Mark an image as deleted by its ID. (superadmin only)
+
+    The image is not removed from the database but its status changes to DELETED.
+    This is a soft delete operation.
+    """)
+)  # type: ignore[misc]
+async def admin_forget_image_v2(
+    input: ForgetImageV2InputGQL,
+    info: Info[StrawberryGQLContext],
+) -> ForgetImageV2ResultGQL:
+    check_admin_only()
+    ctx = info.context
+
+    result = await ctx.processors.image.forget_image_by_id.wait_for_complete(
+        ForgetImageByIdAction(image_id=ImageID(UUID(input.image_id)))
+    )
+
+    return ForgetImageV2ResultGQL(image=ImageV2GQL.from_data(result.image))
+
+
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Mark an image as deleted by its ID.
+
+    The image is not removed from the database but its status changes to DELETED.
+    This is a soft delete operation.
+    """)
+)  # type: ignore[misc]
+async def user_forget_image_v2(
+    input: ForgetImageV2InputGQL,
+    info: Info[StrawberryGQLContext],
+) -> ForgetImageV2ResultGQL:
+    me = current_user()
+    if me is None:
+        raise InsufficientPrivilege("Authentication required")
+    ctx = info.context
+
+    result = await ctx.processors.image.forget_image_by_id.wait_for_complete(
+        ForgetImageByIdAction(image_id=ImageID(UUID(input.image_id)))
+    )
+
+    return ForgetImageV2ResultGQL(image=ImageV2GQL.from_data(result.image))
+
+
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Completely purge an image by its ID. (superadmin only)
+
+    The image is permanently removed from the database. Optionally, the image
+    can also be untagged from the container registry (HarborV2 only).
+    """)
+)  # type: ignore[misc]
+async def admin_purge_image_v2(
+    input: PurgeImageV2InputGQL,
+    info: Info[StrawberryGQLContext],
+) -> PurgeImageV2ResultGQL:
+    check_admin_only()
+    ctx = info.context
+    image_uuid = UUID(input.image_id)
+
+    result = await ctx.processors.image.purge_image_by_id.wait_for_complete(
+        PurgeImageByIdAction(image_id=ImageID(image_uuid))
+    )
+
+    if input.options and input.options.remove_from_registry:
+        await ctx.processors.image.untag_image_from_registry.wait_for_complete(
+            UntagImageFromRegistryAction(image_id=ImageID(image_uuid))
+        )
+
+    return PurgeImageV2ResultGQL(image=ImageV2GQL.from_data(result.image))
+
+
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Completely purge an image by its ID.
+
+    The image is permanently removed from the database. Optionally, the image
+    can also be untagged from the container registry (HarborV2 only).
+    """)
+)  # type: ignore[misc]
+async def user_purge_image_v2(
+    input: PurgeImageV2InputGQL,
+    info: Info[StrawberryGQLContext],
+) -> PurgeImageV2ResultGQL:
+    me = current_user()
+    if me is None:
+        raise InsufficientPrivilege("Authentication required")
+    ctx = info.context
+    image_uuid = UUID(input.image_id)
+
+    result = await ctx.processors.image.purge_image_by_id.wait_for_complete(
+        PurgeImageByIdAction(image_id=ImageID(image_uuid))
+    )
+
+    if input.options and input.options.remove_from_registry:
+        await ctx.processors.image.untag_image_from_registry.wait_for_complete(
+            UntagImageFromRegistryAction(image_id=ImageID(image_uuid))
+        )
+
+    return PurgeImageV2ResultGQL(image=ImageV2GQL.from_data(result.image))
+
+
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Create an alias for an image by its ID.
+
+    An alias is an alternative name that can be used to reference the image.
+    Multiple aliases can be created for the same image.
+    """)
+)  # type: ignore[misc]
+async def admin_alias_image_v2(
+    input: AliasImageV2InputGQL,
+    info: Info[StrawberryGQLContext],
+) -> AliasImageV2ResultGQL:
+    check_admin_only()
+    ctx = info.context
+
+    result = await ctx.processors.image.alias_image_by_id.wait_for_complete(
+        AliasImageByIdAction(
+            image_id=ImageID(UUID(input.image_id)),
+            alias=input.alias,
+        )
+    )
+
+    return AliasImageV2ResultGQL(
+        image_id=ID(str(result.image_id)),
+        alias=result.image_alias.alias,
+    )
+
+
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Remove an alias from an image.
+    """)
+)  # type: ignore[misc]
+async def admin_dealias_image_v2(
+    input: DealiasImageV2InputGQL,
+    info: Info[StrawberryGQLContext],
+) -> DealiasImageV2ResultGQL:
+    check_admin_only()
+    ctx = info.context
+
+    result = await ctx.processors.image.dealias_image.wait_for_complete(
+        DealiasImageAction(alias=input.alias)
+    )
+
+    return DealiasImageV2ResultGQL(
+        image_id=ID(str(result.image_id)),
+        alias=result.image_alias.alias,
+    )
+
+
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Clear custom resource limits for an image by its ID.
+
+    This removes any user-defined resource limits and reverts to the defaults
+    specified in the image labels.
+    """)
+)  # type: ignore[misc]
+async def admin_clear_image_v2_resource_limit(
+    input: ClearImageV2ResourceLimitInputGQL,
+    info: Info[StrawberryGQLContext],
+) -> ClearImageV2ResourceLimitResultGQL:
+    check_admin_only()
+    ctx = info.context
+
+    result = await ctx.processors.image.clear_image_custom_resource_limit_by_id.wait_for_complete(
+        ClearImageCustomResourceLimitByIdAction(image_id=ImageID(UUID(input.image_id)))
+    )
+
+    return ClearImageV2ResourceLimitResultGQL(image=ImageV2GQL.from_data(result.image_data))
+
+
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Set custom resource limits for an image by its ID.
+
+    This allows overriding the default resource limits specified in the image labels.
+    """)
+)  # type: ignore[misc]
+async def admin_set_image_v2_resource_limit(
+    input: SetImageV2ResourceLimitInputGQL,
+    info: Info[StrawberryGQLContext],
+) -> SetImageV2ResourceLimitResultGQL:
+    check_admin_only()
+    ctx = info.context
+
+    resource_limit = ResourceLimitInput(
+        slot_name=input.resource_limit.slot_name,
+        min_value=Decimal(input.resource_limit.min_value)
+        if input.resource_limit.min_value
+        else None,
+        max_value=Decimal(input.resource_limit.max_value)
+        if input.resource_limit.max_value
+        else None,
+    )
+
+    result = await ctx.processors.image.set_image_resource_limit_by_id.wait_for_complete(
+        SetImageResourceLimitByIdAction(
+            image_id=ImageID(UUID(input.image_id)),
+            resource_limit=resource_limit,
+        )
+    )
+
+    return SetImageV2ResourceLimitResultGQL(image=ImageV2GQL.from_data(result.image_data))
+
+
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 26.3.0.
+
+    Modify an image's properties by its ID.
+
+    This allows updating various image metadata such as labels, resource limits,
+    and supported accelerators.
+    """)
+)  # type: ignore[misc]
+async def admin_modify_image_v2(
+    input: ModifyImageV2InputGQL,
+    info: Info[StrawberryGQLContext],
+) -> ModifyImageV2ResultGQL:
+    check_admin_only()
+    ctx = info.context
+
+    result = await ctx.processors.image.modify_image_by_id.wait_for_complete(
+        ModifyImageByIdAction(
+            image_id=ImageID(UUID(input.image_id)),
+            updater_spec=input.props.to_updater_spec(),
+        )
+    )
+
+    return ModifyImageV2ResultGQL(image=ImageV2GQL.from_data(result.image))
