@@ -7,6 +7,9 @@ from ai.backend.manager.repositories.artifact.repositories import ArtifactReposi
 from ai.backend.manager.repositories.artifact_registry.repositories import (
     ArtifactRegistryRepositories,
 )
+from ai.backend.manager.repositories.artifact_storage.repositories import (
+    ArtifactStorageRepositories,
+)
 from ai.backend.manager.repositories.audit_log.repositories import AuditLogRepositories
 from ai.backend.manager.repositories.auth.repositories import AuthRepositories
 from ai.backend.manager.repositories.container_registry.repositories import (
@@ -104,6 +107,7 @@ class Repositories:
     huggingface_registry: HuggingFaceRegistryRepositories
     artifact: ArtifactRepositories
     artifact_registry: ArtifactRegistryRepositories
+    artifact_storage: ArtifactStorageRepositories
     storage_namespace: StorageNamespaceRepositories
     audit_log: AuditLogRepositories
 
@@ -146,6 +150,7 @@ class Repositories:
         artifact_repositories = ArtifactRepositories.create(args)
         huggingface_registry_repositories = HuggingFaceRegistryRepositories.create(args)
         artifact_registries = ArtifactRegistryRepositories.create(args)
+        artifact_storage_repositories = ArtifactStorageRepositories.create(args)
         storage_namespace_repositories = StorageNamespaceRepositories.create(args)
         audit_log_repositories = AuditLogRepositories.create(args)
 
@@ -187,6 +192,7 @@ class Repositories:
             huggingface_registry=huggingface_registry_repositories,
             artifact=artifact_repositories,
             artifact_registry=artifact_registries,
+            artifact_storage=artifact_storage_repositories,
             storage_namespace=storage_namespace_repositories,
             audit_log=audit_log_repositories,
         )

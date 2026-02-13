@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
+from ai.backend.common.exception import RelationNotLoadedError
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.base import (
@@ -16,6 +17,7 @@ from ai.backend.manager.models.base import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
     from ai.backend.manager.models.association_artifacts_storages import (
         AssociationArtifactsStorageRow,
     )
@@ -33,6 +35,12 @@ def _get_vfs_storage_association_artifact_join_cond() -> sa.ColumnElement[bool]:
     return VFSStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_namespace_id)
 
 
+def _get_vfs_storage_meta_join_cond() -> sa.ColumnElement[bool]:
+    from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
+
+    return VFSStorageRow.id == foreign(ArtifactStorageRow.storage_id)
+
+
 class VFSStorageRow(Base):  # type: ignore[misc]
     """
     Represents a VFS storage configuration.
@@ -45,7 +53,6 @@ class VFSStorageRow(Base):  # type: ignore[misc]
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    name: Mapped[str] = mapped_column("name", sa.String, index=True, unique=True, nullable=False)
     host: Mapped[str] = mapped_column("host", sa.String, nullable=False)
     base_path: Mapped[str] = mapped_column("base_path", sa.String, nullable=False)
 
@@ -57,23 +64,26 @@ class VFSStorageRow(Base):  # type: ignore[misc]
             overlaps="association_artifacts_storages_rows,object_storage_row",
         )
     )
+    meta: Mapped[ArtifactStorageRow | None] = relationship(
+        "ArtifactStorageRow",
+        back_populates="vfs_storages",
+        primaryjoin=_get_vfs_storage_meta_join_cond,
+        uselist=False,
+        viewonly=True,
+    )
 
     def __str__(self) -> str:
-        return (
-            f"VFSStorageRow("
-            f"id={self.id}, "
-            f"name={self.name}, "
-            f"host={self.host}, "
-            f"base_path={self.base_path})"
-        )
+        return f"VFSStorageRow(id={self.id}, host={self.host}, base_path={self.base_path})"
 
     def __repr__(self) -> str:
         return self.__str__()
 
     def to_dataclass(self) -> VFSStorageData:
+        if self.meta is None:
+            raise RelationNotLoadedError()
         return VFSStorageData(
             id=self.id,
-            name=self.name,
+            name=self.meta.name,
             host=self.host,
             base_path=Path(self.base_path),
         )
