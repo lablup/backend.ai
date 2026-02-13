@@ -760,9 +760,12 @@
     "FairShareSettingDescription": "變更不會立即反映於公平分享計算中，約需 5 分鐘才會更新，因為計算週期的關係。",
     "FairShareSettingTitleWithName": "公平分配設定：{{name}}",
     "FairShareSettingsSuccessfullyUpdated": "公平分配設定已更新。",
+    "GoBackToFirstStep": "前往第一步驟",
     "HalfLifeDays": "半衰期",
     "HalfLifeDaysDescription": "使用量權重減半的週期。若設為 7 天，7 天前的使用量按 50% 計算，14 天前則按 25% 計算。建議將此值設定為衰減單位的整數倍。",
     "Id": "識別碼",
+    "InvalidParameterDescription": "我們找不到您要找的內容。它可能已被移除，或網址不正確。",
+    "InvalidParameterTitle": "找不到",
     "LookbackDays": "回溯期間",
     "LookbackDaysDescription": "反映在 Fair Share 計算中的使用歷史範圍。此期間之前的使用不納入計算。建議將此值設為半衰期的倍數。",
     "ModifiedAt": "修改時間",
@@ -777,6 +780,8 @@
     "SchedulerDescription": "公平分配排程器（Fair Share Scheduler）是一種根據歷史資源使用量決定會話執行優先順序的排程方法。它會將較高的優先權分配給過去消耗較少資源的使用者，確保所有使用者能隨時間公平地存取資源。<br /> <br />\n管理員可以在網域（Domain）、專案（Project）和使用者（User）層級設定權重，以將更多資源分配給特定群組。優先權以 0.0 到 1.0 的值表示，數值越接近 1.0 表示優先權越高。",
     "SchedulerDoesNotAppliedToResourceGroup": "所選資源群組（{{resourceGroup}}）未啟用公平分享排程器。若要使用排程器，請更新該資源群組的設定。",
     "TotalUsage": "總使用量",
+    "UnknownErrorDescription": "發生意外錯誤。請稍後再試。",
+    "UnknownErrorOccurred": "發生錯誤",
     "UsageHistory": "使用紀錄",
     "User": "使用者",
     "UserDescription": "使用者定義聚合期間的權重與累積使用量。使用者權重用於計算個別使用者的優先係數。",
@@ -799,7 +804,6 @@
       "SelectDateRange": "選擇日期範圍"
     }
   },
-  "fairShrae": {},
   "general": {
     "AccessKey": "訪問密鑰",
     "Active": "積極的",

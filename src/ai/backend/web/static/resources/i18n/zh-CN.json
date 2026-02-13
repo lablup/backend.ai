@@ -761,9 +761,12 @@
     "FairShareSettingDescription": "更改不会立即反映在 Fair Share 计算中，受计算周期影响，可能需要大约 5 分钟。",
     "FairShareSettingTitleWithName": "公平共享配置：{{name}}",
     "FairShareSettingsSuccessfullyUpdated": "公平份额设置已更新。",
+    "GoBackToFirstStep": "转到第一步",
     "HalfLifeDays": "半衰期",
     "HalfLifeDaysDescription": "用量反映率衰减到一半所需的周期。例如，若设置为7天，则7天前的用量按50%计算，14天前的用量按25%计算。建议将其设置为衰减单位的倍数。",
     "Id": "ID",
+    "InvalidParameterDescription": "我们无法找到您要查找的内容。它可能已被删除，或地址不正确。",
+    "InvalidParameterTitle": "未找到",
     "LookbackDays": "回溯",
     "LookbackDaysDescription": "在 Fair Share 计算中纳入的使用历史范围。该期间之前的使用不计入计算。建议将其设置为半衰期的倍数。",
     "ModifiedAt": "修改时间",
@@ -778,6 +781,8 @@
     "SchedulerDescription": "公平共享调度器（Fair Share Scheduler）是一种基于历史资源使用情况确定会话执行优先级的调度方法。它会将更高的优先级分配给消耗资源较少的用户，确保所有用户随着时间公平地访问资源。<br /> <br />管理员可以在域 (Domain)、项目 (Project) 和用户 (User) 级别配置权重，以向特定组分配更多资源。优先级以 0.0 到 1.0 之间的值表示，数值越接近 1.0 表示优先级越高。",
     "SchedulerDoesNotAppliedToResourceGroup": "所选资源组（{{resourceGroup}}）未启用公平共享调度器。要使用该调度器，请更新资源组设置。",
     "TotalUsage": "总使用量",
+    "UnknownErrorDescription": "发生意外错误。请稍后再试。",
+    "UnknownErrorOccurred": "出现了问题",
     "UsageHistory": "使用记录",
     "User": "用户",
     "UserDescription": "用户定义聚合周期内的配置权重和累计使用量。用户权重用于计算各用户的优先级系数。",
@@ -800,7 +805,6 @@
       "SelectDateRange": "选择日期范围"
     }
   },
-  "fairShrae": {},
   "general": {
     "AccessKey": "访问密钥",
     "Active": "积极的",

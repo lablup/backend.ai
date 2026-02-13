@@ -761,9 +761,12 @@
     "FairShareSettingDescription": "Các thay đổi sẽ không được phản ánh ngay lập tức trong tính toán Fair Share và có thể mất khoảng 5 phút do chu kỳ tính toán.",
     "FairShareSettingTitleWithName": "Cấu hình Fair Share: {{name}}",
     "FairShareSettingsSuccessfullyUpdated": "Cài đặt chia sẻ công bằng đã được cập nhật.",
+    "GoBackToFirstStep": "Chuyển đến bước đầu tiên",
     "HalfLifeDays": "Thời gian bán rã",
     "HalfLifeDaysDescription": "Khoảng thời gian mà tỷ lệ phản ánh mức sử dụng giảm đi một nửa. Nếu đặt là 7 ngày, mức sử dụng cách đây 7 ngày được tính là 50%, và cách đây 14 ngày là 25%. Khuyến nghị đặt giá trị này thành bội số của đơn vị suy giảm.",
     "Id": "ID",
+    "InvalidParameterDescription": "Không tìm thấy nội dung bạn yêu cầu. Có thể nội dung đã bị xóa hoặc địa chỉ không chính xác.",
+    "InvalidParameterTitle": "Không tìm thấy",
     "LookbackDays": "Khoảng thời gian xem lại",
     "LookbackDaysDescription": "Phạm vi lịch sử sử dụng được phản ánh trong các phép tính Fair Share. Việc sử dụng trước khoảng thời gian này sẽ không được tính. Khuyến nghị đặt giá trị này thành bội số của thời gian bán rã.",
     "ModifiedAt": "Cập nhật lúc",
@@ -778,6 +781,8 @@
     "SchedulerDescription": "Bộ lập lịch Fair Share là một phương pháp lập lịch xác định thứ tự ưu tiên thực thi phiên dựa trên mức sử dụng tài nguyên trong quá khứ. Nó gán ưu tiên cao hơn cho người dùng đã sử dụng ít tài nguyên hơn, đảm bảo mọi người dùng có thể truy cập tài nguyên một cách công bằng theo thời gian.\n\nQuản trị viên có thể cấu hình trọng số ở cấp miền (Domain), dự án (Project) và người dùng (User) để phân bổ nhiều tài nguyên hơn cho các nhóm cụ thể. Mức ưu tiên được biểu thị bằng giá trị từ 0.0 đến 1.0, trong đó các giá trị càng gần 1.0 thì ưu tiên càng cao.",
     "SchedulerDoesNotAppliedToResourceGroup": "Bộ lập lịch chia sẻ công bằng chưa được bật cho nhóm tài nguyên được chọn ({{resourceGroup}}). Để sử dụng bộ lập lịch, vui lòng cập nhật cài đặt nhóm tài nguyên.",
     "TotalUsage": "Tổng sử dụng",
+    "UnknownErrorDescription": "Đã xảy ra lỗi bất ngờ. Vui lòng thử lại sau.",
+    "UnknownErrorOccurred": "Đã xảy ra lỗi",
     "UsageHistory": "Lịch sử sử dụng",
     "User": "Người dùng",
     "UserDescription": "Người dùng xác định trọng số đã cấu hình và mức sử dụng tích lũy trong kỳ tổng hợp. Trọng số người dùng được sử dụng để tính hệ số ưu tiên cho từng người dùng.",
@@ -800,7 +805,6 @@
       "SelectDateRange": "Chọn khoảng thời gian"
     }
   },
-  "fairShrae": {},
   "general": {
     "AccessKey": "Khóa truy cập",
     "Active": "Tích cực",

@@ -761,9 +761,12 @@
     "FairShareSettingDescription": "Änderungen werden nicht sofort in den Fair-Share-Berechnungen berücksichtigt. Aufgrund des Berechnungszyklus kann es etwa 5 Minuten dauern.",
     "FairShareSettingTitleWithName": "Fair-Share-Konfiguration: {{name}}",
     "FairShareSettingsSuccessfullyUpdated": "Die Fair-Share-Einstellungen wurden aktualisiert.",
+    "GoBackToFirstStep": "Zum ersten Schritt",
     "HalfLifeDays": "Halbwertszeit",
     "HalfLifeDaysDescription": "Die Zeitspanne, in der die Gewichtung der Nutzung auf die Hälfte absinkt. Wenn sie auf 7 Tage gesetzt ist, wird die Nutzung von vor 7 Tagen zu 50 % und die von vor 14 Tagen zu 25 % berechnet. Es wird empfohlen, diesen Wert als Vielfaches der Zerfallseinheit einzustellen.",
     "Id": "ID",
+    "InvalidParameterDescription": "Wir konnten nicht finden, wonach Sie suchen. Möglicherweise wurde es entfernt oder die Adresse ist nicht korrekt.",
+    "InvalidParameterTitle": "Nicht gefunden",
     "LookbackDays": "Rückblick",
     "LookbackDaysDescription": "Der Zeitraum des Nutzungsverlaufs, der in die Fair-Share-Berechnungen einbezogen wird. Nutzungen vor diesem Zeitraum werden von den Berechnungen ausgeschlossen. Es wird empfohlen, diesen Zeitraum als Vielfaches der Halbwertszeit festzulegen.",
     "ModifiedAt": "Geändert am",
@@ -778,6 +781,8 @@
     "SchedulerDescription": "Der Fair-Share-Scheduler ist ein Planungsverfahren, das die Ausführungspriorität von Sitzungen anhand des historischen Ressourcenverbrauchs bestimmt. Er vergibt höhere Priorität an Nutzer, die weniger Ressourcen verbraucht haben, und sorgt so dafür, dass alle Nutzer im Zeitverlauf fairen Zugriff auf Ressourcen erhalten.\n<br /> <br />\nAdministratoren können Gewichte auf Domain-, Projekt- und Benutzerebene konfigurieren, um bestimmten Gruppen mehr Ressourcen zuzuweisen. Die Priorität wird als Wert zwischen 0,0 und 1,0 angegeben; Werte näher bei 1,0 bedeuten höhere Priorität.",
     "SchedulerDoesNotAppliedToResourceGroup": "Der Fair Share Scheduler ist für die ausgewählte Ressourcengruppe ({{resourceGroup}}) nicht aktiviert. Um den Scheduler zu verwenden, aktualisieren Sie bitte die Einstellungen der Ressourcengruppe.",
     "TotalUsage": "Gesamtnutzung",
+    "UnknownErrorDescription": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.",
+    "UnknownErrorOccurred": "Ein Fehler ist aufgetreten",
     "UsageHistory": "Nutzungsverlauf",
     "User": "Benutzer",
     "UserDescription": "Der Benutzer legt das konfigurierte Gewicht und die kumulative Nutzung für den Aggregationszeitraum fest. Das Benutzergewicht wird verwendet, um den Prioritätsfaktor für einzelne Benutzer zu berechnen.",
@@ -800,7 +805,6 @@
       "SelectDateRange": "Datumsbereich auswählen"
     }
   },
-  "fairShrae": {},
   "general": {
     "AccessKey": "Zugangsschlüssel",
     "Active": "Aktiv",

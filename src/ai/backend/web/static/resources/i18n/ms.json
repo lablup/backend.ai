@@ -759,9 +759,12 @@
     "FairShareSettingDescription": "Perubahan tidak akan segera tercermin dalam pengiraan Fair Share dan mungkin mengambil masa kira-kira 5 minit disebabkan kitaran pengiraan.",
     "FairShareSettingTitleWithName": "Konfigurasi Fair Share: {{name}}",
     "FairShareSettingsSuccessfullyUpdated": "Tetapan perkongsian adil telah dikemas kini.",
+    "GoBackToFirstStep": "Pergi ke langkah pertama",
     "HalfLifeDays": "Separuh Hayat",
     "HalfLifeDaysDescription": "Tempoh di mana kadar pencerminan penggunaan berkurang separuh. Jika ditetapkan kepada 7 hari, penggunaan dari 7 hari yang lalu dikira pada 50%, dan penggunaan dari 14 hari yang lalu pada 25%. Disyorkan untuk menetapkannya sebagai gandaan unit peluruhan.",
     "Id": "ID",
+    "InvalidParameterDescription": "Kami tidak dapat menemui apa yang anda cari. Mungkin ia telah dipadam atau alamatnya tidak betul.",
+    "InvalidParameterTitle": "Tidak ditemui",
     "LookbackDays": "Jangka masa",
     "LookbackDaysDescription": "Julat sejarah penggunaan yang diambil kira dalam pengiraan Fair Share. Penggunaan sebelum tempoh ini dikecualikan daripada pengiraan. Adalah disyorkan untuk menetapkannya sebagai gandaan suku hayat.",
     "Name": "Nama",
@@ -775,6 +778,8 @@
     "SchedulerDescription": "Fair Share Scheduler ialah kaedah penjadualan yang menentukan keutamaan pelaksanaan sesi berdasarkan penggunaan sumber terdahulu. Ia memberi keutamaan lebih tinggi kepada pengguna yang telah menggunakan lebih sedikit sumber, memastikan semua pengguna dapat mengakses sumber secara adil dari masa ke masa.\n<br /> <br />\nPentadbir boleh menetapkan wajaran pada peringkat Domain, Projek, dan Pengguna untuk memperuntukkan lebih banyak sumber kepada kumpulan tertentu. Keutamaan dinyatakan sebagai nilai antara 0.0 dan 1.0, di mana nilai yang lebih dekat dengan 1.0 menunjukkan keutamaan yang lebih tinggi.",
     "SchedulerDoesNotAppliedToResourceGroup": "Fair Share Scheduler tidak diaktifkan untuk kumpulan sumber yang dipilih ({{resourceGroup}}). Untuk menggunakan penjadual ini, sila kemas kini tetapan kumpulan sumber.",
     "TotalUsage": "Jumlah Penggunaan",
+    "UnknownErrorDescription": "Ralat tidak dijangka berlaku. Sila cuba lagi kemudian.",
+    "UnknownErrorOccurred": "Ralat berlaku",
     "UsageHistory": "Sejarah Penggunaan",
     "User": "Pengguna",
     "UserDescription": "Pengguna menentukan berat yang dikonfigurasikan dan jumlah penggunaan terkumpul sepanjang tempoh pengagregatan. Berat pengguna digunakan untuk mengira pekali keutamaan bagi setiap pengguna.",
@@ -797,7 +802,6 @@
       "SelectDateRange": "Pilih Julat Tarikh"
     }
   },
-  "fairShrae": {},
   "general": {
     "AccessKey": "Kunci akses",
     "Active": "Aktif",

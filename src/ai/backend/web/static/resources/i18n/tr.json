@@ -760,9 +760,12 @@
     "FairShareSettingDescription": "Değişiklikler Fair Share hesaplamalarına hemen yansımaz ve hesaplama döngüsü nedeniyle yaklaşık 5 dakika sürebilir.",
     "FairShareSettingTitleWithName": "Adil Paylaşım Yapılandırması: {{name}}",
     "FairShareSettingsSuccessfullyUpdated": "Adil paylaşım ayarları güncellendi.",
+    "GoBackToFirstStep": "İlk adıma git",
     "HalfLifeDays": "Yarı ömür",
     "HalfLifeDaysDescription": "Kullanım yansıtma oranının yarıya indiği süre. Örneğin 7 gün olarak ayarlanırsa, 7 gün önceki kullanım %50, 14 gün önceki kullanım %25 olarak hesaplanır. Bunun azalma biriminin katı olarak ayarlanması önerilir.",
     "Id": "Kimlik",
+    "InvalidParameterDescription": "Aradığınızı bulamadık. Kaldırılmış olabilir veya adres yanlış/hatalı olabilir.",
+    "InvalidParameterTitle": "Bulunamadı",
     "LookbackDays": "Geriye Bakış",
     "LookbackDaysDescription": "Fair Share hesaplamalarında yansıtılan kullanım geçmişinin aralığı. Bu dönemin öncesindeki kullanım hesaplamalara dahil edilmez. Bunun yarı ömrün katı olarak ayarlanması önerilir.",
     "Name": "Ad",
@@ -776,6 +779,8 @@
     "SchedulerDescription": "Adil Paylaşım Zamanlayıcısı, oturum yürütme önceliğini geçmiş kaynak kullanımına göre belirleyen bir zamanlama yöntemidir. Daha az kaynak tüketmiş kullanıcılara daha yüksek öncelik vererek tüm kullanıcıların zaman içinde kaynaklara adil erişimini sağlar.\n<br /> <br />\nYöneticiler belirli gruplara daha fazla kaynak tahsis etmek için Domain, Proje ve Kullanıcı düzeylerinde ağırlıkları yapılandırabilir. Öncelik 0.0 ile 1.0 arasında bir değerle ifade edilir; 1.0'a yakın değerler daha yüksek önceliği gösterir.",
     "SchedulerDoesNotAppliedToResourceGroup": "Seçili kaynak grubu ({{resourceGroup}}) için Fair Share Scheduler etkin değil. Planlayıcıyı kullanmak için lütfen kaynak grubu ayarlarını güncelleyin.",
     "TotalUsage": "Toplam Kullanım",
+    "UnknownErrorDescription": "Beklenmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyin.",
+    "UnknownErrorOccurred": "Bir şeyler yanlış gitti",
     "UsageHistory": "Kullanım Geçmişi",
     "User": "Kullanıcı",
     "UserDescription": "Kullanıcı, agregasyon dönemi sırasında ayarlanan ağırlığı ve kümülatif kullanımı belirler. Kullanıcı ağırlığı, bireysel kullanıcıların öncelik katsayısını hesaplamak için kullanılır.",
@@ -798,7 +803,6 @@
       "SelectDateRange": "Tarih Aralığı Seç"
     }
   },
-  "fairShrae": {},
   "general": {
     "AccessKey": "Erişim anahtarı",
     "Active": "Aktif",
