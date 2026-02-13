@@ -25,7 +25,8 @@ from pydantic import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common import typed_validators as tv
-from ai.backend.common.api_handlers import BaseFieldModel
+from ai.backend.common.api_handlers import BaseFieldModel, BaseRequestModel
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -92,6 +93,7 @@ from ai.backend.manager.services.model_serving.actions.search_services import (
     SearchServicesActionResult,
 )
 from ai.backend.manager.services.model_serving.actions.update_route import UpdateRouteAction
+from ai.backend.manager.services.model_serving.adapter import ServiceSearchAdapter
 from ai.backend.manager.types import MountOptionModel, UserScope
 
 from .auth import auth_required
@@ -193,8 +195,12 @@ async def list_serve(
     ]
 
 
+class ServiceFilterModel(BaseRequestModel):
+    name: StringFilter | None = Field(default=None, description="Filter by service name.")
+
+
 class SearchServicesRequestModel(LegacyBaseRequestModel):
-    name: str | None = Field(default=None)
+    filter: ServiceFilterModel | None = Field(default=None)
     offset: int = Field(default=0, ge=0)
     limit: int = Field(default=20, ge=1, le=100)
 
@@ -211,6 +217,7 @@ class ServiceSearchItemModel(LegacyBaseResponseModel):
         default=None, description="Public URL of the service endpoint (nullable)."
     )
     resource_slots: dict[str, Any] = Field(description="Resource allocation per replica.")
+    resource_group: str = Field(description="Name of the resource group for inference sessions.")
     open_to_public: bool = Field(description="Whether the endpoint is publicly accessible.")
 
 
@@ -236,9 +243,12 @@ async def search_services(
 
     log.info("SERVE.SEARCH (email:{}, ak:{})", request["user"]["email"], access_key)
 
+    adapter = ServiceSearchAdapter()
+    conditions = adapter.convert_filter(params.filter) if params.filter else []
+
     action = SearchServicesAction(
         session_owner_id=request["user"]["uuid"],
-        name=params.name,
+        conditions=conditions,
         offset=params.offset,
         limit=params.limit,
     )
@@ -256,6 +266,7 @@ async def search_services(
                 active_route_count=item.active_route_count,
                 service_endpoint=item.service_endpoint,
                 resource_slots=dict(item.resource_slots),
+                resource_group=item.resource_group,
                 open_to_public=item.open_to_public,
             )
             for item in result.items

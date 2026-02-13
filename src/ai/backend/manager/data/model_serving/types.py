@@ -247,6 +247,7 @@ class ServiceSearchItem:
     service_endpoint: HttpUrl | None
     open_to_public: bool
     resource_slots: ResourceSlot
+    resource_group: str
     routings: Sequence[RoutingData] | None
 
 

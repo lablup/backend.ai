@@ -7,7 +7,6 @@ from http import HTTPStatus
 from typing import cast
 
 import aiohttp
-import sqlalchemy as sa
 from pydantic import HttpUrl
 from yarl import URL
 
@@ -64,12 +63,11 @@ from ai.backend.manager.errors.service import (
     ModelServiceNotFound,
     RouteNotFound,
 )
-from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
+from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
-from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
 from ai.backend.manager.repositories.model_serving.creators import EndpointTokenCreatorSpec
@@ -404,17 +402,9 @@ class ModelServingService:
         )
 
     async def search_services(self, action: SearchServicesAction) -> SearchServicesActionResult:
-        conditions: list[QueryCondition] = []
-        if action.name:
-            _name: str = action.name
-
-            def _name_condition() -> sa.sql.expression.ColumnElement[bool]:
-                return EndpointRow.name == _name
-
-            conditions.append(_name_condition)
         querier = BatchQuerier(
             pagination=OffsetPagination(offset=action.offset, limit=action.limit),
-            conditions=conditions,
+            conditions=action.conditions,
         )
         result = await self._repository.search_services_paginated(action.session_owner_id, querier)
         return SearchServicesActionResult(

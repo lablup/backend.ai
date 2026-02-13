@@ -11,10 +11,12 @@ from pydantic import HttpUrl
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.api.service import ServiceFilterModel
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.model_serving.types import (
@@ -27,6 +29,7 @@ from ai.backend.manager.services.model_serving.actions.search_services import (
     SearchServicesAction,
     SearchServicesActionResult,
 )
+from ai.backend.manager.services.model_serving.adapter import ServiceSearchAdapter
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
@@ -196,7 +199,7 @@ class TestSearchServices:
 
         action = SearchServicesAction(
             session_owner_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-            name=None,
+            conditions=[],
             offset=0,
             limit=20,
         )
@@ -229,6 +232,7 @@ class TestSearchServices:
                     service_endpoint=HttpUrl("https://api.example.com/v1/my-service"),
                     open_to_public=False,
                     resource_slots=resource_slots,
+                    resource_group="nvidia-H100",
                     routings=None,
                 ),
             ],
@@ -239,7 +243,7 @@ class TestSearchServices:
 
         action = SearchServicesAction(
             session_owner_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-            name=None,
+            conditions=[],
             offset=0,
             limit=20,
         )
@@ -275,6 +279,7 @@ class TestSearchServices:
                     service_endpoint=None,
                     open_to_public=True,
                     resource_slots=ResourceSlot({"cpu": "2"}),
+                    resource_group="default",
                     routings=None,
                 ),
             ],
@@ -285,7 +290,7 @@ class TestSearchServices:
 
         action = SearchServicesAction(
             session_owner_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-            name=None,
+            conditions=[],
             offset=0,
             limit=20,
         )
@@ -314,6 +319,7 @@ class TestSearchServices:
                 service_endpoint=None,
                 open_to_public=False,
                 resource_slots=ResourceSlot({"cpu": "1"}),
+                resource_group="default",
                 routings=None,
             )
             for i in range(5)
@@ -328,7 +334,7 @@ class TestSearchServices:
 
         action = SearchServicesAction(
             session_owner_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-            name=None,
+            conditions=[],
             offset=5,
             limit=5,
         )
@@ -358,6 +364,7 @@ class TestSearchServices:
                     service_endpoint=HttpUrl("https://api.example.com/v1/target"),
                     open_to_public=False,
                     resource_slots=ResourceSlot({"cpu": "4", "cuda.shares": "2.5"}),
+                    resource_group="gpu-cluster",
                     routings=None,
                 ),
             ],
@@ -366,9 +373,13 @@ class TestSearchServices:
             has_previous_page=False,
         )
 
+        adapter = ServiceSearchAdapter()
+        name_filter = StringFilter(equals="target-service")
+        conditions = adapter.convert_filter(ServiceFilterModel(name=name_filter))
+
         action = SearchServicesAction(
             session_owner_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-            name="target-service",
+            conditions=conditions,
             offset=0,
             limit=20,
         )

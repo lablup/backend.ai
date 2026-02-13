@@ -1003,6 +1003,7 @@ class ModelServingRepository:
                         service_endpoint=HttpUrl(ep.url) if ep.url else None,
                         open_to_public=ep.open_to_public or False,
                         resource_slots=ep.resource_slots,
+                        resource_group=ep.resource_group,
                         routings=routings_data,
                     )
                 )

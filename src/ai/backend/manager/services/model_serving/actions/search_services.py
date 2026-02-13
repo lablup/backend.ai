@@ -1,19 +1,20 @@
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.types import ServiceSearchItem
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
 
 
 @dataclass
 class SearchServicesAction(ModelServiceAction):
     session_owner_id: uuid.UUID
-    name: str | None
-    offset: int
-    limit: int
+    conditions: list[QueryCondition] = field(default_factory=list)
+    offset: int = 0
+    limit: int = 20
 
     @override
     def entity_id(self) -> str | None:
