@@ -5,7 +5,10 @@ from collections.abc import MutableMapping
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
-from ai.backend.agent.kernel_registry.exception import KernelRegistryNotFound
+from ai.backend.agent.kernel_registry.exception import (
+    KernelRegistryLoadError,
+    KernelRegistryNotFound,
+)
 from ai.backend.agent.kernel_registry.types import KernelRecoveryData
 from ai.backend.agent.scratch.utils import ScratchConfig, ScratchUtils
 from ai.backend.common.types import KernelId
@@ -31,11 +34,24 @@ class ContainerBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
 
     async def _load_kernel_recovery_from_scratch(self, config_path: Path) -> KernelRecoveryData:
         config = ScratchConfig(config_path)
-        json_data = await config.get_json_recovery_data()
-        if json_data is None:
-            raise KernelRegistryNotFound
-        environ = await config.get_kernel_environ()
-        resource_spec = await config.get_kernel_resource_spec()
+        try:
+            json_data = await config.get_json_recovery_data()
+            if json_data is None:
+                log.warning("Missing recovery.json in scratch path {}", str(config_path))
+                raise KernelRegistryNotFound
+            environ = await config.get_kernel_environ()
+            resource_spec = await config.get_kernel_resource_spec()
+        except KernelRegistryNotFound:
+            raise
+        except FileNotFoundError as e:
+            log.warning("Missing recovery file in scratch path {}: {}", str(config_path), e)
+            raise KernelRegistryNotFound from e
+        except OSError as e:
+            log.warning("Failed to read recovery file in scratch path {}: {}", str(config_path), e)
+            raise KernelRegistryLoadError from e
+        except Exception as e:
+            log.warning("Corrupt recovery data in scratch path {}: {}", str(config_path), e)
+            raise KernelRegistryLoadError from e
         return json_data.to_kernel_recovery_data(
             resource_spec,
             environ,
@@ -55,7 +71,7 @@ class ContainerBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
             try:
                 recovery_data = await self._load_kernel_recovery_from_scratch(config_path)
                 result[kernel_id] = recovery_data.to_docker_kernel()
-            except KernelRegistryNotFound:
+            except (KernelRegistryNotFound, KernelRegistryLoadError):
                 log.warning(
                     "Failed to load kernel recovery data for kernel id {} from scratch path {}",
                     str(kernel_id),
