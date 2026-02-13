@@ -100,6 +100,7 @@ class EntityType(enum.StrEnum):
     MODEL_SERVICE = "model_service"
     NOTIFICATION = "notification"
     OBJECT_PERMISSION = "object_permission"
+    ARTIFACT_STORAGE = "artifact_storage"
     OBJECT_STORAGE = "object_storage"
     PERMISSION = "permission"
     RESOURCE_GROUP = "resource_group"

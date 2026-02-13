@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.data.artifact_storages.types import ArtifactStorageCreatorSpec
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
 from ai.backend.manager.repositories.base.creator import Creator
@@ -23,6 +25,9 @@ from ai.backend.manager.services.vfs_storage.actions.update import UpdateVFSStor
 from ai.backend.manager.types import OptionalState
 
 from .types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 
 
 @strawberry.type(description="Added in 25.16.0. VFS Storage configuration")
@@ -113,9 +118,16 @@ class CreateVFSStorageInput:
     def to_creator(self) -> Creator[VFSStorageRow]:
         return Creator(
             spec=VFSStorageCreatorSpec(
-                name=self.name,
                 host=self.host,
                 base_path=self.base_path,
+            )
+        )
+
+    def to_meta_creator(self) -> Creator[ArtifactStorageRow]:
+        return Creator(
+            spec=ArtifactStorageCreatorSpec(
+                name=self.name,
+                storage_type=ArtifactStorageType.VFS_STORAGE,
             )
         )
 
@@ -123,13 +135,11 @@ class CreateVFSStorageInput:
 @strawberry.input(description="Added in 25.16.0. Input for updating VFS storage")
 class UpdateVFSStorageInput:
     id: ID
-    name: str | None = UNSET
     host: str | None = UNSET
     base_path: str | None = UNSET
 
     def to_updater(self) -> Updater[VFSStorageRow]:
         spec = VFSStorageUpdaterSpec(
-            name=OptionalState[str].from_graphql(self.name),
             host=OptionalState[str].from_graphql(self.host),
             base_path=OptionalState[str].from_graphql(self.base_path),
         )
@@ -167,6 +177,7 @@ async def create_vfs_storage(
     action_result = await processors.vfs_storage.create.wait_for_complete(
         CreateVFSStorageAction(
             creator=input.to_creator(),
+            meta_creator=input.to_meta_creator(),
         )
     )
 

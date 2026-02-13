@@ -709,6 +709,30 @@ type ArtifactStatusChangedPayload {
   artifactRevision: ArtifactRevision!
 }
 
+"""Added in 26.3.0. Artifact storage metadata"""
+type ArtifactStorage {
+  """The ID of the artifact storage"""
+  id: ID!
+
+  """The name of the artifact storage"""
+  name: String!
+
+  """The ID of the underlying storage (ObjectStorage or VFSStorage)"""
+  storageId: ID!
+
+  """The type of the artifact storage"""
+  type: ArtifactStorageType!
+}
+
+"""
+Added in 26.3.0. The type of artifact storage backend. OBJECT_STORAGE: Object storage (e.g., S3-compatible). VFS_STORAGE: Virtual folder storage. GIT_LFS: Git LFS storage.
+"""
+enum ArtifactStorageType {
+  OBJECT_STORAGE
+  VFS_STORAGE
+  GIT_LFS
+}
+
 enum ArtifactType {
   MODEL
   PACKAGE
@@ -3558,6 +3582,11 @@ type Mutation {
   deleteVFSStorage(input: DeleteVFSStorageInput!): DeleteVFSStoragePayload!
 
   """
+  Added in 26.3.0. Update artifact storage metadata (common fields like name)
+  """
+  adminUpdateArtifactStorage(input: UpdateArtifactStorageInput!): UpdateArtifactStoragePayload!
+
+  """
   Added in 25.15.0.
   
   Registers a new namespace within a storage.
@@ -6087,6 +6116,21 @@ type UpdateArtifactPayload {
   artifact: Artifact!
 }
 
+"""Added in 26.3.0. Input for updating artifact storage metadata"""
+input UpdateArtifactStorageInput {
+  """The ID of the artifact storage"""
+  id: ID!
+
+  """The new name for the artifact storage"""
+  name: String
+}
+
+"""Added in 26.3.0. Payload for updating artifact storage metadata"""
+type UpdateArtifactStoragePayload {
+  """The updated artifact storage"""
+  artifactStorage: ArtifactStorage!
+}
+
 input UpdateAutoScalingRuleInput {
   id: ID!
   metricSource: AutoScalingMetricSource
@@ -6164,7 +6208,6 @@ type UpdateNotificationRulePayload {
 """Added in 25.14.0"""
 input UpdateObjectStorageInput {
   id: ID!
-  name: String
   host: String
   accessKey: String
   secretKey: String
@@ -6347,7 +6390,6 @@ type UpdateUserV2Payload {
 """Added in 25.16.0. Input for updating VFS storage"""
 input UpdateVFSStorageInput {
   id: ID!
-  name: String
   host: String
   basePath: String
 }

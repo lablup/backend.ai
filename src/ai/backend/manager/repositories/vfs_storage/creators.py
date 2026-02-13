@@ -13,14 +13,12 @@ from ai.backend.manager.repositories.base import CreatorSpec
 class VFSStorageCreatorSpec(CreatorSpec[VFSStorageRow]):
     """CreatorSpec for VFS storage creation."""
 
-    name: str
     host: str
     base_path: str
 
     @override
     def build_row(self) -> VFSStorageRow:
         return VFSStorageRow(
-            name=self.name,
             host=self.host,
             base_path=self.base_path,
         )
