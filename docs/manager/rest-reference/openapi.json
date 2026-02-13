@@ -3426,7 +3426,7 @@
         "type": "string"
       },
       "OrderDirection": {
-        "description": "Specifies the direction for sorting export results.\n\nUsed in ExportOrder to control whether results are sorted\nin ascending or descending order for each field.",
+        "description": "Order direction for sorting.",
         "enum": [
           "asc",
           "desc"
@@ -8139,6 +8139,190 @@
           }
         },
         "title": "AuditLogExportCSVRequest",
+        "type": "object"
+      },
+      "AgentFilter": {
+        "description": "Filter for agents.",
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentStatusEnumFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by agent status. Supports equals, in, not_equals, and not_in operations."
+          },
+          "resource_group": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by resource group name. Supports equals, contains, starts_with, ends_with, and their case-insensitive and negated variants."
+          }
+        },
+        "title": "AgentFilter",
+        "type": "object"
+      },
+      "AgentOrder": {
+        "description": "Order specification for agents.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/AgentOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "AgentOrder",
+        "type": "object"
+      },
+      "AgentOrderField": {
+        "description": "Fields available for ordering agents.",
+        "enum": [
+          "id",
+          "status",
+          "resource_group"
+        ],
+        "title": "AgentOrderField",
+        "type": "string"
+      },
+      "AgentStatusEnum": {
+        "description": "Agent statuses available for filtering.",
+        "enum": [
+          "ALIVE",
+          "LOST",
+          "RESTARTING",
+          "TERMINATED"
+        ],
+        "title": "AgentStatusEnum",
+        "type": "string"
+      },
+      "AgentStatusEnumFilter": {
+        "description": "Filter for agent status enum fields.\n\nSupports equals, in, not_equals, and not_in operations,\nfollowing the Strawberry GQL EnumFilter pattern.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentStatusEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match for agent status."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AgentStatusEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided statuses.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentStatusEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude exact status match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AgentStatusEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided statuses.",
+            "title": "Not In"
+          }
+        },
+        "title": "AgentStatusEnumFilter",
+        "type": "object"
+      },
+      "SearchAgentsRequest": {
+        "description": "Request body for searching agents with filters, orders, and pagination.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AgentOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum items to return",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Number of items to skip",
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "title": "SearchAgentsRequest",
         "type": "object"
       }
     }
@@ -19133,6 +19317,35 @@
         },
         "parameters": [],
         "description": "Export audit log data as CSV.\n\nPOST /export/audit-logs/csv\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/agents/search": {
+      "post": {
+        "operationId": "agents.search_agents",
+        "tags": [
+          "agents"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchAgentsRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search agents with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     }
   }
