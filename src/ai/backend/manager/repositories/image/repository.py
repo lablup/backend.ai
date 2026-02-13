@@ -257,9 +257,6 @@ class ImageRepository:
     async def scan_image_by_identifier(
         self, image_canonical: str, architecture: str
     ) -> RescanImagesResult:
-        """
-        Deprecated. Use scan_images_by_ids instead.
-        """
         return await self._db_source.scan_and_upsert_image(image_canonical, architecture)
 
     @image_repository_resilience.apply()
@@ -326,13 +323,6 @@ class ImageRepository:
         Returns ImageAliasListResult with items and pagination info.
         """
         return await self._db_source.search_aliases(querier)
-
-    @image_repository_resilience.apply()
-    async def scan_images_by_ids(self, image_ids: list[UUID]) -> RescanImagesResult:
-        """
-        Scans multiple images by their IDs.
-        """
-        return await self._db_source.scan_images_by_ids(image_ids)
 
     @image_repository_resilience.apply()
     async def get_aliases_by_image_ids(self, image_ids: list[UUID]) -> dict[UUID, list[str]]:

@@ -268,10 +268,6 @@ class ImageDBSource:
     async def scan_and_upsert_image(
         self, image_canonical: str, architecture: str
     ) -> RescanImagesResult:
-        """
-        Deprecated. Use scan_images_by_ids instead.
-        """
-
         async with self._db.begin_session() as session:
             # Resolve the image first
             image_row = await self._resolve_image(
@@ -449,44 +445,6 @@ class ImageDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
-
-    async def scan_images_by_ids(self, image_ids: list[UUID]) -> RescanImagesResult:
-        """
-        Scans multiple images by their IDs and upserts them into the database.
-        Returns RescanImagesResult with the scanned image data.
-        """
-        all_images: list[ImageData] = []
-        all_errors: list[str] = []
-
-        async with self._db.begin_session() as session:
-            for image_id in image_ids:
-                try:
-                    image_row = await self._get_image_by_id(session, image_id)
-
-                    # Get the registry info
-                    registry_parts = []
-                    if image_row.registry:
-                        registry_parts.append(image_row.registry)
-                    if image_row.project:
-                        registry_parts.append(image_row.project)
-                    registry_key = "/".join(registry_parts) if registry_parts else ""
-
-                    # Get the registry row
-                    registry_row = await session.get(ContainerRegistryRow, image_row.registry_id)
-                    if not registry_row:
-                        all_errors.append(f"Registry not found for image {image_row.name}")
-                        continue
-
-                    # Call the original scan function
-                    result = await scan_single_image(
-                        self._db, registry_key, registry_row, image_row.name
-                    )
-                    all_images.extend(result.images)
-                    all_errors.extend(result.errors)
-                except ImageNotFound:
-                    all_errors.append(f"Image not found: {image_id}")
-
-        return RescanImagesResult(images=all_images, errors=all_errors)
 
     async def query_aliases_by_image_ids(self, image_ids: list[UUID]) -> dict[UUID, list[str]]:
         """
