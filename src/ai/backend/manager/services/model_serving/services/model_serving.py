@@ -436,11 +436,11 @@ class ModelServingService:
 
         # Prepare mounts and environ
         mounts: list[uuid.UUID] = [
-            model_vfolder_id,
+            service_prepare_ctx.model_id,
             *[m.vfid.folder_id for m in service_prepare_ctx.extra_mounts],
         ]
         mount_map: dict[uuid.UUID, str] = {
-            model_vfolder_id: action.config.model_mount_destination,
+            service_prepare_ctx.model_id: action.config.model_mount_destination,
         }
         for m in service_prepare_ctx.extra_mounts:
             mount_map[m.vfid.folder_id] = str(m.kernel_path)
