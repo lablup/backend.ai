@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import uuid
-from collections import defaultdict
 from collections.abc import Sequence
 
-from ai.backend.common.types import ImageID
 from ai.backend.manager.data.image.types import ImageAliasData
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.image.options import ImageAliasConditions
@@ -38,4 +36,3 @@ async def load_alias_by_ids(
 
     alias_map: dict[uuid.UUID, ImageAliasData] = {alias.id: alias for alias in result.data}
     return [alias_map.get(alias_id) for alias_id in alias_ids]
-
