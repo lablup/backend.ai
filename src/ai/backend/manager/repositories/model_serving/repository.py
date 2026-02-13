@@ -3,6 +3,7 @@ import uuid
 from typing import Any, cast
 
 import sqlalchemy as sa
+from pydantic import HttpUrl
 from sqlalchemy.exc import IntegrityError, NoResultFound, StatementError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
@@ -33,6 +34,8 @@ from ai.backend.manager.data.model_serving.types import (
     MutationResult,
     RoutingData,
     ScalingGroupData,
+    ServiceSearchItem,
+    ServiceSearchResult,
     UserData,
 )
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
@@ -957,6 +960,57 @@ class ModelServingRepository:
             items = [row.EndpointAutoScalingRuleRow.to_data() for row in result.rows]
 
             return EndpointAutoScalingRuleListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    @model_serving_repository_resilience.apply()
+    async def search_services_paginated(
+        self,
+        session_owner_id: uuid.UUID,
+        querier: BatchQuerier,
+    ) -> ServiceSearchResult:
+        """
+        Search services with pagination.
+        Base conditions (session_owner, lifecycle_stage) are applied as security constraints.
+        Additional filter/pagination conditions come from the querier.
+        """
+        async with self._db.begin_readonly_session_read_committed() as session:
+            query = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.session_owner == session_owner_id)
+                .where(EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED)
+                .options(selectinload(EndpointRow.routings))
+            )
+
+            result = await execute_batch_querier(session, query, querier)
+
+            items: list[ServiceSearchItem] = []
+            for row in result.rows:
+                ep = row.EndpointRow
+                routings_data = [r.to_data() for r in ep.routings] if ep.routings else None
+                active_route_count = (
+                    len([r for r in ep.routings if r.status == RouteStatus.HEALTHY])
+                    if ep.routings
+                    else 0
+                )
+                items.append(
+                    ServiceSearchItem(
+                        id=ep.id,
+                        name=ep.name,
+                        replicas=ep.replicas,
+                        active_route_count=active_route_count,
+                        service_endpoint=HttpUrl(ep.url) if ep.url else None,
+                        open_to_public=ep.open_to_public or False,
+                        resource_slots=ep.resource_slots,
+                        resource_group=ep.resource_group,
+                        routings=routings_data,
+                    )
+                )
+
+            return ServiceSearchResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,

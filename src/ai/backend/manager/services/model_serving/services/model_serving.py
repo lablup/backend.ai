@@ -66,7 +66,7 @@ from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
 from ai.backend.manager.repositories.model_serving.creators import EndpointTokenCreatorSpec
@@ -118,6 +118,10 @@ from ai.backend.manager.services.model_serving.actions.list_model_service import
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import (
     ModifyEndpointAction,
     ModifyEndpointActionResult,
+)
+from ai.backend.manager.services.model_serving.actions.search_services import (
+    SearchServicesAction,
+    SearchServicesActionResult,
 )
 from ai.backend.manager.services.model_serving.actions.update_route import (
     UpdateRouteAction,
@@ -394,6 +398,19 @@ class ModelServingService:
                 )
                 for endpoint in endpoints
             ]
+        )
+
+    async def search_services(self, action: SearchServicesAction) -> SearchServicesActionResult:
+        querier = BatchQuerier(
+            pagination=OffsetPagination(offset=action.offset, limit=action.limit),
+            conditions=action.conditions,
+        )
+        result = await self._repository.search_services_paginated(action.session_owner_id, querier)
+        return SearchServicesActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            offset=action.offset,
+            limit=action.limit,
         )
 
     async def check_user_access(self) -> None:
