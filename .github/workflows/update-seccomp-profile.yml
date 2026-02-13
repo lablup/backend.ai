@@ -37,7 +37,7 @@ jobs:
           title: "chore: update default seccomp profile from upstream moby/moby"
           body: |
             ## Summary
-            - Update `src/ai/backend/runner/default-seccomp.json` to the latest version from [moby/moby](https://github.com/moby/moby/blob/master/profiles/seccomp/default.json).
+            - Update `src/ai/backend/runner/default-seccomp.json` to the latest version from [moby/profiles](https://github.com/moby/profiles/blob/main/seccomp/default.json).
 
             This PR was automatically created by the `update-seccomp-profile` workflow.
           labels: auto-update
