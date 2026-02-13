@@ -130,17 +130,6 @@ class ClearImageV2ResourceLimitInputGQL:
     description=dedent_strip("""
     Added in 26.3.0.
 
-    Input for untagging an image from its container registry.
-    """)
-)
-class UntagImageV2FromRegistryInputGQL:
-    image_id: ID = strawberry.field(description="The ID of the image to untag from registry.")
-
-
-@strawberry.input(
-    description=dedent_strip("""
-    Added in 26.3.0.
-
     Input for a single resource limit specification.
     """)
 )
@@ -436,18 +425,6 @@ class DealiasImageV2ResultGQL:
 )
 class ClearImageV2ResourceLimitResultGQL:
     image: ImageV2GQL = strawberry.field(description="The image with cleared resource limits.")
-
-
-@strawberry.type(
-    name="UntagImageV2FromRegistryResult",
-    description=dedent_strip("""
-    Added in 26.3.0.
-
-    Result of untagging an image from its container registry.
-    """),
-)
-class UntagImageV2FromRegistryResultGQL:
-    image: ImageV2GQL = strawberry.field(description="The untagged image.")
 
 
 @strawberry.type(
