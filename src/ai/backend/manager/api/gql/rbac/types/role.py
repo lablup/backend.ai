@@ -83,7 +83,7 @@ class RoleOrderField(StrEnum):
 # ==================== Node Types ====================
 
 
-@strawberry.type(description="Added in 26.3.0. RBAC role")
+@strawberry.type(name="Role", description="Added in 26.3.0. RBAC role")
 class RoleGQL(Node):
     id: NodeID[str]
     name: str
@@ -118,7 +118,10 @@ class RoleGQL(Node):
         )
 
 
-@strawberry.type(description="Added in 26.3.0. RBAC role assignment (user-role association)")
+@strawberry.type(
+    name="RoleAssignment",
+    description="Added in 26.3.0. RBAC role assignment (user-role association)",
+)
 class RoleAssignmentGQL(Node):
     id: NodeID[str]
     user_id: uuid.UUID = strawberry.field(description="The assigned user ID.")
@@ -157,9 +160,9 @@ class RoleAssignmentGQL(Node):
     @classmethod
     def from_dataclass(cls, data: AssignedUserData) -> Self:
         return cls(
-            id=ID(f"{data.user_id}"),
+            id=ID(str(data.id)),
             user_id=data.user_id,
-            role_id=uuid.UUID(int=0),  # Populated from context
+            role_id=data.role_id,
             granted_by=data.granted_by,
             granted_at=data.granted_at,
         )
@@ -167,7 +170,7 @@ class RoleAssignmentGQL(Node):
     @classmethod
     def from_assignment_data(cls, data: UserRoleAssignmentData) -> Self:
         return cls(
-            id=ID(f"{data.user_id}:{data.role_id}"),
+            id=ID(str(data.id)),
             user_id=data.user_id,
             role_id=data.role_id,
             granted_by=data.granted_by,
@@ -177,7 +180,7 @@ class RoleAssignmentGQL(Node):
     @classmethod
     def from_revocation_data(cls, data: UserRoleRevocationData) -> Self:
         return cls(
-            id=ID(f"{data.user_id}:{data.role_id}"),
+            id=ID(str(data.user_role_id)),
             user_id=data.user_id,
             role_id=data.role_id,
             granted_by=None,

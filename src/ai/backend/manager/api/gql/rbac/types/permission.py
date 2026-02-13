@@ -20,6 +20,8 @@ from ai.backend.manager.api.gql.base import OrderDirection
 from ai.backend.manager.api.gql.rbac.types.entity import EntityNode
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.permission.permission import PermissionData
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.models.rbac.exceptions import InvalidScope
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base.creator import Creator
@@ -61,17 +63,33 @@ class EntityTypeGQL(StrEnum):
 
     @classmethod
     def from_internal(cls, value: EntityType) -> EntityTypeGQL:
-        return cls(value.value)
+        try:
+            return cls(value.value)
+        except ValueError:
+            raise InvalidAPIParameters(
+                extra_msg=f"{value.value!r} is not a valid EntityTypeGQL"
+            ) from None
 
     def to_internal(self) -> EntityType:
-        return EntityType(self.value)
+        try:
+            return EntityType(self.value)
+        except ValueError:
+            raise InvalidAPIParameters(
+                extra_msg=f"{self.value!r} is not a valid EntityType"
+            ) from None
 
     @classmethod
     def from_scope_type(cls, value: ScopeType) -> EntityTypeGQL:
-        return cls(value.value)
+        try:
+            return cls(value.value)
+        except ValueError:
+            raise InvalidScope(extra_msg=f"{value.value!r} is not a valid EntityTypeGQL") from None
 
     def to_scope_type(self) -> ScopeType:
-        return ScopeType(self.value)
+        try:
+            return ScopeType(self.value)
+        except ValueError:
+            raise InvalidScope(extra_msg=f"{self.value!r} is not a valid scope type") from None
 
 
 @strawberry.enum(name="OperationType", description="Added in 26.3.0. RBAC operation type")
@@ -89,10 +107,20 @@ class OperationTypeGQL(StrEnum):
 
     @classmethod
     def from_internal(cls, value: OperationType) -> OperationTypeGQL:
-        return cls(value.value)
+        try:
+            return cls(value.value)
+        except ValueError:
+            raise InvalidAPIParameters(
+                extra_msg=f"{value.value!r} is not a valid OperationTypeGQL"
+            ) from None
 
     def to_internal(self) -> OperationType:
-        return OperationType(self.value)
+        try:
+            return OperationType(self.value)
+        except ValueError:
+            raise InvalidAPIParameters(
+                extra_msg=f"{self.value!r} is not a valid OperationType"
+            ) from None
 
 
 @strawberry.enum(description="Added in 26.3.0. Permission ordering field")
@@ -104,7 +132,7 @@ class PermissionOrderField(StrEnum):
 # ==================== Node Types ====================
 
 
-@strawberry.type(description="Added in 26.3.0. RBAC scoped permission")
+@strawberry.type(name="Permission", description="Added in 26.3.0. RBAC scoped permission")
 class PermissionGQL(Node):
     id: NodeID[str]
     role_id: uuid.UUID
