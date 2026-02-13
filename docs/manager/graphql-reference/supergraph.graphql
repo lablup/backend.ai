@@ -7464,15 +7464,6 @@ type Mutation
   """
   Added in 26.3.0.
   
-  Untag an image from its container registry by its ID. (superadmin only)
-  
-  This removes the image tag from the registry. Only available for HarborV2 registries.
-  """
-  adminUntagImageV2FromRegistry(input: UntagImageV2FromRegistryInputGQL!): UntagImageV2FromRegistryResult! @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 26.3.0.
-  
   Create an alias for an image by its ID.
   
   An alias is an alternative name that can be used to reference the image.

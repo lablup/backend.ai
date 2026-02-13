@@ -14,7 +14,6 @@ from .mutations import (
     admin_modify_image_v2,
     admin_purge_image_v2,
     admin_set_image_v2_resource_limit,
-    admin_untag_image_v2_from_registry,
     user_forget_image_v2,
     user_purge_image_v2,
     user_untag_image_v2_from_registry,
@@ -103,7 +102,6 @@ __all__ = [
     "admin_dealias_image_v2",
     "admin_clear_image_v2_resource_limit",
     "admin_set_image_v2_resource_limit",
-    "admin_untag_image_v2_from_registry",
     "user_untag_image_v2_from_registry",
     "admin_modify_image_v2",
 ]

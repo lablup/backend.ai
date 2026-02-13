@@ -609,29 +609,6 @@ async def admin_clear_image_v2_resource_limit(
     description=dedent_strip("""
     Added in 26.3.0.
 
-    Untag an image from its container registry by its ID. (superadmin only)
-
-    This removes the image tag from the registry. Only available for HarborV2 registries.
-    """)
-)  # type: ignore[misc]
-async def admin_untag_image_v2_from_registry(
-    input: UntagImageV2FromRegistryInputGQL,
-    info: Info[StrawberryGQLContext],
-) -> UntagImageV2FromRegistryResultGQL:
-    check_admin_only()
-    ctx = info.context
-
-    result = await ctx.processors.image.untag_image_from_registry.wait_for_complete(
-        UntagImageFromRegistryAction(image_id=ImageID(UUID(input.image_id)))
-    )
-
-    return UntagImageV2FromRegistryResultGQL(image=ImageV2GQL.from_data(result.image))
-
-
-@strawberry.mutation(
-    description=dedent_strip("""
-    Added in 26.3.0.
-
     Untag an image from its container registry by its ID.
 
     This removes the image tag from the registry. Only available for HarborV2 registries.

@@ -126,7 +126,6 @@ from .image import (
     admin_modify_image_v2,
     admin_purge_image_v2,
     admin_set_image_v2_resource_limit,
-    admin_untag_image_v2_from_registry,
     container_registry_images_v2,
     image_alias,
     image_scoped_aliases,
@@ -457,7 +456,6 @@ class Mutation:
     # Image - Admin APIs
     admin_forget_image_v2 = admin_forget_image_v2
     admin_purge_image_v2 = admin_purge_image_v2
-    admin_untag_image_v2_from_registry = admin_untag_image_v2_from_registry
     admin_alias_image_v2 = admin_alias_image_v2
     admin_dealias_image_v2 = admin_dealias_image_v2
     admin_clear_image_v2_resource_limit = admin_clear_image_v2_resource_limit
