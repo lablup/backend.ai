@@ -4,7 +4,7 @@ import logging
 import secrets
 import uuid
 from http import HTTPStatus
-from typing import cast
+from typing import Any, cast
 
 import aiohttp
 import tomli
@@ -33,7 +33,6 @@ from ai.backend.common.types import (
     ImageAlias,
     KernelEnqueueingConfig,
     SessionTypes,
-    VFolderID,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -436,17 +435,17 @@ class ModelServingService:
         session_name = f"model-eval-{session_creation_id}"
 
         # Prepare mounts and environ
-        mounts = [
-            service_prepare_ctx.model_id,
-            *[m.vfid for m in service_prepare_ctx.extra_mounts],
+        mounts: list[uuid.UUID] = [
+            model_vfolder_id,
+            *[m.vfid.folder_id for m in service_prepare_ctx.extra_mounts],
         ]
-        mount_map: dict[uuid.UUID | VFolderID, str] = {
-            service_prepare_ctx.model_id: action.config.model_mount_destination,
+        mount_map: dict[uuid.UUID, str] = {
+            model_vfolder_id: action.config.model_mount_destination,
         }
         for m in service_prepare_ctx.extra_mounts:
-            mount_map[m.vfid] = str(m.kernel_path)
-        mount_options = {
-            m.vfid: {"permission": m.mount_perm} for m in service_prepare_ctx.extra_mounts
+            mount_map[m.vfid.folder_id] = str(m.kernel_path)
+        mount_options: dict[uuid.UUID, dict[str, Any]] = {
+            m.vfid.folder_id: {"permission": m.mount_perm} for m in service_prepare_ctx.extra_mounts
         }
         environ = creation_config.get("environ", {})
 
