@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from enum import StrEnum
 from typing import override
-from uuid import UUID
 
 import strawberry
 
@@ -412,22 +411,3 @@ class UserOrderByGQL(GQLOrderBy):
                 return UserOrders.by_project_name(ascending)
             case _:
                 raise ValueError(f"Unknown order field: {self.field}")
-
-
-@strawberry.input(
-    name="UserV2Scope",
-    description=(
-        "Added in 26.2.0. Scope for user queries to restrict results to a specific context."
-    ),
-)
-class UserScopeGQL:
-    """Scope for user queries."""
-
-    domain_name: str | None = strawberry.field(
-        default=None,
-        description="Restrict results to users in this domain.",
-    )
-    project_id: UUID | None = strawberry.field(
-        default=None,
-        description="Restrict results to users in this project.",
-    )

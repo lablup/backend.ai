@@ -11,7 +11,6 @@ from .filters import (
     UserOrderFieldGQL,
     UserProjectNestedFilter,
     UserRoleEnumFilterGQL,
-    UserScopeGQL,
     UserStatusEnumFilterGQL,
 )
 from .inputs import (
@@ -71,7 +70,6 @@ __all__ = [
     "UserFilterGQL",
     "UserOrderFieldGQL",
     "UserOrderByGQL",
-    "UserScopeGQL",
     "UserStatusEnumFilterGQL",
     "UserRoleEnumFilterGQL",
     # Scopes
