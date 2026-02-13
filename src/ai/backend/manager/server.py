@@ -351,6 +351,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".scheduling_history",
     ".fair_share",
     ".export",
+    ".agent",
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
