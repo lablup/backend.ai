@@ -2270,7 +2270,7 @@ type EntityEdge {
   cursor: String!
 }
 
-union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ArtifactRevision | RoleGQL
+union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ArtifactRevision | Role
 
 """
 Added in 26.2.0. Common timestamp fields for entity lifecycle tracking. Reusable across different entity types.
@@ -3821,10 +3821,10 @@ type Mutation {
   adminPurgeUsers(input: PurgeUsersV2Input!): PurgeUsersV2Payload!
 
   """Added in 26.3.0. Create a new role (admin only)."""
-  adminCreateRole(input: CreateRoleInput!): RoleGQL!
+  adminCreateRole(input: CreateRoleInput!): Role!
 
   """Added in 26.3.0. Update an existing role (admin only)."""
-  adminUpdateRole(input: UpdateRoleInput!): RoleGQL!
+  adminUpdateRole(input: UpdateRoleInput!): Role!
 
   """Added in 26.3.0. Soft-delete a role (admin only)."""
   adminDeleteRole(input: DeleteRoleInput!): DeleteRolePayload!
@@ -3833,16 +3833,16 @@ type Mutation {
   adminPurgeRole(input: PurgeRoleInput!): PurgeRolePayload!
 
   """Added in 26.3.0. Create a scoped permission (admin only)."""
-  adminCreatePermission(input: CreatePermissionInput!): PermissionGQL!
+  adminCreatePermission(input: CreatePermissionInput!): Permission!
 
   """Added in 26.3.0. Delete a scoped permission (admin only)."""
   adminDeletePermission(input: DeletePermissionInput!): DeletePermissionPayload!
 
   """Added in 26.3.0. Assign a role to a user (admin only)."""
-  adminAssignRole(input: AssignRoleInput!): RoleAssignmentGQL!
+  adminAssignRole(input: AssignRoleInput!): RoleAssignment!
 
   """Added in 26.3.0. Revoke a role from a user (admin only)."""
-  adminRevokeRole(input: RevokeRoleInput!): RoleAssignmentGQL!
+  adminRevokeRole(input: RevokeRoleInput!): RoleAssignment!
 }
 
 """An object with a Globally Unique ID"""
@@ -4051,25 +4051,8 @@ type PageInfo @shareable {
   endCursor: String
 }
 
-"""Added in 26.3.0. Permission connection"""
-type PermissionConnection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [PermissionGQLEdge!]!
-  count: Int!
-}
-
-"""Added in 26.3.0. Filter for scoped permissions"""
-input PermissionFilter {
-  roleId: UUID = null
-  scopeType: EntityType = null
-  entityType: EntityType = null
-}
-
 """Added in 26.3.0. RBAC scoped permission"""
-type PermissionGQL implements Node {
+type Permission implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   roleId: UUID!
@@ -4079,19 +4062,36 @@ type PermissionGQL implements Node {
   operation: OperationType!
 
   """The role this permission belongs to."""
-  role: RoleGQL
+  role: Role
 
   """The scope this permission applies to."""
   scope: EntityNode
 }
 
+"""Added in 26.3.0. Permission connection"""
+type PermissionConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [PermissionEdge!]!
+  count: Int!
+}
+
 """An edge in a connection."""
-type PermissionGQLEdge {
+type PermissionEdge {
   """A cursor for use in pagination"""
   cursor: String!
 
   """The item at the end of the edge"""
-  node: PermissionGQL!
+  node: Permission!
+}
+
+"""Added in 26.3.0. Filter for scoped permissions"""
+input PermissionFilter {
+  roleId: UUID = null
+  scopeType: EntityType = null
+  entityType: EntityType = null
 }
 
 """Added in 26.3.0. Order by specification for permissions"""
@@ -4972,7 +4972,7 @@ type Query {
   adminImageAliases(filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
 
   """Added in 26.3.0. Get a single role by ID (admin only)."""
-  adminRole(id: UUID!): RoleGQL
+  adminRole(id: UUID!): Role
 
   """
   Added in 26.3.0. List roles with filtering and pagination (admin only).
@@ -5688,23 +5688,21 @@ input RevokeRoleInput {
   roleId: UUID!
 }
 
-"""Added in 26.3.0. Role assignment connection"""
-type RoleAssignmentConnection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [RoleAssignmentGQLEdge!]!
-  count: Int!
-}
-
-"""Added in 26.3.0. Filter for role assignments"""
-input RoleAssignmentFilter {
-  roleId: UUID = null
+"""Added in 26.3.0. RBAC role"""
+type Role implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  description: String
+  source: RoleSource!
+  status: RoleStatus!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  deletedAt: DateTime
 }
 
 """Added in 26.3.0. RBAC role assignment (user-role association)"""
-type RoleAssignmentGQL implements Node {
+type RoleAssignment implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
@@ -5719,19 +5717,34 @@ type RoleAssignmentGQL implements Node {
   grantedAt: DateTime!
 
   """The assigned role."""
-  role: RoleGQL
+  role: Role
 
   """The assigned user."""
   user: UserV2
 }
 
+"""Added in 26.3.0. Role assignment connection"""
+type RoleAssignmentConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RoleAssignmentEdge!]!
+  count: Int!
+}
+
 """An edge in a connection."""
-type RoleAssignmentGQLEdge {
+type RoleAssignmentEdge {
   """A cursor for use in pagination"""
   cursor: String!
 
   """The item at the end of the edge"""
-  node: RoleAssignmentGQL!
+  node: RoleAssignment!
+}
+
+"""Added in 26.3.0. Filter for role assignments"""
+input RoleAssignmentFilter {
+  roleId: UUID = null
 }
 
 """Added in 26.3.0. Role connection"""
@@ -5740,8 +5753,17 @@ type RoleConnection {
   pageInfo: PageInfo!
 
   """Contains the nodes in this connection"""
-  edges: [RoleGQLEdge!]!
+  edges: [RoleEdge!]!
   count: Int!
+}
+
+"""An edge in a connection."""
+type RoleEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: Role!
 }
 
 """Added in 26.3.0. Filter for roles"""
@@ -5752,28 +5774,6 @@ input RoleFilter {
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
   NOT: RoleFilter = null
-}
-
-"""Added in 26.3.0. RBAC role"""
-type RoleGQL implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-  name: String!
-  description: String
-  source: RoleSource!
-  status: RoleStatus!
-  createdAt: DateTime!
-  updatedAt: DateTime!
-  deletedAt: DateTime
-}
-
-"""An edge in a connection."""
-type RoleGQLEdge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: RoleGQL!
 }
 
 """Added in 26.3.0. Order by specification for roles"""
