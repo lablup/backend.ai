@@ -99,7 +99,7 @@ class RouteExecutor:
                     route_session_ids[route.route_id] = session_id
                 successes.append(route)
             except Exception as e:
-                log.exception("Failed to provision route {}: {}", route.route_id, e)
+                log.warning("Failed to provision route {}: {}", route.route_id, e)
                 errors.append(
                     RouteExecutionError(
                         route_info=route,
