@@ -84,7 +84,10 @@ from ai.backend.testutils.db import with_tables
 
 def _qty(slots: list[SlotQuantity], name: str) -> Decimal:
     """Find a SlotQuantity by slot_name and return its quantity."""
-    return next(sq.quantity for sq in slots if sq.slot_name == name)
+    return next(
+        (sq.quantity for sq in slots if sq.slot_name == name),
+        Decimal("0"),
+    )
 
 
 class TestCheckPresetsOccupiedSlots:
