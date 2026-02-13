@@ -4,13 +4,10 @@ import uuid
 from functools import lru_cache
 
 import strawberry
-from aiotools import apartial
 from strawberry import Info
-from strawberry.dataloader import DataLoader
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
-from ai.backend.manager.api.gql.artifact_registry_meta import ArtifactRegistryMeta
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -185,17 +182,18 @@ async def fetch_artifacts(
         SearchArtifactsAction(querier=querier)
     )
 
-    registry_meta_loader = DataLoader(
-        apartial(ArtifactRegistryMeta.load_by_id, info.context),
-    )
-
     # Build GraphQL connection response
+    data_loaders = info.context.data_loaders
     edges = []
     for artifact_data in action_result.data:
-        registry_meta = await registry_meta_loader.load(artifact_data.registry_id)
-        source_registry_meta = await registry_meta_loader.load(artifact_data.source_registry_id)
+        registry_url = await get_registry_url(
+            data_loaders, artifact_data.registry_id, artifact_data.registry_type
+        )
+        source_url = await get_registry_url(
+            data_loaders, artifact_data.source_registry_id, artifact_data.source_registry_type
+        )
         artifact = Artifact.from_dataclass(
-            artifact_data, registry_url=registry_meta.url, source_url=source_registry_meta.url
+            artifact_data, registry_url=registry_url, source_url=source_url
         )
         cursor = encode_cursor(artifact_data.id)
         edges.append(ArtifactEdge(node=artifact, cursor=cursor))
@@ -227,16 +225,17 @@ async def fetch_artifact(
         )
     )
 
-    registry_meta_loader = DataLoader(
-        apartial(ArtifactRegistryMeta.load_by_id, info.context),
+    data_loaders = info.context.data_loaders
+    registry_url = await get_registry_url(
+        data_loaders, action_result.result.registry_id, action_result.result.registry_type
+    )
+    source_url = await get_registry_url(
+        data_loaders,
+        action_result.result.source_registry_id,
+        action_result.result.source_registry_type,
     )
 
-    registry_data = await registry_meta_loader.load(action_result.result.registry_id)
-    source_registry_data = await registry_meta_loader.load(action_result.result.source_registry_id)
-
-    return Artifact.from_dataclass(
-        action_result.result, registry_data.url, source_registry_data.url
-    )
+    return Artifact.from_dataclass(action_result.result, registry_url, source_url)
 
 
 async def fetch_artifact_revision(

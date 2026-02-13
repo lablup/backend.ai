@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from functools import partial
 from typing import Any, Self
 
 import strawberry
 from strawberry import ID
-from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
@@ -52,9 +50,6 @@ class ArtifactRegistryMeta(Node):
     async def load_by_id(
         cls, ctx: StrawberryGQLContext, registry_ids: Sequence[uuid.UUID]
     ) -> list[Self]:
-        from ai.backend.manager.api.gql.huggingface_registry import HuggingFaceRegistry
-        from ai.backend.manager.api.gql.reservoir_registry import ReservoirRegistry
-
         # Get all registry metas in a single batch query
         registry_metas_action = (
             await ctx.processors.artifact_registry.get_registry_metas.wait_for_complete(
@@ -72,18 +67,22 @@ class ArtifactRegistryMeta(Node):
 
             registry_meta = registry_meta_map[registry_id]
             registry_type = registry_meta.type
-            url = None
+            url: str | None = None
 
             match registry_type:
                 case ArtifactRegistryType.HUGGINGFACE:
-                    hf_registry = await DataLoader(
-                        partial(HuggingFaceRegistry.load_by_id, ctx),
-                    ).load(registry_id)
+                    hf_registry = await ctx.data_loaders.huggingface_registry_loader.load(
+                        registry_id
+                    )
+                    if hf_registry is None:
+                        raise ArtifactRegistryNotFoundError
                     url = hf_registry.url
                 case ArtifactRegistryType.RESERVOIR:
-                    reservoir_registry = await DataLoader(
-                        partial(ReservoirRegistry.load_by_id, ctx),
-                    ).load(registry_id)
+                    reservoir_registry = await ctx.data_loaders.reservoir_registry_loader.load(
+                        registry_id
+                    )
+                    if reservoir_registry is None:
+                        raise ArtifactRegistryNotFoundError
                     url = reservoir_registry.endpoint
 
             registries.append(cls.from_dataclass(registry_meta, url=url))
