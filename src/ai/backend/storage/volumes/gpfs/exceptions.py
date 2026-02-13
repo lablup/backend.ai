@@ -9,15 +9,19 @@ from ai.backend.common.exception import (
 )
 
 
-class GPFSError(Exception):
+class GPFSError(BackendAIError):
     """Base error for GPFS-related errors."""
 
 
-class GPFSInitError(GPFSError):
-    pass
+class GPFSInitError(GPFSError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/gpfs-init-error"
+    error_title = "GPFS initialization failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(ErrorDomain.STORAGE, ErrorOperation.SETUP, ErrorDetail.NOT_READY)
 
 
-class GPFSAPIError(GPFSError, BackendAIError):
+class GPFSAPIError(GPFSError):
     error_type = "https://api.backend.ai/probs/gpfs-api-error"
     error_title = "GPFS API error."
 
@@ -73,13 +77,25 @@ class GPFSInternalError(GPFSAPIError, web.HTTPInternalServerError):
         return ErrorCode(ErrorDomain.STORAGE, ErrorOperation.REQUEST, ErrorDetail.INTERNAL_ERROR)
 
 
-class GPFSNoMetricError(GPFSError):
-    pass
+class GPFSNoMetricError(GPFSError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/gpfs-no-metric"
+    error_title = "GPFS metric not available."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(ErrorDomain.STORAGE, ErrorOperation.READ, ErrorDetail.NOT_FOUND)
 
 
-class GPFSJobFailedError(GPFSError):
-    pass
+class GPFSJobFailedError(GPFSError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/gpfs-job-failed"
+    error_title = "GPFS job failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(ErrorDomain.STORAGE, ErrorOperation.EXECUTE, ErrorDetail.INTERNAL_ERROR)
 
 
-class GPFSJobCancelledError(GPFSError):
-    pass
+class GPFSJobCancelledError(GPFSError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/gpfs-job-cancelled"
+    error_title = "GPFS job was cancelled."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(ErrorDomain.STORAGE, ErrorOperation.EXECUTE, ErrorDetail.CANCELED)
