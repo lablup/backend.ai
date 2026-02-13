@@ -2161,9 +2161,28 @@
         "title": "ServeInfoModel",
         "type": "object"
       },
-      "SearchServicesRequestModel": {
+      "ServiceFilterModel": {
         "properties": {
           "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by service name."
+          }
+        },
+        "title": "ServiceFilterModel",
+        "type": "object"
+      },
+      "StringFilter": {
+        "description": "Comprehensive string field filter supporting multiple match operations.\n\nProvides flexible string matching with four operation types (equals, contains,\nstarts_with, ends_with), each available in case-sensitive, case-insensitive,\nand negated variants for complete filtering control.",
+        "properties": {
+          "equals": {
             "anyOf": [
               {
                 "type": "string"
@@ -2173,7 +2192,220 @@
               }
             ],
             "default": null,
-            "title": "Name"
+            "description": "Exact match (case-sensitive)",
+            "title": "Equals"
+          },
+          "contains": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Contains (case-sensitive)",
+            "title": "Contains"
+          },
+          "starts_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Starts with (case-sensitive)",
+            "title": "Starts With"
+          },
+          "ends_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Ends with (case-sensitive)",
+            "title": "Ends With"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not equals (case-sensitive)",
+            "title": "Not Equals"
+          },
+          "not_contains": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not contains (case-sensitive)",
+            "title": "Not Contains"
+          },
+          "not_starts_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not starts with (case-sensitive)",
+            "title": "Not Starts With"
+          },
+          "not_ends_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not ends with (case-sensitive)",
+            "title": "Not Ends With"
+          },
+          "i_equals": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match (case-insensitive)",
+            "title": "I Equals"
+          },
+          "i_contains": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Contains (case-insensitive)",
+            "title": "I Contains"
+          },
+          "i_starts_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Starts with (case-insensitive)",
+            "title": "I Starts With"
+          },
+          "i_ends_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Ends with (case-insensitive)",
+            "title": "I Ends With"
+          },
+          "i_not_equals": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not equals (case-insensitive)",
+            "title": "I Not Equals"
+          },
+          "i_not_contains": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not contains (case-insensitive)",
+            "title": "I Not Contains"
+          },
+          "i_not_starts_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not starts with (case-insensitive)",
+            "title": "I Not Starts With"
+          },
+          "i_not_ends_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not ends with (case-insensitive)",
+            "title": "I Not Ends With"
+          }
+        },
+        "title": "StringFilter",
+        "type": "object"
+      },
+      "SearchServicesRequestModel": {
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceFilterModel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "offset": {
             "default": 0,
@@ -2285,6 +2517,11 @@
             "title": "Resource Slots",
             "type": "object"
           },
+          "resource_group": {
+            "description": "Name of the resource group for inference sessions.",
+            "title": "Resource Group",
+            "type": "string"
+          },
           "open_to_public": {
             "description": "Whether the endpoint is publicly accessible.",
             "title": "Open To Public",
@@ -2298,6 +2535,7 @@
           "replicas",
           "active_route_count",
           "resource_slots",
+          "resource_group",
           "open_to_public"
         ],
         "title": "ServiceSearchItemModel",
@@ -3195,221 +3433,6 @@
         ],
         "title": "OrderDirection",
         "type": "string"
-      },
-      "StringFilter": {
-        "description": "Comprehensive string field filter supporting multiple match operations.\n\nProvides flexible string matching with four operation types (equals, contains,\nstarts_with, ends_with), each available in case-sensitive, case-insensitive,\nand negated variants for complete filtering control.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact match (case-sensitive)",
-            "title": "Equals"
-          },
-          "contains": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Contains (case-sensitive)",
-            "title": "Contains"
-          },
-          "starts_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Starts with (case-sensitive)",
-            "title": "Starts With"
-          },
-          "ends_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Ends with (case-sensitive)",
-            "title": "Ends With"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not equals (case-sensitive)",
-            "title": "Not Equals"
-          },
-          "not_contains": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not contains (case-sensitive)",
-            "title": "Not Contains"
-          },
-          "not_starts_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not starts with (case-sensitive)",
-            "title": "Not Starts With"
-          },
-          "not_ends_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not ends with (case-sensitive)",
-            "title": "Not Ends With"
-          },
-          "i_equals": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact match (case-insensitive)",
-            "title": "I Equals"
-          },
-          "i_contains": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Contains (case-insensitive)",
-            "title": "I Contains"
-          },
-          "i_starts_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Starts with (case-insensitive)",
-            "title": "I Starts With"
-          },
-          "i_ends_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Ends with (case-insensitive)",
-            "title": "I Ends With"
-          },
-          "i_not_equals": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not equals (case-insensitive)",
-            "title": "I Not Equals"
-          },
-          "i_not_contains": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not contains (case-insensitive)",
-            "title": "I Not Contains"
-          },
-          "i_not_starts_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not starts with (case-insensitive)",
-            "title": "I Not Starts With"
-          },
-          "i_not_ends_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not ends with (case-insensitive)",
-            "title": "I Not Ends With"
-          }
-        },
-        "title": "StringFilter",
-        "type": "object"
       },
       "SearchNotificationChannelsRequest": {
         "description": "Request body for searching notification channels with filters, orders, and pagination.",
