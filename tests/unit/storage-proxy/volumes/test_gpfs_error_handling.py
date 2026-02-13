@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
 import pytest
+from pytest import FixtureRequest
 
 from ai.backend.storage.errors import ExternalStorageServiceError
 from ai.backend.storage.volumes.gpfs.exceptions import (
@@ -36,34 +37,32 @@ class StatusErrorCase:
     expected_exc: type[Exception]
 
 
-@pytest.fixture
-def response_case(request: pytest.FixtureRequest) -> ResponseSpec:
-    """Parametrized response specification."""
-    return cast(ResponseSpec, request.param)
-
-
-@pytest.fixture
-async def mock_response(response_case: ResponseSpec) -> MagicMock:
-    """Create a mock aiohttp.ClientResponse from response_case."""
-    response = MagicMock(spec=aiohttp.ClientResponse)
-    response.status = response_case.status
-    if response_case.body is not None:
-        response.json = AsyncMock(return_value=response_case.body)
-    else:
-        response.json = AsyncMock(side_effect=aiohttp.ContentTypeError(MagicMock(), MagicMock()))
-    return response
-
-
 class TestBaseResponseHandler:
     """Tests for base_response_handler HTTP status code handling."""
 
-    @pytest.mark.asyncio
+    @pytest.fixture
+    def response_case(self, request: FixtureRequest) -> ResponseSpec:
+        """Parametrized response specification."""
+        return cast(ResponseSpec, request.param)
+
+    @pytest.fixture
+    async def mock_response(self, response_case: ResponseSpec) -> MagicMock:
+        """Create a mock aiohttp.ClientResponse from response_case."""
+        response = MagicMock(spec=aiohttp.ClientResponse)
+        response.status = response_case.status
+        if response_case.body is not None:
+            response.json = AsyncMock(return_value=response_case.body)
+        else:
+            response.json = AsyncMock(
+                side_effect=aiohttp.ContentTypeError(MagicMock(), MagicMock())
+            )
+        return response
+
     @pytest.mark.parametrize("response_case", [ResponseSpec(status=200, body=None)], indirect=True)
     async def test_2xx_returns_response(self, mock_response: MagicMock) -> None:
         result = await base_response_handler(mock_response)
         assert result is mock_response
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "response_case",
         [
@@ -95,7 +94,6 @@ class TestBaseResponseHandler:
         with pytest.raises(response_case.expected_exc):
             await base_response_handler(mock_response)
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "response_case",
         [ResponseSpec(401, {"status": {"code": 401, "message": "Invalid token"}})],
@@ -106,7 +104,6 @@ class TestBaseResponseHandler:
             await base_response_handler(mock_response)
         assert "Invalid token" in str(exc_info.value)
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("response_case", [ResponseSpec(401)], indirect=True)
     async def test_non_json_error_body_handled_gracefully(self, mock_response: MagicMock) -> None:
         with pytest.raises(GPFSUnauthorizedError) as exc_info:
