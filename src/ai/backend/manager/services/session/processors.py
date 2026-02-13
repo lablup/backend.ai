@@ -99,6 +99,10 @@ from ai.backend.manager.services.session.actions.restart_session import (
     RestartSessionAction,
     RestartSessionActionResult,
 )
+from ai.backend.manager.services.session.actions.search import (
+    SearchSessionsAction,
+    SearchSessionsActionResult,
+)
 from ai.backend.manager.services.session.actions.search_kernel import (
     SearchKernelsAction,
     SearchKernelsActionResult,
@@ -152,6 +156,7 @@ class SessionProcessors(AbstractProcessorPackage):
     rename_session: ActionProcessor[RenameSessionAction, RenameSessionActionResult]
     restart_session: ActionProcessor[RestartSessionAction, RestartSessionActionResult]
     search_kernels: ActionProcessor[SearchKernelsAction, SearchKernelsActionResult]
+    search_sessions: ActionProcessor[SearchSessionsAction, SearchSessionsActionResult]
     shutdown_service: ActionProcessor[ShutdownServiceAction, ShutdownServiceActionResult]
     start_service: ActionProcessor[StartServiceAction, StartServiceActionResult]
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
@@ -188,6 +193,7 @@ class SessionProcessors(AbstractProcessorPackage):
         self.rename_session = ActionProcessor(service.rename_session, action_monitors)
         self.restart_session = ActionProcessor(service.restart_session, action_monitors)
         self.search_kernels = ActionProcessor(service.search_kernels, action_monitors)
+        self.search_sessions = ActionProcessor(service.search, action_monitors)
         self.shutdown_service = ActionProcessor(service.shutdown_service, action_monitors)
         self.start_service = ActionProcessor(service.start_service, action_monitors)
         self.upload_files = ActionProcessor(service.upload_files, action_monitors)
@@ -222,6 +228,7 @@ class SessionProcessors(AbstractProcessorPackage):
             RenameSessionAction.spec(),
             RestartSessionAction.spec(),
             SearchKernelsAction.spec(),
+            SearchSessionsAction.spec(),
             ShutdownServiceAction.spec(),
             StartServiceAction.spec(),
             UploadFilesAction.spec(),

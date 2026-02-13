@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.gql.base import UUIDEqualMatchSpec, UUIDInMatchSpec
+    from ai.backend.manager.api.gql.base import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
     from ai.backend.manager.api.gql.kernel.types import KernelStatusInMatchSpec
 
 from ai.backend.common.types import KernelId, SessionId
@@ -48,6 +48,58 @@ class SessionConditions:
     def by_scaling_group(scaling_group: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return SessionRow.scaling_group_name == scaling_group
+
+        return inner
+
+    @staticmethod
+    def by_scaling_group_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = SessionRow.scaling_group_name.ilike(f"%{spec.value}%")
+            else:
+                condition = SessionRow.scaling_group_name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_scaling_group_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(SessionRow.scaling_group_name) == spec.value.lower()
+            else:
+                condition = SessionRow.scaling_group_name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_scaling_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = SessionRow.scaling_group_name.ilike(f"{spec.value}%")
+            else:
+                condition = SessionRow.scaling_group_name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_scaling_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = SessionRow.scaling_group_name.ilike(f"%{spec.value}")
+            else:
+                condition = SessionRow.scaling_group_name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
