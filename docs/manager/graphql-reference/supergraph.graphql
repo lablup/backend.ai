@@ -7444,22 +7444,31 @@ type Mutation
   """
   Added in 26.2.0.
   
-  Mark an image as deleted by its ID.
+  Mark an image as deleted by its ID. (superadmin only)
   
   The image is not removed from the database but its status changes to DELETED.
   This is a soft delete operation.
   """
-  forgetImage(input: ForgetImageInputGQL!): ForgetImageResult! @join__field(graph: STRAWBERRY)
+  adminForgetImage(input: ForgetImageInputGQL!): ForgetImageResult! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0.
   
-  Completely purge an image by its ID.
+  Completely purge an image by its ID. (superadmin only)
   
   The image is permanently removed from the database. Optionally, the image
   can also be untagged from the container registry (HarborV2 only).
   """
-  purgeImage(input: PurgeImageInputGQL!): PurgeImageResult! @join__field(graph: STRAWBERRY)
+  adminPurgeImage(input: PurgeImageInputGQL!): PurgeImageResult! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Untag an image from its container registry by its ID. (superadmin only)
+  
+  This removes the image tag from the registry. Only available for HarborV2 registries.
+  """
+  adminUntagImageFromRegistry(input: UntagImageFromRegistryInputGQL!): UntagImageFromRegistryResult! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0.
@@ -7469,14 +7478,14 @@ type Mutation
   An alias is an alternative name that can be used to reference the image.
   Multiple aliases can be created for the same image.
   """
-  aliasImage(input: AliasImageInputGQL!): AliasImageResult! @join__field(graph: STRAWBERRY)
+  adminAliasImage(input: AliasImageInputGQL!): AliasImageResult! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0.
   
   Remove an alias from an image.
   """
-  dealiasImage(input: DealiasImageInputGQL!): DealiasImageResult! @join__field(graph: STRAWBERRY)
+  adminDealiasImage(input: DealiasImageInputGQL!): DealiasImageResult! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0.
@@ -7486,7 +7495,7 @@ type Mutation
   This removes any user-defined resource limits and reverts to the defaults
   specified in the image labels.
   """
-  clearImageResourceLimit(input: ClearImageResourceLimitInputGQL!): ClearImageResourceLimitResult! @join__field(graph: STRAWBERRY)
+  adminClearImageResourceLimit(input: ClearImageResourceLimitInputGQL!): ClearImageResourceLimitResult! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0.
@@ -7495,16 +7504,7 @@ type Mutation
   
   This allows overriding the default resource limits specified in the image labels.
   """
-  setImageResourceLimit(input: SetImageResourceLimitInputGQL!): SetImageResourceLimitResult! @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 26.2.0.
-  
-  Untag an image from its container registry by its ID.
-  
-  This removes the image tag from the registry. Only available for HarborV2 registries.
-  """
-  untagImageFromRegistry(input: UntagImageFromRegistryInputGQL!): UntagImageFromRegistryResult! @join__field(graph: STRAWBERRY)
+  adminSetImageResourceLimit(input: SetImageResourceLimitInputGQL!): SetImageResourceLimitResult! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0.
@@ -7514,7 +7514,36 @@ type Mutation
   This allows updating various image metadata such as labels, resource limits,
   and supported accelerators.
   """
-  modifyImage(input: ModifyImageInputGQL!): ModifyImageResult! @join__field(graph: STRAWBERRY)
+  adminModifyImage(input: ModifyImageInputGQL!): ModifyImageResult! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Mark an image as deleted by its ID.
+  
+  The image is not removed from the database but its status changes to DELETED.
+  This is a soft delete operation.
+  """
+  userForgetImage(input: ForgetImageInputGQL!): ForgetImageResult! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Completely purge an image by its ID.
+  
+  The image is permanently removed from the database. Optionally, the image
+  can also be untagged from the container registry (HarborV2 only).
+  """
+  userPurgeImage(input: PurgeImageInputGQL!): PurgeImageResult! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Untag an image from its container registry by its ID.
+  
+  This removes the image tag from the registry. Only available for HarborV2 registries.
+  """
+  userUntagImageFromRegistry(input: UntagImageFromRegistryInputGQL!): UntagImageFromRegistryResult! @join__field(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0."""

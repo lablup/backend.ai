@@ -3913,22 +3913,31 @@ type Mutation {
   """
   Added in 26.2.0.
   
-  Mark an image as deleted by its ID.
+  Mark an image as deleted by its ID. (superadmin only)
   
   The image is not removed from the database but its status changes to DELETED.
   This is a soft delete operation.
   """
-  forgetImage(input: ForgetImageInputGQL!): ForgetImageResult!
+  adminForgetImage(input: ForgetImageInputGQL!): ForgetImageResult!
 
   """
   Added in 26.2.0.
   
-  Completely purge an image by its ID.
+  Completely purge an image by its ID. (superadmin only)
   
   The image is permanently removed from the database. Optionally, the image
   can also be untagged from the container registry (HarborV2 only).
   """
-  purgeImage(input: PurgeImageInputGQL!): PurgeImageResult!
+  adminPurgeImage(input: PurgeImageInputGQL!): PurgeImageResult!
+
+  """
+  Added in 26.2.0.
+  
+  Untag an image from its container registry by its ID. (superadmin only)
+  
+  This removes the image tag from the registry. Only available for HarborV2 registries.
+  """
+  adminUntagImageFromRegistry(input: UntagImageFromRegistryInputGQL!): UntagImageFromRegistryResult!
 
   """
   Added in 26.2.0.
@@ -3938,14 +3947,14 @@ type Mutation {
   An alias is an alternative name that can be used to reference the image.
   Multiple aliases can be created for the same image.
   """
-  aliasImage(input: AliasImageInputGQL!): AliasImageResult!
+  adminAliasImage(input: AliasImageInputGQL!): AliasImageResult!
 
   """
   Added in 26.2.0.
   
   Remove an alias from an image.
   """
-  dealiasImage(input: DealiasImageInputGQL!): DealiasImageResult!
+  adminDealiasImage(input: DealiasImageInputGQL!): DealiasImageResult!
 
   """
   Added in 26.2.0.
@@ -3955,7 +3964,7 @@ type Mutation {
   This removes any user-defined resource limits and reverts to the defaults
   specified in the image labels.
   """
-  clearImageResourceLimit(input: ClearImageResourceLimitInputGQL!): ClearImageResourceLimitResult!
+  adminClearImageResourceLimit(input: ClearImageResourceLimitInputGQL!): ClearImageResourceLimitResult!
 
   """
   Added in 26.2.0.
@@ -3964,16 +3973,7 @@ type Mutation {
   
   This allows overriding the default resource limits specified in the image labels.
   """
-  setImageResourceLimit(input: SetImageResourceLimitInputGQL!): SetImageResourceLimitResult!
-
-  """
-  Added in 26.2.0.
-  
-  Untag an image from its container registry by its ID.
-  
-  This removes the image tag from the registry. Only available for HarborV2 registries.
-  """
-  untagImageFromRegistry(input: UntagImageFromRegistryInputGQL!): UntagImageFromRegistryResult!
+  adminSetImageResourceLimit(input: SetImageResourceLimitInputGQL!): SetImageResourceLimitResult!
 
   """
   Added in 26.2.0.
@@ -3983,7 +3983,36 @@ type Mutation {
   This allows updating various image metadata such as labels, resource limits,
   and supported accelerators.
   """
-  modifyImage(input: ModifyImageInputGQL!): ModifyImageResult!
+  adminModifyImage(input: ModifyImageInputGQL!): ModifyImageResult!
+
+  """
+  Added in 26.2.0.
+  
+  Mark an image as deleted by its ID.
+  
+  The image is not removed from the database but its status changes to DELETED.
+  This is a soft delete operation.
+  """
+  userForgetImage(input: ForgetImageInputGQL!): ForgetImageResult!
+
+  """
+  Added in 26.2.0.
+  
+  Completely purge an image by its ID.
+  
+  The image is permanently removed from the database. Optionally, the image
+  can also be untagged from the container registry (HarborV2 only).
+  """
+  userPurgeImage(input: PurgeImageInputGQL!): PurgeImageResult!
+
+  """
+  Added in 26.2.0.
+  
+  Untag an image from its container registry by its ID.
+  
+  This removes the image tag from the registry. Only available for HarborV2 registries.
+  """
+  userUntagImageFromRegistry(input: UntagImageFromRegistryInputGQL!): UntagImageFromRegistryResult!
 }
 
 """An object with a Globally Unique ID"""

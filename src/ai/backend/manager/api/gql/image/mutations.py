@@ -12,10 +12,12 @@ from uuid import UUID
 import strawberry
 from strawberry import ID, Info
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql.utils import dedent_strip
+from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
 from ai.backend.manager.data.image.types import ImageType, ResourceLimitInput
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageByIdAction,
@@ -417,16 +419,17 @@ class ModifyImageResultGQL:
     description=dedent_strip("""
     Added in 26.2.0.
 
-    Mark an image as deleted by its ID.
+    Mark an image as deleted by its ID. (superadmin only)
 
     The image is not removed from the database but its status changes to DELETED.
     This is a soft delete operation.
     """)
 )  # type: ignore[misc]
-async def forget_image(
+async def admin_forget_image(
     input: ForgetImageInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> ForgetImageResultGQL:
+    check_admin_only()
     ctx = info.context
 
     result = await ctx.processors.image.forget_image_by_id.wait_for_complete(
@@ -440,16 +443,75 @@ async def forget_image(
     description=dedent_strip("""
     Added in 26.2.0.
 
+    Mark an image as deleted by its ID.
+
+    The image is not removed from the database but its status changes to DELETED.
+    This is a soft delete operation.
+    """)
+)  # type: ignore[misc]
+async def user_forget_image(
+    input: ForgetImageInputGQL,
+    info: Info[StrawberryGQLContext],
+) -> ForgetImageResultGQL:
+    me = current_user()
+    if me is None:
+        raise InsufficientPrivilege("Authentication required")
+    ctx = info.context
+
+    result = await ctx.processors.image.forget_image_by_id.wait_for_complete(
+        ForgetImageByIdAction(image_id=ImageID(UUID(input.image_id)))
+    )
+
+    return ForgetImageResultGQL(image=ImageV2GQL.from_data(result.image))
+
+
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 26.2.0.
+
+    Completely purge an image by its ID. (superadmin only)
+
+    The image is permanently removed from the database. Optionally, the image
+    can also be untagged from the container registry (HarborV2 only).
+    """)
+)  # type: ignore[misc]
+async def admin_purge_image(
+    input: PurgeImageInputGQL,
+    info: Info[StrawberryGQLContext],
+) -> PurgeImageResultGQL:
+    check_admin_only()
+    ctx = info.context
+    image_uuid = UUID(input.image_id)
+
+    result = await ctx.processors.image.purge_image_by_id.wait_for_complete(
+        PurgeImageByIdAction(image_id=ImageID(image_uuid))
+    )
+
+    if input.options and input.options.remove_from_registry:
+        await ctx.processors.image.untag_image_from_registry.wait_for_complete(
+            UntagImageFromRegistryAction(image_id=ImageID(image_uuid))
+        )
+
+    return PurgeImageResultGQL(image=ImageV2GQL.from_data(result.image))
+
+
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 26.2.0.
+
     Completely purge an image by its ID.
 
     The image is permanently removed from the database. Optionally, the image
     can also be untagged from the container registry (HarborV2 only).
     """)
 )  # type: ignore[misc]
-async def purge_image(
+async def user_purge_image(
     input: PurgeImageInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> PurgeImageResultGQL:
+    me = current_user()
+    if me is None:
+        raise InsufficientPrivilege("Authentication required")
     ctx = info.context
     image_uuid = UUID(input.image_id)
 
@@ -475,10 +537,11 @@ async def purge_image(
     Multiple aliases can be created for the same image.
     """)
 )  # type: ignore[misc]
-async def alias_image(
+async def admin_alias_image(
     input: AliasImageInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> AliasImageResultGQL:
+    check_admin_only()
     ctx = info.context
 
     result = await ctx.processors.image.alias_image_by_id.wait_for_complete(
@@ -501,10 +564,11 @@ async def alias_image(
     Remove an alias from an image.
     """)
 )  # type: ignore[misc]
-async def dealias_image(
+async def admin_dealias_image(
     input: DealiasImageInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> DealiasImageResultGQL:
+    check_admin_only()
     ctx = info.context
 
     result = await ctx.processors.image.dealias_image.wait_for_complete(
@@ -527,10 +591,11 @@ async def dealias_image(
     specified in the image labels.
     """)
 )  # type: ignore[misc]
-async def clear_image_resource_limit(
+async def admin_clear_image_resource_limit(
     input: ClearImageResourceLimitInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> ClearImageResourceLimitResultGQL:
+    check_admin_only()
     ctx = info.context
 
     result = await ctx.processors.image.clear_image_custom_resource_limit_by_id.wait_for_complete(
@@ -544,15 +609,41 @@ async def clear_image_resource_limit(
     description=dedent_strip("""
     Added in 26.2.0.
 
+    Untag an image from its container registry by its ID. (superadmin only)
+
+    This removes the image tag from the registry. Only available for HarborV2 registries.
+    """)
+)  # type: ignore[misc]
+async def admin_untag_image_from_registry(
+    input: UntagImageFromRegistryInputGQL,
+    info: Info[StrawberryGQLContext],
+) -> UntagImageFromRegistryResultGQL:
+    check_admin_only()
+    ctx = info.context
+
+    result = await ctx.processors.image.untag_image_from_registry.wait_for_complete(
+        UntagImageFromRegistryAction(image_id=ImageID(UUID(input.image_id)))
+    )
+
+    return UntagImageFromRegistryResultGQL(image=ImageV2GQL.from_data(result.image))
+
+
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 26.2.0.
+
     Untag an image from its container registry by its ID.
 
     This removes the image tag from the registry. Only available for HarborV2 registries.
     """)
 )  # type: ignore[misc]
-async def untag_image_from_registry(
+async def user_untag_image_from_registry(
     input: UntagImageFromRegistryInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> UntagImageFromRegistryResultGQL:
+    me = current_user()
+    if me is None:
+        raise InsufficientPrivilege("Authentication required")
     ctx = info.context
 
     result = await ctx.processors.image.untag_image_from_registry.wait_for_complete(
@@ -571,10 +662,11 @@ async def untag_image_from_registry(
     This allows overriding the default resource limits specified in the image labels.
     """)
 )  # type: ignore[misc]
-async def set_image_resource_limit(
+async def admin_set_image_resource_limit(
     input: SetImageResourceLimitInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> SetImageResourceLimitResultGQL:
+    check_admin_only()
     ctx = info.context
 
     resource_limit = ResourceLimitInput(
@@ -607,10 +699,11 @@ async def set_image_resource_limit(
     and supported accelerators.
     """)
 )  # type: ignore[misc]
-async def modify_image(
+async def admin_modify_image(
     input: ModifyImageInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> ModifyImageResultGQL:
+    check_admin_only()
     ctx = info.context
 
     result = await ctx.processors.image.modify_image_by_id.wait_for_complete(

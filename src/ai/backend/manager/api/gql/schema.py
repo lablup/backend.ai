@@ -117,20 +117,23 @@ from .huggingface_registry import (
     update_huggingface_registry,
 )
 from .image import (
+    admin_alias_image,
+    admin_clear_image_resource_limit,
+    admin_dealias_image,
+    admin_forget_image,
     admin_image_aliases,
     admin_images_v2,
-    alias_image,
-    clear_image_resource_limit,
+    admin_modify_image,
+    admin_purge_image,
+    admin_set_image_resource_limit,
+    admin_untag_image_from_registry,
     container_registry_images_v2,
-    dealias_image,
-    forget_image,
     image_alias,
     image_scoped_aliases,
     image_v2,
-    modify_image,
-    purge_image,
-    set_image_resource_limit,
-    untag_image_from_registry,
+    user_forget_image,
+    user_purge_image,
+    user_untag_image_from_registry,
 )
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
 from .notification import (
@@ -451,15 +454,19 @@ class Mutation:
     admin_delete_users = admin_delete_users
     admin_purge_user = admin_purge_user
     admin_purge_users = admin_purge_users
-    # Image
-    forget_image = forget_image
-    purge_image = purge_image
-    alias_image = alias_image
-    dealias_image = dealias_image
-    clear_image_resource_limit = clear_image_resource_limit
-    set_image_resource_limit = set_image_resource_limit
-    untag_image_from_registry = untag_image_from_registry
-    modify_image = modify_image
+    # Image - Admin APIs
+    admin_forget_image = admin_forget_image
+    admin_purge_image = admin_purge_image
+    admin_untag_image_from_registry = admin_untag_image_from_registry
+    admin_alias_image = admin_alias_image
+    admin_dealias_image = admin_dealias_image
+    admin_clear_image_resource_limit = admin_clear_image_resource_limit
+    admin_set_image_resource_limit = admin_set_image_resource_limit
+    admin_modify_image = admin_modify_image
+    # Image - User APIs
+    user_forget_image = user_forget_image
+    user_purge_image = user_purge_image
+    user_untag_image_from_registry = user_untag_image_from_registry
 
 
 @strawberry.type
