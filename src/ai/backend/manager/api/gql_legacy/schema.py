@@ -14,7 +14,9 @@ import graphene_federation
 import sqlalchemy as sa
 from graphene.types.inputobjecttype import set_input_object_type_default_value
 from graphql import GraphQLError, OperationType, Undefined
-from graphql.type import GraphQLField
+from graphql.type import GraphQLField, get_named_type, is_leaf_type
+from opentelemetry import trace
+from opentelemetry.trace import StatusCode
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
@@ -3351,6 +3353,8 @@ class GQLMetricMiddleware:
     def resolve(
         self, next: Callable[..., Any], root: Any, info: graphene.ResolveInfo, **args: Any
     ) -> Any:
+        if is_leaf_type(get_named_type(info.return_type)):
+            return next(root, info, **args)
         graph_ctx: GraphQueryContext = info.context
         operation_type = info.operation.operation
         field_name = info.field_name
@@ -3358,6 +3362,25 @@ class GQLMetricMiddleware:
         operation_name = (
             info.operation.name.value if info.operation.name is not None else "anonymous"
         )
+
+        tracer = trace.get_tracer(__name__)
+        span = tracer.start_span(
+            f"gql.{operation_name}.{field_name}",
+            attributes={
+                "graphql.operation_name": operation_name,
+                "graphql.field_name": field_name,
+                "graphql.parent_type": parent_type,
+            },
+        )
+
+        def _set_span(*, error: BaseException | None = None, end_span: bool = False) -> None:
+            if error is not None:
+                span.record_exception(error)
+                span.set_status(StatusCode.ERROR, str(error))
+            else:
+                span.set_status(StatusCode.OK)
+            if end_span:
+                span.end()
 
         def _observe(*, duration: float, error: BaseException | None = None) -> None:
             match error:
@@ -3378,25 +3401,41 @@ class GQLMetricMiddleware:
             )
 
         async def _observe_coroutine(coro: Awaitable[Any]) -> Any:
+            with trace.use_span(
+                span,
+                end_on_exit=True,
+                record_exception=False,
+                set_status_on_exception=False,
+            ):
+                start = time.perf_counter()
+                try:
+                    result = await coro
+                    _set_span()
+                    _observe(duration=time.perf_counter() - start)
+                except BaseException as e:
+                    _set_span(error=e)
+                    _observe(duration=time.perf_counter() - start, error=e)
+                    raise
+                return result
+
+        with trace.use_span(
+            span,
+            end_on_exit=False,
+            record_exception=False,
+            set_status_on_exception=False,
+        ):
             start = time.perf_counter()
             try:
-                result = await coro
+                res = next(root, info, **args)
+                if asyncio.iscoroutine(res):
+                    return _observe_coroutine(res)
+                _set_span(end_span=True)
                 _observe(duration=time.perf_counter() - start)
             except BaseException as e:
+                _set_span(error=e, end_span=True)
                 _observe(duration=time.perf_counter() - start, error=e)
                 raise
-            return result
-
-        start = time.perf_counter()
-        try:
-            res = next(root, info, **args)
-            if asyncio.iscoroutine(res):
-                return _observe_coroutine(res)
-            _observe(duration=time.perf_counter() - start)
-        except BaseException as e:
-            _observe(duration=time.perf_counter() - start, error=e)
-            raise
-        return res
+            return res
 
 
 graphene_schema = graphene_federation.build_schema(
