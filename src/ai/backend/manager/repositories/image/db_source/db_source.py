@@ -446,28 +446,6 @@ class ImageDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def query_aliases_by_image_ids(self, image_ids: list[UUID]) -> dict[UUID, list[str]]:
-        """
-        Queries image aliases by image IDs.
-        Returns a dictionary mapping image ID to list of alias strings.
-        """
-        if not image_ids:
-            return {}
-
-        query = sa.select(ImageAliasRow).where(ImageAliasRow.image_id.in_(image_ids))
-
-        async with self._db.begin_readonly_session() as session:
-            result = await session.execute(query)
-            alias_rows = result.scalars().all()
-
-        # Group aliases by image_id
-        aliases_map: dict[UUID, list[str]] = {image_id: [] for image_id in image_ids}
-        for alias_row in alias_rows:
-            if alias_row.alias is not None:
-                aliases_map[alias_row.image_id].append(alias_row.alias)
-
-        return aliases_map
-
     async def rescan_images(
         self,
         registry_or_image: str | None = None,

@@ -325,14 +325,6 @@ class ImageRepository:
         return await self._db_source.search_aliases(querier)
 
     @image_repository_resilience.apply()
-    async def get_aliases_by_image_ids(self, image_ids: list[UUID]) -> dict[UUID, list[str]]:
-        """
-        Retrieves aliases for multiple images by their IDs.
-        Returns a dictionary mapping image ID to list of alias strings.
-        """
-        return await self._db_source.query_aliases_by_image_ids(image_ids)
-
-    @image_repository_resilience.apply()
     async def rescan_images(
         self,
         registry_or_image: str | None = None,
