@@ -7804,34 +7804,29 @@
       "AgentFilter": {
         "description": "Filter for agents.",
         "properties": {
-          "statuses": {
+          "status": {
             "anyOf": [
               {
-                "items": {
-                  "$ref": "#/components/schemas/AgentStatusFilter"
-                },
-                "type": "array"
+                "$ref": "#/components/schemas/AgentStatusEnumFilter"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Filter by agent statuses",
-            "title": "Statuses"
+            "description": "Filter by agent status. Supports equals, in, not_equals, and not_in operations."
           },
           "scaling_group": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/StringFilter"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Filter by scaling group",
-            "title": "Scaling Group"
+            "description": "Filter by scaling group name. Supports equals, contains, starts_with, ends_with, and their case-insensitive and negated variants."
           }
         },
         "title": "AgentFilter",
@@ -7866,7 +7861,7 @@
         "title": "AgentOrderField",
         "type": "string"
       },
-      "AgentStatusFilter": {
+      "AgentStatusEnum": {
         "description": "Agent statuses available for filtering.",
         "enum": [
           "ALIVE",
@@ -7874,8 +7869,71 @@
           "RESTARTING",
           "TERMINATED"
         ],
-        "title": "AgentStatusFilter",
+        "title": "AgentStatusEnum",
         "type": "string"
+      },
+      "AgentStatusEnumFilter": {
+        "description": "Filter for agent status enum fields.\n\nSupports equals, in, not_equals, and not_in operations,\nfollowing the Strawberry GQL EnumFilter pattern.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentStatusEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match for agent status."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AgentStatusEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided statuses.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentStatusEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude exact status match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AgentStatusEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided statuses.",
+            "title": "Not In"
+          }
+        },
+        "title": "AgentStatusEnumFilter",
+        "type": "object"
       },
       "SearchAgentsRequest": {
         "description": "Request body for searching agents with filters, orders, and pagination.",
