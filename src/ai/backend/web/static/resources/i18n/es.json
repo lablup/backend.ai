@@ -760,9 +760,12 @@
     "FairShareSettingDescription": "Los cambios no se reflejan de inmediato en los cálculos de Fair Share y pueden tardar aproximadamente 5 minutos debido al ciclo de cálculo.",
     "FairShareSettingTitleWithName": "Configuración de participación justa: {{name}}",
     "FairShareSettingsSuccessfullyUpdated": "La configuración de cuota justa se ha actualizado.",
+    "GoBackToFirstStep": "Ir al primer paso",
     "HalfLifeDays": "Vida media",
     "HalfLifeDaysDescription": "Período durante el cual la ponderación del uso se reduce a la mitad. Si se establece en 7 días, el uso de hace 7 días se calcula al 50% y el de hace 14 días al 25%. Se recomienda establecerlo como un múltiplo de la unidad de decaimiento.",
     "Id": "ID",
+    "InvalidParameterDescription": "No hemos podido encontrar lo que busca. Puede que se haya eliminado o que la dirección sea incorrecta.",
+    "InvalidParameterTitle": "No encontrado",
     "LookbackDays": "Intervalo de observación",
     "LookbackDaysDescription": "El intervalo del historial de uso que se refleja en los cálculos de Fair Share. El uso anterior a este intervalo queda excluido de los cálculos. Se recomienda establecerlo como un múltiplo de la vida media.",
     "Name": "Nombre",
@@ -776,6 +779,8 @@
     "SchedulerDescription": "El planificador Fair Share es un método de planificación que determina la prioridad de ejecución de las sesiones en función del uso histórico de recursos. Asigna mayor prioridad a los usuarios que han consumido menos recursos, garantizando que todos los usuarios puedan acceder a los recursos de forma equitativa a lo largo del tiempo.\n<br /> <br />\nLos administradores pueden configurar pesos a nivel de Dominio, Proyecto y Usuario para asignar más recursos a grupos específicos. La prioridad se expresa mediante un valor entre 0.0 y 1.0, donde los valores más próximos a 1.0 indican mayor prioridad.",
     "SchedulerDoesNotAppliedToResourceGroup": "El planificador Fair Share no está habilitado para el grupo de recursos seleccionado ({{resourceGroup}}). Para usar el planificador, actualice la configuración del grupo de recursos.",
     "TotalUsage": "Uso total",
+    "UnknownErrorDescription": "Se produjo un error inesperado. Por favor, inténtelo de nuevo más tarde.",
+    "UnknownErrorOccurred": "Algo salió mal",
     "UsageHistory": "Historial de uso",
     "User": "Usuario",
     "UserDescription": "El usuario define el peso configurado y el uso acumulado durante el período de agregación. El peso del usuario se utiliza para calcular el coeficiente de prioridad de cada usuario.",
@@ -798,7 +803,6 @@
       "SelectDateRange": "Seleccionar rango de fechas"
     }
   },
-  "fairShrae": {},
   "general": {
     "AccessKey": "Clave de acceso",
     "Active": "Activo",

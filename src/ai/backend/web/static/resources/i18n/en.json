@@ -765,9 +765,12 @@
     "FairShareSettingDescription": "Changes are not immediately reflected in Fair Share calculations and may take approximately 5 minutes due to the calculation cycle.",
     "FairShareSettingTitleWithName": "Fair Share Config: {{name}}",
     "FairShareSettingsSuccessfullyUpdated": "Fair share settings have been updated.",
+    "GoBackToFirstStep": "Go to the first step",
     "HalfLifeDays": "Half Life",
     "HalfLifeDaysDescription": "The period over which the usage reflection rate decreases by half. If set to 7 days, usage from 7 days ago is calculated at 50%, and usage from 14 days ago at 25%. It is recommended to set this as a multiple of the decay unit.",
     "Id": "ID",
+    "InvalidParameterDescription": "We couldn't find what you're looking for. It may have been removed or the address may be incorrect.",
+    "InvalidParameterTitle": "Not Found",
     "LookbackDays": "Lookback",
     "LookbackDaysDescription": "The range of usage history reflected in Fair Share calculations. Usage prior to this period is excluded from calculations. It is recommended to set this as a multiple of half-life.",
     "Name": "Name",
@@ -781,6 +784,8 @@
     "SchedulerDescription": "The Fair Share Scheduler is a scheduling method that determines session execution priority based on historical resource usage. It assigns higher priority to users who have consumed fewer resources, ensuring that all users can access resources fairly over time.\n<br /> <br />\nAdministrators can configure weights at the Domain, Project, and User levels to allocate more resources to specific groups. Priority is expressed as a value between 0.0 and 1.0, where values closer to 1.0 indicate higher priority.",
     "SchedulerDoesNotAppliedToResourceGroup": "The Fair Share Scheduler is not enabled for the selected resource group ({{resourceGroup}}). To use the scheduler, please update the resource group settings.",
     "TotalUsage": "Total Usage",
+    "UnknownErrorDescription": "An unexpected error occurred. Please try again later.",
+    "UnknownErrorOccurred": "Something Went Wrong",
     "UsageHistory": "Usage History",
     "User": "User",
     "UserDescription": "User defines the configured weight and cumulative usage during the aggregation period. The user weight is used to calculate the priority coefficient for individual users. ",
@@ -803,7 +808,6 @@
       "SelectDateRange": "Select Date Range"
     }
   },
-  "fairShrae": {},
   "general": {
     "AccessKey": "Access Key",
     "Active": "Active",

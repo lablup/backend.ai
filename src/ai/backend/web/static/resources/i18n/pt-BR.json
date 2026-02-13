@@ -760,9 +760,12 @@
     "FairShareSettingDescription": "As alterações não são refletidas imediatamente nos cálculos do Fair Share e podem levar cerca de 5 minutos devido ao ciclo de cálculo.",
     "FairShareSettingTitleWithName": "Configuração de Fair Share: {{name}}",
     "FairShareSettingsSuccessfullyUpdated": "As configurações de fair share foram atualizadas.",
+    "GoBackToFirstStep": "Ir para o primeiro passo",
     "HalfLifeDays": "Meia-vida",
     "HalfLifeDaysDescription": "Período em que a taxa de ponderação do uso é reduzida pela metade. Se definido como 7 dias, o uso de 7 dias atrás é calculado como 50% e o de 14 dias atrás como 25%. Recomenda-se definir isso como um múltiplo da unidade de decaimento.",
     "Id": "ID",
+    "InvalidParameterDescription": "Não conseguimos encontrar o que você está procurando. Pode ter sido removido ou o endereço pode estar incorreto.",
+    "InvalidParameterTitle": "Não encontrado",
     "LookbackDays": "Período retroativo",
     "LookbackDaysDescription": "O intervalo do histórico de uso considerado nos cálculos do Fair Share. O uso anterior a esse período é excluído dos cálculos. Recomenda-se definir este período como um múltiplo da meia-vida.",
     "Name": "Nome",
@@ -776,6 +779,8 @@
     "SchedulerDescription": "O Escalonador Fair Share é um método de escalonamento que determina a prioridade de execução das sessões com base no uso histórico de recursos. Ele atribui prioridade mais alta a usuários que consumiram menos recursos, garantindo que todos tenham acesso justo aos recursos ao longo do tempo.\n<br /> <br />\nAdministradores podem configurar pesos nos níveis de Domínio, Projeto e Usuário para alocar mais recursos a grupos específicos. A prioridade é expressa por um valor entre 0,0 e 1,0, onde valores mais próximos de 1,0 indicam prioridade maior.",
     "SchedulerDoesNotAppliedToResourceGroup": "O Agendador Fair Share não está habilitado para o grupo de recursos selecionado ({{resourceGroup}}). Para usar o Agendador, atualize as configurações do grupo de recursos.",
     "TotalUsage": "Uso total",
+    "UnknownErrorDescription": "Ocorreu um erro inesperado. Por favor, tente novamente mais tarde.",
+    "UnknownErrorOccurred": "Algo deu errado",
     "UsageHistory": "Histórico de uso",
     "User": "Usuário",
     "UserDescription": "O usuário define o peso configurado e o uso acumulado durante o período de agregação. O peso do usuário é usado para calcular o coeficiente de prioridade para usuários individuais.",
@@ -798,7 +803,6 @@
       "SelectDateRange": "Selecionar intervalo de datas"
     }
   },
-  "fairShrae": {},
   "general": {
     "AccessKey": "Chave de acesso",
     "Active": "Ativo",

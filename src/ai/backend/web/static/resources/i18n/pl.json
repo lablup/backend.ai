@@ -759,9 +759,12 @@
     "FairShareSettingDescription": "Zmiany nie są od razu uwzględniane w obliczeniach Fair Share; ich zastosowanie może potrwać około 5 minut z powodu cyklu obliczeniowego.",
     "FairShareSettingTitleWithName": "Konfiguracja Fair Share: {{name}}",
     "FairShareSettingsSuccessfullyUpdated": "Ustawienia sprawiedliwego przydziału zostały zaktualizowane.",
+    "GoBackToFirstStep": "Przejdź do pierwszego kroku",
     "HalfLifeDays": "Okres półtrwania",
     "HalfLifeDaysDescription": "Okres, w którym współczynnik odzwierciedlenia użycia zmniejsza się o połowę. Jeśli ustawione na 7 dni, użycie sprzed 7 dni jest liczone jako 50%, a sprzed 14 dni jako 25%. Zaleca się ustawienie tej wartości jako wielokrotności jednostki zaniku.",
     "Id": "Identyfikator",
+    "InvalidParameterDescription": "Nie mogliśmy znaleźć tego, czego szukasz. Może zostało usunięte lub adres jest nieprawidłowy.",
+    "InvalidParameterTitle": "Nie znaleziono",
     "LookbackDays": "Okres wsteczny",
     "LookbackDaysDescription": "Zakres historii użycia uwzględniany w obliczeniach Fair Share. Użycie sprzed tego okresu jest wykluczone z obliczeń. Zaleca się ustawienie tego jako wielokrotności czasu połowicznego zaniku.",
     "Name": "Nazwa",
@@ -775,6 +778,8 @@
     "SchedulerDescription": "Fair Share Scheduler to metoda planowania, która ustala priorytet wykonywania sesji na podstawie historycznego zużycia zasobów. Przyznaje wyższy priorytet użytkownikom, którzy zużyli mniej zasobów, zapewniając sprawiedny dostęp do zasobów dla wszystkich użytkowników w czasie.\n<br /> <br />\nAdministratorzy mogą konfigurować wagi na poziomie domeny, projektu i użytkownika, aby przydzielać więcej zasobów konkretnym grupom. Priorytet jest wyrażany jako wartość między 0.0 a 1.0, gdzie wartości bliższe 1.0 oznaczają wyższy priorytet.",
     "SchedulerDoesNotAppliedToResourceGroup": "Fair Share Scheduler nie jest włączony dla wybranej grupy zasobów ({{resourceGroup}}). Aby z niego korzystać, zaktualizuj ustawienia grupy zasobów.",
     "TotalUsage": "Łączne użycie",
+    "UnknownErrorDescription": "Wystąpił nieoczekiwany błąd. Proszę spróbować ponownie później.",
+    "UnknownErrorOccurred": "Coś poszło nie tak",
     "UsageHistory": "Historia użycia",
     "User": "Użytkownik",
     "UserDescription": "Użytkownik określa wagę oraz skumulowane zużycie w okresie agregacji. Waga użytkownika służy do obliczania współczynnika priorytetu dla poszczególnych użytkowników.",
@@ -797,7 +802,6 @@
       "SelectDateRange": "Wybierz zakres dat"
     }
   },
-  "fairShrae": {},
   "general": {
     "AccessKey": "Klucz dostępu",
     "Active": "Aktywny",
