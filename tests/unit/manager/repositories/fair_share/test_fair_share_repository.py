@@ -283,7 +283,7 @@ class TestFairShareRepository:
         assert result.data.calculation_snapshot.fair_share_factor == Decimal(
             "1.0"
         )  # Default initial value
-        assert result.data.calculation_snapshot.total_decayed_usage == ResourceSlot()
+        assert result.data.calculation_snapshot.total_decayed_usage == []
 
     @pytest.mark.asyncio
     async def test_upsert_domain_fair_share_insert(
