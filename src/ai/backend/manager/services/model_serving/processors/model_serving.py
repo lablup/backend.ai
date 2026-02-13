@@ -47,6 +47,10 @@ from ai.backend.manager.services.model_serving.actions.modify_endpoint import (
     ModifyEndpointAction,
     ModifyEndpointActionResult,
 )
+from ai.backend.manager.services.model_serving.actions.search_services import (
+    SearchServicesAction,
+    SearchServicesActionResult,
+)
 from ai.backend.manager.services.model_serving.actions.update_route import (
     UpdateRouteAction,
     UpdateRouteActionResult,
@@ -71,6 +75,7 @@ class ModelServingProcessors(AbstractProcessorPackage):
     delete_route: ActionProcessor[DeleteRouteAction, DeleteRouteActionResult]
     generate_token: ActionProcessor[GenerateTokenAction, GenerateTokenActionResult]
     modify_endpoint: ActionProcessor[ModifyEndpointAction, ModifyEndpointActionResult]
+    search_services: ActionProcessor[SearchServicesAction, SearchServicesActionResult]
 
     def __init__(
         self,
@@ -91,6 +96,7 @@ class ModelServingProcessors(AbstractProcessorPackage):
         self.delete_route = ActionProcessor(service.delete_route, action_monitors)
         self.generate_token = ActionProcessor(service.generate_token, action_monitors)
         self.modify_endpoint = ActionProcessor(service.modify_endpoint, action_monitors)
+        self.search_services = ActionProcessor(service.search_services, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -107,4 +113,5 @@ class ModelServingProcessors(AbstractProcessorPackage):
             DeleteRouteAction.spec(),
             GenerateTokenAction.spec(),
             ModifyEndpointAction.spec(),
+            SearchServicesAction.spec(),
         ]

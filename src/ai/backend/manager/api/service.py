@@ -87,6 +87,10 @@ from ai.backend.manager.services.model_serving.actions.list_model_service import
 from ai.backend.manager.services.model_serving.actions.scale_service_replicas import (
     ScaleServiceReplicasAction,
 )
+from ai.backend.manager.services.model_serving.actions.search_services import (
+    SearchServicesAction,
+    SearchServicesActionResult,
+)
 from ai.backend.manager.services.model_serving.actions.update_route import UpdateRouteAction
 from ai.backend.manager.types import MountOptionModel, UserScope
 
@@ -187,6 +191,81 @@ async def list_serve(
         )
         for info in result.data
     ]
+
+
+class SearchServicesRequestModel(LegacyBaseRequestModel):
+    name: str | None = Field(default=None)
+    offset: int = Field(default=0, ge=0)
+    limit: int = Field(default=20, ge=1, le=100)
+
+
+class ServiceSearchItemModel(LegacyBaseResponseModel):
+    id: uuid.UUID = Field(description="Service/endpoint UUID.")
+    name: str = Field(description="Service name.")
+    desired_session_count: NonNegativeInt = Field(description="Target replica count.")
+    replicas: NonNegativeInt = Field(description="Target replica count.")
+    active_route_count: NonNegativeInt = Field(
+        description="Number of active routing entries (HEALTHY status)."
+    )
+    service_endpoint: HttpUrl | None = Field(
+        default=None, description="Public URL of the service endpoint (nullable)."
+    )
+    resource_slots: dict[str, Any] = Field(description="Resource allocation per replica.")
+    open_to_public: bool = Field(description="Whether the endpoint is publicly accessible.")
+
+
+class PaginationInfoModel(LegacyBaseResponseModel):
+    total: int = Field(description="Total number of items matching the query.")
+    offset: int = Field(description="Current offset.")
+    limit: int = Field(description="Current limit.")
+
+
+class SearchServicesResponseModel(LegacyBaseResponseModel):
+    items: list[ServiceSearchItemModel]
+    pagination: PaginationInfoModel
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+@pydantic_params_api_handler(SearchServicesRequestModel)
+async def search_services(
+    request: web.Request, params: SearchServicesRequestModel
+) -> SearchServicesResponseModel:
+    root_ctx: RootContext = request.app["_root.context"]
+    access_key = request["keypair"]["access_key"]
+
+    log.info("SERVE.SEARCH (email:{}, ak:{})", request["user"]["email"], access_key)
+
+    action = SearchServicesAction(
+        session_owner_id=request["user"]["uuid"],
+        name=params.name,
+        offset=params.offset,
+        limit=params.limit,
+    )
+    result: SearchServicesActionResult = (
+        await root_ctx.processors.model_serving.search_services.wait_for_complete(action)
+    )
+
+    return SearchServicesResponseModel(
+        items=[
+            ServiceSearchItemModel(
+                id=item.id,
+                name=item.name,
+                desired_session_count=item.replicas,
+                replicas=item.replicas,
+                active_route_count=item.active_route_count,
+                service_endpoint=item.service_endpoint,
+                resource_slots=dict(item.resource_slots),
+                open_to_public=item.open_to_public,
+            )
+            for item in result.items
+        ],
+        pagination=PaginationInfoModel(
+            total=result.total_count,
+            offset=result.offset,
+            limit=result.limit,
+        ),
+    )
 
 
 class RouteInfoModel(BaseFieldModel):
@@ -1067,6 +1146,7 @@ def create_app(
     root_resource = cors.add(app.router.add_resource(r""))
     cors.add(root_resource.add_route("GET", list_serve))
     cors.add(root_resource.add_route("POST", create))
+    cors.add(add_route("POST", "/_/search", search_services))
     cors.add(add_route("POST", "/_/try", try_start))
     cors.add(add_route("GET", "/_/runtimes", list_supported_runtimes))
     cors.add(add_route("GET", "/{service_id}", get_info))

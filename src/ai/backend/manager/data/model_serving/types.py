@@ -35,6 +35,8 @@ __all__ = [
     "EndpointLifecycle",
     "EndpointTokenData",
     "RoutingData",
+    "ServiceSearchItem",
+    "ServiceSearchResult",
 ]
 
 
@@ -234,6 +236,26 @@ class CompactServiceInfo:
     active_route_count: int
     service_endpoint: HttpUrl | None
     is_public: bool
+
+
+@dataclass
+class ServiceSearchItem:
+    id: uuid.UUID
+    name: str
+    replicas: int
+    active_route_count: int
+    service_endpoint: HttpUrl | None
+    open_to_public: bool
+    resource_slots: ResourceSlot
+    routings: Sequence[RoutingData] | None
+
+
+@dataclass
+class ServiceSearchResult:
+    items: list[ServiceSearchItem]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
 
 @dataclass
