@@ -561,6 +561,12 @@ class ModelServingService:
 
         # Enqueue session before starting background task to avoid race conditions
         session_id = await self._scheduling_controller.enqueue_session(session_spec)
+        # dry_run must return DryRunModelServiceActionResult with task_id,
+        # so raise instead of returning None when the scaling group is not accessible.
+        if session_id is None:
+            raise InvalidAPIParameters(
+                f"Scaling group '{session_spec.scaling_group}' is not accessible"
+            )
         session_id_str = str(session_id)
 
         async def _task(reporter: ProgressReporter) -> None:

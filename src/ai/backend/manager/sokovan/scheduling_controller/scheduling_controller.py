@@ -136,7 +136,7 @@ class SchedulingController:
     async def _resolve_scaling_group(
         self,
         session_spec: SessionCreationSpec,
-    ) -> AllowedScalingGroup:
+    ) -> AllowedScalingGroup | None:
         """
         Resolve the scaling group for the session.
 
@@ -147,7 +147,7 @@ class SchedulingController:
             session_spec: Session creation specification
 
         Returns:
-            str: The resolved scaling group name
+            The resolved scaling group, or None if the specified group is not accessible.
         """
         # Fetch allowed groups to determine the scaling group
         allowed_groups = await self._repository.query_allowed_scaling_groups(
@@ -159,9 +159,14 @@ class SchedulingController:
             for sg in allowed_groups:
                 if sg.name == session_spec.scaling_group:
                     return sg
-            raise InvalidAPIParameters(
-                f"Scaling group '{session_spec.scaling_group}' is not accessible"
+            log.warning(
+                "Scaling group '{}' is not accessible for access_key:{}, domain:{}, group:{}",
+                session_spec.scaling_group,
+                session_spec.access_key,
+                session_spec.user_scope.domain_name,
+                session_spec.user_scope.group_id,
             )
+            return None
 
         # Resolve the scaling group
         return self._scaling_group_resolver.resolve(
@@ -172,7 +177,7 @@ class SchedulingController:
     async def enqueue_session(
         self,
         session_spec: SessionCreationSpec,
-    ) -> SessionId:
+    ) -> SessionId | None:
         """
         Enqueue a new session for scheduling.
 
@@ -187,13 +192,16 @@ class SchedulingController:
             session_spec: Session creation specification
 
         Returns:
-            SessionId: The ID of the created session
+            SessionId of the created session, or None if the scaling group could not be resolved.
         """
         # Phase 1: Resolve scaling group
         with self._metric_observer.measure_phase(
             "scheduling_controller", "", "resolve_scaling_group"
         ):
             validated_scaling_group = await self._resolve_scaling_group(session_spec)
+            # None when the requested scaling group is not accessible to the user
+            if validated_scaling_group is None:
+                return None
 
         # Phase 2: Fetch all required data
         with self._metric_observer.measure_phase(

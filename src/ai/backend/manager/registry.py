@@ -597,6 +597,10 @@ class AgentRegistry:
                 ),
             )
 
+            # None when the requested scaling group is not accessible to the user
+            if session_id is None:
+                return resp
+
             resp["sessionId"] = str(session_id)  # changed since API v5
             resp["sessionName"] = str(session_name)
             resp["status"] = "PENDING"
@@ -835,6 +839,10 @@ class AgentRegistry:
                     ),
                 )
             )
+            # None when the requested scaling group is not accessible to the user
+            if session_id is None:
+                return resp
+
             kernel_id = cast(KernelId, session_id)  # the main kernel's ID is the session ID.
             resp["kernelId"] = str(kernel_id)
             resp["status"] = "PENDING"
@@ -927,7 +935,7 @@ class AgentRegistry:
         sudo_session_enabled: bool,
         network: NetworkRow | None,
         startup_command: str | None,
-    ) -> SessionId:
+    ) -> SessionId | None:
         """Enqueue session using Sokovan scheduling controller."""
         kernel_enqueue_configs: list[KernelEnqueueingConfig] = session_enqueue_configs[
             "kernel_configs"
@@ -990,7 +998,7 @@ class AgentRegistry:
         sudo_session_enabled: bool = False,
         network: NetworkRow | None = None,
         startup_command: str | None = None,
-    ) -> SessionId:
+    ) -> SessionId | None:
         return await self._enqueue_session_via_sokovan(
             session_creation_id=session_creation_id,
             session_name=session_name,
