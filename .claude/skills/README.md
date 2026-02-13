@@ -31,6 +31,18 @@ This directory contains Claude Code skills for Backend.AI development tasks.
 |-------|---------|
 | `/cli-executor` | Execute component CLI (mgr, ag, storage, web, app-proxy) |
 
+## Submission
+
+| Skill | Purpose | Use When |
+|-------|---------|----------|
+| `/submit` | Quality checks, commit, PR creation, changelog, push | After finishing implementation, ready to submit PR |
+
+## Release
+
+| Skill | Purpose | Use When |
+|-------|---------|----------|
+| `/release` | Release script execution, changelog generation, RC consolidation with subsection grouping | Preparing a new version release (RC or final) |
+
 ## Skill Integration
 
 **Feature Development Flow:**
@@ -42,6 +54,12 @@ bep-guide → ┬→ repository-guide ─┐
 
 **Testing Flow:**
 tdd-guide → repository/service/api layer tests
+
+**Submission Flow:**
+jira-issue → [implement] → submit (quality checks → commit → PR → changelog → push)
+
+**Release Flow:**
+release (pre-flight → release.sh → changelog editing → RC consolidation → summary)
 
 **Infrastructure Flow:**
 db-status → db-migrate → cli-executor
