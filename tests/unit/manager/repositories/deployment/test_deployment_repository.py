@@ -3234,3 +3234,46 @@ class TestDeploymentRepositoryDuplicateName:
 
         assert result.metadata.name == "same-name-endpoint"
         assert result.metadata.project == different_group.id
+
+    @pytest.mark.asyncio
+    async def test_create_endpoint_succeeds_with_same_name_when_existing_is_destroyed(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainRow,
+        test_group: GroupRow,
+        test_scaling_group: ScalingGroupRow,
+        test_image_id: uuid.UUID,
+    ) -> None:
+        """Test that create_endpoint_legacy allows same name when existing endpoint is destroyed."""
+        # Create first endpoint
+        first_creator = self._create_endpoint_creator(
+            name="reusable-endpoint",
+            domain=test_domain,
+            group=test_group,
+            scaling_group=test_scaling_group,
+            image_id=test_image_id,
+        )
+        first_result = await deployment_repository.create_endpoint_legacy(first_creator)
+
+        # Mark the first endpoint as destroyed
+        async with db_with_cleanup.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == first_result.id)
+                .values(lifecycle_stage=EndpointLifecycle.DESTROYED)
+            )
+
+        # Create second endpoint with same name should succeed
+        second_creator = self._create_endpoint_creator(
+            name="reusable-endpoint",
+            domain=test_domain,
+            group=test_group,
+            scaling_group=test_scaling_group,
+            image_id=test_image_id,
+        )
+
+        result = await deployment_repository.create_endpoint_legacy(second_creator)
+
+        assert result.metadata.name == "reusable-endpoint"
+        assert result.metadata.project == test_group.id

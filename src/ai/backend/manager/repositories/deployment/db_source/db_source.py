@@ -349,6 +349,7 @@ class DeploymentDBSource:
                     EndpointRow.domain == domain_name,
                     EndpointRow.project == project_id,
                     EndpointRow.name == name,
+                    EndpointRow.lifecycle_stage != EndpointLifecycle.DESTROYED,
                 )
             )
             .limit(1)
