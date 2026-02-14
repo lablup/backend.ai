@@ -4,30 +4,43 @@ Request DTOs for registry domain.
 Covers container registry, HuggingFace registry,
 and group registry quota endpoints.
 
+Models already defined in other ``common`` modules are re-exported here
+so that callers can import everything from a single domain-specific path.
+
 Note: Artifact registry request models that depend on manager-specific types
 (e.g., ArtifactType, DelegateeTarget, PaginationOptions) remain in
 ``ai.backend.manager.dto.request`` to comply with the ``common → manager``
 visibility constraint.
 """
 
-import uuid
-from typing import Any
-
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, Field
 
 from ai.backend.common.api_handlers import BaseFieldModel, BaseRequestModel
-from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.container_registry import (
+    AllowedGroupsModel,
+    ContainerRegistryModel,
+    PatchContainerRegistryRequestModel,
+)
+from ai.backend.common.dto.manager.request import (
+    CreateHuggingFaceRegistryReq,
+    DeleteArtifactPathParam,
+    DeleteHuggingFaceRegistryReq,
+    ImportArtifactPathParam,
+    ImportArtifactReq,
+    UpdateArtifactPathParam,
+    UpdateArtifactReq,
+)
 
 __all__ = (
-    # Container registry models
+    # Container registry models (re-exported from common.container_registry)
     "AllowedGroupsModel",
     "ContainerRegistryModel",
     "PatchContainerRegistryRequestModel",
     "HarborWebhookRequestModel",
-    # HuggingFace registry models
+    # HuggingFace registry models (re-exported from common.dto.manager.request)
     "CreateHuggingFaceRegistryReq",
     "DeleteHuggingFaceRegistryReq",
-    # Artifact registry models (common-safe subset)
+    # Artifact registry models (re-exported from common.dto.manager.request)
     "ImportArtifactPathParam",
     "ImportArtifactReq",
     "UpdateArtifactPathParam",
@@ -42,36 +55,7 @@ __all__ = (
 
 
 # ---------------------------------------------------------------------------
-# Container registry models (from common/container_registry.py)
-# ---------------------------------------------------------------------------
-
-
-class AllowedGroupsModel(BaseFieldModel):
-    add: list[str] = []
-    remove: list[str] = []
-
-
-class ContainerRegistryModel(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID | None = None
-    url: str | None = None
-    registry_name: str | None = None
-    type: ContainerRegistryType | None = None
-    project: str | None = None
-    username: str | None = None
-    password: str | None = None
-    ssl_verify: bool | None = None
-    is_global: bool | None = None
-    extra: dict[str, Any] | None = None
-
-
-class PatchContainerRegistryRequestModel(ContainerRegistryModel, BaseRequestModel):
-    allowed_groups: AllowedGroupsModel | None = None
-
-
-# ---------------------------------------------------------------------------
-# Harbor webhook model (from manager/api/container_registry.py)
+# Harbor webhook model (unique to this module)
 # ---------------------------------------------------------------------------
 
 
@@ -95,64 +79,6 @@ class HarborWebhookRequestModel(BaseRequestModel):
         repository: Repository = Field(description="Repository details")
 
     event_data: EventData = Field(description="Event details")
-
-
-# ---------------------------------------------------------------------------
-# HuggingFace registry models (from common/dto/manager/request.py)
-# ---------------------------------------------------------------------------
-
-
-class CreateHuggingFaceRegistryReq(BaseRequestModel):
-    name: str = Field(description="Name of the Hugging Face model registry")
-    endpoint: str = Field(
-        description="Endpoint URL of the Hugging Face model registry",
-        examples=["https://huggingface.co"],
-    )
-    token: str | None = Field(
-        description="Authentication token for the Hugging Face model registry",
-        examples=["your_token_here"],
-    )
-
-
-class DeleteHuggingFaceRegistryReq(BaseRequestModel):
-    id: uuid.UUID = Field(description="The unique identifier of the Hugging Face model registry")
-
-
-# ---------------------------------------------------------------------------
-# Artifact registry models — common-safe subset
-# (from common/dto/manager/request.py; no manager dependencies)
-# ---------------------------------------------------------------------------
-
-
-class ImportArtifactPathParam(BaseRequestModel):
-    artifact_id: uuid.UUID = Field(
-        description="The unique identifier of the artifact to be imported."
-    )
-
-
-class ImportArtifactReq(BaseRequestModel):
-    storage_id: uuid.UUID = Field(
-        description="The unique identifier of the storage where the artifact will be imported."
-    )
-
-
-class UpdateArtifactPathParam(BaseRequestModel):
-    artifact_id: uuid.UUID = Field(
-        description="The unique identifier of the artifact to be updated."
-    )
-
-
-class UpdateArtifactReq(BaseRequestModel):
-    description: str | None = Field(default=None, description="Updated description")
-    readonly: bool | None = Field(
-        default=None, description="Whether the artifact should be readonly."
-    )
-
-
-class DeleteArtifactPathParam(BaseRequestModel):
-    artifact_id: uuid.UUID = Field(
-        description="The unique identifier of the artifact to be deleted."
-    )
 
 
 # ---------------------------------------------------------------------------

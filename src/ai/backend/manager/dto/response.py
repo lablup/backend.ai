@@ -1,11 +1,18 @@
 import uuid
 
-from pydantic import BaseModel
-
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
     CombinedDownloadProgress,
+)
+from ai.backend.common.dto.manager.storage.response import (
+    GetVFSStorageResponse as GetVFSStorageResponse,
+)
+from ai.backend.common.dto.manager.storage.response import (
+    ListVFSStorageResponse as ListVFSStorageResponse,
+)
+from ai.backend.common.dto.manager.storage.response import (
+    VFSStorage as VFSStorage,
 )
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
@@ -83,20 +90,6 @@ class UpdateArtifactResponse(BaseResponseModel):
 
 class GetArtifactRevisionReadmeResponse(BaseResponseModel):
     readme: str | None
-
-
-class VFSStorage(BaseModel):
-    name: str
-    base_path: str
-    host: str
-
-
-class GetVFSStorageResponse(BaseResponseModel):
-    storage: VFSStorage
-
-
-class ListVFSStorageResponse(BaseResponseModel):
-    storages: list[VFSStorage]
 
 
 class GetDownloadProgressResponse(BaseResponseModel):

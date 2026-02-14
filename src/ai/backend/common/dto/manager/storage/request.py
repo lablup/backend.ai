@@ -3,20 +3,28 @@ Request DTOs for storage domain.
 
 Covers object storage configuration, presigned URL generation,
 and VFS storage management endpoints.
-"""
 
-import uuid
+Models already defined in ``common.dto.manager.request`` are re-exported here
+so that callers can import everything from a single domain-specific path.
+"""
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.request import (
+    CreateObjectStorageReq,
+    GetPresignedDownloadURLReq,
+    GetPresignedUploadURLReq,
+    ObjectStoragePathParam,
+    UpdateObjectStorageReq,
+)
 
 __all__ = (
-    # Object storage models (from common/dto/manager/request.py)
+    # Object storage models (re-exported from common.dto.manager.request)
     "CreateObjectStorageReq",
     "ObjectStoragePathParam",
     "UpdateObjectStorageReq",
-    # Presigned URL models (from common/dto/manager/request.py)
+    # Presigned URL models (re-exported from common.dto.manager.request)
     "GetPresignedDownloadURLReq",
     "GetPresignedUploadURLReq",
     # VFS storage models (NEW)
@@ -27,58 +35,7 @@ __all__ = (
 
 
 # ---------------------------------------------------------------------------
-# Object storage models (from common/dto/manager/request.py)
-# ---------------------------------------------------------------------------
-
-
-class CreateObjectStorageReq(BaseRequestModel):
-    name: str = Field(description="Name of the object storage")
-    host: str = Field(description="Host address of the object storage")
-    access_key: str = Field(description="Access key for authentication")
-    secret_key: str = Field(description="Secret key for authentication")
-    endpoint: str = Field(description="Endpoint URL of the object storage")
-    region: str = Field(description="Region of the object storage")
-
-
-class ObjectStoragePathParam(BaseRequestModel):
-    storage_id: uuid.UUID = Field(description="The unique identifier of the object storage.")
-
-
-class UpdateObjectStorageReq(BaseRequestModel):
-    name: str | None = Field(default=None, description="Updated name of the object storage")
-    host: str | None = Field(default=None, description="Updated host address")
-    access_key: str | None = Field(default=None, description="Updated access key")
-    secret_key: str | None = Field(default=None, description="Updated secret key")
-    endpoint: str | None = Field(default=None, description="Updated endpoint URL")
-    region: str | None = Field(default=None, description="Updated region")
-
-
-# ---------------------------------------------------------------------------
-# Presigned URL models (from common/dto/manager/request.py)
-# ---------------------------------------------------------------------------
-
-
-class GetPresignedDownloadURLReq(BaseRequestModel):
-    artifact_revision_id: uuid.UUID = Field(
-        description="The unique identifier of the artifact revision"
-    )
-    key: str = Field(description="Object key")
-    expiration: int | None = Field(default=None, description="URL expiration time in seconds")
-
-
-class GetPresignedUploadURLReq(BaseRequestModel):
-    artifact_revision_id: uuid.UUID = Field(
-        description="The unique identifier of the artifact revision"
-    )
-    key: str = Field(description="Object key")
-    content_type: str | None = Field(default=None, description="Content type of the object")
-    expiration: int | None = Field(default=None, description="URL expiration time in seconds")
-    min_size: int | None = Field(default=None, description="Minimum file size")
-    max_size: int | None = Field(default=None, description="Maximum file size")
-
-
-# ---------------------------------------------------------------------------
-# VFS storage models (NEW - manager-specific path params)
+# VFS storage models (NEW - unique to this module)
 # ---------------------------------------------------------------------------
 
 

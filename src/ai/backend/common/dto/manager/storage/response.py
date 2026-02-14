@@ -2,25 +2,39 @@
 Response DTOs for storage domain.
 
 Covers object storage and VFS storage response models.
+
+Models already defined in ``common.dto.manager.response`` are re-exported here
+so that callers can import everything from a single domain-specific path.
+
+Note on VFS models: ``VFSStorage``, ``GetVFSStorageResponse``, and
+``ListVFSStorageResponse`` are defined here (in ``common``) as the canonical
+location, because ``common`` cannot import from ``manager``.
+``manager.dto.response`` re-exports these models for backward compatibility.
 """
 
-import uuid
-
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.response import (
+    GetPresignedDownloadURLResponse,
+    GetPresignedUploadURLResponse,
+    ObjectStorageAllBucketsResponse,
+    ObjectStorageBucketsResponse,
+    ObjectStorageListResponse,
+    ObjectStorageResponse,
+)
 
 __all__ = (
-    # Object storage models (from common/dto/manager/response.py)
+    # Object storage models (re-exported from common.dto.manager.response)
     "ObjectStorageResponse",
     "ObjectStorageListResponse",
-    # Presigned URL models (from common/dto/manager/response.py)
+    # Presigned URL models (re-exported from common.dto.manager.response)
     "GetPresignedDownloadURLResponse",
     "GetPresignedUploadURLResponse",
-    # Object storage bucket models (from common/dto/manager/response.py)
+    # Object storage bucket models (re-exported from common.dto.manager.response)
     "ObjectStorageBucketsResponse",
     "ObjectStorageAllBucketsResponse",
-    # VFS storage models (from manager/dto/response.py)
+    # VFS storage models (canonical location; re-exported by manager.dto.response)
     "VFSStorage",
     "GetVFSStorageResponse",
     "ListVFSStorageResponse",
@@ -28,55 +42,12 @@ __all__ = (
 
 
 # ---------------------------------------------------------------------------
-# Object storage models (from common/dto/manager/response.py)
-# ---------------------------------------------------------------------------
-
-
-class ObjectStorageResponse(BaseResponseModel):
-    id: str = Field(description="ID of the object storage")
-    name: str = Field(description="Name of the object storage")
-    host: str = Field(description="Host address of the object storage")
-    access_key: str = Field(description="Access key for authentication")
-    secret_key: str = Field(description="Secret key for authentication")
-    endpoint: str = Field(description="Endpoint URL of the object storage")
-    region: str = Field(description="Region of the object storage")
-
-
-class ObjectStorageListResponse(BaseResponseModel):
-    storages: list[ObjectStorageResponse] = Field(description="List of object storages")
-
-
-# ---------------------------------------------------------------------------
-# Presigned URL models (from common/dto/manager/response.py)
-# ---------------------------------------------------------------------------
-
-
-class GetPresignedDownloadURLResponse(BaseResponseModel):
-    presigned_url: str = Field(description="The presigned download URL")
-
-
-class GetPresignedUploadURLResponse(BaseResponseModel):
-    presigned_url: str = Field(description="The presigned upload URL")
-    fields: str = Field(description="JSON string containing the form fields")
-
-
-# ---------------------------------------------------------------------------
-# Object storage bucket models (from common/dto/manager/response.py)
-# ---------------------------------------------------------------------------
-
-
-class ObjectStorageBucketsResponse(BaseResponseModel):
-    buckets: list[str] = Field(description="List of bucket names for a specific storage")
-
-
-class ObjectStorageAllBucketsResponse(BaseResponseModel):
-    buckets_by_storage: dict[uuid.UUID, list[str]] = Field(
-        description="Mapping of storage IDs to bucket lists"
-    )
-
-
-# ---------------------------------------------------------------------------
-# VFS storage models (from manager/dto/response.py)
+# VFS storage models
+#
+# These are the canonical definitions.  They live in ``common`` because the
+# ``common → manager`` dependency direction forbids importing from ``manager``.
+# ``ai.backend.manager.dto.response`` re-exports them for callers that already
+# import from the manager package.
 # ---------------------------------------------------------------------------
 
 
