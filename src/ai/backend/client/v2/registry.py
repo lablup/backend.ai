@@ -24,8 +24,17 @@ if TYPE_CHECKING:
 class BackendAIClientRegistry:
     _client: BackendAIClient
 
-    def __init__(self, config: ClientConfig, auth: AuthStrategy) -> None:
-        self._client = BackendAIClient(config, auth)
+    def __init__(self, client: BackendAIClient) -> None:
+        self._client = client
+
+    @classmethod
+    async def create(
+        cls,
+        config: ClientConfig,
+        auth: AuthStrategy,
+    ) -> BackendAIClientRegistry:
+        client = await BackendAIClient.create(config, auth)
+        return cls(client)
 
     async def close(self) -> None:
         await self._client.close()

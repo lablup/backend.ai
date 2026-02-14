@@ -1,8 +1,9 @@
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from yarl import URL
 
+from ai.backend.client.v2.base_client import BackendAIClient
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.auth import AuthClient
@@ -25,8 +26,17 @@ class TestBackendAIClientRegistry:
     @pytest.fixture
     def registry(self) -> BackendAIClientRegistry:
         config = ClientConfig(endpoint=URL("https://api.example.com"))
-        auth = MockAuth()
-        return BackendAIClientRegistry(config, auth)
+        mock_session = MagicMock(spec_set=["request", "close"])
+        client = BackendAIClient(config, MockAuth(), mock_session)
+        return BackendAIClientRegistry(client)
+
+    @pytest.mark.asyncio
+    async def test_create_factory(self) -> None:
+        config = ClientConfig(endpoint=URL("https://api.example.com"))
+        with patch("ai.backend.client.v2.base_client.aiohttp.ClientSession") as mock_cls:
+            mock_cls.return_value = MagicMock()
+            registry = await BackendAIClientRegistry.create(config, MockAuth())
+            assert isinstance(registry._client, BackendAIClient)
 
     def test_domain_clients_return_correct_types(self, registry: BackendAIClientRegistry) -> None:
         assert isinstance(registry.session, SessionClient)
@@ -56,8 +66,10 @@ class TestBackendAIClientRegistry:
         assert id(registry.session) != id(registry.vfolder)
 
     @pytest.mark.asyncio
-    async def test_close_delegates_to_client(self, registry: BackendAIClientRegistry) -> None:
+    async def test_close_delegates_to_client(self) -> None:
         mock_session = AsyncMock()
-        registry._client._session = mock_session
+        config = ClientConfig(endpoint=URL("https://api.example.com"))
+        client = BackendAIClient(config, MockAuth(), mock_session)
+        registry = BackendAIClientRegistry(client)
         await registry.close()
         mock_session.close.assert_awaited_once()

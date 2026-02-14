@@ -19,40 +19,45 @@ class BackendAIClient:
 
     All public request methods accept and return Pydantic models only.
     Use ``typed_request()`` as the sole public interface for making API calls.
+
+    Prefer ``create()`` for production use; ``__init__`` accepts a pre-built
+    session so tests can inject a mock directly.
     """
 
     _config: ClientConfig
     _auth: AuthStrategy
-    __session: aiohttp.ClientSession | None
+    _session: aiohttp.ClientSession
 
-    def __init__(self, config: ClientConfig, auth: AuthStrategy) -> None:
+    def __init__(
+        self,
+        config: ClientConfig,
+        auth: AuthStrategy,
+        session: aiohttp.ClientSession,
+    ) -> None:
         self._config = config
         self._auth = auth
-        self.__session = None
+        self._session = session
 
-    @property
-    def _session(self) -> aiohttp.ClientSession:
-        if self.__session is None:
-            ssl_context: ssl.SSLContext | bool = not self._config.skip_ssl_verification
-            connector = aiohttp.TCPConnector(ssl=ssl_context)
-            timeout = aiohttp.ClientTimeout(
-                sock_connect=self._config.connection_timeout or None,
-                sock_read=self._config.read_timeout or None,
-            )
-            self.__session = aiohttp.ClientSession(
-                connector=connector,
-                timeout=timeout,
-            )
-        return self.__session
-
-    @_session.setter
-    def _session(self, value: aiohttp.ClientSession) -> None:
-        self.__session = value
+    @classmethod
+    async def create(
+        cls,
+        config: ClientConfig,
+        auth: AuthStrategy,
+    ) -> BackendAIClient:
+        ssl_context: ssl.SSLContext | bool = not config.skip_ssl_verification
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        timeout = aiohttp.ClientTimeout(
+            sock_connect=config.connection_timeout or None,
+            sock_read=config.read_timeout or None,
+        )
+        session = aiohttp.ClientSession(
+            connector=connector,
+            timeout=timeout,
+        )
+        return cls(config, auth, session)
 
     async def close(self) -> None:
-        if self.__session is not None:
-            await self.__session.close()
-            self.__session = None
+        await self._session.close()
 
     def _build_url(self, path: str) -> str:
         base = str(self._config.endpoint).rstrip("/")
