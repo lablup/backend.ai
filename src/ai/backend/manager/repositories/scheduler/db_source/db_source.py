@@ -2441,24 +2441,12 @@ class ScheduleDBSource:
                     raise ImageNotFound
 
     async def update_sessions_to_running(self, sessions_data: list[SessionRunningData]) -> None:
-        """
-        Update sessions with occupying_slots.
+        """No-op after Phase 3 (BA-4308).
 
-        Note: Status transition is handled by the Coordinator via SessionStatusBatchUpdaterSpec.
-        This method only updates the occupying_slots field.
+        Previously wrote sessions.occupying_slots JSONB.  The column is now
+        deprecated — resource allocations are tracked via the normalized
+        resource_allocations / agent_resources tables.
         """
-        if not sessions_data:
-            return
-
-        async with self._begin_session_read_committed() as db_sess:
-            # Update each session individually with its calculated occupying_slots
-            for session_data in sessions_data:
-                stmt = (
-                    sa.update(SessionRow)
-                    .where(SessionRow.id == session_data.session_id)
-                    .values(occupying_slots=session_data.occupying_slots)
-                )
-                await db_sess.execute(stmt)
 
     async def _resolve_image_configs(
         self, db_sess: SASession, unique_images: set[ImageIdentifier]
@@ -3294,16 +3282,12 @@ class ScheduleDBSource:
         ar = AgentResourceRow.__table__
         total_allocated = 0
         async with self._begin_session_read_committed() as db_sess:
-            # Phase 1: Update session occupying_slots
-            for session_data in sessions_data:
-                stmt = (
-                    sa.update(SessionRow)
-                    .where(SessionRow.id == session_data.session_id)
-                    .values(occupying_slots=session_data.occupying_slots)
-                )
-                await db_sess.execute(stmt)
+            # Phase 3 (BA-4308): Legacy JSONB write to sessions.occupying_slots
+            # removed.  The sessions.occupying_slots column is retained for
+            # historical audit but no longer written to.  Resource allocations
+            # are tracked via the normalized tables below.
 
-            # Phase 2: Allocate kernel resources (same transaction)
+            # Allocate kernel resources
             for kernel_id, agent_id, slots in allocations:
                 for s in slots:
                     alloc_result = await db_sess.execute(

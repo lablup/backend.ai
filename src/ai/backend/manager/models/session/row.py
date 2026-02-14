@@ -753,7 +753,10 @@ class SessionRow(Base):  # type: ignore[misc]
     tag: Mapped[str | None] = mapped_column("tag", sa.String(length=64), nullable=True)
 
     # Resource occupation
-    # occupied_slots = mapped_column('occupied_slots', ResourceSlotColumn(), nullable=False)
+    # DEPRECATED (Phase 3, BA-4308): No longer written to.
+    # Resource allocations are now tracked by the normalized
+    # resource_allocations / agent_resources tables.
+    # Retained for historical audit; will be dropped in a future major version.
     occupying_slots: Mapped[ResourceSlot] = mapped_column(
         "occupying_slots", ResourceSlotColumn(), nullable=False
     )

@@ -84,6 +84,9 @@ class AgentRow(Base):  # type: ignore[misc]
     available_slots: Mapped[ResourceSlot] = mapped_column(
         "available_slots", ResourceSlotColumn(), nullable=False
     )
+    # DEPRECATED (Phase 3, BA-4308): No longer written to.
+    # Agent occupied slots are now tracked by the normalized agent_resources table.
+    # Retained for historical audit; will be dropped in a future major version.
     occupied_slots: Mapped[ResourceSlot] = mapped_column(
         "occupied_slots", ResourceSlotColumn(), nullable=False
     )

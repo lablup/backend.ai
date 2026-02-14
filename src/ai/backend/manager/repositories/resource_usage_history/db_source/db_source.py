@@ -19,6 +19,7 @@ from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
     KernelUsageRecordRow,
     ProjectUsageBucketRow,
+    UsageBucketEntryRow,
     UserUsageBucketRow,
 )
 from ai.backend.manager.repositories.base import (
@@ -367,11 +368,8 @@ class ResourceUsageHistoryDBSource:
     ) -> Mapping[tuple[uuid.UUID, uuid.UUID], ResourceSlot]:
         """Get aggregated usage by (user_uuid, project_id) pairs.
 
-        This method aggregates resource_usage across all buckets within the
-        lookback period for each user-project pair.
-
-        Note: ResourceSlot is a JSONB type and cannot be aggregated in SQL,
-        so we fetch all rows and aggregate in Python.
+        Uses SQL SUM on normalized usage_bucket_entries table for efficient
+        per-slot aggregation instead of Python-side JSONB processing.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await self._fetch_aggregated_usage_by_user(
@@ -385,28 +383,45 @@ class ResourceUsageHistoryDBSource:
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[tuple[uuid.UUID, uuid.UUID], ResourceSlot]:
-        """Private method to fetch and aggregate user usage."""
-        query = sa.select(
-            UserUsageBucketRow.user_uuid,
-            UserUsageBucketRow.project_id,
-            UserUsageBucketRow.resource_usage,
-        ).where(
-            sa.and_(
-                UserUsageBucketRow.resource_group == resource_group,
-                UserUsageBucketRow.period_start >= lookback_start,
-                UserUsageBucketRow.period_start <= lookback_end,
+        """Fetch and aggregate user usage via normalized entries."""
+        ube = UsageBucketEntryRow.__table__
+        query = (
+            sa.select(
+                UserUsageBucketRow.user_uuid,
+                UserUsageBucketRow.project_id,
+                ube.c.slot_name,
+                sa.func.sum(ube.c.amount).label("total_amount"),
+            )
+            .select_from(
+                sa.join(
+                    UserUsageBucketRow.__table__,
+                    ube,
+                    UserUsageBucketRow.__table__.c.id == ube.c.bucket_id,
+                )
+            )
+            .where(
+                sa.and_(
+                    UserUsageBucketRow.resource_group == resource_group,
+                    UserUsageBucketRow.period_start >= lookback_start,
+                    UserUsageBucketRow.period_start <= lookback_end,
+                    ube.c.bucket_type == "user",
+                )
+            )
+            .group_by(
+                UserUsageBucketRow.user_uuid,
+                UserUsageBucketRow.project_id,
+                ube.c.slot_name,
             )
         )
         result = await db_sess.execute(query)
         rows = result.all()
 
-        # Aggregate in Python since ResourceSlot is JSONB
         aggregated: dict[tuple[uuid.UUID, uuid.UUID], ResourceSlot] = {}
         for row in rows:
             key = (row.user_uuid, row.project_id)
             if key not in aggregated:
                 aggregated[key] = ResourceSlot()
-            aggregated[key] = aggregated[key] + row.resource_usage
+            aggregated[key][row.slot_name] = row.total_amount
         return aggregated
 
     async def get_aggregated_usage_by_project(
@@ -417,29 +432,44 @@ class ResourceUsageHistoryDBSource:
     ) -> Mapping[uuid.UUID, ResourceSlot]:
         """Get aggregated usage by project_id.
 
-        This method aggregates resource_usage across all buckets within the
-        lookback period for each project.
+        Uses SQL SUM on normalized usage_bucket_entries table.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(
-                ProjectUsageBucketRow.project_id,
-                ProjectUsageBucketRow.resource_usage,
-            ).where(
-                sa.and_(
-                    ProjectUsageBucketRow.resource_group == resource_group,
-                    ProjectUsageBucketRow.period_start >= lookback_start,
-                    ProjectUsageBucketRow.period_start <= lookback_end,
+            ube = UsageBucketEntryRow.__table__
+            query = (
+                sa.select(
+                    ProjectUsageBucketRow.project_id,
+                    ube.c.slot_name,
+                    sa.func.sum(ube.c.amount).label("total_amount"),
+                )
+                .select_from(
+                    sa.join(
+                        ProjectUsageBucketRow.__table__,
+                        ube,
+                        ProjectUsageBucketRow.__table__.c.id == ube.c.bucket_id,
+                    )
+                )
+                .where(
+                    sa.and_(
+                        ProjectUsageBucketRow.resource_group == resource_group,
+                        ProjectUsageBucketRow.period_start >= lookback_start,
+                        ProjectUsageBucketRow.period_start <= lookback_end,
+                        ube.c.bucket_type == "project",
+                    )
+                )
+                .group_by(
+                    ProjectUsageBucketRow.project_id,
+                    ube.c.slot_name,
                 )
             )
             result = await db_sess.execute(query)
             rows = result.all()
 
-            # Aggregate in Python since ResourceSlot is JSONB
             aggregated: dict[uuid.UUID, ResourceSlot] = {}
             for row in rows:
                 if row.project_id not in aggregated:
                     aggregated[row.project_id] = ResourceSlot()
-                aggregated[row.project_id] = aggregated[row.project_id] + row.resource_usage
+                aggregated[row.project_id][row.slot_name] = row.total_amount
             return aggregated
 
     async def get_aggregated_usage_by_domain(
@@ -450,29 +480,44 @@ class ResourceUsageHistoryDBSource:
     ) -> Mapping[str, ResourceSlot]:
         """Get aggregated usage by domain_name.
 
-        This method aggregates resource_usage across all buckets within the
-        lookback period for each domain.
+        Uses SQL SUM on normalized usage_bucket_entries table.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(
-                DomainUsageBucketRow.domain_name,
-                DomainUsageBucketRow.resource_usage,
-            ).where(
-                sa.and_(
-                    DomainUsageBucketRow.resource_group == resource_group,
-                    DomainUsageBucketRow.period_start >= lookback_start,
-                    DomainUsageBucketRow.period_start <= lookback_end,
+            ube = UsageBucketEntryRow.__table__
+            query = (
+                sa.select(
+                    DomainUsageBucketRow.domain_name,
+                    ube.c.slot_name,
+                    sa.func.sum(ube.c.amount).label("total_amount"),
+                )
+                .select_from(
+                    sa.join(
+                        DomainUsageBucketRow.__table__,
+                        ube,
+                        DomainUsageBucketRow.__table__.c.id == ube.c.bucket_id,
+                    )
+                )
+                .where(
+                    sa.and_(
+                        DomainUsageBucketRow.resource_group == resource_group,
+                        DomainUsageBucketRow.period_start >= lookback_start,
+                        DomainUsageBucketRow.period_start <= lookback_end,
+                        ube.c.bucket_type == "domain",
+                    )
+                )
+                .group_by(
+                    DomainUsageBucketRow.domain_name,
+                    ube.c.slot_name,
                 )
             )
             result = await db_sess.execute(query)
             rows = result.all()
 
-            # Aggregate in Python since ResourceSlot is JSONB
             aggregated: dict[str, ResourceSlot] = {}
             for row in rows:
                 if row.domain_name not in aggregated:
                     aggregated[row.domain_name] = ResourceSlot()
-                aggregated[row.domain_name] = aggregated[row.domain_name] + row.resource_usage
+                aggregated[row.domain_name][row.slot_name] = row.total_amount
             return aggregated
 
     # ==================== Bucket Delta Updates ====================
@@ -536,7 +581,7 @@ class ResourceUsageHistoryDBSource:
             existing_usage = existing.get(lookup_key, ResourceSlot())
             new_usage = existing_usage + delta
 
-            # Upsert with merged usage
+            # Upsert with merged usage (JSONB)
             stmt = (
                 pg_insert(UserUsageBucketRow.__table__)
                 .values(
@@ -553,8 +598,13 @@ class ResourceUsageHistoryDBSource:
                     index_elements=["user_uuid", "project_id", "resource_group", "period_start"],
                     set_={"resource_usage": new_usage, "updated_at": sa.func.now()},
                 )
+                .returning(UserUsageBucketRow.__table__.c.id)
             )
-            await db_sess.execute(stmt)
+            result = await db_sess.execute(stmt)
+            bucket_id = result.scalar_one()
+
+            # Also write normalized entries
+            await self._upsert_bucket_entries(db_sess, bucket_id, "user", delta)
 
     async def _fetch_existing_user_buckets(
         self,
@@ -614,7 +664,7 @@ class ResourceUsageHistoryDBSource:
             existing_usage = existing.get(lookup_key, ResourceSlot())
             new_usage = existing_usage + delta
 
-            # Upsert with merged usage
+            # Upsert with merged usage (JSONB)
             stmt = (
                 pg_insert(ProjectUsageBucketRow.__table__)
                 .values(
@@ -630,8 +680,13 @@ class ResourceUsageHistoryDBSource:
                     index_elements=["project_id", "resource_group", "period_start"],
                     set_={"resource_usage": new_usage, "updated_at": sa.func.now()},
                 )
+                .returning(ProjectUsageBucketRow.__table__.c.id)
             )
-            await db_sess.execute(stmt)
+            result = await db_sess.execute(stmt)
+            bucket_id = result.scalar_one()
+
+            # Also write normalized entries
+            await self._upsert_bucket_entries(db_sess, bucket_id, "project", delta)
 
     async def _fetch_existing_project_buckets(
         self,
@@ -683,7 +738,7 @@ class ResourceUsageHistoryDBSource:
             existing_usage = existing.get(lookup_key, ResourceSlot())
             new_usage = existing_usage + delta
 
-            # Upsert with merged usage
+            # Upsert with merged usage (JSONB)
             stmt = (
                 pg_insert(DomainUsageBucketRow.__table__)
                 .values(
@@ -698,8 +753,13 @@ class ResourceUsageHistoryDBSource:
                     index_elements=["domain_name", "resource_group", "period_start"],
                     set_={"resource_usage": new_usage, "updated_at": sa.func.now()},
                 )
+                .returning(DomainUsageBucketRow.__table__.c.id)
             )
-            await db_sess.execute(stmt)
+            result = await db_sess.execute(stmt)
+            bucket_id = result.scalar_one()
+
+            # Also write normalized entries
+            await self._upsert_bucket_entries(db_sess, bucket_id, "domain", delta)
 
     async def _fetch_existing_domain_buckets(
         self,
@@ -731,3 +791,42 @@ class ResourceUsageHistoryDBSource:
             (row.domain_name, row.resource_group, row.period_start): row.resource_usage
             for row in result.all()
         }
+
+    # ==================== Normalized Bucket Entries ====================
+
+    async def _upsert_bucket_entries(
+        self,
+        db_sess: SASession,
+        bucket_id: uuid.UUID,
+        bucket_type: str,
+        delta: ResourceSlot,
+    ) -> None:
+        """Upsert normalized usage_bucket_entries for a bucket.
+
+        For each slot in the delta ResourceSlot, insert or update an entry row.
+        The ``amount`` column accumulates resource-seconds (additive).
+        ``duration_seconds`` is set to 86400 (1 day) for daily buckets and
+        updated on conflict by adding the new duration.
+        ``capacity`` is set to 0 here; it is updated separately during
+        fair share factor calculation when the cluster capacity is known.
+        """
+        entry_table = UsageBucketEntryRow.__table__
+        for slot_name, value in delta.items():
+            stmt = (
+                pg_insert(entry_table)
+                .values(
+                    bucket_id=bucket_id,
+                    bucket_type=bucket_type,
+                    slot_name=slot_name,
+                    amount=value,
+                    duration_seconds=86400,
+                    capacity=0,
+                )
+                .on_conflict_do_update(
+                    constraint="pk_usage_bucket_entries",
+                    set_={
+                        "amount": entry_table.c.amount + value,
+                    },
+                )
+            )
+            await db_sess.execute(stmt)
