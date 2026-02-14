@@ -26,6 +26,10 @@ from .export import (
     StreamingExportQuery,
     execute_streaming_export,
 )
+from .integrity import (
+    _match_integrity_error,
+    parse_integrity_error,
+)
 from .pagination import (
     CursorBackwardPagination,
     CursorForwardPagination,
@@ -54,6 +58,7 @@ from .querier import (
 from .types import (
     CursorConditionFactory,
     ExistenceCheck,
+    IntegrityErrorCheck,
     QueryCondition,
     QueryOrder,
     SearchScope,
@@ -88,7 +93,11 @@ __all__ = [
     "QueryOrder",
     "CursorConditionFactory",
     "ExistenceCheck",
+    "IntegrityErrorCheck",
     "SearchScope",
+    # Integrity
+    "parse_integrity_error",
+    "_match_integrity_error",
     # Export
     "ExportDataStream",
     "ExportFieldDef",
