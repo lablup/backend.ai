@@ -78,6 +78,23 @@ class TestTransitSessionStatusResponse:
         data = resp.model_dump(mode="json")
         assert str(sid) in data["session_status_map"]
 
+    def test_json_deserialization_string_keys(self) -> None:
+        """Verify that string UUID keys are correctly converted to SessionId
+        during JSON round-trip deserialization."""
+        sid = uuid4()
+        raw = {"session_status_map": {str(sid): "RUNNING"}}
+        resp = TransitSessionStatusResponse.model_validate(raw)
+        assert SessionId(sid) in resp.session_status_map
+        assert resp.session_status_map[SessionId(sid)] == "RUNNING"
+
+    def test_json_round_trip(self) -> None:
+        """Ensure dump → validate round-trip preserves SessionId keys."""
+        sid = SessionId(uuid4())
+        original = TransitSessionStatusResponse(session_status_map={sid: "PENDING"})
+        dumped = original.model_dump(mode="json")
+        restored = TransitSessionStatusResponse.model_validate(dumped)
+        assert restored.session_status_map[sid] == "PENDING"
+
 
 class TestCommitSessionResponse:
     def test_with_result(self) -> None:

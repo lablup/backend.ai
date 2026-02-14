@@ -5,6 +5,17 @@ Several handlers return raw dicts from action results — those are typed as
 ``dict[str, Any]`` until more precise action-result types are available.
 Endpoints that return 204 NO_CONTENT or binary streams do not have a
 response model.
+
+.. todo::
+   Replace ``result: dict[str, Any]`` fields with precise typed models once
+   action-result schemas are formalised (see ``ActionResult`` types in the
+   service layer).  Affected models: ``CreateSessionResponse``,
+   ``GetCommitStatusResponse``, ``GetAbusingReportResponse``,
+   ``CommitSessionResponse``, ``DestroySessionResponse``,
+   ``GetSessionInfoResponse``, ``GetDirectAccessInfoResponse``,
+   ``ExecuteResponse``, ``CompleteResponse``, ``ListFilesResponse``,
+   ``GetContainerLogsResponse``, ``GetStatusHistoryResponse``,
+   ``GetDependencyGraphResponse``.
 """
 
 from __future__ import annotations
@@ -41,7 +52,7 @@ class CreateSessionResponse(BaseResponseModel):
     """Shared response for ``create_from_template``, ``create_from_params``,
     and ``create_cluster``."""
 
-    result: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
 
 
 class StartServiceResponse(BaseResponseModel):
@@ -54,13 +65,13 @@ class StartServiceResponse(BaseResponseModel):
 class GetCommitStatusResponse(BaseResponseModel):
     """GET ``/{session_name}/commit``"""
 
-    result: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
 
 
 class GetAbusingReportResponse(BaseResponseModel):
     """GET ``/{session_name}/abusing-report``"""
 
-    result: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
 
 
 class TransitSessionStatusResponse(BaseResponseModel):
@@ -72,7 +83,7 @@ class TransitSessionStatusResponse(BaseResponseModel):
 class CommitSessionResponse(BaseResponseModel):
     """POST ``/{session_name}/commit``"""
 
-    result: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
 
 
 class ConvertSessionToImageResponse(BaseResponseModel):
@@ -84,19 +95,19 @@ class ConvertSessionToImageResponse(BaseResponseModel):
 class DestroySessionResponse(BaseResponseModel):
     """DELETE ``/{session_name}``"""
 
-    result: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
 
 
 class GetSessionInfoResponse(BaseResponseModel):
     """GET ``/{session_name}``"""
 
-    result: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
 
 
 class GetDirectAccessInfoResponse(BaseResponseModel):
     """GET ``/{session_name}/direct-access-info``"""
 
-    result: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
 
 
 class MatchSessionsResponse(BaseResponseModel):
@@ -108,34 +119,34 @@ class MatchSessionsResponse(BaseResponseModel):
 class ExecuteResponse(BaseResponseModel):
     """POST ``/{session_name}``"""
 
-    result: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
 
 
 class CompleteResponse(BaseResponseModel):
     """POST ``/{session_name}/complete``"""
 
-    result: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
 
 
 class ListFilesResponse(BaseResponseModel):
     """GET ``/{session_name}/files``"""
 
-    result: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
 
 
 class GetContainerLogsResponse(BaseResponseModel):
     """GET ``/{session_name}/logs``"""
 
-    result: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
 
 
 class GetStatusHistoryResponse(BaseResponseModel):
     """GET ``/{session_name}/status-history``"""
 
-    result: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
 
 
 class GetDependencyGraphResponse(BaseResponseModel):
     """GET ``/{session_name}/dependency-graph``"""
 
-    result: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model

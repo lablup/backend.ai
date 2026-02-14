@@ -119,7 +119,17 @@ class CreationConfigV3(BaseFieldModel):
 
 
 class CreationConfigV3Template(BaseFieldModel):
-    """Template variant of V3 — all fields default to ``None`` (unset)."""
+    """Template variant of V3 — all fields default to ``None`` (unset).
+
+    Note: The field set is intentionally identical to :class:`CreationConfigV3`.
+    In the original Trafaret schema the only difference is that template variants
+    use ``default=undefined`` with an ``UndefChecker`` wrapper, whereas the
+    non-template version uses ``default=None``.  In the Pydantic representation
+    both collapse to ``Optional`` fields with ``None`` defaults, making the two
+    classes structurally identical.  They are kept as separate types so that
+    handler code can distinguish between direct creation and template-based
+    creation at the type level.
+    """
 
     mounts: list[str] | None = None
     environ: dict[str, str] | None = None

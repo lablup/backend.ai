@@ -128,7 +128,7 @@ class CreateFromTemplateRequest(BaseRequestModel):
         default=None,
         validation_alias=AliasChoices("bootstrap_script", "bootstrapScript"),
     )
-    dependencies: list[UUID] | list[str] | None = None
+    dependencies: list[UUID | str] | None = None
     callback_url: str | None = Field(
         default=None,
         validation_alias=AliasChoices("callback_url", "callbackUrl", "callbackURL"),
@@ -206,7 +206,7 @@ class CreateFromParamsRequest(BaseRequestModel):
         default=None,
         validation_alias=AliasChoices("bootstrap_script", "bootstrapScript"),
     )
-    dependencies: list[UUID] | list[str] | None = None
+    dependencies: list[UUID | str] | None = None
     callback_url: str | None = Field(
         default=None,
         validation_alias=AliasChoices("callback_url", "callbackUrl", "callbackURL"),

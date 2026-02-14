@@ -87,6 +87,25 @@ class TestCreateFromTemplateRequest:
                 "priority": SESSION_PRIORITY_MAX + 1,
             })
 
+    def test_dependencies_with_uuid_strings(self) -> None:
+        """UUID-formatted strings are accepted; they remain str because
+        Pydantic matches ``str`` before ``UUID`` in the union.  The handler
+        layer is responsible for coercing to UUID when needed."""
+        dep_ids = [uuid4(), uuid4()]
+        req = CreateFromTemplateRequest.model_validate({
+            "template_id": str(uuid4()),
+            "dependencies": [str(d) for d in dep_ids],
+        })
+        assert req.dependencies is not None
+        assert len(req.dependencies) == 2
+
+    def test_dependencies_with_plain_strings(self) -> None:
+        req = CreateFromTemplateRequest.model_validate({
+            "template_id": str(uuid4()),
+            "dependencies": ["sess-a", "sess-b"],
+        })
+        assert req.dependencies == ["sess-a", "sess-b"]
+
 
 class TestCreateFromParamsRequest:
     def test_required_fields(self) -> None:
@@ -117,6 +136,35 @@ class TestCreateFromParamsRequest:
         assert req.architecture == "x86_64"
         assert req.group == "mygroup"
         assert req.domain == "mydomain"
+
+    def test_dependencies_with_uuid_strings(self) -> None:
+        """UUID-formatted strings are accepted; they remain str because
+        Pydantic matches ``str`` before ``UUID`` in the union.  The handler
+        layer is responsible for coercing to UUID when needed."""
+        dep_ids = [uuid4(), uuid4()]
+        req = CreateFromParamsRequest.model_validate({
+            "session_name": "s",
+            "image": "python:3.11",
+            "dependencies": [str(d) for d in dep_ids],
+        })
+        assert req.dependencies is not None
+        assert len(req.dependencies) == 2
+
+    def test_dependencies_with_plain_strings(self) -> None:
+        req = CreateFromParamsRequest.model_validate({
+            "session_name": "s",
+            "image": "python:3.11",
+            "dependencies": ["session-name-a", "session-name-b"],
+        })
+        assert req.dependencies is not None
+        assert req.dependencies == ["session-name-a", "session-name-b"]
+
+    def test_dependencies_none(self) -> None:
+        req = CreateFromParamsRequest.model_validate({
+            "session_name": "s",
+            "image": "python:3.11",
+        })
+        assert req.dependencies is None
 
 
 class TestCreateClusterRequest:
