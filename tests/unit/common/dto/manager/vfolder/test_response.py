@@ -3,6 +3,7 @@
 import uuid
 
 from ai.backend.common.dto.manager.field import (
+    VFolderItemField,
     VFolderOperationStatusField,
     VFolderOwnershipTypeField,
     VFolderPermissionField,
@@ -31,7 +32,6 @@ from ai.backend.common.dto.manager.vfolder.response import (
     VFolderGetInfoResponse,
     VFolderInfoDTO,
     VFolderInvitationDTO,
-    VFolderItemField,
     VFolderListResponse,
     VFolderSharedInfoDTO,
     VolumeInfoDTO,

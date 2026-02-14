@@ -63,11 +63,11 @@ class TestVFolderCreateReq:
         gid = uuid.uuid4()
         req = VFolderCreateReq(
             name="my-folder",
-            host="storage-host",
+            folder_host="storage-host",
             usage_mode=VFolderUsageMode.MODEL,
             permission=VFolderPermissionField.READ_ONLY,
             cloneable=True,
-            group=str(gid),
+            group_id=gid,
         )
         assert req.name == "my-folder"
         assert req.folder_host == "storage-host"
