@@ -3,7 +3,7 @@ from __future__ import annotations
 import ssl
 from collections.abc import Mapping
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import aiohttp
 
@@ -81,14 +81,18 @@ class BackendAIClient:
             **headers,
         }
 
-    async def _request(
+    async def _raw_request(
         self,
         method: str,
         path: str,
         *,
         json: Any | None = None,
         params: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
+    ) -> tuple[int, Any]:
+        """Low-level request returning ``(status, body)``.
+
+        *body* is the parsed JSON value (dict, list, or ``None`` for 204).
+        """
         session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
@@ -107,8 +111,42 @@ class BackendAIClient:
                 except Exception:
                     data = await resp.text()
                 raise map_status_to_exception(resp.status, resp.reason or "", data)
-            result: dict[str, Any] = await resp.json()
-            return result
+            if resp.status == 204:
+                return resp.status, None
+            body = await resp.json()
+            return resp.status, body
+
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        json: Any | None = None,
+        params: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        _, body = await self._raw_request(method, path, json=json, params=params)
+        return cast(dict[str, Any], body)
+
+    async def _request_list(
+        self,
+        method: str,
+        path: str,
+        *,
+        json: Any | None = None,
+        params: dict[str, str] | None = None,
+    ) -> list[Any]:
+        _, body = await self._raw_request(method, path, json=json, params=params)
+        return cast(list[Any], body)
+
+    async def _request_no_content(
+        self,
+        method: str,
+        path: str,
+        *,
+        json: Any | None = None,
+        params: dict[str, str] | None = None,
+    ) -> None:
+        await self._raw_request(method, path, json=json, params=params)
 
     async def typed_request[T: BaseResponseModel](
         self,
@@ -122,3 +160,16 @@ class BackendAIClient:
         json_body = request.model_dump(exclude_none=True) if request is not None else None
         data = await self._request(method, path, json=json_body, params=params)
         return response_model.model_validate(data)
+
+    async def typed_request_list[T: BaseResponseModel](
+        self,
+        method: str,
+        path: str,
+        *,
+        request: BaseRequestModel | None = None,
+        response_model: type[T],
+        params: dict[str, str] | None = None,
+    ) -> list[T]:
+        json_body = request.model_dump(exclude_none=True) if request is not None else None
+        items = await self._request_list(method, path, json=json_body, params=params)
+        return [response_model.model_validate(item) for item in items]
