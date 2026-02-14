@@ -8,12 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import (
     OperationType,
+    ScopeType,
 )
 from ai.backend.manager.data.permission.id import (
     ObjectId,
-    ScopeId,
 )
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 
 # =============================================================================
 # Data Classes
@@ -23,19 +23,19 @@ from ai.backend.manager.models.rbac_models.permission.object_permission import O
 @dataclass
 class RBACGranter:
     """
-    Data class for granting object-level permissions to specific role(s).
+    Data class for granting permissions to specific role(s) using entity-as-scope pattern.
 
     Note: Only entity-level granting is supported. Field-level granting is not supported.
 
     Attributes:
         granted_entity_id: The entity to grant access to (must be entity, not field).
-        granted_entity_scope_id: The original scope where the entity belongs.
+        granted_entity_scope_type: The scope_type for entity-as-scope in permissions table.
         target_role_ids: The role ID(s) to grant permissions to.
         operations: The operations to grant on the entity.
     """
 
     granted_entity_id: ObjectId
-    granted_entity_scope_id: ScopeId
+    granted_entity_scope_type: ScopeType
     target_role_ids: list[UUID]
     operations: list[OperationType]
 
@@ -45,31 +45,33 @@ class RBACGranter:
 # =============================================================================
 
 
-async def _insert_object_permissions(
+async def _insert_permissions(
     db_sess: SASession,
     role_ids: Collection[UUID],
     entity_id: ObjectId,
+    scope_type: ScopeType,
     operations: Collection[OperationType],
 ) -> None:
     """
-    Insert object permissions for each role.
+    Insert permissions for each role using entity-as-scope pattern.
 
     Raises IntegrityError on unique constraint violation (duplicate permission).
     """
     if not role_ids or not operations:
         return
 
-    obj_perms = [
-        ObjectPermissionRow(
+    perms = [
+        PermissionRow(
             role_id=role_id,
+            scope_type=scope_type,
+            scope_id=entity_id.entity_id,
             entity_type=entity_id.entity_type,
-            entity_id=entity_id.entity_id,
             operation=operation,
         )
         for role_id in role_ids
         for operation in operations
     ]
-    db_sess.add_all(obj_perms)
+    db_sess.add_all(perms)
     await db_sess.flush()
 
 
@@ -83,14 +85,14 @@ async def execute_rbac_granter(
     granter: RBACGranter,
 ) -> None:
     """
-    Grant object-level permissions to specified roles.
+    Grant permissions to specified roles using entity-as-scope pattern.
 
     This is used when sharing an existing entity with specific roles.
     For example, when user A invites user B to a VFolder:
-    - User B's role (provided by caller) gets object permissions for that VFolder.
+    - User B's role (provided by caller) gets permissions for that VFolder.
 
     Raises:
-        IntegrityError: If duplicate object permission already exists.
+        IntegrityError: If duplicate permission already exists.
 
     Args:
         db_sess: Async SQLAlchemy session (must be writable).
@@ -102,5 +104,7 @@ async def execute_rbac_granter(
     if not role_ids:
         return
 
-    # Insert object permissions (raises on conflict)
-    await _insert_object_permissions(db_sess, role_ids, entity_id, granter.operations)
+    # Insert permissions (raises on conflict)
+    await _insert_permissions(
+        db_sess, role_ids, entity_id, granter.granted_entity_scope_type, granter.operations
+    )
