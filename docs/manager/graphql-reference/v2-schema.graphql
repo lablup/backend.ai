@@ -4992,7 +4992,7 @@ type Query {
   """
   Added in 26.3.0. Search entities by type (admin only). Only entity_type selection and pagination are supported. Use each entity's dedicated query for detailed options.
   """
-  adminEntities(entityType: EntityType!, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection!
+  adminEntities(entityType: EntityType!, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection
 
   """Added in 26.3.0. List available scope types."""
   scopeTypes: [EntityType!]!
