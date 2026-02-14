@@ -102,7 +102,10 @@ class RoleGQL(Node):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        raise NotImplementedError
+        results = await info.context.data_loaders.role_loader.load_many([
+            uuid.UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_dataclass(data) if data is not None else None for data in results]
 
     @classmethod
     def from_dataclass(cls, data: RoleData | RoleDetailData) -> Self:
@@ -139,11 +142,17 @@ class RoleAssignmentGQL(Node):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        raise NotImplementedError
+        results = await info.context.data_loaders.role_assignment_loader.load_many([
+            uuid.UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_dataclass(data) if data is not None else None for data in results]
 
     @strawberry.field(description="The assigned role.")  # type: ignore[misc]
     async def role(self, info: Info[StrawberryGQLContext]) -> RoleGQL | None:
-        raise NotImplementedError
+        data = await info.context.data_loaders.role_loader.load(self.role_id)
+        if data is None:
+            return None
+        return RoleGQL.from_dataclass(data)
 
     @strawberry.field(description="The assigned user.")  # type: ignore[misc]
     async def user(
@@ -155,7 +164,12 @@ class RoleAssignmentGQL(Node):
         ]
         | None
     ):
-        raise NotImplementedError
+        from ai.backend.manager.api.gql.user.types.node import UserV2GQL
+
+        data = await info.context.data_loaders.user_loader.load(self.user_id)
+        if data is None:
+            return None
+        return UserV2GQL.from_data(data)
 
     @classmethod
     def from_dataclass(cls, data: AssignedUserData) -> Self:

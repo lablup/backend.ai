@@ -5,21 +5,17 @@ from __future__ import annotations
 import strawberry
 from strawberry import Info
 
-from ai.backend.manager.api.gql.rbac.types import (
-    EntityConnection,
-    EntityFilter,
-    EntityOrderBy,
-)
+from ai.backend.manager.api.gql.rbac.fetcher.entity import fetch_entities
+from ai.backend.manager.api.gql.rbac.types import EntityConnection, EntityTypeGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
 @strawberry.field(
-    description="Added in 26.3.0. Search entity associations (admin only). Optionally filter by entity_type and entity_id."
+    description="Added in 26.3.0. Search entities by type (admin only). Only entity_type selection and pagination are supported. Use each entity's dedicated query for detailed options."
 )  # type: ignore[misc]
 async def admin_entities(
     info: Info[StrawberryGQLContext],
-    filter: EntityFilter | None = None,
-    order_by: list[EntityOrderBy] | None = None,
+    entity_type: EntityTypeGQL,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -27,5 +23,20 @@ async def admin_entities(
     limit: int | None = None,
     offset: int | None = None,
 ) -> EntityConnection:
-    """Search entity associations with filtering, ordering, and pagination."""
-    raise NotImplementedError
+    """Search entities by type with pagination only.
+
+    Per-entity filtering and ordering are not provided because EntityNode
+    is a union of 15+ types, making a common filter schema impractical.
+    Use dedicated root queries (e.g., admin_users, admin_projects) for
+    detailed options including filtering and ordering.
+    """
+    return await fetch_entities(
+        info,
+        entity_type=entity_type,
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
+    )

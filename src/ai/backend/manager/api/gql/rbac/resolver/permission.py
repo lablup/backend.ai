@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import strawberry
-from strawberry import Info
+from strawberry import ID, Info
 
+from ai.backend.manager.api.gql.rbac.fetcher.permission import fetch_permissions
 from ai.backend.manager.api.gql.rbac.types import (
     CreatePermissionInput,
     DeletePermissionInput,
@@ -15,6 +16,12 @@ from ai.backend.manager.api.gql.rbac.types import (
     PermissionOrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.services.permission_contoller.actions.permission import (
+    CreatePermissionAction,
+    DeletePermissionAction,
+)
 
 # ==================== Query Resolvers ====================
 
@@ -33,7 +40,17 @@ async def admin_permissions(
     limit: int | None = None,
     offset: int | None = None,
 ) -> PermissionConnection:
-    raise NotImplementedError
+    return await fetch_permissions(
+        info,
+        filter=filter,
+        order_by=order_by,
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
+    )
 
 
 # ==================== Mutation Resolvers ====================
@@ -44,7 +61,12 @@ async def admin_create_permission(
     info: Info[StrawberryGQLContext],
     input: CreatePermissionInput,
 ) -> PermissionGQL:
-    raise NotImplementedError
+    action_result = (
+        await info.context.processors.permission_controller.create_permission.wait_for_complete(
+            CreatePermissionAction(creator=input.to_creator())
+        )
+    )
+    return PermissionGQL.from_dataclass(action_result.data)
 
 
 @strawberry.mutation(description="Added in 26.3.0. Delete a scoped permission (admin only).")  # type: ignore[misc]
@@ -52,4 +74,8 @@ async def admin_delete_permission(
     info: Info[StrawberryGQLContext],
     input: DeletePermissionInput,
 ) -> DeletePermissionPayload:
-    raise NotImplementedError
+    purger = Purger(row_class=PermissionRow, pk_value=input.id)
+    await info.context.processors.permission_controller.delete_permission.wait_for_complete(
+        DeletePermissionAction(purger=purger)
+    )
+    return DeletePermissionPayload(id=ID(str(input.id)))
