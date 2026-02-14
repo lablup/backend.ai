@@ -5,6 +5,8 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import AliasChoices, Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
@@ -73,7 +75,7 @@ class ListSessionTemplatesRequest(BaseRequestModel):
 class GetSessionTemplateRequest(BaseRequestModel):
     """Request parameters for getting a session template."""
 
-    format: str = Field(
+    format: Literal["yaml", "json"] = Field(
         default="json",
         description='Response format: "yaml" or "json"',
     )
@@ -152,7 +154,7 @@ class ListClusterTemplatesRequest(BaseRequestModel):
 class GetClusterTemplateRequest(BaseRequestModel):
     """Request parameters for getting a cluster template."""
 
-    format: str = Field(
+    format: Literal["yaml", "json"] = Field(
         default="yaml",
         description='Response format: "yaml" or "json"',
     )

@@ -5,9 +5,10 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
-from typing import Any
+from datetime import datetime
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 
 from ai.backend.common.api_handlers import BaseResponseModel
 
@@ -40,7 +41,7 @@ class SessionTemplateItemDTO(BaseModel):
 
     name: str = Field(description="Template name")
     id: str = Field(description="Template ID")
-    created_at: str = Field(description="Creation timestamp")
+    created_at: datetime = Field(description="Creation timestamp")
     is_owner: bool = Field(description="Whether the current user is the owner")
     user: str | None = Field(description="Owner user UUID")
     group: str | None = Field(description="Group ID")
@@ -59,7 +60,7 @@ class SessionTemplateListItemDTO(SessionTemplateItemDTO):
 class ClusterTemplateListItemDTO(SessionTemplateItemDTO):
     """DTO for cluster template list items."""
 
-    type: str = Field(description='Template type ("user" or "group")')
+    type: Literal["user", "group"] = Field(description='Template type ("user" or "group")')
 
 
 class CreateSessionTemplateItemDTO(BaseModel):
@@ -72,20 +73,18 @@ class CreateSessionTemplateItemDTO(BaseModel):
 # --- Session Template Responses ---
 
 
-class CreateSessionTemplateResponse(BaseResponseModel):
-    """Response for creating session template(s)."""
+class CreateSessionTemplateResponse(RootModel[list[CreateSessionTemplateItemDTO]]):
+    """Response for creating session template(s).
 
-    items: list[CreateSessionTemplateItemDTO] = Field(
-        description="List of created session templates",
-    )
+    The handler returns a raw JSON array of created template entries.
+    """
 
 
-class ListSessionTemplatesResponse(BaseResponseModel):
-    """Response for listing session templates."""
+class ListSessionTemplatesResponse(RootModel[list[SessionTemplateListItemDTO]]):
+    """Response for listing session templates.
 
-    items: list[SessionTemplateListItemDTO] = Field(
-        description="List of session templates",
-    )
+    The handler returns a raw JSON array of template items.
+    """
 
 
 class GetSessionTemplateResponse(BaseResponseModel):
@@ -120,18 +119,18 @@ class CreateClusterTemplateResponse(BaseResponseModel):
     user: str = Field(description="Owner user UUID")
 
 
-class ListClusterTemplatesResponse(BaseResponseModel):
-    """Response for listing cluster templates."""
+class ListClusterTemplatesResponse(RootModel[list[ClusterTemplateListItemDTO]]):
+    """Response for listing cluster templates.
 
-    items: list[ClusterTemplateListItemDTO] = Field(
-        description="List of cluster templates",
-    )
+    The handler returns a raw JSON array of cluster template items.
+    """
 
 
-class GetClusterTemplateResponse(BaseResponseModel):
-    """Response for getting a single cluster template."""
+class GetClusterTemplateResponse(RootModel[dict[str, Any]]):
+    """Response for getting a single cluster template.
 
-    template: dict[str, Any] = Field(description="Template data")
+    The handler returns the template dict directly without a wrapper.
+    """
 
 
 class UpdateClusterTemplateResponse(BaseResponseModel):

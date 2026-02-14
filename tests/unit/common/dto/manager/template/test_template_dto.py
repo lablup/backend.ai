@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
+from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.template.request import (
     CreateClusterTemplateRequest,
@@ -18,7 +21,6 @@ from ai.backend.common.dto.manager.template.request import (
 from ai.backend.common.dto.manager.template.response import (
     ClusterTemplateListItemDTO,
     CreateClusterTemplateResponse,
-    CreateSessionTemplateItemDTO,
     CreateSessionTemplateResponse,
     DeleteClusterTemplateResponse,
     DeleteSessionTemplateResponse,
@@ -31,6 +33,8 @@ from ai.backend.common.dto.manager.template.response import (
     UpdateClusterTemplateResponse,
     UpdateSessionTemplateResponse,
 )
+
+_NOW = datetime.now(UTC)
 
 
 class TestTemplatePathParam:
@@ -101,6 +105,10 @@ class TestGetSessionTemplateRequest:
     def test_yaml_format(self) -> None:
         req = GetSessionTemplateRequest(format="yaml")
         assert req.format == "yaml"
+
+    def test_invalid_format_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            GetSessionTemplateRequest.model_validate({"format": "xml"})
 
 
 class TestUpdateSessionTemplateRequest:
@@ -176,6 +184,10 @@ class TestGetClusterTemplateRequest:
         req = GetClusterTemplateRequest(format="json")
         assert req.format == "json"
 
+    def test_invalid_format_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            GetClusterTemplateRequest.model_validate({"format": "toml"})
+
 
 class TestUpdateClusterTemplateRequest:
     def test_basic(self) -> None:
@@ -198,7 +210,7 @@ class TestSessionTemplateItemDTO:
         dto = SessionTemplateItemDTO(
             name="my-template",
             id="abc123",
-            created_at="2024-01-01T00:00:00",
+            created_at=_NOW,
             is_owner=True,
             user="user-uuid",
             group="group-id",
@@ -207,6 +219,7 @@ class TestSessionTemplateItemDTO:
         )
         assert dto.name == "my-template"
         assert dto.id == "abc123"
+        assert dto.created_at == _NOW
         assert dto.is_owner is True
         assert dto.user_email == "user@example.com"
 
@@ -214,7 +227,7 @@ class TestSessionTemplateItemDTO:
         dto = SessionTemplateItemDTO(
             name="my-template",
             id="abc123",
-            created_at="2024-01-01T00:00:00",
+            created_at=_NOW,
             is_owner=False,
             user=None,
             group=None,
@@ -232,7 +245,7 @@ class TestSessionTemplateListItemDTO:
         dto = SessionTemplateListItemDTO(
             name="my-template",
             id="abc123",
-            created_at="2024-01-01T00:00:00",
+            created_at=_NOW,
             is_owner=True,
             user="user-uuid",
             group="group-id",
@@ -248,11 +261,11 @@ class TestSessionTemplateListItemDTO:
 
 
 class TestClusterTemplateListItemDTO:
-    def test_with_type(self) -> None:
+    def test_with_type_user(self) -> None:
         dto = ClusterTemplateListItemDTO(
             name="cluster-template",
             id="def456",
-            created_at="2024-01-01T00:00:00",
+            created_at=_NOW,
             is_owner=False,
             user="user-uuid",
             group="group-id",
@@ -262,40 +275,69 @@ class TestClusterTemplateListItemDTO:
         )
         assert dto.type == "user"
 
+    def test_with_type_group(self) -> None:
+        dto = ClusterTemplateListItemDTO(
+            name="cluster-template",
+            id="def456",
+            created_at=_NOW,
+            is_owner=False,
+            user=None,
+            group="group-id",
+            user_email=None,
+            group_name="mygroup",
+            type="group",
+        )
+        assert dto.type == "group"
+
+    def test_invalid_type_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            ClusterTemplateListItemDTO.model_validate({
+                "name": "cluster-template",
+                "id": "def456",
+                "created_at": _NOW.isoformat(),
+                "is_owner": False,
+                "user": "user-uuid",
+                "group": "group-id",
+                "user_email": None,
+                "group_name": "mygroup",
+                "type": "invalid",
+            })
+
 
 class TestCreateSessionTemplateResponse:
-    def test_with_items(self) -> None:
-        resp = CreateSessionTemplateResponse(
-            items=[
-                CreateSessionTemplateItemDTO(id="tmpl-1", user="user-1"),
-                CreateSessionTemplateItemDTO(id="tmpl-2", user="user-2"),
-            ],
-        )
-        assert len(resp.items) == 2
-        assert resp.items[0].id == "tmpl-1"
-        assert resp.items[1].user == "user-2"
+    def test_raw_list(self) -> None:
+        resp = CreateSessionTemplateResponse.model_validate([
+            {"id": "tmpl-1", "user": "user-1"},
+            {"id": "tmpl-2", "user": "user-2"},
+        ])
+        assert len(resp.root) == 2
+        assert resp.root[0].id == "tmpl-1"
+        assert resp.root[1].user == "user-2"
+
+    def test_empty_list(self) -> None:
+        resp = CreateSessionTemplateResponse.model_validate([])
+        assert len(resp.root) == 0
 
 
 class TestListSessionTemplatesResponse:
-    def test_with_items(self) -> None:
-        resp = ListSessionTemplatesResponse(
-            items=[
-                SessionTemplateListItemDTO(
-                    name="tmpl",
-                    id="abc",
-                    created_at="2024-01-01",
-                    is_owner=True,
-                    user="u1",
-                    group="g1",
-                    user_email="a@b.com",
-                    group_name="grp",
-                    domain_name="default",
-                    type="TASK",
-                    template={},
-                ),
-            ],
-        )
-        assert len(resp.items) == 1
+    def test_raw_list(self) -> None:
+        resp = ListSessionTemplatesResponse.model_validate([
+            {
+                "name": "tmpl",
+                "id": "abc",
+                "created_at": "2024-01-01T00:00:00Z",
+                "is_owner": True,
+                "user": "u1",
+                "group": "g1",
+                "user_email": "a@b.com",
+                "group_name": "grp",
+                "domain_name": "default",
+                "type": "TASK",
+                "template": {},
+            },
+        ])
+        assert len(resp.root) == 1
+        assert resp.root[0].name == "tmpl"
 
 
 class TestGetSessionTemplateResponse:
@@ -331,30 +373,28 @@ class TestCreateClusterTemplateResponse:
 
 
 class TestListClusterTemplatesResponse:
-    def test_with_items(self) -> None:
-        resp = ListClusterTemplatesResponse(
-            items=[
-                ClusterTemplateListItemDTO(
-                    name="cluster",
-                    id="abc",
-                    created_at="2024-01-01",
-                    is_owner=True,
-                    user="u1",
-                    group="g1",
-                    user_email=None,
-                    group_name="grp",
-                    type="group",
-                ),
-            ],
-        )
-        assert len(resp.items) == 1
-        assert resp.items[0].type == "group"
+    def test_raw_list(self) -> None:
+        resp = ListClusterTemplatesResponse.model_validate([
+            {
+                "name": "cluster",
+                "id": "abc",
+                "created_at": "2024-01-01T00:00:00Z",
+                "is_owner": True,
+                "user": "u1",
+                "group": "g1",
+                "user_email": None,
+                "group_name": "grp",
+                "type": "group",
+            },
+        ])
+        assert len(resp.root) == 1
+        assert resp.root[0].type == "group"
 
 
 class TestGetClusterTemplateResponse:
     def test_instantiation(self) -> None:
-        resp = GetClusterTemplateResponse(template={"nodes": []})
-        assert resp.template == {"nodes": []}
+        resp = GetClusterTemplateResponse.model_validate({"nodes": []})
+        assert resp.root == {"nodes": []}
 
 
 class TestUpdateClusterTemplateResponse:
