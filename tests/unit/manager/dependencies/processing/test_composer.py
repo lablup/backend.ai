@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -114,9 +115,8 @@ class TestProcessingComposer:
                 mock_event_dispatcher.start.assert_called_once()
 
                 # Verify bgtask registry was set
-                setup_input.background_task_manager.set_registry.assert_called_once_with(
-                    mock_registry
-                )
+                mock_bgtask_mgr = cast(MagicMock, setup_input.background_task_manager)
+                mock_bgtask_mgr.set_registry.assert_called_once_with(mock_registry)
 
     @pytest.mark.asyncio
     @patch(
@@ -145,33 +145,36 @@ class TestProcessingComposer:
         """
         call_order: list[str] = []
 
+        def _track(label: str, return_value: Any) -> Any:
+            """Record the call order and return the mock object."""
+            call_order.append(label)
+            return return_value
+
         mock_event_dispatcher = MagicMock()
         mock_event_dispatcher.start = AsyncMock(
             side_effect=lambda: call_order.append("dispatcher.start")
         )
         mock_event_dispatcher.close = AsyncMock()
         mock_dispatcher_class.return_value = mock_event_dispatcher
-        mock_dispatcher_class.side_effect = (
-            lambda *a, **kw: call_order.append("EventDispatcher") or mock_event_dispatcher
+        mock_dispatcher_class.side_effect = lambda *a, **kw: _track(
+            "EventDispatcher", mock_event_dispatcher
         )
 
         mock_processors = MagicMock()
-        mock_processors_class.create.side_effect = (
-            lambda *a, **kw: call_order.append("Processors.create") or mock_processors
+        mock_processors_class.create.side_effect = lambda *a, **kw: _track(
+            "Processors.create", mock_processors
         )
 
         mock_dispatchers = MagicMock()
         mock_dispatchers.dispatch.side_effect = lambda *a: call_order.append("dispatchers.dispatch")
         mock_dispatchers_class.return_value = mock_dispatchers
-        mock_dispatchers_class.side_effect = (
-            lambda *a, **kw: call_order.append("Dispatchers") or mock_dispatchers
+        mock_dispatchers_class.side_effect = lambda *a, **kw: _track(
+            "Dispatchers", mock_dispatchers
         )
 
         mock_registry = MagicMock()
         mock_registry_class.return_value = mock_registry
-        mock_registry_class.side_effect = (
-            lambda *a, **kw: call_order.append("BgtaskRegistry") or mock_registry
-        )
+        mock_registry_class.side_effect = lambda *a, **kw: _track("BgtaskRegistry", mock_registry)
 
         setup_input = _make_processing_input()
         composer = ProcessingComposer()

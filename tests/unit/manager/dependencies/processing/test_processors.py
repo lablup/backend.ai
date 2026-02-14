@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.dependencies.processing.processors import (
     ProcessorsDependency,
     ProcessorsProviderInput,
@@ -24,7 +25,7 @@ class TestProcessorsDependency:
         mock_processors_class.create.return_value = mock_processors
 
         mock_service_args = MagicMock()
-        mock_monitors = [MagicMock(), MagicMock()]
+        mock_monitors: list[ActionMonitor] = [MagicMock(), MagicMock()]
 
         dependency = ProcessorsDependency()
         processors_input = ProcessorsProviderInput(
