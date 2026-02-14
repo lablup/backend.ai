@@ -5,7 +5,6 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
-from typing import Any
 from uuid import UUID
 
 from pydantic import AliasChoices, Field
@@ -164,6 +163,6 @@ class PerformSchedulerOpsRequest(BaseRequestModel):
     op: SchedulerOps = Field(
         description="Scheduler operation to perform",
     )
-    args: Any = Field(
-        description="Arguments for the scheduler operation (e.g., list of agent IDs)",
+    args: list[str] = Field(
+        description="List of agent IDs to include or exclude from scheduling",
     )
