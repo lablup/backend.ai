@@ -8,7 +8,7 @@ from ai.backend.client.v2.auth import AuthStrategy
 from ai.backend.client.v2.config import ClientConfig
 
 
-class MockAuth:
+class MockAuth(AuthStrategy):
     """A mock auth strategy for testing that returns predictable headers."""
 
     def sign(

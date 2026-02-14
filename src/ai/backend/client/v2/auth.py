@@ -1,14 +1,14 @@
+from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Protocol, runtime_checkable
 
 from yarl import URL
 
 from ai.backend.common.auth.utils import generate_signature
 
 
-@runtime_checkable
-class AuthStrategy(Protocol):
+class AuthStrategy(metaclass=ABCMeta):
+    @abstractmethod
     def sign(
         self,
         method: str,
@@ -20,7 +20,7 @@ class AuthStrategy(Protocol):
     ) -> Mapping[str, str]: ...
 
 
-class HMACAuth:
+class HMACAuth(AuthStrategy):
     def __init__(
         self,
         access_key: str,

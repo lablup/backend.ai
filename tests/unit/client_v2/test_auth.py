@@ -37,6 +37,6 @@ class TestHMACAuth:
         )
         assert "HMAC-SHA512" in headers["Authorization"]
 
-    def test_satisfies_auth_strategy_protocol(self) -> None:
+    def test_is_auth_strategy_subclass(self) -> None:
         auth = HMACAuth(access_key="test", secret_key="test")
         assert isinstance(auth, AuthStrategy)

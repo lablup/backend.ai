@@ -13,8 +13,6 @@ from .auth import AuthStrategy
 from .config import ClientConfig
 from .exceptions import map_status_to_exception
 
-type ResponseT = BaseResponseModel
-
 
 class BackendAIClient:
     """Async HTTP client for Backend.AI REST API.
@@ -25,31 +23,36 @@ class BackendAIClient:
 
     _config: ClientConfig
     _auth: AuthStrategy
-    _session: aiohttp.ClientSession | None
+    __session: aiohttp.ClientSession | None
 
     def __init__(self, config: ClientConfig, auth: AuthStrategy) -> None:
         self._config = config
         self._auth = auth
-        self._session = None
+        self.__session = None
 
-    def _ensure_session(self) -> aiohttp.ClientSession:
-        if self._session is None:
+    @property
+    def _session(self) -> aiohttp.ClientSession:
+        if self.__session is None:
             ssl_context: ssl.SSLContext | bool = not self._config.skip_ssl_verification
             connector = aiohttp.TCPConnector(ssl=ssl_context)
             timeout = aiohttp.ClientTimeout(
                 sock_connect=self._config.connection_timeout or None,
                 sock_read=self._config.read_timeout or None,
             )
-            self._session = aiohttp.ClientSession(
+            self.__session = aiohttp.ClientSession(
                 connector=connector,
                 timeout=timeout,
             )
-        return self._session
+        return self.__session
+
+    @_session.setter
+    def _session(self, value: aiohttp.ClientSession) -> None:
+        self.__session = value
 
     async def close(self) -> None:
-        if self._session is not None:
-            await self._session.close()
-            self._session = None
+        if self.__session is not None:
+            await self.__session.close()
+            self.__session = None
 
     def _build_url(self, path: str) -> str:
         base = str(self._config.endpoint).rstrip("/")
@@ -81,7 +84,7 @@ class BackendAIClient:
         json: Any | None = None,
         params: dict[str, str] | None = None,
     ) -> dict[str, Any]:
-        session = self._ensure_session()
+        session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
         headers = self._sign(method, rel_url, content_type)

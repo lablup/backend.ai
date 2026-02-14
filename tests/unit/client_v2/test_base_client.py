@@ -44,8 +44,8 @@ class TestBackendAIClient:
         assert "X-BackendAI-Version" in headers
         assert headers["Content-Type"] == "application/json"
 
-    def test_session_lazy_initialized(self, client: BackendAIClient) -> None:
-        assert client._session is None
+    def test_session_lazily_created(self, client: BackendAIClient) -> None:
+        assert client._BackendAIClient__session is None  # type: ignore[attr-defined]
 
     def test_docstring_mentions_pydantic(self) -> None:
         assert "Pydantic" in (BackendAIClient.__doc__ or "")
