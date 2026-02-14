@@ -15,19 +15,34 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
+    KernelUsageRecordRow,
     ProjectUsageBucketRow,
     UsageBucketEntryRow,
     UserUsageBucketRow,
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.resource_usage_history.db_source.db_source import (
     ResourceUsageHistoryDBSource,
 )
 from ai.backend.manager.sokovan.scheduler.fair_share.aggregator import (
+    BucketDelta,
     DomainUsageBucketKey,
     UsageBucketAggregationResult,
     UserUsageBucketKey,
@@ -46,8 +61,22 @@ class TestUsageBucketEntries:
         async with with_tables(
             database_connection,
             [
+                # Base rows in FK dependency order (parents before children)
                 DomainRow,
                 ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                AgentRow,
+                ImageRow,
+                SessionRow,
+                KernelRow,
+                # Resource Usage History rows
+                KernelUsageRecordRow,
                 DomainUsageBucketRow,
                 ProjectUsageBucketRow,
                 UserUsageBucketRow,
@@ -67,7 +96,7 @@ class TestUsageBucketEntries:
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -90,7 +119,8 @@ class TestUsageBucketEntries:
         test_domain_name: str,
     ) -> None:
         """Verify that incrementing domain buckets also writes normalized entries."""
-        delta = ResourceSlot({"cpu": Decimal("600"), "mem": Decimal("4096000")})
+        raw_slots = ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096000")})
+        duration = 300  # 5-minute slice
         period = date(2024, 1, 15)
 
         result = UsageBucketAggregationResult(
@@ -101,13 +131,13 @@ class TestUsageBucketEntries:
                     domain_name=test_domain_name,
                     resource_group="default",
                     period_date=period,
-                ): delta,
+                ): BucketDelta(slots=raw_slots, duration_seconds=duration),
             },
         )
 
         await db_source.increment_usage_buckets(result)
 
-        # Verify entries were created
+        # Verify entries were created with separated amount/duration
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             entry_rows = (
                 (
@@ -125,9 +155,10 @@ class TestUsageBucketEntries:
             slot_map = {e.slot_name: e for e in entry_rows}
             assert "cpu" in slot_map
             assert "mem" in slot_map
-            assert slot_map["cpu"].amount == Decimal("600")
+            assert slot_map["cpu"].amount == Decimal("2")
             assert slot_map["mem"].amount == Decimal("4096000")
-            assert slot_map["cpu"].duration_seconds == 86400
+            assert slot_map["cpu"].duration_seconds == 300
+            assert slot_map["mem"].duration_seconds == 300
 
     @pytest.mark.asyncio
     async def test_increment_accumulates_entries(
@@ -136,7 +167,7 @@ class TestUsageBucketEntries:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
     ) -> None:
-        """Verify that multiple increments accumulate in entries."""
+        """Verify that multiple increments accumulate amount and duration."""
         period = date(2024, 1, 15)
         key = DomainUsageBucketKey(
             domain_name=test_domain_name,
@@ -144,25 +175,33 @@ class TestUsageBucketEntries:
             period_date=period,
         )
 
-        # First increment
-        delta1 = ResourceSlot({"cpu": Decimal("300")})
+        # First increment: 2 CPUs for 300 seconds
         result1 = UsageBucketAggregationResult(
             user_usage_deltas={},
             project_usage_deltas={},
-            domain_usage_deltas={key: delta1},
+            domain_usage_deltas={
+                key: BucketDelta(
+                    slots=ResourceSlot({"cpu": Decimal("2")}),
+                    duration_seconds=300,
+                ),
+            },
         )
         await db_source.increment_usage_buckets(result1)
 
-        # Second increment
-        delta2 = ResourceSlot({"cpu": Decimal("200")})
+        # Second increment: 3 CPUs for 300 seconds
         result2 = UsageBucketAggregationResult(
             user_usage_deltas={},
             project_usage_deltas={},
-            domain_usage_deltas={key: delta2},
+            domain_usage_deltas={
+                key: BucketDelta(
+                    slots=ResourceSlot({"cpu": Decimal("3")}),
+                    duration_seconds=300,
+                ),
+            },
         )
         await db_source.increment_usage_buckets(result2)
 
-        # Verify accumulated
+        # Verify accumulated: amount = 2 + 3 = 5, duration = 300 + 300 = 600
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             entry_rows = (
                 (
@@ -178,7 +217,8 @@ class TestUsageBucketEntries:
 
             assert len(entry_rows) == 1
             assert entry_rows[0].slot_name == "cpu"
-            assert entry_rows[0].amount == Decimal("500")
+            assert entry_rows[0].amount == Decimal("5")
+            assert entry_rows[0].duration_seconds == 600
 
     @pytest.mark.asyncio
     async def test_increment_user_buckets_creates_entries(
@@ -190,7 +230,8 @@ class TestUsageBucketEntries:
         """Verify that incrementing user buckets also writes normalized entries."""
         user_uuid = uuid.uuid4()
         project_id = uuid.uuid4()
-        delta = ResourceSlot({"cpu": Decimal("900"), "cuda.device": Decimal("1200")})
+        raw_slots = ResourceSlot({"cpu": Decimal("3"), "cuda.device": Decimal("2")})
+        duration = 300  # 5-minute slice
         period = date(2024, 1, 15)
 
         result = UsageBucketAggregationResult(
@@ -201,7 +242,7 @@ class TestUsageBucketEntries:
                     domain_name=test_domain_name,
                     resource_group="default",
                     period_date=period,
-                ): delta,
+                ): BucketDelta(slots=raw_slots, duration_seconds=duration),
             },
             project_usage_deltas={},
             domain_usage_deltas={},
@@ -209,7 +250,7 @@ class TestUsageBucketEntries:
 
         await db_source.increment_usage_buckets(result)
 
-        # Verify entries were created
+        # Verify entries were created with separated amount/duration
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             entry_rows = (
                 (
@@ -225,8 +266,9 @@ class TestUsageBucketEntries:
 
             assert len(entry_rows) == 2
             slot_map = {e.slot_name: e for e in entry_rows}
-            assert slot_map["cpu"].amount == Decimal("900")
-            assert slot_map["cuda.device"].amount == Decimal("1200")
+            assert slot_map["cpu"].amount == Decimal("3")
+            assert slot_map["cuda.device"].amount == Decimal("2")
+            assert slot_map["cpu"].duration_seconds == 300
 
     @pytest.mark.asyncio
     async def test_aggregated_usage_reads_from_entries(
@@ -239,7 +281,7 @@ class TestUsageBucketEntries:
         period1 = date(2024, 1, 15)
         period2 = date(2024, 1, 16)
 
-        # Insert two domain buckets with entries
+        # Insert two domain buckets with entries (raw amount, not resource-seconds)
         result = UsageBucketAggregationResult(
             user_usage_deltas={},
             project_usage_deltas={},
@@ -248,17 +290,23 @@ class TestUsageBucketEntries:
                     domain_name=test_domain_name,
                     resource_group="default",
                     period_date=period1,
-                ): ResourceSlot({"cpu": Decimal("600")}),
+                ): BucketDelta(
+                    slots=ResourceSlot({"cpu": Decimal("2")}),
+                    duration_seconds=300,
+                ),
                 DomainUsageBucketKey(
                     domain_name=test_domain_name,
                     resource_group="default",
                     period_date=period2,
-                ): ResourceSlot({"cpu": Decimal("400")}),
+                ): BucketDelta(
+                    slots=ResourceSlot({"cpu": Decimal("3")}),
+                    duration_seconds=300,
+                ),
             },
         )
         await db_source.increment_usage_buckets(result)
 
-        # Query aggregated usage
+        # Query aggregated usage — SUM(amount) across buckets
         aggregated = await db_source.get_aggregated_usage_by_domain(
             resource_group="default",
             lookback_start=date(2024, 1, 14),
@@ -266,4 +314,5 @@ class TestUsageBucketEntries:
         )
 
         assert test_domain_name in aggregated
-        assert aggregated[test_domain_name]["cpu"] == Decimal("1000")
+        # 2 + 3 = 5 (raw amounts summed across buckets)
+        assert aggregated[test_domain_name]["cpu"] == Decimal("5")
