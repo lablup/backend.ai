@@ -43,6 +43,7 @@ from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
     ProjectUsageBucketRow,
+    UsageBucketEntryRow,
     UserUsageBucketRow,
 )
 from ai.backend.manager.models.scaling_group import (
@@ -1559,79 +1560,124 @@ class FairShareDBSource:
         lookback_start: date,
         lookback_end: date,
     ) -> RawUsageBucketsByLevel:
-        """Fetch raw usage buckets without applying decay.
+        """Fetch raw usage buckets from normalized entries without applying decay.
 
-        Returns per-date buckets for each entity. The Calculator is responsible
-        for applying time decay to these raw values.
+        Reads from usage_bucket_entries joined with parent bucket tables.
+        Returns per-date ResourceSlot buckets for each entity.
+        The Calculator is responsible for applying time decay to these raw values.
         """
-        # Fetch user usage buckets
-        user_query = sa.select(
-            UserUsageBucketRow.user_uuid,
-            UserUsageBucketRow.project_id,
-            UserUsageBucketRow.period_start,
-            UserUsageBucketRow.resource_usage,
-        ).where(
-            sa.and_(
-                UserUsageBucketRow.resource_group == scaling_group,
-                UserUsageBucketRow.period_start >= lookback_start,
-                UserUsageBucketRow.period_start <= lookback_end,
+        ube = UsageBucketEntryRow.__table__
+
+        # Fetch user usage buckets via normalized entries
+        user_query = (
+            sa.select(
+                UserUsageBucketRow.user_uuid,
+                UserUsageBucketRow.project_id,
+                UserUsageBucketRow.period_start,
+                ube.c.slot_name,
+                ube.c.amount,
+            )
+            .select_from(
+                sa.join(
+                    UserUsageBucketRow.__table__,
+                    ube,
+                    UserUsageBucketRow.__table__.c.id == ube.c.bucket_id,
+                )
+            )
+            .where(
+                sa.and_(
+                    UserUsageBucketRow.resource_group == scaling_group,
+                    UserUsageBucketRow.period_start >= lookback_start,
+                    UserUsageBucketRow.period_start <= lookback_end,
+                    ube.c.bucket_type == "user",
+                )
             )
         )
         user_result = await db_sess.execute(user_query)
         user_rows = user_result.all()
 
-        # Fetch project usage buckets
-        project_query = sa.select(
-            ProjectUsageBucketRow.project_id,
-            ProjectUsageBucketRow.period_start,
-            ProjectUsageBucketRow.resource_usage,
-        ).where(
-            sa.and_(
-                ProjectUsageBucketRow.resource_group == scaling_group,
-                ProjectUsageBucketRow.period_start >= lookback_start,
-                ProjectUsageBucketRow.period_start <= lookback_end,
+        # Fetch project usage buckets via normalized entries
+        project_query = (
+            sa.select(
+                ProjectUsageBucketRow.project_id,
+                ProjectUsageBucketRow.period_start,
+                ube.c.slot_name,
+                ube.c.amount,
+            )
+            .select_from(
+                sa.join(
+                    ProjectUsageBucketRow.__table__,
+                    ube,
+                    ProjectUsageBucketRow.__table__.c.id == ube.c.bucket_id,
+                )
+            )
+            .where(
+                sa.and_(
+                    ProjectUsageBucketRow.resource_group == scaling_group,
+                    ProjectUsageBucketRow.period_start >= lookback_start,
+                    ProjectUsageBucketRow.period_start <= lookback_end,
+                    ube.c.bucket_type == "project",
+                )
             )
         )
         project_result = await db_sess.execute(project_query)
         project_rows = project_result.all()
 
-        # Fetch domain usage buckets
-        domain_query = sa.select(
-            DomainUsageBucketRow.domain_name,
-            DomainUsageBucketRow.period_start,
-            DomainUsageBucketRow.resource_usage,
-        ).where(
-            sa.and_(
-                DomainUsageBucketRow.resource_group == scaling_group,
-                DomainUsageBucketRow.period_start >= lookback_start,
-                DomainUsageBucketRow.period_start <= lookback_end,
+        # Fetch domain usage buckets via normalized entries
+        domain_query = (
+            sa.select(
+                DomainUsageBucketRow.domain_name,
+                DomainUsageBucketRow.period_start,
+                ube.c.slot_name,
+                ube.c.amount,
+            )
+            .select_from(
+                sa.join(
+                    DomainUsageBucketRow.__table__,
+                    ube,
+                    DomainUsageBucketRow.__table__.c.id == ube.c.bucket_id,
+                )
+            )
+            .where(
+                sa.and_(
+                    DomainUsageBucketRow.resource_group == scaling_group,
+                    DomainUsageBucketRow.period_start >= lookback_start,
+                    DomainUsageBucketRow.period_start <= lookback_end,
+                    ube.c.bucket_type == "domain",
+                )
             )
         )
         domain_result = await db_sess.execute(domain_query)
         domain_rows = domain_result.all()
 
-        # Organize into per-date buckets (no decay applied)
+        # Organize into per-date ResourceSlot buckets (no decay applied)
         user_buckets: dict[UserProjectKey, dict[date, ResourceSlot]] = {}
-        for user_row in user_rows:
-            key = UserProjectKey(user_row.user_uuid, user_row.project_id)
+        for row in user_rows:
+            key = UserProjectKey(row.user_uuid, row.project_id)
             if key not in user_buckets:
                 user_buckets[key] = {}
-            user_buckets[key][user_row.period_start] = user_row.resource_usage
+            if row.period_start not in user_buckets[key]:
+                user_buckets[key][row.period_start] = ResourceSlot()
+            user_buckets[key][row.period_start][row.slot_name] = Decimal(str(row.amount))
 
         project_buckets: dict[uuid.UUID, dict[date, ResourceSlot]] = {}
-        for project_row in project_rows:
-            if project_row.project_id not in project_buckets:
-                project_buckets[project_row.project_id] = {}
-            project_buckets[project_row.project_id][project_row.period_start] = (
-                project_row.resource_usage
+        for row in project_rows:
+            if row.project_id not in project_buckets:
+                project_buckets[row.project_id] = {}
+            if row.period_start not in project_buckets[row.project_id]:
+                project_buckets[row.project_id][row.period_start] = ResourceSlot()
+            project_buckets[row.project_id][row.period_start][row.slot_name] = Decimal(
+                str(row.amount)
             )
 
         domain_buckets: dict[str, dict[date, ResourceSlot]] = {}
-        for domain_row in domain_rows:
-            if domain_row.domain_name not in domain_buckets:
-                domain_buckets[domain_row.domain_name] = {}
-            domain_buckets[domain_row.domain_name][domain_row.period_start] = (
-                domain_row.resource_usage
+        for row in domain_rows:
+            if row.domain_name not in domain_buckets:
+                domain_buckets[row.domain_name] = {}
+            if row.period_start not in domain_buckets[row.domain_name]:
+                domain_buckets[row.domain_name][row.period_start] = ResourceSlot()
+            domain_buckets[row.domain_name][row.period_start][row.slot_name] = Decimal(
+                str(row.amount)
             )
 
         return RawUsageBucketsByLevel(
