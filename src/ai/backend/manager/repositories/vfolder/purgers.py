@@ -7,6 +7,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.types import EntityType
 from ai.backend.manager.models.vfolder.row import VFolderInvitationRow, VFolderPermissionRow
@@ -55,3 +56,7 @@ class VFolderPurgerSpec(RBACEntityPurgerSpec):
                 entity_id=str(self.vfolder_id),
             )
         )
+
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.VFOLDER
