@@ -9,7 +9,7 @@ from typing import TypeVar
 from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import EntityType, RelationType, ScopeType
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
@@ -44,6 +44,7 @@ class RBACEntityCreator[TRow: Base]:
     entity_type: EntityType
     scope_ref: ScopeId
     additional_scope_refs: Sequence[ScopeId] = field(default_factory=list)
+    relation_type: RelationType = RelationType.AUTO
 
 
 @dataclass
@@ -101,6 +102,7 @@ async def execute_rbac_entity_creator[TRow: Base](
                 scope_id=scope_ref.scope_id,
                 entity_type=creator.entity_type,
                 entity_id=str(pk_value),
+                relation_type=creator.relation_type,
             ),
         )
 
@@ -127,6 +129,7 @@ class RBACBulkEntityCreator[TRow: Base]:
     scope_type: ScopeType
     scope_id: str
     entity_type: EntityType
+    relation_type: RelationType = RelationType.AUTO
 
 
 @dataclass
@@ -177,6 +180,7 @@ async def execute_rbac_bulk_entity_creator[TRow: Base](
             scope_id=creator.scope_id,
             entity_type=creator.entity_type,
             entity_id=str(inspect(row).identity[0]),
+            relation_type=creator.relation_type,
         )
         for row in rows
     ]
