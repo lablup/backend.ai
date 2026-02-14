@@ -319,13 +319,13 @@ class VfolderRepository:
                 })
                 await session.execute(permission_insert)
 
-                # Add object permission to user's role using RBACGranter
+                # Add permission to user's role using RBACGranter (entity-as-scope)
                 granter = RBACGranter(
                     granted_entity_id=ObjectId(
                         entity_type=EntityType.VFOLDER,
                         entity_id=str(params.id),
                     ),
-                    granted_entity_scope_id=ScopeId(scope_type, scope_id),
+                    granted_entity_scope_type=ScopeType.VFOLDER,
                     target_role_ids=[user_role_id],
                     operations=[OperationType.READ],
                 )
@@ -486,13 +486,10 @@ class VfolderRepository:
         Create a VFolder permission entry.
         """
         async with self._db.begin_session() as session:
-            # Get vfolder to determine its scope
+            # Verify vfolder exists
             vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
             if vfolder_row is None:
                 raise VFolderNotFound()
-            vfolder_data = self._vfolder_row_to_data(vfolder_row)
-            vfolder_scope = self._get_vfolder_scope(vfolder_data)
-
             # Get user's role_id
             user_role_id = await self._get_user_role_id(session, user_id)
 
@@ -507,13 +504,13 @@ class VfolderRepository:
             query = sa.insert(VFolderPermissionRow).values(insert_values)
             await session.execute(query)
 
-            # Grant object permission to user's role using RBACGranter
+            # Grant permission to user's role using RBACGranter (entity-as-scope)
             granter = RBACGranter(
                 granted_entity_id=ObjectId(
                     entity_type=EntityType.VFOLDER,
                     entity_id=str(vfolder_id),
                 ),
-                granted_entity_scope_id=vfolder_scope,
+                granted_entity_scope_type=ScopeType.VFOLDER,
                 target_role_ids=[user_role_id],
                 operations=list(permission.to_rbac_operation()),
             )
