@@ -122,36 +122,3 @@ class BackendAIClient:
         json_body = request.model_dump(exclude_none=True) if request is not None else None
         data = await self._request(method, path, json=json_body, params=params)
         return response_model.model_validate(data)
-
-    async def fire_and_forget(
-        self,
-        method: str,
-        path: str,
-        *,
-        request: BaseRequestModel | None = None,
-        params: dict[str, str] | None = None,
-    ) -> None:
-        """Send a request and discard the response body.
-
-        Use this for endpoints that return ``204 No Content`` or similar
-        status codes with no JSON body.
-        """
-        json_body = request.model_dump(exclude_none=True) if request is not None else None
-        session = self._session
-        content_type = "application/json"
-        rel_url = "/" + path.lstrip("/")
-        headers = self._sign(method, rel_url, content_type)
-        url = self._build_url(path)
-        async with session.request(
-            method,
-            url,
-            headers=headers,
-            json=json_body,
-            params=params,
-        ) as resp:
-            if resp.status >= 400:
-                try:
-                    data = await resp.json()
-                except Exception:
-                    data = await resp.text()
-                raise map_status_to_exception(resp.status, resp.reason or "", data)

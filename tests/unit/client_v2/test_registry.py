@@ -9,7 +9,6 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.auth import AuthClient
 from ai.backend.client.v2.domains.config import ConfigClient
 from ai.backend.client.v2.domains.container_registry import ContainerRegistryClient
-from ai.backend.client.v2.domains.group import GroupClient
 from ai.backend.client.v2.domains.infra import InfraClient
 from ai.backend.client.v2.domains.model_serving import ModelServingClient
 from ai.backend.client.v2.domains.operations import OperationsClient
@@ -50,7 +49,6 @@ class TestBackendAIClientRegistry:
         assert isinstance(registry.template, TemplateClient)
         assert isinstance(registry.operations, OperationsClient)
         assert isinstance(registry.container_registry, ContainerRegistryClient)
-        assert isinstance(registry.group, GroupClient)
         assert isinstance(registry.storage, StorageClient)
 
     def test_domain_clients_inherit_base(self, registry: BackendAIClientRegistry) -> None:
