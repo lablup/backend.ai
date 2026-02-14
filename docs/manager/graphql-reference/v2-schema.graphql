@@ -799,6 +799,12 @@ type ArtifactVerifierResultEntry {
   result: ArtifactVerifierResult!
 }
 
+"""Added in 26.3.0. Input for assigning a role to a user"""
+input AssignRoleInput {
+  userId: UUID!
+  roleId: UUID!
+}
+
 """Added in 25.1.0"""
 enum AutoScalingMetricSource {
   KERNEL
@@ -1189,6 +1195,15 @@ type CreateObjectStoragePayload {
   objectStorage: ObjectStorage!
 }
 
+"""Added in 26.3.0. Input for creating a scoped permission"""
+input CreatePermissionInput {
+  roleId: UUID!
+  scopeType: EntityType!
+  scopeId: String!
+  entityType: EntityType!
+  operation: OperationType!
+}
+
 """Added in 25.14.0"""
 input CreateReservoirRegistryInput {
   name: String!
@@ -1219,6 +1234,13 @@ input CreateRevisionInput {
 """Added in 25.16.0"""
 type CreateRevisionPayload {
   revision: ModelRevision!
+}
+
+"""Added in 26.3.0. Input for creating a role"""
+input CreateRoleInput {
+  name: String!
+  description: String = null
+  source: RoleSource = null
 }
 
 """
@@ -1494,6 +1516,16 @@ type DeleteObjectStoragePayload {
   id: ID!
 }
 
+"""Added in 26.3.0. Input for deleting a scoped permission"""
+input DeletePermissionInput {
+  id: UUID!
+}
+
+"""Added in 26.3.0. Payload for delete permission mutation"""
+type DeletePermissionPayload {
+  id: ID!
+}
+
 """Added in 25.14.0"""
 input DeleteReservoirRegistryInput {
   id: ID!
@@ -1501,6 +1533,16 @@ input DeleteReservoirRegistryInput {
 
 """Added in 25.14.0"""
 type DeleteReservoirRegistryPayload {
+  id: ID!
+}
+
+"""Added in 26.3.0. Input for soft-deleting a role"""
+input DeleteRoleInput {
+  id: UUID!
+}
+
+"""Added in 26.3.0. Payload for delete role mutation"""
+type DeleteRolePayload {
   id: ID!
 }
 
@@ -2215,6 +2257,21 @@ input EmailSpecInput {
   auth: SMTPAuthInput = null
 }
 
+"""Added in 26.3.0. Entity connection"""
+type EntityConnection {
+  edges: [EntityEdge!]!
+  pageInfo: PageInfo!
+  count: Int!
+}
+
+"""Added in 26.3.0. Entity edge"""
+type EntityEdge {
+  node: EntityNode!
+  cursor: String!
+}
+
+union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ArtifactRevision | Role
+
 """
 Added in 26.2.0. Common timestamp fields for entity lifecycle tracking. Reusable across different entity types.
 """
@@ -2224,6 +2281,28 @@ type EntityTimestamps {
 
   """Timestamp when this entity was last modified."""
   modifiedAt: DateTime
+}
+
+"""Added in 26.3.0. RBAC entity type"""
+enum EntityType {
+  USER
+  PROJECT
+  DOMAIN
+  VFOLDER
+  IMAGE
+  SESSION
+  ARTIFACT
+  ARTIFACT_REGISTRY
+  ARTIFACT_REVISION
+  APP_CONFIG
+  NOTIFICATION_CHANNEL
+  NOTIFICATION_RULE
+  MODEL_DEPLOYMENT
+  RESOURCE_GROUP
+  CONTAINER_REGISTRY
+  STORAGE_HOST
+  DEPLOYMENT
+  ROLE
 }
 
 """
@@ -3740,6 +3819,30 @@ type Mutation {
   Added in 26.2.0. Permanently delete multiple users (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted.
   """
   adminPurgeUsers(input: PurgeUsersV2Input!): PurgeUsersV2Payload!
+
+  """Added in 26.3.0. Create a new role (admin only)."""
+  adminCreateRole(input: CreateRoleInput!): Role!
+
+  """Added in 26.3.0. Update an existing role (admin only)."""
+  adminUpdateRole(input: UpdateRoleInput!): Role!
+
+  """Added in 26.3.0. Soft-delete a role (admin only)."""
+  adminDeleteRole(input: DeleteRoleInput!): DeleteRolePayload!
+
+  """Added in 26.3.0. Permanently remove a role (admin only)."""
+  adminPurgeRole(input: PurgeRoleInput!): PurgeRolePayload!
+
+  """Added in 26.3.0. Create a scoped permission (admin only)."""
+  adminCreatePermission(input: CreatePermissionInput!): Permission!
+
+  """Added in 26.3.0. Delete a scoped permission (admin only)."""
+  adminDeletePermission(input: DeletePermissionInput!): DeletePermissionPayload!
+
+  """Added in 26.3.0. Assign a role to a user (admin only)."""
+  adminAssignRole(input: AssignRoleInput!): RoleAssignment!
+
+  """Added in 26.3.0. Revoke a role from a user (admin only)."""
+  adminRevokeRole(input: RevokeRoleInput!): RoleAssignment!
 }
 
 """An object with a Globally Unique ID"""
@@ -3914,6 +4017,20 @@ type ObjectStorageEdge {
   node: ObjectStorage!
 }
 
+"""Added in 26.3.0. RBAC operation type"""
+enum OperationType {
+  CREATE
+  READ
+  UPDATE
+  SOFT_DELETE
+  HARD_DELETE
+  GRANT_ALL
+  GRANT_READ
+  GRANT_UPDATE
+  GRANT_SOFT_DELETE
+  GRANT_HARD_DELETE
+}
+
 enum OrderDirection {
   ASC
   DESC
@@ -3932,6 +4049,61 @@ type PageInfo @shareable {
 
   """When paginating forwards, the cursor to continue."""
   endCursor: String
+}
+
+"""Added in 26.3.0. RBAC scoped permission"""
+type Permission implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  roleId: UUID!
+  scopeType: EntityType!
+  scopeId: String!
+  entityType: EntityType!
+  operation: OperationType!
+
+  """The role this permission belongs to."""
+  role: Role
+
+  """The scope this permission applies to."""
+  scope: EntityNode
+}
+
+"""Added in 26.3.0. Permission connection"""
+type PermissionConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [PermissionEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type PermissionEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: Permission!
+}
+
+"""Added in 26.3.0. Filter for scoped permissions"""
+input PermissionFilter {
+  roleId: UUID = null
+  scopeType: EntityType = null
+  entityType: EntityType = null
+}
+
+"""Added in 26.3.0. Order by specification for permissions"""
+input PermissionOrderBy {
+  field: PermissionOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.3.0. Permission ordering field"""
+enum PermissionOrderField {
+  ID
+  ENTITY_TYPE
 }
 
 """
@@ -4522,6 +4694,16 @@ input ProjectWeightInputItem {
   weight: Decimal = null
 }
 
+"""Added in 26.3.0. Input for purging a role"""
+input PurgeRoleInput {
+  id: UUID!
+}
+
+"""Added in 26.3.0. Payload for purge role mutation"""
+type PurgeRolePayload {
+  id: ID!
+}
+
 """
 Added in 26.2.0. Input for permanently deleting a user and all associated data. This action is irreversible.
 """
@@ -4788,6 +4970,35 @@ type Query {
   Supports both cursor-based and offset-based pagination.
   """
   adminImageAliases(filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
+
+  """Added in 26.3.0. Get a single role by ID (admin only)."""
+  adminRole(id: UUID!): Role
+
+  """
+  Added in 26.3.0. List roles with filtering and pagination (admin only).
+  """
+  adminRoles(filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection!
+
+  """
+  Added in 26.3.0. List scoped permissions with filtering and pagination (admin only).
+  """
+  adminPermissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection!
+
+  """
+  Added in 26.3.0. List role assignments with filtering and pagination (admin only).
+  """
+  adminRoleAssignments(filter: RoleAssignmentFilter = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
+
+  """
+  Added in 26.3.0. Search entities by type (admin only). Only entity_type selection and pagination are supported. Use each entity's dedicated query for detailed options.
+  """
+  adminEntities(entityType: EntityType!, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection!
+
+  """Added in 26.3.0. List available scope types."""
+  scopeTypes: [EntityType!]!
+
+  """Added in 26.3.0. List available entity types."""
+  entityTypes: [EntityType!]!
 
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
@@ -5469,6 +5680,126 @@ Contains the artifacts that were restored from soft-deleted state.
 """
 type RestoreArtifactsPayload {
   artifacts: [Artifact!]!
+}
+
+"""Added in 26.3.0. Input for revoking a role from a user"""
+input RevokeRoleInput {
+  userId: UUID!
+  roleId: UUID!
+}
+
+"""Added in 26.3.0. RBAC role"""
+type Role implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  description: String
+  source: RoleSource!
+  status: RoleStatus!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  deletedAt: DateTime
+}
+
+"""Added in 26.3.0. RBAC role assignment (user-role association)"""
+type RoleAssignment implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The assigned user ID."""
+  userId: UUID!
+
+  """The assigned role ID."""
+  roleId: UUID!
+
+  """The user who granted this assignment."""
+  grantedBy: UUID
+  grantedAt: DateTime!
+
+  """The assigned role."""
+  role: Role
+
+  """The assigned user."""
+  user: UserV2
+}
+
+"""Added in 26.3.0. Role assignment connection"""
+type RoleAssignmentConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RoleAssignmentEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RoleAssignmentEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RoleAssignment!
+}
+
+"""Added in 26.3.0. Filter for role assignments"""
+input RoleAssignmentFilter {
+  roleId: UUID = null
+}
+
+"""Added in 26.3.0. Role connection"""
+type RoleConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RoleEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RoleEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: Role!
+}
+
+"""Added in 26.3.0. Filter for roles"""
+input RoleFilter {
+  name: StringFilter = null
+  source: [RoleSource!] = null
+  status: [RoleStatus!] = null
+  AND: [RoleFilter!] = null
+  OR: [RoleFilter!] = null
+  NOT: RoleFilter = null
+}
+
+"""Added in 26.3.0. Order by specification for roles"""
+input RoleOrderBy {
+  field: RoleOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.3.0. Role ordering field"""
+enum RoleOrderField {
+  NAME
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""Added in 26.3.0. Role definition source"""
+enum RoleSource {
+  SYSTEM
+  CUSTOM
+}
+
+"""Added in 26.3.0. Role status"""
+enum RoleStatus {
+  ACTIVE
+  INACTIVE
+  DELETED
 }
 
 """Added in 25.19.0. Configuration for rolling update strategy."""
@@ -6268,6 +6599,13 @@ input UpdateResourceGroupInput {
 type UpdateResourceGroupPayload {
   """The updated resource group with new configuration."""
   resourceGroup: ResourceGroup!
+}
+
+"""Added in 26.3.0. Input for updating a role"""
+input UpdateRoleInput {
+  id: UUID!
+  name: String = null
+  description: String = null
 }
 
 """Added in 25.19.0. Input for updating route traffic status."""

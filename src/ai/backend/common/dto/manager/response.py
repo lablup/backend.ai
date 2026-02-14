@@ -6,30 +6,10 @@ from graphql.language.location import FormattedSourceLocation
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.bgtask.types import TaskID
 
-from .field import VFolderItemField
-
-
-class VFolderCreateResponse(BaseResponseModel):
-    item: VFolderItemField
-
-
-class VFolderListResponse(BaseResponseModel):
-    items: list[VFolderItemField] = Field(default_factory=list)
-
-
-class DeleteFilesAsyncResponse(BaseResponseModel):
-    """Response for asynchronous file deletion operation in manager API."""
-
-    bgtask_id: TaskID = Field(
-        description="""
-        Unique identifier for the background file deletion task.
-        Use this ID to subscribe to task progress updates via GraphQL subscriptions
-        or to check the current status of the deletion operation.
-        The task transitions through states: ONGOING → SUCCESS/FAILURE/CANCELLED.
-        """,
-    )
+from .vfolder.response import DeleteFilesAsyncResponse as DeleteFilesAsyncResponse
+from .vfolder.response import VFolderCreateResponse as VFolderCreateResponse
+from .vfolder.response import VFolderListResponse as VFolderListResponse
 
 
 class GraphQLResponse(BaseResponseModel):

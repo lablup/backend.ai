@@ -167,6 +167,23 @@ from .project_v2 import (
     project_domain_v2,
     project_v2,
 )
+from .rbac import (
+    admin_assign_role,
+    admin_create_permission,
+    admin_create_role,
+    admin_delete_permission,
+    admin_delete_role,
+    admin_entities,
+    admin_permissions,
+    admin_purge_role,
+    admin_revoke_role,
+    admin_role,
+    admin_role_assignments,
+    admin_roles,
+    admin_update_role,
+    entity_types,
+    scope_types,
+)
 from .reservoir_registry import (
     create_reservoir_registry,
     delete_reservoir_registry,
@@ -286,6 +303,14 @@ class Query:
     admin_images_v2 = admin_images_v2
     admin_kernels_v2 = admin_kernels_v2
     admin_image_aliases = admin_image_aliases
+    # RBAC Admin APIs
+    admin_role = admin_role
+    admin_roles = admin_roles
+    admin_permissions = admin_permissions
+    admin_role_assignments = admin_role_assignments
+    admin_entities = admin_entities
+    scope_types = scope_types
+    entity_types = entity_types
     # Session Scoped APIs
     session_kernels_v2 = session_kernels_v2
     # Resource Group Scoped APIs
@@ -443,6 +468,15 @@ class Mutation:
     admin_delete_users = admin_delete_users
     admin_purge_user = admin_purge_user
     admin_purge_users = admin_purge_users
+    # RBAC Admin APIs
+    admin_create_role = admin_create_role
+    admin_update_role = admin_update_role
+    admin_delete_role = admin_delete_role
+    admin_purge_role = admin_purge_role
+    admin_create_permission = admin_create_permission
+    admin_delete_permission = admin_delete_permission
+    admin_assign_role = admin_assign_role
+    admin_revoke_role = admin_revoke_role
 
 
 @strawberry.type
