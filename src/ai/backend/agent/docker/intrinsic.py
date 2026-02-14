@@ -1105,10 +1105,9 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
         }
         for index, port_info in enumerate(kernel.service_ports):
             port_name = port_info["name"]
-            if port_name in ("sshd", "ttyd"):
-                intrinsic_ports[port_name] = host_ports[index + 2]
+            intrinsic_ports[port_name] = host_ports[index + 2]
 
         return ContainerNetworkInfo(
             bind_host,
-            {service_name: {port: port} for service_name, port in intrinsic_ports.items()},
+            {service_name: (port, port) for service_name, port in intrinsic_ports.items()},
         )
