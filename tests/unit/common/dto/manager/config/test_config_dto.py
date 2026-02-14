@@ -169,14 +169,14 @@ class TestUserConfigRequests:
 
 class TestGroupConfigRequests:
     def test_create_group_dotfile_with_uuid(self) -> None:
-        group_uuid = "550e8400-e29b-41d4-a716-446655440000"
+        group_uuid = UUID("550e8400-e29b-41d4-a716-446655440000")
         req = CreateGroupDotfileRequest(
             group=group_uuid,
             path=".bashrc",
             data="content",
             permission="644",
         )
-        assert req.group == UUID(group_uuid)
+        assert req.group == group_uuid
 
     def test_create_group_dotfile_with_name(self) -> None:
         req = CreateGroupDotfileRequest(
@@ -196,7 +196,7 @@ class TestGroupConfigRequests:
             "data": "content",
             "permission": "644",
         })
-        assert req.group == UUID("550e8400-e29b-41d4-a716-446655440000")
+        assert str(req.group) == "550e8400-e29b-41d4-a716-446655440000"
 
     def test_group_alias_group_id(self) -> None:
         req = CreateGroupDotfileRequest.model_validate({
