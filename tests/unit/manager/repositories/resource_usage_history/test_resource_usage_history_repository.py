@@ -30,6 +30,7 @@ from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
     KernelUsageRecordRow,
     ProjectUsageBucketRow,
+    UsageBucketEntryRow,
     UserUsageBucketRow,
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
@@ -92,6 +93,7 @@ class TestResourceUsageHistoryRepository:
                 DomainUsageBucketRow,
                 ProjectUsageBucketRow,
                 UserUsageBucketRow,
+                UsageBucketEntryRow,
             ],
         ):
             yield database_connection
@@ -605,6 +607,7 @@ class TestResourceUsageHistoryRepository:
     async def test_get_aggregated_usage_by_user(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group: str,
         test_domain_name: str,
         test_project_id: uuid.UUID,
@@ -613,7 +616,7 @@ class TestResourceUsageHistoryRepository:
         """Test getting aggregated usage by user"""
         today = datetime.now(tz=UTC).date()
 
-        # Create multiple user usage buckets
+        # Create multiple user usage buckets with normalized entries
         for i in range(3):
             bucket_date = today - timedelta(days=i)
             creator = Creator(
@@ -629,7 +632,19 @@ class TestResourceUsageHistoryRepository:
                     capacity_snapshot=ResourceSlot({"cpu": Decimal("8")}),
                 )
             )
-            await resource_usage_history_repository.create_user_usage_bucket(creator)
+            result = await resource_usage_history_repository.create_user_usage_bucket(creator)
+            # Create normalized entries for aggregation queries
+            async with db_with_cleanup.begin_session() as db_sess:
+                db_sess.add(
+                    UsageBucketEntryRow(
+                        bucket_id=result.id,
+                        bucket_type="user",
+                        slot_name="cpu",
+                        amount=Decimal("3600"),
+                        duration_seconds=300,
+                        capacity=Decimal("0"),
+                    )
+                )
 
         # Get aggregated usage
         lookback_start = today - timedelta(days=7)
@@ -667,6 +682,7 @@ class TestResourceUsageHistoryRepository:
     async def test_get_aggregated_usage_by_project(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group: str,
         test_domain_name: str,
         test_project_id: uuid.UUID,
@@ -689,7 +705,19 @@ class TestResourceUsageHistoryRepository:
                     capacity_snapshot=ResourceSlot({"cpu": Decimal("8")}),
                 )
             )
-            await resource_usage_history_repository.create_project_usage_bucket(creator)
+            result = await resource_usage_history_repository.create_project_usage_bucket(creator)
+            # Create normalized entries for aggregation queries
+            async with db_with_cleanup.begin_session() as db_sess:
+                db_sess.add(
+                    UsageBucketEntryRow(
+                        bucket_id=result.id,
+                        bucket_type="project",
+                        slot_name="cpu",
+                        amount=Decimal("7200"),
+                        duration_seconds=300,
+                        capacity=Decimal("0"),
+                    )
+                )
 
         # Get aggregated usage
         lookback_start = today - timedelta(days=7)
@@ -707,6 +735,7 @@ class TestResourceUsageHistoryRepository:
     async def test_get_aggregated_usage_by_domain(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group: str,
         test_domain_name: str,
     ) -> None:
@@ -727,7 +756,19 @@ class TestResourceUsageHistoryRepository:
                     capacity_snapshot=ResourceSlot({"cpu": Decimal("16")}),
                 )
             )
-            await resource_usage_history_repository.create_domain_usage_bucket(creator)
+            result = await resource_usage_history_repository.create_domain_usage_bucket(creator)
+            # Create normalized entries for aggregation queries
+            async with db_with_cleanup.begin_session() as db_sess:
+                db_sess.add(
+                    UsageBucketEntryRow(
+                        bucket_id=result.id,
+                        bucket_type="domain",
+                        slot_name="cpu",
+                        amount=Decimal("86400"),
+                        duration_seconds=300,
+                        capacity=Decimal("0"),
+                    )
+                )
 
         # Get aggregated usage
         lookback_start = today - timedelta(days=7)
