@@ -124,9 +124,10 @@ class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
 
     @classmethod
     def apply_otel(cls, spec: OpenTelemetrySpec) -> None:
-        from .otel import apply_otel_loggers
+        from .otel import apply_otel_loggers, apply_otel_tracer
 
         apply_otel_loggers(cls._loggers, spec)
+        apply_otel_tracer(spec)
 
 
 def enforce_debug_logging(loggers: Iterable[str]) -> None:
