@@ -5,6 +5,7 @@ from __future__ import annotations
 import strawberry
 from strawberry import Info
 
+from ai.backend.manager.api.gql.rbac.fetcher.entity import fetch_entities
 from ai.backend.manager.api.gql.rbac.types import EntityConnection, EntityTypeGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
@@ -29,4 +30,13 @@ async def admin_entities(
     Use dedicated root queries (e.g., admin_users, admin_projects) for
     detailed options including filtering and ordering.
     """
-    raise NotImplementedError
+    return await fetch_entities(
+        info,
+        entity_type=entity_type,
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
+    )
