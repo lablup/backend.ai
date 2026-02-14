@@ -6,14 +6,10 @@ from abc import ABC, abstractmethod
 from collections.abc import Collection
 from dataclasses import dataclass
 from typing import Any, cast
-from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import (
-    selectinload,
-)
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.id import ObjectId
@@ -22,9 +18,7 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec, Purger, PurgerResult, TRow
 
 # =============================================================================
@@ -124,122 +118,8 @@ class RBACEntityBatchPurgerResult:
     """Result of RBAC entity batch purge operation."""
 
     deleted_count: int
-    deleted_object_permission_count: int
+    deleted_permission_count: int
     deleted_scope_association_count: int
-
-
-# =============================================================================
-# Query Helpers (Single Entity)
-# =============================================================================
-
-
-async def _get_related_roles(
-    db_sess: SASession,
-    object_id: ObjectId,
-) -> list[RoleRow]:
-    """
-    Get all roles related to the given entity via object permissions.
-
-    Eagerly loads:
-    - object_permissions with their scope_associations
-    """
-    role_scalars = await db_sess.scalars(
-        sa.select(RoleRow)
-        .join(ObjectPermissionRow, RoleRow.id == ObjectPermissionRow.role_id)
-        .where(
-            sa.and_(
-                ObjectPermissionRow.entity_id == object_id.entity_id,
-                ObjectPermissionRow.entity_type == object_id.entity_type,
-            )
-        )
-        .options(
-            selectinload(RoleRow.object_permission_rows).selectinload(
-                ObjectPermissionRow.scope_association_rows
-            ),
-        )
-    )
-    return list(role_scalars.unique().all())
-
-
-# =============================================================================
-# Query Helpers (Batch)
-# =============================================================================
-
-
-async def _get_related_roles_for_entities(
-    db_sess: SASession,
-    entity_ids: Collection[ObjectId],
-) -> list[RoleRow]:
-    """
-    Get all roles related to multiple entities via object permissions.
-
-    Eagerly loads:
-    - object_permissions with their scope_associations
-    """
-    if not entity_ids:
-        return []
-
-    conditions = [
-        sa.and_(
-            ObjectPermissionRow.entity_id == eid.entity_id,
-            ObjectPermissionRow.entity_type == eid.entity_type,
-        )
-        for eid in entity_ids
-    ]
-
-    role_scalars = await db_sess.scalars(
-        sa.select(RoleRow)
-        .join(ObjectPermissionRow, RoleRow.id == ObjectPermissionRow.role_id)
-        .where(sa.or_(*conditions))
-        .options(
-            selectinload(RoleRow.object_permission_rows).selectinload(
-                ObjectPermissionRow.scope_association_rows
-            ),
-        )
-    )
-    return list(role_scalars.unique().all())
-
-
-# =============================================================================
-# ID Collection Helpers (Pure Functions)
-# =============================================================================
-
-
-def _find_object_permissions_for_entity(
-    role_rows: Collection[RoleRow],
-    entity_to_delete: ObjectId,
-) -> list[UUID]:
-    """Collect object permission IDs that reference the entity to be deleted."""
-    if not role_rows:
-        return []
-    object_permission_ids: list[UUID] = []
-    for role_row in role_rows:
-        for object_permission_row in role_row.object_permission_rows:
-            object_id = object_permission_row.object_id()
-            if object_id == entity_to_delete:
-                object_permission_ids.append(object_permission_row.id)
-    return object_permission_ids
-
-
-# =============================================================================
-# ID Collection Helpers (Batch)
-# =============================================================================
-
-
-def _find_object_permissions_for_entities(
-    role_rows: Collection[RoleRow],
-    entities_to_delete: Collection[ObjectId],
-) -> list[UUID]:
-    """Collect object permission IDs that reference any of the entities to be deleted."""
-    if not role_rows or not entities_to_delete:
-        return []
-    entity_set = set(entities_to_delete)
-    object_permission_ids: list[UUID] = []
-    for role_row in role_rows:
-        for object_permission_row in role_row.object_permission_rows:
-            if object_permission_row.object_id() in entity_set:
-                object_permission_ids.append(object_permission_row.id)
-    return object_permission_ids
 
 
 # =============================================================================
@@ -247,41 +127,41 @@ def _find_object_permissions_for_entities(
 # =============================================================================
 
 
-async def _delete_object_permissions(
+async def _delete_entity_scope_permissions(
     db_sess: SASession,
-    ids: Collection[UUID],
+    element_type: RBACElementType,
+    scope_id: str,
 ) -> None:
-    """Delete ObjectPermissionRows by IDs."""
-    if not ids:
-        return
-    await db_sess.execute(sa.delete(ObjectPermissionRow).where(ObjectPermissionRow.id.in_(ids)))
-
-
-async def _delete_entity_fields(
-    db_sess: SASession,
-    entity_id: ObjectId,
-) -> None:
-    """Delete all EntityFieldRows for the given entity."""
+    """Delete permissions where the entity is used as scope (entity-as-scope pattern)."""
+    scope_type = element_type.to_scope_type()
     await db_sess.execute(
-        sa.delete(EntityFieldRow).where(
+        sa.delete(PermissionRow).where(
             sa.and_(
-                EntityFieldRow.entity_type == entity_id.entity_type.value,
-                EntityFieldRow.entity_id == entity_id.entity_id,
+                PermissionRow.scope_type == scope_type,
+                PermissionRow.scope_id == scope_id,
             )
         )
     )
 
 
-async def _delete_scope_associations(
+async def _delete_scope_associations_bidirectional(
     db_sess: SASession,
     entity_id: ObjectId,
+    element_type: RBACElementType,
 ) -> None:
-    """Delete all scope associations for the given entity."""
+    """Delete all scope associations where the entity is the target or the scope."""
+    scope_type = element_type.to_scope_type()
     await db_sess.execute(
         sa.delete(AssociationScopesEntitiesRow).where(
-            sa.and_(
-                AssociationScopesEntitiesRow.entity_id == entity_id.entity_id,
-                AssociationScopesEntitiesRow.entity_type == entity_id.entity_type,
+            sa.or_(
+                sa.and_(
+                    AssociationScopesEntitiesRow.entity_id == entity_id.entity_id,
+                    AssociationScopesEntitiesRow.entity_type == entity_id.entity_type,
+                ),
+                sa.and_(
+                    AssociationScopesEntitiesRow.scope_type == scope_type,
+                    AssociationScopesEntitiesRow.scope_id == entity_id.entity_id,
+                ),
             )
         )
     )
@@ -292,28 +172,41 @@ async def _delete_scope_associations(
 # =============================================================================
 
 
-async def _batch_delete_object_permissions(
+async def _batch_delete_entity_scope_permissions(
     db_sess: SASession,
-    ids: Collection[UUID],
+    element_type: RBACElementType,
+    entity_ids: Collection[ObjectId],
 ) -> int:
-    """Delete ObjectPermissionRows by IDs. Returns count of deleted rows."""
-    if not ids:
+    """Delete permissions where the entities are used as scope. Returns count of deleted rows."""
+    if not entity_ids:
         return 0
+
+    scope_type = element_type.to_scope_type()
+    scope_id_values = [eid.entity_id for eid in entity_ids]
     result = await db_sess.execute(
-        sa.delete(ObjectPermissionRow).where(ObjectPermissionRow.id.in_(ids))
+        sa.delete(PermissionRow).where(
+            sa.and_(
+                PermissionRow.scope_type == scope_type,
+                PermissionRow.scope_id.in_(scope_id_values),
+            )
+        )
     )
     return cast(CursorResult[Any], result).rowcount or 0
 
 
-async def _batch_delete_scope_associations(
+async def _batch_delete_scope_associations_bidirectional(
     db_sess: SASession,
+    element_type: RBACElementType,
     entity_ids: Collection[ObjectId],
 ) -> int:
-    """Delete scope associations for multiple entities. Returns count of deleted rows."""
+    """Delete scope associations where entities are the target or the scope. Returns count."""
     if not entity_ids:
         return 0
 
-    conditions = [
+    scope_type = element_type.to_scope_type()
+    scope_id_values = [eid.entity_id for eid in entity_ids]
+
+    entity_conditions = [
         sa.and_(
             AssociationScopesEntitiesRow.entity_id == eid.entity_id,
             AssociationScopesEntitiesRow.entity_type == eid.entity_type,
@@ -322,7 +215,15 @@ async def _batch_delete_scope_associations(
     ]
 
     result = await db_sess.execute(
-        sa.delete(AssociationScopesEntitiesRow).where(sa.or_(*conditions))
+        sa.delete(AssociationScopesEntitiesRow).where(
+            sa.or_(
+                *entity_conditions,
+                sa.and_(
+                    AssociationScopesEntitiesRow.scope_type == scope_type,
+                    AssociationScopesEntitiesRow.scope_id.in_(scope_id_values),
+                ),
+            )
+        )
     )
     return cast(CursorResult[Any], result).rowcount or 0
 
@@ -336,7 +237,7 @@ async def _batch_delete_scope_associations(
 class _RBACEntityBatchCleanupCounts:
     """Internal result for batch RBAC cleanup counts."""
 
-    object_permission_count: int
+    permission_count: int
     scope_association_count: int
 
 
@@ -348,48 +249,45 @@ class _RBACEntityBatchCleanupCounts:
 async def _delete_rbac_for_entity(
     db_sess: SASession,
     entity_id: ObjectId,
+    element_type: RBACElementType,
 ) -> None:
     """
     Delete all RBAC entries related to an entity.
 
     Deletion order:
-    1. ObjectPermissionRows - permissions granted on this entity
-    2. AssociationScopesEntitiesRows - scope-entity mappings
-    3. EntityFieldRows - field mappings for this entity
+    1. PermissionRows - permissions where this entity is the scope
+    2. AssociationScopesEntitiesRows - bidirectional (entity as target + entity as scope)
     """
-    # Collect related data
-    role_rows = await _get_related_roles(db_sess, entity_id)
-    object_permission_ids = _find_object_permissions_for_entity(role_rows, entity_id)
+    # 1. Delete permissions where entity is the scope
+    await _delete_entity_scope_permissions(db_sess, element_type, entity_id.entity_id)
 
-    # Execute deletions
-    await _delete_object_permissions(db_sess, object_permission_ids)
-    await _delete_scope_associations(db_sess, entity_id)
-
-    # Delete EntityFieldRows for this entity
-    await _delete_entity_fields(db_sess, entity_id)
+    # 2. Delete scope associations in both directions
+    await _delete_scope_associations_bidirectional(db_sess, entity_id, element_type)
 
 
 async def _batch_delete_rbac_for_entities(
     db_sess: SASession,
     entity_ids: Collection[ObjectId],
+    element_type: RBACElementType,
 ) -> _RBACEntityBatchCleanupCounts:
     """Delete all RBAC entries for multiple entities.
 
     Mirrors _delete_rbac_for_entity() but for batch operations with counts.
 
     Deletion order:
-    1. ObjectPermissionRows - permissions granted on these entities
-    2. AssociationScopesEntitiesRows - scope-entity mappings
+    1. PermissionRows - permissions where these entities are the scope
+    2. AssociationScopesEntitiesRows - bidirectional (entities as target + entities as scope)
     """
-    role_rows = await _get_related_roles_for_entities(db_sess, entity_ids)
+    # 1. Delete permissions where entities are the scope
+    perm_count = await _batch_delete_entity_scope_permissions(db_sess, element_type, entity_ids)
 
-    obj_perm_ids = _find_object_permissions_for_entities(role_rows, entity_ids)
-    obj_perm_count = await _batch_delete_object_permissions(db_sess, obj_perm_ids)
-
-    scope_assoc_count = await _batch_delete_scope_associations(db_sess, entity_ids)
+    # 2. Delete scope associations in both directions
+    scope_assoc_count = await _batch_delete_scope_associations_bidirectional(
+        db_sess, element_type, entity_ids
+    )
 
     return _RBACEntityBatchCleanupCounts(
-        object_permission_count=obj_perm_count,
+        permission_count=perm_count,
         scope_association_count=scope_assoc_count,
     )
 
@@ -432,7 +330,7 @@ async def execute_rbac_entity_purger(
 
     Operations performed:
     1. Get entity info from spec
-    2. Delete RBAC entries (ObjectPermissions/Associations)
+    2. Delete RBAC entries (Permissions/Associations in both directions)
     3. Delete the main object row with RETURNING
 
     Args:
@@ -444,9 +342,10 @@ async def execute_rbac_entity_purger(
     """
     # 1. Get entity info from spec
     entity_id = purger.spec.entity().entity
+    element_type = purger.spec.element_type()
 
     # 2. Delete RBAC entries
-    await _delete_rbac_for_entity(db_sess, entity_id)
+    await _delete_rbac_for_entity(db_sess, entity_id, element_type)
 
     # 3. Delete main row with RETURNING
     row = await _delete_row_by_pk_returning(db_sess, purger)
@@ -464,8 +363,8 @@ async def execute_rbac_entity_batch_purger(
     Execute batch DELETE for scope-scoped entities with RBAC cleanup.
 
     Deletes rows in batches, cleaning up related RBAC entries for each batch:
-    - ObjectPermissionRows for entity_ids
-    - AssociationScopesEntitiesRows for entity_ids
+    - PermissionRows where entities are the scope
+    - AssociationScopesEntitiesRows in both directions (entity as target and as scope)
 
     Args:
         db_sess: Async SQLAlchemy session (must be writable)
@@ -475,7 +374,7 @@ async def execute_rbac_entity_batch_purger(
         RBACEntityBatchPurgerResult with counts of deleted rows
     """
     total_deleted = 0
-    total_obj_perm = 0
+    total_perm = 0
     total_scope_assoc = 0
 
     # Get table and PK info from subquery
@@ -489,7 +388,8 @@ async def execute_rbac_entity_batch_purger(
         )
 
     pk_col = pk_columns[0]
-    entity_type = purger.spec.element_type().to_entity_type()
+    element_type = purger.spec.element_type()
+    entity_type = element_type.to_entity_type()
 
     while True:
         # 1. DELETE with RETURNING - get PKs and delete in one query
@@ -513,8 +413,8 @@ async def execute_rbac_entity_batch_purger(
         ]
 
         # 3. Clean up RBAC entries (after main row deletion - no FK constraint)
-        cleanup = await _batch_delete_rbac_for_entities(db_sess, entity_ids)
-        total_obj_perm += cleanup.object_permission_count
+        cleanup = await _batch_delete_rbac_for_entities(db_sess, entity_ids, element_type)
+        total_perm += cleanup.permission_count
         total_scope_assoc += cleanup.scope_association_count
 
         if batch_deleted < purger.batch_size:
@@ -522,6 +422,6 @@ async def execute_rbac_entity_batch_purger(
 
     return RBACEntityBatchPurgerResult(
         deleted_count=total_deleted,
-        deleted_object_permission_count=total_obj_perm,
+        deleted_permission_count=total_perm,
         deleted_scope_association_count=total_scope_assoc,
     )
