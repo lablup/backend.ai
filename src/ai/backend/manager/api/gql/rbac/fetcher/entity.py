@@ -2,19 +2,27 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from collections.abc import Sequence
+from typing import Protocol
 
 import strawberry
 from strawberry import Info
 
 from ai.backend.manager.api.gql.rbac.types import EntityConnection, EntityTypeGQL
-from ai.backend.manager.api.gql.rbac.types.entity import EntityEdge
+from ai.backend.manager.api.gql.rbac.types.entity import EntityEdge, EntityNode
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+
+class _EdgeLike(Protocol):
+    @property
+    def node(self) -> EntityNode: ...
+    @property
+    def cursor(self) -> str: ...
 
 
 class _PaginatedConnection(Protocol):
     @property
-    def edges(self) -> Any: ...
+    def edges(self) -> Sequence[_EdgeLike]: ...
     @property
     def page_info(self) -> strawberry.relay.PageInfo: ...
     @property
