@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from .domains.auth import AuthClient
     from .domains.config import ConfigClient
     from .domains.container_registry import ContainerRegistryClient
+    from .domains.group import GroupClient
     from .domains.infra import InfraClient
     from .domains.model_serving import ModelServingClient
     from .domains.operations import OperationsClient
@@ -98,6 +99,12 @@ class BackendAIClientRegistry:
         from .domains.container_registry import ContainerRegistryClient
 
         return ContainerRegistryClient(self._client)
+
+    @cached_property
+    def group(self) -> GroupClient:
+        from .domains.group import GroupClient
+
+        return GroupClient(self._client)
 
     @cached_property
     def storage(self) -> StorageClient:
