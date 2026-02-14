@@ -4,7 +4,6 @@ from typing import Protocol, runtime_checkable
 
 from yarl import URL
 
-from ai.backend.client.config import get_env
 from ai.backend.common.auth.utils import generate_signature
 
 
@@ -53,9 +52,3 @@ class HMACAuth:
             hash_type=self.hash_type,
         )
         return headers
-
-    @classmethod
-    def from_env(cls) -> "HMACAuth":
-        access_key: str = get_env("ACCESS_KEY", "")
-        secret_key: str = get_env("SECRET_KEY", "")
-        return cls(access_key=access_key, secret_key=secret_key)

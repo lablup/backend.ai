@@ -1,3 +1,5 @@
+from unittest.mock import AsyncMock
+
 import pytest
 from yarl import URL
 
@@ -54,9 +56,8 @@ class TestBackendAIClientRegistry:
         assert id(registry.session) != id(registry.vfolder)
 
     @pytest.mark.asyncio
-    async def test_context_manager_lifecycle(self) -> None:
-        config = ClientConfig(endpoint=URL("https://api.example.com"))
-        auth = MockAuth()
-        async with BackendAIClientRegistry(config, auth) as api:
-            assert api._client._session is not None
-        assert api._client._session is None
+    async def test_close_delegates_to_client(self, registry: BackendAIClientRegistry) -> None:
+        mock_session = AsyncMock()
+        registry._client._session = mock_session
+        await registry.close()
+        mock_session.close.assert_awaited_once()
