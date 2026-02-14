@@ -11,11 +11,13 @@ from dataclasses import dataclass
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     ProjectFairShareData,
     UserFairShareData,
 )
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
     ProjectNotFound,
@@ -65,6 +67,14 @@ class DomainFairShareSearchScope(SearchScope):
         return inner
 
     @property
+    def target(self) -> ScopeId:
+        return ScopeId(ScopeType.RESOURCE_GROUP, self.resource_group)
+
+    @property
+    def prerequisite_scopes(self) -> set[ScopeId]:
+        return set()
+
+    @property
     def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
         """Return existence checks for scope validation."""
         return [
@@ -101,6 +111,14 @@ class ProjectFairShareSearchScope(SearchScope):
             )
 
         return inner
+
+    @property
+    def target(self) -> ScopeId:
+        return ScopeId(ScopeType.RESOURCE_GROUP, self.resource_group)
+
+    @property
+    def prerequisite_scopes(self) -> set[ScopeId]:
+        return {ScopeId(ScopeType.DOMAIN, self.domain_name)}
 
     @property
     def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
@@ -149,6 +167,17 @@ class UserFairShareSearchScope(SearchScope):
             )
 
         return inner
+
+    @property
+    def target(self) -> ScopeId:
+        return ScopeId(ScopeType.RESOURCE_GROUP, self.resource_group)
+
+    @property
+    def prerequisite_scopes(self) -> set[ScopeId]:
+        return {
+            ScopeId(ScopeType.DOMAIN, self.domain_name),
+            ScopeId(ScopeType.PROJECT, str(self.project_id)),
+        }
 
     @property
     def existence_checks(

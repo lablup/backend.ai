@@ -10,7 +10,9 @@ from typing import Any
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound, ScalingGroupNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.domain import DomainRow
@@ -223,6 +225,14 @@ class DomainUsageBucketSearchScope(SearchScope):
         return inner
 
     @property
+    def target(self) -> ScopeId:
+        return ScopeId(ScopeType.RESOURCE_GROUP, self.resource_group)
+
+    @property
+    def prerequisite_scopes(self) -> set[ScopeId]:
+        return {ScopeId(ScopeType.DOMAIN, self.domain_name)}
+
+    @property
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(
@@ -259,6 +269,17 @@ class ProjectUsageBucketSearchScope(SearchScope):
             )
 
         return inner
+
+    @property
+    def target(self) -> ScopeId:
+        return ScopeId(ScopeType.RESOURCE_GROUP, self.resource_group)
+
+    @property
+    def prerequisite_scopes(self) -> set[ScopeId]:
+        return {
+            ScopeId(ScopeType.DOMAIN, self.domain_name),
+            ScopeId(ScopeType.PROJECT, str(self.project_id)),
+        }
 
     @property
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
@@ -305,6 +326,18 @@ class UserUsageBucketSearchScope(SearchScope):
             )
 
         return inner
+
+    @property
+    def target(self) -> ScopeId:
+        return ScopeId(ScopeType.RESOURCE_GROUP, self.resource_group)
+
+    @property
+    def prerequisite_scopes(self) -> set[ScopeId]:
+        return {
+            ScopeId(ScopeType.DOMAIN, self.domain_name),
+            ScopeId(ScopeType.PROJECT, str(self.project_id)),
+            ScopeId(ScopeType.USER, str(self.user_uuid)),
+        }
 
     @property
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
