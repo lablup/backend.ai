@@ -11,17 +11,10 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import OperationType
-from ai.backend.manager.data.permission.id import ObjectId, ScopeId
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    RoleSource,
-    ScopeType,
-)
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
+from ai.backend.common.data.permission.types import EntityType, OperationType, ScopeType
+from ai.backend.manager.data.permission.id import ObjectId
+from ai.backend.manager.data.permission.types import RoleSource
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base.rbac.revoker import (
     RBACRevoker,
@@ -39,8 +32,7 @@ if TYPE_CHECKING:
 
 REVOKER_TABLES = [
     RoleRow,
-    ObjectPermissionRow,
-    AssociationScopesEntitiesRow,
+    PermissionRow,
 ]
 
 
@@ -54,17 +46,7 @@ class SingleEntityWithRoleContext:
     """Context with single entity granted to a role."""
 
     entity_id: ObjectId
-    entity_scope_id: ScopeId
-    role_id: UUID
-
-
-@dataclass
-class TwoEntitiesWithRoleContext:
-    """Context with two entities granted to the same role."""
-
-    entity_id1: ObjectId
-    entity_id2: ObjectId
-    entity_scope_id: ScopeId
+    entity_scope_type: ScopeType
     role_id: UUID
 
 
@@ -73,7 +55,7 @@ class EntityWithTwoRolesContext:
     """Context with entity granted to two different roles."""
 
     entity_id: ObjectId
-    entity_scope_id: ScopeId
+    entity_scope_type: ScopeType
     role_id1: UUID
     role_id2: UUID
 
@@ -106,10 +88,9 @@ class TestRevokerBasic:
         database_connection: ExtendedAsyncSAEngine,
         create_tables: None,
     ) -> AsyncGenerator[SingleEntityWithRoleContext, None]:
-        """Create entity with role having object permissions."""
-        user_id = str(uuid.uuid4())
-        entity_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=user_id)
+        """Create entity with role having permissions."""
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
+        entity_scope_type = ScopeType.VFOLDER
 
         role_id: UUID
 
@@ -123,62 +104,53 @@ class TestRevokerBasic:
             db_sess.add(role)
             await db_sess.flush()
 
-            # Create scope-entity association
-            assoc_row = AssociationScopesEntitiesRow(
-                scope_type=entity_scope_id.scope_type,
-                scope_id=entity_scope_id.scope_id,
-                entity_type=entity_id.entity_type,
-                entity_id=entity_id.entity_id,
-            )
-            db_sess.add(assoc_row)
-
-            # Create object permissions
+            # Create permissions using entity-as-scope pattern
             for op in [OperationType.READ, OperationType.UPDATE]:
-                obj_perm = ObjectPermissionRow(
+                perm = PermissionRow(
                     role_id=role.id,
+                    scope_type=entity_scope_type,
+                    scope_id=entity_id.entity_id,
                     entity_type=entity_id.entity_type,
-                    entity_id=entity_id.entity_id,
                     operation=op,
                 )
-                db_sess.add(obj_perm)
+                db_sess.add(perm)
             await db_sess.flush()
 
             role_id = role.id
 
         yield SingleEntityWithRoleContext(
             entity_id=entity_id,
-            entity_scope_id=entity_scope_id,
+            entity_scope_type=entity_scope_type,
             role_id=role_id,
         )
 
-    async def test_revoker_removes_object_permissions(
+    async def test_revoker_removes_permissions(
         self,
         database_connection: ExtendedAsyncSAEngine,
         single_entity_with_role: SingleEntityWithRoleContext,
     ) -> None:
-        """Test that revoker removes object permissions from specified role."""
+        """Test that revoker removes permissions from specified role."""
         ctx = single_entity_with_role
 
         async with database_connection.begin_session_read_committed() as db_sess:
             # Verify initial state
-            obj_perm_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(ObjectPermissionRow)
-            )
-            assert obj_perm_count == 2
+            perm_count = await db_sess.scalar(sa.select(sa.func.count()).select_from(PermissionRow))
+            assert perm_count == 2
 
             # Execute revoke
             revoker = RBACRevoker(
                 entity_id=ctx.entity_id,
+                entity_scope_type=ctx.entity_scope_type,
                 target_role_ids=[ctx.role_id],
                 operations=None,  # Revoke all operations
             )
             await execute_rbac_revoker(db_sess, revoker)
 
-            # Verify object permissions deleted
-            obj_perm_count_after = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(ObjectPermissionRow)
+            # Verify permissions deleted
+            perm_count_after = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(PermissionRow)
             )
-            assert obj_perm_count_after == 0
+            assert perm_count_after == 0
 
     async def test_revoker_with_empty_role_ids_does_nothing(
         self,
@@ -192,16 +164,15 @@ class TestRevokerBasic:
             # Execute revoke with empty role_ids
             revoker = RBACRevoker(
                 entity_id=ctx.entity_id,
+                entity_scope_type=ctx.entity_scope_type,
                 target_role_ids=[],
                 operations=None,
             )
             await execute_rbac_revoker(db_sess, revoker)
 
-            # Verify object permissions still exist
-            obj_perm_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(ObjectPermissionRow)
-            )
-            assert obj_perm_count == 2
+            # Verify permissions still exist
+            perm_count = await db_sess.scalar(sa.select(sa.func.count()).select_from(PermissionRow))
+            assert perm_count == 2
 
     async def test_revoker_removes_only_specified_operations(
         self,
@@ -215,13 +186,14 @@ class TestRevokerBasic:
             # Execute revoke for READ only
             revoker = RBACRevoker(
                 entity_id=ctx.entity_id,
+                entity_scope_type=ctx.entity_scope_type,
                 target_role_ids=[ctx.role_id],
                 operations=[OperationType.READ],
             )
             await execute_rbac_revoker(db_sess, revoker)
 
             # Verify UPDATE still exists
-            remaining_perms = (await db_sess.scalars(sa.select(ObjectPermissionRow))).all()
+            remaining_perms = (await db_sess.scalars(sa.select(PermissionRow))).all()
             assert len(remaining_perms) == 1
             assert remaining_perms[0].operation == OperationType.UPDATE
 
@@ -237,16 +209,15 @@ class TestRevokerBasic:
             # Execute revoke with operations=None
             revoker = RBACRevoker(
                 entity_id=ctx.entity_id,
+                entity_scope_type=ctx.entity_scope_type,
                 target_role_ids=[ctx.role_id],
                 operations=None,
             )
             await execute_rbac_revoker(db_sess, revoker)
 
             # Verify no permissions remain
-            obj_perm_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(ObjectPermissionRow)
-            )
-            assert obj_perm_count == 0
+            perm_count = await db_sess.scalar(sa.select(sa.func.count()).select_from(PermissionRow))
+            assert perm_count == 0
 
 
 class TestRevokerMultipleRoles:
@@ -259,9 +230,8 @@ class TestRevokerMultipleRoles:
         create_tables: None,
     ) -> AsyncGenerator[EntityWithTwoRolesContext, None]:
         """Create entity granted to two different roles."""
-        user_id = str(uuid.uuid4())
-        entity_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=user_id)
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
+        entity_scope_type = ScopeType.VFOLDER
 
         role_id1: UUID
         role_id2: UUID
@@ -282,24 +252,16 @@ class TestRevokerMultipleRoles:
             db_sess.add(role2)
             await db_sess.flush()
 
-            # Create scope-entity association
-            assoc_row = AssociationScopesEntitiesRow(
-                scope_type=entity_scope_id.scope_type,
-                scope_id=entity_scope_id.scope_id,
-                entity_type=entity_id.entity_type,
-                entity_id=entity_id.entity_id,
-            )
-            db_sess.add(assoc_row)
-
-            # Create object permissions for both roles
+            # Create permissions for both roles
             for role in [role1, role2]:
-                obj_perm = ObjectPermissionRow(
+                perm = PermissionRow(
                     role_id=role.id,
+                    scope_type=entity_scope_type,
+                    scope_id=entity_id.entity_id,
                     entity_type=entity_id.entity_type,
-                    entity_id=entity_id.entity_id,
                     operation=OperationType.READ,
                 )
-                db_sess.add(obj_perm)
+                db_sess.add(perm)
             await db_sess.flush()
 
             role_id1 = role1.id
@@ -307,7 +269,7 @@ class TestRevokerMultipleRoles:
 
         yield EntityWithTwoRolesContext(
             entity_id=entity_id,
-            entity_scope_id=entity_scope_id,
+            entity_scope_type=entity_scope_type,
             role_id1=role_id1,
             role_id2=role_id2,
         )
@@ -324,16 +286,15 @@ class TestRevokerMultipleRoles:
             # Execute revoke for both roles
             revoker = RBACRevoker(
                 entity_id=ctx.entity_id,
+                entity_scope_type=ctx.entity_scope_type,
                 target_role_ids=[ctx.role_id1, ctx.role_id2],
                 operations=None,
             )
             await execute_rbac_revoker(db_sess, revoker)
 
             # Verify no permissions remain
-            obj_perm_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(ObjectPermissionRow)
-            )
-            assert obj_perm_count == 0
+            perm_count = await db_sess.scalar(sa.select(sa.func.count()).select_from(PermissionRow))
+            assert perm_count == 0
 
     async def test_revoker_revokes_from_single_role_preserves_other(
         self,
@@ -347,13 +308,14 @@ class TestRevokerMultipleRoles:
             # Execute revoke for role1 only
             revoker = RBACRevoker(
                 entity_id=ctx.entity_id,
+                entity_scope_type=ctx.entity_scope_type,
                 target_role_ids=[ctx.role_id1],
                 operations=None,
             )
             await execute_rbac_revoker(db_sess, revoker)
 
             # Verify role2's permissions preserved
-            remaining_perms = (await db_sess.scalars(sa.select(ObjectPermissionRow))).all()
+            remaining_perms = (await db_sess.scalars(sa.select(PermissionRow))).all()
             assert len(remaining_perms) == 1
             assert remaining_perms[0].role_id == ctx.role_id2
 
@@ -367,10 +329,9 @@ class TestRevokerIdempotent:
         database_connection: ExtendedAsyncSAEngine,
         create_tables: None,
     ) -> AsyncGenerator[SingleEntityWithRoleContext, None]:
-        """Create entity with role having object permissions."""
-        user_id = str(uuid.uuid4())
-        entity_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=user_id)
+        """Create entity with role having permissions."""
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
+        entity_scope_type = ScopeType.VFOLDER
 
         role_id: UUID
 
@@ -383,29 +344,21 @@ class TestRevokerIdempotent:
             db_sess.add(role)
             await db_sess.flush()
 
-            # Create scope-entity association
-            assoc_row = AssociationScopesEntitiesRow(
-                scope_type=entity_scope_id.scope_type,
-                scope_id=entity_scope_id.scope_id,
-                entity_type=entity_id.entity_type,
-                entity_id=entity_id.entity_id,
-            )
-            db_sess.add(assoc_row)
-
-            obj_perm = ObjectPermissionRow(
+            perm = PermissionRow(
                 role_id=role.id,
+                scope_type=entity_scope_type,
+                scope_id=entity_id.entity_id,
                 entity_type=entity_id.entity_type,
-                entity_id=entity_id.entity_id,
                 operation=OperationType.READ,
             )
-            db_sess.add(obj_perm)
+            db_sess.add(perm)
             await db_sess.flush()
 
             role_id = role.id
 
         yield SingleEntityWithRoleContext(
             entity_id=entity_id,
-            entity_scope_id=entity_scope_id,
+            entity_scope_type=entity_scope_type,
             role_id=role_id,
         )
 
@@ -420,6 +373,7 @@ class TestRevokerIdempotent:
         async with database_connection.begin_session_read_committed() as db_sess:
             revoker = RBACRevoker(
                 entity_id=ctx.entity_id,
+                entity_scope_type=ctx.entity_scope_type,
                 target_role_ids=[ctx.role_id],
                 operations=None,
             )
@@ -428,16 +382,14 @@ class TestRevokerIdempotent:
             await execute_rbac_revoker(db_sess, revoker)
 
             # Verify first revoke deleted permissions
-            obj_perm_count_after_first = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(ObjectPermissionRow)
+            perm_count_after_first = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(PermissionRow)
             )
-            assert obj_perm_count_after_first == 0
+            assert perm_count_after_first == 0
 
             # Second revoke (should do nothing)
             await execute_rbac_revoker(db_sess, revoker)
 
             # Verify final state is same as after first revoke
-            obj_perm_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(ObjectPermissionRow)
-            )
-            assert obj_perm_count == 0
+            perm_count = await db_sess.scalar(sa.select(sa.func.count()).select_from(PermissionRow))
+            assert perm_count == 0
