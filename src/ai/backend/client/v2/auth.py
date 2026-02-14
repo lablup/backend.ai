@@ -1,4 +1,4 @@
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from datetime import datetime
 
@@ -7,7 +7,7 @@ from yarl import URL
 from ai.backend.common.auth.utils import generate_signature
 
 
-class AuthStrategy(metaclass=ABCMeta):
+class AuthStrategy(ABC):
     @abstractmethod
     def sign(
         self,
@@ -17,7 +17,8 @@ class AuthStrategy(metaclass=ABCMeta):
         date: datetime,
         rel_url: str,
         content_type: str,
-    ) -> Mapping[str, str]: ...
+    ) -> Mapping[str, str]:
+        raise NotImplementedError
 
 
 class HMACAuth(AuthStrategy):
