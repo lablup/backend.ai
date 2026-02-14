@@ -172,10 +172,70 @@ class PermissionGQL(Node):
         *,
         info: Info[StrawberryGQLContext],
     ) -> EntityNode | None:
-        # Scope resolution depends on the scope_type and requires loading the
-        # appropriate entity. This is deferred as it involves complex entity
-        # resolution logic that varies by scope type.
-        return None
+        from ai.backend.manager.api.gql.artifact.types import ArtifactRevision
+        from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
+        from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+        from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+        from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
+        from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
+        from ai.backend.manager.api.gql.user.types.node import UserV2GQL
+
+        scope_type = self.scope_type.to_scope_type()
+        data_loaders = info.context.data_loaders
+        match scope_type:
+            case ScopeType.USER:
+                user_data = await data_loaders.user_loader.load(uuid.UUID(self.scope_id))
+                if user_data is None:
+                    return None
+                return UserV2GQL.from_data(user_data)
+            case ScopeType.PROJECT:
+                project_data = await data_loaders.project_loader.load(uuid.UUID(self.scope_id))
+                if project_data is None:
+                    return None
+                return ProjectV2GQL.from_data(project_data)
+            case ScopeType.DOMAIN:
+                domain_data = await data_loaders.domain_loader.load(self.scope_id)
+                if domain_data is None:
+                    return None
+                return DomainV2GQL.from_data(domain_data)
+            case ScopeType.ROLE:
+                role_data = await data_loaders.role_loader.load(uuid.UUID(self.scope_id))
+                if role_data is None:
+                    return None
+                return RoleGQL.from_dataclass(role_data)
+            case ScopeType.RESOURCE_GROUP:
+                rg_data = await data_loaders.resource_group_loader.load(self.scope_id)
+                if rg_data is None:
+                    return None
+                return ResourceGroupGQL.from_dataclass(rg_data)
+            case ScopeType.DEPLOYMENT:
+                deploy_data = await data_loaders.deployment_loader.load(uuid.UUID(self.scope_id))
+                if deploy_data is None:
+                    return None
+                return ModelDeployment.from_dataclass(deploy_data)
+            case ScopeType.ARTIFACT_REVISION:
+                rev_data = await data_loaders.artifact_revision_loader.load(
+                    uuid.UUID(self.scope_id)
+                )
+                if rev_data is None:
+                    return None
+                return ArtifactRevision.from_dataclass(rev_data)
+            case ScopeType.GLOBAL:
+                return None
+            case ScopeType.ARTIFACT:
+                return None
+            case ScopeType.ARTIFACT_REGISTRY:
+                return None
+            case ScopeType.IMAGE:
+                return None
+            case ScopeType.CONTAINER_REGISTRY:
+                return None
+            case ScopeType.STORAGE_HOST:
+                return None
+            case ScopeType.SESSION:
+                return None
+            case ScopeType.VFOLDER:
+                return None
 
     @classmethod
     def from_dataclass(cls, data: PermissionData) -> Self:
