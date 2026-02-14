@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from typing import NoReturn
 
 import sqlalchemy as sa
+from asyncpg.exceptions import PostgresError
 
 from ai.backend.manager.errors.repository import (
     CheckConstraintViolationError,
@@ -41,11 +42,11 @@ def parse_integrity_error(e: sa.exc.IntegrityError) -> RepositoryIntegrityError:
     """Parse a SQLAlchemy IntegrityError into a structured RepositoryIntegrityError.
 
     Classification strategy:
-    1. Primary: use SQLSTATE code from asyncpg's ``orig.pgcode``
+    1. Primary: use SQLSTATE code from asyncpg's ``orig.sqlstate``
     2. Fallback: match keywords in the error message string
 
     Diagnostic attributes (constraint_name, table_name, column_name, detail)
-    are extracted from asyncpg's ``orig.diag`` when available.
+    are extracted directly from asyncpg's ``PostgresError`` when available.
     """
     orig = e.orig
     pgcode: str | None = None
@@ -54,17 +55,12 @@ def parse_integrity_error(e: sa.exc.IntegrityError) -> RepositoryIntegrityError:
     column_name: str | None = None
     detail: str | None = None
 
-    # Extract pgcode from asyncpg exception
-    if orig is not None and hasattr(orig, "pgcode"):
-        pgcode = orig.pgcode
-
-    # Extract diagnostic info from asyncpg exception
-    if orig is not None and hasattr(orig, "diag"):
-        diag = orig.diag
-        constraint_name = getattr(diag, "constraint_name", None)
-        table_name = getattr(diag, "table_name", None)
-        column_name = getattr(diag, "column_name", None)
-        detail = getattr(diag, "message_detail", None)
+    if isinstance(orig, PostgresError):
+        pgcode = orig.sqlstate
+        constraint_name = orig.constraint_name
+        table_name = orig.table_name
+        column_name = orig.column_name
+        detail = orig.detail
 
     error_msg = str(e.orig) if e.orig is not None else str(e)
     kwargs = {

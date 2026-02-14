@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
+import asyncpg.exceptions
 import pytest
 import sqlalchemy as sa
 
@@ -22,52 +21,49 @@ from ai.backend.manager.repositories.base.integrity import (
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
-@dataclass
-class FakeDiag:
-    """Simulates asyncpg's diagnostic object."""
-
-    constraint_name: str | None = None
-    table_name: str | None = None
-    column_name: str | None = None
-    message_detail: str | None = None
-
-
-class FakeOrig(Exception):
-    """Simulates an asyncpg exception wrapped by SQLAlchemy.
-
-    Only exposes ``pgcode`` and ``diag`` attributes when explicitly provided,
-    so ``hasattr`` checks in the parser work correctly.
-    """
-
-    def __init__(
-        self,
-        message: str = "some error",
-        pgcode: str | None = None,
-        diag: FakeDiag | None = None,
-    ) -> None:
-        super().__init__(message)
-        self._message = message
-        if pgcode is not None:
-            self.pgcode = pgcode
-        if diag is not None:
-            self.diag = diag
-
-    def __str__(self) -> str:
-        return self._message
+def _make_asyncpg_error(
+    *,
+    sqlstate: str,
+    message: str = "some error",
+    constraint_name: str | None = None,
+    table_name: str | None = None,
+    column_name: str | None = None,
+    detail: str | None = None,
+) -> asyncpg.exceptions.PostgresError:
+    """Create an asyncpg PostgresError using its ``new()`` factory."""
+    fields: dict[str, str] = {"C": sqlstate, "M": message}
+    if constraint_name is not None:
+        fields["n"] = constraint_name
+    if table_name is not None:
+        fields["t"] = table_name
+    if column_name is not None:
+        fields["c"] = column_name
+    if detail is not None:
+        fields["D"] = detail
+    return asyncpg.exceptions.PostgresError.new(fields)
 
 
 def _make_integrity_error(
     *,
-    pgcode: str | None = None,
-    diag: FakeDiag | None = None,
+    sqlstate: str | None = None,
     message: str = "some error",
+    constraint_name: str | None = None,
+    table_name: str | None = None,
+    column_name: str | None = None,
+    detail: str | None = None,
 ) -> sa.exc.IntegrityError:
     """Create a mock SQLAlchemy IntegrityError with asyncpg-like orig."""
-    orig = FakeOrig(
-        message=message,
-        pgcode=pgcode,
-        diag=diag,
-    )
+    if sqlstate is not None:
+        orig: Exception = _make_asyncpg_error(
+            sqlstate=sqlstate,
+            message=message,
+            constraint_name=constraint_name,
+            table_name=table_name,
+            column_name=column_name,
+            detail=detail,
+        )
+    else:
+        orig = Exception(message)
     return sa.exc.IntegrityError(
         statement="INSERT INTO ...",
         params={},
@@ -93,19 +89,19 @@ class TestParseIntegrityErrorBySQLSTATE:
         pgcode: str,
         expected_cls: type[RepositoryIntegrityError],
     ) -> None:
-        e = _make_integrity_error(pgcode=pgcode)
+        e = _make_integrity_error(sqlstate=pgcode)
         result = parse_integrity_error(e)
         assert isinstance(result, expected_cls)
         assert result.pgcode == pgcode
 
     def test_extracts_diag_attributes(self) -> None:
-        diag = FakeDiag(
+        e = _make_integrity_error(
+            sqlstate="23505",
             constraint_name="uq_users_email",
             table_name="users",
             column_name="email",
-            message_detail="Key (email)=(test@example.com) already exists.",
+            detail="Key (email)=(test@example.com) already exists.",
         )
-        e = _make_integrity_error(pgcode="23505", diag=diag)
         result = parse_integrity_error(e)
         assert isinstance(result, UniqueConstraintViolationError)
         assert result.constraint_name == "uq_users_email"
@@ -114,7 +110,7 @@ class TestParseIntegrityErrorBySQLSTATE:
         assert result.detail == "Key (email)=(test@example.com) already exists."
 
     def test_unknown_sqlstate_falls_back_to_generic(self) -> None:
-        e = _make_integrity_error(pgcode="23999")
+        e = _make_integrity_error(sqlstate="23999")
         result = parse_integrity_error(e)
         assert type(result) is RepositoryIntegrityError
         assert result.pgcode == "23999"
@@ -172,10 +168,10 @@ class TestParseIntegrityErrorByMessage:
 
 
 class TestParseIntegrityErrorWithoutDiag:
-    """Test graceful handling when asyncpg diag is unavailable."""
+    """Test graceful handling when asyncpg diagnostic attributes are unavailable."""
 
     def test_no_diag_attributes_are_none(self) -> None:
-        e = _make_integrity_error(pgcode="23505")
+        e = _make_integrity_error(sqlstate="23505")
         result = parse_integrity_error(e)
         assert isinstance(result, UniqueConstraintViolationError)
         assert result.constraint_name is None
