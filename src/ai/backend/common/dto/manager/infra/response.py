@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 
 from ai.backend.common.api_handlers import BaseResponseModel
 
@@ -78,26 +78,28 @@ class ResourcePresetDTO(BaseModel):
 # --- etcd.py responses ---
 
 
-class GetResourceSlotsResponse(BaseResponseModel):
-    """Response containing available resource slot types and their units."""
+class GetResourceSlotsResponse(RootModel[dict[str, str]]):
+    """Response containing available resource slot types and their units.
 
-    resource_slots: dict[str, str] = Field(
-        description="Mapping of resource slot names to their unit types."
-    )
-
-
-class GetResourceMetadataResponse(BaseResponseModel):
-    """Response containing metadata for accelerator resource slots."""
-
-    accelerator_metadata: dict[str, AcceleratorMetadataDTO] = Field(
-        description="Mapping of slot names to their accelerator metadata."
-    )
+    The handler returns a bare dict mapping resource slot names to their unit types.
+    e.g., ``{"cpu": "count", "mem": "bytes", "cuda.device": "count"}``
+    """
 
 
-class GetVFolderTypesResponse(BaseResponseModel):
-    """Response containing available virtual folder types."""
+class GetResourceMetadataResponse(RootModel[dict[str, AcceleratorMetadataDTO]]):
+    """Response containing metadata for accelerator resource slots.
 
-    vfolder_types: list[str] = Field(description="List of available virtual folder type names.")
+    The handler returns a bare dict mapping slot names to their accelerator metadata.
+    e.g., ``{"cpu": {"slot_name": "cpu", ...}, "cuda.device": {...}}``
+    """
+
+
+class GetVFolderTypesResponse(RootModel[list[str]]):
+    """Response containing available virtual folder types.
+
+    The handler returns a bare list of vfolder type names.
+    e.g., ``["user", "group"]``
+    """
 
 
 class GetConfigResponse(BaseResponseModel):
@@ -175,48 +177,52 @@ class CheckPresetsResponse(BaseResponseModel):
 
 
 class RecalculateUsageResponse(BaseResponseModel):
-    """Response confirming usage recalculation."""
+    """Response confirming usage recalculation.
+
+    The handler returns an empty dict ``{}``.
+    """
 
     pass
 
 
-class UsagePerMonthResponse(BaseResponseModel):
-    """Response containing monthly usage statistics."""
+class UsagePerMonthResponse(RootModel[list[Any]]):
+    """Response containing monthly usage statistics.
 
-    result: list[Any] = Field(
-        description="List of container usage records for the requested month."
-    )
-
-
-class UsagePerPeriodResponse(BaseResponseModel):
-    """Response containing usage statistics for a date range."""
-
-    result: list[Any] = Field(
-        description="List of container usage records for the requested period."
-    )
+    The handler returns a bare list of container usage records for the requested month.
+    """
 
 
-class MonthStatsResponse(BaseResponseModel):
-    """Response containing time-binned session statistics over the last 30 days."""
+class UsagePerPeriodResponse(RootModel[list[Any]]):
+    """Response containing usage statistics for a date range.
 
-    stats: list[Any] = Field(description="Time-binned (15 min) statistics for terminated sessions.")
-
-
-class WatcherStatusResponse(BaseResponseModel):
-    """Response containing the watcher status for an agent."""
-
-    data: dict[str, Any] = Field(description="Watcher status data for the agent.")
+    The handler returns a bare list of container usage records for the requested period.
+    """
 
 
-class WatcherAgentActionResponse(BaseResponseModel):
-    """Response for watcher agent actions (start, stop, restart)."""
+class MonthStatsResponse(RootModel[list[Any]]):
+    """Response containing time-binned session statistics over the last 30 days.
 
-    data: dict[str, Any] = Field(description="Result data from the watcher agent action.")
+    The handler returns a bare list of time-binned (15 min) statistics
+    for terminated sessions.
+    """
 
 
-class GetContainerRegistriesResponse(BaseResponseModel):
-    """Response containing registered container registries."""
+class WatcherStatusResponse(RootModel[dict[str, Any]]):
+    """Response containing the watcher status for an agent.
 
-    registries: dict[str, Any] = Field(
-        description="Mapping of registry hostnames to their configurations."
-    )
+    The handler returns a bare dict of watcher status data.
+    """
+
+
+class WatcherAgentActionResponse(RootModel[dict[str, Any]]):
+    """Response for watcher agent actions (start, stop, restart).
+
+    The handler returns a bare dict of action result data.
+    """
+
+
+class GetContainerRegistriesResponse(RootModel[dict[str, Any]]):
+    """Response containing registered container registries.
+
+    The handler returns a bare dict mapping registry hostnames to their configurations.
+    """

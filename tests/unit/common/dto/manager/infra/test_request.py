@@ -158,8 +158,8 @@ class TestCheckPresetsRequest:
 
 
 class TestUsagePerMonthRequest:
-    def test_valid(self) -> None:
-        req = UsagePerMonthRequest(month="202006")
+    def test_valid_with_null_group_ids(self) -> None:
+        req = UsagePerMonthRequest(group_ids=None, month="202006")
         assert req.month == "202006"
         assert req.group_ids is None
 
@@ -167,9 +167,17 @@ class TestUsagePerMonthRequest:
         req = UsagePerMonthRequest(group_ids=["g1", "g2"], month="202106")
         assert req.group_ids == ["g1", "g2"]
 
+    def test_missing_group_ids_raises(self) -> None:
+        with pytest.raises(ValidationError):
+            UsagePerMonthRequest(month="202006")  # type: ignore[call-arg]
+
     def test_invalid_month_pattern(self) -> None:
         with pytest.raises(ValidationError):
-            UsagePerMonthRequest(month="abc")
+            UsagePerMonthRequest(group_ids=None, month="abc")
+
+    def test_month_rejects_extra_chars(self) -> None:
+        with pytest.raises(ValidationError):
+            UsagePerMonthRequest(group_ids=None, month="202006extra")
 
     def test_serialization_roundtrip(self) -> None:
         req = UsagePerMonthRequest(group_ids=["g1"], month="202312")

@@ -98,6 +98,7 @@ class GetWSProxyVersionRequest(BaseRequestModel):
 class ListPresetsRequest(BaseRequestModel):
     """Request for listing resource presets."""
 
+    # NOTE: scaling_group is sourced from a query parameter, not the request body.
     scaling_group: str | None = Field(
         default=None,
         description="Scaling group name to filter presets by.",
@@ -118,12 +119,11 @@ class UsagePerMonthRequest(BaseRequestModel):
     """Request for querying container usage statistics for a specified month."""
 
     group_ids: list[str] | None = Field(
-        default=None,
-        description="List of group IDs to filter usage by. If null, includes all groups.",
+        description="List of group IDs to filter usage by. Null to include all groups.",
     )
     month: str = Field(
         description="Year-month in YYYYMM format (e.g., '202006' for June 2020).",
-        pattern=r"^\d{6}",
+        pattern=r"^\d{6}$",
     )
 
 
