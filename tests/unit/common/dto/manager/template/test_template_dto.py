@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -421,13 +422,13 @@ class TestListClusterTemplatesResponse:
 
 class TestGetClusterTemplateResponse:
     def test_bare_dict_input(self) -> None:
-        raw = {"nodes": []}
+        raw: dict[str, Any] = {"nodes": []}
         resp = GetClusterTemplateResponse.model_validate(raw)
         assert resp.root == {"nodes": []}
         assert resp.model_dump() == raw
 
     def test_serialization_roundtrip(self) -> None:
-        raw = {"nodes": []}
+        raw: dict[str, Any] = {"nodes": []}
         resp = GetClusterTemplateResponse.model_validate(raw)
         dumped = resp.model_dump()
         assert dumped == raw

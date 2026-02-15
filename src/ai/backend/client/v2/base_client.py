@@ -3,19 +3,20 @@ from __future__ import annotations
 import ssl
 from collections.abc import Mapping
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, TypeVar
 
 import aiohttp
 
 from ai.backend.common.api_handlers import (
     BaseRequestModel,
     BaseResponseModel,
-    BaseRootResponseModel,
 )
 
 from .auth import AuthStrategy
 from .config import ClientConfig
 from .exceptions import map_status_to_exception
+
+ResponseT = TypeVar("ResponseT", bound=BaseResponseModel)
 
 
 class BackendAIClient:
@@ -113,15 +114,15 @@ class BackendAIClient:
                 raise map_status_to_exception(resp.status, resp.reason or "", data)
             return await resp.json()
 
-    async def typed_request[T: BaseResponseModel | BaseRootResponseModel](
+    async def typed_request(
         self,
         method: str,
         path: str,
         *,
         request: BaseRequestModel | None = None,
-        response_model: type[T],
+        response_model: type[ResponseT],
         params: dict[str, str] | None = None,
-    ) -> T:
+    ) -> ResponseT:
         json_body = request.model_dump(exclude_none=True) if request is not None else None
         data = await self._request(method, path, json=json_body, params=params)
         return response_model.model_validate(data)

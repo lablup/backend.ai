@@ -59,7 +59,7 @@ def _make_request_session(resp: AsyncMock) -> MagicMock:
     return mock_session
 
 
-def _ok_response(data: dict[str, object] | list[object]) -> AsyncMock:
+def _ok_response(data: object) -> AsyncMock:
     resp = AsyncMock()
     resp.status = 200
     resp.json = AsyncMock(return_value=data)
