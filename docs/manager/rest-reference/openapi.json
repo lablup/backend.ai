@@ -5407,6 +5407,762 @@
         "title": "SearchEntitiesRequest",
         "type": "object"
       },
+      "DefaultForUnspecified": {
+        "enum": [
+          "LIMITED",
+          "UNLIMITED"
+        ],
+        "title": "DefaultForUnspecified",
+        "type": "string"
+      },
+      "CreateKeypairResourcePolicyRequest": {
+        "description": "Request to create a keypair resource policy.",
+        "properties": {
+          "name": {
+            "description": "Policy name",
+            "title": "Name",
+            "type": "string"
+          },
+          "default_for_unspecified": {
+            "$ref": "#/components/schemas/DefaultForUnspecified",
+            "default": "LIMITED",
+            "description": "Default behavior for unspecified resource slots"
+          },
+          "total_resource_slots": {
+            "additionalProperties": true,
+            "description": "Total resource slots",
+            "title": "Total Resource Slots",
+            "type": "object"
+          },
+          "max_session_lifetime": {
+            "default": 0,
+            "description": "Max session lifetime in seconds",
+            "title": "Max Session Lifetime",
+            "type": "integer"
+          },
+          "max_concurrent_sessions": {
+            "default": 1,
+            "description": "Max concurrent sessions",
+            "title": "Max Concurrent Sessions",
+            "type": "integer"
+          },
+          "max_pending_session_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Max pending session count",
+            "title": "Max Pending Session Count"
+          },
+          "max_pending_session_resource_slots": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Max pending session resource slots",
+            "title": "Max Pending Session Resource Slots"
+          },
+          "max_concurrent_sftp_sessions": {
+            "default": 1,
+            "description": "Max concurrent SFTP sessions",
+            "title": "Max Concurrent Sftp Sessions",
+            "type": "integer"
+          },
+          "max_containers_per_session": {
+            "default": 1,
+            "description": "Max containers per session",
+            "title": "Max Containers Per Session",
+            "type": "integer"
+          },
+          "idle_timeout": {
+            "default": 1800,
+            "description": "Idle timeout in seconds",
+            "title": "Idle Timeout",
+            "type": "integer"
+          },
+          "allowed_vfolder_hosts": {
+            "additionalProperties": true,
+            "description": "Allowed vfolder hosts and permissions",
+            "title": "Allowed Vfolder Hosts",
+            "type": "object"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateKeypairResourcePolicyRequest",
+        "type": "object"
+      },
+      "KeypairResourcePolicyFilter": {
+        "description": "Filter for keypair resource policies.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by name"
+          }
+        },
+        "title": "KeypairResourcePolicyFilter",
+        "type": "object"
+      },
+      "KeypairResourcePolicyOrder": {
+        "description": "Order specification for keypair resource policies.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/KeypairResourcePolicyOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "KeypairResourcePolicyOrder",
+        "type": "object"
+      },
+      "KeypairResourcePolicyOrderField": {
+        "description": "Fields available for ordering keypair resource policies.",
+        "enum": [
+          "name",
+          "created_at"
+        ],
+        "title": "KeypairResourcePolicyOrderField",
+        "type": "string"
+      },
+      "SearchKeypairResourcePoliciesRequest": {
+        "description": "Request body for searching keypair resource policies.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeypairResourcePolicyFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/KeypairResourcePolicyOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum items to return",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Number of items to skip",
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "title": "SearchKeypairResourcePoliciesRequest",
+        "type": "object"
+      },
+      "UpdateKeypairResourcePolicyRequest": {
+        "description": "Request to update a keypair resource policy.",
+        "properties": {
+          "default_for_unspecified": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DefaultForUnspecified"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              }
+            ],
+            "default": 1,
+            "description": "Default behavior for unspecified resource slots",
+            "title": "Default For Unspecified"
+          },
+          "total_resource_slots": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              }
+            ],
+            "default": 1,
+            "description": "Total resource slots",
+            "title": "Total Resource Slots"
+          },
+          "max_session_lifetime": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              }
+            ],
+            "default": 1,
+            "description": "Max session lifetime in seconds",
+            "title": "Max Session Lifetime"
+          },
+          "max_concurrent_sessions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              }
+            ],
+            "default": 1,
+            "description": "Max concurrent sessions",
+            "title": "Max Concurrent Sessions"
+          },
+          "max_pending_session_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 1,
+            "description": "Max pending session count",
+            "title": "Max Pending Session Count"
+          },
+          "max_pending_session_resource_slots": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 1,
+            "description": "Max pending session resource slots",
+            "title": "Max Pending Session Resource Slots"
+          },
+          "max_concurrent_sftp_sessions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              }
+            ],
+            "default": 1,
+            "description": "Max concurrent SFTP sessions",
+            "title": "Max Concurrent Sftp Sessions"
+          },
+          "max_containers_per_session": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              }
+            ],
+            "default": 1,
+            "description": "Max containers per session",
+            "title": "Max Containers Per Session"
+          },
+          "idle_timeout": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              }
+            ],
+            "default": 1,
+            "description": "Idle timeout in seconds",
+            "title": "Idle Timeout"
+          },
+          "allowed_vfolder_hosts": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              }
+            ],
+            "default": 1,
+            "description": "Allowed vfolder hosts and permissions",
+            "title": "Allowed Vfolder Hosts"
+          }
+        },
+        "title": "UpdateKeypairResourcePolicyRequest",
+        "type": "object"
+      },
+      "DeleteKeypairResourcePolicyRequest": {
+        "description": "Request to delete a keypair resource policy.",
+        "properties": {
+          "name": {
+            "description": "Policy name to delete",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "DeleteKeypairResourcePolicyRequest",
+        "type": "object"
+      },
+      "CreateUserResourcePolicyRequest": {
+        "description": "Request to create a user resource policy.",
+        "properties": {
+          "name": {
+            "description": "Policy name",
+            "title": "Name",
+            "type": "string"
+          },
+          "max_vfolder_count": {
+            "default": 0,
+            "description": "Max vfolder count",
+            "title": "Max Vfolder Count",
+            "type": "integer"
+          },
+          "max_quota_scope_size": {
+            "default": 0,
+            "description": "Max quota scope size in bytes",
+            "title": "Max Quota Scope Size",
+            "type": "integer"
+          },
+          "max_session_count_per_model_session": {
+            "default": 0,
+            "description": "Max session count per model session",
+            "title": "Max Session Count Per Model Session",
+            "type": "integer"
+          },
+          "max_customized_image_count": {
+            "default": 3,
+            "description": "Max customized image count",
+            "title": "Max Customized Image Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateUserResourcePolicyRequest",
+        "type": "object"
+      },
+      "UserResourcePolicyFilter": {
+        "description": "Filter for user resource policies.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by name"
+          }
+        },
+        "title": "UserResourcePolicyFilter",
+        "type": "object"
+      },
+      "UserResourcePolicyOrder": {
+        "description": "Order specification for user resource policies.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/UserResourcePolicyOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "UserResourcePolicyOrder",
+        "type": "object"
+      },
+      "UserResourcePolicyOrderField": {
+        "description": "Fields available for ordering user resource policies.",
+        "enum": [
+          "name",
+          "created_at"
+        ],
+        "title": "UserResourcePolicyOrderField",
+        "type": "string"
+      },
+      "SearchUserResourcePoliciesRequest": {
+        "description": "Request body for searching user resource policies.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserResourcePolicyFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UserResourcePolicyOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum items to return",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Number of items to skip",
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "title": "SearchUserResourcePoliciesRequest",
+        "type": "object"
+      },
+      "UpdateUserResourcePolicyRequest": {
+        "description": "Request to update a user resource policy.",
+        "properties": {
+          "max_vfolder_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              }
+            ],
+            "default": 1,
+            "description": "Max vfolder count",
+            "title": "Max Vfolder Count"
+          },
+          "max_quota_scope_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              }
+            ],
+            "default": 1,
+            "description": "Max quota scope size in bytes",
+            "title": "Max Quota Scope Size"
+          },
+          "max_session_count_per_model_session": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              }
+            ],
+            "default": 1,
+            "description": "Max session count per model session",
+            "title": "Max Session Count Per Model Session"
+          },
+          "max_customized_image_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              }
+            ],
+            "default": 1,
+            "description": "Max customized image count",
+            "title": "Max Customized Image Count"
+          }
+        },
+        "title": "UpdateUserResourcePolicyRequest",
+        "type": "object"
+      },
+      "DeleteUserResourcePolicyRequest": {
+        "description": "Request to delete a user resource policy.",
+        "properties": {
+          "name": {
+            "description": "Policy name to delete",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "DeleteUserResourcePolicyRequest",
+        "type": "object"
+      },
+      "CreateProjectResourcePolicyRequest": {
+        "description": "Request to create a project resource policy.",
+        "properties": {
+          "name": {
+            "description": "Policy name",
+            "title": "Name",
+            "type": "string"
+          },
+          "max_vfolder_count": {
+            "default": 0,
+            "description": "Max vfolder count",
+            "title": "Max Vfolder Count",
+            "type": "integer"
+          },
+          "max_quota_scope_size": {
+            "default": 0,
+            "description": "Max quota scope size in bytes",
+            "title": "Max Quota Scope Size",
+            "type": "integer"
+          },
+          "max_network_count": {
+            "default": 0,
+            "description": "Max network count",
+            "title": "Max Network Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateProjectResourcePolicyRequest",
+        "type": "object"
+      },
+      "ProjectResourcePolicyFilter": {
+        "description": "Filter for project resource policies.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by name"
+          }
+        },
+        "title": "ProjectResourcePolicyFilter",
+        "type": "object"
+      },
+      "ProjectResourcePolicyOrder": {
+        "description": "Order specification for project resource policies.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/ProjectResourcePolicyOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "ProjectResourcePolicyOrder",
+        "type": "object"
+      },
+      "ProjectResourcePolicyOrderField": {
+        "description": "Fields available for ordering project resource policies.",
+        "enum": [
+          "name",
+          "created_at"
+        ],
+        "title": "ProjectResourcePolicyOrderField",
+        "type": "string"
+      },
+      "SearchProjectResourcePoliciesRequest": {
+        "description": "Request body for searching project resource policies.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectResourcePolicyFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ProjectResourcePolicyOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum items to return",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Number of items to skip",
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "title": "SearchProjectResourcePoliciesRequest",
+        "type": "object"
+      },
+      "UpdateProjectResourcePolicyRequest": {
+        "description": "Request to update a project resource policy.",
+        "properties": {
+          "max_vfolder_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              }
+            ],
+            "default": 1,
+            "description": "Max vfolder count",
+            "title": "Max Vfolder Count"
+          },
+          "max_quota_scope_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              }
+            ],
+            "default": 1,
+            "description": "Max quota scope size in bytes",
+            "title": "Max Quota Scope Size"
+          },
+          "max_network_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              }
+            ],
+            "default": 1,
+            "description": "Max network count",
+            "title": "Max Network Count"
+          }
+        },
+        "title": "UpdateProjectResourcePolicyRequest",
+        "type": "object"
+      },
+      "DeleteProjectResourcePolicyRequest": {
+        "description": "Request to delete a project resource policy.",
+        "properties": {
+          "name": {
+            "description": "Policy name to delete",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "DeleteProjectResourcePolicyRequest",
+        "type": "object"
+      },
       "SchedulingResultType": {
         "enum": [
           "SUCCESS",
@@ -17985,6 +18741,462 @@
           }
         ],
         "description": "Search entities within a scope by entity type with filters and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/resource-policies/keypair": {
+      "post": {
+        "operationId": "v2.0.create_keypair_policy",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateKeypairResourcePolicyRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Create a new keypair resource policy.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/resource-policies/keypair/search": {
+      "post": {
+        "operationId": "v2.0.search_keypair_policies",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchKeypairResourcePoliciesRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search keypair resource policies.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/resource-policies/keypair/{policy_name}": {
+      "get": {
+        "operationId": "v2.0.get_keypair_policy",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific keypair resource policy by name.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "v2.0.update_keypair_policy",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateKeypairResourcePolicyRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "policy_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update a keypair resource policy.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/resource-policies/keypair/delete": {
+      "post": {
+        "operationId": "v2.0.delete_keypair_policy",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteKeypairResourcePolicyRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Delete a keypair resource policy.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/resource-policies/user": {
+      "post": {
+        "operationId": "v2.0.create_user_policy",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserResourcePolicyRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Create a new user resource policy.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/resource-policies/user/search": {
+      "post": {
+        "operationId": "v2.0.search_user_policies",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchUserResourcePoliciesRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search user resource policies.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/resource-policies/user/{policy_name}": {
+      "get": {
+        "operationId": "v2.0.get_user_policy",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific user resource policy by name.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "v2.0.update_user_policy",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserResourcePolicyRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "policy_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update a user resource policy.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/resource-policies/user/delete": {
+      "post": {
+        "operationId": "v2.0.delete_user_policy",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteUserResourcePolicyRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Delete a user resource policy.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/resource-policies/project": {
+      "post": {
+        "operationId": "v2.0.create_project_policy",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectResourcePolicyRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Create a new project resource policy.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/resource-policies/project/search": {
+      "post": {
+        "operationId": "v2.0.search_project_policies",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchProjectResourcePoliciesRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search project resource policies.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/resource-policies/project/{policy_name}": {
+      "get": {
+        "operationId": "v2.0.get_project_policy",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific project resource policy by name.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "v2.0.update_project_policy",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProjectResourcePolicyRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "policy_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update a project resource policy.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2.0/admin/resource-policies/project/delete": {
+      "post": {
+        "operationId": "v2.0.delete_project_policy",
+        "tags": [
+          "v2.0"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteProjectResourcePolicyRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Delete a project resource policy.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/scheduling-history/sessions/search": {
