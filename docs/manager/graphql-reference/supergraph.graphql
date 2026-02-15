@@ -4149,8 +4149,17 @@ type EntityConnection
 type EntityEdge
   @join__type(graph: STRAWBERRY)
 {
-  node: EntityNode!
+  node: EntityRef!
   cursor: String!
+}
+
+"""Added in 26.3.0. Filter for entity associations"""
+input EntityFilter
+  @join__type(graph: STRAWBERRY)
+{
+  entityType: EntityType!
+  scopeType: EntityType = null
+  scopeId: String = null
 }
 
 union EntityNode
@@ -4171,6 +4180,38 @@ union EntityNode
   @join__unionMember(graph: STRAWBERRY, member: "ArtifactRevision")
   @join__unionMember(graph: STRAWBERRY, member: "Role")
  = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ArtifactRevision | Role
+
+"""Added in 26.3.0. Order by specification for entity associations"""
+input EntityOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: EntityOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.3.0. Entity ordering field"""
+enum EntityOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  REGISTERED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.3.0. Entity reference from the association_scopes_entities table
+"""
+type EntityRef implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  scopeType: EntityType!
+  scopeId: String!
+  entityType: EntityType!
+  entityId: String!
+  relationType: RelationType!
+  registeredAt: DateTime!
+}
 
 """
 Added in 26.2.0. Common timestamp fields for entity lifecycle tracking. Reusable across different entity types.
@@ -9247,9 +9288,9 @@ type Query
   adminRoleAssignments(filter: RoleAssignmentFilter = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection! @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.3.0. Search entities by type (admin only). Only entity_type selection and pagination are supported. Use each entity's dedicated query for detailed options.
+  Added in 26.3.0. Search entity associations (admin only). Filter by entity_type (required), optionally by scope_type and scope_id.
   """
-  adminEntities(entityType: EntityType!, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection! @join__field(graph: STRAWBERRY)
+  adminEntities(filter: EntityFilter!, orderBy: EntityOrderBy = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. List available scope types."""
   scopeTypes: [EntityType!]! @join__field(graph: STRAWBERRY)
@@ -9549,6 +9590,14 @@ type RejectArtifactPayload
   @join__type(graph: STRAWBERRY)
 {
   artifactRevision: ArtifactRevision!
+}
+
+"""Added in 26.3.0. Classification of parent-child entity edges"""
+enum RelationType
+  @join__type(graph: STRAWBERRY)
+{
+  AUTO @join__enumValue(graph: STRAWBERRY)
+  REF @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.19.0"""
