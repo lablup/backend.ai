@@ -53,6 +53,9 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.container_registry.creators import (
     ContainerRegistryCreatorSpec,
 )
+from ai.backend.manager.repositories.container_registry.db_source.db_source import (
+    ContainerRegistryDBSource,
+)
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -138,7 +141,8 @@ class TestContainerRegistryRepository:
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:
         """Create ContainerRegistryRepository instance with real database"""
-        return ContainerRegistryRepository(db=db_with_cleanup)
+        db_source = ContainerRegistryDBSource(db_with_cleanup)
+        return ContainerRegistryRepository(db_source)
 
     @pytest.fixture
     async def sample_domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:

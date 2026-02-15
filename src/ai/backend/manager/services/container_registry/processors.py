@@ -39,6 +39,15 @@ from ai.backend.manager.services.container_registry.service import ContainerRegi
 
 
 class ContainerRegistryProcessors(AbstractProcessorPackage):
+    create_container_registry: ActionProcessor[
+        CreateContainerRegistryAction, CreateContainerRegistryActionResult
+    ]
+    modify_container_registry: ActionProcessor[
+        ModifyContainerRegistryAction, ModifyContainerRegistryActionResult
+    ]
+    delete_container_registry: ActionProcessor[
+        DeleteContainerRegistryAction, DeleteContainerRegistryActionResult
+    ]
     rescan_images: ActionProcessor[RescanImagesAction, RescanImagesActionResult]
     clear_images: ActionProcessor[ClearImagesAction, ClearImagesActionResult]
     load_container_registries: ActionProcessor[
@@ -50,19 +59,19 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
     get_container_registries: ActionProcessor[
         GetContainerRegistriesAction, GetContainerRegistriesActionResult
     ]
-    create_container_registry: ActionProcessor[
-        CreateContainerRegistryAction, CreateContainerRegistryActionResult
-    ]
-    modify_container_registry: ActionProcessor[
-        ModifyContainerRegistryAction, ModifyContainerRegistryActionResult
-    ]
-    delete_container_registry: ActionProcessor[
-        DeleteContainerRegistryAction, DeleteContainerRegistryActionResult
-    ]
 
     def __init__(
         self, service: ContainerRegistryService, action_monitors: list[ActionMonitor]
     ) -> None:
+        self.create_container_registry = ActionProcessor(
+            service.create_container_registry, action_monitors
+        )
+        self.modify_container_registry = ActionProcessor(
+            service.modify_container_registry, action_monitors
+        )
+        self.delete_container_registry = ActionProcessor(
+            service.delete_container_registry, action_monitors
+        )
         self.rescan_images = ActionProcessor(service.rescan_images, action_monitors)
         self.clear_images = ActionProcessor(service.clear_images, action_monitors)
         self.load_container_registries = ActionProcessor(
@@ -73,15 +82,6 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
         )
         self.get_container_registries = ActionProcessor(
             service.get_container_registries, action_monitors
-        )
-        self.create_container_registry = ActionProcessor(
-            service.create_container_registry, action_monitors
-        )
-        self.modify_container_registry = ActionProcessor(
-            service.modify_container_registry, action_monitors
-        )
-        self.delete_container_registry = ActionProcessor(
-            service.delete_container_registry, action_monitors
         )
 
     @override
