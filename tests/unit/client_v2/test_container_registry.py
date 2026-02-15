@@ -6,11 +6,13 @@ from yarl import URL
 from ai.backend.client.v2.base_client import BackendAIClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.container_registry import ContainerRegistryClient
-from ai.backend.common.container_registry import (
+from ai.backend.common.dto.manager.container_registry.request import (
+    HarborWebhookRequestModel,
     PatchContainerRegistryRequestModel,
+)
+from ai.backend.common.dto.manager.container_registry.response import (
     PatchContainerRegistryResponseModel,
 )
-from ai.backend.common.dto.manager.registry.request import HarborWebhookRequestModel
 
 from .conftest import MockAuth
 
