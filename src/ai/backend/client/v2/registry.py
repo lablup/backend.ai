@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from .domains.compute_session import ComputeSessionClient
     from .domains.config import ConfigClient
     from .domains.container_registry import ContainerRegistryClient
+    from .domains.deployment import DeploymentClient
     from .domains.fair_share import FairShareClient
     from .domains.group import GroupClient
     from .domains.infra import InfraClient
@@ -117,6 +118,12 @@ class BackendAIClientRegistry:
         from .domains.container_registry import ContainerRegistryClient
 
         return ContainerRegistryClient(self._client)
+
+    @cached_property
+    def deployment(self) -> DeploymentClient:
+        from .domains.deployment import DeploymentClient
+
+        return DeploymentClient(self._client)
 
     @cached_property
     def notification(self) -> NotificationClient:
