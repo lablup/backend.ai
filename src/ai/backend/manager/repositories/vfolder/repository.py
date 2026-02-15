@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -23,6 +24,7 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.data.vfolder.types import (
+    ValidatedVFolderInfo,
     VFolderAccessInfo,
     VFolderCreateParams,
     VFolderData,
@@ -31,6 +33,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderPermissionData,
 )
+from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
@@ -1125,6 +1128,40 @@ class VfolderRepository:
                 domain_name=domain_name,
                 group_id=group_id,
             )
+
+    @vfolder_repository_resilience.apply()
+    async def get_validated_vfolder_id(
+        self,
+        vfolder_uuid: uuid.UUID,
+        *,
+        permission: VFolderHostPermission,
+        allowed_vfolder_types: Sequence[str],
+        resource_policy: Mapping[str, Any],
+    ) -> ValidatedVFolderInfo:
+        """
+        Resolve user from context, validate vfolder access, check host permission,
+        and return validated VFolderID with storage info.
+        """
+        user = current_user()
+        if user is None:
+            raise AuthorizationFailed("User context is not available")
+        vfolder_data = await self.get_by_id_validated(vfolder_uuid, user.user_id, user.domain_name)
+        await self.ensure_host_permission_allowed(
+            vfolder_data.host,
+            permission=permission,
+            allowed_vfolder_types=allowed_vfolder_types,
+            user_uuid=user.user_id,
+            resource_policy=resource_policy,
+            domain_name=vfolder_data.domain_name,
+        )
+        return ValidatedVFolderInfo(
+            vfolder_id=VFolderID(
+                quota_scope_id=vfolder_data.quota_scope_id,
+                folder_id=vfolder_data.id,
+            ),
+            host=vfolder_data.host,
+            unmanaged_path=vfolder_data.unmanaged_path,
+        )
 
     def _vfolder_dict_to_data(self, vfolder_dict: dict[str, Any]) -> VFolderData:
         """
