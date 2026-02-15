@@ -228,8 +228,7 @@ class TestUpdateManagerStatus:
     @pytest.mark.asyncio
     async def test_sends_put_with_body(self) -> None:
         mock_resp = AsyncMock()
-        mock_resp.status = 200
-        mock_resp.json = AsyncMock(return_value={})
+        mock_resp.status = 204
         mock_session = _make_request_session(mock_resp)
         client = _make_ops_client(mock_session)
 
@@ -270,8 +269,7 @@ class TestUpdateAnnouncement:
     @pytest.mark.asyncio
     async def test_sends_post_with_body(self) -> None:
         mock_resp = AsyncMock()
-        mock_resp.status = 200
-        mock_resp.json = AsyncMock(return_value={})
+        mock_resp.status = 204
         mock_session = _make_request_session(mock_resp)
         client = _make_ops_client(mock_session)
 
@@ -293,8 +291,7 @@ class TestPerformSchedulerOps:
     @pytest.mark.asyncio
     async def test_sends_post_with_body(self) -> None:
         mock_resp = AsyncMock()
-        mock_resp.status = 200
-        mock_resp.json = AsyncMock(return_value={})
+        mock_resp.status = 204
         mock_session = _make_request_session(mock_resp)
         client = _make_ops_client(mock_session)
 

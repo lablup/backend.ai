@@ -10,6 +10,7 @@ from ai.backend.common.container_registry import (
     PatchContainerRegistryRequestModel,
     PatchContainerRegistryResponseModel,
 )
+from ai.backend.common.dto.manager.registry.request import HarborWebhookRequestModel
 
 from .conftest import MockAuth
 
@@ -91,3 +92,37 @@ class TestContainerRegistryClient:
         call_kwargs = mock_session.request.call_args.kwargs
         assert call_kwargs["json"]["url"] == "https://reg.io"
         assert call_kwargs["json"]["username"] == "user"
+
+
+class TestHarborWebhook:
+    @pytest.mark.asyncio
+    async def test_handle_harbor_webhook_sends_post(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 204
+        mock_session = _make_request_session(mock_resp)
+        client = _make_client(mock_session)
+        domain = ContainerRegistryClient(client)
+
+        request = HarborWebhookRequestModel(
+            type="PUSH_ARTIFACT",
+            event_data=HarborWebhookRequestModel.EventData(
+                resources=[
+                    HarborWebhookRequestModel.EventData.Resource(
+                        resource_url="https://harbor.example.com/library/nginx",
+                        tag="latest",
+                    ),
+                ],
+                repository=HarborWebhookRequestModel.EventData.Repository(
+                    namespace="library",
+                    name="nginx",
+                ),
+            ),
+        )
+        await domain.handle_harbor_webhook(request)
+
+        call_args = mock_session.request.call_args
+        assert call_args[0][0] == "POST"
+        assert "/container-registries/webhook/harbor" in str(call_args[0][1])
+        call_kwargs = call_args.kwargs
+        assert call_kwargs["json"]["type"] == "PUSH_ARTIFACT"
+        assert call_kwargs["json"]["event_data"]["repository"]["name"] == "nginx"

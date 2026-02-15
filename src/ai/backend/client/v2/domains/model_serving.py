@@ -6,7 +6,6 @@ from typing import Any
 from pydantic import TypeAdapter
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
-from ai.backend.client.v2.exceptions import map_status_to_exception
 from ai.backend.common.dto.manager.model_serving import (
     CompactServeInfoModel,
     ErrorListResponseModel,
@@ -144,19 +143,10 @@ class ModelServingClient(BaseDomainClient):
         )
 
     async def clear_error(self, service_id: uuid.UUID) -> None:
-        method = "POST"
-        path = f"{self.API_PREFIX}/{service_id}/errors/clear"
-        content_type = "application/json"
-        rel_url = "/" + path.lstrip("/")
-        headers = self._client._sign(method, rel_url, content_type)
-        url = self._client._build_url(path)
-        async with self._client._session.request(method, url, headers=headers) as resp:
-            if resp.status >= 400:
-                try:
-                    data = await resp.json()
-                except Exception:
-                    data = await resp.text()
-                raise map_status_to_exception(resp.status, resp.reason or "", data)
+        await self._client.typed_request_no_content(
+            "POST",
+            f"{self.API_PREFIX}/{service_id}/errors/clear",
+        )
 
     async def list_supported_runtimes(self) -> RuntimeInfoModel:
         return await self._client.typed_request(

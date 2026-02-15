@@ -9,7 +9,6 @@ from yarl import URL
 from ai.backend.client.v2.base_client import BackendAIClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.model_serving import ModelServingClient
-from ai.backend.client.v2.exceptions import ServerError
 from ai.backend.common.dto.manager.model_serving import (
     ErrorListResponseModel,
     NewServiceRequestModel,
@@ -253,43 +252,14 @@ class TestListErrors:
 
 class TestClearError:
     @pytest.mark.asyncio
-    async def test_clear_error_returns_none(self) -> None:
+    async def test_clear_error_calls_typed_request_no_content(self) -> None:
         ms, mock = _make_model_serving_client()
-        mock_resp = AsyncMock()
-        mock_resp.status = 204
-        mock_ctx = AsyncMock()
-        mock_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
-        mock_ctx.__aexit__ = AsyncMock(return_value=False)
-        mock._session = MagicMock()
-        mock._session.request = MagicMock(return_value=mock_ctx)
-        mock._sign = MagicMock(return_value={"Authorization": "mock"})
-        mock._build_url = MagicMock(
-            return_value=f"https://api.example.com/services/{_SERVICE_ID}/errors/clear"
-        )
+        mock.typed_request_no_content = AsyncMock()
         await ms.clear_error(_SERVICE_ID)
-        mock._session.request.assert_called_once()
-        call_args = mock._session.request.call_args
-        assert call_args[0][0] == "POST"
-
-    @pytest.mark.asyncio
-    async def test_clear_error_raises_on_error(self) -> None:
-        ms, mock = _make_model_serving_client()
-        mock_resp = AsyncMock()
-        mock_resp.status = 500
-        mock_resp.reason = "Internal Server Error"
-        mock_resp.json = AsyncMock(return_value={"title": "error"})
-        mock_ctx = AsyncMock()
-        mock_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
-        mock_ctx.__aexit__ = AsyncMock(return_value=False)
-        mock._session = MagicMock()
-        mock._session.request = MagicMock(return_value=mock_ctx)
-        mock._sign = MagicMock(return_value={"Authorization": "mock"})
-        mock._build_url = MagicMock(
-            return_value=f"https://api.example.com/services/{_SERVICE_ID}/errors/clear"
+        mock.typed_request_no_content.assert_awaited_once_with(
+            "POST",
+            f"/services/{_SERVICE_ID}/errors/clear",
         )
-
-        with pytest.raises(ServerError):
-            await ms.clear_error(_SERVICE_ID)
 
 
 class TestListSupportedRuntimes:

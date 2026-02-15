@@ -3,6 +3,7 @@ from ai.backend.common.container_registry import (
     PatchContainerRegistryRequestModel,
     PatchContainerRegistryResponseModel,
 )
+from ai.backend.common.dto.manager.registry.request import HarborWebhookRequestModel
 
 
 class ContainerRegistryClient(BaseDomainClient):
@@ -16,4 +17,14 @@ class ContainerRegistryClient(BaseDomainClient):
             f"/container-registries/{registry_id}",
             request=request,
             response_model=PatchContainerRegistryResponseModel,
+        )
+
+    async def handle_harbor_webhook(
+        self,
+        request: HarborWebhookRequestModel,
+    ) -> None:
+        await self._client.typed_request_no_content(
+            "POST",
+            "/container-registries/webhook/harbor",
+            request=request,
         )
