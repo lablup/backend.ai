@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, override
 
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.errors.user import UserCreationBadRequest
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.repositories.base.creator import CreatorSpec
+from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -34,6 +38,18 @@ class UserCreatorSpec(CreatorSpec[UserRow]):
     container_uid: int | None = None
     container_main_gid: int | None = None
     container_gids: list[int] | None = None
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return (
+            IntegrityErrorCheck(
+                violation_type=UniqueConstraintViolationError,
+                error=UserCreationBadRequest(
+                    "Failed to create user due to database constraint violation"
+                ),
+            ),
+        )
 
     @override
     def build_row(self) -> UserRow:

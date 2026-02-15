@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 import sqlalchemy as sa
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
@@ -35,7 +34,7 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.errors.common import ObjectNotFound
-from ai.backend.manager.errors.permission import RoleAlreadyAssigned, RoleNotAssigned, RoleNotFound
+from ai.backend.manager.errors.permission import RoleNotAssigned, RoleNotFound
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -54,6 +53,7 @@ from ai.backend.manager.repositories.base.updater import Updater, execute_update
 from ai.backend.manager.repositories.permission_controller.creators import (
     ObjectPermissionCreatorSpec,
     PermissionCreatorSpec,
+    UserRoleCreatorSpec,
 )
 from ai.backend.manager.repositories.permission_controller.types import (
     ObjectPermissionSearchScope,
@@ -239,16 +239,15 @@ class PermissionDBSource:
 
     async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleRow:
         async with self._db.begin_session() as db_session:
-            user_role_row = UserRoleRow.from_input(data)
-            try:
-                db_session.add(user_role_row)
-                await db_session.flush()
-                await db_session.refresh(user_role_row)
-                return user_role_row
-            except IntegrityError as e:
-                raise RoleAlreadyAssigned(
-                    f"Role {data.role_id} is already assigned to user {data.user_id}."
-                ) from e
+            creator = Creator(
+                spec=UserRoleCreatorSpec(
+                    user_id=data.user_id,
+                    role_id=data.role_id,
+                    granted_by=data.granted_by,
+                )
+            )
+            result = await execute_creator(db_session, creator)
+            return result.row
 
     async def revoke_role(self, data: UserRoleRevocationInput) -> uuid.UUID:
         async with self._db.begin_session() as db_session:

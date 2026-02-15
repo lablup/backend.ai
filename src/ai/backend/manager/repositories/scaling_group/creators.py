@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,
@@ -15,6 +17,7 @@ from ai.backend.manager.models.scaling_group import (
 )
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base.creator import CreatorSpec
+from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
 @dataclass
@@ -33,6 +36,16 @@ class ScalingGroupCreatorSpec(CreatorSpec[ScalingGroupRow]):
     scheduler_opts: ScalingGroupOpts | None = None
     use_host_network: bool = False
     fair_share_spec: FairShareScalingGroupSpec | None = None
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return (
+            IntegrityErrorCheck(
+                violation_type=UniqueConstraintViolationError,
+                error=ScalingGroupConflict(f"Duplicate scaling group name: {self.name}"),
+            ),
+        )
 
     @override
     def build_row(self) -> ScalingGroupRow:
