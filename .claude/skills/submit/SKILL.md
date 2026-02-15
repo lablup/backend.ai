@@ -55,9 +55,10 @@ pants test --changed-since=origin/{base_branch} --changed-dependents=transitive
    - Never stage `.env`, credentials, or other sensitive files
 
 2. **Generate commit message**
-   - Use conventional commit style: `type(scope): description`
+   - Use conventional commit style: `type(BA-XXXX): description`
    - Types: `fix`, `feat`, `refactor`, `test`, `doc`, `ci`, `chore`, `perf`
-   - Include JIRA key in description if available: `fix(manager): resolve session cleanup (BA-1234)`
+   - **When a JIRA key is available, ALWAYS use it as the conventional commit scope. Never use component names like `manager`, `client`, `client-sdk` as the scope.**
+   - Example: `fix(BA-1234): resolve session cleanup race condition`
    - Keep first line under 80 characters
    - Add detailed body if multiple significant changes
 
@@ -71,9 +72,9 @@ pants test --changed-since=origin/{base_branch} --changed-dependents=transitive
    - `git push -u origin {branch_name}`
 
 2. **Generate PR content**
-   - **Title**: Conventional commit style with JIRA key prefix
-     - Format: `type(scope): description (BA-XXXX)`
-     - Example: `fix(manager): resolve session cleanup race condition (BA-1234)`
+   - **Title**: Conventional commit style with JIRA key as scope
+     - Format: `type(BA-XXXX): description`
+     - Example: `fix(BA-1234): resolve session cleanup race condition`
    - **Body**: Use this template:
 
    ```markdown
