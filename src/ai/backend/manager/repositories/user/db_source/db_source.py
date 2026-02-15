@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from datetime import datetime, timedelta
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -19,7 +19,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.keypair.types import KeyPairCreator
-from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
@@ -43,6 +43,7 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.group import (
     AssocGroupUserRow,
+    GroupRow,
     ProjectType,
     association_groups_users,
     groups,
@@ -79,11 +80,12 @@ from ai.backend.manager.models.vfolder import (
 from ai.backend.manager.repositories.base.creator import BulkCreatorError, Creator, execute_creator
 from ai.backend.manager.repositories.base.purger import execute_batch_purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.permission_controller.creators import (
-    AssociationScopesEntitiesCreatorSpec,
-    UserRoleCreatorSpec,
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
 )
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.purgers import (
@@ -156,9 +158,22 @@ class UserDBSource:
                 raise UserConflict(
                     f"User with email {email} or username {user_name} already exists."
                 )
+
+            # Collect project IDs to join (including model store project)
+            project_ids = await self._get_project_scope_ids_for_user(
+                db_session, domain_name, [UUID(gid) for gid in group_ids or []]
+            )
+            project_scope_refs = [ScopeId(ScopeType.PROJECT, str(pid)) for pid in project_ids]
+
             try:
-                # Insert user
-                result = await execute_creator(db_session, creator)
+                # Insert user with RBAC scope associations (domain + projects)
+                rbac_creator = RBACEntityCreator(
+                    spec=creator.spec,
+                    entity_type=EntityType.USER,
+                    scope_ref=ScopeId(ScopeType.DOMAIN, domain_name),
+                    additional_scope_refs=project_scope_refs,
+                )
+                result = await execute_rbac_entity_creator(db_session, rbac_creator)
                 row = result.row
             except RepositoryIntegrityError as e:
                 error_msg = str(e)
@@ -189,24 +204,17 @@ class UserDBSource:
             row.main_access_key = kp_data.access_key
             created_user.main_access_key = kp_data.access_key
 
-            # Add user to groups including model store project
-            if created_user.domain_name:
-                await self._add_user_to_groups(
-                    db_session, created_user.uuid, created_user.domain_name, group_ids or []
-                )
+            # Add user to groups (using already-resolved project_ids)
+            if project_ids:
+                await self._add_user_to_groups(db_session, created_user.uuid, project_ids)
 
+            # Create RBAC role and map user to role
+            # Note: Entity-Scope association is handled by RBACEntityCreator above
             role = await self._role_manager.create_system_role(db_session, created_user)
             user_role_creator = Creator(
                 spec=UserRoleCreatorSpec(user_id=created_user.uuid, role_id=role.id)
             )
-            await self._role_manager.map_user_to_role(db_session, user_role_creator)
-            entity_scope_creator = Creator(
-                spec=AssociationScopesEntitiesCreatorSpec(
-                    scope_id=ScopeId(ScopeType.DOMAIN, str(created_user.domain_name)),
-                    object_id=ObjectId(EntityType.USER, str(created_user.uuid)),
-                )
-            )
-            await self._role_manager.map_entity_to_scope(db_session, entity_scope_creator)
+            await execute_creator(db_session, user_role_creator)
 
         return UserCreateResultData(created_user, kp_data)
 
@@ -635,36 +643,38 @@ class UserDBSource:
             raise UserNotFound(f"User with email {email} not found.")
         return cast(UserRow, res)
 
-    async def _add_user_to_groups(
-        self, db_session: SASession, user_uuid: UUID, domain_name: str, group_ids: list[str]
-    ) -> None:
-        """Private method to add user to groups including model store project."""
+    async def _get_project_scope_ids_for_user(
+        self, db_session: SASession, domain_name: str, project_ids: Iterable[UUID]
+    ) -> list[UUID]:
+        """Get project scope ids for user including model store project."""
         # Check for model store project
-        model_store_query = sa.select(groups.c.id).where(groups.c.type == ProjectType.MODEL_STORE)
-        model_store_project = (await db_session.execute(model_store_query)).first()
-
-        gids_to_join = list(group_ids)
-        if model_store_project:
-            gids_to_join.append(model_store_project.id)
-
-        if gids_to_join:
-            query = (
-                sa.select(groups.c.id)
-                .select_from(groups)
-                .where(groups.c.domain_name == domain_name)
-                .where(groups.c.id.in_(gids_to_join))
+        rows = await db_session.scalars(
+            sa.select(GroupRow.id).where(
+                sa.or_(
+                    sa.and_(
+                        GroupRow.domain_name == domain_name,
+                        sa.or_(
+                            GroupRow.id.in_(project_ids),
+                            GroupRow.type == ProjectType.MODEL_STORE,
+                        ),
+                    ),
+                ),
             )
-            grps = (await db_session.execute(query)).all()
-            if grps:
-                group_data = [{"user_id": user_uuid, "group_id": grp.id} for grp in grps]
-                group_insert_query = sa.insert(association_groups_users).values(group_data)
-                await db_session.execute(group_insert_query)
-            else:
-                log.warning(
-                    "No valid groups found to add user {0} in domain {1}", user_uuid, domain_name
-                )
-        else:
-            log.info("Adding new user {0} with no groups in domain {1}", user_uuid, domain_name)
+        )
+        gids_to_join = rows.all()
+        return list(gids_to_join)
+
+    async def _add_user_to_groups(
+        self, db_session: SASession, user_uuid: UUID, project_ids: Iterable[UUID]
+    ) -> None:
+        """Add user to groups using pre-resolved project IDs.
+
+        Note: RBAC scope associations are handled by RBACEntityCreator in create_user_validated().
+        This method only handles the association_groups_users table.
+        """
+        group_data = [{"user_id": user_uuid, "group_id": pid} for pid in project_ids]
+        if group_data:
+            await db_session.execute(sa.insert(association_groups_users).values(group_data))
 
     async def _validate_and_update_main_access_key(
         self, conn: AsyncConnection, email: str, main_access_key: str
