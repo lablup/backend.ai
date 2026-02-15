@@ -13,6 +13,8 @@ from sqlalchemy.engine import CursorResult
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 
+from .integrity import parse_integrity_error
+
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
@@ -57,6 +59,12 @@ async def execute_purger[TRow: Base](
     Returns:
         PurgerResult containing the deleted row, or None if no row matched
 
+    Raises:
+        RepositoryIntegrityError: If the DELETE violates a database constraint
+            (e.g., foreign key). This is a safety-net fallback; callers should
+            use ``existence_checks`` before invoking the purger to provide
+            user-friendly error messages.
+
     Example:
         purger = Purger(
             row_class=SessionRow,
@@ -77,7 +85,10 @@ async def execute_purger[TRow: Base](
 
     stmt = sa.delete(table).where(pk_columns[0] == purger.pk_value).returning(*table.columns)
 
-    result = await db_sess.execute(stmt)
+    try:
+        result = await db_sess.execute(stmt)
+    except sa.exc.IntegrityError as e:
+        raise parse_integrity_error(e) from e
     row_data = result.fetchone()
 
     if row_data is None:
@@ -149,6 +160,12 @@ async def execute_batch_purger[TRow: Base](
     Returns:
         BatchPurgerResult containing the total count of deleted rows
 
+    Raises:
+        RepositoryIntegrityError: If the DELETE violates a database constraint
+            (e.g., foreign key). This is a safety-net fallback; callers should
+            use ``existence_checks`` before invoking the purger to provide
+            user-friendly error messages.
+
     Note:
         This performs a hard delete. For soft delete, implement
         in the repository layer using update statements.
@@ -186,7 +203,10 @@ async def execute_batch_purger[TRow: Base](
 
         # Delete rows matching the subquery (supports composite PKs)
         stmt = sa.delete(table).where(sa.tuple_(*pk_columns).in_(pk_subquery))
-        result = await db_sess.execute(stmt)
+        try:
+            result = await db_sess.execute(stmt)
+        except sa.exc.IntegrityError as e:
+            raise parse_integrity_error(e) from e
 
         batch_deleted = cast(CursorResult[Any], result).rowcount
         total_deleted += batch_deleted
