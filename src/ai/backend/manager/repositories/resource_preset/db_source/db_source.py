@@ -10,7 +10,6 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.exception import ResourcePresetConflict
 from ai.backend.common.types import (
     AccessKey,
     DefaultForUnspecified,
@@ -22,7 +21,6 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
     InvalidPresetQuery,
@@ -45,7 +43,6 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
-from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
 from ai.backend.manager.repositories.resource_slot.types import (
     add_quantities,
     min_quantities,
@@ -85,14 +82,8 @@ class ResourcePresetDBSource:
         Creates a new resource preset.
         Raises ResourcePresetConflict if a preset with the same name and scaling group already exists.
         """
-        spec = cast(ResourcePresetCreatorSpec, creator.spec)
         async with self._db.begin_session() as session:
-            try:
-                result = await execute_creator(session, creator)
-            except RepositoryIntegrityError as e:
-                raise ResourcePresetConflict(
-                    f"Duplicate resource preset name (name:{spec.name}, scaling_group:{spec.scaling_group_name})"
-                ) from e
+            result = await execute_creator(session, creator)
             return result.row.to_dataclass()
 
     async def get_preset_by_id(self, preset_id: UUID) -> ResourcePresetData:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
@@ -14,6 +15,8 @@ from ai.backend.manager.data.permission.types import (
     RoleSource,
     ScopeType,
 )
+from ai.backend.manager.errors.permission import RoleAlreadyAssigned
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -22,6 +25,7 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.repositories.base.creator import CreatorSpec
+from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
 @dataclass
@@ -95,6 +99,18 @@ class UserRoleCreatorSpec(CreatorSpec[UserRoleRow]):
     user_id: uuid.UUID
     role_id: uuid.UUID
     granted_by: uuid.UUID | None = None
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return (
+            IntegrityErrorCheck(
+                violation_type=UniqueConstraintViolationError,
+                error=RoleAlreadyAssigned(
+                    f"Role {self.role_id} is already assigned to user {self.user_id}."
+                ),
+            ),
+        )
 
     @override
     def build_row(self) -> UserRoleRow:

@@ -28,7 +28,6 @@ from ai.backend.manager.data.user.types import (
     UserSearchResult,
 )
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
-from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.errors.user import (
     KeyPairForbidden,
     KeyPairNotFound,
@@ -156,15 +155,9 @@ class UserDBSource:
                 raise UserConflict(
                     f"User with email {email} or username {user_name} already exists."
                 )
-            try:
-                # Insert user
-                result = await execute_creator(db_session, creator)
-                row = result.row
-            except RepositoryIntegrityError as e:
-                error_msg = str(e)
-                raise UserCreationBadRequest(
-                    f"Failed to create user due to database constraint violation: {error_msg}"
-                ) from e
+            # Insert user (integrity_error_checks on UserCreatorSpec handles constraint violations)
+            result = await execute_creator(db_session, creator)
+            row = result.row
 
             if not row:
                 raise UserCreationFailure("Failed to create user")

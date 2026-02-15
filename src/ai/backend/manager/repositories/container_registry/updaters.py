@@ -5,24 +5,24 @@ from __future__ import annotations
 import builtins
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, cast, override
+from typing import Any, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
-from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
 from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.repositories.base.creator import BulkCreator, execute_bulk_creator
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
+from ai.backend.manager.repositories.container_registry.creators import (
+    ContainerRegistryGroupCreatorSpec,
+)
 from ai.backend.manager.types import OptionalState, TriState
-
-if TYPE_CHECKING:
-    pass
 
 
 async def handle_allowed_groups_update(
@@ -43,18 +43,15 @@ async def handle_allowed_groups_update(
         ContainerRegistryGroupsAssociationNotFound: If trying to remove non-existing associations
     """
     if allowed_group_updates.add:
-        insert_values = [
-            {"registry_id": registry_id, "group_id": group_id}
+        specs = [
+            ContainerRegistryGroupCreatorSpec(
+                registry_id=registry_id,
+                group_id=uuid.UUID(group_id),
+            )
             for group_id in allowed_group_updates.add
         ]
-
-        try:
-            insert_query = sa.insert(AssociationContainerRegistriesGroupsRow).values(insert_values)
-            await session.execute(insert_query)
-        except sa.exc.IntegrityError as e:
-            raise ContainerRegistryGroupsAlreadyAssociated(
-                f"Already associated groups for registry_id: {registry_id}, group_ids: {allowed_group_updates.add}"
-            ) from e
+        bulk_creator = BulkCreator(specs=specs)
+        await execute_bulk_creator(session, bulk_creator)
 
     if allowed_group_updates.remove:
         delete_query = (
