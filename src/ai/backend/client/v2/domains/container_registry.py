@@ -1,9 +1,11 @@
 from ai.backend.client.v2.base_domain import BaseDomainClient
-from ai.backend.common.container_registry import (
+from ai.backend.common.dto.manager.container_registry.request import (
+    HarborWebhookRequestModel,
     PatchContainerRegistryRequestModel,
+)
+from ai.backend.common.dto.manager.container_registry.response import (
     PatchContainerRegistryResponseModel,
 )
-from ai.backend.common.dto.manager.registry.request import HarborWebhookRequestModel
 
 
 class ContainerRegistryClient(BaseDomainClient):
