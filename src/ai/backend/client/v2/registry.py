@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from .domains.operations import OperationsClient
     from .domains.rbac import RBACClient
     from .domains.resource_policy import ResourcePolicyClient
+    from .domains.scaling_group import ScalingGroupClient
     from .domains.scheduling_history import SchedulingHistoryClient
     from .domains.session import SessionClient
     from .domains.storage import StorageClient
@@ -166,6 +167,12 @@ class BackendAIClientRegistry:
         from .domains.storage import StorageClient
 
         return StorageClient(self._client)
+
+    @cached_property
+    def scaling_group(self) -> ScalingGroupClient:
+        from .domains.scaling_group import ScalingGroupClient
+
+        return ScalingGroupClient(self._client)
 
     @cached_property
     def scheduling_history(self) -> SchedulingHistoryClient:
