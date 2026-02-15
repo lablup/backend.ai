@@ -12,6 +12,7 @@ __all__ = (
     "PaginationInfo",
     "ContainerDTO",
     "ComputeSessionDTO",
+    "GetComputeSessionDetailResponse",
     "SearchComputeSessionsResponse",
 )
 
@@ -48,6 +49,12 @@ class ComputeSessionDTO(BaseResponseModel):
     terminated_at: datetime | None = None
     starts_at: datetime | None = None
     containers: list[ContainerDTO] = Field(default_factory=list)
+
+
+class GetComputeSessionDetailResponse(BaseResponseModel):
+    """Response for getting a single compute session detail."""
+
+    session: ComputeSessionDTO = Field(description="Compute session detail data")
 
 
 class SearchComputeSessionsResponse(BaseResponseModel):

@@ -25,13 +25,19 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import (
+    AgentDetailData,
     AgentHeartbeatUpsert,
     UpsertResult,
 )
+from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.services.agent.actions.get_agent import (
+    GetAgentAction,
+    GetAgentActionResult,
+)
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -237,6 +243,13 @@ class AgentService:
     ) -> GetTotalResourcesActionResult:
         total_resources = await self._scheduler_repository.get_total_resource_slots()
         return GetTotalResourcesActionResult(total_resources=total_resources)
+
+    async def get_agent(self, action: GetAgentAction) -> GetAgentActionResult:
+        """Get a single agent detail by ID. It is used by superadmin only."""
+        agent_data = await self._agent_repository.get_by_id(action.agent_id)
+        admin_permissions = list(ADMIN_AGENT_PERMISSIONS)
+        agent_detail = AgentDetailData(agent=agent_data, permissions=admin_permissions)
+        return GetAgentActionResult(data=agent_detail)
 
     async def search_agents(self, action: SearchAgentsAction) -> SearchAgentsActionResult:
         """Searches agents. It is used by superadmin only."""

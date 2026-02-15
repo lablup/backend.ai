@@ -11,6 +11,8 @@ from ai.backend.common.api_handlers import BaseResponseModel
 
 __all__ = (
     "AgentDTO",
+    "AgentResourceStatsResponse",
+    "GetAgentDetailResponse",
     "PaginationInfo",
     "SearchAgentsResponse",
 )
@@ -37,6 +39,20 @@ class PaginationInfo(BaseModel):
     total: int = Field(description="Total number of items")
     offset: int = Field(description="Number of items skipped")
     limit: int | None = Field(default=None, description="Maximum items returned")
+
+
+class GetAgentDetailResponse(BaseResponseModel):
+    """Response for getting a single agent detail."""
+
+    agent: AgentDTO = Field(description="Agent detail data")
+
+
+class AgentResourceStatsResponse(BaseResponseModel):
+    """Response for aggregate resource stats across agents."""
+
+    total_used_slots: dict[str, str] = Field(description="Total occupied resource slots")
+    total_free_slots: dict[str, str] = Field(description="Total free resource slots")
+    total_capacity_slots: dict[str, str] = Field(description="Total capacity resource slots")
 
 
 class SearchAgentsResponse(BaseResponseModel):

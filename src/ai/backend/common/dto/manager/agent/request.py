@@ -16,8 +16,15 @@ from .types import AgentOrderField, AgentStatusEnumFilter, OrderDirection
 __all__ = (
     "AgentFilter",
     "AgentOrder",
+    "AgentPathParam",
     "SearchAgentsRequest",
 )
+
+
+class AgentPathParam(BaseRequestModel):
+    """Path parameter for agent ID."""
+
+    agent_id: str = Field(description="Agent ID")
 
 
 class AgentFilter(BaseRequestModel):
