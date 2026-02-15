@@ -9,6 +9,7 @@ from ai.backend.client.v2.base_client import BackendAIClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.compute_session import ComputeSessionClient
 from ai.backend.common.dto.manager.compute_session import (
+    GetComputeSessionDetailResponse,
     SearchComputeSessionsRequest,
     SearchComputeSessionsResponse,
 )
@@ -193,6 +194,95 @@ class TestSearchComputeSessions:
 
         assert len(result.items) == 1
         session = result.items[0]
+        assert len(session.containers) == 2
+        assert session.containers[0].agent_id == "agent-001"
+        assert session.containers[1].status == "PREPARING"
+
+
+class TestGetComputeSession:
+    @pytest.mark.asyncio
+    async def test_happy_path(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(
+            return_value={
+                "session": {
+                    "id": "11111111-1111-1111-1111-111111111111",
+                    "name": "my-session",
+                    "type": "interactive",
+                    "status": "RUNNING",
+                    "image": ["cr.backend.ai/stable/python:3.11"],
+                    "scaling_group": "default",
+                    "resource_slots": {"cpu": "4", "mem": "8G"},
+                    "occupied_slots": {"cpu": "2", "mem": "4G"},
+                    "created_at": "2025-01-01T00:00:00",
+                    "terminated_at": None,
+                    "starts_at": "2025-01-01T00:00:00",
+                    "containers": [
+                        {
+                            "id": "22222222-2222-2222-2222-222222222222",
+                            "agent_id": "agent-001",
+                            "status": "RUNNING",
+                            "resource_usage": {"cpu": "50%"},
+                        },
+                    ],
+                },
+            }
+        )
+        mock_session = _make_request_session(mock_resp)
+        client = _make_compute_session_client(mock_session)
+
+        result = await client.get_session("11111111-1111-1111-1111-111111111111")
+
+        call_args = mock_session.request.call_args
+        assert call_args[0][0] == "GET"
+        assert "/compute-sessions/11111111-1111-1111-1111-111111111111" in str(call_args[0][1])
+        assert isinstance(result, GetComputeSessionDetailResponse)
+        assert result.session.name == "my-session"
+        assert result.session.status == "RUNNING"
+
+    @pytest.mark.asyncio
+    async def test_with_nested_containers(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(
+            return_value={
+                "session": {
+                    "id": "33333333-3333-3333-3333-333333333333",
+                    "name": "multi-container",
+                    "type": "batch",
+                    "status": "RUNNING",
+                    "image": None,
+                    "scaling_group": None,
+                    "resource_slots": None,
+                    "occupied_slots": None,
+                    "created_at": "2025-01-01T00:00:00",
+                    "terminated_at": None,
+                    "starts_at": None,
+                    "containers": [
+                        {
+                            "id": "44444444-4444-4444-4444-444444444444",
+                            "agent_id": "agent-001",
+                            "status": "RUNNING",
+                            "resource_usage": None,
+                        },
+                        {
+                            "id": "55555555-5555-5555-5555-555555555555",
+                            "agent_id": "agent-002",
+                            "status": "PREPARING",
+                            "resource_usage": None,
+                        },
+                    ],
+                },
+            }
+        )
+        mock_session = _make_request_session(mock_resp)
+        client = _make_compute_session_client(mock_session)
+
+        result = await client.get_session("33333333-3333-3333-3333-333333333333")
+
+        assert isinstance(result, GetComputeSessionDetailResponse)
+        session = result.session
         assert len(session.containers) == 2
         assert session.containers[0].agent_id == "agent-001"
         assert session.containers[1].status == "PREPARING"

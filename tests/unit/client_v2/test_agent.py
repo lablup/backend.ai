@@ -11,6 +11,8 @@ from ai.backend.client.v2.domains.agent import AgentClient
 from ai.backend.common.dto.manager.agent import (
     AgentFilter,
     AgentOrder,
+    AgentResourceStatsResponse,
+    GetAgentDetailResponse,
     SearchAgentsRequest,
     SearchAgentsResponse,
 )
@@ -140,3 +142,97 @@ class TestSearchAgents:
         assert body["order"][0]["direction"] == "desc"
         assert body["limit"] == 25
         assert isinstance(result, SearchAgentsResponse)
+
+
+class TestGetAgent:
+    @pytest.mark.asyncio
+    async def test_happy_path(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(
+            return_value={
+                "agent": {
+                    "id": "agent-001",
+                    "status": "ALIVE",
+                    "region": "us-east-1",
+                    "resource_group": "default",
+                    "schedulable": True,
+                    "available_slots": {"cpu": "4", "mem": "8G"},
+                    "occupied_slots": {"cpu": "2", "mem": "4G"},
+                    "addr": "10.0.0.1:6001",
+                    "architecture": "x86_64",
+                    "version": "24.12.0",
+                },
+            }
+        )
+        mock_session = _make_request_session(mock_resp)
+        client = _make_agent_client(mock_session)
+
+        result = await client.get_agent("agent-001")
+
+        call_args = mock_session.request.call_args
+        assert call_args[0][0] == "GET"
+        assert "/agents/agent-001" in str(call_args[0][1])
+        assert isinstance(result, GetAgentDetailResponse)
+        assert result.agent.id == "agent-001"
+        assert result.agent.status == "ALIVE"
+        assert result.agent.schedulable is True
+        assert result.agent.available_slots == {"cpu": "4", "mem": "8G"}
+
+    @pytest.mark.asyncio
+    async def test_field_validation(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(
+            return_value={
+                "agent": {
+                    "id": "agent-002",
+                    "status": "LOST",
+                    "region": "ap-northeast-2",
+                    "resource_group": "gpu-cluster",
+                    "schedulable": False,
+                    "available_slots": {},
+                    "occupied_slots": {},
+                    "addr": "10.0.0.2:6001",
+                    "architecture": "aarch64",
+                    "version": "25.1.0",
+                },
+            }
+        )
+        mock_session = _make_request_session(mock_resp)
+        client = _make_agent_client(mock_session)
+
+        result = await client.get_agent("agent-002")
+
+        assert isinstance(result, GetAgentDetailResponse)
+        assert result.agent.id == "agent-002"
+        assert result.agent.status == "LOST"
+        assert result.agent.resource_group == "gpu-cluster"
+        assert result.agent.schedulable is False
+        assert result.agent.architecture == "aarch64"
+
+
+class TestGetResourceStats:
+    @pytest.mark.asyncio
+    async def test_happy_path(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(
+            return_value={
+                "total_used_slots": {"cpu": "8", "mem": "16G"},
+                "total_free_slots": {"cpu": "24", "mem": "48G"},
+                "total_capacity_slots": {"cpu": "32", "mem": "64G"},
+            }
+        )
+        mock_session = _make_request_session(mock_resp)
+        client = _make_agent_client(mock_session)
+
+        result = await client.get_resource_stats()
+
+        call_args = mock_session.request.call_args
+        assert call_args[0][0] == "GET"
+        assert "/agents/resource-stats" in str(call_args[0][1])
+        assert isinstance(result, AgentResourceStatsResponse)
+        assert result.total_used_slots == {"cpu": "8", "mem": "16G"}
+        assert result.total_free_slots == {"cpu": "24", "mem": "48G"}
+        assert result.total_capacity_slots == {"cpu": "32", "mem": "64G"}

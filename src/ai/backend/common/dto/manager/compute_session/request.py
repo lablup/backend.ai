@@ -6,7 +6,16 @@ from ai.backend.common.api_handlers import BaseRequestModel
 
 from .types import ComputeSessionFilter, ComputeSessionOrder
 
-__all__ = ("SearchComputeSessionsRequest",)
+__all__ = (
+    "ComputeSessionPathParam",
+    "SearchComputeSessionsRequest",
+)
+
+
+class ComputeSessionPathParam(BaseRequestModel):
+    """Path parameter for compute session ID."""
+
+    session_id: str = Field(description="Compute session ID")
 
 
 class SearchComputeSessionsRequest(BaseRequestModel):

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from .request import SearchComputeSessionsRequest
+from .request import ComputeSessionPathParam, SearchComputeSessionsRequest
 from .response import (
     ComputeSessionDTO,
     ContainerDTO,
+    GetComputeSessionDetailResponse,
     PaginationInfo,
     SearchComputeSessionsResponse,
 )
@@ -21,10 +22,12 @@ __all__ = (
     "ComputeSessionOrder",
     "ComputeSessionOrderField",
     # Request
+    "ComputeSessionPathParam",
     "SearchComputeSessionsRequest",
     # Response
     "PaginationInfo",
     "ContainerDTO",
     "ComputeSessionDTO",
+    "GetComputeSessionDetailResponse",
     "SearchComputeSessionsResponse",
 )
