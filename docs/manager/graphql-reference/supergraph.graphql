@@ -9292,7 +9292,7 @@ type Query
   """
   Added in 26.3.0. Search entity associations (admin only). Optionally filter by entity_type and entity_id.
   """
-  adminEntities(filter: EntityFilter = null, orderBy: EntityOrderBy = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection! @join__field(graph: STRAWBERRY)
+  adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. List available scope types."""
   scopeTypes: [EntityType!]! @join__field(graph: STRAWBERRY)
