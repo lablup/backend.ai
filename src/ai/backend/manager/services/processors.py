@@ -41,6 +41,12 @@ from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
+from ai.backend.manager.services.container_registry_quota.processors import (
+    ContainerRegistryQuotaProcessors,
+)
+from ai.backend.manager.services.container_registry_quota.service import (
+    ContainerRegistryQuotaService,
+)
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.services.domain.processors import DomainProcessors
@@ -158,6 +164,7 @@ class Services:
     user: UserService
     image: ImageService
     container_registry: ContainerRegistryService
+    container_registry_quota: ContainerRegistryQuotaService
     vfolder: VFolderService
     vfolder_file: VFolderFileService
     vfolder_invite: VFolderInviteService
@@ -228,6 +235,9 @@ class Services:
         container_registry_service = ContainerRegistryService(
             args.db,
             repositories.container_registry.repository,
+        )
+        container_registry_quota_service = ContainerRegistryQuotaService(
+            repository=repositories.container_registry_quota.repository,
         )
         vfolder_service = VFolderService(
             args.config_provider,
@@ -377,6 +387,7 @@ class Services:
             user=user_service,
             image=image_service,
             container_registry=container_registry_service,
+            container_registry_quota=container_registry_quota_service,
             vfolder=vfolder_service,
             vfolder_file=vfolder_file_service,
             vfolder_invite=vfolder_invite_service,
@@ -426,6 +437,7 @@ class Processors(AbstractProcessorPackage):
     vfolder_file: VFolderFileProcessors
     session: SessionProcessors
     container_registry: ContainerRegistryProcessors
+    container_registry_quota: ContainerRegistryQuotaProcessors
     keypair_resource_policy: KeypairResourcePolicyProcessors
     user_resource_policy: UserResourcePolicyProcessors
     project_resource_policy: ProjectResourcePolicyProcessors
@@ -462,6 +474,9 @@ class Processors(AbstractProcessorPackage):
         image_processors = ImageProcessors(services.image, action_monitors)
         container_registry_processors = ContainerRegistryProcessors(
             services.container_registry, action_monitors
+        )
+        container_registry_quota_processors = ContainerRegistryQuotaProcessors(
+            services.container_registry_quota, action_monitors
         )
         vfolder_processors = VFolderProcessors(services.vfolder, action_monitors)
         vfolder_file_processors = VFolderFileProcessors(services.vfolder_file, action_monitors)
@@ -530,6 +545,7 @@ class Processors(AbstractProcessorPackage):
             user=user_processors,
             image=image_processors,
             container_registry=container_registry_processors,
+            container_registry_quota=container_registry_quota_processors,
             vfolder=vfolder_processors,
             vfolder_file=vfolder_file_processors,
             vfolder_invite=vfolder_invite_processors,
@@ -570,6 +586,7 @@ class Processors(AbstractProcessorPackage):
             *self.user.supported_actions(),
             *self.image.supported_actions(),
             *self.container_registry.supported_actions(),
+            *self.container_registry_quota.supported_actions(),
             *self.vfolder.supported_actions(),
             *self.vfolder_file.supported_actions(),
             *self.vfolder_invite.supported_actions(),
