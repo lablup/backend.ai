@@ -620,6 +620,76 @@ class EntityScopeConditions:
 
         return inner
 
+    @staticmethod
+    def by_entity_id_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AssociationScopesEntitiesRow.entity_id.ilike(f"%{spec.value}%")
+            else:
+                condition = AssociationScopesEntitiesRow.entity_id.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_entity_id_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = (
+                    sa.func.lower(AssociationScopesEntitiesRow.entity_id) == spec.value.lower()
+                )
+            else:
+                condition = AssociationScopesEntitiesRow.entity_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_entity_id_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AssociationScopesEntitiesRow.entity_id.ilike(f"{spec.value}%")
+            else:
+                condition = AssociationScopesEntitiesRow.entity_id.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_entity_id_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AssociationScopesEntitiesRow.entity_id.ilike(f"%{spec.value}")
+            else:
+                condition = AssociationScopesEntitiesRow.entity_id.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+
+class EntityScopeOrders:
+    """Query orders for entity scope search."""
+
+    @staticmethod
+    def entity_type(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return AssociationScopesEntitiesRow.entity_type.asc()
+        return AssociationScopesEntitiesRow.entity_type.desc()
+
+    @staticmethod
+    def registered_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return AssociationScopesEntitiesRow.registered_at.asc()
+        return AssociationScopesEntitiesRow.registered_at.desc()
+
 
 class ScopedPermissionConditions:
     """Query conditions for scoped permissions."""
