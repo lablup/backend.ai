@@ -3,8 +3,8 @@
 from .entity import (
     EntityConnection,
     EntityEdge,
-    EntityNode,
 )
+from .entity_node import EntityNode
 from .permission import (
     CreatePermissionInput,
     DeletePermissionInput,
