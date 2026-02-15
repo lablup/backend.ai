@@ -1,5 +1,8 @@
 import uuid
 
+from ai.backend.common.clients.valkey_client.valkey_artifact_registries.client import (
+    ValkeyArtifactRegistryClient,
+)
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -19,6 +22,9 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.reservoir_registry.db_source.db_source import ReservoirDBSource
+from ai.backend.manager.repositories.reservoir_registry.stateful_source.stateful_source import (
+    ReservoirStatefulSource,
+)
 
 reservoir_registry_repository_resilience = Resilience(
     policies=[
@@ -41,37 +47,52 @@ class ReservoirRegistryRepository:
     """Repository layer that delegates to data source."""
 
     _db_source: ReservoirDBSource
+    _stateful_source: ReservoirStatefulSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(
+        self, db: ExtendedAsyncSAEngine, valkey_artifact_registry: ValkeyArtifactRegistryClient
+    ) -> None:
         self._db_source = ReservoirDBSource(db)
+        self._stateful_source = ReservoirStatefulSource(valkey_artifact_registry)
 
     @reservoir_registry_repository_resilience.apply()
     async def get_reservoir_registry_data_by_id(
         self, reservoir_id: uuid.UUID
     ) -> ReservoirRegistryData:
-        return await self._db_source.get_reservoir_registry_data_by_id(reservoir_id)
+        data = await self._db_source.get_reservoir_registry_data_by_id(reservoir_id)
+        await self._stateful_source.set_registry(data.to_stateful_data())
+        return data
 
     @reservoir_registry_repository_resilience.apply()
     async def get_registries_by_ids(
         self, reservoir_ids: list[uuid.UUID]
     ) -> list[ReservoirRegistryData]:
-        return await self._db_source.get_registries_by_ids(reservoir_ids)
+        results = await self._db_source.get_registries_by_ids(reservoir_ids)
+        for data in results:
+            await self._stateful_source.set_registry(data.to_stateful_data())
+        return results
 
     @reservoir_registry_repository_resilience.apply()
     async def get_registry_data_by_name(self, name: str) -> ReservoirRegistryData:
-        return await self._db_source.get_registry_data_by_name(name)
+        data = await self._db_source.get_registry_data_by_name(name)
+        await self._stateful_source.set_registry(data.to_stateful_data())
+        return data
 
     @reservoir_registry_repository_resilience.apply()
     async def get_registry_data_by_artifact_id(
         self, artifact_id: uuid.UUID
     ) -> ReservoirRegistryData:
-        return await self._db_source.get_registry_data_by_artifact_id(artifact_id)
+        data = await self._db_source.get_registry_data_by_artifact_id(artifact_id)
+        await self._stateful_source.set_registry(data.to_stateful_data())
+        return data
 
     @reservoir_registry_repository_resilience.apply()
     async def create(
         self, creator: Creator[ReservoirRegistryRow], meta: ArtifactRegistryCreatorMeta
     ) -> ReservoirRegistryData:
-        return await self._db_source.create(creator, meta)
+        data = await self._db_source.create(creator, meta)
+        await self._stateful_source.set_registry(data.to_stateful_data())
+        return data
 
     @reservoir_registry_repository_resilience.apply()
     async def update(
@@ -79,15 +100,22 @@ class ReservoirRegistryRepository:
         updater: Updater[ReservoirRegistryRow],
         meta: ArtifactRegistryModifierMeta,
     ) -> ReservoirRegistryData:
-        return await self._db_source.update(updater, meta)
+        data = await self._db_source.update(updater, meta)
+        await self._stateful_source.set_registry(data.to_stateful_data())
+        return data
 
     @reservoir_registry_repository_resilience.apply()
     async def delete(self, reservoir_id: uuid.UUID) -> uuid.UUID:
-        return await self._db_source.delete(reservoir_id)
+        result = await self._db_source.delete(reservoir_id)
+        await self._stateful_source.delete_registry(reservoir_id)
+        return result
 
     @reservoir_registry_repository_resilience.apply()
     async def list_reservoir_registries(self) -> list[ReservoirRegistryData]:
-        return await self._db_source.list_reservoir_registries()
+        results = await self._db_source.list_reservoir_registries()
+        for data in results:
+            await self._stateful_source.set_registry(data.to_stateful_data())
+        return results
 
     @reservoir_registry_repository_resilience.apply()
     async def search_registries(
