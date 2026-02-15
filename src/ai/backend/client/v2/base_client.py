@@ -7,7 +7,11 @@ from typing import Any
 
 import aiohttp
 
-from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
+from ai.backend.common.api_handlers import (
+    BaseRequestModel,
+    BaseResponseModel,
+    BaseRootResponseModel,
+)
 
 from .auth import AuthStrategy
 from .config import ClientConfig
@@ -88,7 +92,7 @@ class BackendAIClient:
         *,
         json: Any | None = None,
         params: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
+    ) -> Any:
         session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
@@ -107,10 +111,9 @@ class BackendAIClient:
                 except Exception:
                     data = await resp.text()
                 raise map_status_to_exception(resp.status, resp.reason or "", data)
-            result: dict[str, Any] = await resp.json()
-            return result
+            return await resp.json()
 
-    async def typed_request[T: BaseResponseModel](
+    async def typed_request[T: BaseResponseModel | BaseRootResponseModel](
         self,
         method: str,
         path: str,

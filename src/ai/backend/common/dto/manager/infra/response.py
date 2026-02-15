@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.api_handlers import BaseResponseModel, BaseRootResponseModel
 
 __all__ = (
     # Nested DTOs
@@ -78,57 +78,28 @@ class ResourcePresetDTO(BaseModel):
 # --- etcd.py responses ---
 
 
-class GetResourceSlotsResponse(BaseResponseModel):
+class GetResourceSlotsResponse(BaseRootResponseModel[dict[str, str]]):
     """Response containing available resource slot types and their units.
 
     The handler returns a bare dict mapping resource slot names to their unit types.
     e.g., ``{"cpu": "count", "mem": "bytes", "cuda.device": "count"}``
     """
 
-    resource_slots: dict[str, str] = Field(description="Mapping of slot names to unit types.")
 
-    @model_validator(mode="before")
-    @classmethod
-    def _wrap_bare_response(cls, data: Any) -> Any:
-        if isinstance(data, dict) and "resource_slots" not in data:
-            return {"resource_slots": data}
-        return data
-
-
-class GetResourceMetadataResponse(BaseResponseModel):
+class GetResourceMetadataResponse(BaseRootResponseModel[dict[str, AcceleratorMetadataDTO]]):
     """Response containing metadata for accelerator resource slots.
 
     The handler returns a bare dict mapping slot names to their accelerator metadata.
     e.g., ``{"cpu": {"slot_name": "cpu", ...}, "cuda.device": {...}}``
     """
 
-    metadata: dict[str, AcceleratorMetadataDTO] = Field(
-        description="Mapping of slot names to accelerator metadata."
-    )
 
-    @model_validator(mode="before")
-    @classmethod
-    def _wrap_bare_response(cls, data: Any) -> Any:
-        if isinstance(data, dict) and "metadata" not in data:
-            return {"metadata": data}
-        return data
-
-
-class GetVFolderTypesResponse(BaseResponseModel):
+class GetVFolderTypesResponse(BaseRootResponseModel[list[str]]):
     """Response containing available virtual folder types.
 
     The handler returns a bare list of vfolder type names.
     e.g., ``["user", "group"]``
     """
-
-    vfolder_types: list[str] = Field(description="List of available vfolder type names.")
-
-    @model_validator(mode="before")
-    @classmethod
-    def _wrap_bare_response(cls, data: Any) -> Any:
-        if isinstance(data, list):
-            return {"vfolder_types": data}
-        return data
 
 
 class GetConfigResponse(BaseResponseModel):
@@ -214,100 +185,44 @@ class RecalculateUsageResponse(BaseResponseModel):
     pass
 
 
-class UsagePerMonthResponse(BaseResponseModel):
+class UsagePerMonthResponse(BaseRootResponseModel[list[Any]]):
     """Response containing monthly usage statistics.
 
     The handler returns a bare list of container usage records for the requested month.
     """
 
-    items: list[Any] = Field(description="List of usage records for the month.")
 
-    @model_validator(mode="before")
-    @classmethod
-    def _wrap_bare_response(cls, data: Any) -> Any:
-        if isinstance(data, list):
-            return {"items": data}
-        return data
-
-
-class UsagePerPeriodResponse(BaseResponseModel):
+class UsagePerPeriodResponse(BaseRootResponseModel[list[Any]]):
     """Response containing usage statistics for a date range.
 
     The handler returns a bare list of container usage records for the requested period.
     """
 
-    items: list[Any] = Field(description="List of usage records for the period.")
 
-    @model_validator(mode="before")
-    @classmethod
-    def _wrap_bare_response(cls, data: Any) -> Any:
-        if isinstance(data, list):
-            return {"items": data}
-        return data
-
-
-class MonthStatsResponse(BaseResponseModel):
+class MonthStatsResponse(BaseRootResponseModel[list[Any]]):
     """Response containing time-binned session statistics over the last 30 days.
 
     The handler returns a bare list of time-binned (15 min) statistics
     for terminated sessions.
     """
 
-    items: list[Any] = Field(description="List of time-binned statistics.")
 
-    @model_validator(mode="before")
-    @classmethod
-    def _wrap_bare_response(cls, data: Any) -> Any:
-        if isinstance(data, list):
-            return {"items": data}
-        return data
-
-
-class WatcherStatusResponse(BaseResponseModel):
+class WatcherStatusResponse(BaseRootResponseModel[dict[str, Any]]):
     """Response containing the watcher status for an agent.
 
     The handler returns a bare dict of watcher status data.
     """
 
-    data: dict[str, Any] = Field(description="Watcher status data.")
 
-    @model_validator(mode="before")
-    @classmethod
-    def _wrap_bare_response(cls, data: Any) -> Any:
-        if isinstance(data, dict) and "data" not in data:
-            return {"data": data}
-        return data
-
-
-class WatcherAgentActionResponse(BaseResponseModel):
+class WatcherAgentActionResponse(BaseRootResponseModel[dict[str, Any]]):
     """Response for watcher agent actions (start, stop, restart).
 
     The handler returns a bare dict of action result data.
     """
 
-    data: dict[str, Any] = Field(description="Action result data.")
 
-    @model_validator(mode="before")
-    @classmethod
-    def _wrap_bare_response(cls, data: Any) -> Any:
-        if isinstance(data, dict) and "data" not in data:
-            return {"data": data}
-        return data
-
-
-class GetContainerRegistriesResponse(BaseResponseModel):
+class GetContainerRegistriesResponse(BaseRootResponseModel[dict[str, Any]]):
     """Response containing registered container registries.
 
     The handler returns a bare dict mapping registry hostnames to their configurations.
     """
-
-    registries: dict[str, Any] = Field(
-        description="Mapping of registry hostnames to their configurations."
-    )
-
-    @model_validator(mode="before")
-    @classmethod
-    def _wrap_bare_response(cls, data: Any) -> Any:
-        if isinstance(data, dict) and "registries" not in data:
-            return {"registries": data}
-        return data

@@ -56,9 +56,10 @@ def _make_template_client(mock_session: MagicMock) -> TemplateClient:
 class TestCreateSessionTemplate:
     @pytest.mark.asyncio
     async def test_sends_post_to_correct_path(self) -> None:
+        raw_data = [{"id": "tmpl-1", "user": "user-1"}]
         mock_resp = AsyncMock()
         mock_resp.status = 200
-        mock_resp.json = AsyncMock(return_value=[{"id": "tmpl-1", "user": "user-1"}])
+        mock_resp.json = AsyncMock(return_value=raw_data)
         mock_session = _make_request_session(mock_resp)
         client = _make_template_client(mock_session)
 
@@ -73,7 +74,8 @@ class TestCreateSessionTemplate:
         assert call_args[0][0] == "POST"
         assert "/template/session" in str(call_args[0][1])
         assert isinstance(result, CreateSessionTemplateResponse)
-        assert result.items[0].id == "tmpl-1"
+        assert result.root[0].id == "tmpl-1"
+        assert result.model_dump() == raw_data
 
     @pytest.mark.asyncio
     async def test_serializes_request_body(self) -> None:
@@ -116,31 +118,30 @@ class TestListSessionTemplates:
 
     @pytest.mark.asyncio
     async def test_deserializes_list_response(self) -> None:
+        raw_data = [
+            {
+                "name": "tmpl1",
+                "id": "id-1",
+                "created_at": "2024-01-01T00:00:00",
+                "is_owner": True,
+                "user": "u1",
+                "group": "g1",
+                "user_email": "a@b.com",
+                "group_name": "grp",
+                "domain_name": "default",
+                "type": "user",
+                "template": {"key": "val"},
+            },
+        ]
         mock_resp = AsyncMock()
         mock_resp.status = 200
-        mock_resp.json = AsyncMock(
-            return_value=[
-                {
-                    "name": "tmpl1",
-                    "id": "id-1",
-                    "created_at": "2024-01-01T00:00:00",
-                    "is_owner": True,
-                    "user": "u1",
-                    "group": "g1",
-                    "user_email": "a@b.com",
-                    "group_name": "grp",
-                    "domain_name": "default",
-                    "type": "user",
-                    "template": {"key": "val"},
-                },
-            ]
-        )
+        mock_resp.json = AsyncMock(return_value=raw_data)
         mock_session = _make_request_session(mock_resp)
         client = _make_template_client(mock_session)
 
         result = await client.list_session_templates(ListSessionTemplatesRequest())
-        assert len(result.items) == 1
-        assert result.items[0].name == "tmpl1"
+        assert len(result.root) == 1
+        assert result.root[0].name == "tmpl1"
 
 
 class TestGetSessionTemplate:
@@ -280,37 +281,37 @@ class TestListClusterTemplates:
 
     @pytest.mark.asyncio
     async def test_deserializes_list_response(self) -> None:
+        raw_data = [
+            {
+                "name": "cluster1",
+                "id": "ct-1",
+                "created_at": "2024-01-01T00:00:00",
+                "is_owner": True,
+                "user": "u1",
+                "group": "g1",
+                "user_email": "a@b.com",
+                "group_name": "grp",
+                "type": "user",
+            },
+        ]
         mock_resp = AsyncMock()
         mock_resp.status = 200
-        mock_resp.json = AsyncMock(
-            return_value=[
-                {
-                    "name": "cluster1",
-                    "id": "ct-1",
-                    "created_at": "2024-01-01T00:00:00",
-                    "is_owner": True,
-                    "user": "u1",
-                    "group": "g1",
-                    "user_email": "a@b.com",
-                    "group_name": "grp",
-                    "type": "user",
-                },
-            ]
-        )
+        mock_resp.json = AsyncMock(return_value=raw_data)
         mock_session = _make_request_session(mock_resp)
         client = _make_template_client(mock_session)
 
         result = await client.list_cluster_templates(ListClusterTemplatesRequest())
-        assert len(result.items) == 1
-        assert result.items[0].name == "cluster1"
+        assert len(result.root) == 1
+        assert result.root[0].name == "cluster1"
 
 
 class TestGetClusterTemplate:
     @pytest.mark.asyncio
     async def test_interpolates_template_id(self) -> None:
+        raw_data = {"name": "cluster-tmpl", "nodes": []}
         mock_resp = AsyncMock()
         mock_resp.status = 200
-        mock_resp.json = AsyncMock(return_value={"name": "cluster-tmpl", "nodes": []})
+        mock_resp.json = AsyncMock(return_value=raw_data)
         mock_session = _make_request_session(mock_resp)
         client = _make_template_client(mock_session)
 
@@ -320,7 +321,8 @@ class TestGetClusterTemplate:
         assert call_args[0][0] == "GET"
         assert "/template/cluster/ct-123" in str(call_args[0][1])
         assert isinstance(result, GetClusterTemplateResponse)
-        assert result.template["name"] == "cluster-tmpl"
+        assert result.root["name"] == "cluster-tmpl"
+        assert result.model_dump() == raw_data
 
     @pytest.mark.asyncio
     async def test_passes_format_query_param(self) -> None:

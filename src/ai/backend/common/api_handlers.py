@@ -19,7 +19,7 @@ from typing import (
 from aiohttp import web
 from aiohttp.web_urldispatcher import UrlMappingMatchInfo
 from multidict import CIMultiDictProxy, MultiMapping
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, RootModel
 from pydantic_core._pydantic_core import ValidationError
 
 from ai.backend.common.types import StreamReader
@@ -60,6 +60,18 @@ class BaseFieldModel(BaseModel):
 
 
 class BaseResponseModel(BaseModel):
+    pass
+
+
+class BaseRootResponseModel[T](RootModel[T]):
+    """Base class for response types that map to bare JSON values (list, dict, etc.).
+
+    Unlike ``BaseResponseModel`` (which wraps structured fields),
+    ``BaseRootResponseModel`` preserves the raw JSON shape so that
+    ``model_dump()`` returns exactly what the server sent.
+    Access the underlying value via ``.root``.
+    """
+
     pass
 
 
