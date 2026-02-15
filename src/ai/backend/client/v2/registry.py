@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from .domains.config import ConfigClient
     from .domains.container_registry import ContainerRegistryClient
     from .domains.fair_share import FairShareClient
+    from .domains.group import GroupClient
     from .domains.infra import InfraClient
     from .domains.model_serving import ModelServingClient
     from .domains.notification import NotificationClient
@@ -115,6 +116,12 @@ class BackendAIClientRegistry:
         from .domains.notification import NotificationClient
 
         return NotificationClient(self._client)
+
+    @cached_property
+    def group(self) -> GroupClient:
+        from .domains.group import GroupClient
+
+        return GroupClient(self._client)
 
     @cached_property
     def storage(self) -> StorageClient:

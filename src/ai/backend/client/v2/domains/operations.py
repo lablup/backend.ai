@@ -73,10 +73,10 @@ class OperationsClient(BaseDomainClient):
         self,
         request: UpdateManagerStatusRequest,
     ) -> None:
-        await self._client._request(
+        await self._client.typed_request_no_content(
             "PUT",
             "/manager/status",
-            json=request.model_dump(exclude_none=True),
+            request=request,
         )
 
     async def get_announcement(self) -> GetAnnouncementResponse:
@@ -90,10 +90,10 @@ class OperationsClient(BaseDomainClient):
         self,
         request: UpdateAnnouncementRequest,
     ) -> None:
-        await self._client._request(
+        await self._client.typed_request_no_content(
             "POST",
             "/manager/announcement",
-            json=request.model_dump(exclude_none=True),
+            request=request,
         )
 
     # --- Scheduler ---
@@ -102,8 +102,8 @@ class OperationsClient(BaseDomainClient):
         self,
         request: PerformSchedulerOpsRequest,
     ) -> None:
-        await self._client._request(
+        await self._client.typed_request_no_content(
             "POST",
             "/manager/scheduler/operation",
-            json=request.model_dump(exclude_none=True),
+            request=request,
         )

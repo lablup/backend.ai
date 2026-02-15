@@ -3,8 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
-from ai.backend.client.v2.exceptions import map_status_to_exception
-from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.session.request import (
     CommitSessionRequest,
     CompleteRequest,
@@ -51,35 +49,6 @@ _BASE_PATH = "/session"
 
 
 class SessionClient(BaseDomainClient):
-    async def _request_no_content(
-        self,
-        method: str,
-        path: str,
-        *,
-        request: BaseRequestModel | None = None,
-        params: dict[str, str] | None = None,
-    ) -> None:
-        """Fire an API call that returns 204 No Content."""
-        client = self._client
-        json_body = request.model_dump(exclude_none=True) if request is not None else None
-        content_type = "application/json"
-        rel_url = "/" + path.lstrip("/")
-        headers = client._sign(method, rel_url, content_type)
-        url = client._build_url(path)
-        async with client._session.request(
-            method,
-            url,
-            headers=headers,
-            json=json_body,
-            params=params,
-        ) as resp:
-            if resp.status >= 400:
-                try:
-                    data: Any = await resp.json()
-                except Exception:
-                    data = await resp.text()
-                raise map_status_to_exception(resp.status, resp.reason or "", data)
-
     # -----------------------------------------------------------------------
     # Session creation
     # -----------------------------------------------------------------------
@@ -140,7 +109,7 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: RestartSessionRequest | None = None,
     ) -> None:
-        await self._request_no_content(
+        await self._client.typed_request_no_content(
             "PATCH",
             f"{_BASE_PATH}/{session_name}",
             request=request,
@@ -163,7 +132,7 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: RenameSessionRequest,
     ) -> None:
-        await self._request_no_content(
+        await self._client.typed_request_no_content(
             "POST",
             f"{_BASE_PATH}/{session_name}/rename",
             request=request,
@@ -173,7 +142,7 @@ class SessionClient(BaseDomainClient):
         self,
         session_name: str,
     ) -> None:
-        await self._request_no_content(
+        await self._client.typed_request_no_content(
             "POST",
             f"{_BASE_PATH}/{session_name}/interrupt",
         )
@@ -238,7 +207,7 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: ShutdownServiceRequest,
     ) -> None:
-        await self._request_no_content(
+        await self._client.typed_request_no_content(
             "POST",
             f"{_BASE_PATH}/{session_name}/shutdown-service",
             request=request,
