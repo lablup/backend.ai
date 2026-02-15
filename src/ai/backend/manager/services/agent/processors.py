@@ -3,10 +3,6 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.services.agent.actions.get_agent import (
-    GetAgentAction,
-    GetAgentActionResult,
-)
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -85,7 +81,6 @@ class AgentProcessors(AbstractProcessorPackage):
     remove_agent_from_images: ActionProcessor[
         RemoveAgentFromImagesAction, RemoveAgentFromImagesActionResult
     ]
-    get_agent: ActionProcessor[GetAgentAction, GetAgentActionResult]
     search_agents: ActionProcessor[SearchAgentsAction, SearchAgentsActionResult]
     load_container_counts: ActionProcessor[
         LoadContainerCountsAction, LoadContainerCountsActionResult
@@ -108,7 +103,6 @@ class AgentProcessors(AbstractProcessorPackage):
         self.remove_agent_from_images = ActionProcessor(
             service.remove_agent_from_images, action_monitors
         )
-        self.get_agent = ActionProcessor(service.get_agent, action_monitors)
         self.search_agents = ActionProcessor(service.search_agents, action_monitors)
         self.load_container_counts = ActionProcessor(service.load_container_counts, action_monitors)
 
@@ -125,7 +119,6 @@ class AgentProcessors(AbstractProcessorPackage):
             HandleHeartbeatAction.spec(),
             RemoveAgentFromImagesAction.spec(),
             RemoveAgentFromImagesByCanonicalsAction.spec(),
-            GetAgentAction.spec(),
             SearchAgentsAction.spec(),
             LoadContainerCountsAction.spec(),
         ]
