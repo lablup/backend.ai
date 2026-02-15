@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from .domains.container_registry import ContainerRegistryClient
     from .domains.deployment import DeploymentClient
     from .domains.error_log import ErrorLogClient
+    from .domains.event_stream import EventStreamClient
     from .domains.export import ExportClient
     from .domains.fair_share import FairShareClient
     from .domains.group import GroupClient
@@ -143,6 +144,12 @@ class BackendAIClientRegistry:
         from .domains.error_log import ErrorLogClient
 
         return ErrorLogClient(self._client)
+
+    @cached_property
+    def event_stream(self) -> EventStreamClient:
+        from .domains.event_stream import EventStreamClient
+
+        return EventStreamClient(self._client)
 
     @cached_property
     def export(self) -> ExportClient:
