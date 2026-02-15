@@ -99,39 +99,64 @@ class TestResourcePresetDTO:
 class TestGetResourceSlotsResponse:
     """Handler returns bare dict: ``{str(k): v for k, v in known_slots.items()}``"""
 
-    def test_creation(self) -> None:
-        resp = GetResourceSlotsResponse({"cpu": "count", "mem": "bytes", "cuda.device": "count"})
-        assert "cpu" in resp.root
-        assert resp.root["mem"] == "bytes"
+    def test_bare_dict_input(self) -> None:
+        resp = GetResourceSlotsResponse.model_validate({
+            "cpu": "count",
+            "mem": "bytes",
+            "cuda.device": "count",
+        })
+        assert "cpu" in resp.resource_slots
+        assert resp.resource_slots["mem"] == "bytes"
+
+    def test_wrapped_input(self) -> None:
+        resp = GetResourceSlotsResponse.model_validate({
+            "resource_slots": {"cpu": "count", "mem": "bytes"}
+        })
+        assert resp.resource_slots == {"cpu": "count", "mem": "bytes"}
 
     def test_empty_slots(self) -> None:
-        resp = GetResourceSlotsResponse({})
-        assert resp.root == {}
+        resp = GetResourceSlotsResponse.model_validate({"resource_slots": {}})
+        assert resp.resource_slots == {}
 
     def test_serialization_roundtrip(self) -> None:
         data = {"cpu": "count", "mem": "bytes"}
-        resp = GetResourceSlotsResponse(data)
-        json_str = resp.model_dump_json()
-        restored = GetResourceSlotsResponse.model_validate_json(json_str)
-        assert restored.root == data
+        resp = GetResourceSlotsResponse.model_validate(data)
+        dumped = resp.model_dump()
+        restored = GetResourceSlotsResponse.model_validate(dumped)
+        assert restored.resource_slots == data
 
 
 class TestGetResourceMetadataResponse:
     """Handler returns bare dict of accelerator metadata."""
 
-    def test_creation(self) -> None:
-        resp = GetResourceMetadataResponse({
-            "cpu": AcceleratorMetadataDTO(
-                slot_name="cpu",
-                description="CPU",
-                human_readable_name="CPU",
-                display_unit="Core",
-                number_format=NumberFormatDTO(binary=False, round_length=0),
-                display_icon="cpu",
-            ),
+    def test_bare_dict_input(self) -> None:
+        resp = GetResourceMetadataResponse.model_validate({
+            "cpu": {
+                "slot_name": "cpu",
+                "description": "CPU",
+                "human_readable_name": "CPU",
+                "display_unit": "Core",
+                "number_format": {"binary": False, "round_length": 0},
+                "display_icon": "cpu",
+            },
         })
-        assert "cpu" in resp.root
-        assert resp.root["cpu"].display_unit == "Core"
+        assert "cpu" in resp.metadata
+        assert resp.metadata["cpu"].display_unit == "Core"
+
+    def test_wrapped_input(self) -> None:
+        resp = GetResourceMetadataResponse.model_validate({
+            "metadata": {
+                "cpu": {
+                    "slot_name": "cpu",
+                    "description": "CPU",
+                    "human_readable_name": "CPU",
+                    "display_unit": "Core",
+                    "number_format": {"binary": False, "round_length": 0},
+                    "display_icon": "cpu",
+                },
+            },
+        })
+        assert resp.metadata["cpu"].slot_name == "cpu"
 
     def test_from_raw_dict(self) -> None:
         """Verify construction from raw dict (as handler returns)."""
@@ -145,26 +170,30 @@ class TestGetResourceMetadataResponse:
                 "display_icon": "cpu",
             },
         })
-        assert resp.root["cpu"].slot_name == "cpu"
+        assert resp.metadata["cpu"].slot_name == "cpu"
 
 
 class TestGetVFolderTypesResponse:
     """Handler returns bare list: ``vfolder_types``."""
 
-    def test_creation(self) -> None:
-        resp = GetVFolderTypesResponse(["user", "group"])
-        assert len(resp.root) == 2
+    def test_bare_list_input(self) -> None:
+        resp = GetVFolderTypesResponse.model_validate(["user", "group"])
+        assert len(resp.vfolder_types) == 2
+
+    def test_wrapped_input(self) -> None:
+        resp = GetVFolderTypesResponse.model_validate({"vfolder_types": ["user", "group"]})
+        assert resp.vfolder_types == ["user", "group"]
 
     def test_empty_list(self) -> None:
-        resp = GetVFolderTypesResponse([])
-        assert resp.root == []
+        resp = GetVFolderTypesResponse.model_validate([])
+        assert resp.vfolder_types == []
 
     def test_serialization_roundtrip(self) -> None:
         data = ["user", "group"]
-        resp = GetVFolderTypesResponse(data)
-        json_str = resp.model_dump_json()
-        restored = GetVFolderTypesResponse.model_validate_json(json_str)
-        assert restored.root == data
+        resp = GetVFolderTypesResponse.model_validate(data)
+        dumped = resp.model_dump()
+        restored = GetVFolderTypesResponse.model_validate(dumped)
+        assert restored.vfolder_types == data
 
 
 class TestGetConfigResponse:
@@ -268,78 +297,113 @@ class TestRecalculateUsageResponse:
 class TestUsagePerMonthResponse:
     """Handler returns bare list: ``result.result``."""
 
-    def test_creation(self) -> None:
-        resp = UsagePerMonthResponse([{"session_id": "s1", "cpu_used": 100}])
-        assert len(resp.root) == 1
+    def test_bare_list_input(self) -> None:
+        resp = UsagePerMonthResponse.model_validate([{"session_id": "s1", "cpu_used": 100}])
+        assert len(resp.items) == 1
+
+    def test_wrapped_input(self) -> None:
+        resp = UsagePerMonthResponse.model_validate({
+            "items": [{"session_id": "s1", "cpu_used": 100}]
+        })
+        assert resp.items[0]["session_id"] == "s1"
 
     def test_empty_result(self) -> None:
-        resp = UsagePerMonthResponse([])
-        assert resp.root == []
+        resp = UsagePerMonthResponse.model_validate([])
+        assert resp.items == []
 
     def test_serialization_roundtrip(self) -> None:
         data = [{"session_id": "s1", "cpu_used": 100}]
-        resp = UsagePerMonthResponse(data)
-        json_str = resp.model_dump_json()
-        restored = UsagePerMonthResponse.model_validate_json(json_str)
-        assert restored.root == data
+        resp = UsagePerMonthResponse.model_validate(data)
+        dumped = resp.model_dump()
+        restored = UsagePerMonthResponse.model_validate(dumped)
+        assert restored.items == data
 
 
 class TestUsagePerPeriodResponse:
     """Handler returns bare list: ``result.result``."""
 
-    def test_creation(self) -> None:
-        resp = UsagePerPeriodResponse([{"date": "20200601", "count": 5}])
-        assert len(resp.root) == 1
+    def test_bare_list_input(self) -> None:
+        resp = UsagePerPeriodResponse.model_validate([{"date": "20200601", "count": 5}])
+        assert len(resp.items) == 1
+
+    def test_wrapped_input(self) -> None:
+        resp = UsagePerPeriodResponse.model_validate({"items": [{"date": "20200601", "count": 5}]})
+        assert resp.items[0]["date"] == "20200601"
 
 
 class TestMonthStatsResponse:
     """Handler returns bare list: ``result.stats``."""
 
-    def test_creation(self) -> None:
-        resp = MonthStatsResponse([{"timestamp": "2020-06-01T00:00:00", "count": 3}])
-        assert len(resp.root) == 1
+    def test_bare_list_input(self) -> None:
+        resp = MonthStatsResponse.model_validate([{"timestamp": "2020-06-01T00:00:00", "count": 3}])
+        assert len(resp.items) == 1
+
+    def test_wrapped_input(self) -> None:
+        resp = MonthStatsResponse.model_validate({
+            "items": [{"timestamp": "2020-06-01T00:00:00", "count": 3}]
+        })
+        assert resp.items[0]["count"] == 3
 
     def test_empty_stats(self) -> None:
-        resp = MonthStatsResponse([])
-        assert resp.root == []
+        resp = MonthStatsResponse.model_validate([])
+        assert resp.items == []
 
 
 class TestWatcherStatusResponse:
     """Handler returns bare dict: ``result.data``."""
 
-    def test_creation(self) -> None:
-        resp = WatcherStatusResponse({"status": "running", "uptime": 3600})
-        assert resp.root["status"] == "running"
+    def test_bare_dict_input(self) -> None:
+        resp = WatcherStatusResponse.model_validate({"status": "running", "uptime": 3600})
+        assert resp.data["status"] == "running"
+
+    def test_wrapped_input(self) -> None:
+        resp = WatcherStatusResponse.model_validate({"data": {"status": "running", "uptime": 3600}})
+        assert resp.data["status"] == "running"
 
 
 class TestWatcherAgentActionResponse:
     """Handler returns bare dict: ``result.data``."""
 
-    def test_creation(self) -> None:
-        resp = WatcherAgentActionResponse({"result": "ok"})
-        assert resp.root["result"] == "ok"
+    def test_bare_dict_input(self) -> None:
+        resp = WatcherAgentActionResponse.model_validate({"result": "ok"})
+        assert resp.data["result"] == "ok"
+
+    def test_wrapped_input(self) -> None:
+        resp = WatcherAgentActionResponse.model_validate({"data": {"result": "ok"}})
+        assert resp.data["result"] == "ok"
 
 
 class TestGetContainerRegistriesResponse:
     """Handler returns bare dict: ``result.registries``."""
 
-    def test_creation(self) -> None:
-        resp = GetContainerRegistriesResponse({
+    def test_bare_dict_input(self) -> None:
+        resp = GetContainerRegistriesResponse.model_validate({
             "cr.backend.ai": {"type": "harbor2", "url": "https://cr.backend.ai"},
         })
-        assert "cr.backend.ai" in resp.root
+        assert "cr.backend.ai" in resp.registries
+
+    def test_wrapped_input(self) -> None:
+        resp = GetContainerRegistriesResponse.model_validate({
+            "registries": {
+                "cr.backend.ai": {"type": "harbor2", "url": "https://cr.backend.ai"},
+            }
+        })
+        assert "cr.backend.ai" in resp.registries
 
     def test_empty_registries(self) -> None:
-        resp = GetContainerRegistriesResponse({})
-        assert resp.root == {}
+        resp = GetContainerRegistriesResponse.model_validate({"registries": {}})
+        assert resp.registries == {}
 
 
 class TestFieldDescriptions:
-    """Verify all non-RootModel response models have descriptions for their fields."""
+    """Verify all BaseResponseModel response models have descriptions for their fields."""
 
     @pytest.mark.parametrize(
         "model_cls",
         [
+            GetResourceSlotsResponse,
+            GetResourceMetadataResponse,
+            GetVFolderTypesResponse,
             GetConfigResponse,
             SetConfigResponse,
             DeleteConfigResponse,
@@ -347,6 +411,12 @@ class TestFieldDescriptions:
             GetWSProxyVersionResponse,
             ListPresetsResponse,
             CheckPresetsResponse,
+            UsagePerMonthResponse,
+            UsagePerPeriodResponse,
+            MonthStatsResponse,
+            WatcherStatusResponse,
+            WatcherAgentActionResponse,
+            GetContainerRegistriesResponse,
         ],
     )
     def test_all_fields_have_descriptions(self, model_cls: type[BaseModel]) -> None:

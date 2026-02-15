@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.template import (
     CreateClusterTemplateRequest,
@@ -36,17 +34,24 @@ class TemplateClient(BaseDomainClient):
         self,
         request: CreateSessionTemplateRequest,
     ) -> CreateSessionTemplateResponse:
-        json_body = request.model_dump(exclude_none=True)
-        data: Any = await self._client._request("POST", "/template/session", json=json_body)
-        return CreateSessionTemplateResponse.model_validate(data)
+        return await self._client.typed_request(
+            "POST",
+            "/template/session",
+            request=request,
+            response_model=CreateSessionTemplateResponse,
+        )
 
     async def list_session_templates(
         self,
         request: ListSessionTemplatesRequest,
     ) -> ListSessionTemplatesResponse:
         params = {k: str(v) for k, v in request.model_dump(exclude_none=True).items()}
-        data: Any = await self._client._request("GET", "/template/session", params=params)
-        return ListSessionTemplatesResponse.model_validate(data)
+        return await self._client.typed_request(
+            "GET",
+            "/template/session",
+            response_model=ListSessionTemplatesResponse,
+            params=params,
+        )
 
     async def get_session_template(
         self,
@@ -108,8 +113,12 @@ class TemplateClient(BaseDomainClient):
         request: ListClusterTemplatesRequest,
     ) -> ListClusterTemplatesResponse:
         params = {k: str(v) for k, v in request.model_dump(exclude_none=True).items()}
-        data: Any = await self._client._request("GET", "/template/cluster", params=params)
-        return ListClusterTemplatesResponse.model_validate(data)
+        return await self._client.typed_request(
+            "GET",
+            "/template/cluster",
+            response_model=ListClusterTemplatesResponse,
+            params=params,
+        )
 
     async def get_cluster_template(
         self,
@@ -119,10 +128,12 @@ class TemplateClient(BaseDomainClient):
         params: dict[str, str] | None = None
         if request is not None:
             params = {k: str(v) for k, v in request.model_dump(exclude_none=True).items()}
-        data: Any = await self._client._request(
-            "GET", f"/template/cluster/{template_id}", params=params
+        return await self._client.typed_request(
+            "GET",
+            f"/template/cluster/{template_id}",
+            response_model=GetClusterTemplateResponse,
+            params=params,
         )
-        return GetClusterTemplateResponse.model_validate(data)
 
     async def update_cluster_template(
         self,

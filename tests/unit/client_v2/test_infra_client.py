@@ -77,7 +77,7 @@ class TestInfraClientEtcdConfig:
         result = await infra.get_resource_slots()
 
         assert isinstance(result, GetResourceSlotsResponse)
-        assert result.root == {"cpu": "count", "mem": "bytes", "cuda.device": "count"}
+        assert result.resource_slots == {"cpu": "count", "mem": "bytes", "cuda.device": "count"}
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "GET"
         assert "/config/resource-slots" in str(call_args[0][1])
@@ -102,8 +102,8 @@ class TestInfraClientEtcdConfig:
         result = await infra.get_resource_metadata(request)
 
         assert isinstance(result, GetResourceMetadataResponse)
-        assert "cpu" in result.root
-        assert result.root["cpu"].slot_name == "cpu"
+        assert "cpu" in result.metadata
+        assert result.metadata["cpu"].slot_name == "cpu"
         call_args = mock_session.request.call_args
         assert call_args.kwargs["params"] == {"sgroup": "default"}
 
@@ -139,7 +139,7 @@ class TestInfraClientEtcdConfig:
         result = await infra.get_vfolder_types()
 
         assert isinstance(result, GetVFolderTypesResponse)
-        assert result.root == ["user", "group"]
+        assert result.vfolder_types == ["user", "group"]
 
     @pytest.mark.asyncio
     async def test_get_config(self) -> None:
@@ -195,7 +195,7 @@ class TestInfraClientEtcdConfig:
         result = await infra.get_container_registries()
 
         assert isinstance(result, GetContainerRegistriesResponse)
-        assert "cr.example.com" in result.root
+        assert "cr.example.com" in result.registries
 
 
 class TestInfraClientScalingGroups:
@@ -323,7 +323,7 @@ class TestInfraClientUsageStats:
         result = await infra.get_usage_per_month(request)
 
         assert isinstance(result, UsagePerMonthResponse)
-        assert len(result.root) == 1
+        assert len(result.items) == 1
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "GET"
         assert call_args.kwargs["json"]["month"] == "202506"
@@ -339,7 +339,7 @@ class TestInfraClientUsageStats:
         result = await infra.get_usage_per_period(request)
 
         assert isinstance(result, UsagePerPeriodResponse)
-        assert len(result.root) == 1
+        assert len(result.items) == 1
 
     @pytest.mark.asyncio
     async def test_get_user_month_stats(self) -> None:
@@ -351,7 +351,7 @@ class TestInfraClientUsageStats:
         result = await infra.get_user_month_stats()
 
         assert isinstance(result, MonthStatsResponse)
-        assert len(result.root) == 1
+        assert len(result.items) == 1
         call_args = mock_session.request.call_args
         assert "/resource/stats/user/month" in str(call_args[0][1])
 
@@ -381,7 +381,7 @@ class TestInfraClientWatcher:
         result = await infra.get_watcher_status(request)
 
         assert isinstance(result, WatcherStatusResponse)
-        assert result.root["status"] == "running"
+        assert result.data["status"] == "running"
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "GET"
         assert call_args.kwargs["json"]["agent_id"] == "agent-001"
@@ -397,7 +397,7 @@ class TestInfraClientWatcher:
         result = await infra.start_watcher_agent(request)
 
         assert isinstance(result, WatcherAgentActionResponse)
-        assert result.root["status"] == "started"
+        assert result.data["status"] == "started"
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "POST"
         assert "/resource/watcher/agent/start" in str(call_args[0][1])
@@ -413,7 +413,7 @@ class TestInfraClientWatcher:
         result = await infra.stop_watcher_agent(request)
 
         assert isinstance(result, WatcherAgentActionResponse)
-        assert result.root["status"] == "stopped"
+        assert result.data["status"] == "stopped"
         call_args = mock_session.request.call_args
         assert "/resource/watcher/agent/stop" in str(call_args[0][1])
 
@@ -428,6 +428,6 @@ class TestInfraClientWatcher:
         result = await infra.restart_watcher_agent(request)
 
         assert isinstance(result, WatcherAgentActionResponse)
-        assert result.root["status"] == "restarted"
+        assert result.data["status"] == "restarted"
         call_args = mock_session.request.call_args
         assert "/resource/watcher/agent/restart" in str(call_args[0][1])

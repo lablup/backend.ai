@@ -305,22 +305,39 @@ class TestClusterTemplateListItemDTO:
 
 
 class TestCreateSessionTemplateResponse:
-    def test_raw_list(self) -> None:
+    def test_bare_list_input(self) -> None:
         resp = CreateSessionTemplateResponse.model_validate([
             {"id": "tmpl-1", "user": "user-1"},
             {"id": "tmpl-2", "user": "user-2"},
         ])
-        assert len(resp.root) == 2
-        assert resp.root[0].id == "tmpl-1"
-        assert resp.root[1].user == "user-2"
+        assert len(resp.items) == 2
+        assert resp.items[0].id == "tmpl-1"
+        assert resp.items[1].user == "user-2"
+
+    def test_wrapped_input(self) -> None:
+        resp = CreateSessionTemplateResponse.model_validate({
+            "items": [
+                {"id": "tmpl-1", "user": "user-1"},
+            ],
+        })
+        assert len(resp.items) == 1
+        assert resp.items[0].id == "tmpl-1"
 
     def test_empty_list(self) -> None:
         resp = CreateSessionTemplateResponse.model_validate([])
-        assert len(resp.root) == 0
+        assert len(resp.items) == 0
+
+    def test_serialization_roundtrip(self) -> None:
+        resp = CreateSessionTemplateResponse.model_validate([
+            {"id": "tmpl-1", "user": "user-1"},
+        ])
+        dumped = resp.model_dump()
+        restored = CreateSessionTemplateResponse.model_validate(dumped)
+        assert restored.items[0].id == "tmpl-1"
 
 
 class TestListSessionTemplatesResponse:
-    def test_raw_list(self) -> None:
+    def test_bare_list_input(self) -> None:
         resp = ListSessionTemplatesResponse.model_validate([
             {
                 "name": "tmpl",
@@ -336,8 +353,28 @@ class TestListSessionTemplatesResponse:
                 "template": {},
             },
         ])
-        assert len(resp.root) == 1
-        assert resp.root[0].name == "tmpl"
+        assert len(resp.items) == 1
+        assert resp.items[0].name == "tmpl"
+
+    def test_wrapped_input(self) -> None:
+        resp = ListSessionTemplatesResponse.model_validate({
+            "items": [
+                {
+                    "name": "tmpl",
+                    "id": "abc",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "is_owner": True,
+                    "user": "u1",
+                    "group": "g1",
+                    "user_email": "a@b.com",
+                    "group_name": "grp",
+                    "domain_name": "default",
+                    "type": "TASK",
+                    "template": {},
+                },
+            ],
+        })
+        assert resp.items[0].name == "tmpl"
 
 
 class TestGetSessionTemplateResponse:
@@ -373,7 +410,7 @@ class TestCreateClusterTemplateResponse:
 
 
 class TestListClusterTemplatesResponse:
-    def test_raw_list(self) -> None:
+    def test_bare_list_input(self) -> None:
         resp = ListClusterTemplatesResponse.model_validate([
             {
                 "name": "cluster",
@@ -387,14 +424,60 @@ class TestListClusterTemplatesResponse:
                 "type": "group",
             },
         ])
-        assert len(resp.root) == 1
-        assert resp.root[0].type == "group"
+        assert len(resp.items) == 1
+        assert resp.items[0].type == "group"
+
+    def test_wrapped_input(self) -> None:
+        resp = ListClusterTemplatesResponse.model_validate({
+            "items": [
+                {
+                    "name": "cluster",
+                    "id": "abc",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "is_owner": True,
+                    "user": "u1",
+                    "group": "g1",
+                    "user_email": None,
+                    "group_name": "grp",
+                    "type": "group",
+                },
+            ],
+        })
+        assert resp.items[0].type == "group"
+
+    def test_serialization_roundtrip(self) -> None:
+        resp = ListClusterTemplatesResponse.model_validate([
+            {
+                "name": "cluster",
+                "id": "abc",
+                "created_at": "2024-01-01T00:00:00Z",
+                "is_owner": True,
+                "user": "u1",
+                "group": "g1",
+                "user_email": None,
+                "group_name": "grp",
+                "type": "group",
+            },
+        ])
+        dumped = resp.model_dump()
+        restored = ListClusterTemplatesResponse.model_validate(dumped)
+        assert restored.items[0].name == "cluster"
 
 
 class TestGetClusterTemplateResponse:
-    def test_instantiation(self) -> None:
+    def test_bare_dict_input(self) -> None:
         resp = GetClusterTemplateResponse.model_validate({"nodes": []})
-        assert resp.root == {"nodes": []}
+        assert resp.template == {"nodes": []}
+
+    def test_wrapped_input(self) -> None:
+        resp = GetClusterTemplateResponse.model_validate({"template": {"nodes": []}})
+        assert resp.template == {"nodes": []}
+
+    def test_serialization_roundtrip(self) -> None:
+        resp = GetClusterTemplateResponse.model_validate({"nodes": []})
+        dumped = resp.model_dump()
+        restored = GetClusterTemplateResponse.model_validate(dumped)
+        assert restored.template == {"nodes": []}
 
 
 class TestUpdateClusterTemplateResponse:

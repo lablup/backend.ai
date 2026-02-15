@@ -73,7 +73,7 @@ class TestCreateSessionTemplate:
         assert call_args[0][0] == "POST"
         assert "/template/session" in str(call_args[0][1])
         assert isinstance(result, CreateSessionTemplateResponse)
-        assert result.root[0].id == "tmpl-1"
+        assert result.items[0].id == "tmpl-1"
 
     @pytest.mark.asyncio
     async def test_serializes_request_body(self) -> None:
@@ -139,8 +139,8 @@ class TestListSessionTemplates:
         client = _make_template_client(mock_session)
 
         result = await client.list_session_templates(ListSessionTemplatesRequest())
-        assert len(result.root) == 1
-        assert result.root[0].name == "tmpl1"
+        assert len(result.items) == 1
+        assert result.items[0].name == "tmpl1"
 
 
 class TestGetSessionTemplate:
@@ -301,8 +301,8 @@ class TestListClusterTemplates:
         client = _make_template_client(mock_session)
 
         result = await client.list_cluster_templates(ListClusterTemplatesRequest())
-        assert len(result.root) == 1
-        assert result.root[0].name == "cluster1"
+        assert len(result.items) == 1
+        assert result.items[0].name == "cluster1"
 
 
 class TestGetClusterTemplate:
@@ -320,7 +320,7 @@ class TestGetClusterTemplate:
         assert call_args[0][0] == "GET"
         assert "/template/cluster/ct-123" in str(call_args[0][1])
         assert isinstance(result, GetClusterTemplateResponse)
-        assert result.root["name"] == "cluster-tmpl"
+        assert result.template["name"] == "cluster-tmpl"
 
     @pytest.mark.asyncio
     async def test_passes_format_query_param(self) -> None:

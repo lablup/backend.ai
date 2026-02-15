@@ -43,8 +43,11 @@ class InfraClient(BaseDomainClient):
     # ---- Etcd Config ----
 
     async def get_resource_slots(self) -> GetResourceSlotsResponse:
-        data = await self._client._request("GET", "/config/resource-slots")
-        return GetResourceSlotsResponse.model_validate(data)
+        return await self._client.typed_request(
+            "GET",
+            "/config/resource-slots",
+            response_model=GetResourceSlotsResponse,
+        )
 
     async def get_resource_metadata(
         self, request: GetResourceMetadataRequest | None = None
@@ -52,12 +55,19 @@ class InfraClient(BaseDomainClient):
         params = None
         if request is not None and request.sgroup is not None:
             params = {"sgroup": request.sgroup}
-        data = await self._client._request("GET", "/config/resource-slots/details", params=params)
-        return GetResourceMetadataResponse.model_validate(data)
+        return await self._client.typed_request(
+            "GET",
+            "/config/resource-slots/details",
+            response_model=GetResourceMetadataResponse,
+            params=params,
+        )
 
     async def get_vfolder_types(self) -> GetVFolderTypesResponse:
-        data = await self._client._request("GET", "/config/vfolder-types")
-        return GetVFolderTypesResponse.model_validate(data)
+        return await self._client.typed_request(
+            "GET",
+            "/config/vfolder-types",
+            response_model=GetVFolderTypesResponse,
+        )
 
     async def get_config(self, request: GetConfigRequest) -> GetConfigResponse:
         return await self._client.typed_request(
@@ -84,8 +94,11 @@ class InfraClient(BaseDomainClient):
         )
 
     async def get_container_registries(self) -> GetContainerRegistriesResponse:
-        data = await self._client._request("GET", "/config/docker-registries")
-        return GetContainerRegistriesResponse.model_validate(data)
+        return await self._client.typed_request(
+            "GET",
+            "/config/docker-registries",
+            response_model=GetContainerRegistriesResponse,
+        )
 
     # ---- Scaling Groups ----
 
@@ -138,45 +151,67 @@ class InfraClient(BaseDomainClient):
         )
 
     async def get_usage_per_month(self, request: UsagePerMonthRequest) -> UsagePerMonthResponse:
-        json_body = request.model_dump(exclude_none=True)
-        data = await self._client._request("GET", "/resource/usage/month", json=json_body)
-        return UsagePerMonthResponse.model_validate(data)
+        return await self._client.typed_request(
+            "GET",
+            "/resource/usage/month",
+            request=request,
+            response_model=UsagePerMonthResponse,
+        )
 
     async def get_usage_per_period(self, request: UsagePerPeriodRequest) -> UsagePerPeriodResponse:
-        json_body = request.model_dump(exclude_none=True)
-        data = await self._client._request("GET", "/resource/usage/period", json=json_body)
-        return UsagePerPeriodResponse.model_validate(data)
+        return await self._client.typed_request(
+            "GET",
+            "/resource/usage/period",
+            request=request,
+            response_model=UsagePerPeriodResponse,
+        )
 
     async def get_user_month_stats(self) -> MonthStatsResponse:
-        data = await self._client._request("GET", "/resource/stats/user/month")
-        return MonthStatsResponse.model_validate(data)
+        return await self._client.typed_request(
+            "GET",
+            "/resource/stats/user/month",
+            response_model=MonthStatsResponse,
+        )
 
     async def get_admin_month_stats(self) -> MonthStatsResponse:
-        data = await self._client._request("GET", "/resource/stats/admin/month")
-        return MonthStatsResponse.model_validate(data)
+        return await self._client.typed_request(
+            "GET",
+            "/resource/stats/admin/month",
+            response_model=MonthStatsResponse,
+        )
 
     # ---- Watcher ----
 
     async def get_watcher_status(self, request: WatcherAgentRequest) -> WatcherStatusResponse:
-        json_body = request.model_dump(exclude_none=True)
-        data = await self._client._request("GET", "/resource/watcher", json=json_body)
-        return WatcherStatusResponse.model_validate(data)
+        return await self._client.typed_request(
+            "GET",
+            "/resource/watcher",
+            request=request,
+            response_model=WatcherStatusResponse,
+        )
 
     async def start_watcher_agent(self, request: WatcherAgentRequest) -> WatcherAgentActionResponse:
-        json_body = request.model_dump(exclude_none=True)
-        data = await self._client._request("POST", "/resource/watcher/agent/start", json=json_body)
-        return WatcherAgentActionResponse.model_validate(data)
+        return await self._client.typed_request(
+            "POST",
+            "/resource/watcher/agent/start",
+            request=request,
+            response_model=WatcherAgentActionResponse,
+        )
 
     async def stop_watcher_agent(self, request: WatcherAgentRequest) -> WatcherAgentActionResponse:
-        json_body = request.model_dump(exclude_none=True)
-        data = await self._client._request("POST", "/resource/watcher/agent/stop", json=json_body)
-        return WatcherAgentActionResponse.model_validate(data)
+        return await self._client.typed_request(
+            "POST",
+            "/resource/watcher/agent/stop",
+            request=request,
+            response_model=WatcherAgentActionResponse,
+        )
 
     async def restart_watcher_agent(
         self, request: WatcherAgentRequest
     ) -> WatcherAgentActionResponse:
-        json_body = request.model_dump(exclude_none=True)
-        data = await self._client._request(
-            "POST", "/resource/watcher/agent/restart", json=json_body
+        return await self._client.typed_request(
+            "POST",
+            "/resource/watcher/agent/restart",
+            request=request,
+            response_model=WatcherAgentActionResponse,
         )
-        return WatcherAgentActionResponse.model_validate(data)

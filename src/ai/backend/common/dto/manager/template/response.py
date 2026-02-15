@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, RootModel
+from pydantic import BaseModel, Field, model_validator
 
 from ai.backend.common.api_handlers import BaseResponseModel
 
@@ -73,18 +73,38 @@ class CreateSessionTemplateItemDTO(BaseModel):
 # --- Session Template Responses ---
 
 
-class CreateSessionTemplateResponse(RootModel[list[CreateSessionTemplateItemDTO]]):
+class CreateSessionTemplateResponse(BaseResponseModel):
     """Response for creating session template(s).
 
     The handler returns a raw JSON array of created template entries.
     """
 
+    items: list[CreateSessionTemplateItemDTO] = Field(
+        description="List of created template entries."
+    )
 
-class ListSessionTemplatesResponse(RootModel[list[SessionTemplateListItemDTO]]):
+    @model_validator(mode="before")
+    @classmethod
+    def _wrap_bare_response(cls, data: Any) -> Any:
+        if isinstance(data, list):
+            return {"items": data}
+        return data
+
+
+class ListSessionTemplatesResponse(BaseResponseModel):
     """Response for listing session templates.
 
     The handler returns a raw JSON array of template items.
     """
+
+    items: list[SessionTemplateListItemDTO] = Field(description="List of session template items.")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _wrap_bare_response(cls, data: Any) -> Any:
+        if isinstance(data, list):
+            return {"items": data}
+        return data
 
 
 class GetSessionTemplateResponse(BaseResponseModel):
@@ -119,18 +139,36 @@ class CreateClusterTemplateResponse(BaseResponseModel):
     user: str = Field(description="Owner user UUID")
 
 
-class ListClusterTemplatesResponse(RootModel[list[ClusterTemplateListItemDTO]]):
+class ListClusterTemplatesResponse(BaseResponseModel):
     """Response for listing cluster templates.
 
     The handler returns a raw JSON array of cluster template items.
     """
 
+    items: list[ClusterTemplateListItemDTO] = Field(description="List of cluster template items.")
 
-class GetClusterTemplateResponse(RootModel[dict[str, Any]]):
+    @model_validator(mode="before")
+    @classmethod
+    def _wrap_bare_response(cls, data: Any) -> Any:
+        if isinstance(data, list):
+            return {"items": data}
+        return data
+
+
+class GetClusterTemplateResponse(BaseResponseModel):
     """Response for getting a single cluster template.
 
     The handler returns the template dict directly without a wrapper.
     """
+
+    template: dict[str, Any] = Field(description="Cluster template data.")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _wrap_bare_response(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "template" not in data:
+            return {"template": data}
+        return data
 
 
 class UpdateClusterTemplateResponse(BaseResponseModel):
