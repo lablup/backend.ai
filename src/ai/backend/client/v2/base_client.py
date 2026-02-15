@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import ssl
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Iterable, Mapping
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Any
 
@@ -11,7 +12,8 @@ from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 
 from .auth import AuthStrategy
 from .config import ClientConfig
-from .exceptions import map_status_to_exception
+from .exceptions import SSEError, WebSocketError, map_status_to_exception
+from .streaming_types import SSEConnection, WebSocketSession
 
 
 class BackendAIClient:
@@ -122,3 +124,87 @@ class BackendAIClient:
         json_body = request.model_dump(exclude_none=True) if request is not None else None
         data = await self._request(method, path, json=json_body, params=params)
         return response_model.model_validate(data)
+
+    @asynccontextmanager
+    async def ws_connect(
+        self,
+        path: str,
+        *,
+        params: dict[str, str] | None = None,
+        heartbeat: float | None = 30.0,
+        protocols: Iterable[str] = (),
+    ) -> AsyncIterator[WebSocketSession]:
+        """Open a WebSocket connection with proper auth headers.
+
+        Usage::
+
+            async with client.ws_connect("/stream/session/abc/pty") as ws:
+                await ws.send_str("hello")
+                async for msg in ws:
+                    print(msg.data)
+        """
+        rel_url = "/" + path.lstrip("/")
+        headers = self._sign("GET", rel_url, "application/octet-stream")
+        url = self._build_url(path)
+        ws: aiohttp.ClientWebSocketResponse | None = None
+        try:
+            ws = await self._session.ws_connect(
+                url,
+                headers=headers,
+                autoping=True,
+                heartbeat=heartbeat,
+                protocols=protocols,
+                params=params,
+            )
+        except aiohttp.WSServerHandshakeError as e:
+            raise map_status_to_exception(e.status, e.message or "", {"title": str(e)}) from e
+        except aiohttp.ClientConnectionError as e:
+            raise WebSocketError(f"WebSocket connection failed: {e!r}") from e
+        session = WebSocketSession(ws)
+        try:
+            yield session
+        finally:
+            await session.close()
+
+    @asynccontextmanager
+    async def sse_connect(
+        self,
+        path: str,
+        *,
+        params: dict[str, str] | None = None,
+    ) -> AsyncIterator[SSEConnection]:
+        """Open an SSE connection with proper auth headers.
+
+        Usage::
+
+            async with client.sse_connect("/events/session") as events:
+                async for event in events:
+                    print(event.event, event.data)
+        """
+        rel_url = "/" + path.lstrip("/")
+        headers = dict(self._sign("GET", rel_url, "text/event-stream"))
+        headers["Accept"] = "text/event-stream"
+        url = self._build_url(path)
+        timeout = aiohttp.ClientTimeout(total=None, sock_read=None)
+        resp: aiohttp.ClientResponse | None = None
+        try:
+            resp = await self._session.get(
+                url,
+                headers=headers,
+                params=params,
+                timeout=timeout,
+            )
+        except aiohttp.ClientConnectionError as e:
+            raise SSEError(f"SSE connection failed: {e!r}") from e
+        try:
+            if resp.status >= 400:
+                try:
+                    data = await resp.json()
+                except Exception:
+                    data = await resp.text()
+                raise map_status_to_exception(resp.status, resp.reason or "", data)
+            connection = SSEConnection(resp)
+            yield connection
+        finally:
+            if resp is not None:
+                resp.close()
