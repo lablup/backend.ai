@@ -38,6 +38,7 @@ class RBACEntityCreator[TRow: Base]:
         entity_type: The entity type for RBAC association.
         scope_ref: Primary scope reference (scope_type + scope_id) for this entity.
         additional_scope_refs: Additional scope references for multi-scope entities.
+        relation_type: The relation type for the scope-entity association. Defaults to AUTO.
     """
 
     spec: CreatorSpec[TRow]
@@ -123,6 +124,7 @@ class RBACBulkEntityCreator[TRow: Base]:
         scope_type: The scope type for all entities.
         scope_id: The scope ID for all entities.
         entity_type: The entity type for all entities.
+        relation_type: The relation type for the scope-entity association. Defaults to AUTO.
     """
 
     specs: Sequence[CreatorSpec[TRow]]
