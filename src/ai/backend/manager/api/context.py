@@ -13,6 +13,9 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
         ValkeyArtifactDownloadTrackingClient,
     )
+    from ai.backend.common.clients.valkey_client.valkey_artifact_registries.client import (
+        ValkeyArtifactRegistryClient,
+    )
     from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
     from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
         ValkeyContainerLogClient,
@@ -79,6 +82,7 @@ class RootContext(BaseContext):
     event_producer: EventProducer
     etcd: AsyncEtcd
     valkey_artifact: ValkeyArtifactDownloadTrackingClient
+    valkey_artifact_registry: ValkeyArtifactRegistryClient
     valkey_container_log: ValkeyContainerLogClient
     valkey_live: ValkeyLiveClient
     valkey_stat: ValkeyStatClient
