@@ -8,12 +8,15 @@ from .base_client import BackendAIClient
 from .config import ClientConfig
 
 if TYPE_CHECKING:
+    from .domains.agent import AgentClient
     from .domains.auth import AuthClient
+    from .domains.compute_session import ComputeSessionClient
     from .domains.config import ConfigClient
     from .domains.container_registry import ContainerRegistryClient
     from .domains.infra import InfraClient
     from .domains.model_serving import ModelServingClient
     from .domains.operations import OperationsClient
+    from .domains.scheduling_history import SchedulingHistoryClient
     from .domains.session import SessionClient
     from .domains.storage import StorageClient
     from .domains.streaming import StreamingClient
@@ -104,3 +107,21 @@ class BackendAIClientRegistry:
         from .domains.storage import StorageClient
 
         return StorageClient(self._client)
+
+    @cached_property
+    def scheduling_history(self) -> SchedulingHistoryClient:
+        from .domains.scheduling_history import SchedulingHistoryClient
+
+        return SchedulingHistoryClient(self._client)
+
+    @cached_property
+    def agent(self) -> AgentClient:
+        from .domains.agent import AgentClient
+
+        return AgentClient(self._client)
+
+    @cached_property
+    def compute_session(self) -> ComputeSessionClient:
+        from .domains.compute_session import ComputeSessionClient
+
+        return ComputeSessionClient(self._client)
