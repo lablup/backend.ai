@@ -2,7 +2,6 @@ import enum
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from decimal import Decimal
 from importlib.resources import files
 from pathlib import Path
 from typing import Final, override
