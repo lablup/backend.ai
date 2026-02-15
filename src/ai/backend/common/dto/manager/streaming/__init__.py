@@ -2,6 +2,7 @@
 Streaming DTOs for Manager API.
 """
 
+from .response import GetStreamAppsResponse
 from .types import (
     BackgroundTaskEventParams,
     BgtaskCancelledPayload,
@@ -49,6 +50,7 @@ __all__ = (
     "ExecuteRequest",
     "ExecuteResult",
     # Proxy / App
+    "GetStreamAppsResponse",
     "StreamAppInfo",
     "StreamProxyParams",
     # SSE event params
