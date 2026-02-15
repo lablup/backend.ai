@@ -2272,9 +2272,8 @@ type EntityEdge {
 
 """Added in 26.3.0. Filter for entity associations"""
 input EntityFilter {
-  entityType: EntityType!
-  scopeType: EntityType = null
-  scopeId: String = null
+  entityType: EntityType = null
+  entityId: StringFilter = null
 }
 
 union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ArtifactRevision | Role
@@ -2287,6 +2286,7 @@ input EntityOrderBy {
 
 """Added in 26.3.0. Entity ordering field"""
 enum EntityOrderField {
+  ENTITY_TYPE
   REGISTERED_AT
 }
 
@@ -2300,8 +2300,10 @@ type EntityRef implements Node {
   scopeId: String!
   entityType: EntityType!
   entityId: String!
-  relationType: RelationType!
   registeredAt: DateTime!
+
+  """The resolved entity object."""
+  entity: EntityNode
 }
 
 """
@@ -5025,9 +5027,9 @@ type Query {
   adminRoleAssignments(filter: RoleAssignmentFilter = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
 
   """
-  Added in 26.3.0. Search entity associations (admin only). Filter by entity_type (required), optionally by scope_type and scope_id.
+  Added in 26.3.0. Search entity associations (admin only). Optionally filter by entity_type and entity_id.
   """
-  adminEntities(filter: EntityFilter!, orderBy: EntityOrderBy = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection!
+  adminEntities(filter: EntityFilter = null, orderBy: EntityOrderBy = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection!
 
   """Added in 26.3.0. List available scope types."""
   scopeTypes: [EntityType!]!
@@ -5293,12 +5295,6 @@ Contains the rejected artifact revision. Admin-only operation.
 """
 type RejectArtifactPayload {
   artifactRevision: ArtifactRevision!
-}
-
-"""Added in 26.3.0. Classification of parent-child entity edges"""
-enum RelationType {
-  AUTO
-  REF
 }
 
 """Added in 25.19.0"""

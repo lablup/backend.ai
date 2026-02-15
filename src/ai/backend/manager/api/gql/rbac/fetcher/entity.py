@@ -15,7 +15,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 async def fetch_entities(
     info: Info[StrawberryGQLContext],
     filter: EntityFilter | None = None,
-    order_by: EntityOrderBy | None = None,
+    order_by: list[EntityOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
