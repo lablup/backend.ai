@@ -4,7 +4,6 @@ from collections.abc import Iterable, Mapping
 from typing import Protocol, cast
 
 import sqlalchemy as sa
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.logging import BraceStyleAdapter
@@ -20,6 +19,7 @@ from ai.backend.manager.data.permission.types import (
     OperationType,
     RoleSource,
 )
+from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -102,7 +102,7 @@ class RoleManager:
     ) -> None:
         try:
             await execute_creator(db_session, creator)
-        except IntegrityError:
+        except RepositoryIntegrityError:
             spec = cast(AssociationScopesEntitiesCreatorSpec, creator.spec)
             log.exception(
                 "entity and scope mapping already exists: {}, {}. Skipping.",

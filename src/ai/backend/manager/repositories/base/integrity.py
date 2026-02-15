@@ -55,12 +55,20 @@ def parse_integrity_error(e: sa.exc.IntegrityError) -> RepositoryIntegrityError:
     column_name: str | None = None
     detail: str | None = None
 
+    # SA asyncpg dialect wraps the asyncpg PostgresError in a dbapi-level
+    # IntegrityError.  The original asyncpg error is chained as __cause__.
+    pg_error: PostgresError | None = None
     if isinstance(orig, PostgresError):
-        pgcode = orig.sqlstate
-        constraint_name = orig.constraint_name
-        table_name = orig.table_name
-        column_name = orig.column_name
-        detail = orig.detail
+        pg_error = orig
+    elif orig is not None and isinstance(orig.__cause__, PostgresError):
+        pg_error = orig.__cause__
+
+    if pg_error is not None:
+        pgcode = pg_error.sqlstate
+        constraint_name = pg_error.constraint_name
+        table_name = pg_error.table_name
+        column_name = pg_error.column_name
+        detail = pg_error.detail
 
     error_msg = str(e.orig) if e.orig is not None else str(e)
     kwargs = {
