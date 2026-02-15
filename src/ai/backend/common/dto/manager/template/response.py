@@ -8,9 +8,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, RootModel
+from pydantic import BaseModel, Field
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.api_handlers import BaseResponseModel, BaseRootResponseModel
 
 __all__ = (
     # Shared DTOs
@@ -73,14 +73,14 @@ class CreateSessionTemplateItemDTO(BaseModel):
 # --- Session Template Responses ---
 
 
-class CreateSessionTemplateResponse(RootModel[list[CreateSessionTemplateItemDTO]]):
+class CreateSessionTemplateResponse(BaseRootResponseModel[list[CreateSessionTemplateItemDTO]]):
     """Response for creating session template(s).
 
     The handler returns a raw JSON array of created template entries.
     """
 
 
-class ListSessionTemplatesResponse(RootModel[list[SessionTemplateListItemDTO]]):
+class ListSessionTemplatesResponse(BaseRootResponseModel[list[SessionTemplateListItemDTO]]):
     """Response for listing session templates.
 
     The handler returns a raw JSON array of template items.
@@ -119,14 +119,14 @@ class CreateClusterTemplateResponse(BaseResponseModel):
     user: str = Field(description="Owner user UUID")
 
 
-class ListClusterTemplatesResponse(RootModel[list[ClusterTemplateListItemDTO]]):
+class ListClusterTemplatesResponse(BaseRootResponseModel[list[ClusterTemplateListItemDTO]]):
     """Response for listing cluster templates.
 
     The handler returns a raw JSON array of cluster template items.
     """
 
 
-class GetClusterTemplateResponse(RootModel[dict[str, Any]]):
+class GetClusterTemplateResponse(BaseRootResponseModel[dict[str, Any]]):
     """Response for getting a single cluster template.
 
     The handler returns the template dict directly without a wrapper.

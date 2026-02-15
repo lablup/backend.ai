@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -305,11 +306,12 @@ class TestClusterTemplateListItemDTO:
 
 
 class TestCreateSessionTemplateResponse:
-    def test_raw_list(self) -> None:
-        resp = CreateSessionTemplateResponse.model_validate([
+    def test_bare_list_input(self) -> None:
+        raw = [
             {"id": "tmpl-1", "user": "user-1"},
             {"id": "tmpl-2", "user": "user-2"},
-        ])
+        ]
+        resp = CreateSessionTemplateResponse.model_validate(raw)
         assert len(resp.root) == 2
         assert resp.root[0].id == "tmpl-1"
         assert resp.root[1].user == "user-2"
@@ -318,9 +320,17 @@ class TestCreateSessionTemplateResponse:
         resp = CreateSessionTemplateResponse.model_validate([])
         assert len(resp.root) == 0
 
+    def test_serialization_roundtrip(self) -> None:
+        raw = [{"id": "tmpl-1", "user": "user-1"}]
+        resp = CreateSessionTemplateResponse.model_validate(raw)
+        dumped = resp.model_dump()
+        assert dumped == raw
+        restored = CreateSessionTemplateResponse.model_validate(dumped)
+        assert restored.root[0].id == "tmpl-1"
+
 
 class TestListSessionTemplatesResponse:
-    def test_raw_list(self) -> None:
+    def test_bare_list_input(self) -> None:
         resp = ListSessionTemplatesResponse.model_validate([
             {
                 "name": "tmpl",
@@ -373,7 +383,7 @@ class TestCreateClusterTemplateResponse:
 
 
 class TestListClusterTemplatesResponse:
-    def test_raw_list(self) -> None:
+    def test_bare_list_input(self) -> None:
         resp = ListClusterTemplatesResponse.model_validate([
             {
                 "name": "cluster",
@@ -390,11 +400,40 @@ class TestListClusterTemplatesResponse:
         assert len(resp.root) == 1
         assert resp.root[0].type == "group"
 
+    def test_serialization_roundtrip(self) -> None:
+        raw = [
+            {
+                "name": "cluster",
+                "id": "abc",
+                "created_at": "2024-01-01T00:00:00Z",
+                "is_owner": True,
+                "user": "u1",
+                "group": "g1",
+                "user_email": None,
+                "group_name": "grp",
+                "type": "group",
+            },
+        ]
+        resp = ListClusterTemplatesResponse.model_validate(raw)
+        dumped = resp.model_dump()
+        restored = ListClusterTemplatesResponse.model_validate(dumped)
+        assert restored.root[0].name == "cluster"
+
 
 class TestGetClusterTemplateResponse:
-    def test_instantiation(self) -> None:
-        resp = GetClusterTemplateResponse.model_validate({"nodes": []})
+    def test_bare_dict_input(self) -> None:
+        raw: dict[str, Any] = {"nodes": []}
+        resp = GetClusterTemplateResponse.model_validate(raw)
         assert resp.root == {"nodes": []}
+        assert resp.model_dump() == raw
+
+    def test_serialization_roundtrip(self) -> None:
+        raw: dict[str, Any] = {"nodes": []}
+        resp = GetClusterTemplateResponse.model_validate(raw)
+        dumped = resp.model_dump()
+        assert dumped == raw
+        restored = GetClusterTemplateResponse.model_validate(dumped)
+        assert restored.root == {"nodes": []}
 
 
 class TestUpdateClusterTemplateResponse:

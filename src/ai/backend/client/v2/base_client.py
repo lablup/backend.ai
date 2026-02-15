@@ -4,16 +4,21 @@ import ssl
 from collections.abc import AsyncIterator, Iterable, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, TypeVar
 
 import aiohttp
 
-from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
+from ai.backend.common.api_handlers import (
+    BaseRequestModel,
+    BaseResponseModel,
+)
 
 from .auth import AuthStrategy
 from .config import ClientConfig
 from .exceptions import SSEError, WebSocketError, map_status_to_exception
 from .streaming_types import SSEConnection, WebSocketSession
+
+ResponseT = TypeVar("ResponseT", bound=BaseResponseModel)
 
 
 class BackendAIClient:
@@ -90,7 +95,7 @@ class BackendAIClient:
         *,
         json: Any | None = None,
         params: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
+    ) -> Any:
         session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
@@ -109,18 +114,17 @@ class BackendAIClient:
                 except Exception:
                     data = await resp.text()
                 raise map_status_to_exception(resp.status, resp.reason or "", data)
-            result: dict[str, Any] = await resp.json()
-            return result
+            return await resp.json()
 
-    async def typed_request[T: BaseResponseModel](
+    async def typed_request(
         self,
         method: str,
         path: str,
         *,
         request: BaseRequestModel | None = None,
-        response_model: type[T],
+        response_model: type[ResponseT],
         params: dict[str, str] | None = None,
-    ) -> T:
+    ) -> ResponseT:
         json_body = request.model_dump(exclude_none=True) if request is not None else None
         data = await self._request(method, path, json=json_body, params=params)
         return response_model.model_validate(data)

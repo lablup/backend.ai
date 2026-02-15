@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field, RootModel
+from pydantic import BaseModel, Field
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.api_handlers import BaseResponseModel, BaseRootResponseModel
 
 __all__ = (
     # Nested DTOs
@@ -78,7 +78,7 @@ class ResourcePresetDTO(BaseModel):
 # --- etcd.py responses ---
 
 
-class GetResourceSlotsResponse(RootModel[dict[str, str]]):
+class GetResourceSlotsResponse(BaseRootResponseModel[dict[str, str]]):
     """Response containing available resource slot types and their units.
 
     The handler returns a bare dict mapping resource slot names to their unit types.
@@ -86,7 +86,7 @@ class GetResourceSlotsResponse(RootModel[dict[str, str]]):
     """
 
 
-class GetResourceMetadataResponse(RootModel[dict[str, AcceleratorMetadataDTO]]):
+class GetResourceMetadataResponse(BaseRootResponseModel[dict[str, AcceleratorMetadataDTO]]):
     """Response containing metadata for accelerator resource slots.
 
     The handler returns a bare dict mapping slot names to their accelerator metadata.
@@ -94,7 +94,7 @@ class GetResourceMetadataResponse(RootModel[dict[str, AcceleratorMetadataDTO]]):
     """
 
 
-class GetVFolderTypesResponse(RootModel[list[str]]):
+class GetVFolderTypesResponse(BaseRootResponseModel[list[str]]):
     """Response containing available virtual folder types.
 
     The handler returns a bare list of vfolder type names.
@@ -185,21 +185,21 @@ class RecalculateUsageResponse(BaseResponseModel):
     pass
 
 
-class UsagePerMonthResponse(RootModel[list[Any]]):
+class UsagePerMonthResponse(BaseRootResponseModel[list[Any]]):
     """Response containing monthly usage statistics.
 
     The handler returns a bare list of container usage records for the requested month.
     """
 
 
-class UsagePerPeriodResponse(RootModel[list[Any]]):
+class UsagePerPeriodResponse(BaseRootResponseModel[list[Any]]):
     """Response containing usage statistics for a date range.
 
     The handler returns a bare list of container usage records for the requested period.
     """
 
 
-class MonthStatsResponse(RootModel[list[Any]]):
+class MonthStatsResponse(BaseRootResponseModel[list[Any]]):
     """Response containing time-binned session statistics over the last 30 days.
 
     The handler returns a bare list of time-binned (15 min) statistics
@@ -207,21 +207,21 @@ class MonthStatsResponse(RootModel[list[Any]]):
     """
 
 
-class WatcherStatusResponse(RootModel[dict[str, Any]]):
+class WatcherStatusResponse(BaseRootResponseModel[dict[str, Any]]):
     """Response containing the watcher status for an agent.
 
     The handler returns a bare dict of watcher status data.
     """
 
 
-class WatcherAgentActionResponse(RootModel[dict[str, Any]]):
+class WatcherAgentActionResponse(BaseRootResponseModel[dict[str, Any]]):
     """Response for watcher agent actions (start, stop, restart).
 
     The handler returns a bare dict of action result data.
     """
 
 
-class GetContainerRegistriesResponse(RootModel[dict[str, Any]]):
+class GetContainerRegistriesResponse(BaseRootResponseModel[dict[str, Any]]):
     """Response containing registered container registries.
 
     The handler returns a bare dict mapping registry hostnames to their configurations.

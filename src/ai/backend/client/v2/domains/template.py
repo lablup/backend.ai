@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.template import (
     CreateClusterTemplateRequest,
@@ -37,7 +35,7 @@ class TemplateClient(BaseDomainClient):
         request: CreateSessionTemplateRequest,
     ) -> CreateSessionTemplateResponse:
         json_body = request.model_dump(exclude_none=True)
-        data: Any = await self._client._request("POST", "/template/session", json=json_body)
+        data = await self._client._request("POST", "/template/session", json=json_body)
         return CreateSessionTemplateResponse.model_validate(data)
 
     async def list_session_templates(
@@ -45,7 +43,7 @@ class TemplateClient(BaseDomainClient):
         request: ListSessionTemplatesRequest,
     ) -> ListSessionTemplatesResponse:
         params = {k: str(v) for k, v in request.model_dump(exclude_none=True).items()}
-        data: Any = await self._client._request("GET", "/template/session", params=params)
+        data = await self._client._request("GET", "/template/session", params=params)
         return ListSessionTemplatesResponse.model_validate(data)
 
     async def get_session_template(
@@ -108,7 +106,7 @@ class TemplateClient(BaseDomainClient):
         request: ListClusterTemplatesRequest,
     ) -> ListClusterTemplatesResponse:
         params = {k: str(v) for k, v in request.model_dump(exclude_none=True).items()}
-        data: Any = await self._client._request("GET", "/template/cluster", params=params)
+        data = await self._client._request("GET", "/template/cluster", params=params)
         return ListClusterTemplatesResponse.model_validate(data)
 
     async def get_cluster_template(
@@ -119,9 +117,7 @@ class TemplateClient(BaseDomainClient):
         params: dict[str, str] | None = None
         if request is not None:
             params = {k: str(v) for k, v in request.model_dump(exclude_none=True).items()}
-        data: Any = await self._client._request(
-            "GET", f"/template/cluster/{template_id}", params=params
-        )
+        data = await self._client._request("GET", f"/template/cluster/{template_id}", params=params)
         return GetClusterTemplateResponse.model_validate(data)
 
     async def update_cluster_template(
