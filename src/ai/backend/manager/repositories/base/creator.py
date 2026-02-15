@@ -7,7 +7,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, TypeVar
 
+import sqlalchemy as sa
+
 from ai.backend.manager.models.base import Base
+
+from .integrity import _match_integrity_error, parse_integrity_error
+from .types import IntegrityErrorCheck
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -21,6 +26,15 @@ class CreatorSpec[TRow: Base](ABC):
     Implementations specify what to create by providing:
     - A build_row() method that returns the ORM instance to insert
     """
+
+    @property
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        """Integrity error checks to match after flush.
+
+        Override to declare expected constraint violations and their domain errors.
+        Empty by default (unmatched errors raise RepositoryIntegrityError).
+        """
+        return ()
 
     @abstractmethod
     def build_row(self) -> TRow:
@@ -124,7 +138,11 @@ async def execute_creator[TRow: Base](
     """
     row = creator.spec.build_row()
     db_sess.add(row)
-    await db_sess.flush()
+    try:
+        await db_sess.flush()
+    except sa.exc.IntegrityError as e:
+        parsed = parse_integrity_error(e)
+        _match_integrity_error(parsed, creator.spec.integrity_error_checks)
     # Note: refresh() is not needed - SQLAlchemy 2.0 + asyncpg automatically uses RETURNING
     # to populate server_default values (id, created_at, etc.) after flush()
     return CreatorResult(row=row)
@@ -173,7 +191,13 @@ async def execute_bulk_creator[TRow: Base](
 
     rows = [spec.build_row() for spec in bulk_creator.specs]
     db_sess.add_all(rows)
-    await db_sess.flush()
+    try:
+        await db_sess.flush()
+    except sa.exc.IntegrityError as e:
+        parsed = parse_integrity_error(e)
+        # Use first spec's checks (all specs share the same CreatorSpec subclass)
+        checks = bulk_creator.specs[0].integrity_error_checks
+        _match_integrity_error(parsed, checks)
     # Note: refresh() loop removed - SQLAlchemy 2.0 + asyncpg automatically uses RETURNING
     # to populate server_default values (id, created_at, etc.) after flush()
     return BulkCreatorResult(rows=rows)
@@ -236,6 +260,18 @@ async def execute_bulk_creator_partial[TRow: Base](
                 await db_sess.flush()
                 # SQLAlchemy 2.0 + asyncpg uses RETURNING to populate server_default values
                 successes.append(row)
+            except sa.exc.IntegrityError as e:
+                parsed = parse_integrity_error(e)
+                checks = spec.integrity_error_checks
+                if checks:
+                    try:
+                        _match_integrity_error(parsed, checks)
+                    except Exception as domain_error:
+                        errors.append(
+                            BulkCreatorError(spec=spec, exception=domain_error, index=index)
+                        )
+                else:
+                    errors.append(BulkCreatorError(spec=spec, exception=parsed, index=index))
             except Exception as e:
                 # The nested transaction automatically rolls back on exception
                 # This only affects the current row, not previous successful ones

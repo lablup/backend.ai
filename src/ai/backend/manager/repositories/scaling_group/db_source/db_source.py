@@ -15,6 +15,7 @@ from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupData,
     ScalingGroupListResult,
 )
+from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.endpoint import EndpointRow
@@ -79,7 +80,7 @@ class ScalingGroupDBSource:
         async with self._db.begin_session() as session:
             try:
                 result = await execute_creator(session, creator)
-            except sa.exc.IntegrityError as e:
+            except RepositoryIntegrityError as e:
                 spec = cast(ScalingGroupCreatorSpec, creator.spec)
                 raise ScalingGroupConflict(f"Duplicate scaling group name: {spec.name}") from e
             return result.row.to_dataclass()

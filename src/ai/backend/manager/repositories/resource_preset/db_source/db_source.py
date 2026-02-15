@@ -22,6 +22,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
+from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
     InvalidPresetQuery,
@@ -88,7 +89,7 @@ class ResourcePresetDBSource:
         async with self._db.begin_session() as session:
             try:
                 result = await execute_creator(session, creator)
-            except sa.exc.IntegrityError as e:
+            except RepositoryIntegrityError as e:
                 raise ResourcePresetConflict(
                     f"Duplicate resource preset name (name:{spec.name}, scaling_group:{spec.scaling_group_name})"
                 ) from e

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
@@ -194,7 +195,7 @@ class TestProjectResourcePolicyRepository:
             side_effect=IntegrityError("duplicate key", None, Exception())
         )
 
-        with pytest.raises(IntegrityError):
+        with pytest.raises(RepositoryIntegrityError):
             await project_resource_policy_repository.create(new_policy_creator)
 
     @pytest.mark.asyncio

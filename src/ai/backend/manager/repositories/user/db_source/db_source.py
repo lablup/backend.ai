@@ -28,6 +28,7 @@ from ai.backend.manager.data.user.types import (
     UserSearchResult,
 )
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
+from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.errors.user import (
     KeyPairForbidden,
     KeyPairNotFound,
@@ -159,7 +160,7 @@ class UserDBSource:
                 # Insert user
                 result = await execute_creator(db_session, creator)
                 row = result.row
-            except sa.exc.IntegrityError as e:
+            except RepositoryIntegrityError as e:
                 error_msg = str(e)
                 raise UserCreationBadRequest(
                     f"Failed to create user due to database constraint violation: {error_msg}"
