@@ -1,6 +1,6 @@
 from typing import Any
 
-from ai.backend.client.exceptions import BackendAPIError
+from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 
 
 class InvalidRequestError(BackendAPIError):
@@ -39,6 +39,14 @@ STATUS_CODE_EXCEPTION_MAP: dict[int, type[BackendAPIError]] = {
     409: ConflictError,
     429: TooManyRequestsError,
 }
+
+
+class WebSocketError(BackendClientError):
+    """Error during WebSocket connection or communication."""
+
+
+class SSEError(BackendClientError):
+    """Error during SSE connection or stream processing."""
 
 
 def map_status_to_exception(
