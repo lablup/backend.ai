@@ -17,7 +17,7 @@ from ai.backend.common.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.api.gql.base import OrderDirection
-from ai.backend.manager.api.gql.rbac.types.entity import EntityNode
+from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.errors.api import InvalidAPIParameters
