@@ -188,21 +188,40 @@ type JSONDict = dict[str, Any]
 
 
 @dataclass
-class APIResponse:
+class APIResponse[TResponseModel: BaseResponseModel | None = Any]:
+    """
+    Generic API response wrapper for type-safe OpenAPI schema generation.
+
+    Usage:
+        # Explicit type annotation for OpenAPI documentation
+        async def handler(...) -> APIResponse[UserResponse]:
+            return APIResponse.build(200, UserResponse(...))
+
+        # No content response
+        async def handler(...) -> APIResponse[None]:
+            return APIResponse.no_content(204)
+
+        # Legacy usage (defaults to Any, no OpenAPI schema)
+        async def handler(...) -> APIResponse:
+            return APIResponse.build(200, SomeResponse(...))
+    """
+
     _status_code: int
-    _data: BaseResponseModel | None
+    _data: TResponseModel
 
     @classmethod
-    def build(cls, status_code: int, response_model: BaseResponseModel) -> Self:
-        return cls(_status_code=status_code, _data=response_model)
+    def build[T: BaseResponseModel](cls, status_code: int, response_model: T) -> "APIResponse[T]":
+        return APIResponse[T](_status_code=status_code, _data=response_model)
 
     @classmethod
-    def no_content(cls, status_code: int) -> Self:
-        return cls(_status_code=status_code, _data=None)
+    def no_content(cls, status_code: int) -> "APIResponse[None]":
+        return APIResponse[None](_status_code=status_code, _data=None)
 
     @property
     def to_json(self) -> JSONDict | None:
-        return self._data.model_dump(mode="json") if self._data else None
+        if self._data is None:
+            return None
+        return self._data.model_dump(mode="json")
 
     @property
     def status_code(self) -> int:
