@@ -66,6 +66,11 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoSokovanProcessIfNeededEvent,
     DoSokovanProcessScheduleEvent,
 )
+from ai.backend.common.events.event_types.service_discovery.anycast import (
+    DoSweepStaleServicesEvent,
+    ServiceDeregisteredEvent,
+    ServiceRegisteredEvent,
+)
 from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
     ExecutionCancelledAnycastEvent,
@@ -117,6 +122,7 @@ from .handlers.image import ImageEventHandler
 from .handlers.kernel import KernelEventHandler
 from .handlers.model_serving import ModelServingEventHandler
 from .handlers.notification import NotificationEventHandler
+from .handlers.service_catalog import ServiceCatalogEventHandler
 from .handlers.session import SessionEventHandler
 from .handlers.vfolder import VFolderEventHandler
 from .reporters import EventLogger
@@ -158,6 +164,7 @@ class Dispatchers:
     _notification_event_handler: NotificationEventHandler
     _artifact_event_handler: ArtifactEventHandler
     _artifact_registry_event_handler: ArtifactRegistryEventHandler
+    _service_catalog_event_handler: ServiceCatalogEventHandler
 
     def __init__(self, args: DispatcherArgs) -> None:
         """
@@ -216,6 +223,7 @@ class Dispatchers:
             args.storage_manager,
             args.config_provider,
         )
+        self._service_catalog_event_handler = ServiceCatalogEventHandler(args.db)
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
         """
@@ -233,6 +241,7 @@ class Dispatchers:
         self._dispatch_notification_events(event_dispatcher)
         self._dispatch_artifact_events(event_dispatcher)
         self._dispatch_artifact_registry_events(event_dispatcher)
+        self._dispatch_service_catalog_events(event_dispatcher)
 
     def _dispatch_bgtask_events(
         self,
@@ -584,4 +593,27 @@ class Dispatchers:
             None,
             self._notification_event_handler.handle_notification_triggered,
             name="notification.triggered",
+        )
+
+    def _dispatch_service_catalog_events(
+        self,
+        event_dispatcher: EventDispatcher,
+    ) -> None:
+        event_dispatcher.consume(
+            ServiceRegisteredEvent,
+            None,
+            self._service_catalog_event_handler.handle_registered,
+            name="service-catalog.registered",
+        )
+        event_dispatcher.consume(
+            ServiceDeregisteredEvent,
+            None,
+            self._service_catalog_event_handler.handle_deregistered,
+            name="service-catalog.deregistered",
+        )
+        event_dispatcher.consume(
+            DoSweepStaleServicesEvent,
+            None,
+            self._service_catalog_event_handler.handle_sweep_stale_services,
+            name="service-catalog.sweep",
         )

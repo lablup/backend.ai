@@ -94,6 +94,7 @@ from ai.backend.common.service_discovery.etcd_discovery.service_discovery import
     ETCDServiceDiscovery,
     ETCDServiceDiscoveryArgs,
 )
+from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
     RedisServiceDiscovery,
     RedisServiceDiscoveryArgs,
@@ -1524,9 +1525,27 @@ async def service_discovery_ctx(
             service_instance_name=meta.display_name,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
+
+    # Start event-based SD publishing if config has service_group set
+    sd_config = local_config.service_discovery
+    sd_event_publisher: ServiceDiscoveryEventPublisher | None = None
+    if sd_config.service_group:
+        from datetime import UTC, datetime
+
+        default_agent = agent_server.runtime.get_agent(None)
+        sd_event_publisher = ServiceDiscoveryEventPublisher(
+            event_producer=default_agent.event_producer,
+            config=sd_config,
+            component_version=VERSION,
+            startup_time=datetime.now(tz=UTC),
+        )
+        await sd_event_publisher.start()
+
     try:
         yield
     finally:
+        if sd_event_publisher is not None:
+            await sd_event_publisher.stop()
         sd_loop.close()
 
 

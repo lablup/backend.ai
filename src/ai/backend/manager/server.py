@@ -91,6 +91,9 @@ from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
     DoScanReservoirRegistryEvent,
 )
+from ai.backend.common.events.event_types.service_discovery.anycast import (
+    DoSweepStaleServicesEvent,
+)
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.exception import BackendAIError, ErrorCode
@@ -123,6 +126,7 @@ from ai.backend.common.service_discovery.etcd_discovery.service_discovery import
     ETCDServiceDiscovery,
     ETCDServiceDiscoveryArgs,
 )
+from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
     RedisServiceDiscovery,
     RedisServiceDiscoveryArgs,
@@ -849,9 +853,24 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             service_instance_name=meta.display_name,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
+
+    # Start event-based SD publishing if config has service_group set
+    sd_config = root_ctx.config_provider.config.service_discovery
+    sd_event_publisher: ServiceDiscoveryEventPublisher | None = None
+    if sd_config.service_group:
+        sd_event_publisher = ServiceDiscoveryEventPublisher(
+            event_producer=root_ctx.event_producer,
+            config=sd_config,
+            component_version=__version__,
+            startup_time=datetime.now(tz=UTC),
+        )
+        await sd_event_publisher.start()
+
     try:
         yield
     finally:
+        if sd_event_publisher is not None:
+            await sd_event_publisher.stop()
         root_ctx.sd_loop.close()
 
 
@@ -1203,6 +1222,16 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 initial_delay=0,
             )
         )
+
+    # Sweep stale services in the service catalog every 3 minutes
+    task_specs.append(
+        EventTaskSpec(
+            name="service-catalog-sweep",
+            event_factory=lambda: DoSweepStaleServicesEvent(),
+            interval=180,  # 3 minutes
+            initial_delay=60,  # delay to allow initial registrations
+        )
+    )
 
     # Create event producer tasks from specs
     leader_tasks: list[PeriodicTask] = [

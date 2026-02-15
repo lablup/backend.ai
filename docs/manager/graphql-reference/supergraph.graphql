@@ -9138,6 +9138,9 @@ type Query
   """Added in 26.2.0. List resource groups (admin only)"""
   adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection @join__field(graph: STRAWBERRY)
 
+  """Added in 26.3.0. Query service catalog entries. Admin only."""
+  adminServiceCatalogs(filter: ServiceCatalogFilter = null, first: Int = null, offset: Int = null): [ServiceCatalog!]! @join__field(graph: STRAWBERRY)
+
   """List session scheduling history (admin only)"""
   adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection @join__field(graph: STRAWBERRY)
 
@@ -10710,6 +10713,91 @@ Added in 24.12.0. A string value in the format '<SCOPE_TYPE>:<SCOPE_ID>'. <SCOPE
 """
 scalar ScopeField
   @join__type(graph: GRAPHENE)
+
+"""Added in 26.3.0. A registered service instance in the catalog."""
+type ServiceCatalog implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Logical group name (e.g., 'manager', 'agent', 'storage-proxy')."""
+  serviceGroup: String!
+
+  """Unique instance identifier within the group."""
+  instanceId: String!
+
+  """Human-readable display name."""
+  displayName: String!
+
+  """Version of the service instance."""
+  version: String!
+
+  """Labels for categorization and filtering."""
+  labels: JSON!
+
+  """Health status of the service."""
+  status: ServiceCatalogStatus!
+
+  """When the service instance started."""
+  startupTime: DateTime!
+
+  """When the service was first registered."""
+  registeredAt: DateTime!
+
+  """Last heartbeat timestamp."""
+  lastHeartbeat: DateTime!
+
+  """Hash of the service configuration."""
+  configHash: String!
+
+  """Endpoints exposed by this service instance."""
+  endpoints: [ServiceCatalogEndpoint!]!
+}
+
+"""Added in 26.3.0. An endpoint exposed by a service instance."""
+type ServiceCatalogEndpoint
+  @join__type(graph: STRAWBERRY)
+{
+  """Role of this endpoint (e.g., 'main', 'health')."""
+  role: String!
+
+  """Network scope (e.g., 'public', 'private', 'internal')."""
+  scope: String!
+
+  """Hostname or IP address."""
+  address: String!
+
+  """Port number."""
+  port: Int!
+
+  """Protocol (e.g., 'grpc', 'http', 'https')."""
+  protocol: String!
+
+  """Additional metadata."""
+  metadata: JSON
+}
+
+"""Added in 26.3.0. Filter for service catalog queries."""
+input ServiceCatalogFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by service group name (exact match)."""
+  serviceGroup: String = null
+
+  """Filter by health status."""
+  status: ServiceCatalogStatus = null
+}
+
+"""Added in 26.3.0. Health status of a service in the catalog."""
+enum ServiceCatalogStatus
+  @join__type(graph: STRAWBERRY)
+{
+  HEALTHY @join__enumValue(graph: STRAWBERRY)
+  UNHEALTHY @join__enumValue(graph: STRAWBERRY)
+  DEREGISTERED @join__enumValue(graph: STRAWBERRY)
+}
 
 """Added in 25.8.0."""
 type ServiceConfigConnection

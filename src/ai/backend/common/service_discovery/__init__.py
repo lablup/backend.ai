@@ -1,3 +1,4 @@
+from .event_publisher import ServiceDiscoveryEventPublisher
 from .service_discovery import (
     MODEL_SERVICE_GROUP,
     MODEL_SERVICE_ROUTE_TTL,
@@ -15,6 +16,7 @@ __all__ = [
     "HealthStatus",
     "ModelServiceMetadata",
     "ServiceDiscovery",
+    "ServiceDiscoveryEventPublisher",
     "ServiceDiscoveryLoop",
     "ServiceEndpoint",
     "ServiceMetadata",

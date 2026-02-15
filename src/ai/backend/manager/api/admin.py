@@ -78,6 +78,7 @@ class CustomGraphQLView(GraphQLView):
             event_fetcher=root_context.event_fetcher,
             gql_adapter=root_context.gql_adapter,
             data_loaders=DataLoaders(root_context.processors),
+            db=root_context.db,
         )
 
 

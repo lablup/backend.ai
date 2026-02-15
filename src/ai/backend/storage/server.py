@@ -13,6 +13,7 @@ import sys
 import traceback
 from collections.abc import AsyncGenerator, AsyncIterator, Callable, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import TYPE_CHECKING, Any
@@ -62,6 +63,7 @@ from ai.backend.common.service_discovery.etcd_discovery.service_discovery import
     ETCDServiceDiscovery,
     ETCDServiceDiscoveryArgs,
 )
+from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
     RedisServiceDiscovery,
     RedisServiceDiscoveryArgs,
@@ -495,6 +497,7 @@ async def service_discovery_ctx(
     local_config: StorageProxyUnifiedConfig,
     etcd: AsyncEtcd,
     redis_config: RedisConfig,
+    event_producer: EventProducer | None = None,
 ) -> AsyncGenerator[None]:
     announce_addr_config = local_config.api.manager.announce_addr
     announce_addr = CommonHostPortPair(
@@ -546,9 +549,24 @@ async def service_discovery_ctx(
             service_instance_name=meta.display_name,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
+
+    # Start event-based SD publishing if config has service_group set
+    sd_config = local_config.service_discovery
+    sd_event_publisher: ServiceDiscoveryEventPublisher | None = None
+    if sd_config.service_group and event_producer is not None:
+        sd_event_publisher = ServiceDiscoveryEventPublisher(
+            event_producer=event_producer,
+            config=sd_config,
+            component_version=VERSION,
+            startup_time=datetime.now(tz=UTC),
+        )
+        await sd_event_publisher.start()
+
     try:
         yield
     finally:
+        if sd_event_publisher is not None:
+            await sd_event_publisher.stop()
         sd_loop.close()
 
 
@@ -726,7 +744,7 @@ async def server_main(
         monitor.console_locals["internal_api_app"] = internal_api_app
 
         await storage_init_stack.enter_async_context(
-            service_discovery_ctx(local_config, etcd, redis_config)
+            service_discovery_ctx(local_config, etcd, redis_config, event_producer)
         )
 
         if _is_root():

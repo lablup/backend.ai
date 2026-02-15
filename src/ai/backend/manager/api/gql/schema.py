@@ -223,6 +223,7 @@ from .scheduling_history import (
     session_scheduling_histories,
     session_scoped_scheduling_histories,
 )
+from .service_catalog import admin_service_catalogs
 from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
@@ -283,6 +284,7 @@ class Query:
     image_alias = image_alias
     # Admin APIs
     admin_resource_groups = admin_resource_groups
+    admin_service_catalogs = admin_service_catalogs
     admin_session_scheduling_histories = admin_session_scheduling_histories
     admin_deployment_histories = admin_deployment_histories
     admin_route_histories = admin_route_histories
