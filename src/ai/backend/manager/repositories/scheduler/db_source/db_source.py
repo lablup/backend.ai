@@ -1186,7 +1186,7 @@ class ScheduleDBSource:
                 spec=SessionRowCreatorSpec(row=session),
                 scope_ref=ScopeId(
                     scope_type=ScopeType.USER,
-                    scope_id=str(session_data.group_id),
+                    scope_id=str(session_data.user_uuid),
                 ),
                 additional_scope_refs=[],
                 entity_type=EntityType.SESSION,
