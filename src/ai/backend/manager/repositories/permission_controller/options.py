@@ -607,6 +607,18 @@ class EntityScopeConditions:
 
         return inner
 
+    @staticmethod
+    def by_entity_type_and_ids(
+        pairs: Collection[tuple[EntityType, str]],
+    ) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.tuple_(
+                AssociationScopesEntitiesRow.entity_type,
+                AssociationScopesEntitiesRow.entity_id,
+            ).in_(pairs)
+
+        return inner
+
 
 class ScopedPermissionConditions:
     """Query conditions for scoped permissions."""

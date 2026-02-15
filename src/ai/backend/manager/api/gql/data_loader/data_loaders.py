@@ -26,8 +26,10 @@ from ai.backend.manager.data.image.types import ImageAliasData, ImageData
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.data.permission.entity import EntityData
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.role import AssignedUserData, RoleData
+from ai.backend.manager.data.permission.types import EntityType
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.data.session.types import SessionSchedulingHistoryData
@@ -56,6 +58,7 @@ from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
 from .project import load_projects_by_ids
 from .rbac import (
+    load_entities_by_type_and_ids,
     load_permissions_by_ids,
     load_role_assignments_by_ids,
     load_role_assignments_by_role_and_user_ids,
@@ -309,6 +312,17 @@ class DataLoaders:
         return DataLoader(
             load_fn=partial(
                 load_role_assignments_by_role_and_user_ids,
+                self._processors.permission_controller,
+            )
+        )
+
+    @cached_property
+    def entity_loader(
+        self,
+    ) -> DataLoader[tuple[EntityType, str], EntityData | None]:
+        return DataLoader(
+            load_fn=partial(
+                load_entities_by_type_and_ids,
                 self._processors.permission_controller,
             )
         )
