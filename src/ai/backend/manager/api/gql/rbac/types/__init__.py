@@ -3,6 +3,10 @@
 from .entity import (
     EntityConnection,
     EntityEdge,
+    EntityFilter,
+    EntityOrderBy,
+    EntityOrderField,
+    EntityRefGQL,
 )
 from .entity_node import EntityNode
 from .permission import (
@@ -50,17 +54,22 @@ __all__ = [
     "RoleSourceGQL",
     "RoleStatusGQL",
     "RoleOrderField",
+    # Entity enums
+    "EntityOrderField",
     # Types
     "PermissionGQL",
     "RoleGQL",
     "RoleAssignmentGQL",
+    "EntityRefGQL",
     # Filters
     "PermissionFilter",
     "RoleFilter",
     "RoleAssignmentFilter",
+    "EntityFilter",
     # OrderBy
     "PermissionOrderBy",
     "RoleOrderBy",
+    "EntityOrderBy",
     # Inputs
     "CreatePermissionInput",
     "DeletePermissionInput",
