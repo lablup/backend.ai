@@ -4,9 +4,9 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.manager.data.permission.entity import EntityData
+from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.role import AssignedUserData, RoleData
-from ai.backend.manager.data.permission.types import EntityType
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.permission_controller.options import (
     AssignedUserConditions,
@@ -113,19 +113,22 @@ async def load_role_assignments_by_role_and_user_ids(
 
 async def load_entities_by_type_and_ids(
     processor: PermissionControllerProcessors,
-    keys: Sequence[tuple[EntityType, str]],
+    keys: Sequence[ObjectId],
 ) -> list[EntityData | None]:
     if not keys:
         return []
 
     querier = BatchQuerier(
         pagination=NoPagination(),
-        conditions=[EntityScopeConditions.by_entity_type_and_ids(keys)],
+        conditions=[EntityScopeConditions.by_object_ids(keys)],
     )
 
     action_result = await processor.search_entities.wait_for_complete(
         SearchEntitiesAction(querier=querier)
     )
 
-    entity_map = {(e.entity_type, e.entity_id): e for e in action_result.result.items}
+    entity_map = {
+        ObjectId(entity_type=e.entity_type, entity_id=e.entity_id): e
+        for e in action_result.result.items
+    }
     return [entity_map.get(key) for key in keys]
