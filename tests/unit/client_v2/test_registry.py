@@ -14,6 +14,7 @@ from ai.backend.client.v2.domains.group import GroupClient
 from ai.backend.client.v2.domains.infra import InfraClient
 from ai.backend.client.v2.domains.model_serving import ModelServingClient
 from ai.backend.client.v2.domains.operations import OperationsClient
+from ai.backend.client.v2.domains.rbac import RBACClient
 from ai.backend.client.v2.domains.session import SessionClient
 from ai.backend.client.v2.domains.storage import StorageClient
 from ai.backend.client.v2.domains.streaming import StreamingClient
@@ -50,6 +51,7 @@ class TestBackendAIClientRegistry:
         assert isinstance(registry.infra, InfraClient)
         assert isinstance(registry.template, TemplateClient)
         assert isinstance(registry.operations, OperationsClient)
+        assert isinstance(registry.rbac, RBACClient)
         assert isinstance(registry.container_registry, ContainerRegistryClient)
         assert isinstance(registry.group, GroupClient)
         assert isinstance(registry.storage, StorageClient)

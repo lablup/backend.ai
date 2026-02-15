@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from .domains.model_serving import ModelServingClient
     from .domains.notification import NotificationClient
     from .domains.operations import OperationsClient
+    from .domains.rbac import RBACClient
     from .domains.scheduling_history import SchedulingHistoryClient
     from .domains.session import SessionClient
     from .domains.storage import StorageClient
@@ -104,6 +105,12 @@ class BackendAIClientRegistry:
         from .domains.fair_share import FairShareClient
 
         return FairShareClient(self._client)
+
+    @cached_property
+    def rbac(self) -> RBACClient:
+        from .domains.rbac import RBACClient
+
+        return RBACClient(self._client)
 
     @cached_property
     def container_registry(self) -> ContainerRegistryClient:
