@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from .domains.notification import NotificationClient
     from .domains.operations import OperationsClient
     from .domains.rbac import RBACClient
+    from .domains.resource_policy import ResourcePolicyClient
     from .domains.scheduling_history import SchedulingHistoryClient
     from .domains.session import SessionClient
     from .domains.storage import StorageClient
@@ -112,6 +113,12 @@ class BackendAIClientRegistry:
         from .domains.rbac import RBACClient
 
         return RBACClient(self._client)
+
+    @cached_property
+    def resource_policy(self) -> ResourcePolicyClient:
+        from .domains.resource_policy import ResourcePolicyClient
+
+        return ResourcePolicyClient(self._client)
 
     @cached_property
     def container_registry(self) -> ContainerRegistryClient:
