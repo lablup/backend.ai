@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from .domains.auth import AuthClient
     from .domains.config import ConfigClient
     from .domains.container_registry import ContainerRegistryClient
+    from .domains.fair_share import FairShareClient
     from .domains.infra import InfraClient
     from .domains.model_serving import ModelServingClient
     from .domains.operations import OperationsClient
@@ -92,6 +93,12 @@ class BackendAIClientRegistry:
         from .domains.operations import OperationsClient
 
         return OperationsClient(self._client)
+
+    @cached_property
+    def fair_share(self) -> FairShareClient:
+        from .domains.fair_share import FairShareClient
+
+        return FairShareClient(self._client)
 
     @cached_property
     def container_registry(self) -> ContainerRegistryClient:
