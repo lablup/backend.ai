@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from .domains.infra import InfraClient
     from .domains.model_serving import ModelServingClient
     from .domains.notification import NotificationClient
+    from .domains.object_storage import ObjectStorageClient
     from .domains.operations import OperationsClient
     from .domains.rbac import RBACClient
     from .domains.resource_policy import ResourcePolicyClient
@@ -167,6 +168,12 @@ class BackendAIClientRegistry:
         from .domains.storage import StorageClient
 
         return StorageClient(self._client)
+
+    @cached_property
+    def object_storage(self) -> ObjectStorageClient:
+        from .domains.object_storage import ObjectStorageClient
+
+        return ObjectStorageClient(self._client)
 
     @cached_property
     def scaling_group(self) -> ScalingGroupClient:

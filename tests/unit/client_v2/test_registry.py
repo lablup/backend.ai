@@ -14,6 +14,7 @@ from ai.backend.client.v2.domains.fair_share import FairShareClient
 from ai.backend.client.v2.domains.group import GroupClient
 from ai.backend.client.v2.domains.infra import InfraClient
 from ai.backend.client.v2.domains.model_serving import ModelServingClient
+from ai.backend.client.v2.domains.object_storage import ObjectStorageClient
 from ai.backend.client.v2.domains.operations import OperationsClient
 from ai.backend.client.v2.domains.rbac import RBACClient
 from ai.backend.client.v2.domains.session import SessionClient
@@ -57,6 +58,7 @@ class TestBackendAIClientRegistry:
         assert isinstance(registry.deployment, DeploymentClient)
         assert isinstance(registry.group, GroupClient)
         assert isinstance(registry.storage, StorageClient)
+        assert isinstance(registry.object_storage, ObjectStorageClient)
         assert isinstance(registry.fair_share, FairShareClient)
 
     def test_domain_clients_inherit_base(self, registry: BackendAIClientRegistry) -> None:
