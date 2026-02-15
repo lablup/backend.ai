@@ -6,6 +6,7 @@ from collections.abc import Collection
 import sqlalchemy as sa
 
 from ai.backend.manager.api.gql.base import StringMatchSpec
+from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, RoleSource, ScopeType
 from ai.backend.manager.models.domain.row import DomainRow
@@ -604,6 +605,18 @@ class EntityScopeConditions:
     def by_entity_type(entity_type: EntityType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return AssociationScopesEntitiesRow.entity_type == entity_type
+
+        return inner
+
+    @staticmethod
+    def by_object_ids(
+        object_ids: Collection[ObjectId],
+    ) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.tuple_(
+                AssociationScopesEntitiesRow.entity_type,
+                AssociationScopesEntitiesRow.entity_id,
+            ).in_([(oid.entity_type, oid.entity_id) for oid in object_ids])
 
         return inner
 
