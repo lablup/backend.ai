@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from .domains.container_registry import ContainerRegistryClient
     from .domains.infra import InfraClient
     from .domains.model_serving import ModelServingClient
+    from .domains.notification import NotificationClient
     from .domains.operations import OperationsClient
     from .domains.session import SessionClient
     from .domains.storage import StorageClient
@@ -98,6 +99,12 @@ class BackendAIClientRegistry:
         from .domains.container_registry import ContainerRegistryClient
 
         return ContainerRegistryClient(self._client)
+
+    @cached_property
+    def notification(self) -> NotificationClient:
+        from .domains.notification import NotificationClient
+
+        return NotificationClient(self._client)
 
     @cached_property
     def storage(self) -> StorageClient:
