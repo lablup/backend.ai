@@ -18103,6 +18103,35 @@
         "description": "Search compute sessions with nested container data.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/compute-sessions/{session_id}": {
+      "get": {
+        "operationId": "compute-sessions.get_session_detail",
+        "tags": [
+          "compute-sessions"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a single compute session detail with nested containers.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/fair-share/domains/{resource_group}/{domain_name}": {
       "get": {
         "operationId": "fair-share.get_domain_fair_share",
@@ -19346,6 +19375,55 @@
         },
         "parameters": [],
         "description": "Search agents with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/agents/resource-stats": {
+      "get": {
+        "operationId": "agents.get_resource_stats",
+        "tags": [
+          "agents"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Get aggregate resource stats across all agents.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/agents/{agent_id}": {
+      "get": {
+        "operationId": "agents.get_agent_detail",
+        "tags": [
+          "agents"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a single agent detail by ID.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     }
   }
