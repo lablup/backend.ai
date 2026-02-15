@@ -6,11 +6,10 @@ import subprocess
 import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
+from importlib.resources import files
 from pathlib import Path
 from subprocess import CalledProcessError
 from typing import override
-
-import pkg_resources
 
 from ai.backend.common.docker import KernelFeatures
 from ai.backend.common.stage.types import (
@@ -186,20 +185,16 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
     def _clone_func(self, spec: ScratchSpec) -> None:
         work_dir = ScratchUtil.work_dir(spec.scratch_root, spec.kernel_id)
         jupyter_custom_css_path = Path(
-            pkg_resources.resource_filename("ai.backend.runner", "jupyter-custom.css")
+            str(files("ai.backend.runner").joinpath("jupyter-custom.css"))
         )
-        logo_path = Path(pkg_resources.resource_filename("ai.backend.runner", "logo.svg"))
-        font_path = Path(pkg_resources.resource_filename("ai.backend.runner", "roboto.ttf"))
-        font_italic_path = Path(
-            pkg_resources.resource_filename("ai.backend.runner", "roboto-italic.ttf")
-        )
-        bashrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".bashrc"))
-        bash_profile_path = Path(
-            pkg_resources.resource_filename("ai.backend.runner", ".bash_profile")
-        )
-        zshrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".zshrc"))
-        vimrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".vimrc"))
-        tmux_conf_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".tmux.conf"))
+        logo_path = Path(str(files("ai.backend.runner").joinpath("logo.svg")))
+        font_path = Path(str(files("ai.backend.runner").joinpath("roboto.ttf")))
+        font_italic_path = Path(str(files("ai.backend.runner").joinpath("roboto-italic.ttf")))
+        bashrc_path = Path(str(files("ai.backend.runner").joinpath(".bashrc")))
+        bash_profile_path = Path(str(files("ai.backend.runner").joinpath(".bash_profile")))
+        zshrc_path = Path(str(files("ai.backend.runner").joinpath(".zshrc")))
+        vimrc_path = Path(str(files("ai.backend.runner").joinpath(".vimrc")))
+        tmux_conf_path = Path(str(files("ai.backend.runner").joinpath(".tmux.conf")))
         jupyter_custom_dir = work_dir / ".jupyter" / "custom"
         jupyter_custom_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy(jupyter_custom_css_path.resolve(), jupyter_custom_dir / "custom.css")

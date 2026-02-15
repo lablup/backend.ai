@@ -5,10 +5,10 @@ import os
 import shutil
 import textwrap
 from collections.abc import Mapping
+from importlib.resources import files
 from pathlib import Path, PurePosixPath
 from typing import Any, override
 
-import pkg_resources
 import zmq
 from aiodocker.docker import Docker
 from aiotools import TaskGroup
@@ -427,8 +427,10 @@ async def prepare_krunner_env_impl(
     arch = get_arch_name()
     current_version = int(
         Path(
-            pkg_resources.resource_filename(
-                f"ai.backend.krunner.{entrypoint_name}", f"./krunner-version.{distro}.txt"
+            str(
+                files(f"ai.backend.krunner.{entrypoint_name}").joinpath(
+                    f"./krunner-version.{distro}.txt"
+                )
             )
         )
         .read_text()
@@ -446,8 +448,8 @@ async def prepare_krunner_env_impl(
                 break
         else:
             log.info("preparing the Docker image for krunner extractor...")
-            extractor_archive = pkg_resources.resource_filename(
-                "ai.backend.runner", f"krunner-extractor.img.{arch}.tar.xz"
+            extractor_archive = str(
+                files("ai.backend.runner").joinpath(f"krunner-extractor.img.{arch}.tar.xz")
             )
             with lzma.open(extractor_archive, "rb") as reader:
                 proc = await asyncio.create_subprocess_exec(*["docker", "load"], stdin=reader)
@@ -460,12 +462,14 @@ async def prepare_krunner_env_impl(
             log.info("populating {} volume version {}", krunner_folder_name, current_version)
             target_path.mkdir(exist_ok=False)
             archive_path = Path(
-                pkg_resources.resource_filename(
-                    f"ai.backend.krunner.{entrypoint_name}", f"krunner-env.{distro}.{arch}.tar.xz"
+                str(
+                    files(f"ai.backend.krunner.{entrypoint_name}").joinpath(
+                        f"krunner-env.{distro}.{arch}.tar.xz"
+                    )
                 )
             ).resolve()
             extractor_path = Path(
-                pkg_resources.resource_filename("ai.backend.runner", "krunner-extractor.sh")
+                str(files("ai.backend.runner").joinpath("krunner-extractor.sh"))
             ).resolve()
 
             log.debug(
@@ -515,9 +519,9 @@ async def prepare_krunner_env_impl(
 
 
 async def copy_runner_files(scratch_path: Path) -> None:
-    artifact_path = Path(pkg_resources.resource_filename("ai.backend.agent", "../runner"))
-    kernel_path = Path(pkg_resources.resource_filename("ai.backend.agent", "../kernel"))
-    helpers_path = Path(pkg_resources.resource_filename("ai.backend.agent", "../helpers"))
+    artifact_path = Path(str(files("ai.backend.agent").joinpath("../runner")))
+    kernel_path = Path(str(files("ai.backend.agent").joinpath("../kernel")))
+    helpers_path = Path(str(files("ai.backend.agent").joinpath("../helpers")))
 
     destination_path = scratch_path
 
@@ -563,12 +567,7 @@ async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, s
         plugin = entrypoint.load()
         await plugin.init({})  # currently does nothing
         provided_versions = (
-            Path(
-                pkg_resources.resource_filename(
-                    f"ai.backend.krunner.{entrypoint.name}",
-                    "versions.txt",
-                )
-            )
+            Path(str(files(f"ai.backend.krunner.{entrypoint.name}").joinpath("versions.txt")))
             .read_text()
             .splitlines()
         )

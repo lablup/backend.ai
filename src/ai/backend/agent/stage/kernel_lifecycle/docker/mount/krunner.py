@@ -2,10 +2,10 @@ import enum
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from importlib.resources import files
 from pathlib import Path
 from typing import Final, override
 
-import pkg_resources
 from cachetools import LRUCache, cached
 
 from ai.backend.agent.kernel import match_distro_data
@@ -23,7 +23,7 @@ from ai.backend.common.types import (
 )
 
 DISTRO_PATTERN = re.compile(r"\.([a-z-]+\d+\.\d+)\.")
-ARTIFACT_PATH = Path(pkg_resources.resource_filename("ai.backend.agent", "../runner"))
+ARTIFACT_PATH = Path(str(files("ai.backend.agent").joinpath("../runner")))
 
 
 class LibcStyle(enum.StrEnum):
@@ -92,12 +92,7 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
         )
 
     def _resolve_krunner_filepath(self, filename: str) -> Path:
-        return Path(
-            pkg_resources.resource_filename(
-                "ai.backend.runner",
-                "../" + filename,
-            )
-        ).resolve()
+        return Path(str(files("ai.backend.runner").joinpath("../" + filename))).resolve()
 
     def _find_artifacts(self, pattern: str) -> Mapping[str, str]:
         artifacts = {}
@@ -267,9 +262,10 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
             try:
                 krunner_pyver = (
                     Path(
-                        pkg_resources.resource_filename(
-                            f"ai.backend.krunner.{matched_distro_pkgname}",
-                            f"krunner-python.{matched_distro}.txt",
+                        str(
+                            files(f"ai.backend.krunner.{matched_distro_pkgname}").joinpath(
+                                f"krunner-python.{matched_distro}.txt"
+                            )
                         )
                     )
                     .read_text()
