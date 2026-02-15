@@ -119,6 +119,7 @@ class EntityType(enum.StrEnum):
     KEYPAIR_RESOURCE_POLICY = "keypair:resource_policy"
     PROJECT_RESOURCE_POLICY = "project:resource_policy"
     USER_RESOURCE_POLICY = "user:resource_policy"
+    PROJECT_CONFIG = "project:config"
     # App config sub
     APP_CONFIG_DOMAIN = "app_config:domain"
     APP_CONFIG_USER = "app_config:user"
