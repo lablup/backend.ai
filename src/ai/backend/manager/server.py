@@ -348,7 +348,6 @@ global_subapp_pkgs: Final[list[str]] = [
     ".notification",
     ".deployment",
     ".rbac",
-    ".resource_policy",
     ".scheduling_history",
     ".compute_sessions",
     ".fair_share",
