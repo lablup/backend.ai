@@ -10,6 +10,7 @@ from .config import ClientConfig
 if TYPE_CHECKING:
     from .domains.agent import AgentClient
     from .domains.artifact import ArtifactClient
+    from .domains.artifact_registry import ArtifactRegistryClient
     from .domains.auth import AuthClient
     from .domains.compute_session import ComputeSessionClient
     from .domains.config import ConfigClient
@@ -169,6 +170,12 @@ class BackendAIClientRegistry:
         from .domains.artifact import ArtifactClient
 
         return ArtifactClient(self._client)
+
+    @cached_property
+    def artifact_registry(self) -> ArtifactRegistryClient:
+        from .domains.artifact_registry import ArtifactRegistryClient
+
+        return ArtifactRegistryClient(self._client)
 
     @cached_property
     def agent(self) -> AgentClient:
