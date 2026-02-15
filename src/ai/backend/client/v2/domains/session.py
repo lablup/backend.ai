@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
+
+import aiohttp
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.session.request import (
@@ -11,11 +14,14 @@ from ai.backend.common.dto.manager.session.request import (
     CreateFromParamsRequest,
     CreateFromTemplateRequest,
     DestroySessionRequest,
+    DownloadFilesRequest,
+    DownloadSingleRequest,
     ExecuteRequest,
     GetAbusingReportRequest,
     GetCommitStatusRequest,
     GetContainerLogsRequest,
     GetStatusHistoryRequest,
+    GetTaskLogsRequest,
     ListFilesRequest,
     MatchSessionsRequest,
     RenameSessionRequest,
@@ -356,9 +362,57 @@ class SessionClient(BaseDomainClient):
         )
 
     # -----------------------------------------------------------------------
-    # Deferred — require binary/multipart/streaming support
+    # Binary / multipart operations
     # -----------------------------------------------------------------------
-    # TODO: upload_files — POST multipart
-    # TODO: download_files — POST, returns ZIP binary
-    # TODO: download_single — POST, returns file binary
-    # TODO: get_task_logs — GET/HEAD, returns streaming response
+
+    async def upload_files(
+        self,
+        session_name: str,
+        files: list[str | Path],
+        basedir: str | Path | None = None,
+    ) -> dict[str, Any] | None:
+        base_path = Path.cwd() if basedir is None else Path(basedir).resolve()
+        data = aiohttp.FormData()
+        for file in files:
+            file_path = Path(file).resolve()
+            rel = str(file_path.relative_to(base_path))
+            data.add_field(
+                "src",
+                file_path.read_bytes(),
+                filename=rel,
+                content_type="application/octet-stream",
+            )
+        return await self._client.upload(
+            f"{_BASE_PATH}/{session_name}/upload",
+            data,
+        )
+
+    async def download_files(
+        self,
+        session_name: str,
+        request: DownloadFilesRequest,
+    ) -> bytes:
+        return await self._client.download(
+            f"{_BASE_PATH}/{session_name}/download",
+            json=request.model_dump(exclude_none=True),
+        )
+
+    async def download_single(
+        self,
+        session_name: str,
+        request: DownloadSingleRequest,
+    ) -> bytes:
+        return await self._client.download(
+            f"{_BASE_PATH}/{session_name}/download_single",
+            json=request.model_dump(exclude_none=True),
+        )
+
+    async def get_task_logs(
+        self,
+        request: GetTaskLogsRequest,
+    ) -> bytes:
+        return await self._client.download(
+            f"{_BASE_PATH}/_/logs",
+            method="GET",
+            params={"taskId": str(request.kernel_id)},
+        )

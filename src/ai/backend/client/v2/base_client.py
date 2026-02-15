@@ -153,6 +153,67 @@ class BackendAIClient:
         json_body = request.model_dump(exclude_none=True) if request is not None else None
         await self._request(method, path, json=json_body, params=params)
 
+    async def upload(
+        self,
+        path: str,
+        data: aiohttp.FormData,
+        *,
+        params: dict[str, str] | None = None,
+    ) -> dict[str, Any] | None:
+        """Send a multipart file upload and return the parsed JSON response."""
+        session = self._session
+        rel_url = "/" + path.lstrip("/")
+        headers = dict(self._sign("POST", rel_url, "multipart/form-data"))
+        # Let aiohttp set the actual Content-Type with the multipart boundary.
+        del headers["Content-Type"]
+        url = self._build_url(path)
+        async with session.request(
+            "POST",
+            url,
+            headers=headers,
+            data=data,
+            params=params,
+        ) as resp:
+            if resp.status >= 400:
+                try:
+                    err_data = await resp.json()
+                except Exception:
+                    err_data = await resp.text()
+                raise map_status_to_exception(resp.status, resp.reason or "", err_data)
+            if resp.status == 204:
+                return None
+            result: dict[str, Any] = await resp.json()
+            return result
+
+    async def download(
+        self,
+        path: str,
+        *,
+        method: str = "POST",
+        json: Any | None = None,
+        params: dict[str, str] | None = None,
+    ) -> bytes:
+        """Send a request and return the raw binary response."""
+        session = self._session
+        content_type = "application/json"
+        rel_url = "/" + path.lstrip("/")
+        headers = dict(self._sign(method, rel_url, content_type))
+        url = self._build_url(path)
+        async with session.request(
+            method,
+            url,
+            headers=headers,
+            json=json,
+            params=params,
+        ) as resp:
+            if resp.status >= 400:
+                try:
+                    err_data = await resp.json()
+                except Exception:
+                    err_data = await resp.text()
+                raise map_status_to_exception(resp.status, resp.reason or "", err_data)
+            return await resp.read()
+
     @asynccontextmanager
     async def ws_connect(
         self,

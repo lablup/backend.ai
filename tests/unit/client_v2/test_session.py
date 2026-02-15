@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -20,7 +20,10 @@ from ai.backend.common.dto.manager.session.request import (
     CreateFromParamsRequest,
     CreateFromTemplateRequest,
     DestroySessionRequest,
+    DownloadFilesRequest,
+    DownloadSingleRequest,
     ExecuteRequest,
+    GetTaskLogsRequest,
     ListFilesRequest,
     MatchSessionsRequest,
     RenameSessionRequest,
@@ -489,3 +492,76 @@ class TestOtherEndpoints:
         method, url, _ = _last_request_call(mock_session)
         assert method == "GET"
         assert "/session/my-sess/abusing-report" in url
+
+
+# ---------------------------------------------------------------------------
+# Binary / multipart operations
+# ---------------------------------------------------------------------------
+
+
+class TestBinaryOperations:
+    @pytest.mark.asyncio
+    async def test_upload_files(self, tmp_path: Any) -> None:
+        test_file = tmp_path / "hello.txt"
+        test_file.write_bytes(b"hello world")
+
+        mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
+        sc = SessionClient(mock_client)
+        mock_upload = AsyncMock(return_value={"uploaded": True})
+
+        with patch.object(mock_client, "upload", mock_upload):
+            result = await sc.upload_files("my-sess", [str(test_file)], basedir=str(tmp_path))
+
+        assert result == {"uploaded": True}
+        mock_upload.assert_awaited_once()
+        call_args = mock_upload.call_args
+        assert "/session/my-sess/upload" in call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_download_files(self) -> None:
+        mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
+        sc = SessionClient(mock_client)
+        mock_download = AsyncMock(return_value=b"zip-content")
+
+        with patch.object(mock_client, "download", mock_download):
+            result = await sc.download_files(
+                "my-sess", DownloadFilesRequest(files=["a.txt", "b.txt"])
+            )
+
+        assert result == b"zip-content"
+        mock_download.assert_awaited_once()
+        call_args = mock_download.call_args
+        assert "/session/my-sess/download" in call_args.args[0]
+        assert call_args.kwargs["json"]["files"] == ["a.txt", "b.txt"]
+
+    @pytest.mark.asyncio
+    async def test_download_single(self) -> None:
+        mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
+        sc = SessionClient(mock_client)
+        mock_download = AsyncMock(return_value=b"file-bytes")
+
+        with patch.object(mock_client, "download", mock_download):
+            result = await sc.download_single("my-sess", DownloadSingleRequest(file="data.csv"))
+
+        assert result == b"file-bytes"
+        mock_download.assert_awaited_once()
+        call_args = mock_download.call_args
+        assert "/session/my-sess/download_single" in call_args.args[0]
+        assert call_args.kwargs["json"]["file"] == "data.csv"
+
+    @pytest.mark.asyncio
+    async def test_get_task_logs(self) -> None:
+        kernel_id = uuid4()
+        mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
+        sc = SessionClient(mock_client)
+        mock_download = AsyncMock(return_value=b"log-output")
+
+        with patch.object(mock_client, "download", mock_download):
+            result = await sc.get_task_logs(GetTaskLogsRequest(kernel_id=kernel_id))
+
+        assert result == b"log-output"
+        mock_download.assert_awaited_once()
+        call_args = mock_download.call_args
+        assert "/session/_/logs" in call_args.args[0]
+        assert call_args.kwargs["method"] == "GET"
+        assert call_args.kwargs["params"]["taskId"] == str(kernel_id)

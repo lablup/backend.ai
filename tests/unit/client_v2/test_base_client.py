@@ -215,6 +215,102 @@ class TestBackendAIClient:
         assert exc_info.value.status == 204
 
 
+class TestUpload:
+    @pytest.mark.asyncio
+    async def test_upload_success_json_response(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(return_value={"uploaded": True})
+
+        mock_session = _make_request_session(mock_resp)
+        client = _make_client(mock_session)
+        form_data = aiohttp.FormData()
+        form_data.add_field("src", b"file-content", filename="test.txt")
+
+        result = await client.upload("/session/my-sess/upload", form_data)
+
+        assert result == {"uploaded": True}
+        call_args = mock_session.request.call_args
+        assert call_args.args[0] == "POST"
+        headers = call_args.kwargs["headers"]
+        assert "Authorization" in headers
+        assert "Content-Type" not in headers
+
+    @pytest.mark.asyncio
+    async def test_upload_returns_none_on_204(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 204
+
+        mock_session = _make_request_session(mock_resp)
+        client = _make_client(mock_session)
+        form_data = aiohttp.FormData()
+
+        result = await client.upload("/session/my-sess/upload", form_data)
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_upload_raises_on_error(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 500
+        mock_resp.reason = "Internal Server Error"
+        mock_resp.json = AsyncMock(return_value={"title": "server error"})
+
+        mock_session = _make_request_session(mock_resp)
+        client = _make_client(mock_session)
+        form_data = aiohttp.FormData()
+
+        with pytest.raises(ServerError):
+            await client.upload("/session/my-sess/upload", form_data)
+
+
+class TestDownload:
+    @pytest.mark.asyncio
+    async def test_download_returns_bytes(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.read = AsyncMock(return_value=b"binary-content")
+
+        mock_session = _make_request_session(mock_resp)
+        client = _make_client(mock_session)
+
+        result = await client.download("/session/my-sess/download", json={"files": ["a.txt"]})
+
+        assert result == b"binary-content"
+        call_args = mock_session.request.call_args
+        assert call_args.args[0] == "POST"
+        assert call_args.kwargs["json"] == {"files": ["a.txt"]}
+
+    @pytest.mark.asyncio
+    async def test_download_with_get_method(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.read = AsyncMock(return_value=b"log-data")
+
+        mock_session = _make_request_session(mock_resp)
+        client = _make_client(mock_session)
+
+        result = await client.download("/session/_/logs", method="GET", params={"taskId": "t-1"})
+
+        assert result == b"log-data"
+        call_args = mock_session.request.call_args
+        assert call_args.args[0] == "GET"
+        assert call_args.kwargs["params"] == {"taskId": "t-1"}
+
+    @pytest.mark.asyncio
+    async def test_download_raises_on_error(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 404
+        mock_resp.reason = "Not Found"
+        mock_resp.json = AsyncMock(return_value={"title": "not found"})
+
+        mock_session = _make_request_session(mock_resp)
+        client = _make_client(mock_session)
+
+        with pytest.raises(NotFoundError):
+            await client.download("/session/my-sess/download")
+
+
 def _make_mock_ws(*, closed: bool = False) -> MagicMock:
     """Build a mock ``aiohttp.ClientWebSocketResponse``."""
     ws = MagicMock(spec=aiohttp.ClientWebSocketResponse)
