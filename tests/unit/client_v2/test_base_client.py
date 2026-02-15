@@ -5,6 +5,7 @@ import aiohttp
 import pytest
 from yarl import URL
 
+from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.base_client import BackendAIClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import (
@@ -163,6 +164,55 @@ class TestBackendAIClient:
         client = _make_client(mock_session)
         await client.close()
         mock_session.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_request_returns_none_on_204(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 204
+
+        mock_session = _make_request_session(mock_resp)
+        client = _make_client(mock_session)
+        result = await client._request("DELETE", "/resource/123")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_typed_request_no_content_success(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 204
+
+        mock_session = _make_request_session(mock_resp)
+        client = _make_client(mock_session)
+        await client.typed_request_no_content("DELETE", "/resource/123")
+
+    @pytest.mark.asyncio
+    async def test_typed_request_no_content_with_request_body(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 204
+
+        mock_session = _make_request_session(mock_resp)
+        client = _make_client(mock_session)
+        await client.typed_request_no_content(
+            "PUT",
+            "/resource/123",
+            request=SampleRequest(query="update"),
+        )
+        call_kwargs = mock_session.request.call_args
+        assert call_kwargs.kwargs["json"] == {"query": "update"}
+
+    @pytest.mark.asyncio
+    async def test_typed_request_raises_on_unexpected_204(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 204
+
+        mock_session = _make_request_session(mock_resp)
+        client = _make_client(mock_session)
+        with pytest.raises(BackendAPIError) as exc_info:
+            await client.typed_request(
+                "GET",
+                "/items",
+                response_model=SampleResponse,
+            )
+        assert exc_info.value.status == 204
 
 
 def _make_mock_ws(*, closed: bool = False) -> MagicMock:

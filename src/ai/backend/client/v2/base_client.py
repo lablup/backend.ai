@@ -8,6 +8,7 @@ from typing import Any, TypeVar
 
 import aiohttp
 
+from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.common.api_handlers import (
     BaseRequestModel,
     BaseResponseModel,
@@ -95,7 +96,7 @@ class BackendAIClient:
         *,
         json: Any | None = None,
         params: dict[str, str] | None = None,
-    ) -> Any:
+    ) -> dict[str, Any] | None:
         session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
@@ -114,7 +115,10 @@ class BackendAIClient:
                 except Exception:
                     data = await resp.text()
                 raise map_status_to_exception(resp.status, resp.reason or "", data)
-            return await resp.json()
+            if resp.status == 204:
+                return None
+            result: dict[str, Any] = await resp.json()
+            return result
 
     async def typed_request(
         self,
@@ -127,7 +131,27 @@ class BackendAIClient:
     ) -> ResponseT:
         json_body = request.model_dump(exclude_none=True) if request is not None else None
         data = await self._request(method, path, json=json_body, params=params)
+        if data is None:
+            raise BackendAPIError(
+                204,
+                "No Content",
+                {
+                    "type": "https://api.backend.ai/probs/unexpected-no-content",
+                    "title": f"Expected a JSON response from {method} {path}, but got 204 No Content",
+                },
+            )
         return response_model.model_validate(data)
+
+    async def typed_request_no_content(
+        self,
+        method: str,
+        path: str,
+        *,
+        request: BaseRequestModel | None = None,
+        params: dict[str, str] | None = None,
+    ) -> None:
+        json_body = request.model_dump(exclude_none=True) if request is not None else None
+        await self._request(method, path, json=json_body, params=params)
 
     @asynccontextmanager
     async def ws_connect(
