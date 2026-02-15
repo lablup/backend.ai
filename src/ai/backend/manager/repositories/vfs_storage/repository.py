@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import uuid
+from typing import TYPE_CHECKING
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -12,6 +15,9 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.vfs_storage.db_source.db_source import VFSStorageDBSource
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 
 vfs_storage_repository_resilience = Resilience(
     policies=[
@@ -47,11 +53,16 @@ class VFSStorageRepository:
         return await self._db_source.get_by_id(storage_id)
 
     @vfs_storage_repository_resilience.apply()
-    async def create(self, creator: Creator[VFSStorageRow]) -> VFSStorageData:
-        return await self._db_source.create(creator)
+    async def create(
+        self, creator: Creator[VFSStorageRow], meta_creator: Creator[ArtifactStorageRow]
+    ) -> VFSStorageData:
+        return await self._db_source.create(creator, meta_creator)
 
     @vfs_storage_repository_resilience.apply()
-    async def update(self, updater: Updater[VFSStorageRow]) -> VFSStorageData:
+    async def update(
+        self,
+        updater: Updater[VFSStorageRow],
+    ) -> VFSStorageData:
         return await self._db_source.update(updater)
 
     @vfs_storage_repository_resilience.apply()

@@ -5,15 +5,15 @@ from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.models.object_storage import ObjectStorageRow
+from ai.backend.manager.data.artifact_storages.types import ArtifactStorageData
+from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.services.object_storage.actions.base import ObjectStorageAction
+from ai.backend.manager.services.artifact_storage.actions.base import ArtifactStorageAction
 
 
 @dataclass
-class UpdateObjectStorageAction(ObjectStorageAction):
-    updater: Updater[ObjectStorageRow]
+class UpdateArtifactStorageAction(ArtifactStorageAction):
+    updater: Updater[ArtifactStorageRow]
 
     @override
     def entity_id(self) -> str | None:
@@ -26,8 +26,8 @@ class UpdateObjectStorageAction(ObjectStorageAction):
 
 
 @dataclass
-class UpdateObjectStorageActionResult(BaseActionResult):
-    result: ObjectStorageData
+class UpdateArtifactStorageActionResult(BaseActionResult):
+    result: ArtifactStorageData
 
     @override
     def entity_id(self) -> str | None:
