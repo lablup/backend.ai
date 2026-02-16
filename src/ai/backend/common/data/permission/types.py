@@ -308,6 +308,57 @@ class ScopeType(enum.StrEnum):
 GLOBAL_SCOPE_ID = "global"
 
 
+class RBACNodeType(enum.StrEnum):
+    """Unified RBAC node type for BEP-1048 entity relationship model.
+
+    Each value represents a node in the RBAC entity relationship graph.
+    The same node can serve as both scope (parent) and entity (child)
+    depending on the edge direction. Used in ``permissions`` and
+    ``association_scopes_entities`` tables for both ``scope_type``
+    and ``entity_type`` columns.
+
+    This enum replaces the separate ``ScopeType`` and RBAC-subset of
+    ``EntityType`` with a single unified type.
+    """
+
+    # === Scope hierarchy ===
+    DOMAIN = "domain"
+    PROJECT = "project"
+    USER = "user"
+
+    # === Root-query-enabled entities (scoped) ===
+    SESSION = "session"
+    VFOLDER = "vfolder"
+    DEPLOYMENT = "deployment"
+    MODEL_DEPLOYMENT = "model_deployment"
+    KEYPAIR = "keypair"
+    NOTIFICATION_CHANNEL = "notification_channel"
+    NETWORK = "network"
+    RESOURCE_GROUP = "resource_group"
+    CONTAINER_REGISTRY = "container_registry"
+    STORAGE_HOST = "storage_host"
+    IMAGE = "image"
+    ARTIFACT = "artifact"
+    ARTIFACT_REGISTRY = "artifact_registry"
+    SESSION_TEMPLATE = "session_template"
+    APP_CONFIG = "app_config"
+
+    # === Root-query-enabled entities (superadmin-only) ===
+    RESOURCE_PRESET = "resource_preset"
+    USER_RESOURCE_POLICY = "user_resource_policy"
+    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
+    PROJECT_RESOURCE_POLICY = "project_resource_policy"
+    ROLE = "role"
+    AUDIT_LOG = "audit_log"
+    EVENT_LOG = "event_log"
+
+    # === Auto-only entities used in permissions ===
+    NOTIFICATION_RULE = "notification_rule"
+
+    # === Entity-level scopes (for entity-scope permissions) ===
+    ARTIFACT_REVISION = "artifact_revision"
+
+
 class RelationType(enum.StrEnum):
     """Classification of parent-child entity edges in BEP-1048.
 
