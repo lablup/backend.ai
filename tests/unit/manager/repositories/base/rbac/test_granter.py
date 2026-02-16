@@ -12,12 +12,15 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 
-from ai.backend.common.data.permission.types import OperationType
-from ai.backend.manager.data.permission.id import ObjectId
+from ai.backend.common.data.permission.types import OperationType, RelationType
+from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
     RoleSource,
     ScopeType,
+)
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -38,6 +41,7 @@ if TYPE_CHECKING:
 GRANTER_TABLES = [
     RoleRow,
     PermissionRow,
+    AssociationScopesEntitiesRow,
 ]
 
 
@@ -52,6 +56,7 @@ class GranterTestContext:
 
     entity_scope_type: ScopeType
     entity_id: ObjectId
+    target_scope_id: ScopeId
 
 
 @dataclass
@@ -98,6 +103,7 @@ class TestGranterBasic:
     ) -> AsyncGenerator[SingleRoleContext, None]:
         """Create a single role for granter testing."""
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
+        target_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=str(uuid.uuid4()))
 
         role_id: UUID
         async with database_connection.begin_session_read_committed() as db_sess:
@@ -113,6 +119,7 @@ class TestGranterBasic:
         yield SingleRoleContext(
             entity_scope_type=ScopeType.VFOLDER,
             entity_id=entity_id,
+            target_scope_id=target_scope_id,
             role_id=role_id,
         )
 
@@ -124,28 +131,39 @@ class TestGranterBasic:
     ) -> AsyncGenerator[GranterTestContext, None]:
         """Create context without any roles (for testing empty role_ids)."""
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
+        target_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=str(uuid.uuid4()))
 
         yield GranterTestContext(
             entity_scope_type=ScopeType.VFOLDER,
             entity_id=entity_id,
+            target_scope_id=target_scope_id,
         )
 
-    async def test_granter_creates_permissions(
+    async def test_granter_creates_permissions_and_ref_edge(
         self,
         database_connection: ExtendedAsyncSAEngine,
         single_role: SingleRoleContext,
     ) -> None:
-        """Test that granter creates permissions for specified role."""
+        """Test that granter creates ref edge and permissions for specified role."""
         ctx = single_role
 
         async with database_connection.begin_session_read_committed() as db_sess:
             granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_type=ctx.entity_scope_type,
+                target_scope_id=ctx.target_scope_id,
                 target_role_ids=[ctx.role_id],
                 operations=[OperationType.READ, OperationType.UPDATE],
             )
             await execute_rbac_granter(db_sess, granter)
+
+            # Verify ref edge was created in association_scopes_entities
+            assoc = (await db_sess.scalars(sa.select(AssociationScopesEntitiesRow))).one()
+            assert assoc.scope_type == ctx.target_scope_id.scope_type
+            assert assoc.scope_id == ctx.target_scope_id.scope_id
+            assert assoc.entity_type == ctx.entity_id.entity_type
+            assert assoc.entity_id == ctx.entity_id.entity_id
+            assert assoc.relation_type == RelationType.REF
 
             # Verify permissions were created
             perm_count = await db_sess.scalar(sa.select(sa.func.count()).select_from(PermissionRow))
@@ -173,14 +191,19 @@ class TestGranterBasic:
             granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_type=ctx.entity_scope_type,
+                target_scope_id=ctx.target_scope_id,
                 target_role_ids=[],
                 operations=[OperationType.READ],
             )
             await execute_rbac_granter(db_sess, granter)
 
-            # Verify no permissions were created
+            # Verify no permissions or associations were created
             perm_count = await db_sess.scalar(sa.select(sa.func.count()).select_from(PermissionRow))
             assert perm_count == 0
+            assoc_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            )
+            assert assoc_count == 0
 
 
 class TestGranterMultipleRoles:
@@ -194,6 +217,7 @@ class TestGranterMultipleRoles:
     ) -> AsyncGenerator[MultiRoleContext, None]:
         """Create multiple roles for granter testing."""
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
+        target_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=str(uuid.uuid4()))
 
         role_ids: list[UUID] = []
 
@@ -211,6 +235,7 @@ class TestGranterMultipleRoles:
         yield MultiRoleContext(
             entity_scope_type=ScopeType.VFOLDER,
             entity_id=entity_id,
+            target_scope_id=target_scope_id,
             role_ids=role_ids,
         )
 
@@ -226,10 +251,17 @@ class TestGranterMultipleRoles:
             granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_type=ctx.entity_scope_type,
+                target_scope_id=ctx.target_scope_id,
                 target_role_ids=ctx.role_ids,
                 operations=[OperationType.READ],
             )
             await execute_rbac_granter(db_sess, granter)
+
+            # Verify ref edge was created (single edge regardless of role count)
+            assoc_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            )
+            assert assoc_count == 1
 
             # Verify permissions were created for all roles
             perm_count = await db_sess.scalar(sa.select(sa.func.count()).select_from(PermissionRow))
@@ -251,6 +283,7 @@ class TestGranterMultipleOperations:
     ) -> AsyncGenerator[SingleRoleContext, None]:
         """Create a single role for granter testing."""
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
+        target_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=str(uuid.uuid4()))
 
         role_id: UUID
         async with database_connection.begin_session_read_committed() as db_sess:
@@ -266,6 +299,7 @@ class TestGranterMultipleOperations:
         yield SingleRoleContext(
             entity_scope_type=ScopeType.VFOLDER,
             entity_id=entity_id,
+            target_scope_id=target_scope_id,
             role_id=role_id,
         )
 
@@ -287,6 +321,7 @@ class TestGranterMultipleOperations:
             granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_type=ctx.entity_scope_type,
+                target_scope_id=ctx.target_scope_id,
                 target_role_ids=[ctx.role_id],
                 operations=all_operations,
             )
@@ -310,14 +345,19 @@ class TestGranterMultipleOperations:
             granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_type=ctx.entity_scope_type,
+                target_scope_id=ctx.target_scope_id,
                 target_role_ids=[ctx.role_id],
                 operations=[],
             )
             await execute_rbac_granter(db_sess, granter)
 
-            # Verify no permissions were created
+            # Verify no permissions or associations were created
             perm_count = await db_sess.scalar(sa.select(sa.func.count()).select_from(PermissionRow))
             assert perm_count == 0
+            assoc_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            )
+            assert assoc_count == 0
 
 
 class TestGranterIdempotent:
@@ -331,6 +371,7 @@ class TestGranterIdempotent:
     ) -> AsyncGenerator[SingleRoleContext, None]:
         """Create a single role for granter testing."""
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
+        target_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=str(uuid.uuid4()))
 
         role_id: UUID
         async with database_connection.begin_session_read_committed() as db_sess:
@@ -346,6 +387,7 @@ class TestGranterIdempotent:
         yield SingleRoleContext(
             entity_scope_type=ScopeType.VFOLDER,
             entity_id=entity_id,
+            target_scope_id=target_scope_id,
             role_id=role_id,
         )
 
@@ -367,6 +409,7 @@ class TestGranterIdempotent:
             granter = RBACGranter(
                 granted_entity_id=ctx.entity_id,
                 granted_entity_scope_type=ctx.entity_scope_type,
+                target_scope_id=ctx.target_scope_id,
                 target_role_ids=[ctx.role_id],
                 operations=[OperationType.READ, OperationType.UPDATE],
             )
@@ -382,17 +425,18 @@ class TestGranterIdempotent:
             async with database_connection.begin_session_read_committed() as db_sess:
                 await execute_rbac_granter(db_sess, granter)
 
-    async def test_granter_grants_to_multiple_roles_sequentially(
+    async def test_granter_grants_to_different_scopes_sequentially(
         self,
         database_connection: ExtendedAsyncSAEngine,
         create_tables: None,
     ) -> None:
-        """Test that same entity can be granted to multiple roles sequentially."""
+        """Test that same entity can be granted to different scopes sequentially."""
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
 
         async with database_connection.begin_session_read_committed() as db_sess:
-            # Create multiple roles
+            # Create multiple roles (one per user scope)
             role_ids: list[UUID] = []
+            scope_ids: list[ScopeId] = []
             for i in range(3):
                 role = RoleRow(
                     id=uuid.uuid4(),
@@ -402,17 +446,23 @@ class TestGranterIdempotent:
                 db_sess.add(role)
                 await db_sess.flush()
                 role_ids.append(role.id)
+                scope_ids.append(ScopeId(scope_type=ScopeType.USER, scope_id=str(uuid.uuid4())))
 
-            # Grant entity to each role individually
-            for role_id in role_ids:
+            # Grant entity to each role with different target scopes
+            for role_id, scope_id in zip(role_ids, scope_ids, strict=True):
                 granter = RBACGranter(
                     granted_entity_id=entity_id,
                     granted_entity_scope_type=ScopeType.VFOLDER,
+                    target_scope_id=scope_id,
                     target_role_ids=[role_id],
                     operations=[OperationType.READ],
                 )
                 await execute_rbac_granter(db_sess, granter)
 
-            # Verify permissions created for all roles
+            # Verify permissions and associations created for all
             perm_count = await db_sess.scalar(sa.select(sa.func.count()).select_from(PermissionRow))
             assert perm_count == 3
+            assoc_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            )
+            assert assoc_count == 3

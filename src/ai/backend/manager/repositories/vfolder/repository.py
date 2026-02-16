@@ -326,6 +326,10 @@ class VfolderRepository:
                         entity_id=str(params.id),
                     ),
                     granted_entity_scope_type=ScopeType.VFOLDER,
+                    target_scope_id=ScopeId(
+                        scope_type=ScopeType.USER,
+                        scope_id=str(params.user),
+                    ),
                     target_role_ids=[user_role_id],
                     operations=[OperationType.READ],
                 )
@@ -511,6 +515,10 @@ class VfolderRepository:
                     entity_id=str(vfolder_id),
                 ),
                 granted_entity_scope_type=ScopeType.VFOLDER,
+                target_scope_id=ScopeId(
+                    scope_type=ScopeType.USER,
+                    scope_id=str(user_id),
+                ),
                 target_role_ids=[user_role_id],
                 operations=list(permission.to_rbac_operation()),
             )
