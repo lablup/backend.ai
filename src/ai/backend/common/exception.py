@@ -171,6 +171,7 @@ class ErrorDomain(enum.StrEnum):
     AGENT = "agent"
     KERNEL_REGISTRY = "kernel-registry"
     PERMISSION = "permission"
+    RBAC = "rbac"
     ROLE = "role"
     METRIC = "metric"
     STORAGE_PROXY = "storage-proxy"

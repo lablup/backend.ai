@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import enum
 
+from ai.backend.common.data.permission.exceptions import InvalidTypeConversion
+
 
 class PermissionStatus(enum.StrEnum):
     ACTIVE = "active"
@@ -215,6 +217,14 @@ class EntityType(enum.StrEnum):
     # Export sub
     EXPORT_REPORT = "export:report"
 
+    def to_scope_type(self) -> ScopeType:
+        try:
+            return ScopeType(self.value)
+        except ValueError:
+            raise InvalidTypeConversion(
+                extra_msg=f"EntityType {self.value!r} has no corresponding ScopeType",
+            ) from None
+
     @classmethod
     def _scope_types(cls) -> set[EntityType]:
         """
@@ -324,6 +334,14 @@ class ScopeType(enum.StrEnum):
             return RBACElementType(self.value)
         except ValueError as e:
             raise RBACTypeConversionError(f"{self!r} has no corresponding RBACElementType") from e
+
+    def to_entity_type(self) -> EntityType:
+        try:
+            return EntityType(self.value)
+        except ValueError:
+            raise InvalidTypeConversion(
+                extra_msg=f"ScopeType {self.value!r} has no corresponding EntityType",
+            ) from None
 
 
 GLOBAL_SCOPE_ID = "global"
