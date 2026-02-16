@@ -22,6 +22,9 @@ from .types import (
     CreatePermissionInput,
     CreateRoleInput,
     EntityConnection,
+    EntityFilter,
+    EntityOrderBy,
+    EntityRefGQL,
     EntityTypeGQL,
     OperationTypeGQL,
     PermissionConnection,
@@ -51,13 +54,16 @@ __all__ = (
     "RoleGQL",
     "PermissionGQL",
     "RoleAssignmentGQL",
+    "EntityRefGQL",
     # Filters
     "RoleFilter",
     "PermissionFilter",
     "RoleAssignmentFilter",
+    "EntityFilter",
     # OrderBy
     "RoleOrderBy",
     "PermissionOrderBy",
+    "EntityOrderBy",
     # Inputs
     "CreateRoleInput",
     "UpdateRoleInput",

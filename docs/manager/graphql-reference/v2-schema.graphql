@@ -2266,11 +2266,45 @@ type EntityConnection {
 
 """Added in 26.3.0. Entity edge"""
 type EntityEdge {
-  node: EntityNode!
+  node: EntityRef!
   cursor: String!
 }
 
+"""Added in 26.3.0. Filter for entity associations"""
+input EntityFilter {
+  entityType: EntityType = null
+  entityId: StringFilter = null
+}
+
 union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ArtifactRevision | Role
+
+"""Added in 26.3.0. Order by specification for entity associations"""
+input EntityOrderBy {
+  field: EntityOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.3.0. Entity ordering field"""
+enum EntityOrderField {
+  ENTITY_TYPE
+  REGISTERED_AT
+}
+
+"""
+Added in 26.3.0. Entity reference from the association_scopes_entities table
+"""
+type EntityRef implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  scopeType: EntityType!
+  scopeId: String!
+  entityType: EntityType!
+  entityId: String!
+  registeredAt: DateTime!
+
+  """The resolved entity object."""
+  entity: EntityNode
+}
 
 """
 Added in 26.2.0. Common timestamp fields for entity lifecycle tracking. Reusable across different entity types.
@@ -4993,9 +5027,9 @@ type Query {
   adminRoleAssignments(filter: RoleAssignmentFilter = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
 
   """
-  Added in 26.3.0. Search entities by type (admin only). Only entity_type selection and pagination are supported. Use each entity's dedicated query for detailed options.
+  Added in 26.3.0. Search entity associations (admin only). Optionally filter by entity_type and entity_id.
   """
-  adminEntities(entityType: EntityType!, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection!
+  adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection!
 
   """Added in 26.3.0. List available scope types."""
   scopeTypes: [EntityType!]!
