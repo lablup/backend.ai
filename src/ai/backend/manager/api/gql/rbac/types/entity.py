@@ -72,7 +72,7 @@ class EntityRefGQL(Node):
     def from_dataclass(cls, data: AssociationScopesEntitiesData) -> Self:
         return cls(
             id=ID(str(data.id)),
-            scope_type=EntityTypeGQL.from_scope_type(data.scope_id.scope_type),
+            scope_type=EntityTypeGQL.from_internal(data.scope_id.scope_type.to_entity_type()),
             scope_id=data.scope_id.scope_id,
             entity_type=EntityTypeGQL.from_internal(data.object_id.entity_type),
             entity_id=data.object_id.entity_id,

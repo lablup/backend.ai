@@ -14,14 +14,12 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
-    ScopeType,
 )
 from ai.backend.manager.api.gql.base import OrderDirection
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models.rbac.exceptions import InvalidScope
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base.creator import Creator
@@ -77,19 +75,6 @@ class EntityTypeGQL(StrEnum):
             raise InvalidAPIParameters(
                 extra_msg=f"{self.value!r} is not a valid EntityType"
             ) from None
-
-    @classmethod
-    def from_scope_type(cls, value: ScopeType) -> EntityTypeGQL:
-        try:
-            return cls(value.value)
-        except ValueError:
-            raise InvalidScope(extra_msg=f"{value.value!r} is not a valid EntityTypeGQL") from None
-
-    def to_scope_type(self) -> ScopeType:
-        try:
-            return ScopeType(self.value)
-        except ValueError:
-            raise InvalidScope(extra_msg=f"{self.value!r} is not a valid scope type") from None
 
 
 @strawberry.enum(name="OperationType", description="Added in 26.3.0. RBAC operation type")
@@ -178,7 +163,7 @@ class PermissionGQL(Node):
         return cls(
             id=ID(str(data.id)),
             role_id=data.role_id,
-            scope_type=EntityTypeGQL.from_scope_type(data.scope_type),
+            scope_type=EntityTypeGQL.from_internal(data.scope_type.to_entity_type()),
             scope_id=data.scope_id,
             entity_type=EntityTypeGQL.from_internal(data.entity_type),
             operation=OperationTypeGQL.from_internal(data.operation),
@@ -203,7 +188,9 @@ class PermissionFilter(GQLFilter):
 
         if self.scope_type is not None:
             conditions.append(
-                ScopedPermissionConditions.by_scope_type(self.scope_type.to_scope_type())
+                ScopedPermissionConditions.by_scope_type(
+                    self.scope_type.to_internal().to_scope_type()
+                )
             )
 
         if self.entity_type is not None:
@@ -247,7 +234,7 @@ class CreatePermissionInput:
         return Creator(
             spec=PermissionCreatorSpec(
                 role_id=self.role_id,
-                scope_type=self.scope_type.to_scope_type(),
+                scope_type=self.scope_type.to_internal().to_scope_type(),
                 scope_id=self.scope_id,
                 entity_type=self.entity_type.to_internal(),
                 operation=self.operation.to_internal(),
