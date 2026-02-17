@@ -64,6 +64,10 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.delete_aut
     DeleteAutoScalingRuleAction,
     DeleteAutoScalingRuleActionResult,
 )
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_scaling_rule import (
+    GetAutoScalingRuleAction,
+    GetAutoScalingRuleActionResult,
+)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
     SearchAutoScalingRulesActionResult,
@@ -627,6 +631,22 @@ class DeploymentService:
             action.creator
         )
         return CreateAutoScalingRuleActionResult(data=data)
+
+    async def get_auto_scaling_rule(
+        self, action: GetAutoScalingRuleAction
+    ) -> GetAutoScalingRuleActionResult:
+        """Get an auto-scaling rule by ID.
+
+        Args:
+            action: Action containing the rule ID
+
+        Returns:
+            GetAutoScalingRuleActionResult: Result containing the rule data
+        """
+        data = await self._deployment_repository.get_model_deployment_autoscaling_rule(
+            action.auto_scaling_rule_id
+        )
+        return GetAutoScalingRuleActionResult(data=data)
 
     async def update_auto_scaling_rule(
         self, action: UpdateAutoScalingRuleAction
