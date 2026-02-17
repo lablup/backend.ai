@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from .domains.session import SessionClient
     from .domains.storage import StorageClient
     from .domains.streaming import StreamingClient
+    from .domains.system import SystemClient
     from .domains.template import TemplateClient
     from .domains.vfolder import VFolderClient
 
@@ -230,3 +231,9 @@ class BackendAIClientRegistry:
         from .domains.compute_session import ComputeSessionClient
 
         return ComputeSessionClient(self._client)
+
+    @cached_property
+    def system(self) -> SystemClient:
+        from .domains.system import SystemClient
+
+        return SystemClient(self._client)
