@@ -23,6 +23,10 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.delete_aut
     DeleteAutoScalingRuleAction,
     DeleteAutoScalingRuleActionResult,
 )
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_scaling_rule import (
+    GetAutoScalingRuleAction,
+    GetAutoScalingRuleActionResult,
+)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
     SearchAutoScalingRulesActionResult,
@@ -142,6 +146,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
     create_auto_scaling_rule: ActionProcessor[
         CreateAutoScalingRuleAction, CreateAutoScalingRuleActionResult
     ]
+    get_auto_scaling_rule: ActionProcessor[GetAutoScalingRuleAction, GetAutoScalingRuleActionResult]
     update_auto_scaling_rule: ActionProcessor[
         UpdateAutoScalingRuleAction, UpdateAutoScalingRuleActionResult
     ]
@@ -190,6 +195,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.create_auto_scaling_rule = ActionProcessor(
             service.create_auto_scaling_rule, action_monitors
         )
+        self.get_auto_scaling_rule = ActionProcessor(service.get_auto_scaling_rule, action_monitors)
         self.update_auto_scaling_rule = ActionProcessor(
             service.update_auto_scaling_rule, action_monitors
         )
@@ -230,6 +236,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
             SearchReplicasAction.spec(),
             # Auto-scaling rules
             CreateAutoScalingRuleAction.spec(),
+            GetAutoScalingRuleAction.spec(),
             UpdateAutoScalingRuleAction.spec(),
             DeleteAutoScalingRuleAction.spec(),
             SearchAutoScalingRulesAction.spec(),
