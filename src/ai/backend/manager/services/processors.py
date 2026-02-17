@@ -55,6 +55,8 @@ from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.group.service import GroupService
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
+from ai.backend.manager.services.keypair.processors import KeyPairProcessors
+from ai.backend.manager.services.keypair.service import KeyPairService
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
@@ -162,6 +164,7 @@ class Services:
     vfolder_file: VFolderFileService
     vfolder_invite: VFolderInviteService
     session: SessionService
+    keypair: KeyPairService
     keypair_resource_policy: KeypairResourcePolicyService
     user_resource_policy: UserResourcePolicyService
     project_resource_policy: ProjectResourcePolicyService
@@ -260,6 +263,7 @@ class Services:
                 appproxy_client_pool=args.appproxy_client_pool,
             )
         )
+        keypair_service = KeyPairService()
         keypair_resource_policy_service = KeypairResourcePolicyService(
             repositories.keypair_resource_policy.repository
         )
@@ -381,6 +385,7 @@ class Services:
             vfolder_file=vfolder_file_service,
             vfolder_invite=vfolder_invite_service,
             session=session_service,
+            keypair=keypair_service,
             keypair_resource_policy=keypair_resource_policy_service,
             user_resource_policy=user_resource_policy_service,
             project_resource_policy=project_resource_policy_service,
@@ -426,6 +431,7 @@ class Processors(AbstractProcessorPackage):
     vfolder_file: VFolderFileProcessors
     session: SessionProcessors
     container_registry: ContainerRegistryProcessors
+    keypair: KeyPairProcessors
     keypair_resource_policy: KeypairResourcePolicyProcessors
     user_resource_policy: UserResourcePolicyProcessors
     project_resource_policy: ProjectResourcePolicyProcessors
@@ -469,6 +475,7 @@ class Processors(AbstractProcessorPackage):
             services.vfolder_invite, action_monitors
         )
         session_processors = SessionProcessors(services.session, action_monitors)
+        keypair_processors = KeyPairProcessors(services.keypair, action_monitors)
         keypair_resource_policy_processors = KeypairResourcePolicyProcessors(
             services.keypair_resource_policy, action_monitors
         )
@@ -534,6 +541,7 @@ class Processors(AbstractProcessorPackage):
             vfolder_file=vfolder_file_processors,
             vfolder_invite=vfolder_invite_processors,
             session=session_processors,
+            keypair=keypair_processors,
             keypair_resource_policy=keypair_resource_policy_processors,
             user_resource_policy=user_resource_policy_processors,
             project_resource_policy=project_resource_policy_processors,
@@ -574,6 +582,7 @@ class Processors(AbstractProcessorPackage):
             *self.vfolder_file.supported_actions(),
             *self.vfolder_invite.supported_actions(),
             *self.session.supported_actions(),
+            *self.keypair.supported_actions(),
             *self.keypair_resource_policy.supported_actions(),
             *self.user_resource_policy.supported_actions(),
             *self.project_resource_policy.supported_actions(),
