@@ -7,6 +7,7 @@ from ai.backend.client.v2.base_client import BackendAIClient
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.auth import AuthClient
+from ai.backend.client.v2.domains.auto_scaling_rule import AutoScalingRuleClient
 from ai.backend.client.v2.domains.config import ConfigClient
 from ai.backend.client.v2.domains.container_registry import ContainerRegistryClient
 from ai.backend.client.v2.domains.deployment import DeploymentClient
@@ -64,6 +65,7 @@ class TestBackendAIClientRegistry:
         assert isinstance(registry.object_storage, ObjectStorageClient)
         assert isinstance(registry.fair_share, FairShareClient)
         assert isinstance(registry.user, UserClient)
+        assert isinstance(registry.auto_scaling_rule, AutoScalingRuleClient)
 
     def test_domain_clients_inherit_base(self, registry: BackendAIClientRegistry) -> None:
         assert isinstance(registry.session, BaseDomainClient)

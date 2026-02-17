@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from .domains.artifact import ArtifactClient
     from .domains.artifact_registry import ArtifactRegistryClient
     from .domains.auth import AuthClient
+    from .domains.auto_scaling_rule import AutoScalingRuleClient
     from .domains.compute_session import ComputeSessionClient
     from .domains.config import ConfigClient
     from .domains.container_registry import ContainerRegistryClient
@@ -258,3 +259,9 @@ class BackendAIClientRegistry:
         from .domains.system import SystemClient
 
         return SystemClient(self._client)
+
+    @cached_property
+    def auto_scaling_rule(self) -> AutoScalingRuleClient:
+        from .domains.auto_scaling_rule import AutoScalingRuleClient
+
+        return AutoScalingRuleClient(self._client)
