@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import (
@@ -66,9 +67,6 @@ async def execute_rbac_granter(
     For example, when user A invites user B to a VFolder:
     - User B's role (provided by caller) gets permissions for that VFolder.
 
-    Raises:
-        IntegrityError: If duplicate permission already exists.
-
     Args:
         db_sess: Async SQLAlchemy session (must be writable).
         granter: Granter instance containing granted_entity_id, target_role_ids, and operations.
@@ -80,15 +78,20 @@ async def execute_rbac_granter(
         return
 
     # 1. Insert ref edge in association_scopes_entities (visibility)
-    db_sess.add(
-        AssociationScopesEntitiesRow(
+    #    Use ON CONFLICT DO NOTHING to safely handle repeated grants for the
+    #    same (scope_type, scope_id, entity_id) triple.
+    ref_edge_stmt = (
+        pg_insert(AssociationScopesEntitiesRow)
+        .values(
             scope_type=granter.target_scope_id.scope_type,
             scope_id=granter.target_scope_id.scope_id,
             entity_type=entity_id.entity_type,
             entity_id=entity_id.entity_id,
             relation_type=RelationType.REF,
         )
+        .on_conflict_do_nothing(constraint="uq_scope_id_entity_id")
     )
+    await db_sess.execute(ref_edge_stmt)
 
     # 2. Insert entity-scope permissions (access control)
     perms = [
