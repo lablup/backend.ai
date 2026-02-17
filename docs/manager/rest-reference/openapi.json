@@ -8324,6 +8324,353 @@
         },
         "title": "SearchAgentsRequest",
         "type": "object"
+      },
+      "CreateDomainRequest": {
+        "description": "Request to create a domain.",
+        "properties": {
+          "name": {
+            "description": "Domain name",
+            "maxLength": 64,
+            "title": "Name",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domain description",
+            "title": "Description"
+          },
+          "is_active": {
+            "default": true,
+            "description": "Whether the domain is active",
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "total_resource_slots": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Total resource slots",
+            "title": "Total Resource Slots"
+          },
+          "allowed_vfolder_hosts": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Allowed vfolder hosts with permissions",
+            "title": "Allowed Vfolder Hosts"
+          },
+          "allowed_docker_registries": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Allowed docker registries",
+            "title": "Allowed Docker Registries"
+          },
+          "integration_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "External integration ID",
+            "title": "Integration Id"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateDomainRequest",
+        "type": "object"
+      },
+      "DomainFilter": {
+        "description": "Filter for domain search.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by name"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by active status",
+            "title": "Is Active"
+          }
+        },
+        "title": "DomainFilter",
+        "type": "object"
+      },
+      "DomainOrder": {
+        "description": "Order specification for domains.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/DomainOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "DomainOrder",
+        "type": "object"
+      },
+      "DomainOrderField": {
+        "description": "Fields available for ordering domains.",
+        "enum": [
+          "name",
+          "created_at",
+          "modified_at"
+        ],
+        "title": "DomainOrderField",
+        "type": "string"
+      },
+      "SearchDomainsRequest": {
+        "description": "Request body for searching domains with filters, orders, and pagination.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DomainFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DomainOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum items to return",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Number of items to skip",
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "title": "SearchDomainsRequest",
+        "type": "object"
+      },
+      "UpdateDomainRequest": {
+        "description": "Request to update a domain.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "New domain name",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated description",
+            "title": "Description"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated active status",
+            "title": "Is Active"
+          },
+          "total_resource_slots": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated total resource slots",
+            "title": "Total Resource Slots"
+          },
+          "allowed_vfolder_hosts": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated allowed vfolder hosts",
+            "title": "Allowed Vfolder Hosts"
+          },
+          "allowed_docker_registries": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated allowed docker registries",
+            "title": "Allowed Docker Registries"
+          },
+          "integration_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated integration ID",
+            "title": "Integration Id"
+          }
+        },
+        "title": "UpdateDomainRequest",
+        "type": "object"
+      },
+      "DeleteDomainRequest": {
+        "description": "Request to delete (soft-delete) a domain.",
+        "properties": {
+          "name": {
+            "description": "Domain name to delete",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "DeleteDomainRequest",
+        "type": "object"
+      },
+      "PurgeDomainRequest": {
+        "description": "Request to permanently purge a domain.",
+        "properties": {
+          "name": {
+            "description": "Domain name to purge",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "PurgeDomainRequest",
+        "type": "object"
       }
     }
   },
@@ -19346,6 +19693,187 @@
         },
         "parameters": [],
         "description": "Search agents with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/domains": {
+      "post": {
+        "operationId": "admin/domains.create",
+        "tags": [
+          "admin/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDomainRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Create a new domain.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/domains/{domain_name}": {
+      "get": {
+        "operationId": "admin/domains.get",
+        "tags": [
+          "admin/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "domain_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific domain by name.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "admin/domains.update",
+        "tags": [
+          "admin/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDomainRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "domain_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an existing domain.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/domains/search": {
+      "post": {
+        "operationId": "admin/domains.search",
+        "tags": [
+          "admin/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchDomainsRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search domains with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/domains/delete": {
+      "post": {
+        "operationId": "admin/domains.delete",
+        "tags": [
+          "admin/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteDomainRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Delete (soft-delete) a domain.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/domains/purge": {
+      "post": {
+        "operationId": "admin/domains.purge",
+        "tags": [
+          "admin/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurgeDomainRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently purge a domain.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     }
   }
