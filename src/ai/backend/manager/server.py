@@ -359,6 +359,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".agent",
     ".domain",
     ".quota_scope",
+    ".user",
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
