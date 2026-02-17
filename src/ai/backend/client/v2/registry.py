@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from .domains.notification import NotificationClient
     from .domains.object_storage import ObjectStorageClient
     from .domains.operations import OperationsClient
+    from .domains.quota_scope import QuotaScopeClient
     from .domains.rbac import RBACClient
     from .domains.resource_policy import ResourcePolicyClient
     from .domains.scaling_group import ScalingGroupClient
@@ -115,6 +116,12 @@ class BackendAIClientRegistry:
         from .domains.fair_share import FairShareClient
 
         return FairShareClient(self._client)
+
+    @cached_property
+    def quota_scope(self) -> QuotaScopeClient:
+        from .domains.quota_scope import QuotaScopeClient
+
+        return QuotaScopeClient(self._client)
 
     @cached_property
     def rbac(self) -> RBACClient:
