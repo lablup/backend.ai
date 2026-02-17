@@ -8324,6 +8324,211 @@
         },
         "title": "SearchAgentsRequest",
         "type": "object"
+      },
+      "CreateNetworkRequest": {
+        "description": "Request to create a network.",
+        "properties": {
+          "name": {
+            "description": "Network name",
+            "title": "Name",
+            "type": "string"
+          },
+          "project_id": {
+            "description": "Project (group) ID to associate the network with",
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "driver": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Network driver plugin name",
+            "title": "Driver"
+          }
+        },
+        "required": [
+          "name",
+          "project_id"
+        ],
+        "title": "CreateNetworkRequest",
+        "type": "object"
+      },
+      "NetworkFilter": {
+        "description": "Filter for networks.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by name"
+          },
+          "driver": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by driver"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by project ID"
+          },
+          "domain_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by domain name"
+          }
+        },
+        "title": "NetworkFilter",
+        "type": "object"
+      },
+      "NetworkOrder": {
+        "description": "Order specification for networks.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/NetworkOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "NetworkOrder",
+        "type": "object"
+      },
+      "NetworkOrderField": {
+        "description": "Fields available for ordering networks.",
+        "enum": [
+          "name",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "NetworkOrderField",
+        "type": "string"
+      },
+      "SearchNetworksRequest": {
+        "description": "Request body for searching networks with filters, orders, and pagination.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NetworkFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NetworkOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum items to return",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Number of items to skip",
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "title": "SearchNetworksRequest",
+        "type": "object"
+      },
+      "UpdateNetworkRequest": {
+        "description": "Request to update a network.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated network name",
+            "title": "Name"
+          }
+        },
+        "title": "UpdateNetworkRequest",
+        "type": "object"
+      },
+      "DeleteNetworkRequest": {
+        "description": "Request to delete a network.",
+        "properties": {
+          "network_id": {
+            "description": "Network ID to delete",
+            "format": "uuid",
+            "title": "Network Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "network_id"
+        ],
+        "title": "DeleteNetworkRequest",
+        "type": "object"
       }
     }
   },
@@ -19346,6 +19551,158 @@
         },
         "parameters": [],
         "description": "Search agents with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/networks": {
+      "post": {
+        "operationId": "admin/networks.create",
+        "tags": [
+          "admin/networks"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNetworkRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Create a new network.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/networks/{network_id}": {
+      "get": {
+        "operationId": "admin/networks.get",
+        "tags": [
+          "admin/networks"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "network_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific network.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "admin/networks.update",
+        "tags": [
+          "admin/networks"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNetworkRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "network_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an existing network.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/networks/search": {
+      "post": {
+        "operationId": "admin/networks.search",
+        "tags": [
+          "admin/networks"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchNetworksRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search networks with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/networks/delete": {
+      "post": {
+        "operationId": "admin/networks.delete",
+        "tags": [
+          "admin/networks"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteNetworkRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Delete a network.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     }
   }
