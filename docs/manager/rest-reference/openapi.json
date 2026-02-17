@@ -3426,7 +3426,6 @@
         "type": "string"
       },
       "OrderDirection": {
-        "description": "Order direction for sorting.",
         "enum": [
           "asc",
           "desc"
@@ -8670,6 +8669,157 @@
           "name"
         ],
         "title": "PurgeDomainRequest",
+        "type": "object"
+      },
+      "QuotaScopeFilter": {
+        "properties": {
+          "quota_scope_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by quota scope ID"
+          },
+          "storage_host_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by storage host name"
+          }
+        },
+        "title": "QuotaScopeFilter",
+        "type": "object"
+      },
+      "QuotaScopeOrder": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/QuotaScopeOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "QuotaScopeOrder",
+        "type": "object"
+      },
+      "QuotaScopeOrderField": {
+        "enum": [
+          "quota_scope_id",
+          "storage_host_name"
+        ],
+        "title": "QuotaScopeOrderField",
+        "type": "string"
+      },
+      "SearchQuotaScopesRequest": {
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuotaScopeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/QuotaScopeOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum items to return",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Number of items to skip",
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "title": "SearchQuotaScopesRequest",
+        "type": "object"
+      },
+      "SetQuotaRequest": {
+        "properties": {
+          "storage_host_name": {
+            "description": "Storage host name",
+            "title": "Storage Host Name",
+            "type": "string"
+          },
+          "quota_scope_id": {
+            "description": "Quota scope ID (e.g. 'user:<uuid>' or 'project:<uuid>')",
+            "title": "Quota Scope Id",
+            "type": "string"
+          },
+          "hard_limit_bytes": {
+            "description": "Hard limit in bytes for the quota scope",
+            "title": "Hard Limit Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "storage_host_name",
+          "quota_scope_id",
+          "hard_limit_bytes"
+        ],
+        "title": "SetQuotaRequest",
+        "type": "object"
+      },
+      "UnsetQuotaRequest": {
+        "properties": {
+          "storage_host_name": {
+            "description": "Storage host name",
+            "title": "Storage Host Name",
+            "type": "string"
+          },
+          "quota_scope_id": {
+            "description": "Quota scope ID (e.g. 'user:<uuid>' or 'project:<uuid>')",
+            "title": "Quota Scope Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "storage_host_name",
+          "quota_scope_id"
+        ],
+        "title": "UnsetQuotaRequest",
         "type": "object"
       }
     }
@@ -19874,6 +20024,130 @@
         },
         "parameters": [],
         "description": "Permanently purge a domain.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/quota-scopes/{storage_host_name}/{quota_scope_id}": {
+      "get": {
+        "operationId": "admin/quota-scopes.get",
+        "tags": [
+          "admin/quota-scopes"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "storage_host_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "quota_scope_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/quota-scopes/search": {
+      "post": {
+        "operationId": "admin/quota-scopes.search",
+        "tags": [
+          "admin/quota-scopes"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchQuotaScopesRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/quota-scopes/set": {
+      "post": {
+        "operationId": "admin/quota-scopes.set_quota",
+        "tags": [
+          "admin/quota-scopes"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetQuotaRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/quota-scopes/unset": {
+      "post": {
+        "operationId": "admin/quota-scopes.unset_quota",
+        "tags": [
+          "admin/quota-scopes"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnsetQuotaRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     }
   }
