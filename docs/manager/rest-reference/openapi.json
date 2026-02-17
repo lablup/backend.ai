@@ -8821,6 +8821,675 @@
         ],
         "title": "UnsetQuotaRequest",
         "type": "object"
+      },
+      "UserRole": {
+        "enum": [
+          "superadmin",
+          "admin",
+          "user",
+          "monitor"
+        ],
+        "title": "UserRole",
+        "type": "string"
+      },
+      "UserStatus": {
+        "enum": [
+          "active",
+          "inactive",
+          "deleted",
+          "before-verification"
+        ],
+        "title": "UserStatus",
+        "type": "string"
+      },
+      "CreateUserRequest": {
+        "description": "Request to create a new user.",
+        "properties": {
+          "email": {
+            "description": "User email address",
+            "title": "Email",
+            "type": "string"
+          },
+          "username": {
+            "description": "Username",
+            "title": "Username",
+            "type": "string"
+          },
+          "password": {
+            "description": "User password",
+            "title": "Password",
+            "type": "string"
+          },
+          "need_password_change": {
+            "default": false,
+            "description": "Whether user needs to change password on first login",
+            "title": "Need Password Change",
+            "type": "boolean"
+          },
+          "domain_name": {
+            "description": "Domain the user belongs to",
+            "title": "Domain Name",
+            "type": "string"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Full name of the user",
+            "title": "Full Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "User description",
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "User account status"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserRole"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "User role"
+          },
+          "allowed_client_ip": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Allowed client IP addresses",
+            "title": "Allowed Client Ip"
+          },
+          "totp_activated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether TOTP is activated",
+            "title": "Totp Activated"
+          },
+          "resource_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Resource policy name",
+            "title": "Resource Policy"
+          },
+          "sudo_session_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether sudo session is enabled",
+            "title": "Sudo Session Enabled"
+          },
+          "container_uid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Container UID",
+            "title": "Container Uid"
+          },
+          "container_main_gid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Container main GID",
+            "title": "Container Main Gid"
+          },
+          "container_gids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Container additional GIDs",
+            "title": "Container Gids"
+          },
+          "group_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Group IDs to assign the user to",
+            "title": "Group Ids"
+          }
+        },
+        "required": [
+          "email",
+          "username",
+          "password",
+          "domain_name"
+        ],
+        "title": "CreateUserRequest",
+        "type": "object"
+      },
+      "UserFilter": {
+        "description": "Filter criteria for searching users.",
+        "properties": {
+          "uuid": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by user UUID"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by email"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by username"
+          },
+          "domain_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by domain name"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UserStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by user statuses",
+            "title": "Status"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UserRole"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by user roles",
+            "title": "Role"
+          }
+        },
+        "title": "UserFilter",
+        "type": "object"
+      },
+      "UserOrder": {
+        "description": "Order specification for user search results.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/UserOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "UserOrder",
+        "type": "object"
+      },
+      "UserOrderField": {
+        "enum": [
+          "created_at",
+          "modified_at",
+          "username",
+          "email",
+          "status",
+          "domain_name"
+        ],
+        "title": "UserOrderField",
+        "type": "string"
+      },
+      "SearchUsersRequest": {
+        "description": "Request body for searching users with filters, orders, and pagination.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UserOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum items to return",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Number of items to skip",
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "title": "SearchUsersRequest",
+        "type": "object"
+      },
+      "UpdateUserRequest": {
+        "description": "Request to update an existing user.",
+        "properties": {
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated username",
+            "title": "Username"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated password",
+            "title": "Password"
+          },
+          "need_password_change": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated need_password_change flag",
+            "title": "Need Password Change"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated full name",
+            "title": "Full Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated description",
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated user status"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserRole"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated user role"
+          },
+          "domain_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated domain name",
+            "title": "Domain Name"
+          },
+          "allowed_client_ip": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated allowed client IPs",
+            "title": "Allowed Client Ip"
+          },
+          "totp_activated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated TOTP activation status",
+            "title": "Totp Activated"
+          },
+          "resource_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated resource policy name",
+            "title": "Resource Policy"
+          },
+          "sudo_session_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated sudo session enabled flag",
+            "title": "Sudo Session Enabled"
+          },
+          "main_access_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated main access key",
+            "title": "Main Access Key"
+          },
+          "container_uid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated container UID",
+            "title": "Container Uid"
+          },
+          "container_main_gid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated container main GID",
+            "title": "Container Main Gid"
+          },
+          "container_gids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated container additional GIDs",
+            "title": "Container Gids"
+          },
+          "group_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated group IDs",
+            "title": "Group Ids"
+          }
+        },
+        "title": "UpdateUserRequest",
+        "type": "object"
+      },
+      "DeleteUserRequest": {
+        "description": "Request to delete (soft-delete) a user.",
+        "properties": {
+          "user_id": {
+            "description": "UUID of the user to delete",
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "DeleteUserRequest",
+        "type": "object"
+      },
+      "PurgeUserRequest": {
+        "description": "Request to purge (hard-delete) a user permanently.",
+        "properties": {
+          "user_id": {
+            "description": "UUID of the user to purge",
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          },
+          "purge_shared_vfolders": {
+            "default": false,
+            "description": "Whether to purge shared virtual folders",
+            "title": "Purge Shared Vfolders",
+            "type": "boolean"
+          },
+          "delegate_endpoint_ownership": {
+            "default": false,
+            "description": "Whether to delegate endpoint ownership",
+            "title": "Delegate Endpoint Ownership",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "PurgeUserRequest",
+        "type": "object"
       }
     }
   },
@@ -20148,6 +20817,187 @@
         },
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/users": {
+      "post": {
+        "operationId": "admin/users.create_user",
+        "tags": [
+          "admin/users"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Create a new user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/users/{user_id}": {
+      "get": {
+        "operationId": "admin/users.get_user",
+        "tags": [
+          "admin/users"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific user by ID.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "admin/users.update_user",
+        "tags": [
+          "admin/users"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an existing user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/users/search": {
+      "post": {
+        "operationId": "admin/users.search_users",
+        "tags": [
+          "admin/users"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchUsersRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search users with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/users/delete": {
+      "post": {
+        "operationId": "admin/users.delete_user",
+        "tags": [
+          "admin/users"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteUserRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Soft-delete a user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/users/purge": {
+      "post": {
+        "operationId": "admin/users.purge_user",
+        "tags": [
+          "admin/users"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurgeUserRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently purge a user and all associated resources.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     }
   }
