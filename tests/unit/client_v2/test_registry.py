@@ -21,6 +21,7 @@ from ai.backend.client.v2.domains.session import SessionClient
 from ai.backend.client.v2.domains.storage import StorageClient
 from ai.backend.client.v2.domains.streaming import StreamingClient
 from ai.backend.client.v2.domains.template import TemplateClient
+from ai.backend.client.v2.domains.user import UserClient
 from ai.backend.client.v2.domains.vfolder import VFolderClient
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 
@@ -60,6 +61,7 @@ class TestBackendAIClientRegistry:
         assert isinstance(registry.storage, StorageClient)
         assert isinstance(registry.object_storage, ObjectStorageClient)
         assert isinstance(registry.fair_share, FairShareClient)
+        assert isinstance(registry.user, UserClient)
 
     def test_domain_clients_inherit_base(self, registry: BackendAIClientRegistry) -> None:
         assert isinstance(registry.session, BaseDomainClient)
