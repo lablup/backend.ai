@@ -2957,6 +2957,213 @@
         "title": "ConvertSessionToImageResponseModel",
         "type": "object"
       },
+      "ImageFilter": {
+        "description": "Filter for images.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by image name"
+          },
+          "architecture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by architecture"
+          }
+        },
+        "title": "ImageFilter",
+        "type": "object"
+      },
+      "ImageOrder": {
+        "description": "Order specification for images.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/ImageOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "ImageOrder",
+        "type": "object"
+      },
+      "ImageOrderField": {
+        "description": "Fields available for ordering images.",
+        "enum": [
+          "name",
+          "created_at"
+        ],
+        "title": "ImageOrderField",
+        "type": "string"
+      },
+      "OrderDirection": {
+        "enum": [
+          "asc",
+          "desc"
+        ],
+        "title": "OrderDirection",
+        "type": "string"
+      },
+      "SearchImagesRequest": {
+        "description": "Request body for searching images with filters, orders, and pagination.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ImageOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum items to return",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Number of items to skip",
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "title": "SearchImagesRequest",
+        "type": "object"
+      },
+      "RescanImagesRequest": {
+        "description": "Request body for rescanning images from a registry.",
+        "properties": {
+          "canonical": {
+            "description": "Image canonical name to rescan",
+            "title": "Canonical",
+            "type": "string"
+          },
+          "architecture": {
+            "description": "Image architecture to rescan",
+            "title": "Architecture",
+            "type": "string"
+          }
+        },
+        "required": [
+          "canonical",
+          "architecture"
+        ],
+        "title": "RescanImagesRequest",
+        "type": "object"
+      },
+      "AliasImageRequest": {
+        "description": "Request body for creating an image alias.",
+        "properties": {
+          "image_id": {
+            "description": "ID of the image to alias",
+            "format": "uuid",
+            "title": "Image Id",
+            "type": "string"
+          },
+          "alias": {
+            "description": "Alias name to assign",
+            "title": "Alias",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_id",
+          "alias"
+        ],
+        "title": "AliasImageRequest",
+        "type": "object"
+      },
+      "DealiasImageRequest": {
+        "description": "Request body for removing an image alias.",
+        "properties": {
+          "alias": {
+            "description": "Alias name to remove",
+            "title": "Alias",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alias"
+        ],
+        "title": "DealiasImageRequest",
+        "type": "object"
+      },
+      "ForgetImageRequest": {
+        "description": "Request body for forgetting (soft-deleting) an image.",
+        "properties": {
+          "image_id": {
+            "description": "ID of the image to forget",
+            "format": "uuid",
+            "title": "Image Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_id"
+        ],
+        "title": "ForgetImageRequest",
+        "type": "object"
+      },
+      "PurgeImageRequest": {
+        "description": "Request body for purging (hard-deleting) an image.",
+        "properties": {
+          "image_id": {
+            "description": "ID of the image to purge",
+            "format": "uuid",
+            "title": "Image Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_id"
+        ],
+        "title": "PurgeImageRequest",
+        "type": "object"
+      },
       "GetPresignedUploadURLReq": {
         "properties": {
           "artifact_revision_id": {
@@ -3423,14 +3630,6 @@
           "updated_at"
         ],
         "title": "NotificationChannelOrderField",
-        "type": "string"
-      },
-      "OrderDirection": {
-        "enum": [
-          "asc",
-          "desc"
-        ],
-        "title": "OrderDirection",
         "type": "string"
       },
       "SearchNotificationChannelsRequest": {
@@ -16074,6 +16273,209 @@
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+      }
+    },
+    "/admin/images/search": {
+      "post": {
+        "operationId": "admin/images.search",
+        "tags": [
+          "admin/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchImagesRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search images with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/images/{image_id}": {
+      "get": {
+        "operationId": "admin/images.get",
+        "tags": [
+          "admin/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a single image by ID.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/images/rescan": {
+      "post": {
+        "operationId": "admin/images.rescan",
+        "tags": [
+          "admin/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescanImagesRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Rescan an image from the registry.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/images/alias": {
+      "post": {
+        "operationId": "admin/images.alias",
+        "tags": [
+          "admin/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AliasImageRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Create an image alias.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/images/dealias": {
+      "post": {
+        "operationId": "admin/images.dealias",
+        "tags": [
+          "admin/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DealiasImageRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Remove an image alias.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/images/forget": {
+      "post": {
+        "operationId": "admin/images.forget",
+        "tags": [
+          "admin/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgetImageRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Forget (soft-delete) an image.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/images/purge": {
+      "post": {
+        "operationId": "admin/images.purge",
+        "tags": [
+          "admin/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurgeImageRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge (hard-delete) an image.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/user-config/dotfiles": {
