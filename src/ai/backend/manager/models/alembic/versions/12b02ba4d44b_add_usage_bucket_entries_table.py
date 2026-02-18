@@ -1,6 +1,6 @@
 """add_usage_bucket_entries_table
 
-Revision ID: ba4308_usage_entries
+Revision ID: 12b02ba4d44b
 Revises: ccf8ae5c90fe
 Create Date: 2026-02-14 00:00:00.000000
 
@@ -12,7 +12,7 @@ from alembic import op
 from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
-revision = "ba4308_usage_entries"
+revision = "12b02ba4d44b"
 down_revision = "ccf8ae5c90fe"
 branch_labels = None
 depends_on = None
