@@ -8,10 +8,10 @@ import secrets
 import shutil
 import tempfile
 import textwrap
+import uuid
 from collections.abc import AsyncIterator, Iterator
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
-from functools import partial, update_wrapper
 from pathlib import Path
 from typing import Any
 
@@ -20,14 +20,12 @@ import pytest
 import sqlalchemy as sa
 import yarl
 from aiohttp import web
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio.engine import create_async_engine
 
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.config import ConfigurationError
 from ai.backend.common.jwt.validator import JWTValidator
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.logging import LocalLogger, LogLevel
@@ -39,14 +37,18 @@ from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
 from ai.backend.manager.config.bootstrap import BootstrapConfig
-from ai.backend.manager.models.base import (
-    pgsql_connect_opts,
-    populate_fixture,
-)
+from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.resource_policy import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+    keypair_resource_policies,
+)
+from ai.backend.manager.models.scaling_group import scaling_groups, sgroups_for_domains
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import users
@@ -75,6 +77,20 @@ __all__ = [
 here = Path(__file__).parent
 
 log = logging.getLogger("tests.integration.conftest")
+
+
+# Admin user UUID / keypair used by the admin_registry fixture
+ADMIN_USER_UUID = uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4")
+ADMIN_ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE"
+ADMIN_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+# Normal user UUID / keypair used by the user_registry fixture
+USER_UUID = uuid.UUID("dfa9da54-4b28-432f-be29-c0d680c7a412")
+USER_ACCESS_KEY = "AKIANABBDUSEREXAMPLE"
+USER_SECRET_KEY = "C8qnIo29EZvXkPK_MXcuAakYTy4NYrxwmCEyNPlf"
+
+# Default group UUID
+DEFAULT_GROUP_UUID = uuid.UUID("2de2b969-1d04-48a6-af16-0bc8adb3c831")
 
 
 @dataclass
@@ -190,7 +206,7 @@ def bootstrap_config(
 
     build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
 
-    bootstrap_config = BootstrapConfig.model_validate({
+    config = BootstrapConfig.model_validate({
         "etcd": {
             "namespace": test_id,
             "addr": {"host": etcd_addr.host, "port": etcd_addr.port},
@@ -233,53 +249,11 @@ def bootstrap_config(
         "logging": logging_config,
     })
 
-    def _override_if_exists(src: BaseModel, dst: BaseModel, key: str) -> None:
-        if key in src.model_fields_set:
-            setattr(dst, key, getattr(src, key))
-
-    try:
-        fs_bootstrap_config = asyncio.run(
-            BootstrapConfig.load_from_file(Path("dummy-manager.toml"))
-        )
-        bootstrap_config.etcd.addr = fs_bootstrap_config.etcd.addr
-        _override_if_exists(fs_bootstrap_config.etcd, bootstrap_config.etcd, "user")
-        _override_if_exists(fs_bootstrap_config.etcd, bootstrap_config.etcd, "password")
-        bootstrap_config.db.addr = fs_bootstrap_config.db.addr
-        _override_if_exists(fs_bootstrap_config.db, bootstrap_config.db, "user")
-        _override_if_exists(fs_bootstrap_config.db, bootstrap_config.db, "password")
-    except (ConfigurationError, FileNotFoundError):
-        pass
-    yield bootstrap_config
+    yield config
     try:
         shutil.rmtree(ipc_base_path)
     except OSError:
         pass
-
-
-# ---------------------------------------------------------------------------
-# Session-scope mock context fixtures (for build_root_app argument binding)
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="session")
-def mock_etcd_ctx(
-    bootstrap_config: BootstrapConfig,
-) -> Any:
-    argument_binding_ctx = partial(etcd_ctx, etcd_config=bootstrap_config.etcd.to_dataclass())
-    update_wrapper(argument_binding_ctx, etcd_ctx)
-    return argument_binding_ctx
-
-
-@pytest.fixture(scope="session")
-def mock_config_provider_ctx(
-    bootstrap_config: BootstrapConfig,
-) -> Any:
-    base_cfg = bootstrap_config.model_dump()
-    argument_binding_ctx = partial(
-        config_provider_ctx, log_level=LogLevel.DEBUG, config_path=None, extra_config=base_cfg
-    )
-    update_wrapper(argument_binding_ctx, config_provider_ctx)
-    return argument_binding_ctx
 
 
 # ---------------------------------------------------------------------------
@@ -298,10 +272,7 @@ def etcd_fixture(
 ) -> Iterator[None]:
     redis_addr = redis_container[1]
 
-    cli_ctx = CLIContext(
-        config_path=Path.cwd() / "dummy-manager.toml",
-        log_level=LogLevel.DEBUG,
-    )
+    cli_ctx = CLIContext(log_level=LogLevel.DEBUG)
     cli_ctx._bootstrap_config = bootstrap_config
     with tempfile.NamedTemporaryFile(mode="w", suffix=".etcd.json") as f:
         etcd_fixture_data = {
@@ -430,10 +401,7 @@ def database(request: Any, bootstrap_config: BootstrapConfig, test_db: str) -> N
     """
     ).strip()
 
-    cli_ctx = CLIContext(
-        config_path=Path.cwd() / "dummy-manager.toml",
-        log_level=LogLevel.DEBUG,
-    )
+    cli_ctx = CLIContext(log_level=LogLevel.DEBUG)
     cli_ctx._bootstrap_config = bootstrap_config
     test_db_url = db_url.with_path(test_db)
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf8") as alembic_cfg:
@@ -459,7 +427,7 @@ def database(request: Any, bootstrap_config: BootstrapConfig, test_db: str) -> N
 async def database_fixture(
     bootstrap_config: BootstrapConfig, test_db: str, database: None
 ) -> AsyncIterator[None]:
-    """Populate example fixture data into the database, then clean up after each test."""
+    """Populate minimal fixture data into the database, then clean up after each test."""
     db_url = (
         yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/{test_db}")
         .with_port(bootstrap_config.db.addr.port)
@@ -468,57 +436,200 @@ async def database_fixture(
     if bootstrap_config.db.password is not None:
         db_url = db_url.with_password(bootstrap_config.db.password)
 
-    build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
-
-    fixture_paths = [
-        build_root / "fixtures" / "manager" / "example-users.json",
-        build_root / "fixtures" / "manager" / "example-keypairs.json",
-        build_root / "fixtures" / "manager" / "example-set-user-main-access-keys.json",
-        build_root / "fixtures" / "manager" / "example-resource-presets.json",
-        build_root / "fixtures" / "manager" / "example-container-registries-harbor.json",
-    ]
-
-    async def init_fixture() -> None:
-        engine: SAEngine = create_async_engine(
-            str(db_url),
-            connect_args=pgsql_connect_opts,
-        )
-        try:
-            for fixture_path in fixture_paths:
-                with open(fixture_path, "rb") as fp:
-                    data = json.load(fp)
-                try:
-                    await populate_fixture(engine, data)
-                except ValueError:
-                    log.error("Failed to populate fixtures from %s", fixture_path)
-                    raise
-        finally:
-            await engine.dispose()
-
-    await init_fixture()
+    engine: SAEngine = create_async_engine(
+        str(db_url),
+        connect_args=pgsql_connect_opts,
+    )
+    try:
+        async with engine.begin() as conn:
+            # 1) domains
+            await conn.execute(
+                sa.insert(domains).values(
+                    name="default",
+                    description="The default domain",
+                    is_active=True,
+                    total_resource_slots={},
+                    allowed_vfolder_hosts={},
+                )
+            )
+            # 2) resource policies (user, project, keypair)
+            await conn.execute(
+                sa.insert(UserResourcePolicyRow.__table__).values(
+                    name="default",
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_session_count_per_model_session=10,
+                    max_customized_image_count=3,
+                )
+            )
+            await conn.execute(
+                sa.insert(ProjectResourcePolicyRow.__table__).values(
+                    name="default",
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_network_count=3,
+                )
+            )
+            await conn.execute(
+                sa.insert(keypair_resource_policies).values(
+                    name="default",
+                    default_for_unspecified="UNLIMITED",
+                    total_resource_slots={},
+                    max_session_lifetime=0,
+                    max_concurrent_sessions=5,
+                    max_containers_per_session=1,
+                    idle_timeout=3600,
+                    allowed_vfolder_hosts={},
+                )
+            )
+            # 3) scaling group + domain association
+            await conn.execute(
+                sa.insert(scaling_groups).values(
+                    name="default",
+                    description="The default agent scaling group",
+                    is_active=True,
+                    driver="static",
+                    driver_opts={},
+                    scheduler="fifo",
+                    scheduler_opts={},
+                )
+            )
+            await conn.execute(
+                sa.insert(sgroups_for_domains).values(
+                    scaling_group="default",
+                    domain="default",
+                )
+            )
+            # 4) groups (projects)
+            await conn.execute(
+                sa.insert(
+                    sa.table(
+                        "groups",
+                        sa.column("id"),
+                        sa.column("name"),
+                        sa.column("description"),
+                        sa.column("is_active"),
+                        sa.column("domain_name"),
+                        sa.column("resource_policy"),
+                        sa.column("total_resource_slots"),
+                        sa.column("allowed_vfolder_hosts"),
+                        sa.column("type"),
+                    )
+                ).values(
+                    id=str(DEFAULT_GROUP_UUID),
+                    name="default",
+                    description="The default user group",
+                    is_active=True,
+                    domain_name="default",
+                    resource_policy="default",
+                    total_resource_slots="{}",
+                    allowed_vfolder_hosts="{}",
+                    type="general",
+                )
+            )
+            # 5) users (admin + normal user)
+            await conn.execute(
+                sa.insert(users).values([
+                    {
+                        "uuid": str(ADMIN_USER_UUID),
+                        "username": "admin",
+                        "email": "admin@lablup.com",
+                        "password": "wJalrXUt",
+                        "need_password_change": False,
+                        "full_name": "Admin Lablup",
+                        "description": "Lablup's Admin Account",
+                        "status": "active",
+                        "status_info": "admin-requested",
+                        "domain_name": "default",
+                        "resource_policy": "default",
+                        "role": "superadmin",
+                    },
+                    {
+                        "uuid": str(USER_UUID),
+                        "username": "user",
+                        "email": "user@lablup.com",
+                        "password": "C8qnIo29",
+                        "need_password_change": False,
+                        "full_name": "User Lablup",
+                        "description": "Lablup's User Account",
+                        "status": "active",
+                        "status_info": "admin-requested",
+                        "domain_name": "default",
+                        "resource_policy": "default",
+                        "role": "user",
+                    },
+                ])
+            )
+            # 6) keypairs
+            await conn.execute(
+                sa.insert(keypairs).values([
+                    {
+                        "user_id": "admin@lablup.com",
+                        "access_key": ADMIN_ACCESS_KEY,
+                        "secret_key": ADMIN_SECRET_KEY,
+                        "is_active": True,
+                        "resource_policy": "default",
+                        "rate_limit": 30000,
+                        "num_queries": 0,
+                        "is_admin": True,
+                        "user": str(ADMIN_USER_UUID),
+                    },
+                    {
+                        "user_id": "user@lablup.com",
+                        "access_key": USER_ACCESS_KEY,
+                        "secret_key": USER_SECRET_KEY,
+                        "is_active": True,
+                        "resource_policy": "default",
+                        "rate_limit": 30000,
+                        "num_queries": 0,
+                        "is_admin": False,
+                        "user": str(USER_UUID),
+                    },
+                ])
+            )
+            # 7) association_groups_users
+            await conn.execute(
+                sa.insert(association_groups_users).values([
+                    {
+                        "group_id": str(DEFAULT_GROUP_UUID),
+                        "user_id": str(ADMIN_USER_UUID),
+                    },
+                    {
+                        "group_id": str(DEFAULT_GROUP_UUID),
+                        "user_id": str(USER_UUID),
+                    },
+                ])
+            )
+    finally:
+        await engine.dispose()
 
     yield
 
-    async def clean_fixture() -> None:
-        engine: SAEngine = create_async_engine(
-            str(db_url),
-            connect_args=pgsql_connect_opts,
-        )
-        try:
-            async with engine.begin() as conn:
-                await conn.execute(vfolders.delete())
-                await conn.execute(kernels.delete())
-                await conn.execute(SessionRow.__table__.delete())
-                await conn.execute(session_templates.delete())
-                await conn.execute(keypairs.delete())
-                await conn.execute(users.delete())
-                await conn.execute(domains.delete())
-                await conn.execute(ImageAliasRow.__table__.delete())
-                await conn.execute(ImageRow.__table__.delete())
-        finally:
-            await engine.dispose()
-
-    await clean_fixture()
+    # Cleanup: delete rows inserted above (reverse FK order)
+    engine = create_async_engine(
+        str(db_url),
+        connect_args=pgsql_connect_opts,
+    )
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(vfolders.delete())
+            await conn.execute(kernels.delete())
+            await conn.execute(SessionRow.__table__.delete())
+            await conn.execute(session_templates.delete())
+            await conn.execute(association_groups_users.delete())
+            await conn.execute(keypairs.delete())
+            await conn.execute(users.delete())
+            await conn.execute(sgroups_for_domains.delete())
+            await conn.execute(scaling_groups.delete())
+            await conn.execute(sa.text("DELETE FROM groups"))
+            await conn.execute(domains.delete())
+            await conn.execute(keypair_resource_policies.delete())
+            await conn.execute(UserResourcePolicyRow.__table__.delete())
+            await conn.execute(ProjectResourcePolicyRow.__table__.delete())
+            await conn.execute(ImageAliasRow.__table__.delete())
+            await conn.execute(ImageRow.__table__.delete())
+    finally:
+        await engine.dispose()
 
 
 @pytest.fixture()
@@ -589,8 +700,8 @@ async def admin_registry(server_factory: ServerInfo) -> AsyncIterator[BackendAIC
     """Create a BackendAIClientRegistry with superadmin keypair."""
     config = ClientConfig(endpoint=yarl.URL(server_factory.url))
     auth = HMACAuth(
-        access_key="AKIAIOSFODNN7EXAMPLE",
-        secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+        access_key=ADMIN_ACCESS_KEY,
+        secret_key=ADMIN_SECRET_KEY,
     )
     registry = await BackendAIClientRegistry.create(config, auth)
     try:
@@ -604,8 +715,8 @@ async def user_registry(server_factory: ServerInfo) -> AsyncIterator[BackendAICl
     """Create a BackendAIClientRegistry with normal-user keypair."""
     config = ClientConfig(endpoint=yarl.URL(server_factory.url))
     auth = HMACAuth(
-        access_key="AKIANABBDUSEREXAMPLE",
-        secret_key="C8qnIo29EZvXkPK_MXcuAakYTy4NYrxwmCEyNPlf",
+        access_key=USER_ACCESS_KEY,
+        secret_key=USER_SECRET_KEY,
     )
     registry = await BackendAIClientRegistry.create(config, auth)
     try:
