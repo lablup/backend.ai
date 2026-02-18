@@ -1,6 +1,1 @@
-python_test_utils(
-    sources=[
-        "*.py",
-        "!test_*.py",
-    ],
-)
+python_test_utils()
