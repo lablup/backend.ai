@@ -309,11 +309,11 @@ GLOBAL_SCOPE_ID = "global"
 
 
 class RBACNodeType(enum.StrEnum):
-    """Unified RBAC node type.
+    """Unified type for the RBAC scope-entity relationship model.
 
-    Each value represents a node in the RBAC entity relationship graph.
-    The same node can serve as both scope (parent) and entity (child)
-    depending on the edge direction.
+    Each value identifies a participant in the RBAC permission hierarchy
+    that can act as a scope (parent) or an entity (child) depending on
+    the relationship direction.
 
     This enum replaces the separate ``ScopeType`` and RBAC-subset of
     ``EntityType`` with a single unified type.
