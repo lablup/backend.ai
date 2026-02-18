@@ -2427,24 +2427,12 @@ class ScheduleDBSource:
                     raise ImageNotFound
 
     async def update_sessions_to_running(self, sessions_data: list[SessionRunningData]) -> None:
-        """
-        Update sessions with occupying_slots.
+        """No-op after Phase 3 (BA-4308).
 
-        Note: Status transition is handled by the Coordinator via SessionStatusBatchUpdaterSpec.
-        This method only updates the occupying_slots field.
+        Previously wrote sessions.occupying_slots JSONB.  The column is now
+        deprecated — resource allocations are tracked via the normalized
+        resource_allocations / agent_resources tables.
         """
-        if not sessions_data:
-            return
-
-        async with self._begin_session_read_committed() as db_sess:
-            # Update each session individually with its calculated occupying_slots
-            for session_data in sessions_data:
-                stmt = (
-                    sa.update(SessionRow)
-                    .where(SessionRow.id == session_data.session_id)
-                    .values(occupying_slots=session_data.occupying_slots)
-                )
-                await db_sess.execute(stmt)
 
     async def _resolve_image_configs(
         self, db_sess: SASession, unique_images: set[ImageIdentifier]
@@ -3165,6 +3153,7 @@ class ScheduleDBSource:
         if not slots:
             return 0
         ar = AgentResourceRow.__table__
+        allocated_count = 0
         async with self._begin_session_read_committed() as db_sess:
             for s in slots:
                 await db_sess.execute(
@@ -3190,7 +3179,121 @@ class ScheduleDBSource:
                     raise AgentResourceCapacityExceeded(
                         f"Agent {agent_id}: capacity exceeded for slot '{s.slot_name}'"
                     )
-            return len(slots)
+                allocated_count += 1
+            return allocated_count
+
+    async def allocate_session_kernel_resources(
+        self,
+        allocations: Sequence[tuple[UUID, str, Sequence[SlotQuantity]]],
+    ) -> int:
+        """Allocate resources for multiple kernels in a single transaction.
+
+        This ensures all-or-nothing semantics: if any kernel's allocation fails,
+        all allocations in this batch are rolled back.
+
+        Each individual kernel allocation is idempotent (used_at IS NULL guard).
+
+        Args:
+            allocations: List of (kernel_id, agent_id, slots) tuples.
+
+        Returns:
+            Total number of slots allocated across all kernels.
+
+        Raises:
+            AgentResourceCapacityExceeded: If any slot would exceed agent capacity.
+        """
+        if not allocations:
+            return 0
+        ar = AgentResourceRow.__table__
+        total_allocated = 0
+        async with self._begin_session_read_committed() as db_sess:
+            for kernel_id, agent_id, slots in allocations:
+                for s in slots:
+                    alloc_result = await db_sess.execute(
+                        sa.update(ResourceAllocationRow)
+                        .where(
+                            ResourceAllocationRow.kernel_id == kernel_id,
+                            ResourceAllocationRow.slot_name == s.slot_name,
+                            ResourceAllocationRow.free_at.is_(None),
+                            ResourceAllocationRow.used_at.is_(None),
+                        )
+                        .values(used=s.quantity, used_at=sa.func.now())
+                    )
+                    if cast(CursorResult[Any], alloc_result).rowcount == 0:
+                        continue
+                    new_used = ar.c.used + s.quantity
+                    result = await db_sess.execute(
+                        sa.update(ar)
+                        .where(
+                            ar.c.agent_id == agent_id,
+                            ar.c.slot_name == s.slot_name,
+                            new_used <= ar.c.capacity,
+                        )
+                        .values(used=new_used)
+                    )
+                    if cast(CursorResult[Any], result).rowcount == 0:
+                        raise AgentResourceCapacityExceeded(
+                            f"Agent {agent_id}: capacity exceeded for slot '{s.slot_name}'"
+                        )
+                    total_allocated += 1
+            return total_allocated
+
+    async def update_running_and_allocate_resources(
+        self,
+        sessions_data: list[SessionRunningData],
+        allocations: Sequence[tuple[UUID, str, Sequence[SlotQuantity]]],
+    ) -> int:
+        """Atomically update session occupying_slots AND allocate kernel resources.
+
+        Single transaction guarantees:
+        - If allocation fails, session update is also rolled back.
+        - Idempotent per kernel (used_at IS NULL guard).
+
+        Returns:
+            Total number of slots allocated across all kernels.
+
+        Raises:
+            AgentResourceCapacityExceeded: If any slot would exceed agent capacity.
+        """
+        ar = AgentResourceRow.__table__
+        total_allocated = 0
+        async with self._begin_session_read_committed() as db_sess:
+            # Phase 3 (BA-4308): Legacy JSONB write to sessions.occupying_slots
+            # removed.  The sessions.occupying_slots column is retained for
+            # historical audit but no longer written to.  Resource allocations
+            # are tracked via the normalized tables below.
+
+            # Allocate kernel resources
+            for kernel_id, agent_id, slots in allocations:
+                for s in slots:
+                    alloc_result = await db_sess.execute(
+                        sa.update(ResourceAllocationRow)
+                        .where(
+                            ResourceAllocationRow.kernel_id == kernel_id,
+                            ResourceAllocationRow.slot_name == s.slot_name,
+                            ResourceAllocationRow.free_at.is_(None),
+                            ResourceAllocationRow.used_at.is_(None),
+                        )
+                        .values(used=s.quantity, used_at=sa.func.now())
+                    )
+                    if cast(CursorResult[Any], alloc_result).rowcount == 0:
+                        continue
+                    new_used = ar.c.used + s.quantity
+                    result = await db_sess.execute(
+                        sa.update(ar)
+                        .where(
+                            ar.c.agent_id == agent_id,
+                            ar.c.slot_name == s.slot_name,
+                            new_used <= ar.c.capacity,
+                        )
+                        .values(used=new_used)
+                    )
+                    if cast(CursorResult[Any], result).rowcount == 0:
+                        raise AgentResourceCapacityExceeded(
+                            f"Agent {agent_id}: capacity exceeded for slot '{s.slot_name}'"
+                        )
+                    total_allocated += 1
+            return total_allocated
 
     async def free_kernel_resources(
         self,

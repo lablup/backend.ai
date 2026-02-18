@@ -1207,28 +1207,16 @@ class AgentRegistry:
                 else:  # something's wrong; just fall back to requested slot value
                     actual_allocated_slots += kernel_agent_binding.kernel.requested_slots
 
-            # perform DB update only if requested slots and actual allocated value differs
+            # Phase 3 (BA-4308): Legacy JSONB write to agents.occupied_slots removed.
+            # Agent occupied slots are now solely managed by the normalized
+            # agent_resources table.  The agents.occupied_slots JSONB column is
+            # retained for historical audit but no longer written to.
             if actual_allocated_slots != requested_slots:
-                log.debug("calibrating resource slot usage for agent {}", agent_id)
-
-                async def _update_agent_resource() -> None:
-                    async with self.db.begin_session() as db_sess:
-                        select_query = sa.select(AgentRow.occupied_slots).where(
-                            AgentRow.id == agent_id
-                        )
-                        result = await db_sess.execute(select_query)
-                        occupied_slots = result.scalar() or ResourceSlot({})
-                        diff = actual_allocated_slots - requested_slots
-                        update_query = (
-                            sa.update(AgentRow)
-                            .values(
-                                occupied_slots=ResourceSlot.from_json(occupied_slots) + diff,
-                            )
-                            .where(AgentRow.id == agent_id)
-                        )
-                        await db_sess.execute(update_query)
-
-                await execute_with_retry(_update_agent_resource)
+                log.debug(
+                    "agent {} has slot calibration diff (requested != actual); "
+                    "agent_resources table is the source of truth",
+                    agent_id,
+                )
 
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
         async def _recalc() -> Mapping[AccessKey, ConcurrencyUsed]:
