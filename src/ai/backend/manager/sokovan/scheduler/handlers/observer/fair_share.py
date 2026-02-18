@@ -218,7 +218,7 @@ class FairShareObserver(KernelObserver):
 
             # Update capacity on normalized bucket entries
             if context.cluster_capacity:
-                capacity_by_slot = {sq.slot_name: sq.quantity for sq in context.cluster_capacity}
+                capacity_by_slot = dict(context.cluster_capacity.items())
                 await self._resource_usage_repository.update_bucket_entry_capacities(
                     scaling_group,
                     capacity_by_slot,

@@ -3153,6 +3153,7 @@ class ScheduleDBSource:
         if not slots:
             return 0
         ar = AgentResourceRow.__table__
+        allocated_count = 0
         async with self._begin_session_read_committed() as db_sess:
             for s in slots:
                 await db_sess.execute(
