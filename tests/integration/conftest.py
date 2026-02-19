@@ -69,12 +69,14 @@ from ai.backend.manager.server import (
     global_subapp_pkgs,
     webapp_plugin_ctx,
 )
-from ai.backend.testutils.bootstrap import (  # noqa: F401
-    etcd_container,
-    postgres_container,
-    redis_container,
-)
 from ai.backend.testutils.pants import get_parallel_slot
+
+# Import testcontainer fixtures (etcd_container, redis_container, postgres_container)
+# via pytest_plugins so they are registered as fixtures without triggering
+# F401 (unused-import) or F811 (redefined-while-unused) lint errors.
+pytest_plugins = [
+    "ai.backend.testutils.bootstrap",
+]
 
 log = logging.getLogger("tests.integration.conftest")
 
@@ -196,9 +198,9 @@ def bootstrap_config(
     test_id: str,
     ipc_base_path: Path,
     logging_config: LoggingConfig,
-    etcd_container: tuple[str, HostPortPairModel],  # noqa: F811
-    redis_container: tuple[str, HostPortPairModel],  # noqa: F811
-    postgres_container: tuple[str, HostPortPairModel],  # noqa: F811
+    etcd_container: tuple[str, HostPortPairModel],
+    redis_container: tuple[str, HostPortPairModel],
+    postgres_container: tuple[str, HostPortPairModel],
     test_db: str,
 ) -> Iterator[BootstrapConfig]:
     etcd_addr = etcd_container[1]
@@ -206,6 +208,11 @@ def bootstrap_config(
 
     build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
 
+    # NOTE: model_validate() is used for Pydantic config models below because
+    # mypy does not recognize fields with default/default_factory as optional
+    # constructor args, causing [call-arg] errors with direct instantiation.
+    # model_construct() was also considered but it skips validation and does
+    # not populate default values for missing fields, making it unsuitable.
     config = BootstrapConfig(
         etcd=EtcdConfig.model_validate({
             "namespace": test_id,
@@ -265,7 +272,7 @@ def bootstrap_config(
 def etcd_fixture(
     test_id: str,
     bootstrap_config: BootstrapConfig,
-    redis_container: tuple[str, HostPortPairModel],  # noqa: F811
+    redis_container: tuple[str, HostPortPairModel],
     vfolder_mount: Path,
     vfolder_fsprefix: Path,
     vfolder_host: str,
@@ -673,6 +680,9 @@ async def server_factory(
 
         # Create ManagerConfigProvider directly, bypassing the production
         # config loading pipeline (LoaderChain, TOML parsing, etcd watcher).
+        # NOTE: model_validate() is used instead of direct construction because
+        # ManagerUnifiedConfig has fields with default_factory (e.g. service_discovery,
+        # artifact_registry) that mypy does not recognize as optional constructor args.
         unified_config = ManagerUnifiedConfig.model_validate({
             "db": bootstrap_config.db,
             "etcd": bootstrap_config.etcd,
