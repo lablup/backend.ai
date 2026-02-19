@@ -1050,7 +1050,7 @@ input ClusterConfigInput {
   size: Int!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. Cluster mode for compute sessions and deployments."""
 enum ClusterMode {
   SINGLE_NODE
   MULTI_NODE
@@ -3044,7 +3044,7 @@ type KernelV2LifecycleInfo {
   status: KernelV2Status!
 
   """The result of the kernel execution (UNDEFINED, SUCCESS, FAILURE)."""
-  result: SessionResult!
+  result: SessionV2Result!
 
   """Timestamp when the kernel was created."""
   createdAt: DateTime
@@ -3153,6 +3153,62 @@ type KernelV2UserInfo {
 
   """The group (project) ID this kernel belongs to."""
   groupId: UUID
+}
+
+"""
+Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.
+"""
+type KernelV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Startup command executed when the kernel starts."""
+  startupCommand: String
+
+  """Information about the session this kernel belongs to."""
+  sessionInfo: KernelSessionInfo!
+
+  """User and ownership information."""
+  userInfo: KernelUserInfo!
+
+  """Network configuration and exposed ports."""
+  network: KernelNetworkInfo!
+
+  """Cluster configuration for distributed computing."""
+  cluster: KernelClusterInfo!
+
+  """Resource allocation and agent information."""
+  resource: KernelResourceInfo!
+
+  """Lifecycle status and timestamps."""
+  lifecycle: KernelLifecycleInfo!
+
+  """Added in 26.2.0. The agent running this kernel."""
+  agent: AgentV2
+
+  """Added in 26.2.0. The user who owns this kernel."""
+  user: UserV2
+
+  """Added in 26.2.0. The project this kernel belongs to."""
+  project: ProjectV2
+
+  """Added in 26.2.0. The domain this kernel belongs to."""
+  domain: DomainV2
+
+  """Added in 26.2.0. The resource group this kernel is assigned to."""
+  resourceGroup: ResourceGroup
+
+  """Added in 26.2.0. The session this kernel belongs to."""
+  session: SessionV2
+}
+
+"""An edge in a connection."""
+type KernelV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KernelV2!
 }
 
 """
@@ -5179,6 +5235,9 @@ type Query {
   """Added in 25.19.0. List routes for a deployment with optional filters."""
   routes(deploymentId: ID!, filter: RouteFilter = null, orderBy: [RouteOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteConnection
 
+  """Added in 26.2.0. Query sessions with pagination and filtering."""
+  adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
+
   """List session scheduling history (superadmin only)"""
   sessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection @deprecated(reason: "Use admin_session_scheduling_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
@@ -6250,12 +6309,6 @@ type ServicePorts {
   entries: [ServicePortEntry!]!
 }
 
-enum SessionResult {
-  UNDEFINED
-  SUCCESS
-  FAILURE
-}
-
 """Session scheduling history record"""
 type SessionSchedulingHistory implements Node {
   """The Globally Unique ID of this object"""
@@ -6326,6 +6379,225 @@ input SessionScope {
 }
 
 enum SessionTypes {
+  INTERACTIVE
+  BATCH
+  INFERENCE
+  SYSTEM
+}
+
+"""Added in 26.2.0. Represents a compute session in Backend.AI."""
+type SessionV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Metadata including domain, project, and user information."""
+  metadata: SessionV2MetadataInfo!
+
+  """Resource allocation and cluster information."""
+  resource: SessionV2ResourceInfo!
+
+  """Lifecycle status and timestamps."""
+  lifecycle: SessionV2LifecycleInfo!
+
+  """Runtime execution configuration."""
+  runtime: SessionV2RuntimeInfo!
+
+  """Network configuration."""
+  network: SessionV2NetworkInfo!
+
+  """Added in 26.2.0. The domain this session belongs to."""
+  domain: DomainV2
+
+  """Added in 26.2.0. The user who owns this session."""
+  user: UserV2
+
+  """Added in 26.2.0. The project this session belongs to."""
+  project: ProjectV2
+
+  """Added in 26.2.0. The resource group this session is assigned to."""
+  resourceGroup: ResourceGroup
+
+  """
+  Added in 26.2.0. The candidate resource groups considered during scheduling.
+  """
+  targetResourceGroups: ResourceGroupConnection
+
+  """
+  Added in 26.2.0. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
+  """
+  images: ImageConnectionV2!
+
+  """Added in 26.2.0. The kernels belonging to this session."""
+  kernels: KernelConnectionV2!
+}
+
+"""Added in 26.2.0. Connection type for paginated session results."""
+type SessionV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [SessionV2Edge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type SessionV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: SessionV2!
+}
+
+"""Added in 26.2.0. Filter criteria for querying sessions."""
+input SessionV2Filter {
+  id: UUIDFilter = null
+  status: SessionV2StatusFilter = null
+  name: String = null
+  domainName: String = null
+  projectId: UUIDFilter = null
+  userUuid: UUIDFilter = null
+}
+
+"""Added in 26.2.0. Lifecycle status and timestamps for a session."""
+type SessionV2LifecycleInfo {
+  """Current status of the session."""
+  status: SessionV2Status!
+
+  """Result of the session execution (success, failure, etc.)."""
+  result: SessionV2Result!
+
+  """Timestamp when the session was created."""
+  createdAt: DateTime
+
+  """Timestamp when the session was terminated. Null if still active."""
+  terminatedAt: DateTime
+
+  """Scheduled start time for the session, if applicable."""
+  startsAt: DateTime
+
+  """Batch execution timeout in seconds. Applicable to batch sessions."""
+  batchTimeout: Int
+}
+
+"""Added in 26.2.0. Metadata information for a session."""
+type SessionV2MetadataInfo {
+  """Server-generated unique token for tracking session creation."""
+  creationId: String!
+
+  """Human-readable name of the session."""
+  name: String!
+
+  """Type of the session (interactive, batch, inference)."""
+  sessionType: SessionV2Type!
+
+  """Access key used to create this session."""
+  accessKey: String!
+
+  """Cluster mode for distributed sessions (single-node, multi-node)."""
+  clusterMode: ClusterMode!
+
+  """Number of nodes in the cluster."""
+  clusterSize: Int!
+
+  """Scheduling priority of the session."""
+  priority: Int!
+
+  """Timestamp when the session was created."""
+  createdAt: DateTime
+
+  """Optional user-provided tag for the session."""
+  tag: String
+}
+
+"""Added in 26.2.0. Network configuration for a session."""
+type SessionV2NetworkInfo {
+  """Whether the session uses the host network directly."""
+  useHostNetwork: Boolean!
+
+  """Type of network used by the session."""
+  networkType: String
+
+  """ID of the network if applicable."""
+  networkId: String
+}
+
+"""Added in 26.2.0. Ordering specification for sessions."""
+input SessionV2OrderBy {
+  field: SessionV2OrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.2.0. Fields available for ordering sessions."""
+enum SessionV2OrderField {
+  CREATED_AT
+  TERMINATED_AT
+  STATUS
+  ID
+  NAME
+}
+
+"""Added in 26.2.0. Resource allocation information for a session."""
+type SessionV2ResourceInfo {
+  """Resource allocation with requested and occupied slots."""
+  allocation: ResourceAllocation!
+
+  """The resource group (scaling group) this session is assigned to."""
+  resourceGroupName: String
+
+  """Candidate resource group names considered during scheduling."""
+  targetResourceGroupNames: [String!]
+}
+
+"""
+Added in 26.2.0. Result status of a session or kernel execution. Indicates the final outcome after the session/kernel has terminated. UNDEFINED: The session has not yet finished or its result is unknown. SUCCESS: The session completed normally without errors. FAILURE: The session terminated abnormally due to an error or user cancellation.
+"""
+enum SessionV2Result {
+  UNDEFINED
+  SUCCESS
+  FAILURE
+}
+
+"""Added in 26.2.0. Runtime execution configuration for a session."""
+type SessionV2RuntimeInfo {
+  """Environment variables for the session."""
+  environ: EnvironmentVariables
+
+  """Bootstrap script to run before the main process."""
+  bootstrapScript: String
+
+  """Startup command to execute when the session starts."""
+  startupCommand: String
+
+  """
+  URL to call back when the session completes (e.g., for batch sessions).
+  """
+  callbackUrl: String
+}
+
+"""Added in 26.2.0. Status of a session in its lifecycle."""
+enum SessionV2Status {
+  PENDING
+  SCHEDULED
+  PREPARING
+  PREPARED
+  CREATING
+  RUNNING
+  DEPRIORITIZING
+  TERMINATING
+  TERMINATED
+  CANCELLED
+}
+
+"""Added in 26.2.0. Filter for session status."""
+input SessionV2StatusFilter {
+  in: [SessionV2Status!] = null
+  notIn: [SessionV2Status!] = null
+}
+
+"""Added in 26.2.0. Type of compute session."""
+enum SessionV2Type {
   INTERACTIVE
   BATCH
   INFERENCE

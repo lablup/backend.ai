@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
-from enum import StrEnum
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 from uuid import UUID
@@ -23,6 +22,7 @@ from ai.backend.manager.api.gql.base import (
     to_global_id,
 )
 from ai.backend.manager.api.gql.common.types import (
+    ClusterModeGQL,
     ResourceOptsGQL,
     ResourceOptsInput,
 )
@@ -62,12 +62,6 @@ MountPermission: type[CommonMountPermission] = strawberry.enum(
     name="MountPermission",
     description="Added in 25.19.0. This enum represents the permission level for a mounted volume. It can be ro, rw, wd",
 )
-
-
-@strawberry.enum(description="Added in 25.19.0")
-class ClusterMode(StrEnum):
-    SINGLE_NODE = "SINGLE_NODE"
-    MULTI_NODE = "MULTI_NODE"
 
 
 @strawberry.type(
@@ -215,13 +209,13 @@ class ClusterConfig:
     Defines the clustering mode and number of replicas.
     """
 
-    mode: ClusterMode = strawberry.field(description="The clustering mode (e.g., SINGLE_NODE).")
+    mode: ClusterModeGQL = strawberry.field(description="The clustering mode (e.g., SINGLE_NODE).")
     size: int = strawberry.field(description="Number of replicas in the cluster.")
 
     @classmethod
     def from_dataclass(cls, data: ClusterConfigData) -> ClusterConfig:
         return cls(
-            mode=ClusterMode(data.mode.name),
+            mode=ClusterModeGQL(data.mode.name),
             size=data.size,
         )
 
@@ -402,7 +396,7 @@ class ActivateRevisionPayloadGQL:
 # Input Types
 @strawberry.input(description="Added in 25.19.0")
 class ClusterConfigInput:
-    mode: ClusterMode
+    mode: ClusterModeGQL
     size: int
 
 

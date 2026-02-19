@@ -23,7 +23,7 @@ from ai.backend.manager.api.gql.notification.types import (
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
-from ai.backend.manager.api.gql.session import Session
+from ai.backend.manager.api.gql.session_federation import Session
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.api.gql.vfolder import VFolder
 

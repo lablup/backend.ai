@@ -6,17 +6,18 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self
 from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.common.types import AgentId, KernelId, SessionResult, SessionTypes
+from ai.backend.common.types import AgentId, KernelId, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.session.types import SessionV2GQL
     from ai.backend.manager.repositories.base import QueryCondition
 
 from ai.backend.manager.api.gql.agent.types import AgentV2GQL
@@ -24,6 +25,7 @@ from ai.backend.manager.api.gql.common.types import (
     ResourceOptsGQL,
     ServicePortEntryGQL,
     ServicePortsGQL,
+    SessionV2ResultGQL,
 )
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
@@ -340,7 +342,7 @@ class KernelV2LifecycleInfoGQL:
             Indicates the kernel's position in its lifecycle.
         """)
     )
-    result: SessionResult = strawberry.field(
+    result: SessionV2ResultGQL = strawberry.field(
         description="The result of the kernel execution (UNDEFINED, SUCCESS, FAILURE)."
     )
     created_at: datetime | None = strawberry.field(
@@ -372,7 +374,7 @@ class KernelV2GQL(Node):
     )
 
     # Sub-info types
-    session: KernelV2SessionInfoGQL = strawberry.field(
+    session_info: KernelV2SessionInfoGQL = strawberry.field(
         description="Information about the session this kernel belongs to."
     )
     user_info: KernelV2UserInfoGQL = strawberry.field(description="User and ownership information.")
@@ -448,6 +450,20 @@ class KernelV2GQL(Node):
             return None
         return ResourceGroupGQL.from_dataclass(resource_group_data)
 
+    @strawberry.field(  # type: ignore[misc]
+        description="Added in 26.2.0. The session this kernel belongs to."
+    )
+    async def session(
+        self,
+    ) -> (
+        Annotated[
+            SessionV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.session.types"),
+        ]
+        | None
+    ):
+        raise NotImplementedError
+
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
@@ -491,7 +507,7 @@ class KernelV2GQL(Node):
         return cls(
             id=ID(str(kernel_info.id)),
             startup_command=kernel_info.runtime.startup_command,
-            session=KernelV2SessionInfoGQL(
+            session_info=KernelV2SessionInfoGQL(
                 session_id=UUID(kernel_info.session.session_id),
                 creation_id=kernel_info.session.creation_id,
                 name=kernel_info.session.name,
@@ -526,7 +542,7 @@ class KernelV2GQL(Node):
             ),
             lifecycle=KernelV2LifecycleInfoGQL(
                 status=KernelV2StatusGQL.from_internal(kernel_info.lifecycle.status),
-                result=SessionResult(kernel_info.lifecycle.result),
+                result=SessionV2ResultGQL.from_internal(kernel_info.lifecycle.result),
                 created_at=kernel_info.lifecycle.created_at,
                 terminated_at=kernel_info.lifecycle.terminated_at,
                 starts_at=kernel_info.lifecycle.starts_at,
