@@ -5,10 +5,6 @@ from __future__ import annotations
 import enum
 
 
-class RBACTypeConversionError(ValueError):
-    """Raised when an RBAC enum value cannot be converted to another RBAC enum type."""
-
-
 class PermissionStatus(enum.StrEnum):
     ACTIVE = "active"
     # 'inactive' status is used when the permission is temporarily disabled
@@ -275,6 +271,8 @@ class EntityType(enum.StrEnum):
         return {*cls._resource_types(), cls.USER}
 
     def to_element(self) -> RBACElementType:
+        from ai.backend.common.exception import RBACTypeConversionError
+
         try:
             return RBACElementType(self.value)
         except ValueError:
@@ -317,6 +315,8 @@ class ScopeType(enum.StrEnum):
     ROLE = "role"
 
     def to_element(self) -> RBACElementType:
+        from ai.backend.common.exception import RBACTypeConversionError
+
         try:
             return RBACElementType(self.value)
         except ValueError:
@@ -381,6 +381,8 @@ class RBACElementType(enum.StrEnum):
 
         TODO: Remove after the RBAC ORM migration and ScopeType removal are complete.
         """
+        from ai.backend.common.exception import RBACTypeConversionError
+
         try:
             return ScopeType(self.value)
         except ValueError:
@@ -391,6 +393,8 @@ class RBACElementType(enum.StrEnum):
 
         TODO: Remove after the RBAC ORM migration and EntityType RBAC usage removal are complete.
         """
+        from ai.backend.common.exception import RBACTypeConversionError
+
         try:
             return EntityType(self.value)
         except ValueError:
