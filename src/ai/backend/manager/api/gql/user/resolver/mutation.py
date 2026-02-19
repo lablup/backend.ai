@@ -13,9 +13,9 @@ from ai.backend.manager.api.gql.user.types import (
     BulkCreateUserErrorGQL,
     BulkCreateUserInputGQL,
     BulkCreateUsersPayloadGQL,
-    BulkUpdateUserErrorGQL,
-    BulkUpdateUserInputGQL,
-    BulkUpdateUsersPayloadGQL,
+    BulkUpdateUsersV2PayloadGQL,
+    BulkUpdateUserV2ErrorGQL,
+    BulkUpdateUserV2InputGQL,
     CreateUserInputGQL,
     CreateUserPayloadGQL,
     DeleteUserPayloadGQL,
@@ -25,8 +25,8 @@ from ai.backend.manager.api.gql.user.types import (
     PurgeUserPayloadGQL,
     PurgeUsersInputGQL,
     PurgeUsersPayloadGQL,
-    UpdateUserInputGQL,
     UpdateUserPayloadGQL,
+    UpdateUserV2InputGQL,
     UserV2GQL,
 )
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -164,7 +164,7 @@ async def admin_bulk_create_users(
 async def admin_update_user(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
-    input: UpdateUserInputGQL,
+    input: UpdateUserV2InputGQL,
 ) -> UpdateUserPayloadGQL:
     """Update a user's information.
 
@@ -191,8 +191,8 @@ async def admin_update_user(
 )  # type: ignore[misc]
 async def admin_bulk_update_users(
     info: Info[StrawberryGQLContext],
-    input: BulkUpdateUserInputGQL,
-) -> BulkUpdateUsersPayloadGQL:
+    input: BulkUpdateUserV2InputGQL,
+) -> BulkUpdateUsersV2PayloadGQL:
     """Update multiple users in bulk with individual specifications.
 
     Args:
@@ -245,14 +245,14 @@ async def admin_bulk_update_users(
 
     updated_users = [UserV2GQL.from_data(user_data) for user_data in result.data.successes]
     failed = [
-        BulkUpdateUserErrorGQL(
+        BulkUpdateUserV2ErrorGQL(
             user_id=items[error.index].user_id,
             message=str(error.exception),
         )
         for error in result.data.failures
     ]
 
-    return BulkUpdateUsersPayloadGQL(
+    return BulkUpdateUsersV2PayloadGQL(
         updated_users=updated_users,
         failed=failed,
     )
@@ -267,7 +267,7 @@ async def admin_bulk_update_users(
 )  # type: ignore[misc]
 async def update_user(
     info: Info[StrawberryGQLContext],
-    input: UpdateUserInputGQL,
+    input: UpdateUserV2InputGQL,
 ) -> UpdateUserPayloadGQL:
     """Update the current user's own information.
 
@@ -284,7 +284,7 @@ async def update_user(
     raise NotImplementedError("update_user is not yet implemented")
 
 
-# Delete Mutations (Soft Delete)
+# Delete UpdateUserV2InputGQLlete)
 
 
 @strawberry.mutation(

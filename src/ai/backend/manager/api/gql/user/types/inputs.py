@@ -100,7 +100,7 @@ class BulkCreateUserInputGQL:
         "All fields are optional - only provided fields will be updated."
     ),
 )
-class UpdateUserInputGQL:
+class UpdateUserV2InputGQL:
     """Input for updating user information. All fields optional."""
 
     username: str | None = strawberry.field(
@@ -176,11 +176,11 @@ class UpdateUserInputGQL:
         "Pairs a user ID with the fields to update."
     ),
 )
-class BulkUpdateUserItemInputGQL:
+class BulkUpdateUserV2ItemInputGQL:
     """Input for a single user update in bulk operation."""
 
     user_id: UUID = strawberry.field(description="UUID of the user to update.")
-    input: UpdateUserInputGQL = strawberry.field(description="Fields to update for this user.")
+    input: UpdateUserV2InputGQL = strawberry.field(description="Fields to update for this user.")
 
 
 @strawberry.input(
@@ -190,10 +190,10 @@ class BulkUpdateUserItemInputGQL:
         "Each user has individual update specifications."
     ),
 )
-class BulkUpdateUserInputGQL:
+class BulkUpdateUserV2InputGQL:
     """Input for bulk updating users with individual specs."""
 
-    users: list[BulkUpdateUserItemInputGQL] = strawberry.field(
+    users: list[BulkUpdateUserV2ItemInputGQL] = strawberry.field(
         description="List of user update inputs."
     )
 

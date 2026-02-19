@@ -70,7 +70,7 @@ class UpdateUserPayloadGQL:
     name="BulkUpdateUserError",
     description="Added in 26.2.0. Error information for a failed user in bulk update.",
 )
-class BulkUpdateUserErrorGQL:
+class BulkUpdateUserV2ErrorGQL:
     """Error information for a single user that failed during bulk update."""
 
     user_id: UUID = strawberry.field(description="UUID of the user that failed to update.")
@@ -81,13 +81,13 @@ class BulkUpdateUserErrorGQL:
     name="BulkUpdateUsersV2Payload",
     description="Added in 26.2.0. Payload for bulk user update mutation.",
 )
-class BulkUpdateUsersPayloadGQL:
+class BulkUpdateUsersV2PayloadGQL:
     """Payload for bulk user update."""
 
     updated_users: list[UserV2GQL] = strawberry.field(
         description="List of successfully updated users."
     )
-    failed: list[BulkUpdateUserErrorGQL] = strawberry.field(
+    failed: list[BulkUpdateUserV2ErrorGQL] = strawberry.field(
         description="List of errors for users that failed to update."
     )
 
