@@ -2959,7 +2959,7 @@ type KernelV2 implements Node {
   startupCommand: String
 
   """Information about the session this kernel belongs to."""
-  session: KernelV2SessionInfo!
+  sessionInfo: KernelV2SessionInfo!
 
   """User and ownership information."""
   userInfo: KernelV2UserInfo!
@@ -2990,6 +2990,9 @@ type KernelV2 implements Node {
 
   """Added in 26.2.0. The resource group this kernel is assigned to."""
   resourceGroup: ResourceGroup
+
+  """Added in 26.2.0. The session this kernel belongs to."""
+  session: SessionV2
 }
 
 """
@@ -3153,62 +3156,6 @@ type KernelV2UserInfo {
 
   """The group (project) ID this kernel belongs to."""
   groupId: UUID
-}
-
-"""
-Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.
-"""
-type KernelV2 implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-
-  """Startup command executed when the kernel starts."""
-  startupCommand: String
-
-  """Information about the session this kernel belongs to."""
-  sessionInfo: KernelSessionInfo!
-
-  """User and ownership information."""
-  userInfo: KernelUserInfo!
-
-  """Network configuration and exposed ports."""
-  network: KernelNetworkInfo!
-
-  """Cluster configuration for distributed computing."""
-  cluster: KernelClusterInfo!
-
-  """Resource allocation and agent information."""
-  resource: KernelResourceInfo!
-
-  """Lifecycle status and timestamps."""
-  lifecycle: KernelLifecycleInfo!
-
-  """Added in 26.2.0. The agent running this kernel."""
-  agent: AgentV2
-
-  """Added in 26.2.0. The user who owns this kernel."""
-  user: UserV2
-
-  """Added in 26.2.0. The project this kernel belongs to."""
-  project: ProjectV2
-
-  """Added in 26.2.0. The domain this kernel belongs to."""
-  domain: DomainV2
-
-  """Added in 26.2.0. The resource group this kernel is assigned to."""
-  resourceGroup: ResourceGroup
-
-  """Added in 26.2.0. The session this kernel belongs to."""
-  session: SessionV2
-}
-
-"""An edge in a connection."""
-type KernelV2Edge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: KernelV2!
 }
 
 """
@@ -6425,10 +6372,10 @@ type SessionV2 implements Node {
   """
   Added in 26.2.0. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
   """
-  images: ImageConnectionV2!
+  images: ImageV2Connection!
 
   """Added in 26.2.0. The kernels belonging to this session."""
-  kernels: KernelConnectionV2!
+  kernels: KernelV2Connection!
 }
 
 """Added in 26.2.0. Connection type for paginated session results."""
