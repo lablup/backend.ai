@@ -2347,9 +2347,9 @@ input CreatePermissionInput
   @join__type(graph: STRAWBERRY)
 {
   roleId: UUID!
-  scopeType: EntityType!
+  scopeType: RBACElementType!
   scopeId: String!
-  entityType: EntityType!
+  entityType: RBACElementType!
   operation: OperationType!
 }
 
@@ -4157,7 +4157,7 @@ type EntityEdge
 input EntityFilter
   @join__type(graph: STRAWBERRY)
 {
-  entityType: EntityType = null
+  entityType: RBACElementType = null
   entityId: StringFilter = null
 }
 
@@ -4205,9 +4205,9 @@ type EntityRef implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
-  scopeType: EntityType!
+  scopeType: RBACElementType!
   scopeId: String!
-  entityType: EntityType!
+  entityType: RBACElementType!
   entityId: String!
   registeredAt: DateTime!
 
@@ -4226,30 +4226,6 @@ type EntityTimestamps
 
   """Timestamp when this entity was last modified."""
   modifiedAt: DateTime
-}
-
-"""Added in 26.3.0. RBAC entity type"""
-enum EntityType
-  @join__type(graph: STRAWBERRY)
-{
-  USER @join__enumValue(graph: STRAWBERRY)
-  PROJECT @join__enumValue(graph: STRAWBERRY)
-  DOMAIN @join__enumValue(graph: STRAWBERRY)
-  VFOLDER @join__enumValue(graph: STRAWBERRY)
-  IMAGE @join__enumValue(graph: STRAWBERRY)
-  SESSION @join__enumValue(graph: STRAWBERRY)
-  ARTIFACT @join__enumValue(graph: STRAWBERRY)
-  ARTIFACT_REGISTRY @join__enumValue(graph: STRAWBERRY)
-  ARTIFACT_REVISION @join__enumValue(graph: STRAWBERRY)
-  APP_CONFIG @join__enumValue(graph: STRAWBERRY)
-  NOTIFICATION_CHANNEL @join__enumValue(graph: STRAWBERRY)
-  NOTIFICATION_RULE @join__enumValue(graph: STRAWBERRY)
-  MODEL_DEPLOYMENT @join__enumValue(graph: STRAWBERRY)
-  RESOURCE_GROUP @join__enumValue(graph: STRAWBERRY)
-  CONTAINER_REGISTRY @join__enumValue(graph: STRAWBERRY)
-  STORAGE_HOST @join__enumValue(graph: STRAWBERRY)
-  DEPLOYMENT @join__enumValue(graph: STRAWBERRY)
-  ROLE @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -7752,9 +7728,9 @@ type Permission implements Node
   """The Globally Unique ID of this object"""
   id: ID!
   roleId: UUID!
-  scopeType: EntityType!
+  scopeType: RBACElementType!
   scopeId: String!
-  entityType: EntityType!
+  entityType: RBACElementType!
   operation: OperationType!
 
   """The role this permission belongs to."""
@@ -7792,8 +7768,8 @@ input PermissionFilter
   @join__type(graph: STRAWBERRY)
 {
   roleId: UUID = null
-  scopeType: EntityType = null
-  entityType: EntityType = null
+  scopeType: RBACElementType = null
+  entityType: RBACElementType = null
 }
 
 """Added in 26.3.0. Order by specification for permissions"""
@@ -9295,10 +9271,10 @@ type Query
   adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. List available scope types."""
-  scopeTypes: [EntityType!]! @join__field(graph: STRAWBERRY)
+  scopeTypes: [RBACElementType!]! @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.3.0. Use RBACElementType enum values directly.")
 
   """Added in 26.3.0. List available entity types."""
-  entityTypes: [EntityType!]! @join__field(graph: STRAWBERRY)
+  entityTypes: [RBACElementType!]! @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.3.0. Use RBACElementType enum values directly.")
 
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection @join__field(graph: STRAWBERRY)
@@ -9532,6 +9508,41 @@ input QuotaScopeInput
   @join__type(graph: GRAPHENE)
 {
   hard_limit_bytes: BigInt
+}
+
+"""
+Added in 26.3.0. Unified RBAC element type for scope-entity relationships
+"""
+enum RBACElementType
+  @join__type(graph: STRAWBERRY)
+{
+  DOMAIN @join__enumValue(graph: STRAWBERRY)
+  PROJECT @join__enumValue(graph: STRAWBERRY)
+  USER @join__enumValue(graph: STRAWBERRY)
+  SESSION @join__enumValue(graph: STRAWBERRY)
+  VFOLDER @join__enumValue(graph: STRAWBERRY)
+  DEPLOYMENT @join__enumValue(graph: STRAWBERRY)
+  MODEL_DEPLOYMENT @join__enumValue(graph: STRAWBERRY)
+  KEYPAIR @join__enumValue(graph: STRAWBERRY)
+  NOTIFICATION_CHANNEL @join__enumValue(graph: STRAWBERRY)
+  NETWORK @join__enumValue(graph: STRAWBERRY)
+  RESOURCE_GROUP @join__enumValue(graph: STRAWBERRY)
+  CONTAINER_REGISTRY @join__enumValue(graph: STRAWBERRY)
+  STORAGE_HOST @join__enumValue(graph: STRAWBERRY)
+  IMAGE @join__enumValue(graph: STRAWBERRY)
+  ARTIFACT @join__enumValue(graph: STRAWBERRY)
+  ARTIFACT_REGISTRY @join__enumValue(graph: STRAWBERRY)
+  SESSION_TEMPLATE @join__enumValue(graph: STRAWBERRY)
+  APP_CONFIG @join__enumValue(graph: STRAWBERRY)
+  RESOURCE_PRESET @join__enumValue(graph: STRAWBERRY)
+  USER_RESOURCE_POLICY @join__enumValue(graph: STRAWBERRY)
+  KEYPAIR_RESOURCE_POLICY @join__enumValue(graph: STRAWBERRY)
+  PROJECT_RESOURCE_POLICY @join__enumValue(graph: STRAWBERRY)
+  ROLE @join__enumValue(graph: STRAWBERRY)
+  AUDIT_LOG @join__enumValue(graph: STRAWBERRY)
+  EVENT_LOG @join__enumValue(graph: STRAWBERRY)
+  NOTIFICATION_RULE @join__enumValue(graph: STRAWBERRY)
+  ARTIFACT_REVISION @join__enumValue(graph: STRAWBERRY)
 }
 
 """
