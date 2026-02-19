@@ -29,6 +29,7 @@ from ai.backend.manager.api.gql.user.types import (
     UpdateUserPayloadGQL,
     UserV2GQL,
 )
+from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole
@@ -94,6 +95,7 @@ async def admin_bulk_create_users(
     Returns:
         BulkCreateUsersPayloadGQL with created users.
     """
+    check_admin_only()
     ctx = info.context
     auth_config = ctx.config_provider.config.auth
 
@@ -200,6 +202,7 @@ async def admin_bulk_update_users(
     Returns:
         BulkUpdateUsersPayloadGQL with updated users and failures.
     """
+    check_admin_only()
     ctx = info.context
     auth_config = ctx.config_provider.config.auth
 
