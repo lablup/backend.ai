@@ -681,9 +681,67 @@ class EntityScopeConditions:
 
         return inner
 
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get (registered_at, id) of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            cursor_subq = (
+                sa.select(
+                    AssociationScopesEntitiesRow.registered_at,
+                    AssociationScopesEntitiesRow.id,
+                )
+                .where(AssociationScopesEntitiesRow.id == uuid.UUID(cursor_id))
+                .scalar_subquery()
+            )
+            return (
+                sa.tuple_(
+                    AssociationScopesEntitiesRow.registered_at,
+                    AssociationScopesEntitiesRow.id,
+                )
+                < cursor_subq
+            )
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get (registered_at, id) of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            cursor_subq = (
+                sa.select(
+                    AssociationScopesEntitiesRow.registered_at,
+                    AssociationScopesEntitiesRow.id,
+                )
+                .where(AssociationScopesEntitiesRow.id == uuid.UUID(cursor_id))
+                .scalar_subquery()
+            )
+            return (
+                sa.tuple_(
+                    AssociationScopesEntitiesRow.registered_at,
+                    AssociationScopesEntitiesRow.id,
+                )
+                > cursor_subq
+            )
+
+        return inner
+
 
 class EntityScopeOrders:
     """Query orders for entity scope search."""
+
+    @staticmethod
+    def id(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return AssociationScopesEntitiesRow.id.asc()
+        return AssociationScopesEntitiesRow.id.desc()
 
     @staticmethod
     def entity_type(ascending: bool = True) -> QueryOrder:
