@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import tempfile
 from pathlib import Path
 
 from prometheus_client import CollectorRegistry, generate_latest
@@ -28,7 +29,7 @@ log = logging.getLogger(__spec__.name)
 
 _multiprocess_dir: Path | None = None
 
-_DEFAULT_BASE_DIR = Path("/var/run/backendai/prometheus/")
+_DEFAULT_BASE_DIR = Path(tempfile.gettempdir()) / "backendai" / "prometheus"
 
 
 def setup_prometheus_multiprocess_dir(
