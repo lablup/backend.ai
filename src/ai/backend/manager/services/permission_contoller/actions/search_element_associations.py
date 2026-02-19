@@ -13,8 +13,8 @@ from ai.backend.manager.services.permission_contoller.actions.base import RoleAc
 
 
 @dataclass
-class SearchEntityRefsAction(RoleAction):
-    """Action to search entity refs (full association rows) within a scope.
+class SearchElementAssociationsAction(RoleAction):
+    """Action to search element associations (full association rows) within a scope.
 
     This action is only available to superadmins.
     Permission check is performed at the API handler level.
@@ -33,5 +33,5 @@ class SearchEntityRefsAction(RoleAction):
 
 
 @dataclass
-class SearchEntityRefsActionResult(SearchActionResult[AssociationScopesEntitiesData]):
+class SearchElementAssociationsActionResult(SearchActionResult[AssociationScopesEntitiesData]):
     pass

@@ -28,7 +28,7 @@ class EntityListResult(SearchResult[EntityData]):
 
 
 @dataclass(frozen=True)
-class EntityRefListResult(SearchResult[AssociationScopesEntitiesData]):
-    """Result of entity ref search with full association row data."""
+class ElementAssociationListResult(SearchResult[AssociationScopesEntitiesData]):
+    """Result of element association search with full association row data."""
 
     pass
