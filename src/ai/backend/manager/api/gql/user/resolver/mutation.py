@@ -6,7 +6,7 @@ from typing import cast
 from uuid import UUID
 
 import strawberry
-from strawberry import UNSET, Info
+from strawberry import Info
 
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types import (
@@ -210,42 +210,22 @@ async def admin_bulk_update_users(
     for user_item in input.users:
         user_input = user_item.input
 
-        # Convert password if provided
-        password_state: OptionalState[PasswordInfo] = OptionalState.nop()
-        if user_input.password is not None and user_input.password is not UNSET:
-            password_state = OptionalState.update(
-                PasswordInfo(
-                    password=user_input.password,
+        updater_spec = UserUpdaterSpec(
+            username=OptionalState.from_graphql(user_input.username),
+            password=OptionalState.from_graphql(user_input.password).map(
+                lambda pw: PasswordInfo(
+                    password=pw,
                     algorithm=auth_config.password_hash_algorithm,
                     rounds=auth_config.password_hash_rounds,
                     salt_size=auth_config.password_hash_salt_size,
                 )
-            )
-
-        # Convert group_ids if provided
-        group_ids_state: OptionalState[list[str]] = OptionalState.nop()
-        if user_input.group_ids is not None and user_input.group_ids is not UNSET:
-            group_ids_state = OptionalState.update([str(gid) for gid in user_input.group_ids])
-
-        # Convert status enum if provided
-        status_state: OptionalState[UserStatus] = OptionalState.nop()
-        if user_input.status is not None and user_input.status is not UNSET:
-            status_state = OptionalState.update(UserStatus(user_input.status.value))
-
-        # Convert role enum if provided
-        role_state: OptionalState[UserRole] = OptionalState.nop()
-        if user_input.role is not None and user_input.role is not UNSET:
-            role_state = OptionalState.update(UserRole(user_input.role.value))
-
-        updater_spec = UserUpdaterSpec(
-            username=OptionalState.from_graphql(user_input.username),
-            password=password_state,
+            ),
             need_password_change=OptionalState.from_graphql(user_input.need_password_change),
             full_name=OptionalState.from_graphql(user_input.full_name),
             description=OptionalState.from_graphql(user_input.description),
-            status=status_state,
+            status=OptionalState.from_graphql(user_input.status).map(lambda s: UserStatus(s.value)),
             domain_name=OptionalState.from_graphql(user_input.domain_name),
-            role=role_state,
+            role=OptionalState.from_graphql(user_input.role).map(lambda r: UserRole(r.value)),
             allowed_client_ip=TriState.from_graphql(user_input.allowed_client_ip),
             resource_policy=OptionalState.from_graphql(user_input.resource_policy),
             sudo_session_enabled=OptionalState.from_graphql(user_input.sudo_session_enabled),
@@ -253,7 +233,9 @@ async def admin_bulk_update_users(
             container_uid=TriState.from_graphql(user_input.container_uid),
             container_main_gid=TriState.from_graphql(user_input.container_main_gid),
             container_gids=TriState.from_graphql(user_input.container_gids),
-            group_ids=group_ids_state,
+            group_ids=OptionalState.from_graphql(user_input.group_ids).map(
+                lambda gids: [str(gid) for gid in gids]
+            ),
         )
 
         items.append(UserUpdateSpec(user_id=user_item.user_id, updater_spec=updater_spec))
