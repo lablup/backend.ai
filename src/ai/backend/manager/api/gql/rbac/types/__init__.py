@@ -13,7 +13,6 @@ from .permission import (
     CreatePermissionInput,
     DeletePermissionInput,
     DeletePermissionPayload,
-    EntityTypeGQL,
     OperationTypeGQL,
     PermissionConnection,
     PermissionEdge,
@@ -49,7 +48,6 @@ from .role import (
 __all__ = [
     # Permission enums
     "RBACElementTypeGQL",
-    "EntityTypeGQL",
     "OperationTypeGQL",
     "PermissionOrderField",
     # Role enums

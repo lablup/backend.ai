@@ -5,8 +5,6 @@ from .permission import (
     admin_create_permission,
     admin_delete_permission,
     admin_permissions,
-    entity_types,
-    scope_types,
 )
 from .role import (
     admin_assign_role,
@@ -23,8 +21,6 @@ from .role import (
 __all__ = [
     # Permission queries
     "admin_permissions",
-    "scope_types",
-    "entity_types",
     # Entity queries
     "admin_entities",
     # Permission mutations

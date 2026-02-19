@@ -85,34 +85,6 @@ class RBACElementTypeGQL(StrEnum):
         return RBACElementType(self.value)
 
 
-@strawberry.enum(
-    name="EntityType",
-    description="Deprecated since 26.3.0. Use RBACElementType instead.",
-)
-class EntityTypeGQL(StrEnum):
-    USER = "user"
-    PROJECT = "project"
-    DOMAIN = "domain"
-
-    VFOLDER = "vfolder"
-    IMAGE = "image"
-    SESSION = "session"
-
-    ARTIFACT = "artifact"
-    ARTIFACT_REGISTRY = "artifact_registry"
-    ARTIFACT_REVISION = "artifact_revision"
-    APP_CONFIG = "app_config"
-    NOTIFICATION_CHANNEL = "notification_channel"
-    NOTIFICATION_RULE = "notification_rule"
-    MODEL_DEPLOYMENT = "model_deployment"
-
-    RESOURCE_GROUP = "resource_group"
-    CONTAINER_REGISTRY = "container_registry"
-    STORAGE_HOST = "storage_host"
-    DEPLOYMENT = "deployment"
-    ROLE = "role"
-
-
 @strawberry.enum(name="OperationType", description="Added in 26.3.0. RBAC operation type")
 class OperationTypeGQL(StrEnum):
     CREATE = "create"
