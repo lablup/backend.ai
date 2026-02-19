@@ -674,6 +674,13 @@ class EntityScopeConditions:
 
         return inner
 
+    @staticmethod
+    def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssociationScopesEntitiesRow.id.in_(ids)
+
+        return inner
+
 
 class EntityScopeOrders:
     """Query orders for entity scope search."""

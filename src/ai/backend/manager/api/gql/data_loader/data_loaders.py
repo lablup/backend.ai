@@ -26,6 +26,9 @@ from ai.backend.manager.data.image.types import ImageAliasData, ImageData
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.data.permission.association_scopes_entities import (
+    AssociationScopesEntitiesData,
+)
 from ai.backend.manager.data.permission.entity import EntityData
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.permission import PermissionData
@@ -58,6 +61,7 @@ from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
 from .project import load_projects_by_ids
 from .rbac import (
+    load_element_associations_by_ids,
     load_entities_by_type_and_ids,
     load_permissions_by_ids,
     load_role_assignments_by_ids,
@@ -323,6 +327,17 @@ class DataLoaders:
         return DataLoader(
             load_fn=partial(
                 load_entities_by_type_and_ids,
+                self._processors.permission_controller,
+            )
+        )
+
+    @cached_property
+    def element_association_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, AssociationScopesEntitiesData | None]:
+        return DataLoader(
+            load_fn=partial(
+                load_element_associations_by_ids,
                 self._processors.permission_controller,
             )
         )
