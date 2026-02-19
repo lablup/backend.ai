@@ -18,7 +18,7 @@ class TestLoadImagesByIds:
 
     @staticmethod
     def create_mock_image(image_id: ImageID) -> MagicMock:
-        return MagicMock(spec=ImageDataWithDetails, id=image_id)
+        return MagicMock(spec=ImageData, id=image_id)
 
     @staticmethod
     def create_mock_processor(images: list[MagicMock]) -> MagicMock:

@@ -16,9 +16,10 @@ from ai.backend.manager.models.image import (
 )
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, NoPagination
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.image.creators import ImageAliasCreatorSpec
+from ai.backend.manager.repositories.image.options import ImageAliasConditions
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
@@ -41,6 +42,10 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageActionResult,
     ForgetImageByIdAction,
     ForgetImageByIdActionResult,
+)
+from ai.backend.manager.services.image.actions.get_aliases_by_image_ids import (
+    GetAliasesByImageIdsAction,
+    GetAliasesByImageIdsActionResult,
 )
 from ai.backend.manager.services.image.actions.get_all_images import (
     GetAllImagesAction,
@@ -202,6 +207,32 @@ class ImageService:
         return GetImageByIdActionResult(
             image_with_agent_install_status=image_with_agent_install_status
         )
+
+    async def get_images_by_ids(self, action: GetImagesByIdsAction) -> GetImagesByIdsActionResult:
+        is_superadmin = action.user_role == UserRole.SUPERADMIN
+        hide_agents = False if is_superadmin else self._config_provider.config.manager.hide_agents
+        images = await self._image_repository.get_images_by_ids(
+            action.image_ids,
+            status_filter=action.image_status,
+            hide_agents=hide_agents,
+        )
+        return GetImagesByIdsActionResult(images=images)
+
+    async def get_aliases_by_image_ids(
+        self, action: GetAliasesByImageIdsAction
+    ) -> GetAliasesByImageIdsActionResult:
+        result = await self._image_repository.search_aliases(
+            BatchQuerier(
+                pagination=NoPagination(),
+                conditions=[ImageAliasConditions.by_image_ids(action.image_ids)],
+            )
+        )
+        aliases_map: dict[ImageID, list[str]] = {}
+        for alias_data, image_id in zip(result.items, result.image_ids, strict=True):
+            if image_id not in aliases_map:
+                aliases_map[image_id] = []
+            aliases_map[image_id].append(alias_data.alias)
+        return GetAliasesByImageIdsActionResult(aliases_map=aliases_map)
 
     async def forget_image(self, action: ForgetImageAction) -> ForgetImageActionResult:
         """

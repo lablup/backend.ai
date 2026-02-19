@@ -22,11 +22,13 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageCanonical, ImageID, SlotName
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import (
+    ImageAgentInstallStatus,
     ImageAliasData,
     ImageData,
     ImageLabelsData,
     ImageListResult,
     ImageResourcesData,
+    ImageWithAgentInstallStatus,
     ResourceLimitInput,
 )
 from ai.backend.manager.errors.image import (
@@ -1012,6 +1014,7 @@ class TestGetImagesByIds(ImageServiceBaseFixtures):
 
         action = GetImagesByIdsAction(
             image_ids=[image_data.id],
+            user_role=UserRole.SUPERADMIN,
             image_status=None,
         )
 
@@ -1031,6 +1034,7 @@ class TestGetImagesByIds(ImageServiceBaseFixtures):
 
         action = GetImagesByIdsAction(
             image_ids=[],
+            user_role=UserRole.SUPERADMIN,
             image_status=None,
         )
 

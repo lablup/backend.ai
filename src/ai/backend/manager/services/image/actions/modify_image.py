@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
@@ -47,13 +49,13 @@ class ModifyImageByIdAction(ImageAction):
     updater_spec: ImageUpdaterSpec
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.image_id)
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "modify_by_id"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass
@@ -61,7 +63,7 @@ class ModifyImageByIdActionResult(BaseActionResult):
     image: ImageData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.image.id)
 
 
