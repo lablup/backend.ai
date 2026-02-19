@@ -1042,26 +1042,6 @@ class CommonAgentConfig(BaseConfigSchema):
             example=ConfigExample(local="", prod="bai:bai"),
         ),
     ]
-    prometheus_multiproc_dir: Annotated[
-        Path,
-        Field(
-            default=Path("/var/run/backendai/prometheus/"),
-            validation_alias=AliasChoices("prometheus-multiproc-dir", "prometheus_multiproc_dir"),
-            serialization_alias="prometheus-multiproc-dir",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Base directory for Prometheus multiprocess metric files. "
-                "The component name is appended as a subdirectory. "
-                "Must be outside /tmp to avoid cleanup by systemd-tmpfiles-clean."
-            ),
-            added_version="25.12.0",
-            example=ConfigExample(
-                local="/tmp/backendai-prometheus/",
-                prod="/var/run/backendai/prometheus/",
-            ),
-        ),
-    ]
 
     def real_mount_path(self, directory_path: str) -> Path:
         if self.mount_path is None:

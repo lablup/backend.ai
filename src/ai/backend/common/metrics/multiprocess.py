@@ -18,7 +18,6 @@ from __future__ import annotations
 import logging
 import os
 import shutil
-import tomllib
 from pathlib import Path
 
 from prometheus_client import CollectorRegistry, generate_latest
@@ -32,29 +31,8 @@ _multiprocess_dir: Path | None = None
 _DEFAULT_BASE_DIR = Path("/var/run/backendai/prometheus/")
 
 
-def _read_prometheus_dir_from_config(config_path: Path | None, section: str) -> Path | None:
-    """
-    Lightweight TOML pre-read to extract prometheus-multiproc-dir from config.
-
-    This is used by start_server.py before the full config system is loaded.
-    """
-    if config_path is None:
-        return None
-    try:
-        with config_path.open("rb") as f:
-            raw = tomllib.load(f)
-        value = raw.get(section, {}).get("prometheus-multiproc-dir")
-        if value:
-            return Path(value)
-    except Exception:
-        log.warning("Failed to pre-read prometheus config from %s", config_path, exc_info=True)
-    return None
-
-
 def setup_prometheus_multiprocess_dir(
     component: str = "manager",
-    *,
-    base_dir: Path | None = None,
 ) -> Path:
     """
     Set up the prometheus multiprocess directory and environment variable.
@@ -66,8 +44,6 @@ def setup_prometheus_multiprocess_dir(
 
     Args:
         component: Component name for directory naming (e.g., 'manager', 'agent')
-        base_dir: Base directory for prometheus files. The component name is appended
-                  as a subdirectory. If None, defaults to /var/run/backendai/prometheus/.
 
     Returns:
         Path to the created multiprocess directory
@@ -77,10 +53,7 @@ def setup_prometheus_multiprocess_dir(
     if _multiprocess_dir is not None:
         return _multiprocess_dir
 
-    if base_dir is None:
-        base_dir = _DEFAULT_BASE_DIR
-
-    multiprocess_dir = base_dir / component
+    multiprocess_dir = _DEFAULT_BASE_DIR / component
     multiprocess_dir.mkdir(parents=True, exist_ok=True)
 
     # Clean stale .db files from previous runs

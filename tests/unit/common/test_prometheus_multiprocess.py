@@ -9,7 +9,6 @@ import pytest
 
 import ai.backend.common.metrics.multiprocess as mp_mod
 from ai.backend.common.metrics.multiprocess import (
-    _read_prometheus_dir_from_config,
     cleanup_prometheus_multiprocess_dir,
     generate_latest_multiprocess,
     setup_prometheus_multiprocess_dir,
@@ -35,14 +34,6 @@ class TestSetupPrometheusMultiprocDir:
             result = setup_prometheus_multiprocess_dir("manager")
 
         assert result == tmp_path / "manager"
-        assert result.is_dir()
-        assert os.environ["PROMETHEUS_MULTIPROC_DIR"] == str(result)
-
-    def test_creates_directory_with_custom_base_dir(self, tmp_path: Path) -> None:
-        custom_base = tmp_path / "custom"
-        result = setup_prometheus_multiprocess_dir("agent", base_dir=custom_base)
-
-        assert result == custom_base / "agent"
         assert result.is_dir()
         assert os.environ["PROMETHEUS_MULTIPROC_DIR"] == str(result)
 
@@ -131,53 +122,3 @@ class TestCleanupPrometheusMultiprocDir:
 
         # Should not raise
         cleanup_prometheus_multiprocess_dir()
-
-
-class TestReadPrometheusDirFromConfig:
-    def test_returns_none_when_no_config_path(self) -> None:
-        result = _read_prometheus_dir_from_config(None, "manager")
-        assert result is None
-
-    def test_reads_path_from_toml(self, tmp_path: Path) -> None:
-        config_file = tmp_path / "config.toml"
-        config_file.write_text('[manager]\nprometheus-multiproc-dir = "/custom/prometheus"\n')
-
-        result = _read_prometheus_dir_from_config(config_file, "manager")
-        assert result == Path("/custom/prometheus")
-
-    def test_returns_none_when_field_missing(self, tmp_path: Path) -> None:
-        config_file = tmp_path / "config.toml"
-        config_file.write_text("[manager]\nsome-other-field = 42\n")
-
-        result = _read_prometheus_dir_from_config(config_file, "manager")
-        assert result is None
-
-    def test_returns_none_when_section_missing(self, tmp_path: Path) -> None:
-        config_file = tmp_path / "config.toml"
-        config_file.write_text("[other-section]\nfoo = 1\n")
-
-        result = _read_prometheus_dir_from_config(config_file, "manager")
-        assert result is None
-
-    def test_returns_none_on_invalid_toml(self, tmp_path: Path) -> None:
-        config_file = tmp_path / "config.toml"
-        config_file.write_text("this is not valid toml {{{}}")
-
-        result = _read_prometheus_dir_from_config(config_file, "manager")
-        assert result is None
-
-    def test_returns_none_on_missing_file(self, tmp_path: Path) -> None:
-        result = _read_prometheus_dir_from_config(tmp_path / "nonexistent.toml", "manager")
-        assert result is None
-
-    def test_reads_different_sections(self, tmp_path: Path) -> None:
-        config_file = tmp_path / "config.toml"
-        config_file.write_text(
-            '[storage-proxy]\nprometheus-multiproc-dir = "/storage/prom"\n'
-            '[manager]\nprometheus-multiproc-dir = "/manager/prom"\n'
-        )
-
-        storage_result = _read_prometheus_dir_from_config(config_file, "storage-proxy")
-        manager_result = _read_prometheus_dir_from_config(config_file, "manager")
-        assert storage_result == Path("/storage/prom")
-        assert manager_result == Path("/manager/prom")

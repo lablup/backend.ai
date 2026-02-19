@@ -47,14 +47,10 @@ def main(
 
     This is a thin wrapper that defers the heavy import of server module.
     """
-    from ai.backend.common.metrics.multiprocess import (
-        _read_prometheus_dir_from_config,
-        setup_prometheus_multiprocess_dir,
-    )
+    from ai.backend.common.metrics.multiprocess import setup_prometheus_multiprocess_dir
     from ai.backend.logging import LogLevel
 
-    prometheus_base_dir = _read_prometheus_dir_from_config(config_path, "agent")
-    setup_prometheus_multiprocess_dir("agent", base_dir=prometheus_base_dir)
+    setup_prometheus_multiprocess_dir("agent")
 
     from ai.backend.agent.server import main as server_main
 
