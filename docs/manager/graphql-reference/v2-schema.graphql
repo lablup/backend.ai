@@ -5009,12 +5009,6 @@ type Query {
   """
   adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection!
 
-  """Added in 26.3.0. List available scope types."""
-  scopeTypes: [RBACElementType!]! @deprecated(reason: "Deprecated since 26.3.0. Use RBACElementType enum values directly.")
-
-  """Added in 26.3.0. List available entity types."""
-  entityTypes: [RBACElementType!]! @deprecated(reason: "Deprecated since 26.3.0. Use RBACElementType enum values directly.")
-
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
 
