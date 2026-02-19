@@ -174,9 +174,6 @@ class SessionV2MetadataInfoGQL:
     )
     cluster_size: int = strawberry.field(description="Number of nodes in the cluster.")
     priority: int = strawberry.field(description="Scheduling priority of the session.")
-    created_at: datetime | None = strawberry.field(
-        description="Timestamp when the session was created."
-    )
     tag: str | None = strawberry.field(description="Optional user-provided tag for the session.")
 
 

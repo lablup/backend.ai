@@ -6456,9 +6456,6 @@ type SessionV2MetadataInfo {
   """Scheduling priority of the session."""
   priority: Int!
 
-  """Timestamp when the session was created."""
-  createdAt: DateTime
-
   """Optional user-provided tag for the session."""
   tag: String
 }
