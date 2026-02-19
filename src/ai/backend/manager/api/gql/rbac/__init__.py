@@ -31,6 +31,7 @@ from .types import (
     PermissionFilter,
     PermissionGQL,
     PermissionOrderBy,
+    RBACElementTypeGQL,
     RevokeRoleInput,
     RoleAssignmentConnection,
     RoleAssignmentFilter,
@@ -46,6 +47,7 @@ from .types import (
 
 __all__ = (
     # Enums
+    "RBACElementTypeGQL",
     "EntityTypeGQL",
     "OperationTypeGQL",
     "RoleSourceGQL",

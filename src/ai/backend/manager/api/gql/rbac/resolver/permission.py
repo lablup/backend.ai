@@ -9,11 +9,11 @@ from ai.backend.manager.api.gql.rbac.types import (
     CreatePermissionInput,
     DeletePermissionInput,
     DeletePermissionPayload,
-    EntityTypeGQL,
     PermissionConnection,
     PermissionFilter,
     PermissionGQL,
     PermissionOrderBy,
+    RBACElementTypeGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
@@ -37,17 +37,23 @@ async def admin_permissions(
     raise NotImplementedError
 
 
-@strawberry.field(description="Added in 26.3.0. List available scope types.")  # type: ignore[misc]
+@strawberry.field(
+    description="Added in 26.3.0. List available scope types.",
+    deprecation_reason="Deprecated since 26.3.0. Use RBACElementType enum values directly.",
+)  # type: ignore[misc]
 async def scope_types(
     info: Info[StrawberryGQLContext],
-) -> list[EntityTypeGQL]:
+) -> list[RBACElementTypeGQL]:
     raise NotImplementedError
 
 
-@strawberry.field(description="Added in 26.3.0. List available entity types.")  # type: ignore[misc]
+@strawberry.field(
+    description="Added in 26.3.0. List available entity types.",
+    deprecation_reason="Deprecated since 26.3.0. Use RBACElementType enum values directly.",
+)  # type: ignore[misc]
 async def entity_types(
     info: Info[StrawberryGQLContext],
-) -> list[EntityTypeGQL]:
+) -> list[RBACElementTypeGQL]:
     raise NotImplementedError
 
 

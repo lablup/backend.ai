@@ -13,7 +13,7 @@ from strawberry.relay import Node, NodeID
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
-from ai.backend.manager.api.gql.rbac.types.permission import EntityTypeGQL
+from ai.backend.manager.api.gql.rbac.types.permission import RBACElementTypeGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.permission.association_scopes_entities import (
     AssociationScopesEntitiesData,
@@ -42,9 +42,9 @@ class EntityOrderField(StrEnum):
 )
 class EntityRefGQL(Node):
     id: NodeID[str]
-    scope_type: EntityTypeGQL
+    scope_type: RBACElementTypeGQL
     scope_id: str
-    entity_type: EntityTypeGQL
+    entity_type: RBACElementTypeGQL
     entity_id: str
     registered_at: datetime
 
@@ -72,9 +72,9 @@ class EntityRefGQL(Node):
     def from_dataclass(cls, data: AssociationScopesEntitiesData) -> Self:
         return cls(
             id=ID(str(data.id)),
-            scope_type=EntityTypeGQL.from_scope_type(data.scope_id.scope_type),
+            scope_type=RBACElementTypeGQL.from_element(data.scope_id.scope_type.to_element()),
             scope_id=data.scope_id.scope_id,
-            entity_type=EntityTypeGQL.from_internal(data.object_id.entity_type),
+            entity_type=RBACElementTypeGQL.from_element(data.object_id.entity_type.to_element()),
             entity_id=data.object_id.entity_id,
             registered_at=data.registered_at,
         )
@@ -85,7 +85,7 @@ class EntityRefGQL(Node):
 
 @strawberry.input(description="Added in 26.3.0. Filter for entity associations")
 class EntityFilter(GQLFilter):
-    entity_type: EntityTypeGQL | None = None
+    entity_type: RBACElementTypeGQL | None = None
     entity_id: StringFilter | None = None
 
     @override
@@ -93,7 +93,9 @@ class EntityFilter(GQLFilter):
         conditions: list[QueryCondition] = []
 
         if self.entity_type is not None:
-            conditions.append(EntityScopeConditions.by_entity_type(self.entity_type.to_internal()))
+            conditions.append(
+                EntityScopeConditions.by_entity_type(self.entity_type.to_element().to_entity_type())
+            )
 
         if self.entity_id is not None:
             condition = self.entity_id.build_query_condition(
