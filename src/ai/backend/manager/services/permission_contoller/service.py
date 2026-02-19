@@ -52,6 +52,10 @@ from ai.backend.manager.services.permission_contoller.actions.revoke_role import
     RevokeRoleAction,
     RevokeRoleActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
+    SearchElementAssociationsAction,
+    SearchElementAssociationsActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.search_entities import (
     SearchEntitiesAction,
     SearchEntitiesActionResult,
@@ -241,3 +245,10 @@ class PermissionControllerService:
         """Search entities within a scope."""
         result = await self._repository.search_entities(action.querier)
         return SearchEntitiesActionResult(result=result)
+
+    async def search_element_associations(
+        self, action: SearchElementAssociationsAction
+    ) -> SearchElementAssociationsActionResult:
+        """Search element associations (full association rows) within a scope."""
+        result = await self._repository.search_element_associations(action.querier)
+        return SearchElementAssociationsActionResult(result=result)

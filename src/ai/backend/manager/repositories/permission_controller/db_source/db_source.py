@@ -7,7 +7,11 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
-from ai.backend.manager.data.permission.entity import EntityData, EntityListResult
+from ai.backend.manager.data.permission.entity import (
+    ElementAssociationListResult,
+    EntityData,
+    EntityListResult,
+)
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionCreateInputBeforeRoleCreation,
@@ -773,6 +777,29 @@ class PermissionDBSource:
             ]
 
             return EntityListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_element_associations_in_scope(
+        self,
+        querier: BatchQuerier,
+    ) -> ElementAssociationListResult:
+        """Search element associations (full association rows) within a scope."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(AssociationScopesEntitiesRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [cast(AssociationScopesEntitiesRow, row).to_data() for row in result.rows]
+
+            return ElementAssociationListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,

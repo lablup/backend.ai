@@ -9,7 +9,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.permission.entity import EntityListResult
+from ai.backend.manager.data.permission.entity import ElementAssociationListResult, EntityListResult
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionData,
@@ -313,3 +313,18 @@ class PermissionControllerRepository:
             EntityListResult with matching entities.
         """
         return await self._db_source.search_entities_in_scope(querier)
+
+    @permission_controller_repository_resilience.apply()
+    async def search_element_associations(
+        self,
+        querier: BatchQuerier,
+    ) -> ElementAssociationListResult:
+        """Search element associations (full association rows) within a scope.
+
+        Args:
+            querier: BatchQuerier with scope conditions and pagination settings.
+
+        Returns:
+            ElementAssociationListResult with full association row data.
+        """
+        return await self._db_source.search_element_associations_in_scope(querier)

@@ -39,6 +39,10 @@ from .actions.permission import (
     DeletePermissionAction,
     DeletePermissionActionResult,
 )
+from .actions.search_element_associations import (
+    SearchElementAssociationsAction,
+    SearchElementAssociationsActionResult,
+)
 from .actions.search_entities import (
     SearchEntitiesAction,
     SearchEntitiesActionResult,
@@ -74,6 +78,9 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     get_scope_types: ActionProcessor[GetScopeTypesAction, GetScopeTypesActionResult]
     get_entity_types: ActionProcessor[GetEntityTypesAction, GetEntityTypesActionResult]
     search_entities: ActionProcessor[SearchEntitiesAction, SearchEntitiesActionResult]
+    search_element_associations: ActionProcessor[
+        SearchElementAssociationsAction, SearchElementAssociationsActionResult
+    ]
     search_permissions: ActionProcessor[SearchPermissionsAction, SearchPermissionsActionResult]
     create_permission: ActionProcessor[CreatePermissionAction, CreatePermissionActionResult]
     delete_permission: ActionProcessor[DeletePermissionAction, DeletePermissionActionResult]
@@ -99,6 +106,9 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         self.get_scope_types = ActionProcessor(service.get_scope_types, action_monitors)
         self.get_entity_types = ActionProcessor(service.get_entity_types, action_monitors)
         self.search_entities = ActionProcessor(service.search_entities, action_monitors)
+        self.search_element_associations = ActionProcessor(
+            service.search_element_associations, action_monitors
+        )
         self.search_permissions = ActionProcessor(service.search_permissions, action_monitors)
         self.create_permission = ActionProcessor(service.create_permission, action_monitors)
         self.delete_permission = ActionProcessor(service.delete_permission, action_monitors)
@@ -120,6 +130,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             GetScopeTypesAction.spec(),
             GetEntityTypesAction.spec(),
             SearchEntitiesAction.spec(),
+            SearchElementAssociationsAction.spec(),
             SearchPermissionsAction.spec(),
             CreatePermissionAction.spec(),
             DeletePermissionAction.spec(),
