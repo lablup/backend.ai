@@ -100,6 +100,6 @@ class RBACTypeConversionError(BackendAIError, web.HTTPInternalServerError):
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.PERMISSION,
-            operation=ErrorOperation.GENERIC,
+            operation=ErrorOperation.PARSING,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
