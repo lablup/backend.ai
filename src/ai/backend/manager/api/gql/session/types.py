@@ -32,7 +32,7 @@ from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 @strawberry.enum(
     name="SessionV2Status",
-    description="Added in 26.2.0. Status of a session in its lifecycle.",
+    description="Added in 26.3.0. Status of a session in its lifecycle.",
 )
 class SessionV2StatusGQL(StrEnum):
     """GraphQL enum for session status."""
@@ -106,7 +106,7 @@ class SessionV2StatusGQL(StrEnum):
 
 @strawberry.enum(
     name="SessionV2OrderField",
-    description="Added in 26.2.0. Fields available for ordering sessions.",
+    description="Added in 26.3.0. Fields available for ordering sessions.",
 )
 class SessionV2OrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
@@ -117,7 +117,7 @@ class SessionV2OrderFieldGQL(StrEnum):
 
 
 @strawberry.input(
-    name="SessionV2StatusFilter", description="Added in 26.2.0. Filter for session status."
+    name="SessionV2StatusFilter", description="Added in 26.3.0. Filter for session status."
 )
 class SessionV2StatusFilterGQL:
     in_: list[SessionV2StatusGQL] | None = strawberry.field(name="in", default=None)
@@ -128,7 +128,7 @@ class SessionV2StatusFilterGQL:
 
 
 @strawberry.input(
-    name="SessionV2Filter", description="Added in 26.2.0. Filter criteria for querying sessions."
+    name="SessionV2Filter", description="Added in 26.3.0. Filter criteria for querying sessions."
 )
 class SessionV2FilterGQL(GQLFilter):
     id: UUIDFilter | None = None
@@ -143,7 +143,7 @@ class SessionV2FilterGQL(GQLFilter):
 
 
 @strawberry.input(
-    name="SessionV2OrderBy", description="Added in 26.2.0. Ordering specification for sessions."
+    name="SessionV2OrderBy", description="Added in 26.3.0. Ordering specification for sessions."
 )
 class SessionV2OrderByGQL(GQLOrderBy):
     field: SessionV2OrderFieldGQL
@@ -158,7 +158,7 @@ class SessionV2OrderByGQL(GQLOrderBy):
 
 @strawberry.type(
     name="SessionV2MetadataInfo",
-    description="Added in 26.2.0. Metadata information for a session.",
+    description="Added in 26.3.0. Metadata information for a session.",
 )
 class SessionV2MetadataInfoGQL:
     creation_id: str = strawberry.field(
@@ -182,7 +182,7 @@ class SessionV2MetadataInfoGQL:
 
 @strawberry.type(
     name="SessionV2ResourceInfo",
-    description="Added in 26.2.0. Resource allocation information for a session.",
+    description="Added in 26.3.0. Resource allocation information for a session.",
 )
 class SessionV2ResourceInfoGQL:
     allocation: ResourceAllocationGQL = strawberry.field(
@@ -198,7 +198,7 @@ class SessionV2ResourceInfoGQL:
 
 @strawberry.type(
     name="SessionV2LifecycleInfo",
-    description="Added in 26.2.0. Lifecycle status and timestamps for a session.",
+    description="Added in 26.3.0. Lifecycle status and timestamps for a session.",
 )
 class SessionV2LifecycleInfoGQL:
     status: SessionV2StatusGQL = strawberry.field(description="Current status of the session.")
@@ -221,7 +221,7 @@ class SessionV2LifecycleInfoGQL:
 
 @strawberry.type(
     name="SessionV2RuntimeInfo",
-    description="Added in 26.2.0. Runtime execution configuration for a session.",
+    description="Added in 26.3.0. Runtime execution configuration for a session.",
 )
 class SessionV2RuntimeInfoGQL:
     environ: EnvironmentVariablesGQL | None = strawberry.field(
@@ -240,7 +240,7 @@ class SessionV2RuntimeInfoGQL:
 
 @strawberry.type(
     name="SessionV2NetworkInfo",
-    description="Added in 26.2.0. Network configuration for a session.",
+    description="Added in 26.3.0. Network configuration for a session.",
 )
 class SessionV2NetworkInfoGQL:
     use_host_network: bool = strawberry.field(
@@ -255,7 +255,7 @@ class SessionV2NetworkInfoGQL:
 
 @strawberry.type(
     name="SessionV2",
-    description="Added in 26.2.0. Represents a compute session in Backend.AI.",
+    description="Added in 26.3.0. Represents a compute session in Backend.AI.",
 )
 class SessionV2GQL(Node):
     """Session type representing a compute session."""
@@ -277,43 +277,43 @@ class SessionV2GQL(Node):
     network: SessionV2NetworkInfoGQL = strawberry.field(description="Network configuration.")
 
     @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The domain this session belongs to."
+        description="Added in 26.3.0. The domain this session belongs to."
     )
     async def domain(self) -> DomainV2GQL | None:
         raise NotImplementedError
 
     @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The user who owns this session."
+        description="Added in 26.3.0. The user who owns this session."
     )
     async def user(self) -> UserV2GQL | None:
         raise NotImplementedError
 
     @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The project this session belongs to."
+        description="Added in 26.3.0. The project this session belongs to."
     )
     async def project(self) -> ProjectV2GQL | None:
         raise NotImplementedError
 
     @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The resource group this session is assigned to."
+        description="Added in 26.3.0. The resource group this session is assigned to."
     )
     async def resource_group(self) -> ResourceGroupGQL | None:
         raise NotImplementedError
 
     @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The candidate resource groups considered during scheduling."
+        description="Added in 26.3.0. The candidate resource groups considered during scheduling."
     )
     async def target_resource_groups(self) -> ResourceGroupConnection | None:
         raise NotImplementedError
 
     @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions."
+        description="Added in 26.3.0. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions."
     )
     async def images(self) -> ImageV2ConnectionGQL:
         raise NotImplementedError
 
     @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The kernels belonging to this session."
+        description="Added in 26.3.0. The kernels belonging to this session."
     )
     async def kernels(self) -> KernelV2ConnectionGQL:
         raise NotImplementedError
@@ -344,7 +344,7 @@ SessionV2EdgeGQL = Edge[SessionV2GQL]
 
 @strawberry.type(
     name="SessionV2Connection",
-    description="Added in 26.2.0. Connection type for paginated session results.",
+    description="Added in 26.3.0. Connection type for paginated session results.",
 )
 class SessionV2ConnectionGQL(Connection[SessionV2GQL]):
     count: int

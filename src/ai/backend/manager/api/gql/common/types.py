@@ -48,7 +48,7 @@ class ClusterModeGQL(StrEnum):
 
 @strawberry.enum(
     name="SessionV2Type",
-    description="Added in 26.2.0. Type of compute session.",
+    description="Added in 26.3.0. Type of compute session.",
 )
 class SessionV2TypeGQL(StrEnum):
     """GraphQL enum for session types."""
@@ -87,7 +87,7 @@ class SessionV2TypeGQL(StrEnum):
 @strawberry.enum(
     name="SessionV2Result",
     description=(
-        "Added in 26.2.0. Result status of a session or kernel execution. "
+        "Added in 26.3.0. Result status of a session or kernel execution. "
         "Indicates the final outcome after the session/kernel has terminated. "
         "UNDEFINED: The session has not yet finished or its result is unknown. "
         "SUCCESS: The session completed normally without errors. "

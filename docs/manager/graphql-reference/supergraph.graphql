@@ -5407,7 +5407,7 @@ type KernelV2 implements Node
   """Added in 26.2.0. The resource group this kernel is assigned to."""
   resourceGroup: ResourceGroup
 
-  """Added in 26.2.0. The session this kernel belongs to."""
+  """Added in 26.3.0. The session this kernel belongs to."""
   session: SessionV2
 }
 
@@ -9172,7 +9172,7 @@ type Query
   """Added in 26.2.0. Query a single kernel by ID."""
   kernelV2(id: UUID!): KernelV2 @join__field(graph: STRAWBERRY)
 
-  """Added in 26.2.0. Query a single session by ID."""
+  """Added in 26.3.0. Query a single session by ID."""
   sessionV2(id: UUID!): SessionV2 @join__field(graph: STRAWBERRY)
 
   """
@@ -9267,7 +9267,7 @@ type Query
   adminKernelsV2(filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.2.0. Query sessions with pagination and filtering. (admin only)
+  Added in 26.3.0. Query sessions with pagination and filtering. (admin only)
   """
   adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection! @join__field(graph: STRAWBERRY)
 
@@ -11070,7 +11070,7 @@ enum SessionTypes
   SYSTEM @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.2.0. Represents a compute session in Backend.AI."""
+"""Added in 26.3.0. Represents a compute session in Backend.AI."""
 type SessionV2 implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -11093,33 +11093,33 @@ type SessionV2 implements Node
   """Network configuration."""
   network: SessionV2NetworkInfo!
 
-  """Added in 26.2.0. The domain this session belongs to."""
+  """Added in 26.3.0. The domain this session belongs to."""
   domain: DomainV2
 
-  """Added in 26.2.0. The user who owns this session."""
+  """Added in 26.3.0. The user who owns this session."""
   user: UserV2
 
-  """Added in 26.2.0. The project this session belongs to."""
+  """Added in 26.3.0. The project this session belongs to."""
   project: ProjectV2
 
-  """Added in 26.2.0. The resource group this session is assigned to."""
+  """Added in 26.3.0. The resource group this session is assigned to."""
   resourceGroup: ResourceGroup
 
   """
-  Added in 26.2.0. The candidate resource groups considered during scheduling.
+  Added in 26.3.0. The candidate resource groups considered during scheduling.
   """
   targetResourceGroups: ResourceGroupConnection
 
   """
-  Added in 26.2.0. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
+  Added in 26.3.0. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
   """
   images: ImageV2Connection!
 
-  """Added in 26.2.0. The kernels belonging to this session."""
+  """Added in 26.3.0. The kernels belonging to this session."""
   kernels: KernelV2Connection!
 }
 
-"""Added in 26.2.0. Connection type for paginated session results."""
+"""Added in 26.3.0. Connection type for paginated session results."""
 type SessionV2Connection
   @join__type(graph: STRAWBERRY)
 {
@@ -11142,7 +11142,7 @@ type SessionV2Edge
   node: SessionV2!
 }
 
-"""Added in 26.2.0. Filter criteria for querying sessions."""
+"""Added in 26.3.0. Filter criteria for querying sessions."""
 input SessionV2Filter
   @join__type(graph: STRAWBERRY)
 {
@@ -11154,7 +11154,7 @@ input SessionV2Filter
   userUuid: UUIDFilter = null
 }
 
-"""Added in 26.2.0. Lifecycle status and timestamps for a session."""
+"""Added in 26.3.0. Lifecycle status and timestamps for a session."""
 type SessionV2LifecycleInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -11177,7 +11177,7 @@ type SessionV2LifecycleInfo
   batchTimeout: Int
 }
 
-"""Added in 26.2.0. Metadata information for a session."""
+"""Added in 26.3.0. Metadata information for a session."""
 type SessionV2MetadataInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -11209,7 +11209,7 @@ type SessionV2MetadataInfo
   tag: String
 }
 
-"""Added in 26.2.0. Network configuration for a session."""
+"""Added in 26.3.0. Network configuration for a session."""
 type SessionV2NetworkInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -11223,7 +11223,7 @@ type SessionV2NetworkInfo
   networkId: String
 }
 
-"""Added in 26.2.0. Ordering specification for sessions."""
+"""Added in 26.3.0. Ordering specification for sessions."""
 input SessionV2OrderBy
   @join__type(graph: STRAWBERRY)
 {
@@ -11231,7 +11231,7 @@ input SessionV2OrderBy
   direction: OrderDirection! = DESC
 }
 
-"""Added in 26.2.0. Fields available for ordering sessions."""
+"""Added in 26.3.0. Fields available for ordering sessions."""
 enum SessionV2OrderField
   @join__type(graph: STRAWBERRY)
 {
@@ -11242,7 +11242,7 @@ enum SessionV2OrderField
   NAME @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.2.0. Resource allocation information for a session."""
+"""Added in 26.3.0. Resource allocation information for a session."""
 type SessionV2ResourceInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -11257,7 +11257,7 @@ type SessionV2ResourceInfo
 }
 
 """
-Added in 26.2.0. Result status of a session or kernel execution. Indicates the final outcome after the session/kernel has terminated. UNDEFINED: The session has not yet finished or its result is unknown. SUCCESS: The session completed normally without errors. FAILURE: The session terminated abnormally due to an error or user cancellation.
+Added in 26.3.0. Result status of a session or kernel execution. Indicates the final outcome after the session/kernel has terminated. UNDEFINED: The session has not yet finished or its result is unknown. SUCCESS: The session completed normally without errors. FAILURE: The session terminated abnormally due to an error or user cancellation.
 """
 enum SessionV2Result
   @join__type(graph: STRAWBERRY)
@@ -11267,7 +11267,7 @@ enum SessionV2Result
   FAILURE @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.2.0. Runtime execution configuration for a session."""
+"""Added in 26.3.0. Runtime execution configuration for a session."""
 type SessionV2RuntimeInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -11286,7 +11286,7 @@ type SessionV2RuntimeInfo
   callbackUrl: String
 }
 
-"""Added in 26.2.0. Status of a session in its lifecycle."""
+"""Added in 26.3.0. Status of a session in its lifecycle."""
 enum SessionV2Status
   @join__type(graph: STRAWBERRY)
 {
@@ -11302,7 +11302,7 @@ enum SessionV2Status
   CANCELLED @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.2.0. Filter for session status."""
+"""Added in 26.3.0. Filter for session status."""
 input SessionV2StatusFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -11310,7 +11310,7 @@ input SessionV2StatusFilter
   notIn: [SessionV2Status!] = null
 }
 
-"""Added in 26.2.0. Type of compute session."""
+"""Added in 26.3.0. Type of compute session."""
 enum SessionV2Type
   @join__type(graph: STRAWBERRY)
 {

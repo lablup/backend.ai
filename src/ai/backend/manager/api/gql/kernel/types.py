@@ -451,7 +451,7 @@ class KernelV2GQL(Node):
         return ResourceGroupGQL.from_dataclass(resource_group_data)
 
     @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The session this kernel belongs to."
+        description="Added in 26.3.0. The session this kernel belongs to."
     )
     async def session(
         self,

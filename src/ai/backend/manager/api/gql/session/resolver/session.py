@@ -17,7 +17,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
 
-@strawberry.field(description="Added in 26.2.0. Query a single session by ID.")  # type: ignore[misc]
+@strawberry.field(description="Added in 26.3.0. Query a single session by ID.")  # type: ignore[misc]
 async def session_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -26,7 +26,7 @@ async def session_v2(
 
 
 @strawberry.field(
-    description="Added in 26.2.0. Query sessions with pagination and filtering. (admin only)"
+    description="Added in 26.3.0. Query sessions with pagination and filtering. (admin only)"
 )  # type: ignore[misc]
 async def admin_sessions_v2(
     info: Info[StrawberryGQLContext],
