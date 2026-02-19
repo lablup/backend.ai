@@ -275,10 +275,8 @@ class EntityType(enum.StrEnum):
 
         try:
             return RBACElementType(self.value)
-        except ValueError:
-            raise RBACTypeConversionError(
-                f"{self!r} has no corresponding RBACElementType"
-            ) from None
+        except ValueError as e:
+            raise RBACTypeConversionError(f"{self!r} has no corresponding RBACElementType") from e
 
 
 class FieldType(enum.StrEnum):
@@ -319,10 +317,8 @@ class ScopeType(enum.StrEnum):
 
         try:
             return RBACElementType(self.value)
-        except ValueError:
-            raise RBACTypeConversionError(
-                f"{self!r} has no corresponding RBACElementType"
-            ) from None
+        except ValueError as e:
+            raise RBACTypeConversionError(f"{self!r} has no corresponding RBACElementType") from e
 
 
 GLOBAL_SCOPE_ID = "global"
@@ -385,8 +381,8 @@ class RBACElementType(enum.StrEnum):
 
         try:
             return ScopeType(self.value)
-        except ValueError:
-            raise RBACTypeConversionError(f"{self!r} has no corresponding ScopeType") from None
+        except ValueError as e:
+            raise RBACTypeConversionError(f"{self!r} has no corresponding ScopeType") from e
 
     def to_entity_type(self) -> EntityType:
         """Temporary bridge for DB/ORM layers that still use EntityType.
@@ -397,8 +393,8 @@ class RBACElementType(enum.StrEnum):
 
         try:
             return EntityType(self.value)
-        except ValueError:
-            raise RBACTypeConversionError(f"{self!r} has no corresponding EntityType") from None
+        except ValueError as e:
+            raise RBACTypeConversionError(f"{self!r} has no corresponding EntityType") from e
 
 
 class RelationType(enum.StrEnum):
