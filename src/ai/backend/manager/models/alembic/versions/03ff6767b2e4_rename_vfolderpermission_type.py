@@ -1,7 +1,7 @@
 """Rename vfolderpermission PG enum type to vfoldermountpermission
 
-Revision ID: ba4530_rename_vfolderpermission_type
-Revises: ba4308_usage_entries
+Revision ID: 03ff6767b2e4
+Revises: 12b02ba4d44b
 Create Date: 2026-02-18 00:00:00.000000
 
 """
@@ -9,8 +9,8 @@ Create Date: 2026-02-18 00:00:00.000000
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "ba4530_rename_vfolderpermission_type"
-down_revision = "ba4308_usage_entries"
+revision = "03ff6767b2e4"
+down_revision = "12b02ba4d44b"
 branch_labels = None
 depends_on = None
 
