@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
-import tempfile
+import tomllib
 from pathlib import Path
 
 from prometheus_client import CollectorRegistry, generate_latest
@@ -29,18 +29,45 @@ log = logging.getLogger(__spec__.name)
 
 _multiprocess_dir: Path | None = None
 
+_DEFAULT_BASE_DIR = Path("/var/run/backendai/prometheus/")
 
-def setup_prometheus_multiprocess_dir(component: str = "manager") -> Path:
+
+def _read_prometheus_dir_from_config(config_path: Path | None, section: str) -> Path | None:
+    """
+    Lightweight TOML pre-read to extract prometheus-multiproc-dir from config.
+
+    This is used by start_server.py before the full config system is loaded.
+    """
+    if config_path is None:
+        return None
+    try:
+        with config_path.open("rb") as f:
+            raw = tomllib.load(f)
+        value = raw.get(section, {}).get("prometheus-multiproc-dir")
+        if value:
+            return Path(value)
+    except Exception:
+        log.warning("Failed to pre-read prometheus config from %s", config_path, exc_info=True)
+    return None
+
+
+def setup_prometheus_multiprocess_dir(
+    component: str = "manager",
+    *,
+    base_dir: Path | None = None,
+) -> Path:
     """
     Set up the prometheus multiprocess directory and environment variable.
 
     MUST be called before any prometheus_client import.
 
-    Creates a temporary directory for prometheus multiprocess files and sets
+    Creates a directory for prometheus multiprocess files and sets
     the PROMETHEUS_MULTIPROC_DIR environment variable.
 
     Args:
         component: Component name for directory naming (e.g., 'manager', 'agent')
+        base_dir: Base directory for prometheus files. The component name is appended
+                  as a subdirectory. If None, defaults to /var/run/backendai/prometheus/.
 
     Returns:
         Path to the created multiprocess directory
@@ -50,15 +77,18 @@ def setup_prometheus_multiprocess_dir(component: str = "manager") -> Path:
     if _multiprocess_dir is not None:
         return _multiprocess_dir
 
-    base_dir = Path(tempfile.gettempdir()) / "backendai-prometheus"
-    base_dir.mkdir(parents=True, exist_ok=True)
+    if base_dir is None:
+        base_dir = _DEFAULT_BASE_DIR
 
-    multiprocess_dir = Path(
-        tempfile.mkdtemp(
-            prefix=f"{component}-",
-            dir=base_dir,
-        )
-    )
+    multiprocess_dir = base_dir / component
+    multiprocess_dir.mkdir(parents=True, exist_ok=True)
+
+    # Clean stale .db files from previous runs
+    for db_file in multiprocess_dir.glob("*.db"):
+        try:
+            db_file.unlink()
+        except OSError:
+            pass
 
     os.environ["PROMETHEUS_MULTIPROC_DIR"] = str(multiprocess_dir)
     _multiprocess_dir = multiprocess_dir
@@ -75,9 +105,31 @@ def generate_latest_multiprocess() -> bytes:
 
     This should be used by multi-worker components (manager, agent, storage, etc.).
     """
-    registry = CollectorRegistry()
-    MultiProcessCollector(registry)  # type: ignore[no-untyped-call]
-    return generate_latest(registry)
+    try:
+        registry = CollectorRegistry()
+        MultiProcessCollector(registry)  # type: ignore[no-untyped-call]
+        return generate_latest(registry)
+    except ValueError:
+        # Directory may have been deleted (e.g., by systemd-tmpfiles-clean).
+        # Attempt to recreate it and retry once.
+        if _multiprocess_dir is not None:
+            try:
+                _multiprocess_dir.mkdir(parents=True, exist_ok=True)
+                os.environ["PROMETHEUS_MULTIPROC_DIR"] = str(_multiprocess_dir)
+                registry = CollectorRegistry()
+                MultiProcessCollector(registry)  # type: ignore[no-untyped-call]
+                log.warning(
+                    "Prometheus multiprocess dir was missing and has been recreated: %s",
+                    _multiprocess_dir,
+                )
+                return generate_latest(registry)
+            except Exception:
+                log.error(
+                    "Failed to recover prometheus multiprocess dir: %s",
+                    _multiprocess_dir,
+                    exc_info=True,
+                )
+        return b""
 
 
 def generate_latest_singleprocess() -> bytes:

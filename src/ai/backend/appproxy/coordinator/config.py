@@ -526,6 +526,22 @@ class ProxyCoordinatorConfig(BaseSchema):
             example=ConfigExample(local="127.0.0.1:10200", prod="coordinator.example.com:10200"),
         ),
     ]
+    prometheus_multiproc_dir: Annotated[
+        Path,
+        Field(default=Path("/var/run/backendai/prometheus/")),
+        BackendAIConfigMeta(
+            description=(
+                "Base directory for Prometheus multiprocess metric files. "
+                "The component name is appended as a subdirectory. "
+                "Must be outside /tmp to avoid cleanup by systemd-tmpfiles-clean."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(
+                local="/tmp/backendai-prometheus/",
+                prod="/var/run/backendai/prometheus/",
+            ),
+        ),
+    ]
 
     @property
     def advertise_base_url(self) -> str:

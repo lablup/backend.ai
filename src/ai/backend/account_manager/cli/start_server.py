@@ -20,7 +20,7 @@ def main(ctx: click.Context) -> None:
     """
     from ai.backend.common.metrics.multiprocess import setup_prometheus_multiprocess_dir
 
-    setup_prometheus_multiprocess_dir("account-manager")
+    setup_prometheus_multiprocess_dir("account-manager")  # no config_path available in this CLI
 
     from ai.backend.account_manager.server import main as server_main
 

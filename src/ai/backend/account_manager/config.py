@@ -373,6 +373,17 @@ class AccountManagerConfig(BaseSchema):
             gt=0, lt=65536, description="Port number for aiomonitor webui server.", default=39500
         ),
     ]
+    prometheus_multiproc_dir: Annotated[
+        Path,
+        Field(
+            default=Path("/var/run/backendai/prometheus/"),
+            description=(
+                "Base directory for Prometheus multiprocess metric files. "
+                "The component name is appended as a subdirectory. "
+                "Must be outside /tmp to avoid cleanup by systemd-tmpfiles-clean."
+            ),
+        ),
+    ]
 
 
 class PyroscopeConfig(BaseSchema):

@@ -798,6 +798,22 @@ class ProxyWorkerConfig(BaseSchema):
             example=ConfigExample(local="", prod="worker.example.com:10201"),
         ),
     ]
+    prometheus_multiproc_dir: Annotated[
+        Path,
+        Field(default=Path("/var/run/backendai/prometheus/")),
+        BackendAIConfigMeta(
+            description=(
+                "Base directory for Prometheus multiprocess metric files. "
+                "The component name is appended as a subdirectory. "
+                "Must be outside /tmp to avoid cleanup by systemd-tmpfiles-clean."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(
+                local="/tmp/backendai-prometheus/",
+                prod="/var/run/backendai/prometheus/",
+            ),
+        ),
+    ]
 
     @model_validator(mode="after")
     def populate_announce_addr(self) -> Self:
