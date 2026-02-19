@@ -270,6 +270,14 @@ class EntityType(enum.StrEnum):
         """
         return {*cls._resource_types(), cls.USER}
 
+    def to_element(self) -> RBACElementType:
+        from ai.backend.common.exception import RBACTypeConversionError
+
+        try:
+            return RBACElementType(self.value)
+        except ValueError as e:
+            raise RBACTypeConversionError(f"{self!r} has no corresponding RBACElementType") from e
+
 
 class FieldType(enum.StrEnum):
     """Field types for RBAC field-scoped entities.
@@ -303,6 +311,14 @@ class ScopeType(enum.StrEnum):
     ARTIFACT = "artifact"
     ARTIFACT_REVISION = "artifact_revision"
     ROLE = "role"
+
+    def to_element(self) -> RBACElementType:
+        from ai.backend.common.exception import RBACTypeConversionError
+
+        try:
+            return RBACElementType(self.value)
+        except ValueError as e:
+            raise RBACTypeConversionError(f"{self!r} has no corresponding RBACElementType") from e
 
 
 GLOBAL_SCOPE_ID = "global"
@@ -355,6 +371,30 @@ class RBACElementType(enum.StrEnum):
 
     # === Entity-level scopes (for entity-scope permissions) ===
     ARTIFACT_REVISION = "artifact_revision"
+
+    def to_scope_type(self) -> ScopeType:
+        """Temporary bridge for DB/ORM layers that still use ScopeType.
+
+        TODO: Remove after the RBAC ORM migration and ScopeType removal are complete.
+        """
+        from ai.backend.common.exception import RBACTypeConversionError
+
+        try:
+            return ScopeType(self.value)
+        except ValueError as e:
+            raise RBACTypeConversionError(f"{self!r} has no corresponding ScopeType") from e
+
+    def to_entity_type(self) -> EntityType:
+        """Temporary bridge for DB/ORM layers that still use EntityType.
+
+        TODO: Remove after the RBAC ORM migration and EntityType RBAC usage removal are complete.
+        """
+        from ai.backend.common.exception import RBACTypeConversionError
+
+        try:
+            return EntityType(self.value)
+        except ValueError as e:
+            raise RBACTypeConversionError(f"{self!r} has no corresponding EntityType") from e
 
 
 class RelationType(enum.StrEnum):

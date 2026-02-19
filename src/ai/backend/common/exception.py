@@ -1153,3 +1153,17 @@ class JWTPayloadValidationError(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.AUTH,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class RBACTypeConversionError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when an RBAC enum value cannot be converted to another RBAC enum type."""
+
+    error_type = "https://api.backend.ai/probs/rbac-type-conversion-error"
+    error_title = "RBAC type conversion failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
