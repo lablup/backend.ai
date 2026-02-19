@@ -1160,19 +1160,19 @@ async def create_download_session(
         t.Key("files"): t.List(t.String, min_length=1),
     })
 )
-async def create_download_archive_session(
+async def create_archive_download_session(
     request: web.Request, params: Any, row: Mapping[str, Any]
 ) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     log.info(
-        "VFOLDER.CREATE_DOWNLOAD_ARCHIVE_SESSION(email:{}, ak:{}, vf:{} (resolved-from:{!r}), files:{})",
+        "VFOLDER.CREATE_ARCHIVE_DOWNLOAD_SESSION(email:{}, ak:{}, vf:{} (resolved-from:{!r}), files:{})",
         request["user"]["email"],
         request["keypair"]["access_key"],
         row["id"],
         request.match_info["name"],
         params["files"],
     )
-    result = await root_ctx.processors.vfolder_file.download_archive_file.wait_for_complete(
+    result = await root_ctx.processors.vfolder_file.create_archive_download_session.wait_for_complete(
         CreateArchiveDownloadSessionAction(
             keypair_resource_policy=request["keypair"]["resource_policy"],
             vfolder_uuid=row["id"],
@@ -2899,7 +2899,7 @@ def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list
     cors.add(add_route("POST", r"/{name}/request-upload", create_upload_session))
     cors.add(add_route("POST", r"/{name}/request-download", create_download_session))
     cors.add(
-        add_route("POST", r"/{name}/request-download-archive", create_download_archive_session)
+        add_route("POST", r"/{name}/request-download-archive", create_archive_download_session)
     )
     cors.add(add_route("POST", r"/{name}/move-file", move_file))
     cors.add(add_route("POST", r"/{name}/rename-file", rename_file))
