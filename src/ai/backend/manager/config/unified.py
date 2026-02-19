@@ -2497,7 +2497,9 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
         HttpTimeoutConfig,
         Field(
             default_factory=lambda: _DEFAULT_TIMEOUT,
-            validation_alias=AliasChoices("create-archive-download-session", "create_archive_download_session"),
+            validation_alias=AliasChoices(
+                "create-archive-download-session", "create_archive_download_session"
+            ),
             serialization_alias="create-archive-download-session",
         ),
         BackendAIConfigMeta(

@@ -182,7 +182,9 @@ class TestVFolderFileServiceCreateArchiveDownload:
         manager.get_proxy_and_volume.return_value = (self.PROXY_NAME, self.VOLUME_NAME)
         manager.get_client_api_url.return_value = self.STORAGE_URL
         mock_client = MagicMock()
-        mock_client.create_archive_download_token = AsyncMock(return_value={"token": self.STORAGE_TOKEN})
+        mock_client.create_archive_download_token = AsyncMock(
+            return_value={"token": self.STORAGE_TOKEN}
+        )
         manager.get_manager_facing_client.return_value = mock_client
         return manager
 

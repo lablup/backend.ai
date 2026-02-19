@@ -1172,11 +1172,13 @@ async def create_archive_download_session(
         request.match_info["name"],
         params["files"],
     )
-    result = await root_ctx.processors.vfolder_file.create_archive_download_session.wait_for_complete(
-        CreateArchiveDownloadSessionAction(
-            keypair_resource_policy=request["keypair"]["resource_policy"],
-            vfolder_uuid=row["id"],
-            files=params["files"],
+    result = (
+        await root_ctx.processors.vfolder_file.create_archive_download_session.wait_for_complete(
+            CreateArchiveDownloadSessionAction(
+                keypair_resource_policy=request["keypair"]["resource_policy"],
+                vfolder_uuid=row["id"],
+                files=params["files"],
+            )
         )
     )
     resp = {"token": result.token, "url": result.url}
