@@ -847,6 +847,11 @@ async def populate_fixture(
                         if col.name in row and row[col.name] is not None:
                             if not isinstance(row[col.name], VFolderHostPermissionMap):
                                 row[col.name] = VFolderHostPermissionMap(row[col.name])
+                elif isinstance(col.type, PydanticColumn):
+                    for row in rows:
+                        if col.name in row and row[col.name] is not None:
+                            if not isinstance(row[col.name], col.type._schema):
+                                row[col.name] = col.type._schema.model_validate(row[col.name])
 
             match op_mode:
                 case FixtureOpModes.INSERT:
