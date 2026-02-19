@@ -13,7 +13,6 @@ from collections.abc import AsyncIterator, Iterator
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import asyncpg
 import pytest
@@ -26,6 +25,9 @@ from sqlalchemy.ext.asyncio.engine import create_async_engine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.configs.etcd import EtcdConfig
+from ai.backend.common.configs.loader import EtcdConfigWatcher, LoaderChain
+from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.jwt.validator import JWTValidator
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.logging import LocalLogger, LogLevel
@@ -37,6 +39,14 @@ from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
 from ai.backend.manager.config.bootstrap import BootstrapConfig
+from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.config.unified import (
+    DatabaseConfig,
+    DebugConfig,
+    ManagerConfig,
+    ManagerUnifiedConfig,
+)
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import association_groups_users
@@ -55,26 +65,16 @@ from ai.backend.manager.models.user import users
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.server import (
     build_root_app,
-    config_provider_ctx,
     etcd_ctx,
     global_subapp_pkgs,
     webapp_plugin_ctx,
 )
-from ai.backend.testutils.bootstrap import (
+from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
     redis_container,
 )
 from ai.backend.testutils.pants import get_parallel_slot
-
-# Re-export testcontainer fixtures so pytest can discover them
-__all__ = [
-    "etcd_container",
-    "redis_container",
-    "postgres_container",
-]
-
-here = Path(__file__).parent
 
 log = logging.getLogger("tests.integration.conftest")
 
@@ -103,7 +103,7 @@ class ServerInfo:
         return f"http://{self.host}:{self.port}"
 
 
-def pytest_configure(config: Any) -> None:
+def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers",
         "integration: mark test as an integration test (requires full-stack server)",
@@ -196,9 +196,9 @@ def bootstrap_config(
     test_id: str,
     ipc_base_path: Path,
     logging_config: LoggingConfig,
-    etcd_container: tuple[str, HostPortPairModel],
-    redis_container: tuple[str, HostPortPairModel],
-    postgres_container: tuple[str, HostPortPairModel],
+    etcd_container: tuple[str, HostPortPairModel],  # noqa: F811
+    redis_container: tuple[str, HostPortPairModel],  # noqa: F811
+    postgres_container: tuple[str, HostPortPairModel],  # noqa: F811
     test_db: str,
 ) -> Iterator[BootstrapConfig]:
     etcd_addr = etcd_container[1]
@@ -206,48 +206,48 @@ def bootstrap_config(
 
     build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
 
-    config = BootstrapConfig.model_validate({
-        "etcd": {
+    config = BootstrapConfig(
+        etcd=EtcdConfig.model_validate({
             "namespace": test_id,
-            "addr": {"host": etcd_addr.host, "port": etcd_addr.port},
-        },
-        "db": {
+            "addr": HostPortPairModel(host=etcd_addr.host, port=etcd_addr.port),
+        }),
+        db=DatabaseConfig.model_validate({
             "addr": postgres_addr,
             "name": test_db,
             "user": "postgres",
             "password": "develove",
-            "pool-size": 8,
-            "pool-recycle": -1,
-            "pool-pre-ping": False,
-            "max-overflow": 64,
-            "lock-conn-timeout": 0,
-        },
-        "manager": {
+            "pool_size": 8,
+            "pool_recycle": -1,
+            "pool_pre_ping": False,
+            "max_overflow": 64,
+            "lock_conn_timeout": 0,
+        }),
+        manager=ManagerConfig.model_validate({
             "id": f"i-{test_id}",
-            "num-proc": 1,
-            "distributed-lock": "filelock",
-            "ipc-base-path": ipc_base_path,
-            "service-addr": HostPortPairModel(
+            "num_proc": 1,
+            "distributed_lock": "filelock",
+            "ipc_base_path": ipc_base_path,
+            "service_addr": HostPortPairModel(
                 host="127.0.0.1", port=29100 + get_parallel_slot() * 10
             ),
-            "allowed-plugins": set(),
-            "disabled-plugins": set(),
-            "rpc-auth-manager-keypair": f"{build_root}/fixtures/manager/manager.key_secret",
-        },
-        "pyroscope": {
+            "allowed_plugins": set(),
+            "disabled_plugins": set(),
+            "rpc_auth_manager_keypair": build_root / "fixtures" / "manager" / "manager.key_secret",
+        }),
+        pyroscope=PyroscopeConfig(
+            enabled=False,
+            app_name="backend.ai-test",
+            server_addr="http://localhost:4040",
+            sample_rate=100,
+        ),
+        debug=DebugConfig.model_validate({
             "enabled": False,
-            "app-name": "backend.ai-test",
-            "server-addr": "http://localhost:4040",
-            "sample-rate": 100,
-        },
-        "debug": {
-            "enabled": False,
-            "log-events": False,
-            "log-scheduler-ticks": False,
-            "periodic-sync-stats": False,
-        },
-        "logging": logging_config,
-    })
+            "log_events": False,
+            "log_scheduler_ticks": False,
+            "periodic_sync_stats": False,
+        }),
+        logging=logging_config,
+    )
 
     yield config
     try:
@@ -265,7 +265,7 @@ def bootstrap_config(
 def etcd_fixture(
     test_id: str,
     bootstrap_config: BootstrapConfig,
-    redis_container: tuple[str, HostPortPairModel],
+    redis_container: tuple[str, HostPortPairModel],  # noqa: F811
     vfolder_mount: Path,
     vfolder_fsprefix: Path,
     vfolder_host: str,
@@ -324,7 +324,9 @@ def etcd_fixture(
 
 
 @pytest.fixture(scope="session")
-def database(request: Any, bootstrap_config: BootstrapConfig, test_db: str) -> None:
+def database(
+    request: pytest.FixtureRequest, bootstrap_config: BootstrapConfig, test_db: str
+) -> None:
     db_url = (
         yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/testing")
         .with_port(bootstrap_config.db.addr.port)
@@ -663,14 +665,32 @@ async def server_factory(
     root_ctx: RootContext = root_app["_root.context"]
 
     await init_stack.__aenter__()
+    config_provider: ManagerConfigProvider | None = None
     try:
         await init_stack.enter_async_context(
             etcd_ctx(root_ctx, bootstrap_config.etcd.to_dataclass())
         )
-        base_cfg = bootstrap_config.model_dump()
-        await init_stack.enter_async_context(
-            config_provider_ctx(root_ctx, LogLevel.DEBUG, config_path=None, extra_config=base_cfg)
+
+        # Create ManagerConfigProvider directly, bypassing the production
+        # config loading pipeline (LoaderChain, TOML parsing, etcd watcher).
+        unified_config = ManagerUnifiedConfig.model_validate({
+            "db": bootstrap_config.db,
+            "etcd": bootstrap_config.etcd,
+            "manager": bootstrap_config.manager,
+            "logging": bootstrap_config.logging,
+            "pyroscope": bootstrap_config.pyroscope,
+            "debug": bootstrap_config.debug,
+        })
+        legacy_etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
+        etcd_watcher = EtcdConfigWatcher(root_ctx.etcd)
+        loader_chain = LoaderChain([legacy_etcd_loader])
+        config_provider = ManagerConfigProvider(
+            loader_chain,
+            unified_config,
+            etcd_watcher,
+            legacy_etcd_loader,
         )
+        root_ctx.config_provider = config_provider
 
         jwt_config = root_ctx.config_provider.config.jwt.to_jwt_config()
         root_ctx.jwt_validator = JWTValidator(jwt_config)
@@ -692,6 +712,8 @@ async def server_factory(
         yield ServerInfo(host=str(service_addr.host), port=service_addr.port)
     finally:
         await runner.cleanup()
+        if config_provider is not None:
+            await config_provider.terminate()
         await init_stack.__aexit__(None, None, None)
 
 
