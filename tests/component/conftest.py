@@ -26,6 +26,8 @@ from sqlalchemy.ext.asyncio.engine import create_async_engine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.configs.etcd import EtcdConfig
+from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
@@ -37,6 +39,12 @@ from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.config.unified import (
+    DatabaseConfig,
+    DebugConfig,
+    ManagerConfig,
+    ManagerUnifiedConfig,
+)
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import association_groups_users
@@ -55,7 +63,6 @@ from ai.backend.manager.models.user import users
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.server import (
     build_root_app,
-    config_provider_ctx,
     etcd_ctx,
     global_subapp_pkgs,
 )
@@ -176,48 +183,48 @@ def bootstrap_config(
 
     build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
 
-    config = BootstrapConfig.model_validate({
-        "etcd": {
+    config = BootstrapConfig(
+        etcd=EtcdConfig.model_validate({
             "namespace": test_id,
             "addr": {"host": etcd_addr.host, "port": etcd_addr.port},
-        },
-        "db": {
+        }),
+        db=DatabaseConfig.model_validate({
             "addr": postgres_addr,
             "name": test_db,
             "user": "postgres",
             "password": "develove",
-            "pool-size": 8,
-            "pool-recycle": -1,
-            "pool-pre-ping": False,
-            "max-overflow": 64,
-            "lock-conn-timeout": 0,
-        },
-        "manager": {
+            "pool_size": 8,
+            "pool_recycle": -1,
+            "pool_pre_ping": False,
+            "max_overflow": 64,
+            "lock_conn_timeout": 0,
+        }),
+        manager=ManagerConfig.model_validate({
             "id": f"i-{test_id}",
-            "num-proc": 1,
-            "distributed-lock": "filelock",
-            "ipc-base-path": ipc_base_path,
-            "service-addr": HostPortPairModel(
+            "num_proc": 1,
+            "distributed_lock": "filelock",
+            "ipc_base_path": ipc_base_path,
+            "service_addr": HostPortPairModel(
                 host="127.0.0.1", port=29100 + get_parallel_slot() * 10
             ),
-            "allowed-plugins": set(),
-            "disabled-plugins": set(),
-            "rpc-auth-manager-keypair": f"{build_root}/fixtures/manager/manager.key_secret",
-        },
-        "pyroscope": {
+            "allowed_plugins": set(),
+            "disabled_plugins": set(),
+            "rpc_auth_manager_keypair": f"{build_root}/fixtures/manager/manager.key_secret",
+        }),
+        pyroscope=PyroscopeConfig.model_validate({
             "enabled": False,
-            "app-name": "backend.ai-test",
-            "server-addr": "http://localhost:4040",
-            "sample-rate": 100,
-        },
-        "debug": {
+            "app_name": "backend.ai-test",
+            "server_addr": "http://localhost:4040",
+            "sample_rate": 100,
+        }),
+        debug=DebugConfig.model_validate({
             "enabled": False,
-            "log-events": False,
-            "log-scheduler-ticks": False,
-            "periodic-sync-stats": False,
-        },
-        "logging": logging_config,
-    })
+            "log_events": False,
+            "log_scheduler_ticks": False,
+            "periodic_sync_stats": False,
+        }),
+        logging=logging_config,
+    )
 
     yield config
     try:
@@ -227,9 +234,6 @@ def bootstrap_config(
 
 
 EtcdCtxFactory = Callable[[RootContext], AbstractAsyncContextManager[None]]
-ConfigProviderCtxFactory = Callable[
-    [RootContext], AbstractAsyncContextManager[ManagerConfigProvider]
-]
 
 
 @pytest.fixture(scope="session")
@@ -238,18 +242,6 @@ def mock_etcd_ctx(
 ) -> EtcdCtxFactory:
     argument_binding_ctx = partial(etcd_ctx, etcd_config=bootstrap_config.etcd.to_dataclass())
     update_wrapper(argument_binding_ctx, etcd_ctx)
-    return argument_binding_ctx
-
-
-@pytest.fixture(scope="session")
-def mock_config_provider_ctx(
-    bootstrap_config: BootstrapConfig,
-) -> ConfigProviderCtxFactory:
-    base_cfg = bootstrap_config.model_dump()
-    argument_binding_ctx = partial(
-        config_provider_ctx, log_level=LogLevel.DEBUG, config_path=None, extra_config=base_cfg
-    )
-    update_wrapper(argument_binding_ctx, config_provider_ctx)
     return argument_binding_ctx
 
 
@@ -647,7 +639,6 @@ async def database_fixture(
 async def server(
     bootstrap_config: BootstrapConfig,
     mock_etcd_ctx: EtcdCtxFactory,
-    mock_config_provider_ctx: ConfigProviderCtxFactory,
     etcd_fixture: None,
     database_fixture: None,
 ) -> AsyncIterator[ServerInfo]:
@@ -669,10 +660,23 @@ async def server(
     exit_stack = AsyncExitStack()
     await exit_stack.__aenter__()
 
-    # Pre-initialize etcd and config_provider contexts
-    # (matching production server_main() at L1820-1828)
+    # Pre-initialize etcd context (real etcd connection via testcontainer)
     await exit_stack.enter_async_context(mock_etcd_ctx(root_ctx))
-    await exit_stack.enter_async_context(mock_config_provider_ctx(root_ctx))
+
+    # Set up config provider directly, bypassing the production
+    # LoaderChain / TOML parsing / etcd watcher pipeline.
+    unified_config = ManagerUnifiedConfig.model_validate({
+        "db": bootstrap_config.db,
+        "etcd": bootstrap_config.etcd,
+        "manager": bootstrap_config.manager,
+        "logging": bootstrap_config.logging,
+        "pyroscope": bootstrap_config.pyroscope,
+        "debug": bootstrap_config.debug,
+    })
+    config_provider = object.__new__(ManagerConfigProvider)
+    config_provider._config = unified_config
+    config_provider._etcd_watcher_task = asyncio.create_task(asyncio.sleep(0))
+    root_ctx.config_provider = config_provider
 
     runner = web.AppRunner(app, handle_signals=False)
     await runner.setup()
