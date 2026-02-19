@@ -681,9 +681,29 @@ class EntityScopeConditions:
 
         return inner
 
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssociationScopesEntitiesRow.id < uuid.UUID(cursor_id)
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssociationScopesEntitiesRow.id > uuid.UUID(cursor_id)
+
+        return inner
+
 
 class EntityScopeOrders:
     """Query orders for entity scope search."""
+
+    @staticmethod
+    def id(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return AssociationScopesEntitiesRow.id.asc()
+        return AssociationScopesEntitiesRow.id.desc()
 
     @staticmethod
     def entity_type(ascending: bool = True) -> QueryOrder:
