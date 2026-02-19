@@ -684,14 +684,42 @@ class EntityScopeConditions:
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AssociationScopesEntitiesRow.id < uuid.UUID(cursor_id)
+            cursor_subq = (
+                sa.select(
+                    AssociationScopesEntitiesRow.registered_at,
+                    AssociationScopesEntitiesRow.id,
+                )
+                .where(AssociationScopesEntitiesRow.id == uuid.UUID(cursor_id))
+                .scalar_subquery()
+            )
+            return (
+                sa.tuple_(
+                    AssociationScopesEntitiesRow.registered_at,
+                    AssociationScopesEntitiesRow.id,
+                )
+                < cursor_subq
+            )
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AssociationScopesEntitiesRow.id > uuid.UUID(cursor_id)
+            cursor_subq = (
+                sa.select(
+                    AssociationScopesEntitiesRow.registered_at,
+                    AssociationScopesEntitiesRow.id,
+                )
+                .where(AssociationScopesEntitiesRow.id == uuid.UUID(cursor_id))
+                .scalar_subquery()
+            )
+            return (
+                sa.tuple_(
+                    AssociationScopesEntitiesRow.registered_at,
+                    AssociationScopesEntitiesRow.id,
+                )
+                > cursor_subq
+            )
 
         return inner
 
