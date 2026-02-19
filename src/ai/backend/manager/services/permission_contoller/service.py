@@ -56,6 +56,10 @@ from ai.backend.manager.services.permission_contoller.actions.search_entities im
     SearchEntitiesAction,
     SearchEntitiesActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.search_entity_refs import (
+    SearchEntityRefsAction,
+    SearchEntityRefsActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.search_object_permissions import (
     SearchObjectPermissionsAction,
     SearchObjectPermissionsActionResult,
@@ -241,3 +245,10 @@ class PermissionControllerService:
         """Search entities within a scope."""
         result = await self._repository.search_entities(action.querier)
         return SearchEntitiesActionResult(result=result)
+
+    async def search_entity_refs(
+        self, action: SearchEntityRefsAction
+    ) -> SearchEntityRefsActionResult:
+        """Search entity refs (full association rows) within a scope."""
+        result = await self._repository.search_entity_refs(action.querier)
+        return SearchEntityRefsActionResult(result=result)
