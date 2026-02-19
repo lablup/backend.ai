@@ -3,6 +3,9 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 
+from ai.backend.manager.data.permission.association_scopes_entities import (
+    AssociationScopesEntitiesData,
+)
 from ai.backend.manager.data.permission.entity import EntityData
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.permission import PermissionData
@@ -13,6 +16,9 @@ from ai.backend.manager.repositories.permission_controller.options import (
     EntityScopeConditions,
     RoleConditions,
     ScopedPermissionConditions,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
+    SearchElementAssociationsAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_entities import (
     SearchEntitiesAction,
@@ -132,3 +138,23 @@ async def load_entities_by_type_and_ids(
         for e in action_result.result.items
     }
     return [entity_map.get(key) for key in keys]
+
+
+async def load_element_associations_by_ids(
+    processor: PermissionControllerProcessors,
+    ids: Sequence[uuid.UUID],
+) -> list[AssociationScopesEntitiesData | None]:
+    if not ids:
+        return []
+
+    querier = BatchQuerier(
+        pagination=NoPagination(),
+        conditions=[EntityScopeConditions.by_ids(ids)],
+    )
+
+    action_result = await processor.search_element_associations.wait_for_complete(
+        SearchElementAssociationsAction(querier=querier)
+    )
+
+    association_map = {a.id: a for a in action_result.result.items}
+    return [association_map.get(aid) for aid in ids]
