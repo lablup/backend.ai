@@ -14,6 +14,7 @@ __all__ = (
     "NotEnoughPermission",
     "ObjectPermissionNotFound",
     "PermissionNotFound",
+    "RBACTypeConversionError",
     "RoleAlreadyAssigned",
     "RoleNotAssigned",
     "RoleNotFound",
@@ -89,4 +90,16 @@ class ObjectPermissionNotFound(BackendAIError, web.HTTPNotFound):
             domain=ErrorDomain.PERMISSION,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class RBACTypeConversionError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/rbac-type-conversion-error"
+    error_title = "RBAC type conversion failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
