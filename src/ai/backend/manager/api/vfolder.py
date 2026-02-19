@@ -124,6 +124,7 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
 )
 from ai.backend.manager.services.vfolder.actions.file import (
+    CreateArchiveDownloadSessionAction,
     CreateDownloadSessionAction,
     CreateUploadSessionAction,
     DeleteFilesAction,
@@ -1144,6 +1145,38 @@ async def create_download_session(
             vfolder_uuid=row["id"],
             path=params["path"],
             archive=params["archive"],
+        )
+    )
+    resp = {"token": result.token, "url": result.url}
+    return web.json_response(resp, status=HTTPStatus.OK)
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE)
+@with_vfolder_status_checked(VFolderStatusSet.READABLE)
+@check_api_params(
+    t.Dict({
+        t.Key("files"): t.List(t.String, min_length=1),
+    })
+)
+async def create_download_archive_session(
+    request: web.Request, params: Any, row: Mapping[str, Any]
+) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    log.info(
+        "VFOLDER.CREATE_DOWNLOAD_ARCHIVE_SESSION(email:{}, ak:{}, vf:{} (resolved-from:{!r}), files:{})",
+        request["user"]["email"],
+        request["keypair"]["access_key"],
+        row["id"],
+        request.match_info["name"],
+        params["files"],
+    )
+    result = await root_ctx.processors.vfolder_file.download_archive_file.wait_for_complete(
+        CreateArchiveDownloadSessionAction(
+            keypair_resource_policy=request["keypair"]["resource_policy"],
+            vfolder_uuid=row["id"],
+            files=params["files"],
         )
     )
     resp = {"token": result.token, "url": result.url}
@@ -2865,6 +2898,9 @@ def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list
     cors.add(add_route("POST", r"/{name}/mkdir", mkdir))
     cors.add(add_route("POST", r"/{name}/request-upload", create_upload_session))
     cors.add(add_route("POST", r"/{name}/request-download", create_download_session))
+    cors.add(
+        add_route("POST", r"/{name}/request-download-archive", create_download_archive_session)
+    )
     cors.add(add_route("POST", r"/{name}/move-file", move_file))
     cors.add(add_route("POST", r"/{name}/rename-file", rename_file))
     cors.add(add_route("POST", r"/{name}/delete-files", delete_files))

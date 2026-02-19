@@ -14,6 +14,8 @@ from ai.backend.manager.models.vfolder import (
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.file import (
+    CreateArchiveDownloadSessionAction,
+    CreateArchiveDownloadSessionActionResult,
     CreateDownloadSessionAction,
     CreateDownloadSessionActionResult,
     CreateUploadSessionAction,
@@ -150,6 +152,37 @@ class VFolderFileService:
             vfolder_uuid=action.vfolder_uuid,
             token=storage_reply["token"],
             url=str(client_api_url / "download"),
+        )
+
+    async def download_archive_file(
+        self, action: CreateArchiveDownloadSessionAction
+    ) -> CreateArchiveDownloadSessionActionResult:
+        allowed_vfolder_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        )
+        info = await self._vfolder_repository.get_validated_vfolder_id(
+            action.vfolder_uuid,
+            permission=VFolderHostPermission.DOWNLOAD_FILE,
+            allowed_vfolder_types=allowed_vfolder_types,
+            resource_policy=action.keypair_resource_policy,
+        )
+        if is_unmanaged(info.unmanaged_path):
+            raise VFolderInvalidParameter(
+                "Archive download is not supported for unmanaged vfolders"
+            )
+
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(info.host, False)
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        storage_reply = await manager_client.download_archive_file(
+            volume=volume_name,
+            virtual_folder_id=str(info.vfolder_id),
+            files=action.files,
+        )
+        client_api_url = self._storage_manager.get_client_api_url(proxy_name)
+        return CreateArchiveDownloadSessionActionResult(
+            vfolder_uuid=action.vfolder_uuid,
+            token=storage_reply["token"],
+            url=str(client_api_url / "download-archive"),
         )
 
     async def list_files(self, action: ListFilesAction) -> ListFilesActionResult:

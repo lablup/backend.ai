@@ -264,6 +264,17 @@ class VFolderDeleteResult:
 
 
 @dataclass
+class ValidatedVFolderInfo:
+    """
+    VFolder info returned after access validation and host permission checks.
+    """
+
+    vfolder_id: VFolderID
+    host: str
+    unmanaged_path: str | None
+
+
+@dataclass
 class VFolderLocation:
     """
     Minimal VFolder location information for storage access.
