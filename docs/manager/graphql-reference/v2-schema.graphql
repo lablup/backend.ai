@@ -4909,6 +4909,9 @@ type Query {
   """Added in 26.2.0. Query a single kernel by ID."""
   kernelV2(id: UUID!): KernelV2
 
+  """Added in 26.2.0. Query a single session by ID."""
+  sessionV2(id: UUID!): SessionV2
+
   """
   Added in 26.2.0.
   
@@ -4999,6 +5002,11 @@ type Query {
   Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
   """
   adminKernelsV2(filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
+
+  """
+  Added in 26.2.0. Query sessions with pagination and filtering. (admin only)
+  """
+  adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
 
   """
   Added in 26.2.0.
@@ -5181,9 +5189,6 @@ type Query {
 
   """Added in 25.19.0. List routes for a deployment with optional filters."""
   routes(deploymentId: ID!, filter: RouteFilter = null, orderBy: [RouteOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteConnection
-
-  """Added in 26.2.0. Query sessions with pagination and filtering."""
-  adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
 
   """List session scheduling history (superadmin only)"""
   sessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection @deprecated(reason: "Use admin_session_scheduling_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
