@@ -183,6 +183,12 @@ def bootstrap_config(
 
     build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
 
+    # NOTE: All config models below use model_validate() instead of direct
+    # constructor calls because the pydantic-mypy plugin does not recognize
+    # default values declared via Annotated[..., Field(default=...)], treating
+    # every field as required. model_construct() was also considered but
+    # rejected because it skips validation entirely and does not populate
+    # missing fields with their defaults.
     config = BootstrapConfig(
         etcd=EtcdConfig.model_validate({
             "namespace": test_id,
@@ -635,6 +641,22 @@ async def database_fixture(
         await engine.dispose()
 
 
+class _TestConfigProvider(ManagerConfigProvider):
+    """Test-only subclass that provides a ManagerUnifiedConfig directly,
+    bypassing the production LoaderChain / TOML parsing / etcd watcher pipeline.
+
+    Only the ``config`` property is functional; production-only attributes
+    (_loader, _etcd_watcher, _legacy_etcd_config_loader) are not initialized.
+    """
+
+    def __init__(self, config: ManagerUnifiedConfig) -> None:
+        # Intentionally skip super().__init__() to avoid requiring
+        # LoaderChain, EtcdConfigWatcher, and LegacyEtcdLoader dependencies
+        # that are irrelevant in the test environment.
+        self._config = config
+        self._etcd_watcher_task = asyncio.create_task(asyncio.sleep(0))
+
+
 @pytest.fixture()
 async def server(
     bootstrap_config: BootstrapConfig,
@@ -665,6 +687,8 @@ async def server(
 
     # Set up config provider directly, bypassing the production
     # LoaderChain / TOML parsing / etcd watcher pipeline.
+    # NOTE: model_validate() used for the same pydantic-mypy reason
+    # documented in the bootstrap_config fixture above.
     unified_config = ManagerUnifiedConfig.model_validate({
         "db": bootstrap_config.db,
         "etcd": bootstrap_config.etcd,
@@ -673,10 +697,7 @@ async def server(
         "pyroscope": bootstrap_config.pyroscope,
         "debug": bootstrap_config.debug,
     })
-    config_provider = object.__new__(ManagerConfigProvider)
-    config_provider._config = unified_config
-    config_provider._etcd_watcher_task = asyncio.create_task(asyncio.sleep(0))
-    root_ctx.config_provider = config_provider
+    root_ctx.config_provider = _TestConfigProvider(unified_config)
 
     runner = web.AppRunner(app, handle_signals=False)
     await runner.setup()
