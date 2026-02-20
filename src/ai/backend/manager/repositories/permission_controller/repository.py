@@ -337,7 +337,7 @@ class PermissionControllerRepository:
         target_element_ref: RBACElementRef,
         operation: OperationType,
     ) -> bool:
-        """CTE-based permission check that traverses the scope chain via AUTO edges only.
+        """Permission check that traverses the scope chain via AUTO edges only.
 
         Walks the association_scopes_entities hierarchy upward from the target
         entity, checking if the user has the requested operation at any ancestor
