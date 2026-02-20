@@ -9,7 +9,7 @@ from collections.abc import Awaitable, Callable, Iterable
 from typing import Any, Final, cast
 
 import aiohttp
-from aiohttp import web
+from aiohttp import ClientConnectionError, web
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 from multidict import CIMultiDict
@@ -294,6 +294,11 @@ async def web_handler(
             }),
             content_type="application/problem+json",
         )
+    except ClientConnectionError:
+        log.warning(
+            "web_handler_with_jwt: ClientConnectionError - Client disconnected during proxying"
+        )
+        raise
     except Exception:
         log.exception("web_handler: unexpected error")
         return web.HTTPInternalServerError(
@@ -460,6 +465,11 @@ async def web_handler_with_jwt(
             }),
             content_type="application/problem+json",
         )
+    except ClientConnectionError:
+        log.warning(
+            "web_handler_with_jwt: ClientConnectionError - Client disconnected during proxying"
+        )
+        raise
     except Exception:
         log.exception("web_handler_with_jwt: unexpected error")
         return web.HTTPInternalServerError(
