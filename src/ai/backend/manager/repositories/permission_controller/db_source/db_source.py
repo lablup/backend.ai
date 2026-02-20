@@ -949,7 +949,7 @@ class PermissionDBSource:
     ) -> bool:
         """CTE-based permission check that traverses the scope chain.
 
-        Two-layer check (BEP-1048):
+        Two-layer check:
         1. Self-scope direct match — permission scoped to the target entity itself.
         2. Scope chain traversal — walks AUTO edges upward via CTE.
         """
