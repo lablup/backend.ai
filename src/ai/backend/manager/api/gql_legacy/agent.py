@@ -24,12 +24,11 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.bgtask.tasks.rescan_gpu_alloc_maps import RescanGPUAllocMapsManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
-from ai.backend.manager.data.agent.types import AgentData
+from ai.backend.manager.data.agent.types import AgentData, AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.models.agent import (
+from ai.backend.manager.models.agent.row import (
     ADMIN_PERMISSIONS,
     AgentRow,
-    AgentStatus,
     agents,
     get_permission_ctx,
 )
@@ -45,6 +44,7 @@ from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
+from ai.backend.manager.stat_utils import clamp_agent_cpu_util
 
 from .base import (
     FilterExprArg,
@@ -190,7 +190,8 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader_by_func(ctx, self.batch_load_live_stat)
-        return await loader.load(self.id)
+        stat_data = await loader.load(self.id)
+        return clamp_agent_cpu_util(stat_data)
 
     async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> dict[str, float]:
         return await _resolve_gpu_alloc_map(info.context, self.id)
@@ -406,7 +407,8 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_live_stat)
-        return await loader.load(self.id)
+        stat_data = await loader.load(self.id)
+        return clamp_agent_cpu_util(stat_data)
 
     async def resolve_cpu_cur_pct(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
@@ -586,9 +588,10 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[Any]:
         ret = []
         for stat in await cls.batch_load_live_stat(ctx, agent_ids):
-            if stat is not None:
+            clamped_stat = clamp_agent_cpu_util(stat)
+            if clamped_stat is not None:
                 try:
-                    ret.append(float(stat["node"]["cpu_util"]["pct"]))
+                    ret.append(float(clamped_stat["node"]["cpu_util"]["pct"]))
                 except (KeyError, TypeError, ValueError):
                     ret.append(0.0)
             else:
