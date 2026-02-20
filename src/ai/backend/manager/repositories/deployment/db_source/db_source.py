@@ -2273,7 +2273,7 @@ class DeploymentDBSource:
         """
         if not endpoint_ids:
             return {}
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
+        async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(DeploymentPolicyRow).where(
                 DeploymentPolicyRow.endpoint.in_(endpoint_ids)
             )
@@ -2288,18 +2288,23 @@ class DeploymentDBSource:
         """Complete rolling update by setting current_revision and clearing deploying_revision.
 
         For each endpoint, atomically sets current_revision to the new revision
-        and clears deploying_revision.
+        and clears deploying_revision. Groups endpoints by new_revision_id to
+        minimize database round-trips.
 
         Args:
             updates: Mapping of endpoint_id to new_revision_id.
         """
         if not updates:
             return
+        # Group endpoint IDs by new_revision_id for batch execution
+        revision_to_endpoints: dict[uuid.UUID, list[uuid.UUID]] = {}
+        for endpoint_id, new_revision_id in updates.items():
+            revision_to_endpoints.setdefault(new_revision_id, []).append(endpoint_id)
         async with self._begin_session_read_committed() as db_sess:
-            for endpoint_id, new_revision_id in updates.items():
+            for new_revision_id, endpoint_ids in revision_to_endpoints.items():
                 stmt = (
                     sa.update(EndpointRow)
-                    .where(EndpointRow.id == endpoint_id)
+                    .where(EndpointRow.id.in_(endpoint_ids))
                     .values(
                         current_revision=new_revision_id,
                         deploying_revision=None,

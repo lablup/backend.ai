@@ -34,7 +34,10 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
-from ai.backend.manager.errors.deployment import ReplicaCountMismatch
+from ai.backend.manager.errors.deployment import (
+    InvalidRollingUpdateParameters,
+    ReplicaCountMismatch,
+)
 from ai.backend.manager.errors.service import ModelDefinitionNotFound
 from ai.backend.manager.models.deployment_policy import (
     DeploymentPolicyData,
@@ -819,6 +822,14 @@ class DeploymentExecutor:
                 target_count = deployment.replica_spec.target_replica_count
                 deploying_revision_id = deployment.deploying_revision_id
                 current_revision_id = deployment.current_revision_id
+
+                # Validate that at least one of max_surge or max_unavailable is > 0
+                # to prevent infinite stuck state where no progress can be made.
+                if max_surge == 0 and max_unavailable == 0:
+                    raise InvalidRollingUpdateParameters(
+                        "max_surge and max_unavailable cannot both be 0; "
+                        "rolling update would make no progress"
+                    )
 
                 if not deploying_revision_id:
                     log.warning(

@@ -11,6 +11,7 @@ Test Scenarios:
 - RU-008: No-op when deploying_revision is None (edge case)
 - RU-009: Multi-cycle simulation (successive calls show progress)
 - RU-010: Concurrent old/new routes with mixed health statuses
+- RU-011: max_surge=0, max_unavailable=0 raises InvalidRollingUpdateParameters
 """
 
 from __future__ import annotations
@@ -530,4 +531,39 @@ class TestRollingUpdateCycle:
 
         # Should be in-progress
         assert len(result.skipped) == 1
+        assert len(result.successes) == 0
+
+    async def test_ru011_zero_surge_zero_unavailable_raises_error(
+        self,
+        deployment_executor: DeploymentExecutor,
+        mock_deployment_repo: AsyncMock,
+    ) -> None:
+        """RU-011: max_surge=0, max_unavailable=0 raises InvalidRollingUpdateParameters.
+
+        Given: 3 old routes (healthy), 0 new routes, max_surge=0, max_unavailable=0
+        When: Execute rolling update cycle
+        Then: Deployment goes to errors with InvalidRollingUpdateParameters
+        """
+        deployment = _create_deploying_deployment(replica_count=3)
+        old_routes = [
+            _create_route_info(deployment.id, deployment.current_revision_id, RouteStatus.HEALTHY)
+            for _ in range(3)
+        ]
+
+        policy = _create_policy(deployment.id, max_surge=0, max_unavailable=0)
+
+        mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
+            deployment.id: old_routes
+        }
+        mock_deployment_repo.fetch_deployment_policies_by_endpoint_ids.return_value = {
+            deployment.id: policy
+        }
+
+        entity_ids = [deployment.id]
+        with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
+            result = await deployment_executor.execute_rolling_update_cycle([deployment])
+
+        # Should be in errors (invalid parameters)
+        assert len(result.errors) == 1
+        assert len(result.skipped) == 0
         assert len(result.successes) == 0

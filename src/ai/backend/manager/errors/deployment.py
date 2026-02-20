@@ -90,6 +90,18 @@ class InvalidDeploymentStrategySpec(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class InvalidRollingUpdateParameters(BackendAIError):
+    error_type = "https://api.backend.ai/probs/invalid-rolling-update-parameters"
+    error_title = "Invalid rolling update parameters."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_SERVICE,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class ReplicaCountMismatch(BackendAIError):
     error_type = "https://api.backend.ai/probs/replica-count-mismatch"
     error_title = "Active route count does not match target replica count."
