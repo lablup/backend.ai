@@ -19,6 +19,7 @@ from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
+    RBACElementRef,
     ScopeType,
 )
 from ai.backend.manager.models.rbac_models import UserRoleRow
@@ -174,8 +175,10 @@ class TestCheckPermissionWithScopeChain:
 
         result = await db_source.check_permission_with_scope_chain(
             user_id=f.user_id,
-            target_element_type=RBACElementType.VFOLDER,
-            target_element_id=f.vfolder_id,
+            target_element_ref=RBACElementRef(
+                element_type=RBACElementType.VFOLDER,
+                element_id=f.vfolder_id,
+            ),
             operation=OperationType.READ,
         )
         assert result is True
@@ -199,8 +202,10 @@ class TestCheckPermissionWithScopeChain:
 
         result = await db_source.check_permission_with_scope_chain(
             user_id=f.user_id,
-            target_element_type=RBACElementType.VFOLDER,
-            target_element_id=f.vfolder_id,
+            target_element_ref=RBACElementRef(
+                element_type=RBACElementType.VFOLDER,
+                element_id=f.vfolder_id,
+            ),
             operation=OperationType.READ,
         )
         assert result is False
@@ -242,19 +247,21 @@ class TestCheckPermissionWithScopeChain:
 
         result = await db_source.check_permission_with_scope_chain(
             user_id=f.user_id,
-            target_element_type=RBACElementType.VFOLDER,
-            target_element_id=f.vfolder_id,
+            target_element_ref=RBACElementRef(
+                element_type=RBACElementType.VFOLDER,
+                element_id=f.vfolder_id,
+            ),
             operation=OperationType.UPDATE,
         )
         assert result is True
 
-    async def test_ref_edge_allows_read(
+    async def test_ref_edge_blocks_all_operations(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         user_with_active_role: ScopeChainFixture,
     ) -> None:
-        """REF edge allows READ operations to pass through."""
+        """REF edge is not traversed; no operation passes through."""
         f = user_with_active_role
 
         # VFOLDER referenced by PROJECT (ref)
@@ -274,32 +281,6 @@ class TestCheckPermissionWithScopeChain:
             entity_type=EntityType.VFOLDER,
             operation=OperationType.READ,
         )
-
-        result = await db_source.check_permission_with_scope_chain(
-            user_id=f.user_id,
-            target_element_type=RBACElementType.VFOLDER,
-            target_element_id=f.vfolder_id,
-            operation=OperationType.READ,
-        )
-        assert result is True
-
-    async def test_ref_edge_blocks_cud(
-        self,
-        db_with_rbac_tables: ExtendedAsyncSAEngine,
-        db_source: PermissionDBSource,
-        user_with_active_role: ScopeChainFixture,
-    ) -> None:
-        """REF edge blocks non-READ (CUD) operations."""
-        f = user_with_active_role
-
-        await self._add_association(
-            db_with_rbac_tables,
-            scope_type=ScopeType.PROJECT,
-            scope_id=f.project_id,
-            entity_type=EntityType.VFOLDER,
-            entity_id=f.vfolder_id,
-            relation_type=RelationType.REF,
-        )
         await self._add_permission(
             db_with_rbac_tables,
             role_id=f.role_id,
@@ -309,21 +290,35 @@ class TestCheckPermissionWithScopeChain:
             operation=OperationType.UPDATE,
         )
 
+        # READ blocked — ref edge is not part of scope chain
         result = await db_source.check_permission_with_scope_chain(
             user_id=f.user_id,
-            target_element_type=RBACElementType.VFOLDER,
-            target_element_id=f.vfolder_id,
+            target_element_ref=RBACElementRef(
+                element_type=RBACElementType.VFOLDER,
+                element_id=f.vfolder_id,
+            ),
+            operation=OperationType.READ,
+        )
+        assert result is False
+
+        # CUD also blocked
+        result = await db_source.check_permission_with_scope_chain(
+            user_id=f.user_id,
+            target_element_ref=RBACElementRef(
+                element_type=RBACElementType.VFOLDER,
+                element_id=f.vfolder_id,
+            ),
             operation=OperationType.UPDATE,
         )
         assert result is False
 
-    async def test_ref_on_path_blocks_cud_even_with_auto_parent(
+    async def test_ref_edge_stops_chaining(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         user_with_active_role: ScopeChainFixture,
     ) -> None:
-        """AUTO -> REF path: the REF edge on the path blocks CUD at the parent."""
+        """REF edge terminates scope chain; scopes beyond REF are unreachable."""
         f = user_with_active_role
 
         # VFOLDER --(ref)--> PROJECT --(auto)--> DOMAIN
@@ -344,42 +339,26 @@ class TestCheckPermissionWithScopeChain:
             relation_type=RelationType.AUTO,
         )
 
-        # Permission at DOMAIN scope for UPDATE
+        # Permission at DOMAIN scope — beyond the REF edge
         await self._add_permission(
             db_with_rbac_tables,
             role_id=f.role_id,
             scope_type=ScopeType.DOMAIN,
             scope_id=f.domain_id,
             entity_type=EntityType.VFOLDER,
-            operation=OperationType.UPDATE,
+            operation=OperationType.READ,
         )
 
-        # UPDATE should be blocked because REF was on the path
+        # Chain stops at REF; DOMAIN scope is unreachable
         result = await db_source.check_permission_with_scope_chain(
             user_id=f.user_id,
-            target_element_type=RBACElementType.VFOLDER,
-            target_element_id=f.vfolder_id,
-            operation=OperationType.UPDATE,
+            target_element_ref=RBACElementRef(
+                element_type=RBACElementType.VFOLDER,
+                element_id=f.vfolder_id,
+            ),
+            operation=OperationType.READ,
         )
         assert result is False
-
-        # READ should still pass through REF
-        await self._add_permission(
-            db_with_rbac_tables,
-            role_id=f.role_id,
-            scope_type=ScopeType.DOMAIN,
-            scope_id=f.domain_id,
-            entity_type=EntityType.VFOLDER,
-            operation=OperationType.READ,
-        )
-
-        result = await db_source.check_permission_with_scope_chain(
-            user_id=f.user_id,
-            target_element_type=RBACElementType.VFOLDER,
-            target_element_id=f.vfolder_id,
-            operation=OperationType.READ,
-        )
-        assert result is True
 
     async def test_inactive_role_denied(
         self,
@@ -424,8 +403,10 @@ class TestCheckPermissionWithScopeChain:
 
         result = await db_source.check_permission_with_scope_chain(
             user_id=f.user_id,
-            target_element_type=RBACElementType.VFOLDER,
-            target_element_id=f.vfolder_id,
+            target_element_ref=RBACElementRef(
+                element_type=RBACElementType.VFOLDER,
+                element_id=f.vfolder_id,
+            ),
             operation=OperationType.READ,
         )
         assert result is False
