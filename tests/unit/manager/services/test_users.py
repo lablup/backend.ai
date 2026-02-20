@@ -41,6 +41,7 @@ from ai.backend.manager.services.user.actions.modify_user import (
     ModifyUserAction,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
+    BulkPurgeUserAction,
     PurgeUserAction,
 )
 from ai.backend.manager.services.user.service import UserService
@@ -616,3 +617,141 @@ class TestPurgeUser:
 
         with pytest.raises(UserNotFound):
             await service.purge_user(action)
+
+
+class TestBulkPurgeUsers:
+    """Tests for UserService.bulk_purge_users"""
+
+    @pytest.fixture
+    def mock_user_repository(self) -> MagicMock:
+        return MagicMock(spec=UserRepository)
+
+    @pytest.fixture
+    def mock_agent_registry(self) -> MagicMock:
+        return MagicMock()
+
+    @pytest.fixture
+    def service(
+        self,
+        mock_user_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+    ) -> UserService:
+        return UserService(
+            storage_manager=MagicMock(),
+            valkey_stat_client=MagicMock(),
+            agent_registry=mock_agent_registry,
+            user_repository=mock_user_repository,
+        )
+
+    @pytest.fixture
+    def admin_user_info_ctx(self) -> UserInfoContext:
+        return UserInfoContext(
+            uuid=uuid.uuid4(),
+            email="admin@example.com",
+            main_access_key=AccessKey("ADMINKEY123456789"),
+        )
+
+    @pytest.mark.asyncio
+    async def test_bulk_purge_users_all_success(
+        self,
+        service: UserService,
+        mock_user_repository: MagicMock,
+        admin_user_info_ctx: UserInfoContext,
+    ) -> None:
+        """Bulk purge with all users succeeding."""
+        user_ids = [uuid.uuid4() for _ in range(3)]
+
+        mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
+            return_value=False
+        )
+        mock_user_repository.retrieve_active_sessions = AsyncMock(return_value=[])
+        mock_user_repository.delete_endpoints = AsyncMock(return_value=None)
+        mock_user_repository.delete_user_vfolders = AsyncMock(return_value=None)
+        mock_user_repository.purge_user_by_uuid = AsyncMock(return_value=None)
+
+        action = BulkPurgeUserAction(
+            user_ids=user_ids,
+            user_info_ctx=admin_user_info_ctx,
+        )
+
+        result = await service.bulk_purge_users(action)
+
+        assert result.data.purged_count() == 3
+        assert result.data.failure_count() == 0
+        assert result.data.purged_user_ids == user_ids
+
+    @pytest.mark.asyncio
+    async def test_bulk_purge_users_partial_failure(
+        self,
+        service: UserService,
+        mock_user_repository: MagicMock,
+        admin_user_info_ctx: UserInfoContext,
+    ) -> None:
+        """Bulk purge with partial failure - one user has active vfolder mounts."""
+        user_ids = [uuid.uuid4() for _ in range(3)]
+
+        # Second user has active vfolder mounts
+        mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
+            side_effect=[False, True, False]
+        )
+        mock_user_repository.retrieve_active_sessions = AsyncMock(return_value=[])
+        mock_user_repository.delete_endpoints = AsyncMock(return_value=None)
+        mock_user_repository.delete_user_vfolders = AsyncMock(return_value=None)
+        mock_user_repository.purge_user_by_uuid = AsyncMock(return_value=None)
+
+        action = BulkPurgeUserAction(
+            user_ids=user_ids,
+            user_info_ctx=admin_user_info_ctx,
+        )
+
+        result = await service.bulk_purge_users(action)
+
+        assert result.data.purged_count() == 2
+        assert result.data.failure_count() == 1
+        assert user_ids[0] in result.data.purged_user_ids
+        assert user_ids[2] in result.data.purged_user_ids
+        assert result.data.failures[0].user_id == user_ids[1]
+        assert isinstance(result.data.failures[0].exception, UserPurgeFailure)
+
+    @pytest.mark.asyncio
+    async def test_bulk_purge_users_all_failure(
+        self,
+        service: UserService,
+        mock_user_repository: MagicMock,
+        admin_user_info_ctx: UserInfoContext,
+    ) -> None:
+        """Bulk purge with all users failing."""
+        user_ids = [uuid.uuid4() for _ in range(3)]
+
+        mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
+            return_value=True
+        )
+
+        action = BulkPurgeUserAction(
+            user_ids=user_ids,
+            user_info_ctx=admin_user_info_ctx,
+        )
+
+        result = await service.bulk_purge_users(action)
+
+        assert result.data.purged_count() == 0
+        assert result.data.failure_count() == 3
+        failed_user_ids = [f.user_id for f in result.data.failures]
+        assert failed_user_ids == user_ids
+
+    @pytest.mark.asyncio
+    async def test_bulk_purge_users_empty_list(
+        self,
+        service: UserService,
+        admin_user_info_ctx: UserInfoContext,
+    ) -> None:
+        """Bulk purge with empty user list."""
+        action = BulkPurgeUserAction(
+            user_ids=[],
+            user_info_ctx=admin_user_info_ctx,
+        )
+
+        result = await service.bulk_purge_users(action)
+
+        assert result.data.purged_count() == 0
+        assert result.data.failure_count() == 0

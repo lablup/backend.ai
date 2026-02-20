@@ -231,13 +231,21 @@ class PurgeUserInputGQL:
 
 
 @strawberry.input(
-    name="PurgeUsersV2Input",
+    name="BulkPurgeUsersV2Input",
     description=(
-        "Added in 26.2.0. Input for permanently deleting multiple users. "
+        "Added in 26.3.0. Input for permanently deleting multiple users. "
         "This action is irreversible."
     ),
 )
-class PurgeUsersInputGQL:
-    """Input for permanently deleting multiple users."""
+class BulkPurgeUsersV2InputGQL:
+    """Input for bulk permanently deleting multiple users."""
 
     user_ids: list[UUID] = strawberry.field(description="List of user UUIDs to purge.")
+    purge_shared_vfolders: bool = strawberry.field(
+        default=False,
+        description="If true, migrate shared virtual folders to the admin user before purging.",
+    )
+    delegate_endpoint_ownership: bool = strawberry.field(
+        default=False,
+        description="If true, delegate endpoint ownership to the admin user before purging.",
+    )
