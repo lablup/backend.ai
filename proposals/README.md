@@ -120,6 +120,7 @@ BEP numbers start from 1000.
 | [1047](BEP-1047-resource-slot-db-normalization.md) | Resource Slot DB Normalization | HyeokJin Kim | Draft |
 | [1048](BEP-1048-RBAC-entity-relationship-model.md) | RBAC Entity Relationship Model | Sanghun Lee | Draft |
 | [1049](BEP-1049-zero-downtime-deployment.md) | Model Service Zero-downtime deployment architecture | Gyubong Lee | Draft |
+| [1050](BEP-1050-prometheus-query-preset-system.md) | Prometheus Query Preset System | BoKeum Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
