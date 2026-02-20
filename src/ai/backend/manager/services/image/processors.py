@@ -25,10 +25,6 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageByIdAction,
     ForgetImageByIdActionResult,
 )
-from ai.backend.manager.services.image.actions.get_aliases_by_image_ids import (
-    GetAliasesByImageIdsAction,
-    GetAliasesByImageIdsActionResult,
-)
 from ai.backend.manager.services.image.actions.get_all_images import (
     GetAllImagesAction,
     GetAllImagesActionResult,
@@ -44,10 +40,6 @@ from ai.backend.manager.services.image.actions.get_images import (
     GetImageByIdentifierActionResult,
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
-)
-from ai.backend.manager.services.image.actions.get_images_by_ids import (
-    GetImagesByIdsAction,
-    GetImagesByIdsActionResult,
 )
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
@@ -134,10 +126,6 @@ class ImageProcessors(AbstractProcessorPackage):
         GetImageInstalledAgentsAction, GetImageInstalledAgentsActionResult
     ]
     get_all_images: ActionProcessor[GetAllImagesAction, GetAllImagesActionResult]
-    get_images_by_ids: ActionProcessor[GetImagesByIdsAction, GetImagesByIdsActionResult]
-    get_aliases_by_image_ids: ActionProcessor[
-        GetAliasesByImageIdsAction, GetAliasesByImageIdsActionResult
-    ]
     search_images: ActionProcessor[SearchImagesAction, SearchImagesActionResult]
     search_aliases: ActionProcessor[SearchAliasesAction, SearchAliasesActionResult]
 
@@ -178,10 +166,6 @@ class ImageProcessors(AbstractProcessorPackage):
         self.set_image_resource_limit_by_id = ActionProcessor(
             service.set_image_resource_limit_by_id, action_monitors
         )
-        self.get_images_by_ids = ActionProcessor(service.get_images_by_ids, action_monitors)
-        self.get_aliases_by_image_ids = ActionProcessor(
-            service.get_aliases_by_image_ids, action_monitors
-        )
         self.search_images = ActionProcessor(service.search_images, action_monitors)
         self.search_aliases = ActionProcessor(service.search_aliases, action_monitors)
 
@@ -204,6 +188,4 @@ class ImageProcessors(AbstractProcessorPackage):
             ClearImageCustomResourceLimitAction.spec(),
             ClearImageCustomResourceLimitByIdAction.spec(),
             SetImageResourceLimitByIdAction.spec(),
-            GetImagesByIdsAction.spec(),
-            GetAliasesByImageIdsAction.spec(),
         ]
