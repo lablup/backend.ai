@@ -868,15 +868,16 @@ class PermissionDBSource:
     ) -> bool:
         """CTE-based permission check that traverses the scope chain.
 
-        Walks association_scopes_entities upward via AUTO edges only.
-        REF edges are not traversed — permissions for ref-linked entities
-        must be granted via entity-scope direct match (separate check).
+        Two-layer check (BEP-1048):
+        1. Self-scope direct match — permission scoped to the target entity itself.
+        2. Scope chain traversal — walks AUTO edges upward via CTE.
         """
         permissions = PermissionRow.__table__
         user_roles = UserRoleRow.__table__
         roles = RoleRow.__table__
 
         target_entity_type = target_element_ref.element_type.to_entity_type()
+        target_scope_type = target_element_ref.element_type.to_scope_type()
         scope_chain_cte = self._build_scope_chain_cte(target_element_ref)
 
         scope_chain_permission_query = (
@@ -909,7 +910,36 @@ class PermissionDBSource:
             .limit(1)
         )
 
-        combined_query = sa.select(sa.exists(scope_chain_permission_query))
+        self_scope_permission_query = (
+            sa.select(sa.literal(1))
+            .select_from(
+                permissions.join(
+                    roles,
+                    roles.c.id == permissions.c.role_id,
+                ).join(
+                    user_roles,
+                    user_roles.c.role_id == roles.c.id,
+                )
+            )
+            .where(
+                sa.and_(
+                    user_roles.c.user_id == user_id,
+                    roles.c.status == RoleStatus.ACTIVE,
+                    permissions.c.scope_type == target_scope_type,
+                    permissions.c.scope_id == target_element_ref.element_id,
+                    permissions.c.entity_type == target_entity_type,
+                    permissions.c.operation == operation,
+                )
+            )
+            .limit(1)
+        )
+
+        combined_query = sa.select(
+            sa.or_(
+                sa.exists(scope_chain_permission_query),
+                sa.exists(self_scope_permission_query),
+            )
+        )
 
         async with self._db.begin_readonly_session_read_committed() as db_session:
             result = await db_session.scalar(combined_query)

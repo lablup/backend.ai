@@ -168,6 +168,7 @@ class TestCheckPermissionWithScopeChain:
         request: pytest.FixtureRequest,
     ) -> None:
         scope_map: dict[str, tuple[ScopeType, str]] = {
+            "vfolder": (ScopeType.VFOLDER, fixture_ids.vfolder_id),
             "project": (ScopeType.PROJECT, fixture_ids.project_id),
             "domain": (ScopeType.DOMAIN, fixture_ids.domain_id),
         }
@@ -375,3 +376,74 @@ class TestCheckPermissionWithScopeChain:
             operation=OperationType.READ,
         )
         assert result is False
+
+    @pytest.mark.parametrize(
+        ("permission_setup", "check_op", "expected"),
+        [
+            pytest.param(
+                [("vfolder", OperationType.READ)],
+                OperationType.READ,
+                True,
+                id="self-scope-read",
+            ),
+            pytest.param(
+                [("vfolder", OperationType.UPDATE)],
+                OperationType.UPDATE,
+                True,
+                id="self-scope-update",
+            ),
+        ],
+        indirect=["permission_setup"],
+    )
+    async def test_self_scope_permission(
+        self,
+        db_source: PermissionDBSource,
+        user_with_active_role: ScopeChainFixture,
+        vfolder_in_project_ref: None,
+        permission_setup: None,
+        check_op: OperationType,
+        expected: bool,
+    ) -> None:
+        """Permission scoped directly to the target entity itself is honored."""
+        f = user_with_active_role
+        result = await db_source.check_permission_with_scope_chain(
+            user_id=f.user_id,
+            target_element_ref=RBACElementRef(
+                element_type=RBACElementType.VFOLDER,
+                element_id=f.vfolder_id,
+            ),
+            operation=check_op,
+        )
+        assert result is expected
+
+    @pytest.mark.parametrize(
+        ("permission_setup", "check_op", "expected"),
+        [
+            pytest.param(
+                [("vfolder", OperationType.READ)],
+                OperationType.READ,
+                True,
+                id="self-scope-no-assoc",
+            ),
+        ],
+        indirect=["permission_setup"],
+    )
+    async def test_self_scope_without_any_association(
+        self,
+        db_source: PermissionDBSource,
+        user_with_active_role: ScopeChainFixture,
+        permission_setup: None,
+        check_op: OperationType,
+        expected: bool,
+    ) -> None:
+        """Self-scope permission works even without any association edges."""
+        f = user_with_active_role
+        result = await db_source.check_permission_with_scope_chain(
+            user_id=f.user_id,
+            target_element_ref=RBACElementRef(
+                element_type=RBACElementType.VFOLDER,
+                element_id=f.vfolder_id,
+            ),
+            operation=check_op,
+        )
+        assert result is expected
