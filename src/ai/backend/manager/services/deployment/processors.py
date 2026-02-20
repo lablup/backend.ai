@@ -46,6 +46,8 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
     GetDeploymentPolicyAction,
     GetDeploymentPolicyActionResult,
+    SearchDeploymentPoliciesAction,
+    SearchDeploymentPoliciesActionResult,
 )
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
@@ -121,6 +123,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
     get_deployment_policy: ActionProcessor[
         GetDeploymentPolicyAction, GetDeploymentPolicyActionResult
     ]
+    search_deployment_policies: ActionProcessor[
+        SearchDeploymentPoliciesAction, SearchDeploymentPoliciesActionResult
+    ]
 
     # Revision operations
     create_model_revision: ActionProcessor[
@@ -172,6 +177,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.search_deployments = ActionProcessor(service.search_deployments, action_monitors)
         self.get_deployment_by_id = ActionProcessor(service.get_deployment_by_id, action_monitors)
         self.get_deployment_policy = ActionProcessor(service.get_deployment_policy, action_monitors)
+        self.search_deployment_policies = ActionProcessor(
+            service.search_deployment_policies, action_monitors
+        )
 
         # Revision operations
         self.create_model_revision = ActionProcessor(service.create_model_revision, action_monitors)
@@ -221,6 +229,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
             SearchDeploymentsAction.spec(),
             GetDeploymentByIdAction.spec(),
             GetDeploymentPolicyAction.spec(),
+            SearchDeploymentPoliciesAction.spec(),
             # Revision operations
             CreateModelRevisionAction.spec(),
             AddModelRevisionAction.spec(),

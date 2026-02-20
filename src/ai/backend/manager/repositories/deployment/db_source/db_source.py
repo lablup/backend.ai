@@ -43,6 +43,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
+    DeploymentPolicySearchResult,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
@@ -2337,6 +2338,34 @@ class DeploymentDBSource:
                     )
                     for row in result.rows
                 ],
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_deployment_policies(
+        self,
+        querier: BatchQuerier,
+    ) -> DeploymentPolicySearchResult:
+        """Search deployment policies with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            DeploymentPolicySearchResult with items, total_count, and pagination info.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(DeploymentPolicyRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            return DeploymentPolicySearchResult(
+                items=[row.DeploymentPolicyRow.to_data() for row in result.rows],
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,

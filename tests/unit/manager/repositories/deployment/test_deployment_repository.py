@@ -2572,6 +2572,370 @@ class TestDeploymentPolicyOperations:
         assert result is None
 
 
+class TestSearchDeploymentPolicies:
+    """Test cases for search_deployment_policies repository method."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables created."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                ResourcePresetRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                GroupRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def test_domain_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain",
+                is_active=True,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+            )
+            db_sess.add(domain)
+            await db_sess.commit()
+        return domain_name
+
+    @pytest.fixture
+    async def test_scaling_group_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            db_sess.add(sgroup)
+            await db_sess.commit()
+        return sgroup_name
+
+    @pytest.fixture
+    async def test_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+                max_session_count_per_model_session=5,
+                max_customized_image_count=3,
+            )
+            db_sess.add(policy)
+            await db_sess.commit()
+        return policy_name
+
+    @pytest.fixture
+    async def test_project_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = ProjectResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=int(BinarySize.from_str("100GiB")),
+                max_network_count=5,
+            )
+            db_sess.add(policy)
+            await db_sess.commit()
+        return policy_name
+
+    @pytest.fixture
+    async def test_user_uuid(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_resource_policy_name: str,
+    ) -> uuid.UUID:
+        user_uuid = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            user = UserRow(
+                uuid=user_uuid,
+                username=f"testuser-{user_uuid.hex[:8]}",
+                email=f"test-{user_uuid.hex[:8]}@example.com",
+                password=create_test_password_info("test_password"),
+                need_password_change=False,
+                status=UserStatus.ACTIVE,
+                status_info="active",
+                domain_name=test_domain_name,
+                role=UserRole.USER,
+                resource_policy=test_resource_policy_name,
+            )
+            db_sess.add(user)
+            await db_sess.commit()
+        return user_uuid
+
+    @pytest.fixture
+    async def test_group_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_project_resource_policy_name: str,
+    ) -> uuid.UUID:
+        group_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            group = GroupRow(
+                id=group_id,
+                name=f"test-group-{uuid.uuid4().hex[:8]}",
+                domain_name=test_domain_name,
+                resource_policy=test_project_resource_policy_name,
+            )
+            db_sess.add(group)
+            await db_sess.commit()
+        return group_id
+
+    @pytest.fixture
+    async def sample_endpoint_ids(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_user_uuid: uuid.UUID,
+        test_group_id: uuid.UUID,
+    ) -> list[uuid.UUID]:
+        """Create 4 endpoints and return their IDs."""
+        endpoint_ids: list[uuid.UUID] = []
+        async with db_with_cleanup.begin_session() as db_sess:
+            for i in range(4):
+                eid = uuid.uuid4()
+                endpoint = EndpointRow(
+                    id=eid,
+                    name=f"test-endpoint-{i}-{uuid.uuid4().hex[:8]}",
+                    created_user=test_user_uuid,
+                    session_owner=test_user_uuid,
+                    domain=test_domain_name,
+                    project=test_group_id,
+                    resource_group=test_scaling_group_name,
+                    model=None,
+                    desired_replicas=1,
+                    image=None,
+                    runtime_variant=RuntimeVariant.CUSTOM,
+                    url=f"http://test-{eid.hex[:8]}.example.com",
+                    open_to_public=False,
+                    lifecycle_stage=EndpointLifecycle.DESTROYED,
+                    resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
+                )
+                db_sess.add(endpoint)
+                endpoint_ids.append(eid)
+            await db_sess.commit()
+        return endpoint_ids
+
+    @pytest.fixture
+    async def sample_policies(
+        self,
+        deployment_repository: DeploymentRepository,
+        sample_endpoint_ids: list[uuid.UUID],
+    ) -> list[DeploymentPolicyData]:
+        """Create deployment policies for all sample endpoints."""
+        policies: list[DeploymentPolicyData] = []
+        strategies: list[tuple[DeploymentStrategy, RollingUpdateSpec | BlueGreenSpec]] = [
+            (DeploymentStrategy.ROLLING, RollingUpdateSpec(max_surge=1, max_unavailable=0)),
+            (DeploymentStrategy.ROLLING, RollingUpdateSpec(max_surge=2, max_unavailable=1)),
+            (DeploymentStrategy.BLUE_GREEN, BlueGreenSpec(auto_promote=True)),
+            (DeploymentStrategy.ROLLING, RollingUpdateSpec(max_surge=0, max_unavailable=1)),
+        ]
+        for eid, (strategy, spec) in zip(sample_endpoint_ids, strategies, strict=False):
+            data = await deployment_repository.create_deployment_policy(
+                Creator(
+                    spec=DeploymentPolicyCreatorSpec(
+                        endpoint_id=eid,
+                        strategy=strategy,
+                        strategy_spec=spec,
+                        rollback_on_failure=False,
+                    )
+                )
+            )
+            policies.append(data)
+        return policies
+
+    @pytest.fixture
+    def deployment_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DeploymentRepository:
+        storage_manager = MagicMock()
+        valkey_stat = MagicMock()
+        valkey_live = MagicMock()
+        valkey_schedule = MagicMock()
+        return DeploymentRepository(
+            db=db_with_cleanup,
+            storage_manager=storage_manager,
+            valkey_stat=valkey_stat,
+            valkey_live=valkey_live,
+            valkey_schedule=valkey_schedule,
+        )
+
+    # =========================================================================
+    # Tests - Search with pagination
+    # =========================================================================
+
+    async def test_search_first_page(
+        self,
+        deployment_repository: DeploymentRepository,
+        sample_policies: list[DeploymentPolicyData],
+    ) -> None:
+        """Test first page of search results."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=2, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        result = await deployment_repository.search_deployment_policies(querier)
+
+        assert len(result.items) == 2
+        assert result.total_count == 4
+
+    async def test_search_second_page(
+        self,
+        deployment_repository: DeploymentRepository,
+        sample_policies: list[DeploymentPolicyData],
+    ) -> None:
+        """Test second page of search results."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=2, offset=2),
+            conditions=[],
+            orders=[],
+        )
+        result = await deployment_repository.search_deployment_policies(querier)
+
+        assert len(result.items) == 2
+        assert result.total_count == 4
+
+    # =========================================================================
+    # Tests - Search with filtering
+    # =========================================================================
+
+    async def test_search_filter_by_strategy(
+        self,
+        deployment_repository: DeploymentRepository,
+        sample_policies: list[DeploymentPolicyData],
+    ) -> None:
+        """Test filtering deployment policies by strategy."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                lambda: DeploymentPolicyRow.strategy == DeploymentStrategy.BLUE_GREEN,
+            ],
+            orders=[],
+        )
+        result = await deployment_repository.search_deployment_policies(querier)
+
+        assert len(result.items) == 1
+        assert result.items[0].strategy == DeploymentStrategy.BLUE_GREEN
+
+    async def test_search_filter_by_endpoint(
+        self,
+        deployment_repository: DeploymentRepository,
+        sample_policies: list[DeploymentPolicyData],
+        sample_endpoint_ids: list[uuid.UUID],
+    ) -> None:
+        """Test filtering deployment policies by endpoint ID."""
+        target_endpoint_id = sample_endpoint_ids[0]
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                lambda: DeploymentPolicyRow.endpoint == target_endpoint_id,
+            ],
+            orders=[],
+        )
+        result = await deployment_repository.search_deployment_policies(querier)
+
+        assert len(result.items) == 1
+        assert result.items[0].endpoint == target_endpoint_id
+
+    # =========================================================================
+    # Tests - Search with ordering
+    # =========================================================================
+
+    async def test_search_order_by_created_at_ascending(
+        self,
+        deployment_repository: DeploymentRepository,
+        sample_policies: list[DeploymentPolicyData],
+    ) -> None:
+        """Test ordering deployment policies by created_at ascending."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[DeploymentPolicyRow.created_at.asc()],
+        )
+        result = await deployment_repository.search_deployment_policies(querier)
+
+        created_ats = [item.created_at for item in result.items]
+        assert created_ats == sorted(created_ats)
+
+    async def test_search_order_by_created_at_descending(
+        self,
+        deployment_repository: DeploymentRepository,
+        sample_policies: list[DeploymentPolicyData],
+    ) -> None:
+        """Test ordering deployment policies by created_at descending."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[DeploymentPolicyRow.created_at.desc()],
+        )
+        result = await deployment_repository.search_deployment_policies(querier)
+
+        created_ats = [item.created_at for item in result.items]
+        assert created_ats == sorted(created_ats, reverse=True)
+
+    # =========================================================================
+    # Tests - Empty results
+    # =========================================================================
+
+    async def test_search_no_results(
+        self,
+        deployment_repository: DeploymentRepository,
+        sample_policies: list[DeploymentPolicyData],
+    ) -> None:
+        """Test search with no matching results."""
+        nonexistent_id = uuid.uuid4()
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                lambda: DeploymentPolicyRow.endpoint == nonexistent_id,
+            ],
+            orders=[],
+        )
+        result = await deployment_repository.search_deployment_policies(querier)
+
+        assert len(result.items) == 0
+        assert result.total_count == 0
+
+
 class TestRouteOperations:
     """Test cases for route repository operations."""
 

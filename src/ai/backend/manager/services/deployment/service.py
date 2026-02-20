@@ -87,6 +87,8 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
     GetDeploymentPolicyAction,
     GetDeploymentPolicyActionResult,
+    SearchDeploymentPoliciesAction,
+    SearchDeploymentPoliciesActionResult,
 )
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
@@ -461,6 +463,18 @@ class DeploymentService:
         """
         data = await self._deployment_controller.get_deployment_policy(action.endpoint_id)
         return GetDeploymentPolicyActionResult(data=data)
+
+    async def search_deployment_policies(
+        self, action: SearchDeploymentPoliciesAction
+    ) -> SearchDeploymentPoliciesActionResult:
+        """Search deployment policies with pagination and ordering."""
+        result = await self._deployment_repository.search_deployment_policies(action.querier)
+        return SearchDeploymentPoliciesActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     # ========== Revision Operations ==========
 
