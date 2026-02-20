@@ -1698,6 +1698,19 @@
               }
             ],
             "default": null
+          },
+          "subpath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Subpath within the vfolder to mount.",
+            "title": "Subpath"
           }
         },
         "title": "MountOptionModel",
