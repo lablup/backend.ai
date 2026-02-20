@@ -425,6 +425,18 @@ class UserDBSource:
             # Finally delete the user
             await execute_batch_purger(session, create_user_purger(user_uuid))
 
+    async def purge_user_by_uuid(self, user_uuid: UUID) -> None:
+        """Completely purge user and all associated data by UUID."""
+        async with self._db.begin_session() as session:
+            # Delete all user data in proper order using purger pattern
+            await execute_batch_purger(session, create_user_error_log_purger(user_uuid))
+            await execute_batch_purger(session, create_user_keypair_purger(user_uuid))
+            await execute_batch_purger(session, create_user_vfolder_permission_purger(user_uuid))
+            await execute_batch_purger(session, create_user_group_association_purger(user_uuid))
+
+            # Finally delete the user
+            await execute_batch_purger(session, create_user_purger(user_uuid))
+
     async def check_user_vfolder_mounted_to_active_kernels(self, user_uuid: UUID) -> bool:
         """Check if user's vfolders are mounted to active kernels."""
         async with self._db.begin() as conn:

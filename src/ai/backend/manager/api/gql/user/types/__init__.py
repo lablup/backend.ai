@@ -15,10 +15,10 @@ from .filters import (
 )
 from .inputs import (
     BulkCreateUserInputGQL,
+    BulkPurgeUsersV2InputGQL,
     CreateUserInputGQL,
     DeleteUsersInputGQL,
     PurgeUserInputGQL,
-    PurgeUsersInputGQL,
     UpdateUserInputGQL,
 )
 from .nested import (
@@ -37,6 +37,8 @@ from .node import (
 from .payloads import (
     BulkCreateUserErrorGQL,
     BulkCreateUsersPayloadGQL,
+    BulkPurgeUsersV2PayloadGQL,
+    BulkPurgeUserV2ErrorGQL,
     CreateUserPayloadGQL,
     DeleteUserPayloadGQL,
     DeleteUsersPayloadGQL,
@@ -81,7 +83,7 @@ __all__ = [
     "UpdateUserInputGQL",
     "DeleteUsersInputGQL",
     "PurgeUserInputGQL",
-    "PurgeUsersInputGQL",
+    "BulkPurgeUsersV2InputGQL",
     # Payloads
     "CreateUserPayloadGQL",
     "BulkCreateUserErrorGQL",
@@ -91,4 +93,6 @@ __all__ = [
     "DeleteUsersPayloadGQL",
     "PurgeUserPayloadGQL",
     "PurgeUsersPayloadGQL",
+    "BulkPurgeUserV2ErrorGQL",
+    "BulkPurgeUsersV2PayloadGQL",
 ]

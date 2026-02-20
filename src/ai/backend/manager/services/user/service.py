@@ -2,10 +2,12 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Any
+from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.user.types import BulkPurgeError, BulkUserPurgeResultData
 from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.registry import AgentRegistry
@@ -33,6 +35,8 @@ from ai.backend.manager.services.user.actions.modify_user import (
     ModifyUserActionResult,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
+    BulkPurgeUserAction,
+    BulkPurgeUserActionResult,
     PurgeUserAction,
     PurgeUserActionResult,
 )
@@ -194,6 +198,98 @@ class UserService:
         await self._user_repository.purge_user(email)
 
         return PurgeUserActionResult()
+
+    async def _purge_single_user(
+        self,
+        user_uuid: UUID,
+        action: BulkPurgeUserAction,
+    ) -> None:
+        """Purge a single user by UUID.
+
+        This is the UUID-based internal implementation used by bulk_purge_users().
+        The existing purge_user() method is email-based.
+        """
+        # Check for active vfolder mounts
+        if await self._user_repository.check_user_vfolder_mounted_to_active_kernels(user_uuid):
+            raise UserPurgeFailure(
+                "Some of user's virtual folders are mounted to active kernels. "
+                "Terminate those kernels first.",
+            )
+
+        # Handle shared vfolders migration
+        if action.purge_shared_vfolders.optional_value():
+            await self._user_repository.migrate_shared_vfolders(
+                deleted_user_uuid=user_uuid,
+                target_user_uuid=action.user_info_ctx.uuid,
+                target_user_email=action.user_info_ctx.email,
+            )
+
+        # Handle endpoint ownership delegation
+        if action.delegate_endpoint_ownership.optional_value():
+            await self._user_repository.delegate_endpoint_ownership(
+                user_uuid=user_uuid,
+                target_user_uuid=action.user_info_ctx.uuid,
+                target_main_access_key=action.user_info_ctx.main_access_key,
+            )
+            await self._user_repository.delete_endpoints(
+                user_uuid=user_uuid,
+                delete_destroyed_only=True,
+            )
+        else:
+            await self._user_repository.delete_endpoints(
+                user_uuid=user_uuid,
+                delete_destroyed_only=False,
+            )
+
+        # Handle active sessions
+        if active_sessions := await self._user_repository.retrieve_active_sessions(user_uuid):
+            tasks = [
+                asyncio.create_task(
+                    self._agent_registry.destroy_session(
+                        session,
+                        forced=True,
+                        reason=KernelLifecycleEventReason.USER_PURGED,
+                    )
+                )
+                for session in active_sessions
+            ]
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for sess, result in zip(active_sessions, results, strict=True):
+                if isinstance(result, Exception):
+                    log.warning(f"Session {sess.id} not terminated properly: {result}")
+
+        # Delete vfolders
+        await self._user_repository.delete_user_vfolders(
+            user_uuid=user_uuid,
+            storage_manager=self._storage_manager,
+        )
+
+        # Finally purge the user completely
+        await self._user_repository.purge_user_by_uuid(user_uuid)
+
+    async def bulk_purge_users(
+        self,
+        action: BulkPurgeUserAction,
+    ) -> BulkPurgeUserActionResult:
+        purged_user_ids: list[UUID] = []
+        failures: list[BulkPurgeError] = []
+
+        for user_uuid in action.user_ids:
+            try:
+                await self._purge_single_user(user_uuid, action)
+                purged_user_ids.append(user_uuid)
+            except Exception as e:
+                log.warning(f"Failed to purge user {user_uuid}: {e}")
+                failures.append(BulkPurgeError(user_id=user_uuid, exception=e))
+
+        return BulkPurgeUserActionResult(
+            data=BulkUserPurgeResultData(
+                purged_user_ids=purged_user_ids,
+                failures=failures,
+            ),
+        )
 
     async def user_month_stats(self, action: UserMonthStatsAction) -> UserMonthStatsActionResult:
         stats = await self._user_repository.get_user_time_binned_monthly_stats(
