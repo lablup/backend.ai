@@ -13,7 +13,7 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.types import SessionId
-from ai.backend.manager.api.gql.base import OrderDirection, StringMatchSpec, UUIDFilter
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.common.types import (
     ClusterModeGQL,
     SessionV2ResultGQL,
@@ -144,8 +144,8 @@ class SessionV2StatusFilterGQL:
 class SessionV2FilterGQL(GQLFilter):
     id: UUIDFilter | None = None
     status: SessionV2StatusFilterGQL | None = None
-    name: str | None = None
-    domain_name: str | None = None
+    name: StringFilter | None = None
+    domain_name: StringFilter | None = None
     project_id: UUIDFilter | None = None
     user_uuid: UUIDFilter | None = None
 
@@ -162,14 +162,24 @@ class SessionV2FilterGQL(GQLFilter):
             condition = self.status.build_condition()
             if condition:
                 conditions.append(condition)
-        if self.name is not None:
-            conditions.append(
-                SessionConditions.by_name_equals(
-                    StringMatchSpec(self.name, case_insensitive=False, negated=False)
-                )
+        if self.name:
+            name_condition = self.name.build_query_condition(
+                contains_factory=SessionConditions.by_name_contains,
+                equals_factory=SessionConditions.by_name_equals,
+                starts_with_factory=SessionConditions.by_name_starts_with,
+                ends_with_factory=SessionConditions.by_name_ends_with,
             )
-        if self.domain_name is not None:
-            conditions.append(SessionConditions.by_domain_name(self.domain_name))
+            if name_condition:
+                conditions.append(name_condition)
+        if self.domain_name:
+            domain_condition = self.domain_name.build_query_condition(
+                contains_factory=SessionConditions.by_domain_name_contains,
+                equals_factory=SessionConditions.by_domain_name_equals,
+                starts_with_factory=SessionConditions.by_domain_name_starts_with,
+                ends_with_factory=SessionConditions.by_domain_name_ends_with,
+            )
+            if domain_condition:
+                conditions.append(domain_condition)
         if self.project_id:
             condition = self.project_id.build_query_condition(
                 SessionConditions.by_group_id_filter_equals,

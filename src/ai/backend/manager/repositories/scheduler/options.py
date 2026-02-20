@@ -409,15 +409,6 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_domain_name(name: str) -> QueryCondition:
-        """Factory for exact domain name match."""
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return SessionRow.domain_name == name
-
-        return inner
-
-    @staticmethod
     def by_user_uuid_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
         """Factory for user UUID equality filter."""
 

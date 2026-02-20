@@ -11150,8 +11150,8 @@ input SessionV2Filter
 {
   id: UUIDFilter = null
   status: SessionV2StatusFilter = null
-  name: String = null
-  domainName: String = null
+  name: StringFilter = null
+  domainName: StringFilter = null
   projectId: UUIDFilter = null
   userUuid: UUIDFilter = null
 }
