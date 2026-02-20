@@ -43,11 +43,12 @@ Always run these commands and fix all errors:
 pants fmt ::
 pants fix ::
 pants lint --changed-since=HEAD~1
-pants check --changed-since=HEAD~1
-pants test --changed-since=HEAD~1 --changed-dependents=transitive
 ```
 
-**Fix all errors - never suppress or skip.**
+The pre-commit hook runs `pants fmt` and `pants lint` automatically.
+Type checking (`pants check`) and tests (`pants test`) are enforced by CI only — do **not** run them locally.
+
+**Fix all lint errors - never suppress or skip.**
 
 ## Development Guidelines
 

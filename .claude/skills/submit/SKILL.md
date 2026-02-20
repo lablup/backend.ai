@@ -29,7 +29,7 @@ Automates the post-implementation submission pipeline: quality enforcement, comm
    - `git log {base_branch}..HEAD` to see existing commits on branch
    - Summarize changes to user before proceeding
 
-### Phase 2: Quality Enforcement
+### Phase 2: Quality Enforcement (Local)
 
 **MANDATORY - never skip.**
 
@@ -39,14 +39,13 @@ Run sequentially, stop on first failure:
 pants fmt ::
 pants fix ::
 pants lint --changed-since=origin/{base_branch}
-pants check --changed-since=origin/{base_branch}
-pants test --changed-since=origin/{base_branch} --changed-dependents=transitive
 ```
 
 - If `fmt` or `fix` produce changes, stage them automatically
-- If `lint` or `check` fails, fix the issues and re-run
-- If `test` fails, report failures and **stop** - ask user how to proceed
+- If `lint` fails, fix the issues and re-run
 - After all pass, continue to next phase
+
+**Note:** Type checking (`pants check`) and tests (`pants test`) are enforced by CI only. Do NOT run them locally — they consume excessive resources when multiple workers run concurrently.
 
 ### Phase 3: Commit
 
@@ -232,7 +231,8 @@ Agent: [Full submission with BA-9999 reference]
 
 ## Implementation Notes
 
-- Quality checks use `--changed-since=origin/{base_branch}` to cover all PR changes, not just the last commit
+- Local quality checks (`fmt`, `fix`, `lint`) use `--changed-since=origin/{base_branch}` to cover all PR changes, not just the last commit
+- Type checking and tests run in CI only — do not run them locally
 - Changelog follows [towncrier](https://github.com/twisted/towncrier) format configured in `pyproject.toml`
 - PR number is only available after `gh pr create`, so changelog is always a second commit
 - A single PR may have multiple news fragments (e.g., both `feature` and `fix`)

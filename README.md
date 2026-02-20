@@ -348,8 +348,8 @@ Backend.AI uses Git pre-commit hooks to maintain code quality:
 
 ```bash
 # Automatically runs on every commit:
+# - Auto-formatting (pants fmt)
 # - Linting (pants lint)
-# - Type checking (pants check)
 
 # Bypass hooks if needed (use sparingly)
 git commit --no-verify
@@ -357,9 +357,8 @@ git commit --no-verify
 
 The pre-commit hook validates:
 - Code style and formatting
-- Type annotations
 
-Tests run in CI for comprehensive coverage.
+Type checking and tests run in CI for comprehensive coverage.
 
 See [CLAUDE.md](CLAUDE.md#hooks-and-code-quality) for detailed hook system documentation.
 
