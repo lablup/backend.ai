@@ -1,5 +1,11 @@
 from .row import (
+    BlueGreenSpec,
     DeploymentPolicyRow,
+    RollingUpdateSpec,
 )
 
-__all__ = ("DeploymentPolicyRow",)
+__all__ = (
+    "BlueGreenSpec",
+    "DeploymentPolicyRow",
+    "RollingUpdateSpec",
+)

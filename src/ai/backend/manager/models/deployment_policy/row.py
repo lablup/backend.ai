@@ -6,16 +6,13 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
+from pydantic import BaseModel
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import (
-    BlueGreenSpec,
-    DeploymentPolicyData,
-    RollingUpdateSpec,
-)
+from ai.backend.manager.data.deployment.types import DeploymentPolicyData
 from ai.backend.manager.errors.deployment import InvalidDeploymentStrategy
 from ai.backend.manager.models.base import (
     GUID,
@@ -26,9 +23,27 @@ from ai.backend.manager.models.base import (
 if TYPE_CHECKING:
     from ai.backend.manager.models.endpoint import EndpointRow
 
-__all__ = ("DeploymentPolicyRow",)
+__all__ = (
+    "BlueGreenSpec",
+    "DeploymentPolicyRow",
+    "RollingUpdateSpec",
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+class RollingUpdateSpec(BaseModel):
+    """Specification for rolling update deployment strategy."""
+
+    max_surge: int = 1
+    max_unavailable: int = 0
+
+
+class BlueGreenSpec(BaseModel):
+    """Specification for blue-green deployment strategy."""
+
+    auto_promote: bool = False
+    promote_delay_seconds: int = 0
 
 
 def _get_endpoint_join_condition() -> sa.ColumnElement[bool]:

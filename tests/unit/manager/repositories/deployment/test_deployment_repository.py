@@ -31,10 +31,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
-    BlueGreenSpec,
     DeploymentPolicyData,
     ModelRevisionData,
-    RollingUpdateSpec,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -47,7 +45,11 @@ from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyData,
     DeploymentAutoScalingPolicyRow,
 )
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_policy import (
+    BlueGreenSpec,
+    DeploymentPolicyRow,
+    RollingUpdateSpec,
+)
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow

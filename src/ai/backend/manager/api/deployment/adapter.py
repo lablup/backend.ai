@@ -55,7 +55,6 @@ from ai.backend.manager.data.deployment.creator import (
     VFolderMountsCreator,
 )
 from ai.backend.manager.data.deployment.types import (
-    BlueGreenSpec,
     DeploymentMetadata,
     DeploymentNetworkSpec,
     ExecutionSpec,
@@ -64,7 +63,6 @@ from ai.backend.manager.data.deployment.types import (
     MountInfo,
     ReplicaSpec,
     ResourceSpec,
-    RollingUpdateSpec,
     RouteInfo,
 )
 from ai.backend.manager.data.deployment.types import (
@@ -73,6 +71,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
+from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,

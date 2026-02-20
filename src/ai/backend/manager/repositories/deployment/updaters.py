@@ -9,16 +9,15 @@ from uuid import UUID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
-from ai.backend.manager.data.deployment.types import (
-    BlueGreenSpec,
-    RollingUpdateSpec,
-    RouteStatus,
-    RouteTrafficStatus,
-)
+from ai.backend.manager.data.deployment.types import RouteStatus, RouteTrafficStatus
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyRow,
 )
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_policy import (
+    BlueGreenSpec,
+    DeploymentPolicyRow,
+    RollingUpdateSpec,
+)
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
