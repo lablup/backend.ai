@@ -499,6 +499,7 @@ class ModelMountConfigInput:
 class ExtraVFolderMountInput:
     vfolder_id: ID
     mount_destination: str | None
+    subpath: str | None = None
 
 
 @strawberry.input(

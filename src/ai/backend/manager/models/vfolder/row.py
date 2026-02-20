@@ -922,7 +922,13 @@ async def prepare_vfolder_mounts(
         requested_vfolder_subpaths[key] = os.path.normpath(subpath)
         _already_resolved.add(name)
     for vfolder_uuid, value in requested_mount_map.items():
-        requested_vfolder_subpaths[vfolder_uuid] = "."
+        uuid_options = requested_mount_reference_options.get(vfolder_uuid, {})
+        uuid_subpath = uuid_options.get("subpath", ".") if isinstance(uuid_options, dict) else "."
+        if not PurePosixPath(os.path.normpath(uuid_subpath)).is_relative_to("."):
+            raise InvalidAPIParameters(
+                f"The subpath '{uuid_subpath}' must not escape the vfolder root.",
+            )
+        requested_vfolder_subpaths[vfolder_uuid] = os.path.normpath(uuid_subpath)
         requested_vfolder_dstpaths[vfolder_uuid] = value
     for key, value in requested_mount_name_map.items():
         requested_vfolder_dstpaths[key] = value
@@ -977,7 +983,11 @@ async def prepare_vfolder_mounts(
         name = row["name"]
         if vfid in requested_vfolder_ids:
             requested_vfolder_names[vfid] = name
-            requested_vfolder_subpaths[vfid] = "."
+            vfid_options = requested_mount_reference_options.get(vfid, {})
+            vfid_subpath = (
+                vfid_options.get("subpath", ".") if isinstance(vfid_options, dict) else "."
+            )
+            requested_vfolder_subpaths[vfid] = os.path.normpath(vfid_subpath)
         if name in _already_resolved:
             continue
         if name not in requested_names:

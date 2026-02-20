@@ -25,6 +25,7 @@ from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.errors.deployment import DeploymentHasNoTargetRevision
 from ai.backend.manager.models.network import NetworkRow, NetworkType
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.models.vfolder.utils import merge_mount_options_with_subpaths
 from ai.backend.manager.types import UserScope
 
 
@@ -119,6 +120,7 @@ class SessionCreationSpec:
 
         # Prepare mount spec
         mount_spec = target_revision.mounts.to_mount_spec()
+        merged_mount_options = merge_mount_options_with_subpaths(mount_spec)
 
         # Prepare environment variables
         environ = target_revision.execution.environ or {}
@@ -139,7 +141,7 @@ class SessionCreationSpec:
                 creation_config={
                     "mounts": mount_spec.mounts,
                     "mount_map": mount_spec.mount_map,
-                    "mount_options": mount_spec.mount_options,
+                    "mount_options": merged_mount_options,
                     "environ": environ,
                     "resources": target_revision.resource_spec.resource_slots,
                     "resource_opts": target_revision.resource_spec.resource_opts,
@@ -171,7 +173,7 @@ class SessionCreationSpec:
             creation_spec={
                 "mounts": mount_spec.mounts,
                 "mount_map": mount_spec.mount_map,
-                "mount_options": mount_spec.mount_options,
+                "mount_options": merged_mount_options,
                 "model_definition_path": target_revision.mounts.model_definition_path,
                 "runtime_variant": target_revision.execution.runtime_variant,
                 "environ": environ,

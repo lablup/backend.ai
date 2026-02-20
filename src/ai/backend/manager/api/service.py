@@ -451,6 +451,7 @@ class ServiceConfigModel(LegacyBaseRequestModel):
                 mount_destination=mount_option.mount_destination,
                 type=mount_option.type,
                 permission=mount_option.permission,
+                subpath=mount_option.subpath,
             )
 
         return ServiceConfig(

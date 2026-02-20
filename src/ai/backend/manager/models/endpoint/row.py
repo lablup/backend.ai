@@ -1315,6 +1315,7 @@ class ModelServiceHelper:
             folder_id: {
                 "type": options.type,
                 "permission": options.permission,
+                "subpath": options.subpath or ".",
             }
             for folder_id, options in extra_mounts.items()
         }

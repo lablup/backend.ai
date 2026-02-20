@@ -270,7 +270,11 @@ class ModelServingService:
             },
         }
         creation_config["mount_options"] = {
-            m.vfid.folder_id: {"permission": m.mount_perm} for m in service_prepare_ctx.extra_mounts
+            m.vfid.folder_id: {
+                "permission": m.mount_perm,
+                "subpath": str(m.vfsubpath),
+            }
+            for m in service_prepare_ctx.extra_mounts
         }
         sudo_session_enabled = action.creator.sudo_session_enabled
 
@@ -513,7 +517,11 @@ class ModelServingService:
         for m in service_prepare_ctx.extra_mounts:
             mount_map[m.vfid.folder_id] = str(m.kernel_path)
         mount_options: dict[uuid.UUID, dict[str, Any]] = {
-            m.vfid.folder_id: {"permission": m.mount_perm} for m in service_prepare_ctx.extra_mounts
+            m.vfid.folder_id: {
+                "permission": m.mount_perm,
+                "subpath": str(m.vfsubpath),
+            }
+            for m in service_prepare_ctx.extra_mounts
         }
         environ = creation_config.get("environ", {})
 

@@ -164,13 +164,16 @@ class MountOption:
     mount_destination: str | None
     type: MountTypes
     permission: MountPermission | None
+    subpath: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result: dict[str, Any] = {
             "mount_destination": self.mount_destination,
             "type": self.type.value,
             "permission": self.permission.value if self.permission else None,
+            "subpath": self.subpath if self.subpath else None,
         }
+        return result
 
 
 @dataclass
