@@ -106,6 +106,52 @@ class TestCheckPermissionWithScopeChain:
 
         return fixture_ids
 
+    @pytest.fixture
+    async def vfolder_in_project_auto(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        fixture_ids: ScopeChainFixture,
+    ) -> None:
+        """VFOLDER belongs to PROJECT (auto edge)."""
+        await self._add_association(
+            db_with_rbac_tables,
+            scope_type=ScopeType.PROJECT,
+            scope_id=fixture_ids.project_id,
+            entity_type=EntityType.VFOLDER,
+            entity_id=fixture_ids.vfolder_id,
+        )
+
+    @pytest.fixture
+    async def project_in_domain_auto(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        fixture_ids: ScopeChainFixture,
+    ) -> None:
+        """PROJECT belongs to DOMAIN (auto edge)."""
+        await self._add_association(
+            db_with_rbac_tables,
+            scope_type=ScopeType.DOMAIN,
+            scope_id=fixture_ids.domain_id,
+            entity_type=EntityType.PROJECT,
+            entity_id=fixture_ids.project_id,
+        )
+
+    @pytest.fixture
+    async def vfolder_in_project_ref(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        fixture_ids: ScopeChainFixture,
+    ) -> None:
+        """VFOLDER referenced by PROJECT (ref edge)."""
+        await self._add_association(
+            db_with_rbac_tables,
+            scope_type=ScopeType.PROJECT,
+            scope_id=fixture_ids.project_id,
+            entity_type=EntityType.VFOLDER,
+            entity_id=fixture_ids.vfolder_id,
+            relation_type=RelationType.REF,
+        )
+
     async def _add_permission(
         self,
         db: ExtendedAsyncSAEngine,
@@ -151,18 +197,11 @@ class TestCheckPermissionWithScopeChain:
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         user_with_active_role: ScopeChainFixture,
+        vfolder_in_project_auto: None,
     ) -> None:
         """Permission on the direct scope of the target entity grants access."""
         f = user_with_active_role
 
-        # VFOLDER belongs to PROJECT (auto)
-        await self._add_association(
-            db_with_rbac_tables,
-            scope_type=ScopeType.PROJECT,
-            scope_id=f.project_id,
-            entity_type=EntityType.VFOLDER,
-            entity_id=f.vfolder_id,
-        )
         # User has READ permission on VFOLDER in that PROJECT scope
         await self._add_permission(
             db_with_rbac_tables,
@@ -185,20 +224,12 @@ class TestCheckPermissionWithScopeChain:
 
     async def test_no_permission_returns_false(
         self,
-        db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         user_with_active_role: ScopeChainFixture,
+        vfolder_in_project_auto: None,
     ) -> None:
         """No matching permission anywhere in the chain returns False."""
         f = user_with_active_role
-
-        await self._add_association(
-            db_with_rbac_tables,
-            scope_type=ScopeType.PROJECT,
-            scope_id=f.project_id,
-            entity_type=EntityType.VFOLDER,
-            entity_id=f.vfolder_id,
-        )
 
         result = await db_source.check_permission_with_scope_chain(
             user_id=f.user_id,
@@ -215,25 +246,11 @@ class TestCheckPermissionWithScopeChain:
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         user_with_active_role: ScopeChainFixture,
+        vfolder_in_project_auto: None,
+        project_in_domain_auto: None,
     ) -> None:
         """AUTO edge delegates all operations from parent scope."""
         f = user_with_active_role
-
-        # VFOLDER in PROJECT (auto), PROJECT in DOMAIN (auto)
-        await self._add_association(
-            db_with_rbac_tables,
-            scope_type=ScopeType.PROJECT,
-            scope_id=f.project_id,
-            entity_type=EntityType.VFOLDER,
-            entity_id=f.vfolder_id,
-        )
-        await self._add_association(
-            db_with_rbac_tables,
-            scope_type=ScopeType.DOMAIN,
-            scope_id=f.domain_id,
-            entity_type=EntityType.PROJECT,
-            entity_id=f.project_id,
-        )
 
         # Permission granted at DOMAIN scope
         await self._add_permission(
@@ -260,19 +277,11 @@ class TestCheckPermissionWithScopeChain:
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         user_with_active_role: ScopeChainFixture,
+        vfolder_in_project_ref: None,
     ) -> None:
         """REF edge is not traversed; no operation passes through."""
         f = user_with_active_role
 
-        # VFOLDER referenced by PROJECT (ref)
-        await self._add_association(
-            db_with_rbac_tables,
-            scope_type=ScopeType.PROJECT,
-            scope_id=f.project_id,
-            entity_type=EntityType.VFOLDER,
-            entity_id=f.vfolder_id,
-            relation_type=RelationType.REF,
-        )
         await self._add_permission(
             db_with_rbac_tables,
             role_id=f.role_id,
@@ -317,27 +326,11 @@ class TestCheckPermissionWithScopeChain:
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         user_with_active_role: ScopeChainFixture,
+        vfolder_in_project_ref: None,
+        project_in_domain_auto: None,
     ) -> None:
         """REF edge terminates scope chain; scopes beyond REF are unreachable."""
         f = user_with_active_role
-
-        # VFOLDER --(ref)--> PROJECT --(auto)--> DOMAIN
-        await self._add_association(
-            db_with_rbac_tables,
-            scope_type=ScopeType.PROJECT,
-            scope_id=f.project_id,
-            entity_type=EntityType.VFOLDER,
-            entity_id=f.vfolder_id,
-            relation_type=RelationType.REF,
-        )
-        await self._add_association(
-            db_with_rbac_tables,
-            scope_type=ScopeType.DOMAIN,
-            scope_id=f.domain_id,
-            entity_type=EntityType.PROJECT,
-            entity_id=f.project_id,
-            relation_type=RelationType.AUTO,
-        )
 
         # Permission at DOMAIN scope — beyond the REF edge
         await self._add_permission(
@@ -365,6 +358,7 @@ class TestCheckPermissionWithScopeChain:
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         fixture_ids: ScopeChainFixture,
+        vfolder_in_project_auto: None,
     ) -> None:
         """Inactive role does not grant any permission."""
         f = fixture_ids
@@ -385,13 +379,6 @@ class TestCheckPermissionWithScopeChain:
             db_sess.add(user_role)
             await db_sess.flush()
 
-        await self._add_association(
-            db_with_rbac_tables,
-            scope_type=ScopeType.PROJECT,
-            scope_id=f.project_id,
-            entity_type=EntityType.VFOLDER,
-            entity_id=f.vfolder_id,
-        )
         await self._add_permission(
             db_with_rbac_tables,
             role_id=f.role_id,
