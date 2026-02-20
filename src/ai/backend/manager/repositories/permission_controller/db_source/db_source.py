@@ -35,6 +35,7 @@ from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
 from ai.backend.manager.data.permission.types import (
+    EntityType,
     OperationType,
     RBACElementRef,
     ScopeData,
@@ -860,27 +861,20 @@ class PermissionDBSource:
         )
         return scope_chain_cte.union(scope_chain_recursive)
 
-    async def check_permission_with_scope_chain(
+    def _build_scope_chain_permission_query(
         self,
         user_id: uuid.UUID,
         target_element_ref: RBACElementRef,
+        target_entity_type: EntityType,
         operation: OperationType,
-    ) -> bool:
-        """CTE-based permission check that traverses the scope chain.
-
-        Two-layer check (BEP-1048):
-        1. Self-scope direct match — permission scoped to the target entity itself.
-        2. Scope chain traversal — walks AUTO edges upward via CTE.
-        """
+    ) -> sa.sql.Select[Any]:
+        """Build a query that checks permissions via CTE scope chain traversal."""
         permissions = PermissionRow.__table__
         user_roles = UserRoleRow.__table__
         roles = RoleRow.__table__
 
-        target_entity_type = target_element_ref.element_type.to_entity_type()
-        target_scope_type = target_element_ref.element_type.to_scope_type()
         scope_chain_cte = self._build_scope_chain_cte(target_element_ref)
-
-        scope_chain_permission_query = (
+        return (
             sa.select(sa.literal(1))
             .select_from(
                 scope_chain_cte.join(
@@ -910,7 +904,20 @@ class PermissionDBSource:
             .limit(1)
         )
 
-        self_scope_permission_query = (
+    def _build_self_scope_permission_query(
+        self,
+        user_id: uuid.UUID,
+        target_element_ref: RBACElementRef,
+        target_entity_type: EntityType,
+        target_scope_type: ScopeType,
+        operation: OperationType,
+    ) -> sa.sql.Select[Any]:
+        """Build a query that checks permissions scoped to the target entity itself."""
+        permissions = PermissionRow.__table__
+        user_roles = UserRoleRow.__table__
+        roles = RoleRow.__table__
+
+        return (
             sa.select(sa.literal(1))
             .select_from(
                 permissions.join(
@@ -934,10 +941,37 @@ class PermissionDBSource:
             .limit(1)
         )
 
+    async def check_permission_with_scope_chain(
+        self,
+        user_id: uuid.UUID,
+        target_element_ref: RBACElementRef,
+        operation: OperationType,
+    ) -> bool:
+        """CTE-based permission check that traverses the scope chain.
+
+        Two-layer check (BEP-1048):
+        1. Self-scope direct match — permission scoped to the target entity itself.
+        2. Scope chain traversal — walks AUTO edges upward via CTE.
+        """
+        target_entity_type = target_element_ref.element_type.to_entity_type()
+        target_scope_type = target_element_ref.element_type.to_scope_type()
+
         combined_query = sa.select(
             sa.or_(
-                sa.exists(scope_chain_permission_query),
-                sa.exists(self_scope_permission_query),
+                sa.exists(
+                    self._build_scope_chain_permission_query(
+                        user_id, target_element_ref, target_entity_type, operation
+                    )
+                ),
+                sa.exists(
+                    self._build_self_scope_permission_query(
+                        user_id,
+                        target_element_ref,
+                        target_entity_type,
+                        target_scope_type,
+                        operation,
+                    )
+                ),
             )
         )
 
