@@ -5,7 +5,7 @@ from functools import cached_property, partial
 
 from strawberry.dataloader import DataLoader
 
-from ai.backend.common.types import AgentId, ImageID, KernelId
+from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.agent.types import AgentDetailData
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRevisionData
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
@@ -35,7 +35,7 @@ from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.role import AssignedUserData, RoleData
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
-from ai.backend.manager.data.session.types import SessionSchedulingHistoryData
+from ai.backend.manager.data.session.types import SessionData, SessionSchedulingHistoryData
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
@@ -75,6 +75,7 @@ from .scheduling_history import (
     load_route_histories_by_ids,
     load_session_histories_by_ids,
 )
+from .session import load_sessions_by_ids
 from .storage_namespace import load_storage_namespaces_by_ids
 from .user import load_users_by_ids
 from .vfs_storage import load_vfs_storages_by_ids
@@ -215,6 +216,12 @@ class DataLoaders:
         self,
     ) -> DataLoader[KernelId, KernelInfo | None]:
         return DataLoader(load_fn=partial(load_kernels_by_ids, self._processors.session))
+
+    @cached_property
+    def session_loader(
+        self,
+    ) -> DataLoader[SessionId, SessionData | None]:
+        return DataLoader(load_fn=partial(load_sessions_by_ids, self._processors.session))
 
     @cached_property
     def image_alias_loader(

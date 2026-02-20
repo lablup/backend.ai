@@ -6,19 +6,25 @@ from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from typing import Any, Self
+from uuid import UUID
 
 import strawberry
-from strawberry import Info
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
+from ai.backend.common.types import SessionId
+from ai.backend.manager.api.gql.base import OrderDirection, StringMatchSpec, UUIDFilter
 from ai.backend.manager.api.gql.common.types import (
     ClusterModeGQL,
     SessionV2ResultGQL,
     SessionV2TypeGQL,
 )
-from ai.backend.manager.api.gql.deployment.types.revision import EnvironmentVariablesGQL
+from ai.backend.manager.api.gql.deployment.types.revision import (
+    EnvironmentVariableEntryGQL,
+    EnvironmentVariablesGQL,
+)
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.image.types import ImageV2ConnectionGQL
 from ai.backend.manager.api.gql.kernel.types import KernelV2ConnectionGQL, ResourceAllocationGQL
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
@@ -26,8 +32,9 @@ from ai.backend.manager.api.gql.resource_group.resolver import ResourceGroupConn
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
-from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
+from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.scheduler.options import SessionConditions, SessionOrders
 
 
 @strawberry.enum(
@@ -124,7 +131,11 @@ class SessionV2StatusFilterGQL:
     not_in: list[SessionV2StatusGQL] | None = None
 
     def build_condition(self) -> QueryCondition | None:
-        raise NotImplementedError
+        if self.in_:
+            return SessionConditions.by_status_in([s.to_internal() for s in self.in_])
+        if self.not_in:
+            return SessionConditions.by_status_not_in([s.to_internal() for s in self.not_in])
+        return None
 
 
 @strawberry.input(
@@ -139,7 +150,41 @@ class SessionV2FilterGQL(GQLFilter):
     user_uuid: UUIDFilter | None = None
 
     def build_conditions(self) -> list[QueryCondition]:
-        raise NotImplementedError
+        conditions: list[QueryCondition] = []
+        if self.id:
+            condition = self.id.build_query_condition(
+                SessionConditions.by_id_filter_equals,
+                SessionConditions.by_id_filter_in,
+            )
+            if condition:
+                conditions.append(condition)
+        if self.status:
+            condition = self.status.build_condition()
+            if condition:
+                conditions.append(condition)
+        if self.name is not None:
+            conditions.append(
+                SessionConditions.by_name_equals(
+                    StringMatchSpec(self.name, case_insensitive=False, negated=False)
+                )
+            )
+        if self.domain_name is not None:
+            conditions.append(SessionConditions.by_domain_name(self.domain_name))
+        if self.project_id:
+            condition = self.project_id.build_query_condition(
+                SessionConditions.by_group_id_filter_equals,
+                SessionConditions.by_group_id_filter_in,
+            )
+            if condition:
+                conditions.append(condition)
+        if self.user_uuid:
+            condition = self.user_uuid.build_query_condition(
+                SessionConditions.by_user_uuid_filter_equals,
+                SessionConditions.by_user_uuid_filter_in,
+            )
+            if condition:
+                conditions.append(condition)
+        return conditions
 
 
 @strawberry.input(
@@ -150,7 +195,20 @@ class SessionV2OrderByGQL(GQLOrderBy):
     direction: OrderDirection = OrderDirection.DESC
 
     def to_query_order(self) -> QueryOrder:
-        raise NotImplementedError
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case SessionV2OrderFieldGQL.CREATED_AT:
+                return SessionOrders.created_at(ascending)
+            case SessionV2OrderFieldGQL.TERMINATED_AT:
+                return SessionOrders.terminated_at(ascending)
+            case SessionV2OrderFieldGQL.STATUS:
+                return SessionOrders.status(ascending)
+            case SessionV2OrderFieldGQL.ID:
+                return SessionOrders.id(ascending)
+            case SessionV2OrderFieldGQL.NAME:
+                return SessionOrders.name(ascending)
+            case _:
+                raise ValueError(f"Unhandled SessionV2OrderFieldGQL value: {self.field!r}")
 
 
 # ========== Session Info Sub-Types ==========
@@ -259,6 +317,11 @@ class SessionV2GQL(Node):
 
     id: NodeID[str]
 
+    # Private fields for dynamic resolvers
+    _domain_name: strawberry.Private[str]
+    _user_uuid: strawberry.Private[UUID]
+    _group_id: strawberry.Private[UUID]
+
     metadata: SessionV2MetadataInfoGQL = strawberry.field(
         description="Metadata including domain, project, and user information."
     )
@@ -276,26 +339,42 @@ class SessionV2GQL(Node):
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.3.0. The domain this session belongs to."
     )
-    async def domain(self) -> DomainV2GQL | None:
-        raise NotImplementedError
+    async def domain(self, info: Info[StrawberryGQLContext]) -> DomainV2GQL | None:
+        domain_data = await info.context.data_loaders.domain_loader.load(self._domain_name)
+        if domain_data is None:
+            return None
+        return DomainV2GQL.from_data(domain_data)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.3.0. The user who owns this session."
     )
-    async def user(self) -> UserV2GQL | None:
-        raise NotImplementedError
+    async def user(self, info: Info[StrawberryGQLContext]) -> UserV2GQL | None:
+        user_data = await info.context.data_loaders.user_loader.load(self._user_uuid)
+        if user_data is None:
+            return None
+        return UserV2GQL.from_data(user_data)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.3.0. The project this session belongs to."
     )
-    async def project(self) -> ProjectV2GQL | None:
-        raise NotImplementedError
+    async def project(self, info: Info[StrawberryGQLContext]) -> ProjectV2GQL | None:
+        project_data = await info.context.data_loaders.project_loader.load(self._group_id)
+        if project_data is None:
+            return None
+        return ProjectV2GQL.from_data(project_data)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.3.0. The resource group this session is assigned to."
     )
-    async def resource_group(self) -> ResourceGroupGQL | None:
-        raise NotImplementedError
+    async def resource_group(self, info: Info[StrawberryGQLContext]) -> ResourceGroupGQL | None:
+        if self.resource.resource_group_name is None:
+            return None
+        resource_group_data = await info.context.data_loaders.resource_group_loader.load(
+            self.resource.resource_group_name
+        )
+        if resource_group_data is None:
+            return None
+        return ResourceGroupGQL.from_dataclass(resource_group_data)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.3.0. The candidate resource groups considered during scheduling."
@@ -325,12 +404,77 @@ class SessionV2GQL(Node):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        raise NotImplementedError
+        results = await info.context.data_loaders.session_loader.load_many([
+            SessionId(UUID(nid)) for nid in node_ids
+        ])
+        return [cls.from_data(data) if data is not None else None for data in results]
 
     @classmethod
-    def from_session_info(cls, session_info: SessionInfo) -> Self:
-        """Create SessionV2GQL from SessionInfo dataclass."""
-        raise NotImplementedError
+    def from_data(cls, data: SessionData) -> Self:
+        """Create SessionV2GQL from SessionData dataclass."""
+        requested_slots = (
+            ResourceSlotGQL.from_resource_slot(data.requested_slots)
+            if data.requested_slots
+            else ResourceSlotGQL(entries=[])
+        )
+        occupying_slots = (
+            ResourceSlotGQL.from_resource_slot(data.occupying_slots)
+            if data.occupying_slots
+            else None
+        )
+
+        environ_gql: EnvironmentVariablesGQL | None = None
+        if data.environ:
+            environ_gql = EnvironmentVariablesGQL(
+                entries=[
+                    EnvironmentVariableEntryGQL(name=k, value=str(v))
+                    for k, v in data.environ.items()
+                ]
+            )
+
+        return cls(
+            id=ID(str(data.id)),
+            _domain_name=data.domain_name,
+            _user_uuid=data.user_uuid,
+            _group_id=data.group_id,
+            metadata=SessionV2MetadataInfoGQL(
+                creation_id=data.creation_id or "",
+                name=data.name or "",
+                session_type=SessionV2TypeGQL.from_internal(data.session_type),
+                access_key=str(data.access_key) if data.access_key else "",
+                cluster_mode=ClusterModeGQL.from_internal(data.cluster_mode),
+                cluster_size=data.cluster_size,
+                priority=data.priority,
+                tag=data.tag,
+            ),
+            resource=SessionV2ResourceInfoGQL(
+                allocation=ResourceAllocationGQL(
+                    requested=requested_slots,
+                    used=occupying_slots,
+                ),
+                resource_group_name=data.scaling_group_name,
+                target_resource_group_names=data.target_sgroup_names,
+            ),
+            lifecycle=SessionV2LifecycleInfoGQL(
+                status=SessionV2StatusGQL.from_internal(data.status),
+                result=SessionV2ResultGQL.from_internal(data.result),
+                created_at=data.created_at,
+                terminated_at=data.terminated_at,
+                starts_at=data.starts_at,
+                batch_timeout=data.batch_timeout,
+            ),
+            runtime=SessionV2RuntimeInfoGQL(
+                environ=environ_gql,
+                bootstrap_script=data.bootstrap_script,
+                startup_command=data.startup_command,
+                callback_url=data.callback_url,
+            ),
+            network=SessionV2NetworkInfoGQL(
+                use_host_network=data.use_host_network,
+                network_type=str(data.network_type) if data.network_type else None,
+                network_id=data.network_id,
+            ),
+        )
 
 
 # ========== Connection Types ==========
