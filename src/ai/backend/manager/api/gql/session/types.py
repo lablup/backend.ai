@@ -25,7 +25,7 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
 )
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
-from ai.backend.manager.api.gql.image.types import ImageV2ConnectionGQL, ImageV2EdgeGQL, ImageV2GQL
+from ai.backend.manager.api.gql.image.types import ImageV2ConnectionGQL
 from ai.backend.manager.api.gql.kernel.types import (
     KernelV2ConnectionGQL,
     KernelV2EdgeGQL,
@@ -47,13 +47,11 @@ from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
 )
-from ai.backend.manager.repositories.image.options import ImageConditions
 from ai.backend.manager.repositories.scheduler.options import (
     KernelConditions,
     SessionConditions,
     SessionOrders,
 )
-from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 
 
@@ -351,7 +349,6 @@ class SessionV2GQL(Node):
     _domain_name: strawberry.Private[str]
     _user_uuid: strawberry.Private[UUID]
     _group_id: strawberry.Private[UUID]
-    _image_canonicals: strawberry.Private[list[str]]
 
     metadata: SessionV2MetadataInfoGQL = strawberry.field(
         description="Metadata including domain, project, and user information."
@@ -433,37 +430,8 @@ class SessionV2GQL(Node):
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.3.0. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions."
     )
-    async def images(self, info: Info[StrawberryGQLContext]) -> ImageV2ConnectionGQL:
-        if not self._image_canonicals:
-            return ImageV2ConnectionGQL(
-                edges=[],
-                page_info=strawberry.relay.PageInfo(
-                    has_next_page=False,
-                    has_previous_page=False,
-                    start_cursor=None,
-                    end_cursor=None,
-                ),
-                count=0,
-            )
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[ImageConditions.by_canonicals(self._image_canonicals)],
-        )
-        action_result = await info.context.processors.image.search_images.wait_for_complete(
-            SearchImagesAction(querier=querier)
-        )
-        nodes = [ImageV2GQL.from_data(image_data) for image_data in action_result.data]
-        edges = [ImageV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
-        return ImageV2ConnectionGQL(
-            edges=edges,
-            page_info=strawberry.relay.PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
-            ),
-            count=len(nodes),
-        )
+    async def images(self) -> ImageV2ConnectionGQL:
+        raise NotImplementedError
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.3.0. The kernels belonging to this session."
@@ -533,7 +501,6 @@ class SessionV2GQL(Node):
             _domain_name=data.domain_name,
             _user_uuid=data.user_uuid,
             _group_id=data.group_id,
-            _image_canonicals=data.images or [],
             metadata=SessionV2MetadataInfoGQL(
                 creation_id=data.creation_id or "",
                 name=data.name or "",
