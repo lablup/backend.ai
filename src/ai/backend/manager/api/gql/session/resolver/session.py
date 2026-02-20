@@ -1,28 +1,16 @@
 from __future__ import annotations
 
-from uuid import UUID
-
 import strawberry
 from strawberry import Info
 
-from ai.backend.common.types import SessionId
-from ai.backend.manager.api.gql.session.fetcher import fetch_session, fetch_sessions
+from ai.backend.manager.api.gql.session.fetcher import fetch_sessions
 from ai.backend.manager.api.gql.session.types import (
     SessionV2ConnectionGQL,
     SessionV2FilterGQL,
-    SessionV2GQL,
     SessionV2OrderByGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-
-
-@strawberry.field(description="Added in 26.3.0. Query a single session by ID.")  # type: ignore[misc]
-async def session_v2(
-    info: Info[StrawberryGQLContext],
-    id: UUID,
-) -> SessionV2GQL | None:
-    return await fetch_session(info, SessionId(id))
 
 
 @strawberry.field(

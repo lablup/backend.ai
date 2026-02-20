@@ -9198,9 +9198,6 @@ type Query
   """Added in 26.2.0. Query a single kernel by ID."""
   kernelV2(id: UUID!): KernelV2 @join__field(graph: STRAWBERRY)
 
-  """Added in 26.3.0. Query a single session by ID."""
-  sessionV2(id: UUID!): SessionV2 @join__field(graph: STRAWBERRY)
-
   """
   Added in 26.2.0.
   
@@ -11203,8 +11200,8 @@ input SessionV2Filter
 {
   id: UUIDFilter = null
   status: SessionV2StatusFilter = null
-  name: String = null
-  domainName: String = null
+  name: StringFilter = null
+  domainName: StringFilter = null
   projectId: UUIDFilter = null
   userUuid: UUIDFilter = null
 }

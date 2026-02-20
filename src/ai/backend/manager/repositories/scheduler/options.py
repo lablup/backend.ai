@@ -367,6 +367,121 @@ class SessionConditions:
             case KernelMatchType.NOT_ANY:
                 return SessionConditions.no_kernel_in_statuses(statuses)
 
+    @staticmethod
+    def by_id_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        """Factory for id equality filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return SessionRow.id != SessionId(spec.value)
+            return SessionRow.id == SessionId(spec.value)
+
+        return inner
+
+    @staticmethod
+    def by_id_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        """Factory for id IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            session_ids = [SessionId(v) for v in spec.values]
+            if spec.negated:
+                return SessionRow.id.notin_(session_ids)
+            return SessionRow.id.in_(session_ids)
+
+        return inner
+
+    @staticmethod
+    def by_status_in(statuses: Collection[SessionStatus]) -> QueryCondition:
+        """Factory for status IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.status.in_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_status_not_in(statuses: Collection[SessionStatus]) -> QueryCondition:
+        """Factory for status NOT IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.status.notin_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_user_uuid_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        """Factory for user UUID equality filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return SessionRow.user_uuid != spec.value
+            return SessionRow.user_uuid == spec.value
+
+        return inner
+
+    @staticmethod
+    def by_user_uuid_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        """Factory for user UUID IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return SessionRow.user_uuid.notin_(spec.values)
+            return SessionRow.user_uuid.in_(spec.values)
+
+        return inner
+
+    @staticmethod
+    def by_group_id_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        """Factory for group (project) ID equality filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return SessionRow.group_id != spec.value
+            return SessionRow.group_id == spec.value
+
+        return inner
+
+    @staticmethod
+    def by_group_id_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        """Factory for group (project) ID IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return SessionRow.group_id.notin_(spec.values)
+            return SessionRow.group_id.in_(spec.values)
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(SessionRow.created_at).where(SessionRow.id == cursor_id).scalar_subquery()
+            )
+            return SessionRow.created_at < subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(SessionRow.created_at).where(SessionRow.id == cursor_id).scalar_subquery()
+            )
+            return SessionRow.created_at > subquery
+
+        return inner
+
 
 class SessionOrders:
     """Query orders for sessions."""
@@ -382,6 +497,24 @@ class SessionOrders:
         if ascending:
             return SessionRow.id.asc()
         return SessionRow.id.desc()
+
+    @staticmethod
+    def terminated_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return SessionRow.terminated_at.asc()
+        return SessionRow.terminated_at.desc()
+
+    @staticmethod
+    def status(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return SessionRow.status.asc()
+        return SessionRow.status.desc()
+
+    @staticmethod
+    def name(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return SessionRow.name.asc()
+        return SessionRow.name.desc()
 
 
 class KernelConditions:
