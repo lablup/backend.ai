@@ -29,6 +29,7 @@ from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.common.types import VFolderHostPermissionMap
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
@@ -466,7 +467,7 @@ async def domain_fixture(
                 description=f"Test domain {domain_name}",
                 is_active=True,
                 total_resource_slots={},
-                allowed_vfolder_hosts={},
+                allowed_vfolder_hosts=VFolderHostPermissionMap(),
             )
         )
     yield domain_name
@@ -507,7 +508,7 @@ async def resource_policy_fixture(
                 max_concurrent_sessions=5,
                 max_containers_per_session=1,
                 idle_timeout=3600,
-                allowed_vfolder_hosts={},
+                allowed_vfolder_hosts=VFolderHostPermissionMap(),
             )
         )
     yield policy_name
