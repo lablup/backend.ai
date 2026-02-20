@@ -1449,7 +1449,7 @@ input BulkCreateUserV2Input
   users: [CreateUserV2Input!]!
 }
 
-"""Added in 26.2.0. Error information for a failed user in bulk update."""
+"""Added in 26.3.0. Error information for a failed user in bulk update."""
 type BulkUpdateUserError
   @join__type(graph: STRAWBERRY)
 {
@@ -1460,7 +1460,7 @@ type BulkUpdateUserError
   message: String!
 }
 
-"""Added in 26.2.0. Payload for bulk user update mutation."""
+"""Added in 26.3.0. Payload for bulk user update mutation."""
 type BulkUpdateUsersV2Payload
   @join__type(graph: STRAWBERRY)
 {
@@ -1472,7 +1472,7 @@ type BulkUpdateUsersV2Payload
 }
 
 """
-Added in 26.2.0. Input for bulk updating multiple users. Each user has individual update specifications.
+Added in 26.3.0. Input for bulk updating multiple users. Each user has individual update specifications.
 """
 input BulkUpdateUserV2Input
   @join__type(graph: STRAWBERRY)
@@ -1482,7 +1482,7 @@ input BulkUpdateUserV2Input
 }
 
 """
-Added in 26.2.0. Input for a single user update within a bulk operation. Pairs a user ID with the fields to update.
+Added in 26.3.0. Input for a single user update within a bulk operation. Pairs a user ID with the fields to update.
 """
 input BulkUpdateUserV2ItemInput
   @join__type(graph: STRAWBERRY)
@@ -7423,12 +7423,12 @@ type Mutation
   adminBulkCreateUsers(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload! @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.2.0. Update multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual update specifications.
+  Added in 26.3.0. Update multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual update specifications.
   """
-  adminBulkUpdateUsers(input: BulkUpdateUserV2Input!): BulkUpdateUsersV2Payload! @join__field(graph: STRAWBERRY)
+  adminBulkUpdateUsersV2(input: BulkUpdateUserV2Input!): BulkUpdateUsersV2Payload! @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.2.0. Update a user's information (admin only). Requires superadmin privileges. Only provided fields will be updated.
+  Added in 26.3.0. Update a user's information (admin only). Requires superadmin privileges. Only provided fields will be updated.
   """
   adminUpdateUser(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload! @join__field(graph: STRAWBERRY)
 
@@ -11682,7 +11682,7 @@ type UpdateRouteTrafficStatusPayload
 }
 
 """
-Added in 26.2.0. Input for updating user information. All fields are optional - only provided fields will be updated.
+Added in 26.3.0. Input for updating user information. All fields are optional - only provided fields will be updated.
 """
 input UpdateUserV2Input
   @join__type(graph: STRAWBERRY)
@@ -11736,7 +11736,7 @@ input UpdateUserV2Input
   containerGids: [Int!]
 }
 
-"""Added in 26.2.0. Payload for user update mutation."""
+"""Added in 26.3.0. Payload for user update mutation."""
 type UpdateUserV2Payload
   @join__type(graph: STRAWBERRY)
 {
