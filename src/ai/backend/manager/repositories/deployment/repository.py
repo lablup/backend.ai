@@ -1217,6 +1217,33 @@ class DeploymentRepository:
         """
         return await self._db_source.delete_deployment_policy(purger)
 
+    @deployment_repository_resilience.apply()
+    async def fetch_deployment_policies_by_endpoint_ids(
+        self,
+        endpoint_ids: set[uuid.UUID],
+    ) -> Mapping[uuid.UUID, DeploymentPolicyData]:
+        """Fetch deployment policies for multiple endpoints.
+
+        Args:
+            endpoint_ids: Set of endpoint IDs to fetch policies for.
+
+        Returns:
+            Mapping of endpoint_id to DeploymentPolicyData.
+        """
+        return await self._db_source.fetch_deployment_policies_by_endpoint_ids(endpoint_ids)
+
+    @deployment_repository_resilience.apply()
+    async def complete_rolling_update_bulk(
+        self,
+        updates: dict[uuid.UUID, uuid.UUID],
+    ) -> None:
+        """Complete rolling update by setting current_revision and clearing deploying_revision.
+
+        Args:
+            updates: Mapping of endpoint_id to new_revision_id.
+        """
+        await self._db_source.complete_rolling_update_bulk(updates)
+
     # ===================
     # Route operations
     # ===================

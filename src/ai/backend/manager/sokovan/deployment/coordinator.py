@@ -54,6 +54,7 @@ from .handlers import (
     DeploymentHandler,
     DestroyingDeploymentHandler,
     ReconcileDeploymentHandler,
+    RollingUpdateDeploymentHandler,
     ScalingDeploymentHandler,
 )
 from .types import DeploymentExecutionResult, DeploymentLifecycleType
@@ -155,6 +156,11 @@ class DeploymentCoordinator:
                 deployment_controller=self._deployment_controller,
             ),
             DeploymentLifecycleType.DESTROYING: DestroyingDeploymentHandler(
+                deployment_executor=executor,
+                deployment_controller=self._deployment_controller,
+                route_controller=self._route_controller,
+            ),
+            DeploymentLifecycleType.ROLLING_UPDATE: RollingUpdateDeploymentHandler(
                 deployment_executor=executor,
                 deployment_controller=self._deployment_controller,
                 route_controller=self._route_controller,
@@ -389,6 +395,13 @@ class DeploymentCoordinator:
                 short_interval=5.0,
                 long_interval=60.0,
                 initial_delay=25.0,
+            ),
+            # Rolling update deployments
+            DeploymentTaskSpec(
+                DeploymentLifecycleType.ROLLING_UPDATE,
+                short_interval=5.0,
+                long_interval=30.0,
+                initial_delay=10.0,
             ),
         ]
 

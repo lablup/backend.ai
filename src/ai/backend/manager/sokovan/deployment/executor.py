@@ -12,6 +12,7 @@ from ai.backend.common.clients.http_client.client_pool import (
 )
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     RuntimeVariant,
@@ -35,6 +36,10 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.errors.deployment import ReplicaCountMismatch
 from ai.backend.manager.errors.service import ModelDefinitionNotFound
+from ai.backend.manager.models.deployment_policy import (
+    DeploymentPolicyData,
+    RollingUpdateSpec,
+)
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
@@ -671,3 +676,240 @@ class DeploymentExecutor:
                     app_proxy_addr=target.addr,
                     app_proxy_api_token=target.api_token,
                 )
+
+    # Rolling update methods
+
+    async def execute_rolling_update_cycle(
+        self, deployments: Sequence[DeploymentInfo]
+    ) -> DeploymentExecutionResult:
+        """Execute one cycle of rolling update for DEPLOYING deployments.
+
+        Each cycle:
+        1. Loads current routes and deployment policies
+        2. Classifies routes by revision (old vs new)
+        3. Creates new-revision routes up to max_surge limit
+        4. Terminates old-revision routes up to max_unavailable limit
+        5. Returns completed deployments as successes, in-progress as skipped
+        """
+        # Phase 1: Load routes and policies
+        with DeploymentRecorderContext.shared_phase("load_rolling_update_config"):
+            with DeploymentRecorderContext.shared_step("load_active_routes"):
+                endpoint_ids = {deployment.id for deployment in deployments}
+                route_map = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(
+                    endpoint_ids
+                )
+
+            with DeploymentRecorderContext.shared_step("load_deployment_policies"):
+                policy_map = await self._deployment_repo.fetch_deployment_policies_by_endpoint_ids(
+                    endpoint_ids
+                )
+
+        scale_out_creators: list[Creator[RoutingRow]] = []
+        scale_in_route_ids: list[UUID] = []
+        successes: list[DeploymentInfo] = []
+        skipped: list[DeploymentInfo] = []
+        errors: list[DeploymentExecutionError] = []
+        completed_updates: dict[UUID, UUID] = {}
+
+        # Phase 2: Evaluate rolling update per deployment
+        for deployment in deployments:
+            try:
+                creators, terminate_ids, is_complete, should_rollback = (
+                    self._evaluate_rolling_update_cycle(deployment, route_map, policy_map)
+                )
+                if should_rollback:
+                    # Rollback: terminate new-revision routes, complete as success
+                    # (transitions back to READY with current_revision unchanged)
+                    scale_in_route_ids.extend(terminate_ids)
+                    completed_updates[deployment.id] = (
+                        deployment.current_revision_id
+                        or deployment.deploying_revision_id
+                        or UUID(int=0)
+                    )
+                    successes.append(deployment)
+                elif is_complete:
+                    if deployment.deploying_revision_id:
+                        completed_updates[deployment.id] = deployment.deploying_revision_id
+                    successes.append(deployment)
+                else:
+                    scale_out_creators.extend(creators)
+                    scale_in_route_ids.extend(terminate_ids)
+                    skipped.append(deployment)
+            except Exception as e:
+                log.warning(
+                    "Failed to evaluate rolling update for deployment {}: {}",
+                    deployment.id,
+                    e,
+                )
+                errors.append(
+                    DeploymentExecutionError(
+                        deployment_info=deployment,
+                        reason=str(e),
+                        error_detail="Failed to evaluate rolling update cycle",
+                        error_code=_extract_error_code(e),
+                    )
+                )
+
+        # Build BatchUpdater for scale in
+        scale_in_updater: BatchUpdater[RoutingRow] | None = None
+        if scale_in_route_ids:
+            scale_in_updater = BatchUpdater(
+                spec=RouteBatchUpdaterSpec(
+                    status=RouteStatus.TERMINATING,
+                    traffic_ratio=0.0,
+                    traffic_status=RouteTrafficStatus.INACTIVE,
+                ),
+                conditions=[RouteConditions.by_ids(scale_in_route_ids)],
+            )
+
+        # Phase 3: Apply scaling
+        if scale_out_creators or scale_in_updater:
+            with DeploymentRecorderContext.shared_phase(
+                "apply_rolling_update",
+                entity_ids={d.id for d in skipped} | {d.id for d in successes},
+            ):
+                with DeploymentRecorderContext.shared_step("scale_routes"):
+                    await self._deployment_repo.scale_routes(scale_out_creators, scale_in_updater)
+
+        # Phase 4: Complete rolling updates
+        if completed_updates:
+            with DeploymentRecorderContext.shared_phase(
+                "complete_rolling_update", entity_ids=set(completed_updates.keys())
+            ):
+                with DeploymentRecorderContext.shared_step("update_revision"):
+                    await self._deployment_repo.complete_rolling_update_bulk(completed_updates)
+
+        return DeploymentExecutionResult(
+            successes=successes,
+            skipped=skipped,
+            errors=errors,
+        )
+
+    def _evaluate_rolling_update_cycle(
+        self,
+        deployment: DeploymentInfo,
+        route_map: Mapping[UUID, Sequence[RouteInfo]],
+        policy_map: Mapping[UUID, DeploymentPolicyData],
+    ) -> tuple[list[Creator[RoutingRow]], list[UUID], bool, bool]:
+        """Evaluate one rolling update cycle for a single deployment.
+
+        Returns:
+            Tuple of (creators_for_new_routes, old_route_ids_to_terminate, is_complete, should_rollback)
+        """
+        pool = DeploymentRecorderContext.current_pool()
+        recorder = pool.recorder(deployment.id)
+
+        with recorder.phase("evaluate_rolling_update"):
+            with recorder.step("classify_routes"):
+                routes = list(route_map.get(deployment.id, []))
+                policy = policy_map.get(deployment.id)
+
+                # Get rolling update spec from policy
+                rolling_spec = RollingUpdateSpec()
+                rollback_on_failure = False
+                if policy:
+                    rollback_on_failure = policy.rollback_on_failure
+                    if policy.strategy == DeploymentStrategy.ROLLING and isinstance(
+                        policy.strategy_spec, RollingUpdateSpec
+                    ):
+                        rolling_spec = policy.strategy_spec
+
+                max_surge = rolling_spec.max_surge
+                max_unavailable = rolling_spec.max_unavailable
+                target_count = deployment.replica_spec.target_replica_count
+                deploying_revision_id = deployment.deploying_revision_id
+                current_revision_id = deployment.current_revision_id
+
+                if not deploying_revision_id:
+                    log.warning(
+                        "Deployment {} in DEPLOYING state but has no deploying_revision_id",
+                        deployment.id,
+                    )
+                    return [], [], True, False
+
+                # Classify routes by revision
+                old_routes = [r for r in routes if r.revision_id == current_revision_id]
+                new_routes = [r for r in routes if r.revision_id == deploying_revision_id]
+
+            with recorder.step("check_completion"):
+                new_healthy = [r for r in new_routes if r.status == RouteStatus.HEALTHY]
+                new_pending = [
+                    r
+                    for r in new_routes
+                    if r.status
+                    in {RouteStatus.PROVISIONING, RouteStatus.UNHEALTHY, RouteStatus.DEGRADED}
+                ]
+                old_active = [r for r in old_routes if r.status.is_active()]
+
+                # Check for rollback condition: all new routes failed
+                if (
+                    new_routes
+                    and all(r.status == RouteStatus.FAILED_TO_START for r in new_routes)
+                    and not new_pending
+                ):
+                    if rollback_on_failure:
+                        log.info(
+                            "Rolling update rollback for deployment {}: all new routes failed",
+                            deployment.id,
+                        )
+                        # Terminate all new-revision routes (failed ones)
+                        failed_route_ids = [r.route_id for r in new_routes]
+                        return [], failed_route_ids, False, True
+
+                # Check completion: all routes are new-revision and healthy, no old routes
+                if len(new_healthy) >= target_count and len(old_active) == 0:
+                    log.info(
+                        "Rolling update complete for deployment {}: {} healthy new routes",
+                        deployment.id,
+                        len(new_healthy),
+                    )
+                    return [], [], True, False
+
+            with recorder.step("calculate_actions"):
+                creators: list[Creator[RoutingRow]] = []
+                terminate_ids: list[UUID] = []
+
+                # Calculate how many new routes to create
+                can_create = min(
+                    max(0, max_surge - len(new_pending)),
+                    max(0, target_count - len(new_routes)),
+                )
+                for _ in range(can_create):
+                    creator_spec = RouteCreatorSpec(
+                        endpoint_id=deployment.id,
+                        session_owner_id=deployment.metadata.session_owner,
+                        domain=deployment.metadata.domain,
+                        project_id=deployment.metadata.project,
+                        revision_id=deploying_revision_id,
+                    )
+                    creators.append(Creator(spec=creator_spec))
+
+                # Calculate how many old routes to terminate
+                # Only terminate when we have enough healthy new routes
+                # min_available = target_count - max_unavailable
+                # We need at least min_available healthy routes total
+                if new_healthy and old_active:
+                    min_available = max(0, target_count - max_unavailable)
+                    total_healthy = len(new_healthy) + len([
+                        r for r in old_routes if r.status == RouteStatus.HEALTHY
+                    ])
+                    can_terminate = max(0, total_healthy - min_available)
+                    can_terminate = min(can_terminate, len(old_active))
+
+                    # Select old routes to terminate (unhealthy first)
+                    sorted_old = sorted(old_active, key=lambda r: r.status.termination_priority())
+                    terminate_ids = [r.route_id for r in sorted_old[:can_terminate]]
+
+                log.debug(
+                    "Rolling update cycle for deployment {}: "
+                    "old_active={}, new_healthy={}, new_pending={}, "
+                    "creating={}, terminating={}",
+                    deployment.id,
+                    len(old_active),
+                    len(new_healthy),
+                    len(new_pending),
+                    len(creators),
+                    len(terminate_ids),
+                )
+
+        return creators, terminate_ids, False, False

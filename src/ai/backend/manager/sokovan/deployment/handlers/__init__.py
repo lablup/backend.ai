@@ -7,6 +7,7 @@ from .destroying import DestroyingDeploymentHandler
 from .pending import CheckPendingDeploymentHandler
 from .reconcile import ReconcileDeploymentHandler
 from .replica import CheckReplicaDeploymentHandler
+from .rolling_update import RollingUpdateDeploymentHandler
 from .scaling import ScalingDeploymentHandler
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "DeploymentHandler",
     "DestroyingDeploymentHandler",
     "ReconcileDeploymentHandler",
+    "RollingUpdateDeploymentHandler",
     "ScalingDeploymentHandler",
 ]

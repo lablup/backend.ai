@@ -152,7 +152,15 @@ class DeploymentController:
             )
         res = await self._deployment_repository.update_endpoint_with_spec(updater)
         try:
-            await self.mark_lifecycle_needed(DeploymentLifecycleType.CHECK_REPLICA)
+            # Check if this update sets deploying_revision (triggers rolling update)
+            has_deploying_revision = (
+                spec.revision_state is not None
+                and spec.revision_state.deploying_revision.optional_value() is not None
+            )
+            if has_deploying_revision:
+                await self.mark_lifecycle_needed(DeploymentLifecycleType.ROLLING_UPDATE)
+            else:
+                await self.mark_lifecycle_needed(DeploymentLifecycleType.CHECK_REPLICA)
         except Exception as e:
             log.error("Failed to mark deployment lifecycle needed: {}", e)
         return res
