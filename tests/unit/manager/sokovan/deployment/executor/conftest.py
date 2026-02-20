@@ -33,6 +33,7 @@ def mock_deployment_repo() -> AsyncMock:
     repo = AsyncMock()
     repo.fetch_scaling_group_proxy_targets = AsyncMock(return_value={})
     repo.fetch_active_routes_by_endpoint_ids = AsyncMock(return_value={})
+    repo.search_deployment_policies = AsyncMock(return_value={})
     repo.update_endpoint_urls_bulk = AsyncMock(return_value=None)
     repo.update_desired_replicas_bulk = AsyncMock(return_value=None)
     repo.mark_terminating_route_status_bulk = AsyncMock(return_value=None)

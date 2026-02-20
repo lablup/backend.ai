@@ -150,9 +150,7 @@ class TestRollingUpdateCycle:
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
             deployment.id: old_routes
         }
-        mock_deployment_repo.fetch_deployment_policies_by_endpoint_ids.return_value = {
-            deployment.id: policy
-        }
+        mock_deployment_repo.search_deployment_policies.return_value = {deployment.id: policy}
 
         entity_ids = [deployment.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
@@ -195,9 +193,7 @@ class TestRollingUpdateCycle:
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
             deployment.id: old_routes + new_routes
         }
-        mock_deployment_repo.fetch_deployment_policies_by_endpoint_ids.return_value = {
-            deployment.id: policy
-        }
+        mock_deployment_repo.search_deployment_policies.return_value = {deployment.id: policy}
 
         entity_ids = [deployment.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
@@ -229,9 +225,7 @@ class TestRollingUpdateCycle:
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
             deployment.id: new_routes
         }
-        mock_deployment_repo.fetch_deployment_policies_by_endpoint_ids.return_value = {
-            deployment.id: policy
-        }
+        mock_deployment_repo.search_deployment_policies.return_value = {deployment.id: policy}
 
         entity_ids = [deployment.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
@@ -264,9 +258,7 @@ class TestRollingUpdateCycle:
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
             deployment.id: old_routes
         }
-        mock_deployment_repo.fetch_deployment_policies_by_endpoint_ids.return_value = {
-            deployment.id: policy
-        }
+        mock_deployment_repo.search_deployment_policies.return_value = {deployment.id: policy}
 
         entity_ids = [deployment.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
@@ -302,9 +294,7 @@ class TestRollingUpdateCycle:
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
             deployment.id: old_routes
         }
-        mock_deployment_repo.fetch_deployment_policies_by_endpoint_ids.return_value = {
-            deployment.id: policy
-        }
+        mock_deployment_repo.search_deployment_policies.return_value = {deployment.id: policy}
 
         entity_ids = [deployment.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
@@ -343,9 +333,7 @@ class TestRollingUpdateCycle:
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
             deployment.id: old_routes + new_failed_routes
         }
-        mock_deployment_repo.fetch_deployment_policies_by_endpoint_ids.return_value = {
-            deployment.id: policy
-        }
+        mock_deployment_repo.search_deployment_policies.return_value = {deployment.id: policy}
 
         entity_ids = [deployment.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
@@ -387,9 +375,7 @@ class TestRollingUpdateCycle:
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
             deployment.id: old_routes + new_failed_routes
         }
-        mock_deployment_repo.fetch_deployment_policies_by_endpoint_ids.return_value = {
-            deployment.id: policy
-        }
+        mock_deployment_repo.search_deployment_policies.return_value = {deployment.id: policy}
 
         entity_ids = [deployment.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
@@ -432,7 +418,7 @@ class TestRollingUpdateCycle:
         )
 
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {dep_id: []}
-        mock_deployment_repo.fetch_deployment_policies_by_endpoint_ids.return_value = {}
+        mock_deployment_repo.search_deployment_policies.return_value = {}
 
         entity_ids = [dep_id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
@@ -463,9 +449,7 @@ class TestRollingUpdateCycle:
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
             deployment.id: old_routes
         }
-        mock_deployment_repo.fetch_deployment_policies_by_endpoint_ids.return_value = {
-            deployment.id: policy
-        }
+        mock_deployment_repo.search_deployment_policies.return_value = {deployment.id: policy}
 
         entity_ids = [deployment.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
@@ -521,9 +505,7 @@ class TestRollingUpdateCycle:
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
             deployment.id: [old_healthy, old_unhealthy, new_healthy, new_provisioning]
         }
-        mock_deployment_repo.fetch_deployment_policies_by_endpoint_ids.return_value = {
-            deployment.id: policy
-        }
+        mock_deployment_repo.search_deployment_policies.return_value = {deployment.id: policy}
 
         entity_ids = [deployment.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
@@ -555,9 +537,7 @@ class TestRollingUpdateCycle:
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
             deployment.id: old_routes
         }
-        mock_deployment_repo.fetch_deployment_policies_by_endpoint_ids.return_value = {
-            deployment.id: policy
-        }
+        mock_deployment_repo.search_deployment_policies.return_value = {deployment.id: policy}
 
         entity_ids = [deployment.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):

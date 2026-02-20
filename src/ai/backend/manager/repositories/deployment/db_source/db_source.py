@@ -2258,11 +2258,11 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             return await execute_purger(db_sess, purger)
 
-    async def fetch_deployment_policies_by_endpoint_ids(
+    async def search_deployment_policies(
         self,
         endpoint_ids: set[uuid.UUID],
     ) -> Mapping[uuid.UUID, DeploymentPolicyData]:
-        """Fetch deployment policies for multiple endpoints.
+        """Search deployment policies for multiple endpoints.
 
         Args:
             endpoint_ids: Set of endpoint IDs to fetch policies for.
@@ -2271,15 +2271,7 @@ class DeploymentDBSource:
             Mapping of endpoint_id to DeploymentPolicyData.
             Endpoints without policies are omitted.
         """
-        if not endpoint_ids:
-            return {}
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(DeploymentPolicyRow).where(
-                DeploymentPolicyRow.endpoint.in_(endpoint_ids)
-            )
-            result = await db_sess.execute(query)
-            rows = result.scalars().all()
-            return {row.endpoint: row.to_data() for row in rows}
+        raise NotImplementedError("search_deployment_policies is not implemented yet")
 
     async def complete_rolling_update_bulk(
         self,

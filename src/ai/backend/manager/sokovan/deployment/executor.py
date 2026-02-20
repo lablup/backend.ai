@@ -703,9 +703,7 @@ class DeploymentExecutor:
                 )
 
             with DeploymentRecorderContext.shared_step("load_deployment_policies"):
-                policy_map = await self._deployment_repo.fetch_deployment_policies_by_endpoint_ids(
-                    endpoint_ids
-                )
+                policy_map = await self._deployment_repo.search_deployment_policies(endpoint_ids)
 
         scale_out_creators: list[Creator[RoutingRow]] = []
         scale_in_route_ids: list[UUID] = []
