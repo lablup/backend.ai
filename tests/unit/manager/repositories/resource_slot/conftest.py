@@ -10,6 +10,7 @@ from ai.backend.manager.models.resource_slot import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
 from ai.backend.manager.repositories.resource_slot.db_source import ResourceSlotDBSource
 from ai.backend.testutils.db import with_tables
 
@@ -52,3 +53,12 @@ async def db_source(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
 ) -> ResourceSlotDBSource:
     return ResourceSlotDBSource(database_with_resource_slot_tables)
+
+
+@pytest.fixture
+async def resource_slot_repo(
+    database_with_resource_slot_tables: ExtendedAsyncSAEngine,
+) -> ResourceSlotRepository:
+    # ResourceSlotRepository wraps db_source with resilience policies.
+    # Uses the same DB engine as db_source — tables are already created by the outer fixture.
+    return ResourceSlotRepository(database_with_resource_slot_tables)
