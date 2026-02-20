@@ -9,7 +9,6 @@ from ai.backend.manager.api.gql.rbac.types import (
     CreatePermissionInput,
     DeletePermissionInput,
     DeletePermissionPayload,
-    EntityTypeGQL,
     PermissionConnection,
     PermissionFilter,
     PermissionGQL,
@@ -34,20 +33,6 @@ async def admin_permissions(
     limit: int | None = None,
     offset: int | None = None,
 ) -> PermissionConnection:
-    raise NotImplementedError
-
-
-@strawberry.field(description="Added in 26.3.0. List available scope types.")  # type: ignore[misc]
-async def scope_types(
-    info: Info[StrawberryGQLContext],
-) -> list[EntityTypeGQL]:
-    raise NotImplementedError
-
-
-@strawberry.field(description="Added in 26.3.0. List available entity types.")  # type: ignore[misc]
-async def entity_types(
-    info: Info[StrawberryGQLContext],
-) -> list[EntityTypeGQL]:
     raise NotImplementedError
 
 

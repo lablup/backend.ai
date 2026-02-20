@@ -14,8 +14,6 @@ from .resolver import (
     admin_role_assignments,
     admin_roles,
     admin_update_role,
-    entity_types,
-    scope_types,
 )
 from .types import (
     AssignRoleInput,
@@ -25,12 +23,12 @@ from .types import (
     EntityFilter,
     EntityOrderBy,
     EntityRefGQL,
-    EntityTypeGQL,
     OperationTypeGQL,
     PermissionConnection,
     PermissionFilter,
     PermissionGQL,
     PermissionOrderBy,
+    RBACElementTypeGQL,
     RevokeRoleInput,
     RoleAssignmentConnection,
     RoleAssignmentFilter,
@@ -46,7 +44,7 @@ from .types import (
 
 __all__ = (
     # Enums
-    "EntityTypeGQL",
+    "RBACElementTypeGQL",
     "OperationTypeGQL",
     "RoleSourceGQL",
     "RoleStatusGQL",
@@ -81,8 +79,6 @@ __all__ = (
     "admin_permissions",
     "admin_role_assignments",
     "admin_entities",
-    "scope_types",
-    "entity_types",
     # Mutation resolvers
     "admin_create_role",
     "admin_update_role",

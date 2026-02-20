@@ -1198,9 +1198,9 @@ type CreateObjectStoragePayload {
 """Added in 26.3.0. Input for creating a scoped permission"""
 input CreatePermissionInput {
   roleId: UUID!
-  scopeType: EntityType!
+  scopeType: RBACElementType!
   scopeId: String!
-  entityType: EntityType!
+  entityType: RBACElementType!
   operation: OperationType!
 }
 
@@ -2272,7 +2272,7 @@ type EntityEdge {
 
 """Added in 26.3.0. Filter for entity associations"""
 input EntityFilter {
-  entityType: EntityType = null
+  entityType: RBACElementType = null
   entityId: StringFilter = null
 }
 
@@ -2296,9 +2296,9 @@ Added in 26.3.0. Entity reference from the association_scopes_entities table
 type EntityRef implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
-  scopeType: EntityType!
+  scopeType: RBACElementType!
   scopeId: String!
-  entityType: EntityType!
+  entityType: RBACElementType!
   entityId: String!
   registeredAt: DateTime!
 
@@ -2315,28 +2315,6 @@ type EntityTimestamps {
 
   """Timestamp when this entity was last modified."""
   modifiedAt: DateTime
-}
-
-"""Added in 26.3.0. RBAC entity type"""
-enum EntityType {
-  USER
-  PROJECT
-  DOMAIN
-  VFOLDER
-  IMAGE
-  SESSION
-  ARTIFACT
-  ARTIFACT_REGISTRY
-  ARTIFACT_REVISION
-  APP_CONFIG
-  NOTIFICATION_CHANNEL
-  NOTIFICATION_RULE
-  MODEL_DEPLOYMENT
-  RESOURCE_GROUP
-  CONTAINER_REGISTRY
-  STORAGE_HOST
-  DEPLOYMENT
-  ROLE
 }
 
 """
@@ -4090,9 +4068,9 @@ type Permission implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   roleId: UUID!
-  scopeType: EntityType!
+  scopeType: RBACElementType!
   scopeId: String!
-  entityType: EntityType!
+  entityType: RBACElementType!
   operation: OperationType!
 
   """The role this permission belongs to."""
@@ -4124,8 +4102,8 @@ type PermissionEdge {
 """Added in 26.3.0. Filter for scoped permissions"""
 input PermissionFilter {
   roleId: UUID = null
-  scopeType: EntityType = null
-  entityType: EntityType = null
+  scopeType: RBACElementType = null
+  entityType: RBACElementType = null
 }
 
 """Added in 26.3.0. Order by specification for permissions"""
@@ -5031,12 +5009,6 @@ type Query {
   """
   adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection!
 
-  """Added in 26.3.0. List available scope types."""
-  scopeTypes: [EntityType!]!
-
-  """Added in 26.3.0. List available entity types."""
-  entityTypes: [EntityType!]!
-
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
 
@@ -5245,6 +5217,39 @@ type Query {
   Added in 26.2.0. Get the domain that a project belongs to. Returns an error if project or domain is not found.
   """
   projectDomainV2(projectId: UUID!): DomainV2
+}
+
+"""
+Added in 26.3.0. Unified RBAC element type for scope-entity relationships
+"""
+enum RBACElementType {
+  DOMAIN
+  PROJECT
+  USER
+  SESSION
+  VFOLDER
+  DEPLOYMENT
+  MODEL_DEPLOYMENT
+  KEYPAIR
+  NOTIFICATION_CHANNEL
+  NETWORK
+  RESOURCE_GROUP
+  CONTAINER_REGISTRY
+  STORAGE_HOST
+  IMAGE
+  ARTIFACT
+  ARTIFACT_REGISTRY
+  SESSION_TEMPLATE
+  APP_CONFIG
+  RESOURCE_PRESET
+  USER_RESOURCE_POLICY
+  KEYPAIR_RESOURCE_POLICY
+  PROJECT_RESOURCE_POLICY
+  ROLE
+  AUDIT_LOG
+  EVENT_LOG
+  NOTIFICATION_RULE
+  ARTIFACT_REVISION
 }
 
 """
