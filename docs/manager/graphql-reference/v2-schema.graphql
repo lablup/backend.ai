@@ -899,7 +899,7 @@ input BlueGreenConfigInput {
 }
 
 """Added in 26.2.0. Error information for a failed user in bulk creation."""
-type BulkCreateUserV2Error {
+type BulkCreateUserError {
   """Original position in the input list."""
   index: Int!
 
@@ -927,21 +927,12 @@ type BulkCreateUsersV2Payload {
   createdUsers: [UserV2!]!
 
   """List of errors for users that failed to create."""
-  failed: [BulkCreateUserV2Error!]!
+  failed: [BulkCreateUserError!]!
 }
 
 """Added in 26.3.0. Error information for a failed user in bulk purge."""
 type BulkPurgeUserV2Error {
   """UUID of the user that failed to purge."""
-  userId: UUID!
-
-  """Error message describing the failure."""
-  message: String!
-}
-
-"""Added in 26.3.0. Error information for a failed user in bulk update."""
-type BulkUpdateUserV2Error {
-  """UUID of the user that failed to update."""
   userId: UUID!
 
   """Error message describing the failure."""
@@ -973,6 +964,15 @@ type BulkPurgeUsersV2Payload {
   failed: [BulkPurgeUserV2Error!]!
 }
 
+"""Added in 26.3.0. Error information for a failed user in bulk update."""
+type BulkUpdateUserError {
+  """UUID of the user that failed to update."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
 """
 Added in 26.3.0. Input for bulk updating multiple users. Each user has individual update specifications.
 """
@@ -998,7 +998,7 @@ type BulkUpdateUsersV2Payload {
   updatedUsers: [UserV2!]!
 
   """List of errors for users that failed to update."""
-  failed: [BulkUpdateUserV2Error!]!
+  failed: [BulkUpdateUserError!]!
 }
 
 """
@@ -3874,7 +3874,7 @@ type Mutation {
   """
   Added in 26.2.0. Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications.
   """
-  adminBulkCreateUsersV2(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload!
+  adminBulkCreateUsers(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload!
 
   """
   Added in 26.3.0. Update multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual update specifications.

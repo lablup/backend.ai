@@ -1411,19 +1411,8 @@ input BlueGreenConfigInput
   promoteDelaySeconds: Int! = 0
 }
 
-"""Added in 26.2.0. Payload for bulk user creation mutation."""
-type BulkCreateUsersV2Payload
-  @join__type(graph: STRAWBERRY)
-{
-  """List of successfully created users."""
-  createdUsers: [UserV2!]!
-
-  """List of errors for users that failed to create."""
-  failed: [BulkCreateUserV2Error!]!
-}
-
 """Added in 26.2.0. Error information for a failed user in bulk creation."""
-type BulkCreateUserV2Error
+type BulkCreateUserError
   @join__type(graph: STRAWBERRY)
 {
   """Original position in the input list."""
@@ -1439,6 +1428,17 @@ type BulkCreateUserV2Error
   message: String!
 }
 
+"""Added in 26.2.0. Payload for bulk user creation mutation."""
+type BulkCreateUsersV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """List of successfully created users."""
+  createdUsers: [UserV2!]!
+
+  """List of errors for users that failed to create."""
+  failed: [BulkCreateUserError!]!
+}
+
 """
 Added in 26.2.0. Input for bulk creating multiple users. Each user has individual specifications.
 """
@@ -1447,17 +1447,6 @@ input BulkCreateUserV2Input
 {
   """List of user creation inputs."""
   users: [CreateUserV2Input!]!
-}
-
-"""Added in 26.3.0. Error information for a failed user in bulk purge."""
-type BulkPurgeUserV2Error
-  @join__type(graph: STRAWBERRY)
-{
-  """UUID of the user that failed to purge."""
-  userId: UUID!
-
-  """Error message describing the failure."""
-  message: String!
 }
 
 """
@@ -1488,6 +1477,29 @@ type BulkPurgeUsersV2Payload
   """List of errors for users that failed to purge."""
   failed: [BulkPurgeUserV2Error!]!
 }
+
+"""Added in 26.3.0. Error information for a failed user in bulk purge."""
+type BulkPurgeUserV2Error
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the user that failed to purge."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""Added in 26.3.0. Error information for a failed user in bulk update."""
+type BulkUpdateUserError
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the user that failed to update."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
 """Added in 26.3.0. Payload for bulk user update mutation."""
 type BulkUpdateUsersV2Payload
   @join__type(graph: STRAWBERRY)
@@ -1496,18 +1508,7 @@ type BulkUpdateUsersV2Payload
   updatedUsers: [UserV2!]!
 
   """List of errors for users that failed to update."""
-  failed: [BulkUpdateUserV2Error!]!
-}
-
-"""Added in 26.3.0. Error information for a failed user in bulk update."""
-type BulkUpdateUserV2Error
-  @join__type(graph: STRAWBERRY)
-{
-  """UUID of the user that failed to update."""
-  userId: UUID!
-
-  """Error message describing the failure."""
-  message: String!
+  failed: [BulkUpdateUserError!]!
 }
 
 """
@@ -7438,7 +7439,7 @@ type Mutation
   """
   Added in 26.2.0. Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications.
   """
-  adminBulkCreateUsersV2(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload! @join__field(graph: STRAWBERRY)
+  adminBulkCreateUsers(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.3.0. Update multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual update specifications.
