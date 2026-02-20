@@ -476,16 +476,8 @@ class SessionV2GQL(Node):
     @classmethod
     def from_data(cls, data: SessionData) -> Self:
         """Create SessionV2GQL from SessionData dataclass."""
-        requested_slots = (
-            ResourceSlotGQL.from_resource_slot(data.requested_slots)
-            if data.requested_slots
-            else ResourceSlotGQL(entries=[])
-        )
-        occupying_slots = (
-            ResourceSlotGQL.from_resource_slot(data.occupying_slots)
-            if data.occupying_slots
-            else None
-        )
+        requested_slots = ResourceSlotGQL.from_resource_slot(data.requested_slots)
+        occupying_slots = ResourceSlotGQL.from_resource_slot(data.occupying_slots)
 
         environ_gql: EnvironmentVariablesGQL | None = None
         if data.environ:
