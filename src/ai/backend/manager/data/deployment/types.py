@@ -24,6 +24,7 @@ from ai.backend.common.data.model_deployment.types import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
+    from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
 from ai.backend.common.types import (
     AutoScalingMetricSource,
@@ -633,6 +634,29 @@ class AutoScalingRuleSearchResult:
     """Search result with pagination for auto-scaling rules."""
 
     items: list[ModelDeploymentAutoScalingRuleData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class DeploymentPolicyData:
+    """Data class for DeploymentPolicyRow."""
+
+    id: UUID
+    endpoint: UUID
+    strategy: DeploymentStrategy
+    strategy_spec: RollingUpdateSpec | BlueGreenSpec
+    rollback_on_failure: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class DeploymentPolicySearchResult:
+    """Search result with pagination for deployment policies."""
+
+    items: list[DeploymentPolicyData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

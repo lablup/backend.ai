@@ -13,12 +13,12 @@ from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    DeploymentPolicyData,
     RouteInfo,
     RouteSearchResult,
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.permission.id import ScopeId
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyData
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.storage import StorageSessionManager

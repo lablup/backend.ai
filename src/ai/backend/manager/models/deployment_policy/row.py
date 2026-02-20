@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import uuid
-from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -13,6 +12,7 @@ from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.deployment.types import DeploymentPolicyData
 from ai.backend.manager.errors.deployment import InvalidDeploymentStrategy
 from ai.backend.manager.models.base import (
     GUID,
@@ -25,7 +25,6 @@ if TYPE_CHECKING:
 
 __all__ = (
     "BlueGreenSpec",
-    "DeploymentPolicyData",
     "DeploymentPolicyRow",
     "RollingUpdateSpec",
 )
@@ -141,16 +140,3 @@ class DeploymentPolicyRow(Base):  # type: ignore[misc]
                 return BlueGreenSpec.model_validate(self.strategy_spec or {})
             case _:
                 raise InvalidDeploymentStrategy(f"Unknown deployment strategy: {self.strategy}")
-
-
-@dataclass
-class DeploymentPolicyData:
-    """Data class for DeploymentPolicyRow."""
-
-    id: uuid.UUID
-    endpoint: uuid.UUID
-    strategy: DeploymentStrategy
-    strategy_spec: RollingUpdateSpec | BlueGreenSpec
-    rollback_on_failure: bool
-    created_at: datetime
-    updated_at: datetime

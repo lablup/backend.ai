@@ -1,39 +1,38 @@
-"""Action for getting deployment policy."""
+"""Action for searching deployment policies."""
 
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.deployment.actions.deployment_policy.base import (
     DeploymentPolicyBaseAction,
 )
 
 
 @dataclass
-class GetDeploymentPolicyAction(DeploymentPolicyBaseAction):
-    """Action to get a deployment policy by endpoint ID."""
-
-    endpoint_id: UUID
+class SearchDeploymentPoliciesAction(DeploymentPolicyBaseAction):
+    querier: BatchQuerier
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.endpoint_id)
+        return None
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
+        return ActionOperationType.SEARCH
 
 
 @dataclass
-class GetDeploymentPolicyActionResult(BaseActionResult):
-    """Result of getting a deployment policy."""
-
-    data: DeploymentPolicyData
+class SearchDeploymentPoliciesActionResult(BaseActionResult):
+    data: list[DeploymentPolicyData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.data.id)
+        return None

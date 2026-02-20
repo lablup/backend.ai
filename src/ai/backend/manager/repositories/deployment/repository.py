@@ -47,6 +47,8 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
+    DeploymentPolicyData,
+    DeploymentPolicySearchResult,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
@@ -64,10 +66,7 @@ from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyData,
     DeploymentAutoScalingPolicyRow,
 )
-from ai.backend.manager.models.deployment_policy import (
-    DeploymentPolicyData,
-    DeploymentPolicyRow,
-)
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.routing import RoutingRow
@@ -1343,3 +1342,18 @@ class DeploymentRepository:
             AccessTokenSearchResult with items, total_count, and pagination info.
         """
         return await self._db_source.search_access_tokens(querier)
+
+    @deployment_repository_resilience.apply()
+    async def search_deployment_policies(
+        self,
+        querier: BatchQuerier,
+    ) -> DeploymentPolicySearchResult:
+        """Search deployment policies with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            DeploymentPolicySearchResult with items, total_count, and pagination info.
+        """
+        return await self._db_source.search_deployment_policies(querier)
