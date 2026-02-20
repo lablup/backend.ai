@@ -47,7 +47,7 @@ from ai.backend.manager.config.unified import (
 )
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.group import association_groups_users
+from ai.backend.manager.models.group import GroupRow, association_groups_users
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import keypairs
@@ -84,6 +84,18 @@ class ServerInfo:
     @property
     def url(self) -> str:
         return f"http://{self.host}:{self.port}"
+
+
+@dataclass
+class KeypairFixtureData:
+    access_key: str
+    secret_key: str
+
+
+@dataclass
+class UserFixtureData:
+    user_uuid: uuid.UUID
+    keypair: KeypairFixtureData
 
 
 # ---------------------------------------------------------------------------
@@ -419,24 +431,13 @@ def database(
 # ---------------------------------------------------------------------------
 
 
-ADMIN_USER_UUID = uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4")
-ADMIN_ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE"
-ADMIN_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-
-USER_UUID = uuid.UUID("dfa9da54-4b28-432f-be29-c0d680c7a412")
-USER_ACCESS_KEY = "AKIANABBDUSEREXAMPLE"
-USER_SECRET_KEY = "C8qnIo29EZvXkPK_MXcuAakYTy4NYrxwmCEyNPlf"
-
-DEFAULT_GROUP_UUID = uuid.UUID("2de2b969-1d04-48a6-af16-0bc8adb3c831")
-
-
 @pytest.fixture()
-async def database_fixture(
+async def db_engine(
     bootstrap_config: BootstrapConfig,
     test_db: str,
     database: None,
-) -> AsyncIterator[None]:
-    """Populate minimal fixture data programmatically via SQLAlchemy insert."""
+) -> AsyncIterator[SAEngine]:
+    """Provide a function-scoped SQLAlchemy async engine connected to the test database."""
     db_url = (
         yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/{test_db}")
         .with_port(bootstrap_config.db.addr.port)
@@ -444,201 +445,296 @@ async def database_fixture(
     )
     if bootstrap_config.db.password is not None:
         db_url = db_url.with_password(bootstrap_config.db.password)
-
     engine: SAEngine = create_async_engine(
         str(db_url),
         connect_args=pgsql_connect_opts,
     )
-    try:
-        async with engine.begin() as conn:
-            # 1) domains
-            await conn.execute(
-                sa.insert(domains).values(
-                    name="default",
-                    description="The default domain",
-                    is_active=True,
-                    total_resource_slots={},
-                    allowed_vfolder_hosts={},
-                )
-            )
-            # 2) resource policies (user, project, keypair)
-            await conn.execute(
-                sa.insert(UserResourcePolicyRow.__table__).values(
-                    name="default",
-                    max_vfolder_count=0,
-                    max_quota_scope_size=-1,
-                    max_session_count_per_model_session=10,
-                    max_customized_image_count=3,
-                )
-            )
-            await conn.execute(
-                sa.insert(ProjectResourcePolicyRow.__table__).values(
-                    name="default",
-                    max_vfolder_count=0,
-                    max_quota_scope_size=-1,
-                    max_network_count=3,
-                )
-            )
-            await conn.execute(
-                sa.insert(keypair_resource_policies).values(
-                    name="default",
-                    default_for_unspecified="UNLIMITED",
-                    total_resource_slots={},
-                    max_session_lifetime=0,
-                    max_concurrent_sessions=5,
-                    max_containers_per_session=1,
-                    idle_timeout=3600,
-                    allowed_vfolder_hosts={},
-                )
-            )
-            # 3) scaling group + domain association
-            await conn.execute(
-                sa.insert(scaling_groups).values(
-                    name="default",
-                    description="The default agent scaling group",
-                    is_active=True,
-                    driver="static",
-                    driver_opts={},
-                    scheduler="fifo",
-                    scheduler_opts={},
-                )
-            )
-            await conn.execute(
-                sa.insert(sgroups_for_domains).values(
-                    scaling_group="default",
-                    domain="default",
-                )
-            )
-            # 4) groups (projects) — use sa.table() to bypass ORM column defaults
-            await conn.execute(
-                sa.insert(
-                    sa.table(
-                        "groups",
-                        sa.column("id"),
-                        sa.column("name"),
-                        sa.column("description"),
-                        sa.column("is_active"),
-                        sa.column("domain_name"),
-                        sa.column("resource_policy"),
-                        sa.column("total_resource_slots"),
-                        sa.column("allowed_vfolder_hosts"),
-                        sa.column("type"),
-                    )
-                ).values(
-                    id=str(DEFAULT_GROUP_UUID),
-                    name="default",
-                    description="The default user group",
-                    is_active=True,
-                    domain_name="default",
-                    resource_policy="default",
-                    total_resource_slots="{}",
-                    allowed_vfolder_hosts="{}",
-                    type="general",
-                )
-            )
-            # 5) users (admin + normal user)
-            await conn.execute(
-                sa.insert(users).values([
-                    {
-                        "uuid": str(ADMIN_USER_UUID),
-                        "username": "admin",
-                        "email": "admin@lablup.com",
-                        "password": "wJalrXUt",
-                        "need_password_change": False,
-                        "full_name": "Admin Lablup",
-                        "description": "Lablup's Admin Account",
-                        "status": "active",
-                        "status_info": "admin-requested",
-                        "domain_name": "default",
-                        "resource_policy": "default",
-                        "role": "superadmin",
-                    },
-                    {
-                        "uuid": str(USER_UUID),
-                        "username": "user",
-                        "email": "user@lablup.com",
-                        "password": "C8qnIo29",
-                        "need_password_change": False,
-                        "full_name": "User Lablup",
-                        "description": "Lablup's User Account",
-                        "status": "active",
-                        "status_info": "admin-requested",
-                        "domain_name": "default",
-                        "resource_policy": "default",
-                        "role": "user",
-                    },
-                ])
-            )
-            # 6) keypairs
-            await conn.execute(
-                sa.insert(keypairs).values([
-                    {
-                        "user_id": "admin@lablup.com",
-                        "access_key": ADMIN_ACCESS_KEY,
-                        "secret_key": ADMIN_SECRET_KEY,
-                        "is_active": True,
-                        "resource_policy": "default",
-                        "rate_limit": 30000,
-                        "num_queries": 0,
-                        "is_admin": True,
-                        "user": str(ADMIN_USER_UUID),
-                    },
-                    {
-                        "user_id": "user@lablup.com",
-                        "access_key": USER_ACCESS_KEY,
-                        "secret_key": USER_SECRET_KEY,
-                        "is_active": True,
-                        "resource_policy": "default",
-                        "rate_limit": 30000,
-                        "num_queries": 0,
-                        "is_admin": False,
-                        "user": str(USER_UUID),
-                    },
-                ])
-            )
-            # 7) association_groups_users
-            await conn.execute(
-                sa.insert(association_groups_users).values([
-                    {
-                        "group_id": str(DEFAULT_GROUP_UUID),
-                        "user_id": str(ADMIN_USER_UUID),
-                    },
-                    {
-                        "group_id": str(DEFAULT_GROUP_UUID),
-                        "user_id": str(USER_UUID),
-                    },
-                ])
-            )
-    finally:
-        await engine.dispose()
+    yield engine
+    await engine.dispose()
 
-    yield
 
-    # Cleanup: delete rows inserted above (reverse FK order)
-    engine = create_async_engine(
-        str(db_url),
-        connect_args=pgsql_connect_opts,
+@pytest.fixture()
+async def domain_fixture(
+    db_engine: SAEngine,
+) -> AsyncIterator[str]:
+    """Insert a test domain and yield its name."""
+    domain_name = f"domain-{secrets.token_hex(6)}"
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(domains).values(
+                name=domain_name,
+                description=f"Test domain {domain_name}",
+                is_active=True,
+                total_resource_slots={},
+                allowed_vfolder_hosts={},
+            )
+        )
+    yield domain_name
+    async with db_engine.begin() as conn:
+        await conn.execute(domains.delete().where(domains.c.name == domain_name))
+
+
+@pytest.fixture()
+async def resource_policy_fixture(
+    db_engine: SAEngine,
+) -> AsyncIterator[str]:
+    """Insert resource policies (user, project, keypair) with a shared random name."""
+    policy_name = f"policy-{secrets.token_hex(6)}"
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(UserResourcePolicyRow.__table__).values(
+                name=policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=10,
+                max_customized_image_count=3,
+            )
+        )
+        await conn.execute(
+            sa.insert(ProjectResourcePolicyRow.__table__).values(
+                name=policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=3,
+            )
+        )
+        await conn.execute(
+            sa.insert(keypair_resource_policies).values(
+                name=policy_name,
+                default_for_unspecified="UNLIMITED",
+                total_resource_slots={},
+                max_session_lifetime=0,
+                max_concurrent_sessions=5,
+                max_containers_per_session=1,
+                idle_timeout=3600,
+                allowed_vfolder_hosts={},
+            )
+        )
+    yield policy_name
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            keypair_resource_policies.delete().where(
+                keypair_resource_policies.c.name == policy_name
+            )
+        )
+        await conn.execute(
+            UserResourcePolicyRow.__table__.delete().where(
+                UserResourcePolicyRow.__table__.c.name == policy_name
+            )
+        )
+        await conn.execute(
+            ProjectResourcePolicyRow.__table__.delete().where(
+                ProjectResourcePolicyRow.__table__.c.name == policy_name
+            )
+        )
+
+
+@pytest.fixture()
+async def scaling_group_fixture(
+    db_engine: SAEngine,
+    domain_fixture: str,
+) -> AsyncIterator[str]:
+    """Insert a scaling group and its domain association; yield the name."""
+    sgroup_name = f"sgroup-{secrets.token_hex(6)}"
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(scaling_groups).values(
+                name=sgroup_name,
+                description=f"Test scaling group {sgroup_name}",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts={},
+            )
+        )
+        await conn.execute(
+            sa.insert(sgroups_for_domains).values(
+                scaling_group=sgroup_name,
+                domain=domain_fixture,
+            )
+        )
+    yield sgroup_name
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sgroups_for_domains.delete().where(sgroups_for_domains.c.scaling_group == sgroup_name)
+        )
+        await conn.execute(scaling_groups.delete().where(scaling_groups.c.name == sgroup_name))
+
+
+@pytest.fixture()
+async def group_fixture(
+    db_engine: SAEngine,
+    domain_fixture: str,
+    resource_policy_fixture: str,
+) -> AsyncIterator[uuid.UUID]:
+    """Insert a test group (project) and yield its UUID."""
+    group_id = uuid.uuid4()
+    group_name = f"group-{secrets.token_hex(6)}"
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(GroupRow.__table__).values(
+                id=group_id,
+                name=group_name,
+                description=f"Test group {group_name}",
+                is_active=True,
+                domain_name=domain_fixture,
+                resource_policy=resource_policy_fixture,
+            )
+        )
+    yield group_id
+    async with db_engine.begin() as conn:
+        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+
+
+@pytest.fixture()
+async def admin_user_fixture(
+    db_engine: SAEngine,
+    group_fixture: uuid.UUID,
+    domain_fixture: str,
+    resource_policy_fixture: str,
+) -> AsyncIterator[UserFixtureData]:
+    """Insert admin user, keypair, and group membership; yield identifiers."""
+    unique_id = secrets.token_hex(4)
+    email = f"admin-{unique_id}@test.local"
+    data = UserFixtureData(
+        user_uuid=uuid.uuid4(),
+        keypair=KeypairFixtureData(
+            access_key=f"AKTEST{secrets.token_hex(10).upper()}",
+            secret_key=secrets.token_urlsafe(40),
+        ),
     )
-    try:
-        async with engine.begin() as conn:
-            await conn.execute(vfolders.delete())
-            await conn.execute(kernels.delete())
-            await conn.execute(SessionRow.__table__.delete())
-            await conn.execute(session_templates.delete())
-            await conn.execute(association_groups_users.delete())
-            await conn.execute(keypairs.delete())
-            await conn.execute(users.delete())
-            await conn.execute(sgroups_for_domains.delete())
-            await conn.execute(scaling_groups.delete())
-            await conn.execute(sa.text("DELETE FROM groups"))
-            await conn.execute(domains.delete())
-            await conn.execute(keypair_resource_policies.delete())
-            await conn.execute(UserResourcePolicyRow.__table__.delete())
-            await conn.execute(ProjectResourcePolicyRow.__table__.delete())
-            await conn.execute(ImageAliasRow.__table__.delete())
-            await conn.execute(ImageRow.__table__.delete())
-    finally:
-        await engine.dispose()
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(users).values(
+                uuid=str(data.user_uuid),
+                username=f"admin-{unique_id}",
+                email=email,
+                password=secrets.token_urlsafe(8),
+                need_password_change=False,
+                full_name=f"Admin {unique_id}",
+                description=f"Test admin account {unique_id}",
+                status="active",
+                status_info="admin-requested",
+                domain_name=domain_fixture,
+                resource_policy=resource_policy_fixture,
+                role="superadmin",
+            )
+        )
+        await conn.execute(
+            sa.insert(keypairs).values(
+                user_id=email,
+                access_key=data.keypair.access_key,
+                secret_key=data.keypair.secret_key,
+                is_active=True,
+                resource_policy=resource_policy_fixture,
+                rate_limit=30000,
+                num_queries=0,
+                is_admin=True,
+                user=str(data.user_uuid),
+            )
+        )
+        await conn.execute(
+            sa.insert(association_groups_users).values(
+                group_id=str(group_fixture),
+                user_id=str(data.user_uuid),
+            )
+        )
+    yield data
+    async with db_engine.begin() as conn:
+        # Clean side-effect tables that tests may populate via the running server
+        await conn.execute(vfolders.delete())
+        await conn.execute(kernels.delete())
+        await conn.execute(SessionRow.__table__.delete())
+        await conn.execute(session_templates.delete())
+        await conn.execute(ImageAliasRow.__table__.delete())
+        await conn.execute(ImageRow.__table__.delete())
+        # Clean fixture data
+        await conn.execute(
+            association_groups_users.delete().where(
+                association_groups_users.c.user_id == str(data.user_uuid)
+            )
+        )
+        await conn.execute(
+            keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
+        )
+        await conn.execute(users.delete().where(users.c.uuid == str(data.user_uuid)))
+
+
+@pytest.fixture()
+async def regular_user_fixture(
+    db_engine: SAEngine,
+    group_fixture: uuid.UUID,
+    domain_fixture: str,
+    resource_policy_fixture: str,
+) -> AsyncIterator[UserFixtureData]:
+    """Insert regular user, keypair, and group membership; yield identifiers."""
+    unique_id = secrets.token_hex(4)
+    email = f"user-{unique_id}@test.local"
+    data = UserFixtureData(
+        user_uuid=uuid.uuid4(),
+        keypair=KeypairFixtureData(
+            access_key=f"AKTEST{secrets.token_hex(10).upper()}",
+            secret_key=secrets.token_urlsafe(40),
+        ),
+    )
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(users).values(
+                uuid=str(data.user_uuid),
+                username=f"user-{unique_id}",
+                email=email,
+                password=secrets.token_urlsafe(8),
+                need_password_change=False,
+                full_name=f"User {unique_id}",
+                description=f"Test user account {unique_id}",
+                status="active",
+                status_info="admin-requested",
+                domain_name=domain_fixture,
+                resource_policy=resource_policy_fixture,
+                role="user",
+            )
+        )
+        await conn.execute(
+            sa.insert(keypairs).values(
+                user_id=email,
+                access_key=data.keypair.access_key,
+                secret_key=data.keypair.secret_key,
+                is_active=True,
+                resource_policy=resource_policy_fixture,
+                rate_limit=30000,
+                num_queries=0,
+                is_admin=False,
+                user=str(data.user_uuid),
+            )
+        )
+        await conn.execute(
+            sa.insert(association_groups_users).values(
+                group_id=str(group_fixture),
+                user_id=str(data.user_uuid),
+            )
+        )
+    yield data
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            association_groups_users.delete().where(
+                association_groups_users.c.user_id == str(data.user_uuid)
+            )
+        )
+        await conn.execute(
+            keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
+        )
+        await conn.execute(users.delete().where(users.c.uuid == str(data.user_uuid)))
+
+
+@pytest.fixture()
+async def database_fixture(
+    admin_user_fixture: UserFixtureData,
+    regular_user_fixture: UserFixtureData,
+    scaling_group_fixture: str,
+) -> AsyncIterator[None]:
+    """Backward-compatible aggregate: requests all seed data fixtures."""
+    yield
 
 
 class _TestConfigProvider(ManagerConfigProvider):
@@ -717,11 +813,17 @@ async def server(
 
 
 @pytest.fixture()
-async def admin_registry(server: ServerInfo) -> AsyncIterator[BackendAIClientRegistry]:
+async def admin_registry(
+    server: ServerInfo,
+    admin_user_fixture: UserFixtureData,
+) -> AsyncIterator[BackendAIClientRegistry]:
     """Create a BackendAIClientRegistry with superadmin keypair."""
     registry = await BackendAIClientRegistry.create(
         ClientConfig(endpoint=yarl.URL(server.url)),
-        HMACAuth(access_key=ADMIN_ACCESS_KEY, secret_key=ADMIN_SECRET_KEY),
+        HMACAuth(
+            access_key=admin_user_fixture.keypair.access_key,
+            secret_key=admin_user_fixture.keypair.secret_key,
+        ),
     )
     try:
         yield registry
@@ -730,11 +832,17 @@ async def admin_registry(server: ServerInfo) -> AsyncIterator[BackendAIClientReg
 
 
 @pytest.fixture()
-async def user_registry(server: ServerInfo) -> AsyncIterator[BackendAIClientRegistry]:
+async def user_registry(
+    server: ServerInfo,
+    regular_user_fixture: UserFixtureData,
+) -> AsyncIterator[BackendAIClientRegistry]:
     """Create a BackendAIClientRegistry with normal-user keypair."""
     registry = await BackendAIClientRegistry.create(
         ClientConfig(endpoint=yarl.URL(server.url)),
-        HMACAuth(access_key=USER_ACCESS_KEY, secret_key=USER_SECRET_KEY),
+        HMACAuth(
+            access_key=regular_user_fixture.keypair.access_key,
+            secret_key=regular_user_fixture.keypair.secret_key,
+        ),
     )
     try:
         yield registry
