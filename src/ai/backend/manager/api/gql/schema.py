@@ -222,7 +222,25 @@ from .scheduling_history import (
     session_scoped_scheduling_histories,
 )
 from .service_catalog import admin_service_catalogs
-from .session.resolver import admin_sessions_v2, session_v2
+from .session.resolver import (
+    admin_modify_session,
+    admin_sessions_v2,
+    check_and_transit_session_status,
+    commit_session,
+    complete_session_code,
+    convert_session_to_image,
+    create_session_cluster,
+    create_session_from_params,
+    create_session_from_template,
+    destroy_session,
+    execute_in_session,
+    interrupt_session,
+    rename_session,
+    restart_session,
+    session_v2,
+    shutdown_session_service,
+    start_session_service,
+)
 from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
@@ -480,6 +498,22 @@ class Mutation:
     admin_delete_permission = admin_delete_permission
     admin_assign_role = admin_assign_role
     admin_revoke_role = admin_revoke_role
+    # Session V2 APIs
+    admin_modify_session = admin_modify_session
+    check_and_transit_session_status = check_and_transit_session_status
+    destroy_session = destroy_session
+    restart_session = restart_session
+    rename_session = rename_session
+    interrupt_session = interrupt_session
+    execute_in_session = execute_in_session
+    commit_session = commit_session
+    convert_session_to_image = convert_session_to_image
+    start_session_service = start_session_service
+    shutdown_session_service = shutdown_session_service
+    complete_session_code = complete_session_code
+    create_session_from_params = create_session_from_params
+    create_session_from_template = create_session_from_template
+    create_session_cluster = create_session_cluster
 
 
 @strawberry.type
