@@ -532,6 +532,7 @@ class CreateRevisionInput:
                         if extra_mount.mount_destination is not None
                         else ""
                     ),
+                    subpath=extra_mount.subpath or ".",
                 )
                 for extra_mount in self.extra_mounts
             ]
@@ -591,6 +592,7 @@ class AddRevisionInput:
                         if extra_mount.mount_destination is not None
                         else ""
                     ),
+                    subpath=extra_mount.subpath or ".",
                 )
                 for extra_mount in self.extra_mounts
             ]

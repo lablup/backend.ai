@@ -832,7 +832,7 @@ class ModelServingRepository:
                             subpath=(
                                 mount.subpath.value()
                                 if mount.subpath.optional_value() is not None
-                                else None
+                                else "."
                             ),
                         )
                         for mount in extra_mounts_input

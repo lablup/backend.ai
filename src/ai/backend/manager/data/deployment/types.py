@@ -218,6 +218,7 @@ class MountSpec:
 class MountInfo:
     vfolder_id: UUID
     kernel_path: PurePosixPath
+    subpath: str = "."
 
 
 @dataclass

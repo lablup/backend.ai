@@ -987,6 +987,10 @@ async def prepare_vfolder_mounts(
             vfid_subpath = (
                 vfid_options.get("subpath", ".") if isinstance(vfid_options, dict) else "."
             )
+            if not PurePosixPath(os.path.normpath(vfid_subpath)).is_relative_to("."):
+                raise InvalidAPIParameters(
+                    f"The subpath '{vfid_subpath}' must not escape the vfolder root.",
+                )
             requested_vfolder_subpaths[vfid] = os.path.normpath(vfid_subpath)
         if name in _already_resolved:
             continue
