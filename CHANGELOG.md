@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.15.10 (2026-02-20)
+
+### External Dependency Updates
+* Upgrade valkey-glide to ~=2.2.2 and opentelemetry to ~=1.39.0 ([#9170](https://github.com/lablup/backend.ai/issues/9170))
+
+
 ## 25.15.9 (2026-02-13)
 
 ### Fixes
