@@ -189,7 +189,7 @@ async def admin_update_user(
         "Each user has individual update specifications."
     )
 )  # type: ignore[misc]
-async def admin_bulk_update_users(
+async def admin_bulk_update_users_v2(
     info: Info[StrawberryGQLContext],
     input: BulkUpdateUserV2InputGQL,
 ) -> BulkUpdateUsersV2PayloadGQL:
