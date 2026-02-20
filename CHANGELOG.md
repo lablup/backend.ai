@@ -16,6 +16,38 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.2.1 (2026-02-20)
+
+### Features
+* Apply prometheus_client multiprocess mode for multi-worker metric aggregation ([#8786](https://github.com/lablup/backend.ai/issues/8786))
+* Convert JSONB reads to normalized tables and fix resource freeing ([#8787](https://github.com/lablup/backend.ai/issues/8787))
+* Disable introspection in hive router configuration ([#8789](https://github.com/lablup/backend.ai/issues/8789))
+* Add GitHub Action to periodically update the default seccomp profile ([#8791](https://github.com/lablup/backend.ai/issues/8791))
+* make GQL query resolver return types nullable for graceful error handling ([#8793](https://github.com/lablup/backend.ai/issues/8793))
+* Add normalized `usage_bucket_entries` table for per-slot resource usage tracking and remove legacy JSONB dual-writes for agents/sessions occupied slots. ([#8858](https://github.com/lablup/backend.ai/issues/8858))
+
+### Improvements
+* Optimize `invalidate_kernel_related_cache` by replacing SCAN with Index SET ([#8785](https://github.com/lablup/backend.ai/issues/8785))
+* Downgrade route provisioning failure from error to warning log ([#8801](https://github.com/lablup/backend.ai/issues/8801))
+
+### Fixes
+* Rename strawberry `Kernel` GQL types to follow V2 naming convention ([#8769](https://github.com/lablup/backend.ai/issues/8769))
+* Handle missing scratch recovery files gracefully to prevent agent startup failure ([#8796](https://github.com/lablup/backend.ai/issues/8796)),
+  ([#8814](https://github.com/lablup/backend.ai/issues/8814))
+* Fix model service dry run failing when extra mounts are present by correctly extracting `folder_id` from `VFolderID` objects. Previously, the full `VFolderID` object was passed instead of the UUID, causing type mismatches in mount configuration. ([#8804](https://github.com/lablup/backend.ai/issues/8804))
+* Fix Cartesian product warning in model serving repository by using `select_from()` pattern for JOIN queries, resolving SQLAlchemy warnings about missing join conditions between `users` and `keypairs` tables. ([#8813](https://github.com/lablup/backend.ai/issues/8813))
+* Raise proper GPFS exceptions for 4xx HTTP responses instead of silently passing them. Previously, `base_response_handler` ignored all 4xx status codes, causing authentication failures (401) to be misidentified as `GPFSNotFoundError` and preventing proper error diagnosis ([#8815](https://github.com/lablup/backend.ai/issues/8815))
+* Fix UndefinedObjectError on vfolder queries after upgrade by adding alembic migration to rename the `vfolderpermission` PostgreSQL enum type to `vfoldermountpermission`. ([#9067](https://github.com/lablup/backend.ai/issues/9067))
+* Fix alembic migration naming convention for BA-4308 by renaming file and revision ID to use standard 12-char hex format. ([#9070](https://github.com/lablup/backend.ai/issues/9070))
+* Fix Prometheus metrics scrape crash when `/tmp` multiprocess directory is cleaned by OS, by using a persistent directory (`/var/run/backendai/prometheus/`) outside `/tmp`. ([#9114](https://github.com/lablup/backend.ai/issues/9114))
+* Fix FK violation on agent heartbeat by seeding `resource_slot_types` table during oneshot DB initialization. ([#9129](https://github.com/lablup/backend.ai/issues/9129))
+
+### Documentation Updates
+* Add /submit and /release skills ([#8819](https://github.com/lablup/backend.ai/issues/8819))
+
+### Miscellaneous
+* Separate ClientConnectionError handling from generic exception in web proxy to prevent unnecessary 500 error responses and noisy error logs on normal client disconnections. ([#9158](https://github.com/lablup/backend.ai/issues/9158))
+
 
 ## 26.2.0 (2026-02-13)
 
