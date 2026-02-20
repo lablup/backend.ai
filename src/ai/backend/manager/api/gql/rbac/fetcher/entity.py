@@ -19,6 +19,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.permission_controller.options import (
     EntityScopeConditions,
     EntityScopeOrders,
@@ -49,6 +50,7 @@ async def fetch_entities(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
+    base_conditions: list[QueryCondition] | None = None,
 ) -> EntityConnection:
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
@@ -62,6 +64,7 @@ async def fetch_entities(
         get_entity_pagination_spec(),
         filter=filter,
         order_by=order_by,
+        base_conditions=base_conditions,
     )
 
     action_result = await info.context.processors.permission_controller.search_element_associations.wait_for_complete(
