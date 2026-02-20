@@ -3,7 +3,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
 from ai.backend.common.types import (
     AccessKey,
     KernelId,
@@ -18,6 +18,7 @@ from ai.backend.manager.actions.action.single_entity import (
 )
 from ai.backend.manager.actions.action.types import FieldData
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (
@@ -121,6 +122,13 @@ class CreateVFolderAction(VFolderScopeAction):
     def scope_id(self) -> str:
         return self._scope_id
 
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType(self._scope_type.value),
+            element_id=self._scope_id,
+        )
+
 
 @dataclass
 class CreateVFolderActionResult(VFolderScopeActionResult):
@@ -170,6 +178,13 @@ class UpdateVFolderAttributeAction(VFolderSingleEntityAction):
     def target_entity_id(self) -> str:
         return str(self.vfolder_uuid)
 
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.VFOLDER,
+            element_id=str(self.vfolder_uuid),
+        )
+
 
 @dataclass
 class UpdateVFolderAttributeActionResult(VFolderSingleEntityActionResult):
@@ -201,6 +216,13 @@ class GetVFolderAction(VFolderSingleEntityAction):
     @override
     def target_entity_id(self) -> str:
         return str(self.vfolder_uuid)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.VFOLDER,
+            element_id=str(self.vfolder_uuid),
+        )
 
 
 @dataclass
@@ -241,6 +263,13 @@ class ListVFolderAction(VFolderScopeAction):
     @override
     def scope_id(self) -> str:
         return self._scope_id
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType(self._scope_type.value),
+            element_id=self._scope_id,
+        )
 
 
 @dataclass
@@ -283,6 +312,13 @@ class MoveToTrashVFolderAction(VFolderSingleEntityAction):
     def target_entity_id(self) -> str:
         return str(self.vfolder_uuid)
 
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.VFOLDER,
+            element_id=str(self.vfolder_uuid),
+        )
+
 
 @dataclass
 class MoveToTrashVFolderActionResult(VFolderSingleEntityActionResult):
@@ -315,6 +351,13 @@ class RestoreVFolderFromTrashAction(VFolderSingleEntityAction):
     @override
     def target_entity_id(self) -> str:
         return str(self.vfolder_uuid)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.VFOLDER,
+            element_id=str(self.vfolder_uuid),
+        )
 
 
 @dataclass
@@ -349,6 +392,13 @@ class DeleteForeverVFolderAction(VFolderSingleEntityAction):
     def target_entity_id(self) -> str:
         return str(self.vfolder_uuid)
 
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.VFOLDER,
+            element_id=str(self.vfolder_uuid),
+        )
+
 
 @dataclass
 class DeleteForeverVFolderActionResult(VFolderSingleEntityActionResult):
@@ -379,6 +429,13 @@ class PurgeVFolderAction(VFolderSingleEntityAction):
     @override
     def target_entity_id(self) -> str:
         return str(self.purger.pk_value)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.VFOLDER,
+            element_id=str(self.purger.pk_value),
+        )
 
 
 @dataclass
@@ -417,6 +474,13 @@ class ForceDeleteVFolderAction(VFolderSingleEntityAction):
     def target_entity_id(self) -> str:
         return str(self.vfolder_uuid)
 
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.VFOLDER,
+            element_id=str(self.vfolder_uuid),
+        )
+
 
 @dataclass
 class ForceDeleteVFolderActionResult(VFolderSingleEntityActionResult):
@@ -454,6 +518,13 @@ class CloneVFolderAction(VFolderSingleEntityAction):
     @override
     def target_entity_id(self) -> str:
         return str(self.source_vfolder_uuid)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.VFOLDER,
+            element_id=str(self.source_vfolder_uuid),
+        )
 
 
 @dataclass
@@ -504,6 +575,12 @@ class GetTaskLogsAction(VFolderSingleEntityAction):
     @override
     def target_entity_id(self) -> str:
         return str(self.kernel_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        # TODO: GetTaskLogsAction is deprecated and needs migration
+        # away from BaseSingleEntityAction.
+        raise NotImplementedError
 
 
 @dataclass
