@@ -797,7 +797,7 @@ class PermissionDBSource:
                 querier,
             )
 
-            items = [cast(AssociationScopesEntitiesRow, row).to_data() for row in result.rows]
+            items = [row.AssociationScopesEntitiesRow.to_data() for row in result.rows]
 
             return ElementAssociationListResult(
                 items=items,
