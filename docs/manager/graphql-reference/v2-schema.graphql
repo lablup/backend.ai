@@ -939,6 +939,15 @@ type BulkPurgeUserError {
   message: String!
 }
 
+"""Added in 26.3.0. Error information for a failed user in bulk update."""
+type BulkUpdateUserError {
+  """UUID of the user that failed to update."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
 """
 Added in 26.3.0. Input for permanently deleting multiple users. This action is irreversible.
 """
@@ -962,6 +971,34 @@ type BulkPurgeUsersV2Payload {
 
   """List of errors for users that failed to purge."""
   failed: [BulkPurgeUserError!]!
+}
+
+"""
+Added in 26.3.0. Input for bulk updating multiple users. Each user has individual update specifications.
+"""
+input BulkUpdateUserV2Input {
+  """List of user update inputs."""
+  users: [BulkUpdateUserV2ItemInput!]!
+}
+
+"""
+Added in 26.3.0. Input for a single user update within a bulk operation. Pairs a user ID with the fields to update.
+"""
+input BulkUpdateUserV2ItemInput {
+  """UUID of the user to update."""
+  userId: UUID!
+
+  """Fields to update for this user."""
+  input: UpdateUserV2Input!
+}
+
+"""Added in 26.3.0. Payload for bulk user update mutation."""
+type BulkUpdateUsersV2Payload {
+  """List of successfully updated users."""
+  updatedUsers: [UserV2!]!
+
+  """List of errors for users that failed to update."""
+  failed: [BulkUpdateUserError!]!
 }
 
 """
@@ -3840,7 +3877,12 @@ type Mutation {
   adminBulkCreateUsers(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload!
 
   """
-  Added in 26.2.0. Update a user's information (admin only). Requires superadmin privileges. Only provided fields will be updated.
+  Added in 26.3.0. Update multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual update specifications.
+  """
+  adminBulkUpdateUsersV2(input: BulkUpdateUserV2Input!): BulkUpdateUsersV2Payload!
+
+  """
+  Added in 26.3.0. Update a user's information (admin only). Requires superadmin privileges. Only provided fields will be updated.
   """
   adminUpdateUser(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload!
 
@@ -6980,59 +7022,59 @@ type UpdateRouteTrafficStatusPayload {
 }
 
 """
-Added in 26.2.0. Input for updating user information. All fields are optional - only provided fields will be updated.
+Added in 26.3.0. Input for updating user information. All fields are optional - only provided fields will be updated.
 """
 input UpdateUserV2Input {
   """New username."""
-  username: String = null
+  username: String
 
   """New password."""
-  password: String = null
+  password: String
 
   """New full display name."""
-  fullName: String = null
+  fullName: String
 
   """New description."""
-  description: String = null
+  description: String
 
   """New account status."""
-  status: UserStatusV2 = null
+  status: UserStatusV2
 
   """New user role."""
-  role: UserRoleV2 = null
+  role: UserRoleV2
 
   """New domain assignment."""
-  domainName: String = null
+  domainName: String
 
   """New project (group) assignments. Replaces existing assignments."""
-  groupIds: [UUID!] = null
+  groupIds: [UUID!]
 
   """New allowed client IP addresses or CIDR ranges."""
-  allowedClientIp: [String!] = null
+  allowedClientIp: [String!]
 
   """Set password change requirement."""
-  needPasswordChange: Boolean = null
+  needPasswordChange: Boolean
 
   """New user resource policy name."""
-  resourcePolicy: String = null
+  resourcePolicy: String
 
   """Enable or disable sudo session capability."""
-  sudoSessionEnabled: Boolean = null
+  sudoSessionEnabled: Boolean
 
   """Set the primary API access key."""
-  mainAccessKey: String = null
+  mainAccessKey: String
 
   """New container user ID."""
-  containerUid: Int = null
+  containerUid: Int
 
   """New container primary group ID."""
-  containerMainGid: Int = null
+  containerMainGid: Int
 
   """New container supplementary group IDs."""
-  containerGids: [Int!] = null
+  containerGids: [Int!]
 }
 
-"""Added in 26.2.0. Payload for user update mutation."""
+"""Added in 26.3.0. Payload for user update mutation."""
 type UpdateUserV2Payload {
   """The updated user."""
   user: UserV2!

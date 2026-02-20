@@ -8,6 +8,7 @@ from .resolver import (
     # Mutations
     admin_bulk_create_users,
     admin_bulk_purge_users_v2,
+    admin_bulk_update_users_v2,
     admin_create_user,
     admin_delete_user,
     admin_delete_users,
@@ -32,6 +33,7 @@ __all__ = [
     # Mutations
     "admin_create_user",
     "admin_bulk_create_users",
+    "admin_bulk_update_users_v2",
     "admin_update_user",
     "update_user",
     "admin_delete_user",

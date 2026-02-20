@@ -22,6 +22,8 @@ from ai.backend.manager.services.user.actions.get_user import (
     GetUserActionResult,
 )
 from ai.backend.manager.services.user.actions.modify_user import (
+    BulkModifyUserAction,
+    BulkModifyUserActionResult,
     ModifyUserAction,
     ModifyUserActionResult,
 )
@@ -54,6 +56,7 @@ class UserProcessors(AbstractProcessorPackage):
     create_user: ActionProcessor[CreateUserAction, CreateUserActionResult]
     bulk_create_users: ActionProcessor[BulkCreateUserAction, BulkCreateUserActionResult]
     modify_user: ActionProcessor[ModifyUserAction, ModifyUserActionResult]
+    bulk_modify_users: ActionProcessor[BulkModifyUserAction, BulkModifyUserActionResult]
     delete_user: ActionProcessor[DeleteUserAction, DeleteUserActionResult]
     get_user: ActionProcessor[GetUserAction, GetUserActionResult]
     purge_user: ActionProcessor[PurgeUserAction, PurgeUserActionResult]
@@ -72,6 +75,7 @@ class UserProcessors(AbstractProcessorPackage):
         self.create_user = ActionProcessor(user_service.create_user, action_monitors)
         self.bulk_create_users = ActionProcessor(user_service.bulk_create_users, action_monitors)
         self.modify_user = ActionProcessor(user_service.modify_user, action_monitors)
+        self.bulk_modify_users = ActionProcessor(user_service.bulk_modify_users, action_monitors)
         self.delete_user = ActionProcessor(user_service.delete_user, action_monitors)
         self.get_user = ActionProcessor(user_service.get_user, action_monitors)
         self.purge_user = ActionProcessor(user_service.purge_user, action_monitors)
@@ -92,6 +96,7 @@ class UserProcessors(AbstractProcessorPackage):
             CreateUserAction.spec(),
             BulkCreateUserAction.spec(),
             ModifyUserAction.spec(),
+            BulkModifyUserAction.spec(),
             DeleteUserAction.spec(),
             GetUserAction.spec(),
             PurgeUserAction.spec(),

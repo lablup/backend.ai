@@ -18,6 +18,9 @@ from ai.backend.manager.api.gql.user.types import (
     BulkPurgeUsersV2InputGQL,
     BulkPurgeUsersV2PayloadGQL,
     BulkPurgeUserV2ErrorGQL,
+    BulkUpdateUsersV2PayloadGQL,
+    BulkUpdateUserV2ErrorGQL,
+    BulkUpdateUserV2InputGQL,
     CreateUserInputGQL,
     CreateUserPayloadGQL,
     DeleteUserPayloadGQL,
@@ -25,22 +28,28 @@ from ai.backend.manager.api.gql.user.types import (
     DeleteUsersPayloadGQL,
     PurgeUserInputGQL,
     PurgeUserPayloadGQL,
-    UpdateUserInputGQL,
     UpdateUserPayloadGQL,
+    UpdateUserV2InputGQL,
     UserV2GQL,
 )
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.data.user.types import UserInfoContext, UserStatus
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     UserCreateSpec,
 )
+from ai.backend.manager.services.user.actions.modify_user import (
+    BulkModifyUserAction,
+    UserUpdateSpec,
+)
 from ai.backend.manager.services.user.actions.purge_user import BulkPurgeUserAction
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 # Create Mutations
 
@@ -91,6 +100,7 @@ async def admin_bulk_create_users(
     Returns:
         BulkCreateUsersPayloadGQL with created users.
     """
+    check_admin_only()
     ctx = info.context
     auth_config = ctx.config_provider.config.auth
 
@@ -151,7 +161,7 @@ async def admin_bulk_create_users(
 
 @strawberry.mutation(
     description=(
-        "Added in 26.2.0. Update a user's information (admin only). "
+        "Added in 26.3.0. Update a user's information (admin only). "
         "Requires superadmin privileges. "
         "Only provided fields will be updated."
     )
@@ -159,7 +169,7 @@ async def admin_bulk_create_users(
 async def admin_update_user(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
-    input: UpdateUserInputGQL,
+    input: UpdateUserV2InputGQL,
 ) -> UpdateUserPayloadGQL:
     """Update a user's information.
 
@@ -179,6 +189,82 @@ async def admin_update_user(
 
 @strawberry.mutation(
     description=(
+        "Added in 26.3.0. Update multiple users in bulk (admin only). "
+        "Requires superadmin privileges. "
+        "Each user has individual update specifications."
+    )
+)  # type: ignore[misc]
+async def admin_bulk_update_users_v2(
+    info: Info[StrawberryGQLContext],
+    input: BulkUpdateUserV2InputGQL,
+) -> BulkUpdateUsersV2PayloadGQL:
+    """Update multiple users in bulk with individual specifications.
+
+    Args:
+        info: Strawberry GraphQL context.
+        input: Bulk user update input with individual specs.
+
+    Returns:
+        BulkUpdateUsersPayloadGQL with updated users and failures.
+    """
+    check_admin_only()
+    ctx = info.context
+    auth_config = ctx.config_provider.config.auth
+
+    items: list[UserUpdateSpec] = []
+    for user_item in input.users:
+        user_input = user_item.input
+
+        updater_spec = UserUpdaterSpec(
+            username=OptionalState.from_graphql(user_input.username),
+            password=OptionalState.from_graphql(user_input.password).map(
+                lambda pw: PasswordInfo(
+                    password=pw,
+                    algorithm=auth_config.password_hash_algorithm,
+                    rounds=auth_config.password_hash_rounds,
+                    salt_size=auth_config.password_hash_salt_size,
+                )
+            ),
+            need_password_change=OptionalState.from_graphql(user_input.need_password_change),
+            full_name=OptionalState.from_graphql(user_input.full_name),
+            description=OptionalState.from_graphql(user_input.description),
+            status=OptionalState.from_graphql(user_input.status).map(lambda s: UserStatus(s.value)),
+            domain_name=OptionalState.from_graphql(user_input.domain_name),
+            role=OptionalState.from_graphql(user_input.role).map(lambda r: UserRole(r.value)),
+            allowed_client_ip=TriState.from_graphql(user_input.allowed_client_ip),
+            resource_policy=OptionalState.from_graphql(user_input.resource_policy),
+            sudo_session_enabled=OptionalState.from_graphql(user_input.sudo_session_enabled),
+            main_access_key=TriState.from_graphql(user_input.main_access_key),
+            container_uid=TriState.from_graphql(user_input.container_uid),
+            container_main_gid=TriState.from_graphql(user_input.container_main_gid),
+            container_gids=TriState.from_graphql(user_input.container_gids),
+            group_ids=OptionalState.from_graphql(user_input.group_ids).map(
+                lambda gids: [str(gid) for gid in gids]
+            ),
+        )
+
+        items.append(UserUpdateSpec(user_id=user_item.user_id, updater_spec=updater_spec))
+
+    action = BulkModifyUserAction(items=items)
+    result = await ctx.processors.user.bulk_modify_users.wait_for_complete(action)
+
+    updated_users = [UserV2GQL.from_data(user_data) for user_data in result.data.successes]
+    failed = [
+        BulkUpdateUserV2ErrorGQL(
+            user_id=items[error.index].user_id,
+            message=str(error.exception),
+        )
+        for error in result.data.failures
+    ]
+
+    return BulkUpdateUsersV2PayloadGQL(
+        updated_users=updated_users,
+        failed=failed,
+    )
+
+
+@strawberry.mutation(
+    description=(
         "Added in 26.2.0. Update the current user's information. "
         "Users can only update their own profile. "
         "Some fields may be restricted based on user role."
@@ -186,7 +272,7 @@ async def admin_update_user(
 )  # type: ignore[misc]
 async def update_user(
     info: Info[StrawberryGQLContext],
-    input: UpdateUserInputGQL,
+    input: UpdateUserV2InputGQL,
 ) -> UpdateUserPayloadGQL:
     """Update the current user's own information.
 
@@ -203,7 +289,7 @@ async def update_user(
     raise NotImplementedError("update_user is not yet implemented")
 
 
-# Delete Mutations (Soft Delete)
+# Delete UpdateUserV2InputGQLlete)
 
 
 @strawberry.mutation(

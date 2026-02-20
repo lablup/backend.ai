@@ -143,6 +143,24 @@ class BatchUpdaterResult:
     updated_count: int
 
 
+@dataclass
+class BulkUpdaterError[TRow: Base]:
+    """Error information for a failed bulk update operation.
+
+    Contains the spec that failed and the exception for debugging.
+    Follows the same pattern as BulkCreatorError.
+
+    Attributes:
+        spec: The UpdaterSpec that failed
+        exception: The exception that occurred
+        index: Original position in specs list for traceability
+    """
+
+    spec: UpdaterSpec[TRow]
+    exception: Exception
+    index: int
+
+
 async def execute_updater[TRow: Base](
     db_sess: SASession,
     updater: Updater[TRow],
