@@ -46,14 +46,9 @@ pants lint --changed-since=HEAD~1
 ```
 
 The pre-commit hook runs `pants fmt` and `pants lint` automatically.
-Type checking and tests are enforced by CI — run them locally when relevant:
+Type checking (`pants check`) and tests (`pants test`) are enforced by CI only — do **not** run them locally.
 
-```bash
-pants check --changed-since=HEAD~1
-pants test --changed-since=HEAD~1 --changed-dependents=transitive
-```
-
-**Fix all errors - never suppress or skip.**
+**Fix all lint errors - never suppress or skip.**
 
 ## Development Guidelines
 
