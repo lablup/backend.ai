@@ -339,6 +339,32 @@ type AgentV2Edge {
   node: AgentV2!
 }
 
+"""
+Added in 26.2.0.
+
+Input for creating an alias for an image by ID.
+"""
+input AliasImageInputGQL {
+  """The ID of the image to alias."""
+  imageId: ID!
+
+  """The alias to create."""
+  alias: String!
+}
+
+"""
+Added in 26.2.0.
+
+Result of creating an alias for an image.
+"""
+type AliasImageResult {
+  """The ID of the aliased image."""
+  imageId: ID!
+
+  """The created alias."""
+  alias: String!
+}
+
 """Added in 25.16.0. App configuration data"""
 type AppConfig {
   extraConfig: JSON!
@@ -1036,6 +1062,26 @@ type CleanupArtifactRevisionsPayload {
   artifactRevisions: ArtifactRevisionConnection!
 }
 
+"""
+Added in 26.2.0.
+
+Input for clearing custom resource limits for an image.
+"""
+input ClearImageResourceLimitInputGQL {
+  """The ID of the image to clear resource limits for."""
+  imageId: ID!
+}
+
+"""
+Added in 26.2.0.
+
+Result of clearing custom resource limits for an image.
+"""
+type ClearImageResourceLimitResult {
+  """The image with cleared resource limits."""
+  image: ImageV2!
+}
+
 type ClusterConfig {
   """The clustering mode (e.g., SINGLE_NODE)."""
   mode: ClusterMode!
@@ -1335,6 +1381,29 @@ input DateTimeFilter {
   after: DateTime = null
   equals: DateTime = null
   notEquals: DateTime = null
+}
+
+"""
+Added in 26.2.0.
+
+Input for removing an alias from an image.
+"""
+input DealiasImageInputGQL {
+  """The alias to remove."""
+  alias: String!
+}
+
+"""
+Added in 26.2.0.
+
+Result of removing an alias from an image.
+"""
+type DealiasImageResult {
+  """The ID of the image that had the alias."""
+  imageId: ID!
+
+  """The removed alias."""
+  alias: String!
 }
 
 """Decimal (fixed-point)"""
@@ -2508,6 +2577,27 @@ type FairShareSpec {
   Added in 26.2.0. Weights for each resource type with default indicators. Shows which resources use explicit vs default weights. Allows different resources to contribute differently to the fair share calculation. For example, GPU usage might be weighted higher than CPU usage.
   """
   resourceWeights: [ResourceWeightEntry!]!
+}
+
+"""
+Added in 26.2.0.
+
+Input for forgetting an image by ID.
+"""
+input ForgetImageInputGQL {
+  """The ID of the image to forget."""
+  imageId: ID!
+}
+
+"""
+Added in 26.2.0.
+
+Result of forgetting an image by ID. The image is marked as DELETED
+but not removed from the database.
+"""
+type ForgetImageResult {
+  """The forgotten image."""
+  image: ImageV2!
 }
 
 """Added in 25.14.0"""
@@ -3815,6 +3905,53 @@ type Mutation {
   updateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload! @deprecated(reason: "Use admin_update_resource_group_fair_share_spec instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
+  Added in 26.2.0.
+  
+  Mark an image as deleted by its ID.
+  
+  The image is not removed from the database but its status changes to DELETED.
+  This is a soft delete operation.
+  """
+  forgetImage(input: ForgetImageInputGQL!): ForgetImageResult!
+
+  """
+  Added in 26.2.0.
+  
+  Completely purge an image by its ID.
+  
+  The image is permanently removed from the database. Optionally, the image
+  can also be untagged from the container registry (HarborV2 only).
+  """
+  purgeImage(input: PurgeImageInputGQL!): PurgeImageResult!
+
+  """
+  Added in 26.2.0.
+  
+  Create an alias for an image by its ID.
+  
+  An alias is an alternative name that can be used to reference the image.
+  Multiple aliases can be created for the same image.
+  """
+  aliasImage(input: AliasImageInputGQL!): AliasImageResult!
+
+  """
+  Added in 26.2.0.
+  
+  Remove an alias from an image.
+  """
+  dealiasImage(input: DealiasImageInputGQL!): DealiasImageResult!
+
+  """
+  Added in 26.2.0.
+  
+  Clear custom resource limits for an image by its ID.
+  
+  This removes any user-defined resource limits and reverts to the defaults
+  specified in the image labels.
+  """
+  clearImageResourceLimit(input: ClearImageResourceLimitInputGQL!): ClearImageResourceLimitResult!
+
+  """
   Added in 26.2.0. Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user.
   """
   adminCreateUser(input: CreateUserV2Input!): CreateUserV2Payload!
@@ -4726,6 +4863,42 @@ input ProjectWeightInputItem {
   Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
   """
   weight: Decimal = null
+}
+
+"""
+Added in 26.2.0.
+
+Input for purging an image by ID.
+"""
+input PurgeImageInputGQL {
+  """The ID of the image to purge."""
+  imageId: ID!
+
+  """Options for purging the image."""
+  options: PurgeImageOptionsGQL = null
+}
+
+"""
+Added in 26.2.0.
+
+Options for purging an image.
+"""
+input PurgeImageOptionsGQL {
+  """
+  Untag the deleted image from the registry. Only available for HarborV2 registries.
+  """
+  removeFromRegistry: Boolean! = false
+}
+
+"""
+Added in 26.2.0.
+
+Result of purging an image by ID. The image is completely removed
+from the database.
+"""
+type PurgeImageResult {
+  """The purged image data."""
+  image: ImageV2!
 }
 
 """Added in 26.3.0. Input for purging a role"""

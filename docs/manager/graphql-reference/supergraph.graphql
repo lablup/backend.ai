@@ -554,6 +554,36 @@ type AliasImage
   msg: String
 }
 
+"""
+Added in 26.2.0.
+
+Input for creating an alias for an image by ID.
+"""
+input AliasImageInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the image to alias."""
+  imageId: ID!
+
+  """The alias to create."""
+  alias: String!
+}
+
+"""
+Added in 26.2.0.
+
+Result of creating an alias for an image.
+"""
+type AliasImageResult
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the aliased image."""
+  imageId: ID!
+
+  """The created alias."""
+  alias: String!
+}
+
 """Added in 25.3.0."""
 input AllowedGroups
   @join__type(graph: GRAPHENE)
@@ -1615,6 +1645,30 @@ type ClearImageCustomResourceLimitPayload
   image_node: ImageNode
 }
 
+"""
+Added in 26.2.0.
+
+Input for clearing custom resource limits for an image.
+"""
+input ClearImageResourceLimitInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the image to clear resource limits for."""
+  imageId: ID!
+}
+
+"""
+Added in 26.2.0.
+
+Result of clearing custom resource limits for an image.
+"""
+type ClearImageResourceLimitResult
+  @join__type(graph: STRAWBERRY)
+{
+  """The image with cleared resource limits."""
+  image: ImageV2!
+}
+
 type ClearImages
   @join__type(graph: GRAPHENE)
 {
@@ -2635,6 +2689,33 @@ type DealiasImage
 {
   ok: Boolean
   msg: String
+}
+
+"""
+Added in 26.2.0.
+
+Input for removing an alias from an image.
+"""
+input DealiasImageInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The alias to remove."""
+  alias: String!
+}
+
+"""
+Added in 26.2.0.
+
+Result of removing an alias from an image.
+"""
+type DealiasImageResult
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the image that had the alias."""
+  imageId: ID!
+
+  """The removed alias."""
+  alias: String!
 }
 
 """Decimal (fixed-point)"""
@@ -4490,6 +4571,31 @@ type ForgetImageById
 
   """Added since 24.03.1."""
   image: ImageNode
+}
+
+"""
+Added in 26.2.0.
+
+Input for forgetting an image by ID.
+"""
+input ForgetImageInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the image to forget."""
+  imageId: ID!
+}
+
+"""
+Added in 26.2.0.
+
+Result of forgetting an image by ID. The image is marked as DELETED
+but not removed from the database.
+"""
+type ForgetImageResult
+  @join__type(graph: STRAWBERRY)
+{
+  """The forgotten image."""
+  image: ImageV2!
 }
 
 """Added in 25.14.0"""
@@ -7368,6 +7474,53 @@ type Mutation
   updateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_update_resource_group_fair_share_spec instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
+  Added in 26.2.0.
+  
+  Mark an image as deleted by its ID.
+  
+  The image is not removed from the database but its status changes to DELETED.
+  This is a soft delete operation.
+  """
+  forgetImage(input: ForgetImageInputGQL!): ForgetImageResult! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Completely purge an image by its ID.
+  
+  The image is permanently removed from the database. Optionally, the image
+  can also be untagged from the container registry (HarborV2 only).
+  """
+  purgeImage(input: PurgeImageInputGQL!): PurgeImageResult! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Create an alias for an image by its ID.
+  
+  An alias is an alternative name that can be used to reference the image.
+  Multiple aliases can be created for the same image.
+  """
+  aliasImage(input: AliasImageInputGQL!): AliasImageResult! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Remove an alias from an image.
+  """
+  dealiasImage(input: DealiasImageInputGQL!): DealiasImageResult! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Clear custom resource limits for an image by its ID.
+  
+  This removes any user-defined resource limits and reverts to the defaults
+  specified in the image labels.
+  """
+  clearImageResourceLimit(input: ClearImageResourceLimitInputGQL!): ClearImageResourceLimitResult! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.2.0. Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user.
   """
   adminCreateUser(input: CreateUserV2Input!): CreateUserV2Payload! @join__field(graph: STRAWBERRY)
@@ -8539,6 +8692,21 @@ type PurgeImageById
   image: ImageNode
 }
 
+"""
+Added in 26.2.0.
+
+Input for purging an image by ID.
+"""
+input PurgeImageInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the image to purge."""
+  imageId: ID!
+
+  """Options for purging the image."""
+  options: PurgeImageOptionsGQL = null
+}
+
 """Added in 25.10.0."""
 input PurgeImageOptions
   @join__type(graph: GRAPHENE)
@@ -8547,6 +8715,33 @@ input PurgeImageOptions
   Untag the deleted image from the registry. Only available in the HarborV2 registry.
   """
   remove_from_registry: Boolean = false
+}
+
+"""
+Added in 26.2.0.
+
+Options for purging an image.
+"""
+input PurgeImageOptionsGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Untag the deleted image from the registry. Only available for HarborV2 registries.
+  """
+  removeFromRegistry: Boolean! = false
+}
+
+"""
+Added in 26.2.0.
+
+Result of purging an image by ID. The image is completely removed
+from the database.
+"""
+type PurgeImageResult
+  @join__type(graph: STRAWBERRY)
+{
+  """The purged image data."""
+  image: ImageV2!
 }
 
 """Added in 25.6.0."""
