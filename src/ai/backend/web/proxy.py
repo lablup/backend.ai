@@ -296,7 +296,9 @@ async def web_handler(
         )
     except ClientConnectionError:
         log.warning(
-            "web_handler_with_jwt: ClientConnectionError - Client disconnected during proxying"
+            "web_handler: ClientConnectionError - Client disconnected during proxying: method: {}, path: {}",
+            frontend_rqst.method,
+            path,
         )
         raise
     except Exception:
@@ -467,7 +469,9 @@ async def web_handler_with_jwt(
         )
     except ClientConnectionError:
         log.warning(
-            "web_handler_with_jwt: ClientConnectionError - Client disconnected during proxying"
+            "web_handler_with_jwt: ClientConnectionError - Client disconnected during proxying: method: {}, path: {}",
+            frontend_rqst.method,
+            path,
         )
         raise
     except Exception:
