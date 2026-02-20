@@ -7,6 +7,9 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
+from ai.backend.common.data.permission.types import (
+    RelationType,
+)
 from ai.backend.manager.data.permission.entity import (
     ElementAssociationListResult,
     EntityData,
@@ -32,7 +35,9 @@ from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
 from ai.backend.manager.data.permission.types import (
+    EntityType,
     OperationType,
+    RBACElementRef,
     ScopeData,
     ScopeListResult,
     ScopeType,
@@ -805,3 +810,171 @@ class PermissionDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    @staticmethod
+    def _build_scope_chain_cte(
+        target_element_ref: RBACElementRef,
+    ) -> sa.CTE:
+        """Build a recursive CTE that walks the scope chain upward via AUTO edges only.
+
+        Starting from the target entity, traverses association_scopes_entities
+        following only AUTO edges to find all ancestor scopes. REF edges
+        terminate the chain — scopes beyond a REF edge are unreachable.
+
+        Uses UNION (not UNION ALL) to prevent infinite recursion on cycles.
+        """
+        ase = AssociationScopesEntitiesRow.__table__
+        target_entity_type = target_element_ref.element_type.to_entity_type()
+
+        # Base case: direct AUTO scope entries for the target entity.
+        scope_chain_base = sa.select(
+            ase.c.scope_type,
+            ase.c.scope_id,
+        ).where(
+            sa.and_(
+                ase.c.entity_type == target_entity_type,
+                ase.c.entity_id == target_element_ref.element_id,
+                ase.c.relation_type == RelationType.AUTO,
+            )
+        )
+        scope_chain_cte = scope_chain_base.cte("scope_chain", recursive=True)
+
+        # Recursive case: walk parent scopes upward, following AUTO edges only.
+        parent = ase.alias("parent")
+        scope_chain_recursive = (
+            sa.select(
+                parent.c.scope_type,
+                parent.c.scope_id,
+            )
+            .select_from(
+                parent.join(
+                    scope_chain_cte,
+                    sa.and_(
+                        parent.c.entity_type == scope_chain_cte.c.scope_type,
+                        parent.c.entity_id == scope_chain_cte.c.scope_id,
+                    ),
+                )
+            )
+            .where(
+                parent.c.relation_type == RelationType.AUTO,
+            )
+        )
+        return scope_chain_cte.union(scope_chain_recursive)
+
+    def _build_scope_chain_permission_query(
+        self,
+        user_id: uuid.UUID,
+        target_element_ref: RBACElementRef,
+        target_entity_type: EntityType,
+        operation: OperationType,
+    ) -> sa.sql.Select[Any]:
+        """Build a query that checks permissions via CTE scope chain traversal."""
+        permissions = PermissionRow.__table__
+        user_roles = UserRoleRow.__table__
+        roles = RoleRow.__table__
+
+        scope_chain_cte = self._build_scope_chain_cte(target_element_ref)
+        return (
+            sa.select(sa.literal(1))
+            .select_from(
+                scope_chain_cte.join(
+                    permissions,
+                    sa.and_(
+                        permissions.c.scope_type == scope_chain_cte.c.scope_type,
+                        permissions.c.scope_id == scope_chain_cte.c.scope_id,
+                    ),
+                )
+                .join(
+                    roles,
+                    roles.c.id == permissions.c.role_id,
+                )
+                .join(
+                    user_roles,
+                    user_roles.c.role_id == roles.c.id,
+                )
+            )
+            .where(
+                sa.and_(
+                    user_roles.c.user_id == user_id,
+                    roles.c.status == RoleStatus.ACTIVE,
+                    permissions.c.entity_type == target_entity_type,
+                    permissions.c.operation == operation,
+                )
+            )
+            .limit(1)
+        )
+
+    def _build_self_scope_permission_query(
+        self,
+        user_id: uuid.UUID,
+        target_element_ref: RBACElementRef,
+        target_entity_type: EntityType,
+        target_scope_type: ScopeType,
+        operation: OperationType,
+    ) -> sa.sql.Select[Any]:
+        """Build a query that checks permissions scoped to the target entity itself."""
+        permissions = PermissionRow.__table__
+        user_roles = UserRoleRow.__table__
+        roles = RoleRow.__table__
+
+        return (
+            sa.select(sa.literal(1))
+            .select_from(
+                permissions.join(
+                    roles,
+                    roles.c.id == permissions.c.role_id,
+                ).join(
+                    user_roles,
+                    user_roles.c.role_id == roles.c.id,
+                )
+            )
+            .where(
+                sa.and_(
+                    user_roles.c.user_id == user_id,
+                    roles.c.status == RoleStatus.ACTIVE,
+                    permissions.c.scope_type == target_scope_type,
+                    permissions.c.scope_id == target_element_ref.element_id,
+                    permissions.c.entity_type == target_entity_type,
+                    permissions.c.operation == operation,
+                )
+            )
+            .limit(1)
+        )
+
+    async def check_permission_with_scope_chain(
+        self,
+        user_id: uuid.UUID,
+        target_element_ref: RBACElementRef,
+        operation: OperationType,
+    ) -> bool:
+        """CTE-based permission check that traverses the scope chain.
+
+        Two-layer check:
+        1. Self-scope direct match — permission scoped to the target entity itself.
+        2. Scope chain traversal — walks AUTO edges upward via CTE.
+        """
+        target_entity_type = target_element_ref.element_type.to_entity_type()
+        target_scope_type = target_element_ref.element_type.to_scope_type()
+
+        combined_query = sa.select(
+            sa.or_(
+                sa.exists(
+                    self._build_scope_chain_permission_query(
+                        user_id, target_element_ref, target_entity_type, operation
+                    )
+                ),
+                sa.exists(
+                    self._build_self_scope_permission_query(
+                        user_id,
+                        target_element_ref,
+                        target_entity_type,
+                        target_scope_type,
+                        operation,
+                    )
+                ),
+            )
+        )
+
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            result = await db_session.scalar(combined_query)
+            return result or False

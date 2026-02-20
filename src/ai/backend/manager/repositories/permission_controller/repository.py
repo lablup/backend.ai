@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping
 
-from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID
+from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, OperationType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -34,6 +34,7 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.types import (
+    RBACElementRef,
     ScopeData,
     ScopeListResult,
     ScopeType,
@@ -328,3 +329,22 @@ class PermissionControllerRepository:
             ElementAssociationListResult with full association row data.
         """
         return await self._db_source.search_element_associations_in_scope(querier)
+
+    @permission_controller_repository_resilience.apply()
+    async def check_permission_with_scope_chain(
+        self,
+        user_id: uuid.UUID,
+        target_element_ref: RBACElementRef,
+        operation: OperationType,
+    ) -> bool:
+        """Permission check that traverses the scope chain via AUTO edges only.
+
+        Walks the association_scopes_entities hierarchy upward from the target
+        entity, checking if the user has the requested operation at any ancestor
+        scope. REF edges are not traversed.
+        """
+        return await self._db_source.check_permission_with_scope_chain(
+            user_id=user_id,
+            target_element_ref=target_element_ref,
+            operation=operation,
+        )
