@@ -96,7 +96,7 @@ class BulkCreateUserInputGQL:
 @strawberry.input(
     name="UpdateUserV2Input",
     description=(
-        "Added in 26.2.0. Input for updating user information. "
+        "Added in 26.3.0. Input for updating user information. "
         "All fields are optional - only provided fields will be updated."
     ),
 )
@@ -172,7 +172,7 @@ class UpdateUserV2InputGQL:
 @strawberry.input(
     name="BulkUpdateUserV2ItemInput",
     description=(
-        "Added in 26.2.0. Input for a single user update within a bulk operation. "
+        "Added in 26.3.0. Input for a single user update within a bulk operation. "
         "Pairs a user ID with the fields to update."
     ),
 )
@@ -186,7 +186,7 @@ class BulkUpdateUserV2ItemInputGQL:
 @strawberry.input(
     name="BulkUpdateUserV2Input",
     description=(
-        "Added in 26.2.0. Input for bulk updating multiple users. "
+        "Added in 26.3.0. Input for bulk updating multiple users. "
         "Each user has individual update specifications."
     ),
 )

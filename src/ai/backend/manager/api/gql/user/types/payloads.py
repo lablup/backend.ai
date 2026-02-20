@@ -58,7 +58,7 @@ class BulkCreateUsersPayloadGQL:
 
 @strawberry.type(
     name="UpdateUserV2Payload",
-    description="Added in 26.2.0. Payload for user update mutation.",
+    description="Added in 26.3.0. Payload for user update mutation.",
 )
 class UpdateUserPayloadGQL:
     """Payload for user update."""
@@ -68,7 +68,7 @@ class UpdateUserPayloadGQL:
 
 @strawberry.type(
     name="BulkUpdateUserError",
-    description="Added in 26.2.0. Error information for a failed user in bulk update.",
+    description="Added in 26.3.0. Error information for a failed user in bulk update.",
 )
 class BulkUpdateUserV2ErrorGQL:
     """Error information for a single user that failed during bulk update."""
@@ -79,7 +79,7 @@ class BulkUpdateUserV2ErrorGQL:
 
 @strawberry.type(
     name="BulkUpdateUsersV2Payload",
-    description="Added in 26.2.0. Payload for bulk user update mutation.",
+    description="Added in 26.3.0. Payload for bulk user update mutation.",
 )
 class BulkUpdateUsersV2PayloadGQL:
     """Payload for bulk user update."""

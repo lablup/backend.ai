@@ -156,7 +156,7 @@ async def admin_bulk_create_users(
 
 @strawberry.mutation(
     description=(
-        "Added in 26.2.0. Update a user's information (admin only). "
+        "Added in 26.3.0. Update a user's information (admin only). "
         "Requires superadmin privileges. "
         "Only provided fields will be updated."
     )
@@ -184,7 +184,7 @@ async def admin_update_user(
 
 @strawberry.mutation(
     description=(
-        "Added in 26.2.0. Update multiple users in bulk (admin only). "
+        "Added in 26.3.0. Update multiple users in bulk (admin only). "
         "Requires superadmin privileges. "
         "Each user has individual update specifications."
     )
