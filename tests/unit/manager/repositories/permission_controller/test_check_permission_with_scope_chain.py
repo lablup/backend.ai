@@ -113,13 +113,16 @@ class TestCheckPermissionWithScopeChain:
         fixture_ids: ScopeChainFixture,
     ) -> None:
         """VFOLDER belongs to PROJECT (auto edge)."""
-        await self._add_association(
-            db_with_rbac_tables,
-            scope_type=ScopeType.PROJECT,
-            scope_id=fixture_ids.project_id,
-            entity_type=EntityType.VFOLDER,
-            entity_id=fixture_ids.vfolder_id,
-        )
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            assoc = AssociationScopesEntitiesRow(
+                scope_type=ScopeType.PROJECT,
+                scope_id=fixture_ids.project_id,
+                entity_type=EntityType.VFOLDER,
+                entity_id=fixture_ids.vfolder_id,
+                relation_type=RelationType.AUTO,
+            )
+            db_sess.add(assoc)
+            await db_sess.flush()
 
     @pytest.fixture
     async def project_in_domain_auto(
@@ -128,13 +131,16 @@ class TestCheckPermissionWithScopeChain:
         fixture_ids: ScopeChainFixture,
     ) -> None:
         """PROJECT belongs to DOMAIN (auto edge)."""
-        await self._add_association(
-            db_with_rbac_tables,
-            scope_type=ScopeType.DOMAIN,
-            scope_id=fixture_ids.domain_id,
-            entity_type=EntityType.PROJECT,
-            entity_id=fixture_ids.project_id,
-        )
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            assoc = AssociationScopesEntitiesRow(
+                scope_type=ScopeType.DOMAIN,
+                scope_id=fixture_ids.domain_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=fixture_ids.project_id,
+                relation_type=RelationType.AUTO,
+            )
+            db_sess.add(assoc)
+            await db_sess.flush()
 
     @pytest.fixture
     async def vfolder_in_project_ref(
@@ -143,229 +149,192 @@ class TestCheckPermissionWithScopeChain:
         fixture_ids: ScopeChainFixture,
     ) -> None:
         """VFOLDER referenced by PROJECT (ref edge)."""
-        await self._add_association(
-            db_with_rbac_tables,
-            scope_type=ScopeType.PROJECT,
-            scope_id=fixture_ids.project_id,
-            entity_type=EntityType.VFOLDER,
-            entity_id=fixture_ids.vfolder_id,
-            relation_type=RelationType.REF,
-        )
-
-    async def _add_permission(
-        self,
-        db: ExtendedAsyncSAEngine,
-        role_id: uuid.UUID,
-        scope_type: ScopeType,
-        scope_id: str,
-        entity_type: EntityType,
-        operation: OperationType,
-    ) -> None:
-        async with db.begin_session() as db_sess:
-            perm = PermissionRow(
-                role_id=role_id,
-                scope_type=scope_type,
-                scope_id=scope_id,
-                entity_type=entity_type,
-                operation=operation,
-            )
-            db_sess.add(perm)
-            await db_sess.flush()
-
-    async def _add_association(
-        self,
-        db: ExtendedAsyncSAEngine,
-        scope_type: ScopeType,
-        scope_id: str,
-        entity_type: EntityType,
-        entity_id: str,
-        relation_type: RelationType = RelationType.AUTO,
-    ) -> None:
-        async with db.begin_session() as db_sess:
+        async with db_with_rbac_tables.begin_session() as db_sess:
             assoc = AssociationScopesEntitiesRow(
-                scope_type=scope_type,
-                scope_id=scope_id,
-                entity_type=entity_type,
-                entity_id=entity_id,
-                relation_type=relation_type,
+                scope_type=ScopeType.PROJECT,
+                scope_id=fixture_ids.project_id,
+                entity_type=EntityType.VFOLDER,
+                entity_id=fixture_ids.vfolder_id,
+                relation_type=RelationType.REF,
             )
             db_sess.add(assoc)
             await db_sess.flush()
 
-    async def test_direct_scope_match(
+    @pytest.fixture
+    async def permission_setup(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
+        fixture_ids: ScopeChainFixture,
+        request: pytest.FixtureRequest,
+    ) -> None:
+        scope_map: dict[str, tuple[ScopeType, str]] = {
+            "project": (ScopeType.PROJECT, fixture_ids.project_id),
+            "domain": (ScopeType.DOMAIN, fixture_ids.domain_id),
+        }
+        for scope_key, operation in request.param:
+            scope_type, scope_id = scope_map[scope_key]
+            async with db_with_rbac_tables.begin_session() as db_sess:
+                perm = PermissionRow(
+                    role_id=fixture_ids.role_id,
+                    scope_type=scope_type,
+                    scope_id=scope_id,
+                    entity_type=EntityType.VFOLDER,
+                    operation=operation,
+                )
+                db_sess.add(perm)
+                await db_sess.flush()
+
+    @pytest.mark.parametrize(
+        ("permission_setup", "check_op", "expected"),
+        [
+            pytest.param([], OperationType.READ, False, id="no-permission"),
+            pytest.param(
+                [("project", OperationType.READ)],
+                OperationType.READ,
+                True,
+                id="direct-scope-read",
+            ),
+        ],
+        indirect=["permission_setup"],
+    )
+    async def test_vfolder_auto_in_project(
+        self,
         db_source: PermissionDBSource,
         user_with_active_role: ScopeChainFixture,
         vfolder_in_project_auto: None,
+        permission_setup: None,
+        check_op: OperationType,
+        expected: bool,
     ) -> None:
-        """Permission on the direct scope of the target entity grants access."""
+        """VFOLDER in PROJECT (auto): direct scope permission checks."""
         f = user_with_active_role
-
-        # User has READ permission on VFOLDER in that PROJECT scope
-        await self._add_permission(
-            db_with_rbac_tables,
-            role_id=f.role_id,
-            scope_type=ScopeType.PROJECT,
-            scope_id=f.project_id,
-            entity_type=EntityType.VFOLDER,
-            operation=OperationType.READ,
-        )
-
         result = await db_source.check_permission_with_scope_chain(
             user_id=f.user_id,
             target_element_ref=RBACElementRef(
                 element_type=RBACElementType.VFOLDER,
                 element_id=f.vfolder_id,
             ),
-            operation=OperationType.READ,
+            operation=check_op,
         )
-        assert result is True
+        assert result is expected
 
-    async def test_no_permission_returns_false(
-        self,
-        db_source: PermissionDBSource,
-        user_with_active_role: ScopeChainFixture,
-        vfolder_in_project_auto: None,
-    ) -> None:
-        """No matching permission anywhere in the chain returns False."""
-        f = user_with_active_role
-
-        result = await db_source.check_permission_with_scope_chain(
-            user_id=f.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=f.vfolder_id,
+    @pytest.mark.parametrize(
+        ("permission_setup", "check_op", "expected"),
+        [
+            pytest.param(
+                [("domain", OperationType.UPDATE)],
+                OperationType.UPDATE,
+                True,
+                id="parent-scope-update",
             ),
-            operation=OperationType.READ,
-        )
-        assert result is False
-
-    async def test_auto_delegation_from_parent_scope(
+        ],
+        indirect=["permission_setup"],
+    )
+    async def test_vfolder_auto_chain_to_domain(
         self,
-        db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         user_with_active_role: ScopeChainFixture,
         vfolder_in_project_auto: None,
         project_in_domain_auto: None,
+        permission_setup: None,
+        check_op: OperationType,
+        expected: bool,
     ) -> None:
         """AUTO edge delegates all operations from parent scope."""
         f = user_with_active_role
-
-        # Permission granted at DOMAIN scope
-        await self._add_permission(
-            db_with_rbac_tables,
-            role_id=f.role_id,
-            scope_type=ScopeType.DOMAIN,
-            scope_id=f.domain_id,
-            entity_type=EntityType.VFOLDER,
-            operation=OperationType.UPDATE,
-        )
-
         result = await db_source.check_permission_with_scope_chain(
             user_id=f.user_id,
             target_element_ref=RBACElementRef(
                 element_type=RBACElementType.VFOLDER,
                 element_id=f.vfolder_id,
             ),
-            operation=OperationType.UPDATE,
+            operation=check_op,
         )
-        assert result is True
+        assert result is expected
 
-    async def test_ref_edge_blocks_all_operations(
+    @pytest.mark.parametrize(
+        ("permission_setup", "check_op", "expected"),
+        [
+            pytest.param(
+                [("project", OperationType.READ)],
+                OperationType.READ,
+                False,
+                id="ref-blocks-read",
+            ),
+            pytest.param(
+                [("project", OperationType.UPDATE)],
+                OperationType.UPDATE,
+                False,
+                id="ref-blocks-update",
+            ),
+        ],
+        indirect=["permission_setup"],
+    )
+    async def test_vfolder_ref_in_project(
         self,
-        db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         user_with_active_role: ScopeChainFixture,
         vfolder_in_project_ref: None,
+        permission_setup: None,
+        check_op: OperationType,
+        expected: bool,
     ) -> None:
         """REF edge is not traversed; no operation passes through."""
         f = user_with_active_role
-
-        await self._add_permission(
-            db_with_rbac_tables,
-            role_id=f.role_id,
-            scope_type=ScopeType.PROJECT,
-            scope_id=f.project_id,
-            entity_type=EntityType.VFOLDER,
-            operation=OperationType.READ,
-        )
-        await self._add_permission(
-            db_with_rbac_tables,
-            role_id=f.role_id,
-            scope_type=ScopeType.PROJECT,
-            scope_id=f.project_id,
-            entity_type=EntityType.VFOLDER,
-            operation=OperationType.UPDATE,
-        )
-
-        # READ blocked — ref edge is not part of scope chain
         result = await db_source.check_permission_with_scope_chain(
             user_id=f.user_id,
             target_element_ref=RBACElementRef(
                 element_type=RBACElementType.VFOLDER,
                 element_id=f.vfolder_id,
             ),
-            operation=OperationType.READ,
+            operation=check_op,
         )
-        assert result is False
+        assert result is expected
 
-        # CUD also blocked
-        result = await db_source.check_permission_with_scope_chain(
-            user_id=f.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=f.vfolder_id,
+    @pytest.mark.parametrize(
+        ("permission_setup", "check_op", "expected"),
+        [
+            pytest.param(
+                [("domain", OperationType.READ)],
+                OperationType.READ,
+                False,
+                id="ref-stops-chain",
             ),
-            operation=OperationType.UPDATE,
-        )
-        assert result is False
-
-    async def test_ref_edge_stops_chaining(
+        ],
+        indirect=["permission_setup"],
+    )
+    async def test_vfolder_ref_chain_to_domain(
         self,
-        db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         user_with_active_role: ScopeChainFixture,
         vfolder_in_project_ref: None,
         project_in_domain_auto: None,
+        permission_setup: None,
+        check_op: OperationType,
+        expected: bool,
     ) -> None:
         """REF edge terminates scope chain; scopes beyond REF are unreachable."""
         f = user_with_active_role
-
-        # Permission at DOMAIN scope — beyond the REF edge
-        await self._add_permission(
-            db_with_rbac_tables,
-            role_id=f.role_id,
-            scope_type=ScopeType.DOMAIN,
-            scope_id=f.domain_id,
-            entity_type=EntityType.VFOLDER,
-            operation=OperationType.READ,
-        )
-
-        # Chain stops at REF; DOMAIN scope is unreachable
         result = await db_source.check_permission_with_scope_chain(
             user_id=f.user_id,
             target_element_ref=RBACElementRef(
                 element_type=RBACElementType.VFOLDER,
                 element_id=f.vfolder_id,
             ),
-            operation=OperationType.READ,
+            operation=check_op,
         )
-        assert result is False
+        assert result is expected
 
-    async def test_inactive_role_denied(
+    @pytest.fixture
+    async def user_with_inactive_role(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
-        db_source: PermissionDBSource,
         fixture_ids: ScopeChainFixture,
-        vfolder_in_project_auto: None,
-    ) -> None:
-        """Inactive role does not grant any permission."""
-        f = fixture_ids
-
+    ) -> ScopeChainFixture:
+        """Create a user with an inactive role."""
         async with db_with_rbac_tables.begin_session() as db_sess:
             role = RoleRow(
-                id=f.role_id,
+                id=fixture_ids.role_id,
                 name="inactive-role",
                 status=RoleStatus.INACTIVE,
             )
@@ -373,21 +342,30 @@ class TestCheckPermissionWithScopeChain:
             await db_sess.flush()
 
             user_role = UserRoleRow(
-                user_id=f.user_id,
-                role_id=f.role_id,
+                user_id=fixture_ids.user_id,
+                role_id=fixture_ids.role_id,
             )
             db_sess.add(user_role)
             await db_sess.flush()
 
-        await self._add_permission(
-            db_with_rbac_tables,
-            role_id=f.role_id,
-            scope_type=ScopeType.PROJECT,
-            scope_id=f.project_id,
-            entity_type=EntityType.VFOLDER,
-            operation=OperationType.READ,
-        )
+        return fixture_ids
 
+    @pytest.mark.parametrize(
+        ("permission_setup",),
+        [
+            pytest.param([("project", OperationType.READ)], id="inactive-role-read"),
+        ],
+        indirect=["permission_setup"],
+    )
+    async def test_inactive_role_denied(
+        self,
+        db_source: PermissionDBSource,
+        user_with_inactive_role: ScopeChainFixture,
+        vfolder_in_project_auto: None,
+        permission_setup: None,
+    ) -> None:
+        """Inactive role does not grant any permission."""
+        f = user_with_inactive_role
         result = await db_source.check_permission_with_scope_chain(
             user_id=f.user_id,
             target_element_ref=RBACElementRef(
