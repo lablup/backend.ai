@@ -1450,7 +1450,7 @@ input BulkCreateUserV2Input
 }
 
 """Added in 26.3.0. Error information for a failed user in bulk purge."""
-type BulkPurgeUserError
+type BulkPurgeUserV2Error
   @join__type(graph: STRAWBERRY)
 {
   """UUID of the user that failed to purge."""
@@ -1497,7 +1497,7 @@ type BulkPurgeUsersV2Payload
   purgedCount: Int!
 
   """List of errors for users that failed to purge."""
-  failed: [BulkPurgeUserError!]!
+  failed: [BulkPurgeUserV2Error!]!
 }
 
 """Added in 26.3.0. Payload for bulk user update mutation."""

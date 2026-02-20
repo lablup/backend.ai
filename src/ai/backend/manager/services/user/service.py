@@ -287,7 +287,7 @@ class UserService:
                 await self._purge_single_user(user_uuid, action)
                 purged_user_ids.append(user_uuid)
             except Exception as e:
-                log.warning(f"Failed to purge user {user_uuid}: {e}")
+                log.error(f"Failed to purge user {user_uuid}: {e}")
                 failures.append(BulkPurgeError(user_id=user_uuid, exception=e))
 
         return BulkPurgeUserActionResult(

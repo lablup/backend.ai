@@ -931,7 +931,7 @@ type BulkCreateUsersV2Payload {
 }
 
 """Added in 26.3.0. Error information for a failed user in bulk purge."""
-type BulkPurgeUserError {
+type BulkPurgeUserV2Error {
   """UUID of the user that failed to purge."""
   userId: UUID!
 
@@ -970,7 +970,7 @@ type BulkPurgeUsersV2Payload {
   purgedCount: Int!
 
   """List of errors for users that failed to purge."""
-  failed: [BulkPurgeUserError!]!
+  failed: [BulkPurgeUserV2Error!]!
 }
 
 """

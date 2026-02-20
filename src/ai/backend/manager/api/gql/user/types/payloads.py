@@ -142,7 +142,7 @@ class PurgeUsersPayloadGQL:
 
 
 @strawberry.type(
-    name="BulkPurgeUserError",
+    name="BulkPurgeUserV2Error",
     description="Added in 26.3.0. Error information for a failed user in bulk purge.",
 )
 class BulkPurgeUserV2ErrorGQL:
