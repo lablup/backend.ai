@@ -468,7 +468,13 @@ class DeploymentService:
         self, action: SearchDeploymentPoliciesAction
     ) -> SearchDeploymentPoliciesActionResult:
         """Search deployment policies with pagination and ordering."""
-        raise NotImplementedError
+        result = await self._deployment_repository.search_deployment_policies(action.querier)
+        return SearchDeploymentPoliciesActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     # ========== Revision Operations ==========
 
