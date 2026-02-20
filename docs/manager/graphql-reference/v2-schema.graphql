@@ -1050,6 +1050,24 @@ type CancelImportArtifactPayload {
 }
 
 """
+Added in 26.3.0. Input for checking and transitioning session status. Checks the actual status of sessions and updates them accordingly.
+"""
+input CheckAndTransitSessionV2StatusInput {
+  """List of session UUIDs to check and transit."""
+  sessionIds: [UUID!]!
+}
+
+"""
+Added in 26.3.0. Payload for session status check and transition mutation.
+"""
+type CheckAndTransitSessionV2StatusPayload {
+  """
+  List of sessions whose status was checked and potentially transitioned.
+  """
+  sessions: [SessionV2!]!
+}
+
+"""
 Added in 25.14.0.
 
 Input for cleaning up stored artifact revision data.
@@ -1093,6 +1111,49 @@ enum ClusterMode {
   MULTI_NODE
 }
 
+"""Added in 26.3.0. Input for committing the current session state."""
+input CommitSessionV2Input {
+  """Name or ID of the session to commit."""
+  sessionName: String!
+
+  """Optional filename for the committed state."""
+  filename: String = null
+
+  """
+  Access key of the session owner. Required for admin operations on behalf of users.
+  """
+  ownerAccessKey: String = null
+}
+
+"""Added in 26.3.0. Payload for session commit mutation."""
+type CommitSessionV2Payload {
+  """Whether the session commit was initiated."""
+  success: Boolean!
+}
+
+"""Added in 26.3.0. Input for code auto-completion in a session."""
+input CompleteSessionV2CodeInput {
+  """Name or ID of the session."""
+  sessionName: String!
+
+  """Code text for auto-completion."""
+  code: String!
+
+  """JSON string of completion options."""
+  options: String = null
+
+  """
+  Access key of the session owner. Required for admin operations on behalf of users.
+  """
+  ownerAccessKey: String = null
+}
+
+"""Added in 26.3.0. Payload for code auto-completion in session mutation."""
+type CompleteSessionV2CodePayload {
+  """Whether code completion was successful."""
+  success: Boolean!
+}
+
 """
 Added in 26.1.0. A single compute plugin entry representing one plugin and its metadata.
 """
@@ -1130,6 +1191,26 @@ Scope for querying images within a specific container registry.
 input ContainerRegistryScope {
   """UUID of the container registry to scope the query to."""
   registryId: UUID!
+}
+
+"""Added in 26.3.0. Input for converting a session to a container image."""
+input ConvertSessionV2ToImageInput {
+  """Name or ID of the session to convert."""
+  sessionName: String!
+
+  """Name for the resulting container image."""
+  imageName: String!
+
+  """
+  Access key of the session owner. Required for admin operations on behalf of users.
+  """
+  ownerAccessKey: String = null
+}
+
+"""Added in 26.3.0. Payload for session-to-image conversion mutation."""
+type ConvertSessionV2ToImagePayload {
+  """UUID of the background task handling the conversion."""
+  taskId: UUID!
 }
 
 input CreateAccessTokenInput {
@@ -1278,6 +1359,154 @@ input CreateRoleInput {
   name: String!
   description: String = null
   source: RoleSource = null
+}
+
+"""
+Added in 26.3.0. Input for creating a cluster session. Creates a multi-node session based on a template.
+"""
+input CreateSessionV2ClusterInput {
+  """Name for the cluster session."""
+  sessionName: String!
+
+  """UUID of the session template to use."""
+  templateId: UUID!
+
+  """Type of session to create."""
+  sessionType: SessionV2Type! = INTERACTIVE
+
+  """Optional user-provided tag for the session."""
+  tag: String = null
+
+  """
+  Access key of the session owner. Required for admin operations on behalf of users.
+  """
+  ownerAccessKey: String = null
+
+  """If true, only enqueue the session without waiting for it to start."""
+  enqueueOnly: Boolean! = false
+
+  """Maximum seconds to wait for the session to be ready."""
+  maxWaitSeconds: Int! = 0
+
+  """Name of the scaling group (resource group) to use."""
+  scalingGroupName: String = null
+}
+
+"""
+Added in 26.3.0. Input for creating a session with explicit parameters. Specifies image, resources, and configuration directly.
+"""
+input CreateSessionV2FromParamsInput {
+  """Name for the new session."""
+  sessionName: String!
+
+  """Container image reference for the session."""
+  image: String!
+
+  """Type of session to create."""
+  sessionType: SessionV2Type! = INTERACTIVE
+
+  """Number of nodes in the cluster."""
+  clusterSize: Int! = 1
+
+  """Cluster mode for the session."""
+  clusterMode: ClusterMode! = SINGLE_NODE
+
+  """Optional user-provided tag for the session."""
+  tag: String = null
+
+  """Scheduling priority for the session."""
+  priority: Int! = 0
+
+  """
+  Access key of the session owner. Required for admin operations on behalf of users.
+  """
+  ownerAccessKey: String = null
+
+  """If true, only enqueue the session without waiting for it to start."""
+  enqueueOnly: Boolean! = false
+
+  """Maximum seconds to wait for the session to be ready."""
+  maxWaitSeconds: Int! = 0
+
+  """Scheduled start time for the session (ISO 8601 format)."""
+  startsAt: String = null
+
+  """Command to execute when the session starts."""
+  startupCommand: String = null
+
+  """Bootstrap script to run before the main process."""
+  bootstrapScript: String = null
+
+  """URL to call back when the session completes."""
+  callbackUrl: String = null
+
+  """
+  JSON string of additional session configuration (resources, mounts, etc.).
+  """
+  config: String = null
+}
+
+"""
+Added in 26.3.0. Input for creating a session from a predefined template. Template values can be overridden with provided fields.
+"""
+input CreateSessionV2FromTemplateInput {
+  """UUID of the session template to use."""
+  templateId: UUID!
+
+  """Override name for the session. Uses template default if not provided."""
+  sessionName: String = null
+
+  """Override container image. Uses template default if not provided."""
+  image: String = null
+
+  """Override session type. Uses template default if not provided."""
+  sessionType: SessionV2Type = null
+
+  """Override cluster size. Uses template default if not provided."""
+  clusterSize: Int = null
+
+  """Override cluster mode. Uses template default if not provided."""
+  clusterMode: ClusterMode = null
+
+  """Optional user-provided tag for the session."""
+  tag: String = null
+
+  """Override scheduling priority. Uses template default if not provided."""
+  priority: Int = null
+
+  """
+  Access key of the session owner. Required for admin operations on behalf of users.
+  """
+  ownerAccessKey: String = null
+
+  """If true, only enqueue the session without waiting for it to start."""
+  enqueueOnly: Boolean! = false
+
+  """Maximum seconds to wait for the session to be ready."""
+  maxWaitSeconds: Int! = 0
+
+  """Scheduled start time for the session (ISO 8601 format)."""
+  startsAt: String = null
+
+  """Override startup command. Uses template default if not provided."""
+  startupCommand: String = null
+
+  """Override bootstrap script. Uses template default if not provided."""
+  bootstrapScript: String = null
+
+  """URL to call back when the session completes."""
+  callbackUrl: String = null
+
+  """JSON string of additional session configuration overrides."""
+  config: String = null
+}
+
+"""
+Added in 26.3.0. Payload for session creation mutations. Shared by create-from-params, create-from-template, and create-cluster.
+"""
+type CreateSessionV2Payload {
+  """UUID of the newly created session."""
+  sessionId: UUID!
 }
 
 """
@@ -1786,6 +2015,31 @@ Added in 25.19.0. This enum represents the deployment strategy type of a model d
 enum DeploymentStrategyType {
   ROLLING
   BLUE_GREEN
+}
+
+"""
+Added in 26.3.0. Input for terminating/deleting a session. Supports forced termination and recursive deletion.
+"""
+input DestroySessionV2Input {
+  """Name or ID of the session to destroy."""
+  sessionName: String!
+
+  """If true, forcibly terminate the session without graceful shutdown."""
+  forced: Boolean! = false
+
+  """If true, recursively destroy dependent sessions."""
+  recursive: Boolean! = false
+
+  """
+  Access key of the session owner. Required for admin operations on behalf of users.
+  """
+  ownerAccessKey: String = null
+}
+
+"""Added in 26.3.0. Payload for session destruction mutation."""
+type DestroySessionV2Payload {
+  """Whether the session was successfully destroyed."""
+  success: Boolean!
 }
 
 """
@@ -2388,6 +2642,37 @@ input EnvironmentVariablesInput {
   entries: [EnvironmentVariableEntryInput!]!
 }
 
+"""
+Added in 26.3.0. Input for executing code in a session. Supports different execution modes (query, batch, input, continue).
+"""
+input ExecuteInSessionV2Input {
+  """Name or ID of the session to execute in."""
+  sessionName: String!
+
+  """Code to execute."""
+  code: String = null
+
+  """Execution mode: 'query', 'batch', 'input', or 'continue'."""
+  mode: String! = "query"
+
+  """Run ID for tracking multi-step executions."""
+  runId: String = null
+
+  """JSON string of execution options."""
+  options: String = null
+
+  """
+  Access key of the session owner. Required for admin operations on behalf of users.
+  """
+  ownerAccessKey: String = null
+}
+
+"""Added in 26.3.0. Payload for code execution in session mutation."""
+type ExecuteInSessionV2Payload {
+  """Whether the code execution was initiated."""
+  success: Boolean!
+}
+
 type ExtraVFolderMount implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -2958,6 +3243,23 @@ input IntFilter {
   lessThanOrEqual: Int = null
 }
 
+"""Added in 26.3.0. Input for interrupting a running session."""
+input InterruptSessionV2Input {
+  """Name or ID of the session to interrupt."""
+  sessionName: String!
+
+  """
+  Access key of the session owner. Required for admin operations on behalf of users.
+  """
+  ownerAccessKey: String = null
+}
+
+"""Added in 26.3.0. Payload for session interrupt mutation."""
+type InterruptSessionV2Payload {
+  """Whether the interrupt signal was successfully sent."""
+  success: Boolean!
+}
+
 """
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
 """
@@ -3406,6 +3708,26 @@ If revision is not specified, defaults to 'main' revision.
 input ModelTarget {
   modelId: String!
   revision: String = null
+}
+
+"""
+Added in 26.3.0. Input for modifying session properties (admin only). Only provided fields will be updated.
+"""
+input ModifySessionV2Input {
+  """UUID of the session to modify."""
+  sessionId: UUID!
+
+  """New name for the session."""
+  name: String = null
+
+  """New scheduling priority for the session."""
+  priority: Int = null
+}
+
+"""Added in 26.3.0. Payload for session modification mutation."""
+type ModifySessionV2Payload {
+  """The modified session."""
+  session: SessionV2!
 }
 
 type Mutation {
@@ -3900,6 +4222,69 @@ type Mutation {
 
   """Added in 26.3.0. Revoke a role from a user (admin only)."""
   adminRevokeRole(input: RevokeRoleInput!): RoleAssignment!
+
+  """
+  Added in 26.3.0. Modify session properties such as name and priority (admin only).
+  """
+  adminModifySession(input: ModifySessionV2Input!): ModifySessionV2Payload!
+
+  """
+  Added in 26.3.0. Check the actual status of sessions and transition them to the appropriate status if needed.
+  """
+  checkAndTransitSessionStatus(input: CheckAndTransitSessionV2StatusInput!): CheckAndTransitSessionV2StatusPayload!
+
+  """
+  Added in 26.3.0. Terminate and destroy a session. Supports forced termination and recursive deletion of dependent sessions.
+  """
+  destroySession(input: DestroySessionV2Input!): DestroySessionV2Payload!
+
+  """Added in 26.3.0. Restart a running or terminated session."""
+  restartSession(input: RestartSessionV2Input!): RestartSessionV2Payload!
+
+  """Added in 26.3.0. Rename an existing session."""
+  renameSession(input: RenameSessionV2Input!): RenameSessionV2Payload!
+
+  """Added in 26.3.0. Send an interrupt signal to a running session."""
+  interruptSession(input: InterruptSessionV2Input!): InterruptSessionV2Payload!
+
+  """
+  Added in 26.3.0. Execute code in a session. Supports multiple execution modes: query, batch, input, and continue.
+  """
+  executeInSession(input: ExecuteInSessionV2Input!): ExecuteInSessionV2Payload!
+
+  """Added in 26.3.0. Commit the current session state for persistence."""
+  commitSession(input: CommitSessionV2Input!): CommitSessionV2Payload!
+
+  """
+  Added in 26.3.0. Convert a session into a container image. Creates a background task for the conversion process.
+  """
+  convertSessionToImage(input: ConvertSessionV2ToImageInput!): ConvertSessionV2ToImagePayload!
+
+  """
+  Added in 26.3.0. Start an app service within a session (e.g., Jupyter, TensorBoard, SSH).
+  """
+  startSessionService(input: StartSessionV2ServiceInput!): StartSessionV2ServicePayload!
+
+  """Added in 26.3.0. Shut down an app service running within a session."""
+  shutdownSessionService(input: ShutdownSessionV2ServiceInput!): ShutdownSessionV2ServicePayload!
+
+  """Added in 26.3.0. Request code auto-completion in a session."""
+  completeSessionCode(input: CompleteSessionV2CodeInput!): CompleteSessionV2CodePayload!
+
+  """
+  Added in 26.3.0. Create a new session with explicit parameters. Specifies the image, resources, and configuration directly.
+  """
+  createSessionFromParams(input: CreateSessionV2FromParamsInput!): CreateSessionV2Payload!
+
+  """
+  Added in 26.3.0. Create a new session from a predefined template. Template values can be overridden with provided fields.
+  """
+  createSessionFromTemplate(input: CreateSessionV2FromTemplateInput!): CreateSessionV2Payload!
+
+  """
+  Added in 26.3.0. Create a cluster session with multiple nodes based on a template.
+  """
+  createSessionCluster(input: CreateSessionV2ClusterInput!): CreateSessionV2Payload!
 }
 
 """An object with a Globally Unique ID"""
@@ -5355,6 +5740,26 @@ type RejectArtifactPayload {
   artifactRevision: ArtifactRevision!
 }
 
+"""Added in 26.3.0. Input for renaming a session."""
+input RenameSessionV2Input {
+  """Current name or ID of the session."""
+  sessionName: String!
+
+  """New name for the session."""
+  newName: String!
+
+  """
+  Access key of the session owner. Required for admin operations on behalf of users.
+  """
+  ownerAccessKey: String = null
+}
+
+"""Added in 26.3.0. Payload for session rename mutation."""
+type RenameSessionV2Payload {
+  """Whether the session was successfully renamed."""
+  success: Boolean!
+}
+
 """Added in 25.19.0"""
 input ReplicaFilter {
   status: ReplicaStatusFilter = null
@@ -5753,6 +6158,23 @@ input ResourceWeightEntryInput {
   Weight multiplier for this resource type in fair share calculations. Higher weight means this resource contributes more to the normalized usage. Set to null to remove this resource type (revert to default weight 1.0). Example: 0.001 for memory (bytes) to normalize against CPU cores.
   """
   weight: Decimal = null
+}
+
+"""Added in 26.3.0. Input for restarting a session."""
+input RestartSessionV2Input {
+  """Name or ID of the session to restart."""
+  sessionName: String!
+
+  """
+  Access key of the session owner. Required for admin operations on behalf of users.
+  """
+  ownerAccessKey: String = null
+}
+
+"""Added in 26.3.0. Payload for session restart mutation."""
+type RestartSessionV2Payload {
+  """Whether the session restart was initiated."""
+  success: Boolean!
 }
 
 """
@@ -6601,6 +7023,30 @@ enum SessionV2Type {
 }
 
 """
+Added in 26.3.0. Input for shutting down an app service within a session.
+"""
+input ShutdownSessionV2ServiceInput {
+  """Name or ID of the session."""
+  sessionName: String!
+
+  """Name of the service to shut down."""
+  serviceName: String!
+
+  """
+  Access key of the session owner. Required for admin operations on behalf of users.
+  """
+  ownerAccessKey: String = null
+}
+
+"""
+Added in 26.3.0. Payload for shutting down an app service within a session.
+"""
+type ShutdownSessionV2ServicePayload {
+  """Whether the service was successfully shut down."""
+  success: Boolean!
+}
+
+"""
 Added in 25.14.0.
 
 Information about the source or registry of an artifact.
@@ -6610,6 +7056,37 @@ Contains the name and URL of the registry where the artifact is stored or origin
 type SourceInfo {
   name: String
   url: String
+}
+
+"""
+Added in 26.3.0. Input for starting an app service within a session. Services include Jupyter, TensorBoard, SSH, etc.
+"""
+input StartSessionV2ServiceInput {
+  """Name or ID of the session."""
+  sessionName: String!
+
+  """Name of the service to start (e.g., 'jupyter')."""
+  service: String!
+
+  """Optional port number for the service."""
+  port: Int = null
+
+  """JSON string of additional arguments for the service."""
+  arguments: String = null
+
+  """JSON string of environment variables for the service."""
+  envs: String = null
+
+  """
+  Access key of the session owner. Required for admin operations on behalf of users.
+  """
+  ownerAccessKey: String = null
+}
+
+"""Added in 26.3.0. Payload for starting an app service within a session."""
+type StartSessionV2ServicePayload {
+  """Whether the service was successfully started."""
+  success: Boolean!
 }
 
 """
