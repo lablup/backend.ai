@@ -142,7 +142,10 @@ class PermissionGQL(Node):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        raise NotImplementedError
+        results = await info.context.data_loaders.permission_loader.load_many([
+            uuid.UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_dataclass(data) if data is not None else None for data in results]
 
     @strawberry.field(description="The role this permission belongs to.")  # type: ignore[misc]
     async def role(
@@ -154,7 +157,12 @@ class PermissionGQL(Node):
         ]
         | None
     ):
-        raise NotImplementedError
+        from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
+
+        data = await info.context.data_loaders.role_loader.load(self.role_id)
+        if data is None:
+            return None
+        return RoleGQL.from_dataclass(data)
 
     @strawberry.field(  # type: ignore[misc]
         description="The scope this permission applies to."
@@ -164,7 +172,77 @@ class PermissionGQL(Node):
         *,
         info: Info[StrawberryGQLContext],
     ) -> EntityNode | None:
-        raise NotImplementedError
+        from ai.backend.manager.api.gql.artifact.types import ArtifactRevision
+        from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
+        from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+        from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+        from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
+        from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
+        from ai.backend.manager.api.gql.user.types.node import UserV2GQL
+
+        element_type = self.scope_type.to_element()
+        data_loaders = info.context.data_loaders
+        match element_type:
+            case RBACElementType.USER:
+                user_data = await data_loaders.user_loader.load(uuid.UUID(self.scope_id))
+                if user_data is None:
+                    return None
+                return UserV2GQL.from_data(user_data)
+            case RBACElementType.PROJECT:
+                project_data = await data_loaders.project_loader.load(uuid.UUID(self.scope_id))
+                if project_data is None:
+                    return None
+                return ProjectV2GQL.from_data(project_data)
+            case RBACElementType.DOMAIN:
+                domain_data = await data_loaders.domain_loader.load(self.scope_id)
+                if domain_data is None:
+                    return None
+                return DomainV2GQL.from_data(domain_data)
+            case RBACElementType.ROLE:
+                role_data = await data_loaders.role_loader.load(uuid.UUID(self.scope_id))
+                if role_data is None:
+                    return None
+                return RoleGQL.from_dataclass(role_data)
+            case RBACElementType.RESOURCE_GROUP:
+                rg_data = await data_loaders.resource_group_loader.load(self.scope_id)
+                if rg_data is None:
+                    return None
+                return ResourceGroupGQL.from_dataclass(rg_data)
+            case RBACElementType.MODEL_DEPLOYMENT:
+                deploy_data = await data_loaders.deployment_loader.load(uuid.UUID(self.scope_id))
+                if deploy_data is None:
+                    return None
+                return ModelDeployment.from_dataclass(deploy_data)
+            case RBACElementType.ARTIFACT_REVISION:
+                rev_data = await data_loaders.artifact_revision_loader.load(
+                    uuid.UUID(self.scope_id)
+                )
+                if rev_data is None:
+                    return None
+                return ArtifactRevision.from_dataclass(rev_data)
+            case (
+                RBACElementType.SESSION
+                | RBACElementType.VFOLDER
+                | RBACElementType.DEPLOYMENT
+                | RBACElementType.KEYPAIR
+                | RBACElementType.NOTIFICATION_CHANNEL
+                | RBACElementType.NETWORK
+                | RBACElementType.CONTAINER_REGISTRY
+                | RBACElementType.STORAGE_HOST
+                | RBACElementType.IMAGE
+                | RBACElementType.ARTIFACT
+                | RBACElementType.ARTIFACT_REGISTRY
+                | RBACElementType.SESSION_TEMPLATE
+                | RBACElementType.APP_CONFIG
+                | RBACElementType.RESOURCE_PRESET
+                | RBACElementType.USER_RESOURCE_POLICY
+                | RBACElementType.KEYPAIR_RESOURCE_POLICY
+                | RBACElementType.PROJECT_RESOURCE_POLICY
+                | RBACElementType.AUDIT_LOG
+                | RBACElementType.EVENT_LOG
+                | RBACElementType.NOTIFICATION_RULE
+            ):
+                return None
 
     @classmethod
     def from_dataclass(cls, data: PermissionData) -> Self:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import strawberry
 from strawberry import Info
 
+from ai.backend.manager.api.gql.rbac.fetcher.entity import fetch_entities
 from ai.backend.manager.api.gql.rbac.types import (
     EntityConnection,
     EntityFilter,
@@ -28,4 +29,14 @@ async def admin_entities(
     offset: int | None = None,
 ) -> EntityConnection:
     """Search entity associations with filtering, ordering, and pagination."""
-    raise NotImplementedError
+    return await fetch_entities(
+        info,
+        filter=filter,
+        order_by=order_by,
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
+    )
