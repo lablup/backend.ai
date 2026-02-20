@@ -58,12 +58,38 @@ class BulkCreateUsersPayloadGQL:
 
 @strawberry.type(
     name="UpdateUserV2Payload",
-    description="Added in 26.2.0. Payload for user update mutation.",
+    description="Added in 26.3.0. Payload for user update mutation.",
 )
 class UpdateUserPayloadGQL:
     """Payload for user update."""
 
     user: UserV2GQL = strawberry.field(description="The updated user.")
+
+
+@strawberry.type(
+    name="BulkUpdateUserError",
+    description="Added in 26.3.0. Error information for a failed user in bulk update.",
+)
+class BulkUpdateUserV2ErrorGQL:
+    """Error information for a single user that failed during bulk update."""
+
+    user_id: UUID = strawberry.field(description="UUID of the user that failed to update.")
+    message: str = strawberry.field(description="Error message describing the failure.")
+
+
+@strawberry.type(
+    name="BulkUpdateUsersV2Payload",
+    description="Added in 26.3.0. Payload for bulk user update mutation.",
+)
+class BulkUpdateUsersV2PayloadGQL:
+    """Payload for bulk user update."""
+
+    updated_users: list[UserV2GQL] = strawberry.field(
+        description="List of successfully updated users."
+    )
+    failed: list[BulkUpdateUserV2ErrorGQL] = strawberry.field(
+        description="List of errors for users that failed to update."
+    )
 
 
 # Delete User Payloads
