@@ -978,7 +978,7 @@ class ExtraMountInput(graphene.InputObjectType):  # type: ignore[misc]
         description=f"Added in 24.03.4. Set permission of this mount. Should be one of ({','.join([perm.value for perm in MountPermission])}). Default is null"
     )
     subpath = graphene.String(
-        description="Added in 25.4.0. Subpath within the vfolder to mount. Default is root ('.')."
+        description="Added in 26.3.0. Subpath within the vfolder to mount. Default is root ('.')."
     )
 
     def to_action_field(self, info: graphene.ResolveInfo) -> ExtraMount:

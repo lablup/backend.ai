@@ -4319,6 +4319,7 @@ type ExtraVFolderMount implements Node
   """The Globally Unique ID of this object"""
   id: ID!
   mountDestination: String!
+  subpath: String!
   vfolder: VirtualFolderNode!
 }
 
@@ -4351,6 +4352,7 @@ input ExtraVFolderMountInput
 {
   vfolderId: ID!
   mountDestination: String
+  subpath: String = null
 }
 
 """
