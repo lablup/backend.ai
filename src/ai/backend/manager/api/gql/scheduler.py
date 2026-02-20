@@ -18,7 +18,7 @@ from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.errors.kernel import InvalidSessionId
 
-from .session import Session
+from .session_federation import Session
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.types import StrawberryGQLContext
