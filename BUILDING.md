@@ -51,7 +51,8 @@ All development commands use `pants` instead of `pip`, `poetry`, or `uv`.
 
 ### Git Pre-commit Hook (`scripts/pre-commit.sh`)
 - Runs on every `git commit`
-- Validates: `pants lint`, `pants check` on changed files
+- Validates: `pants fmt`, `pants lint` on changed files (fast local feedback)
+- Type checking and tests are handled by CI (`ci.yml` lint-and-typecheck + test jobs)
 - Bypass with `git commit --no-verify` for WIP commits (never on main/release branches)
 
 ## Running Pants Commands

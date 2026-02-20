@@ -25,33 +25,19 @@ fi
 
 EXIT_CODE=0
 
-# 1. Linting
 echo "Running pre-commit checks..."
+
+# 1. Auto-format
+echo "✓ Formatting..."
+if ! pants fmt --changed-since="HEAD"; then
+  echo "❌ Formatting failed"
+  EXIT_CODE=1
+fi
+
+# 2. Linting
 echo "✓ Linting..."
-
-if ! pants lint --changed-since="HEAD" --changed-dependents=transitive; then
+if ! pants lint --changed-since="HEAD"; then
   echo "❌ Linting failed"
-  EXIT_CODE=1
-fi
-
-# 2. Type checking
-echo "✓ Type checking..."
-if ! pants check --changed-since="HEAD" --changed-dependents=transitive; then
-  echo "❌ Type checking failed"
-  EXIT_CODE=1
-fi
-
-# 3. BUILD files check
-echo "✓ Checking BUILD files..."
-if ! pants tailor --check; then
-  echo "❌ BUILD files out of date. Run 'pants tailor' to fix."
-  EXIT_CODE=1
-fi
-
-# 4. Direct tests (only tests that were directly changed)
-echo "✓ Testing changed files..."
-if ! pants test --changed-since="HEAD"; then
-  echo "❌ Tests failed"
   EXIT_CODE=1
 fi
 
