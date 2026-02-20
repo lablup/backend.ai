@@ -7,6 +7,10 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
+from ai.backend.common.data.permission.types import (
+    RBACElementType,
+    RelationType,
+)
 from ai.backend.manager.data.permission.entity import (
     ElementAssociationListResult,
     EntityData,
@@ -32,6 +36,7 @@ from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
 from ai.backend.manager.data.permission.types import (
+    EntityType,
     OperationType,
     ScopeData,
     ScopeListResult,
@@ -805,3 +810,121 @@ class PermissionDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    @staticmethod
+    def _build_scope_chain_cte(
+        target_entity_type: EntityType,
+        target_entity_id: str,
+    ) -> sa.CTE:
+        """Build a recursive CTE that walks the scope chain upward.
+
+        Starting from the target entity, traverses association_scopes_entities
+        to find all ancestor scopes. Each row carries a ``has_ref_on_path``
+        flag that is True when any edge on the path from the target was REF.
+
+        Uses UNION (not UNION ALL) to prevent infinite recursion on cycles.
+        """
+        ase = AssociationScopesEntitiesRow.__table__
+
+        # Base case: direct scope entries for the target entity.
+        scope_chain_base = sa.select(
+            ase.c.scope_type,
+            ase.c.scope_id,
+            sa.cast(
+                ase.c.relation_type == RelationType.REF,
+                sa.Boolean,
+            ).label("has_ref_on_path"),
+        ).where(
+            sa.and_(
+                ase.c.entity_type == target_entity_type,
+                ase.c.entity_id == target_entity_id,
+            )
+        )
+        scope_chain_cte = scope_chain_base.cte("scope_chain", recursive=True)
+
+        # Recursive case: walk parent scopes upward.
+        parent = ase.alias("parent")
+        scope_chain_recursive = sa.select(
+            parent.c.scope_type,
+            parent.c.scope_id,
+            sa.cast(
+                sa.or_(
+                    scope_chain_cte.c.has_ref_on_path,
+                    parent.c.relation_type == RelationType.REF,
+                ),
+                sa.Boolean,
+            ).label("has_ref_on_path"),
+        ).select_from(
+            parent.join(
+                scope_chain_cte,
+                sa.and_(
+                    parent.c.entity_type == scope_chain_cte.c.scope_type,
+                    parent.c.entity_id == scope_chain_cte.c.scope_id,
+                ),
+            )
+        )
+        return scope_chain_cte.union(scope_chain_recursive)
+
+    async def check_permission_with_scope_chain(
+        self,
+        user_id: uuid.UUID,
+        target_element_type: RBACElementType,
+        target_element_id: str,
+        operation: OperationType,
+    ) -> bool:
+        """CTE-based permission check that traverses the scope chain.
+
+        1. Entity-scope direct match (priority)
+        2. Walk association_scopes_entities upward (CTE recursive query)
+           - auto edges: full operation delegation
+           - ref edges: READ-only (block CUD)
+        """
+        permissions = PermissionRow.__table__
+        user_roles = UserRoleRow.__table__
+        roles = RoleRow.__table__
+
+        target_entity_type = target_element_type.to_entity_type()
+        scope_chain_cte = self._build_scope_chain_cte(target_entity_type, target_element_id)
+
+        # Check if any scope in the chain grants the requested permission.
+        # If any edge on the path was REF, only READ operations pass through.
+        scope_chain_permission_query = (
+            sa.select(sa.literal(1))
+            .select_from(
+                scope_chain_cte.join(
+                    permissions,
+                    sa.and_(
+                        permissions.c.scope_type == scope_chain_cte.c.scope_type,
+                        permissions.c.scope_id == scope_chain_cte.c.scope_id,
+                    ),
+                )
+                .join(
+                    roles,
+                    roles.c.id == permissions.c.role_id,
+                )
+                .join(
+                    user_roles,
+                    user_roles.c.role_id == roles.c.id,
+                )
+            )
+            .where(
+                sa.and_(
+                    user_roles.c.user_id == user_id,
+                    roles.c.status == RoleStatus.ACTIVE,
+                    permissions.c.entity_type == target_entity_type,
+                    permissions.c.operation == operation,
+                    # ref edge limitation: if any edge on path was ref, only READ passes
+                    sa.or_(
+                        scope_chain_cte.c.has_ref_on_path == sa.false(),
+                        permissions.c.operation == OperationType.READ,
+                    ),
+                )
+            )
+            .limit(1)
+        )
+
+        combined_query = sa.select(sa.exists(scope_chain_permission_query))
+
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            result = await db_session.scalar(combined_query)
+            return result or False

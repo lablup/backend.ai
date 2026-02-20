@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping
 
-from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID
+from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, OperationType, RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -328,3 +328,24 @@ class PermissionControllerRepository:
             ElementAssociationListResult with full association row data.
         """
         return await self._db_source.search_element_associations_in_scope(querier)
+
+    @permission_controller_repository_resilience.apply()
+    async def check_permission_with_scope_chain(
+        self,
+        user_id: uuid.UUID,
+        target_element_type: RBACElementType,
+        target_element_id: str,
+        operation: OperationType,
+    ) -> bool:
+        """CTE-based permission check that traverses the scope chain.
+
+        Walks the association_scopes_entities hierarchy upward from the target
+        entity, checking if the user has the requested operation at any ancestor
+        scope. Also checks GLOBAL scope as a fallback.
+        """
+        return await self._db_source.check_permission_with_scope_chain(
+            user_id=user_id,
+            target_element_type=target_element_type,
+            target_element_id=target_element_id,
+            operation=operation,
+        )
