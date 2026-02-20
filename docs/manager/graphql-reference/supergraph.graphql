@@ -1449,28 +1449,6 @@ input BulkCreateUserV2Input
   users: [CreateUserV2Input!]!
 }
 
-"""Added in 26.3.0. Error information for a failed user in bulk purge."""
-type BulkPurgeUserV2Error
-  @join__type(graph: STRAWBERRY)
-{
-  """UUID of the user that failed to purge."""
-  userId: UUID!
-
-  """Error message describing the failure."""
-  message: String!
-}
-
-"""Added in 26.3.0. Error information for a failed user in bulk update."""
-type BulkUpdateUserError
-  @join__type(graph: STRAWBERRY)
-{
-  """UUID of the user that failed to update."""
-  userId: UUID!
-
-  """Error message describing the failure."""
-  message: String!
-}
-
 """
 Added in 26.3.0. Input for permanently deleting multiple users. This action is irreversible.
 """
@@ -1498,6 +1476,28 @@ type BulkPurgeUsersV2Payload
 
   """List of errors for users that failed to purge."""
   failed: [BulkPurgeUserV2Error!]!
+}
+
+"""Added in 26.3.0. Error information for a failed user in bulk purge."""
+type BulkPurgeUserV2Error
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the user that failed to purge."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""Added in 26.3.0. Error information for a failed user in bulk update."""
+type BulkUpdateUserError
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the user that failed to update."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
 }
 
 """Added in 26.3.0. Payload for bulk user update mutation."""
