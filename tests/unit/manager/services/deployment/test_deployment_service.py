@@ -13,9 +13,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.manager.data.deployment.types import DeploymentPolicySearchResult
-from ai.backend.manager.models.deployment_policy import (
+from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
+    DeploymentPolicySearchResult,
     RollingUpdateSpec,
 )
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination

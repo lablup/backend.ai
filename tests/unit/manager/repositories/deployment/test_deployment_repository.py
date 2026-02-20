@@ -31,7 +31,10 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
+    BlueGreenSpec,
+    DeploymentPolicyData,
     ModelRevisionData,
+    RollingUpdateSpec,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -44,12 +47,7 @@ from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyData,
     DeploymentAutoScalingPolicyRow,
 )
-from ai.backend.manager.models.deployment_policy import (
-    BlueGreenSpec,
-    DeploymentPolicyData,
-    DeploymentPolicyRow,
-    RollingUpdateSpec,
-)
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
@@ -2817,6 +2815,8 @@ class TestSearchDeploymentPolicies:
 
         assert len(result.items) == 2
         assert result.total_count == 4
+        assert result.has_next_page is True
+        assert result.has_previous_page is False
 
     async def test_search_second_page(
         self,
@@ -2833,6 +2833,8 @@ class TestSearchDeploymentPolicies:
 
         assert len(result.items) == 2
         assert result.total_count == 4
+        assert result.has_next_page is False
+        assert result.has_previous_page is True
 
     # =========================================================================
     # Tests - Search with filtering

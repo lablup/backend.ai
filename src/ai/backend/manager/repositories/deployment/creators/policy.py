@@ -7,11 +7,8 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.manager.models.deployment_policy import (
-    BlueGreenSpec,
-    DeploymentPolicyRow,
-    RollingUpdateSpec,
-)
+from ai.backend.manager.data.deployment.types import BlueGreenSpec, RollingUpdateSpec
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.repositories.base import CreatorSpec
 
 

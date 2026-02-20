@@ -5,6 +5,7 @@ from uuid import UUID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment.types import (
+    BlueGreenSpec,
     DeploymentMetadata,
     DeploymentNetworkSpec,
     ExecutionSpec,
@@ -14,9 +15,9 @@ from ai.backend.manager.data.deployment.types import (
     MountInfo,
     ReplicaSpec,
     ResourceSpec,
+    RollingUpdateSpec,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
 
 @dataclass

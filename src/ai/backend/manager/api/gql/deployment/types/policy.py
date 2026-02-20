@@ -10,12 +10,12 @@ from strawberry import ID
 from strawberry.relay import Node, NodeID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.manager.errors.deployment import InvalidDeploymentStrategySpec
-from ai.backend.manager.models.deployment_policy import (
+from ai.backend.manager.data.deployment.types import (
     BlueGreenSpec,
     DeploymentPolicyData,
     RollingUpdateSpec,
 )
+from ai.backend.manager.errors.deployment import InvalidDeploymentStrategySpec
 
 # Enum defined here to avoid circular import with deployment.py
 DeploymentStrategyTypeGQL: type[DeploymentStrategy] = strawberry.enum(
