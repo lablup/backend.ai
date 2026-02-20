@@ -47,6 +47,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
+    DeploymentPolicySearchResult,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
@@ -1218,19 +1219,19 @@ class DeploymentRepository:
         return await self._db_source.delete_deployment_policy(purger)
 
     @deployment_repository_resilience.apply()
-    async def fetch_deployment_policies_by_endpoint_ids(
+    async def search_deployment_policies(
         self,
-        endpoint_ids: set[uuid.UUID],
-    ) -> Mapping[uuid.UUID, DeploymentPolicyData]:
-        """Fetch deployment policies for multiple endpoints.
+        querier: BatchQuerier,
+    ) -> DeploymentPolicySearchResult:
+        """Search deployment policies with pagination and filtering.
 
         Args:
-            endpoint_ids: Set of endpoint IDs to fetch policies for.
+            querier: BatchQuerier containing conditions, orders, and pagination.
 
         Returns:
-            Mapping of endpoint_id to DeploymentPolicyData.
+            DeploymentPolicySearchResult with items, total_count, and pagination info.
         """
-        return await self._db_source.fetch_deployment_policies_by_endpoint_ids(endpoint_ids)
+        return await self._db_source.search_deployment_policies(querier)
 
     @deployment_repository_resilience.apply()
     async def complete_rolling_update_bulk(

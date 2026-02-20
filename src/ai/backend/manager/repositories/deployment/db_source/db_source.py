@@ -43,6 +43,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
+    DeploymentPolicySearchResult,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
@@ -2258,28 +2259,33 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             return await execute_purger(db_sess, purger)
 
-    async def fetch_deployment_policies_by_endpoint_ids(
+    async def search_deployment_policies(
         self,
-        endpoint_ids: set[uuid.UUID],
-    ) -> Mapping[uuid.UUID, DeploymentPolicyData]:
-        """Fetch deployment policies for multiple endpoints.
+        querier: BatchQuerier,
+    ) -> DeploymentPolicySearchResult:
+        """Search deployment policies with pagination and filtering.
 
         Args:
-            endpoint_ids: Set of endpoint IDs to fetch policies for.
+            querier: BatchQuerier containing conditions, orders, and pagination.
 
         Returns:
-            Mapping of endpoint_id to DeploymentPolicyData.
-            Endpoints without policies are omitted.
+            DeploymentPolicySearchResult with items, total_count, and pagination info.
         """
-        if not endpoint_ids:
-            return {}
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(DeploymentPolicyRow).where(
-                DeploymentPolicyRow.endpoint.in_(endpoint_ids)
+            query = sa.select(DeploymentPolicyRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
             )
-            result = await db_sess.execute(query)
-            rows = result.scalars().all()
-            return {row.endpoint: row.to_data() for row in rows}
+
+            return DeploymentPolicySearchResult(
+                items=[row.to_data() for row in result.rows],
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     async def complete_rolling_update_bulk(
         self,

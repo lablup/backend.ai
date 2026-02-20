@@ -6,6 +6,8 @@ from collections.abc import Coroutine, Mapping, Sequence
 from typing import Any, cast
 from uuid import UUID
 
+import sqlalchemy as sa
+
 from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
@@ -41,10 +43,11 @@ from ai.backend.manager.errors.deployment import (
 from ai.backend.manager.errors.service import ModelDefinitionNotFound
 from ai.backend.manager.models.deployment_policy import (
     DeploymentPolicyData,
+    DeploymentPolicyRow,
     RollingUpdateSpec,
 )
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, NoPagination
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment.creators import (
     RouteBatchUpdaterSpec,
@@ -703,9 +706,19 @@ class DeploymentExecutor:
                 )
 
             with DeploymentRecorderContext.shared_step("load_deployment_policies"):
-                policy_map = await self._deployment_repo.fetch_deployment_policies_by_endpoint_ids(
-                    endpoint_ids
+
+                def _by_endpoint_ids() -> sa.sql.expression.ColumnElement[bool]:
+                    return DeploymentPolicyRow.endpoint.in_(endpoint_ids)
+
+                search_result = await self._deployment_repo.search_deployment_policies(
+                    BatchQuerier(
+                        pagination=NoPagination(),
+                        conditions=[_by_endpoint_ids],
+                    )
                 )
+                policy_map: Mapping[UUID, DeploymentPolicyData] = {
+                    item.endpoint: item for item in search_result.items
+                }
 
         scale_out_creators: list[Creator[RoutingRow]] = []
         scale_in_route_ids: list[UUID] = []
