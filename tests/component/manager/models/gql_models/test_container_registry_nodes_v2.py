@@ -11,6 +11,9 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext, Mutation, Query
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.container_registry.db_source.db_source import (
+    ContainerRegistryDBSource,
+)
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -83,9 +86,8 @@ def client() -> Client:
 def container_registry_processor(
     extra_fixtures: dict[str, Any], database_fixture: None, database_engine: ExtendedAsyncSAEngine
 ) -> ContainerRegistryProcessors:
-    repository = ContainerRegistryRepository(
-        db=database_engine,
-    )
+    db_source = ContainerRegistryDBSource(database_engine)
+    repository = ContainerRegistryRepository(db_source)
     container_registry_service = ContainerRegistryService(
         db=database_engine,
         container_registry_repository=repository,
