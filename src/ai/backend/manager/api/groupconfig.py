@@ -4,30 +4,17 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
 import aiohttp_cors
-import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 
-from ai.backend.common import msgpack
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.errors.resource import ProjectNotFound
-from ai.backend.manager.errors.storage import (
-    DotfileAlreadyExists,
-    DotfileCreationFailed,
-    DotfileNotFound,
-)
-from ai.backend.manager.models.domain import MAXIMUM_DOTFILE_SIZE, verify_dotfile_name
-from ai.backend.manager.models.group import (
-    association_groups_users as agus,
-)
-from ai.backend.manager.models.group import (
-    groups,
-    query_group_domain,
-    query_group_dotfiles,
-)
+from ai.backend.manager.models.domain import MAXIMUM_DOTFILE_SIZE
+from ai.backend.manager.services.group_config.actions.create_dotfile import CreateDotfileAction
+from ai.backend.manager.services.group_config.actions.delete_dotfile import DeleteDotfileAction
+from ai.backend.manager.services.group_config.actions.get_dotfile import GetDotfileAction
+from ai.backend.manager.services.group_config.actions.list_dotfiles import ListDotfilesAction
+from ai.backend.manager.services.group_config.actions.update_dotfile import UpdateDotfileAction
 
 from .auth import admin_required, auth_required
 from .manager import READ_ALLOWED, server_status_required
@@ -56,54 +43,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 async def create(request: web.Request, params: Any) -> web.Response:
     log.info("GROUPCONFIG.CREATE_DOTFILE (group: {0})", params["group"])
     root_ctx: RootContext = request.app["_root.context"]
-    group_id_or_name = params["group"]
-    async with root_ctx.db.begin() as conn:
-        if isinstance(group_id_or_name, str):
-            if params["domain"] is None:
-                raise InvalidAPIParameters("Missing parameter 'domain'")
 
-            query = (
-                sa.select(groups.c.id)
-                .select_from(groups)
-                .where(groups.c.domain_name == params["domain"])
-                .where(groups.c.name == group_id_or_name)
-            )
-            group_id = await conn.scalar(query)
-            domain = params["domain"]
-        else:
-            group_id = group_id_or_name
-            # if group UUID is given, override input domain
-            domain = await query_group_domain(conn, group_id)
-        if group_id is None or domain is None:
-            raise ProjectNotFound
-        if not request["is_superadmin"] and request["user"]["domain_name"] != domain:
-            raise GenericForbidden("Admins cannot create group dotfiles of other domains")
-
-        dotfiles, leftover_space = await query_group_dotfiles(conn, group_id)
-        if dotfiles is None:
-            raise ProjectNotFound
-        if leftover_space == 0:
-            raise DotfileCreationFailed("No leftover space for dotfile storage")
-        if len(dotfiles) == 100:
-            raise DotfileCreationFailed("Dotfile creation limit reached")
-        if not verify_dotfile_name(params["path"]):
-            raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
-
-        duplicate = [x for x in dotfiles if x["path"] == params["path"]]
-        if len(duplicate) > 0:
-            raise DotfileAlreadyExists
-        new_dotfiles = list(dotfiles)
-        new_dotfiles.append({
-            "path": params["path"],
-            "perm": params["permission"],
-            "data": params["data"],
-        })
-        dotfile_packed = msgpack.packb(new_dotfiles)
-        if len(dotfile_packed) > MAXIMUM_DOTFILE_SIZE:
-            raise DotfileCreationFailed("No leftover space for dotfile storage")
-
-        query = groups.update().values(dotfiles=dotfile_packed).where(groups.c.id == group_id)
-        await conn.execute(query)
+    action = CreateDotfileAction(
+        group_id_or_name=params["group"],
+        domain_name=params["domain"],
+        path=params["path"],
+        data=params["data"],
+        permission=params["permission"],
+    )
+    await root_ctx.processors.group_config.create_dotfile.wait_for_complete(action)
     return web.json_response({})
 
 
@@ -119,61 +67,35 @@ async def create(request: web.Request, params: Any) -> web.Response:
 async def list_or_get(request: web.Request, params: Any) -> web.Response:
     log.info("GROUPCONFIG.LIST_OR_GET_DOTFILE (group: {0})", params["group"])
     root_ctx: RootContext = request.app["_root.context"]
-    resp = []
-    group_id_or_name = params["group"]
-    async with root_ctx.db.begin() as conn:
-        if isinstance(group_id_or_name, str):
-            if params["domain"] is None:
-                raise InvalidAPIParameters("Missing parameter 'domain'")
-            query = (
-                sa.select(groups.c.id)
-                .select_from(groups)
-                .where(groups.c.domain_name == params["domain"])
-                .where(groups.c.name == group_id_or_name)
-            )
-            group_id = await conn.scalar(query)
-            domain = params["domain"]
-        else:
-            group_id = group_id_or_name
-            domain = await query_group_domain(conn, group_id)
-        if group_id is None or domain is None:
-            raise ProjectNotFound
-        if not request["is_superadmin"]:
-            if request["is_admin"]:
-                if request["user"]["domain_name"] != domain:
-                    raise GenericForbidden(
-                        "Domain admins cannot access group dotfiles of other domains"
-                    )
-            else:
-                # check if user (non-admin) is in the group
-                query = (
-                    sa.select(agus.c.group_id)
-                    .select_from(agus)
-                    .where(agus.c.user_id == request["user"]["uuid"])
-                )
-                result = await conn.execute(query)
-                rows = result.fetchall()
-                if group_id not in map(lambda x: x.group_id, rows):
-                    raise GenericForbidden("Users cannot access group dotfiles of other groups")
 
-        if params["path"]:
-            dotfiles, _ = await query_group_dotfiles(conn, group_id)
-            if dotfiles is None:
-                raise ProjectNotFound
-            for dotfile in dotfiles:
-                if dotfile["path"] == params["path"]:
-                    return web.json_response(dotfile)
-            raise DotfileNotFound
-        dotfiles, _ = await query_group_dotfiles(conn, group_id)
-        if dotfiles is None:
-            raise ProjectNotFound
-        for entry in dotfiles:
-            resp.append({
-                "path": entry["path"],
-                "permission": entry["perm"],
-                "data": entry["data"],
-            })
-        return web.json_response(resp)
+    if params["path"]:
+        get_action = GetDotfileAction(
+            group_id_or_name=params["group"],
+            domain_name=params["domain"],
+            path=params["path"],
+        )
+        get_result = await root_ctx.processors.group_config.get_dotfile.wait_for_complete(
+            get_action
+        )
+        return web.json_response(get_result.dotfile)
+
+    list_action = ListDotfilesAction(
+        group_id_or_name=params["group"],
+        domain_name=params["domain"],
+    )
+    list_result = await root_ctx.processors.group_config.list_dotfiles.wait_for_complete(
+        list_action
+    )
+    # Transform response format for API compatibility
+    resp = [
+        {
+            "path": entry["path"],
+            "permission": entry["perm"],
+            "data": entry["data"],
+        }
+        for entry in list_result.dotfiles
+    ]
+    return web.json_response(resp)
 
 
 @server_status_required(READ_ALLOWED)
@@ -192,45 +114,15 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
 async def update(request: web.Request, params: Any) -> web.Response:
     log.info("GROUPCONFIG.UPDATE_DOTFILE (domain:{0})", params["domain"])
     root_ctx: RootContext = request.app["_root.context"]
-    group_id_or_name = params["group"]
-    async with root_ctx.db.begin() as conn:
-        if isinstance(group_id_or_name, str):
-            if params["domain"] is None:
-                raise InvalidAPIParameters("Missing parameter 'domain'")
-            query = (
-                sa.select(groups.c.id)
-                .select_from(groups)
-                .where(groups.c.domain_name == params["domain"])
-                .where(groups.c.name == group_id_or_name)
-            )
-            group_id = await conn.scalar(query)
-            domain = params["domain"]
-        else:
-            group_id = group_id_or_name
-            domain = await query_group_domain(conn, group_id)
-        if group_id is None or domain is None:
-            raise ProjectNotFound
-        if not request["is_superadmin"] and request["user"]["domain_name"] != domain:
-            raise GenericForbidden("Admins cannot update group dotfiles of other domains")
 
-        dotfiles, _ = await query_group_dotfiles(conn, group_id)
-        if dotfiles is None:
-            raise ProjectNotFound
-        new_dotfiles = [x for x in dotfiles if x["path"] != params["path"]]
-        if len(new_dotfiles) == len(dotfiles):
-            raise DotfileNotFound
-
-        new_dotfiles.append({
-            "path": params["path"],
-            "perm": params["permission"],
-            "data": params["data"],
-        })
-        dotfile_packed = msgpack.packb(new_dotfiles)
-        if len(dotfile_packed) > MAXIMUM_DOTFILE_SIZE:
-            raise DotfileCreationFailed("No leftover space for dotfile storage")
-
-        query = groups.update().values(dotfiles=dotfile_packed).where(groups.c.id == group_id)
-        await conn.execute(query)
+    action = UpdateDotfileAction(
+        group_id_or_name=params["group"],
+        domain_name=params["domain"],
+        path=params["path"],
+        data=params["data"],
+        permission=params["permission"],
+    )
+    await root_ctx.processors.group_config.update_dotfile.wait_for_complete(action)
     return web.json_response({})
 
 
@@ -246,38 +138,14 @@ async def update(request: web.Request, params: Any) -> web.Response:
 async def delete(request: web.Request, params: Any) -> web.Response:
     log.info("GROUPCONFIG.DELETE_DOTFILE (domain:{0})", params["domain"])
     root_ctx: RootContext = request.app["_root.context"]
-    group_id_or_name = params["group"]
-    async with root_ctx.db.begin() as conn:
-        if isinstance(group_id_or_name, str):
-            if params["domain"] is None:
-                raise InvalidAPIParameters("Missing parameter 'domain'")
-            query = (
-                sa.select(groups.c.id)
-                .select_from(groups)
-                .where(groups.c.domain_name == params["domain"])
-                .where(groups.c.name == group_id_or_name)
-            )
-            group_id = await conn.scalar(query)
-            domain = params["domain"]
-        else:
-            group_id = group_id_or_name
-            domain = await query_group_domain(conn, group_id)
-        if group_id is None or domain is None:
-            raise ProjectNotFound
-        if not request["is_superadmin"] and request["user"]["domain_name"] != domain:
-            raise GenericForbidden("Admins cannot delete dotfiles of other domains")
 
-        dotfiles, _ = await query_group_dotfiles(conn, group_id)
-        if dotfiles is None:
-            raise DotfileNotFound
-        new_dotfiles = [x for x in dotfiles if x["path"] != params["path"]]
-        if len(new_dotfiles) == len(dotfiles):
-            raise DotfileNotFound
-
-        dotfile_packed = msgpack.packb(new_dotfiles)
-        query = groups.update().values(dotfiles=dotfile_packed).where(groups.c.id == group_id)
-        await conn.execute(query)
-        return web.json_response({"success": True})
+    action = DeleteDotfileAction(
+        group_id_or_name=params["group"],
+        domain_name=params["domain"],
+        path=params["path"],
+    )
+    result = await root_ctx.processors.group_config.delete_dotfile.wait_for_complete(action)
+    return web.json_response({"success": result.success})
 
 
 async def init(app: web.Application) -> None:
