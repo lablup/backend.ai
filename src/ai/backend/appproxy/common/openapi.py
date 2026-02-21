@@ -1,3 +1,4 @@
+import inspect
 import sys
 import textwrap
 from collections import defaultdict
@@ -8,6 +9,7 @@ from aiohttp.web_urldispatcher import AbstractResource, DynamicResource
 from pydantic import BaseModel
 
 from ai.backend.appproxy.common.types import PydanticResponse
+from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
 
 from . import __version__
 
@@ -129,7 +131,6 @@ def generate_openapi(
 
             route_def["parameters"] = parameters
             route_def["description"] = "\n".join(description)
-            type_hints = get_type_hints(route.handler)
 
             def _parse_schema(model_cls: type[BaseModel]) -> dict[str, Any]:
                 if not issubclass(model_cls, BaseModel):
@@ -152,28 +153,106 @@ def generate_openapi(
                     },
                 }
 
-            if (ret_type := type_hints.get("return")) and (ret_type_origin := get_origin(ret_type)):
-                if ret_type_origin == Union:
-                    response_classes = get_args(ret_type)
-                    responses = dict()
+            # Extract types from @api_handler decorated handlers
+            # The wrapper function has __wrapped__ attribute pointing to original handler
+            original_handler = getattr(route.handler, "__wrapped__", route.handler)
+            try:
+                original_type_hints = get_type_hints(original_handler)
+            except (NameError, AttributeError):
+                original_type_hints = {}
 
-                    for cls in response_classes:
-                        if (subclass_origin := get_origin(cls)) and issubclass(
-                            subclass_origin, PydanticResponse
+            # Extract request parameters from @api_handler signature
+            sig = inspect.signature(original_handler)
+            for param in sig.parameters.values():
+                param_origin = get_origin(param.annotation)
+
+                # Extract request body from BodyParam[Model]
+                if param_origin is BodyParam and "requestBody" not in route_def:
+                    if not (body_args := get_args(param.annotation)):
+                        continue
+                    body_model = body_args[0]
+                    if isinstance(body_model, type) and issubclass(body_model, BaseModel):
+                        schema_name = body_model.__name__
+                        body_schema = body_model.model_json_schema(
+                            ref_template="#/components/schemas/{model}"
+                        )
+                        if additional_definitions := body_schema.pop("$defs", None):
+                            openapi["components"]["schemas"].update(additional_definitions)
+                        openapi["components"]["schemas"][schema_name] = body_schema
+                        route_def["requestBody"] = {
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": f"#/components/schemas/{schema_name}"}
+                                }
+                            }
+                        }
+
+                # Extract query parameters from QueryParam[Model]
+                if param_origin is QueryParam:
+                    if not (query_args := get_args(param.annotation)):
+                        continue
+                    query_model = query_args[0]
+                    if isinstance(query_model, type) and issubclass(query_model, BaseModel):
+                        for field_name, field_info in query_model.model_fields.items():
+                            param_schema: dict[str, Any] = {"type": "string"}
+                            if field_info.annotation:
+                                if field_info.annotation is int:
+                                    param_schema = {"type": "integer"}
+                                elif field_info.annotation is bool:
+                                    param_schema = {"type": "boolean"}
+                            parameters.append({
+                                "name": field_name,
+                                "in": "query",
+                                "required": field_info.is_required(),
+                                "schema": param_schema,
+                            })
+
+            # Extract response type from APIResponse[Model] return type
+            if ret_type := original_type_hints.get("return"):
+                ret_type_origin = get_origin(ret_type)
+                if ret_type_origin is APIResponse:
+                    if not (response_args := get_args(ret_type)):
+                        pass  # No type parameter, skip
+                    elif (response_model := response_args[0]) is not type(
+                        None
+                    ) and response_model is not Any:
+                        if isinstance(response_model, type) and issubclass(
+                            response_model, BaseModel
                         ):
-                            if "200" in responses:
-                                raise RuntimeError(
-                                    "Cannot specify multiple response types for a single API handler"
-                                )
-                            responses["200"] = _parse_schema(get_args(cls)[0])
-                        elif issubclass(cls, web.HTTPTemporaryRedirect):
-                            responses["301"] = {"Description": "Redirection"}
-                        elif issubclass(cls, web.HTTPPermanentRedirect):
-                            responses["302"] = {"Description": "Redirection"}
+                            route_def["responses"] = {"200": _parse_schema(response_model)}
 
-                    route_def["responses"] = responses
-                elif issubclass(ret_type_origin, PydanticResponse):
-                    route_def["responses"] = {"200": _parse_schema(get_args(ret_type)[0])}
+            # Fallback: handle PydanticResponse for legacy handlers
+            # Uses wrapper's type hints since PydanticResponse is in wrapper's return type
+            if not route_def.get("responses"):
+                type_hints = get_type_hints(route.handler)
+                if (ret_type := type_hints.get("return")) and (
+                    ret_type_origin := get_origin(ret_type)
+                ):
+                    if ret_type_origin == Union:
+                        response_classes = get_args(ret_type)
+                        responses = dict()
+
+                        for cls in response_classes:
+                            if (subclass_origin := get_origin(cls)) and issubclass(
+                                subclass_origin, PydanticResponse
+                            ):
+                                if "200" in responses:
+                                    raise RuntimeError(
+                                        "Cannot specify multiple response types for a single API handler"
+                                    )
+                                responses["200"] = _parse_schema(get_args(cls)[0])
+                            elif isinstance(cls, type) and issubclass(
+                                cls, web.HTTPTemporaryRedirect
+                            ):
+                                responses["301"] = {"description": "Redirection"}
+                            elif isinstance(cls, type) and issubclass(
+                                cls, web.HTTPPermanentRedirect
+                            ):
+                                responses["302"] = {"description": "Redirection"}
+
+                        route_def["responses"] = responses
+                    elif issubclass(ret_type_origin, PydanticResponse):
+                        route_def["responses"] = {"200": _parse_schema(get_args(ret_type)[0])}
 
             openapi["paths"][path][method.lower()] = route_def
     return openapi

@@ -15,7 +15,7 @@ from pydantic import BaseModel, TypeAdapter
 from trafaret.lib import _empty
 
 import ai.backend.common.validators as tx
-from ai.backend.common.api_handlers import BodyParam, PathParam, QueryParam
+from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, QueryParam
 from ai.backend.common.json import pretty_json_str
 from ai.backend.manager import __version__
 from ai.backend.manager.api import ManagerStatus
@@ -443,39 +443,54 @@ def generate_openapi(subapps: list[web.Application], verbose: bool = False) -> d
                                 "schema": prop_schema,
                             })
 
-                # TODO: Extract response model from @api_handler decorated functions.
-                # Currently, @api_handler returns APIResponse which wraps BaseResponseModel,
-                # but the actual response model type is not captured in the return type annotation.
-                #
-                # To enable OpenAPI response schema generation, APIResponse should be made Generic:
-                #
-                #   # In api_handlers.py:
-                #   TResponseModel = TypeVar("TResponseModel", bound=BaseResponseModel)
-                #
-                #   @dataclass
-                #   class APIResponse(Generic[TResponseModel]):
-                #       _status_code: int
-                #       _data: Optional[TResponseModel]
-                #
-                #   # In handler:
-                #   async def handler(...) -> APIResponse[MyResponseModel]:
-                #       return APIResponse.build(200, MyResponseModel(...))
-                #
-                # Then we can extract the response model via:
-                #   ret_type = get_type_hints(handler).get("return")
-                #   if get_origin(ret_type) is APIResponse:
-                #       response_model = get_args(ret_type)[0]
+                # Extract response model from @api_handler decorated functions.
+                # The original handler's return type (e.g., APIResponse[MyModel]) is accessible
+                # via __wrapped__ attribute from @functools.wraps.
+                original_handler = getattr(route.handler, "__wrapped__", route.handler)
+                try:
+                    original_type_hints = get_type_hints(original_handler)
+                except (NameError, AttributeError, ValueError, TypeError):
+                    original_type_hints = {}
+
+                if ret_type := original_type_hints.get("return"):
+                    ret_type_origin = get_origin(ret_type)
+                    if ret_type_origin is APIResponse:
+                        if not (response_args := get_args(ret_type)):
+                            pass  # No type parameter, skip
+                        elif (response_model := response_args[0]) is not type(
+                            None
+                        ) and response_model is not Any:
+                            if isinstance(response_model, type) and issubclass(
+                                response_model, BaseModel
+                            ):
+                                schema_name = response_model.__name__
+                                api_response_schema = response_model.model_json_schema(
+                                    ref_template="#/components/schemas/{model}"
+                                )
+                                if additional_definitions := api_response_schema.pop("$defs", None):
+                                    openapi["components"]["schemas"].update(additional_definitions)
+                                openapi["components"]["schemas"][schema_name] = api_response_schema
+                                route_def["responses"] = {
+                                    "200": {
+                                        "description": "",
+                                        "content": {
+                                            "application/json": {
+                                                "schema": {
+                                                    "$ref": f"#/components/schemas/{schema_name}"
+                                                }
+                                            }
+                                        },
+                                    }
+                                }
 
             route_def["parameters"] = parameters
             route_def["description"] = "\n".join(description)
 
-            # Extract response schema from handler's return type annotation.
+            # Fallback: Extract response schema from handler's return type annotation
+            # for non-@api_handler handlers (e.g., legacy handlers returning BaseModel directly).
             # Supported return types:
             #   - BaseModel subclass: async def handler(...) -> MyResponseModel
             #   - list[BaseModel]: async def handler(...) -> list[MyResponseModel]
-            #
-            # Note: @api_handler decorated functions return APIResponse (not BaseModel),
-            # so they are not captured here. See TODO comment above for future improvement.
             try:
                 type_hints = get_type_hints(route.handler)
             except (NameError, AttributeError):
