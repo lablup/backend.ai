@@ -369,6 +369,32 @@ For detailed development setup, build system usage, and contribution guidelines:
 - [CONTRIBUTING.md](.github/CONTRIBUTING.md) - Contribution guidelines and development workflow
 - [MIGRATION.md](MIGRATION.md) - Migration guide for major version updates
 
+#### CLI Tab Completion for Development
+
+To enable shell tab completion for the Backend.AI CLI during development:
+
+```bash
+# For bash/zsh (from repository root) - MUST use 'source', not execute directly
+source scripts/setup-dev-completion.sh
+
+# For fish shell
+source scripts/setup-dev-completion.fish
+
+# Or create a permanent alias
+# bash/zsh:
+echo 'alias bai-dev="cd /path/to/backend.ai && source scripts/setup-dev-completion.sh"' >> ~/.zshrc
+# fish:
+echo 'alias bai-dev="cd /path/to/backend.ai; and source scripts/setup-dev-completion.fish"' >> ~/.config/fish/config.fish
+```
+
+This will enable tab completion for:
+- `backend.ai <tab>` - Show all commands
+- `backend.ai session <tab>` - Session management
+- `backend.ai admin <tab>` - Admin operations
+- `backend.ai --<tab>` - Global options
+
+Supports **bash**, **zsh**, and **fish** shells.
+
 License
 -------
 
