@@ -545,12 +545,13 @@ class VfolderRepository:
             )
             await session.execute(query)
 
-            # Revoke object permission from user's role using RBACRevoker
+            # Revoke permission from user's role using RBACRevoker
             revoker = RBACRevoker(
                 entity_id=ObjectId(
                     entity_type=EntityType.VFOLDER,
                     entity_id=str(vfolder_id),
                 ),
+                entity_scope_type=ScopeType.VFOLDER,
                 target_role_ids=[user_role_id],
                 operations=None,  # Revoke all operations
             )
