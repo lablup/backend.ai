@@ -1,3 +1,17 @@
+configs:
+  prometheus_config:
+    file: ./prometheus.yaml
+  otel_collector_config:
+    file: ./otel-collector-config.yaml
+  loki_config:
+    file: ./loki-config.yaml
+  tempo_config:
+    file: ./tempo-config.yaml
+  supergraph_schema:
+    file: ./supergraph.graphql
+  gateway_config:
+    file: ./gateway.config.ts
+
 services:
 
   backendai-half-db:
@@ -122,8 +136,9 @@ services:
     restart: unless-stopped
     networks:
       - half
-    volumes:
-      - "./prometheus.yaml:/etc/prometheus/prometheus.yaml"
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yaml
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command:
@@ -137,8 +152,9 @@ services:
     networks:
       - half
     command: ["--config=/etc/otel-collector-config.yaml"]
-    volumes:
-      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    configs:
+      - source: otel_collector_config
+        target: /etc/otel-collector-config.yaml
     ports:
       - "4317:4317"
       - "4318:4318"
@@ -151,8 +167,9 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     ports:
       - "3100:3100"
-    volumes:
-      - ./loki-config.yaml:/etc/loki/local-config.yaml
+    configs:
+      - source: loki_config
+        target: /etc/loki/local-config.yaml
 
   backendai-half-tempo:
     image: grafana/tempo:2.7.2
@@ -160,8 +177,10 @@ services:
     networks:
       - half
     command: [ "-config.file=/etc/tempo.yaml" ]
+    configs:
+      - source: tempo_config
+        target: /etc/tempo.yaml
     volumes:
-      - ./tempo-config.yaml:/etc/tempo.yaml
       - half-tempo:/var/tempo
     ports:
       - "3200" # tempo
@@ -178,9 +197,11 @@ services:
     environment:
       - HOST=0.0.0.0
       - PORT=4000
-    volumes:
-      - ./supergraph.graphql:/gateway/supergraph.graphql:ro
-      - ./gateway.config.ts:/gateway/gateway.config.ts:ro
+    configs:
+      - source: supergraph_schema
+        target: /gateway/supergraph.graphql
+      - source: gateway_config
+        target: /gateway/gateway.config.ts
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
