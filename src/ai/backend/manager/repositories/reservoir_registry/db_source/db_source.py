@@ -44,7 +44,9 @@ class ReservoirDBSource:
             )
             row = result.scalar_one_or_none()
             if row is None:
-                raise ArtifactRegistryNotFoundError(f"Reservoir with ID {reservoir_id} not found")
+                raise ArtifactRegistryNotFoundError(
+                    f"Reservoir with ID {reservoir_id} not found"
+                )
             return row.to_dataclass()
 
     async def get_registries_by_ids(
