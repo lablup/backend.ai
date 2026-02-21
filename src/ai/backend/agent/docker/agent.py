@@ -1298,16 +1298,14 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if "replin" not in port_map or "replout" not in port_map:
                     raise InvalidArgumentError("replin and replout ports are required in port_map")
 
-                repl_in_port = port_map["replin"][2000]
-                repl_out_port = port_map["replout"][2001]
+                repl_in_port = port_map["replin"][1]
+                repl_out_port = port_map["replout"][1]
                 stdin_port = 0  # left for legacy
                 stdout_port = 0  # left for legacy
 
                 for sport in service_ports:
-                    created_host_ports = tuple(
-                        port_map[sport["name"]][cport] for cport in sport["container_ports"]
-                    )
-                    sport["host_ports"] = created_host_ports
+                    sport["container_ports"] = (port_map[sport["name"]][0],)
+                    sport["host_ports"] = (port_map[sport["name"]][1],)
             else:
                 kernel_host = advertised_kernel_host or container_bind_host
                 ctnr_host_port_map: MutableMapping[int, int] = {}
