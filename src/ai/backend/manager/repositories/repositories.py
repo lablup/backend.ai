@@ -32,6 +32,7 @@ from ai.backend.manager.repositories.object_storage.repositories import ObjectSt
 from ai.backend.manager.repositories.permission_controller.repositories import (
     PermissionControllerRepositories,
 )
+from ai.backend.manager.repositories.project_config.repositories import ProjectConfigRepositories
 from ai.backend.manager.repositories.project_resource_policy.repositories import (
     ProjectResourcePolicyRepositories,
 )
@@ -73,6 +74,7 @@ class Repositories:
     export: ExportRepositories
     fair_share: FairShareRepositories
     group: GroupRepositories
+    project_config: ProjectConfigRepositories
     image: ImageRepositories
     keypair_resource_policy: KeypairResourcePolicyRepositories
     metric: MetricRepositories
@@ -111,6 +113,7 @@ class Repositories:
         export_repositories = ExportRepositories.create(args)
         fair_share_repositories = FairShareRepositories.create(args)
         group_repositories = GroupRepositories.create(args)
+        project_config_repositories = ProjectConfigRepositories.create(args)
         image_repositories = ImageRepositories.create(args)
         keypair_resource_policy_repositories = KeypairResourcePolicyRepositories.create(args)
         metric_repositories = MetricRepositories.create(args)
@@ -148,6 +151,7 @@ class Repositories:
             export=export_repositories,
             fair_share=fair_share_repositories,
             group=group_repositories,
+            project_config=project_config_repositories,
             image=image_repositories,
             keypair_resource_policy=keypair_resource_policy_repositories,
             metric=metric_repositories,
