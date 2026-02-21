@@ -17,7 +17,7 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.data.permission.types import EntityType, FieldType
+from ai.backend.common.data.permission.types import EntityType, RelationType, ScopeType
 from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
@@ -55,6 +55,7 @@ from ai.backend.manager.data.deployment.types import (
     ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
@@ -117,10 +118,6 @@ from ai.backend.manager.repositories.base.purger import (
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
-)
-from ai.backend.manager.repositories.base.rbac.field_creator import (
-    RBACFieldCreator,
-    execute_rbac_field_creator,
 )
 from ai.backend.manager.repositories.base.updater import (
     BatchUpdater,
@@ -1952,13 +1949,16 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             spec = cast(DeploymentRevisionCreatorSpec, creator.spec)
 
-            rbac_creator: RBACFieldCreator[DeploymentRevisionRow] = RBACFieldCreator(
+            rbac_creator: RBACEntityCreator[DeploymentRevisionRow] = RBACEntityCreator(
                 spec=spec,
-                entity_type=EntityType.MODEL_DEPLOYMENT,
-                entity_id=str(spec.endpoint_id),
-                field_type=FieldType.MODEL_REVISION,
+                entity_type=EntityType.DEPLOYMENT_REVISION,
+                scope_ref=ScopeId(
+                    scope_type=ScopeType.DEPLOYMENT,
+                    scope_id=str(spec.endpoint_id),
+                ),
+                relation_type=RelationType.AUTO,
             )
-            rbac_result = await execute_rbac_field_creator(db_sess, rbac_creator)
+            rbac_result = await execute_rbac_entity_creator(db_sess, rbac_creator)
             return rbac_result.row.to_data()
 
     async def get_revision(

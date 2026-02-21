@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import load_only, selectinload
 
-from ai.backend.common.data.permission.types import EntityType, FieldType, ScopeType
+from ai.backend.common.data.permission.types import EntityType, RelationType, ScopeType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
@@ -83,12 +83,10 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACBulkEntityCreator,
     RBACEntityCreator,
+    execute_rbac_bulk_entity_creator,
     execute_rbac_entity_creator,
-)
-from ai.backend.manager.repositories.base.rbac.field_creator import (
-    RBACBulkFieldCreator,
-    execute_rbac_bulk_field_creator,
 )
 from ai.backend.manager.repositories.base.updater import BatchUpdater, execute_batch_updater
 from ai.backend.manager.repositories.resource_slot.types import (
@@ -1193,14 +1191,15 @@ class ScheduleDBSource:
             )
             await execute_rbac_entity_creator(db_sess, rbac_creator)
 
-            # Use RBACBulkFieldCreator to create kernels with RBAC field association
-            kernel_field_creator = RBACBulkFieldCreator(
+            # Use RBACBulkEntityCreator to create kernels with RBAC entity association
+            kernel_entity_creator = RBACBulkEntityCreator(
                 specs=[KernelRowCreatorSpec(row=k) for k in kernels],
-                entity_type=EntityType.SESSION,
-                entity_id=str(session_data.id),
-                field_type=FieldType.KERNEL,
+                scope_type=ScopeType.SESSION,
+                scope_id=str(session_data.id),
+                entity_type=EntityType.SESSION_KERNEL,
+                relation_type=RelationType.AUTO,
             )
-            await execute_rbac_bulk_field_creator(db_sess, kernel_field_creator)
+            await execute_rbac_bulk_entity_creator(db_sess, kernel_entity_creator)
             await db_sess.flush()
 
             # Record requested resources in normalized resource_allocations table
