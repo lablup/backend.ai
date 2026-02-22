@@ -421,7 +421,9 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: wheels
-        path: dist/*
+        path: |
+          dist/*
+          !dist/export/
     - name: Upload pants log
       uses: actions/upload-artifact@v4
       with:
@@ -552,7 +554,12 @@ jobs:
         path: dist
     - name: Create GitHub Release
       run: |
-        if [ "${{ env.IS_PRERELEASE }}" = "true" ]; then
+        if gh release view "${{ github.ref_name }}" > /dev/null 2>&1; then
+          echo "Release already exists, updating..."
+          gh release edit "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --notes-file "CHANGELOG_RELEASE.md"
+        elif [ "${{ env.IS_PRERELEASE }}" = "true" ]; then
           gh release create "${{ github.ref_name }}" \
             --title "${{ github.ref_name }}" \
             --notes-file "CHANGELOG_RELEASE.md" \
@@ -567,6 +574,10 @@ jobs:
     - name: Upload release assets
       run: |
         for file in dist/*; do
+          if [ -d "$file" ]; then
+            echo "Skipping directory $file"
+            continue
+          fi
           echo "Uploading $file..."
           for attempt in 1 2 3; do
             if gh release upload "${{ github.ref_name }}" "$file" --clobber; then
@@ -608,7 +619,7 @@ jobs:
       # We don't use `pants publish ::` because we manually rename the
       # wheels after buildling them to add arch-specific tags.
       run: |
-        twine upload dist/*.whl dist/*.tar.gz
+        twine upload --skip-existing dist/*.whl dist/*.tar.gz
     - name: Extract stable release version
       id: extract_stable_release_version
       run: |
