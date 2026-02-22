@@ -8,5 +8,8 @@ search_path = ["<PATH>"]
 [stats]
 log = true
 
+[subprocess-environment]
+env_vars.add = ["SCIENCE_AUTH_API_GITHUB_COM_BEARER"]
+
 [pytest]
 args = ["-vv", "--no-header", "--suppress-no-test-exit-code"]
