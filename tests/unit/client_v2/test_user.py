@@ -218,7 +218,7 @@ class TestUserCRUD:
         assert method == "POST"
         assert url.endswith("/admin/users/delete")
         assert body is not None
-        assert body["user_id"] == _SAMPLE_USER_ID
+        assert body["user_id"] == str(_SAMPLE_USER_ID)
 
     @pytest.mark.asyncio
     async def test_purge_user(self) -> None:
@@ -239,6 +239,6 @@ class TestUserCRUD:
         assert method == "POST"
         assert url.endswith("/admin/users/purge")
         assert body is not None
-        assert body["user_id"] == _SAMPLE_USER_ID
+        assert body["user_id"] == str(_SAMPLE_USER_ID)
         assert body["purge_shared_vfolders"] is True
         assert body["delegate_endpoint_ownership"] is True
