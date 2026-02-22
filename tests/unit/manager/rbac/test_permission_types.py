@@ -1,4 +1,18 @@
-from ai.backend.manager.data.permission.types import EntityType, OperationType
+import pytest
+
+from ai.backend.manager.data.permission.types import (
+    ENTITY_GRAPH,
+    ENTITY_TO_SCOPE_MAP,
+    SCOPE_TO_ENTITY_MAP,
+    EntityType,
+    InvalidTypeConversionError,
+    OperationType,
+    RelationType,
+    ScopeType,
+    entity_type_to_scope_type,
+    get_relation_type,
+    scope_type_to_entity_type,
+)
 
 
 class TestOperationType:
@@ -141,3 +155,103 @@ class TestEntityType:
             EntityType.NOTIFICATION_RULE,
             EntityType.MODEL_DEPLOYMENT,
         }
+
+
+class TestEntityGraph:
+    def test_all_entity_types_are_graph_keys(self) -> None:
+        """Every EntityType value must be a key in ENTITY_GRAPH."""
+        for entity_type in EntityType:
+            assert entity_type in ENTITY_GRAPH, f"Missing graph key: {entity_type}"
+
+    def test_all_children_are_valid_entity_types(self) -> None:
+        all_entity_types = set(EntityType)
+        for parent, children in ENTITY_GRAPH.items():
+            assert parent in all_entity_types, f"Invalid parent: {parent}"
+            for child in children:
+                assert child in all_entity_types, f"Invalid child: {child}"
+
+    def test_no_self_referencing_edges(self) -> None:
+        for parent, children in ENTITY_GRAPH.items():
+            assert parent not in children, f"Self-referencing edge: {parent}"
+
+    def test_known_parent_child_lookups(self) -> None:
+        assert ENTITY_GRAPH[EntityType.SESSION][EntityType.SESSION_KERNEL] == RelationType.AUTO
+        assert ENTITY_GRAPH[EntityType.SESSION][EntityType.AGENT] == RelationType.REF
+        assert ENTITY_GRAPH[EntityType.CONTAINER_REGISTRY][EntityType.IMAGE] == RelationType.AUTO
+        assert ENTITY_GRAPH[EntityType.PROJECT][EntityType.SESSION] == RelationType.AUTO
+
+    def test_leaf_nodes_have_empty_children(self) -> None:
+        assert ENTITY_GRAPH[EntityType.AUTH] == {}
+        assert ENTITY_GRAPH[EntityType.AUDIT_LOG] == {}
+        assert ENTITY_GRAPH[EntityType.IMAGE_ALIAS] == {}
+
+    def test_get_relation_type_known_edges(self) -> None:
+        assert get_relation_type(EntityType.SESSION, EntityType.SESSION_KERNEL) == RelationType.AUTO
+        assert get_relation_type(EntityType.SESSION, EntityType.AGENT) == RelationType.REF
+        assert (
+            get_relation_type(EntityType.CONTAINER_REGISTRY, EntityType.IMAGE) == RelationType.AUTO
+        )
+
+    def test_get_relation_type_unknown_edge_returns_none(self) -> None:
+        assert get_relation_type(EntityType.SESSION, EntityType.DOMAIN) is None
+        assert get_relation_type(EntityType.IMAGE, EntityType.SESSION) is None
+
+    def test_every_edge_has_distinct_parent_and_child(self) -> None:
+        for parent, children in ENTITY_GRAPH.items():
+            for child in children:
+                assert parent != child, f"Self-referencing edge: {parent}"
+
+
+class TestScopeEntityConverter:
+    def test_scope_type_to_entity_type_valid_mappings(self) -> None:
+        assert scope_type_to_entity_type(ScopeType.DOMAIN) == EntityType.DOMAIN
+        assert scope_type_to_entity_type(ScopeType.PROJECT) == EntityType.PROJECT
+        assert scope_type_to_entity_type(ScopeType.USER) == EntityType.USER
+        assert scope_type_to_entity_type(ScopeType.RESOURCE_GROUP) == EntityType.RESOURCE_GROUP
+        assert (
+            scope_type_to_entity_type(ScopeType.CONTAINER_REGISTRY) == EntityType.CONTAINER_REGISTRY
+        )
+        assert (
+            scope_type_to_entity_type(ScopeType.ARTIFACT_REGISTRY) == EntityType.ARTIFACT_REGISTRY
+        )
+        assert scope_type_to_entity_type(ScopeType.STORAGE_HOST) == EntityType.STORAGE_HOST
+        assert scope_type_to_entity_type(ScopeType.SESSION) == EntityType.SESSION
+        assert scope_type_to_entity_type(ScopeType.DEPLOYMENT) == EntityType.DEPLOYMENT
+        assert scope_type_to_entity_type(ScopeType.VFOLDER) == EntityType.VFOLDER
+        assert scope_type_to_entity_type(ScopeType.IMAGE) == EntityType.IMAGE
+        assert scope_type_to_entity_type(ScopeType.ARTIFACT) == EntityType.ARTIFACT
+        assert (
+            scope_type_to_entity_type(ScopeType.ARTIFACT_REVISION) == EntityType.ARTIFACT_REVISION
+        )
+        assert scope_type_to_entity_type(ScopeType.ROLE) == EntityType.ROLE
+
+    def test_scope_type_to_entity_type_global_raises(self) -> None:
+        with pytest.raises(InvalidTypeConversionError):
+            scope_type_to_entity_type(ScopeType.GLOBAL)
+
+    def test_entity_type_to_scope_type_valid_mappings(self) -> None:
+        assert entity_type_to_scope_type(EntityType.DOMAIN) == ScopeType.DOMAIN
+        assert entity_type_to_scope_type(EntityType.PROJECT) == ScopeType.PROJECT
+        assert entity_type_to_scope_type(EntityType.USER) == ScopeType.USER
+        assert entity_type_to_scope_type(EntityType.RESOURCE_GROUP) == ScopeType.RESOURCE_GROUP
+        assert entity_type_to_scope_type(EntityType.SESSION) == ScopeType.SESSION
+        assert entity_type_to_scope_type(EntityType.STORAGE_HOST) == ScopeType.STORAGE_HOST
+
+    def test_entity_type_to_scope_type_unmapped_raises(self) -> None:
+        with pytest.raises(InvalidTypeConversionError):
+            entity_type_to_scope_type(EntityType.AUTH)
+
+    def test_scope_to_entity_map_excludes_global(self) -> None:
+        assert ScopeType.GLOBAL not in SCOPE_TO_ENTITY_MAP
+        assert len(SCOPE_TO_ENTITY_MAP) == len(ScopeType) - 1
+
+    def test_entity_to_scope_map_is_inverse(self) -> None:
+        for scope_type, entity_type in SCOPE_TO_ENTITY_MAP.items():
+            assert ENTITY_TO_SCOPE_MAP[entity_type] == scope_type
+
+    def test_roundtrip_scope_to_entity_to_scope(self) -> None:
+        for scope_type in ScopeType:
+            if scope_type == ScopeType.GLOBAL:
+                continue
+            entity_type = scope_type_to_entity_type(scope_type)
+            assert entity_type_to_scope_type(entity_type) == scope_type

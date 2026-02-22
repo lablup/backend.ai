@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import enum
+from typing import Final
+
+from ai.backend.common.data.permission.exceptions import InvalidTypeConversionError
 
 
 class PermissionStatus(enum.StrEnum):
@@ -105,8 +108,11 @@ class EntityType(enum.StrEnum):
     RESOURCE_GROUP = "resource_group"
     RESOURCE_PRESET = "resource_preset"
     ROLE = "role"
+    STORAGE_HOST = "storage_host"
     STORAGE_NAMESPACE = "storage_namespace"
     VFS_STORAGE = "vfs_storage"
+    KEYPAIR = "keypair"
+    NETWORK = "network"
 
     # === Parent:child sub-entity types (`:` separator) ===
     # Domain/Project/User sub-resources
@@ -124,6 +130,7 @@ class EntityType(enum.StrEnum):
     APP_CONFIG_USER = "app_config:user"
     # Session sub
     SESSION_KERNEL = "session:kernel"
+    KERNEL_SCHEDULING_HISTORY = "session:kernel:scheduling_history"
     SESSION_FILE = "session:file"
     SESSION_DIRECTORY = "session:directory"
     SESSION_APP_SERVICE = "session:app_service"
@@ -147,6 +154,7 @@ class EntityType(enum.StrEnum):
     DEPLOYMENT_SCOPED_HISTORY = "deployment:scoped_history"
     DEPLOYMENT_ERROR = "deployment:error"
     DEPLOYMENT_TOKEN = "deployment:token"
+    DEPLOYMENT_AUTO_SCALING_POLICY = "deployment:auto_scaling_policy"
     # Image sub
     IMAGE_ALIAS = "image:alias"
     IMAGE_TAG = "image:tag"
@@ -167,6 +175,7 @@ class EntityType(enum.StrEnum):
     VFOLDER_FILE = "vfolder:file"
     VFOLDER_DIRECTORY = "vfolder:directory"
     VFOLDER_INVITATION = "vfolder:invitation"
+    VFOLDER_PERMISSION = "vfolder:permission"
     # Resource group sub
     RESOURCE_GROUP_DOMAIN = "resource_group:domain"
     RESOURCE_GROUP_KEYPAIR = "resource_group:keypair"
@@ -201,6 +210,7 @@ class EntityType(enum.StrEnum):
     GROUP_USAGE = "group:usage"
     # User sub
     USER_STATS = "user:stats"
+    USER_ROLE = "user:role"
     # Agent sub
     AGENT_WATCHER = "agent:watcher"
     AGENT_REGISTRY = "agent:registry"
@@ -406,3 +416,397 @@ class RelationType(enum.StrEnum):
 
     AUTO = "auto"
     REF = "ref"
+
+
+def _get_entity_children(parent: EntityType) -> dict[EntityType, RelationType]:
+    """Return the children of a parent entity type with their relation types.
+
+    Every EntityType value must have an explicit case to ensure exhaustive coverage.
+    """
+    match parent:
+        # --- Parents with children ---
+        case EntityType.SESSION:
+            return {
+                EntityType.SESSION_KERNEL: RelationType.AUTO,
+                EntityType.DEPLOYMENT_ROUTE: RelationType.AUTO,
+                EntityType.SESSION_DEPENDENCY_GRAPH: RelationType.AUTO,
+                EntityType.SESSION_STATUS_HISTORY: RelationType.AUTO,
+                EntityType.AGENT: RelationType.REF,
+                EntityType.RESOURCE_GROUP: RelationType.REF,
+                EntityType.KEYPAIR: RelationType.REF,
+            }
+        case EntityType.RESOURCE_GROUP:
+            return {
+                EntityType.AGENT: RelationType.AUTO,
+                EntityType.DOMAIN_FAIR_SHARE: RelationType.AUTO,
+                EntityType.PROJECT_FAIR_SHARE: RelationType.AUTO,
+                EntityType.USER_FAIR_SHARE: RelationType.AUTO,
+            }
+        case EntityType.AGENT:
+            return {
+                EntityType.SESSION_KERNEL: RelationType.AUTO,
+            }
+        case EntityType.CONTAINER_REGISTRY:
+            return {
+                EntityType.IMAGE: RelationType.AUTO,
+            }
+        case EntityType.IMAGE:
+            return {
+                EntityType.IMAGE_ALIAS: RelationType.AUTO,
+            }
+        case EntityType.VFOLDER:
+            return {
+                EntityType.VFOLDER_PERMISSION: RelationType.AUTO,
+                EntityType.VFOLDER_INVITATION: RelationType.AUTO,
+            }
+        case EntityType.MODEL_DEPLOYMENT:
+            return {
+                EntityType.DEPLOYMENT_TOKEN: RelationType.AUTO,
+                EntityType.DEPLOYMENT_AUTO_SCALING_RULE: RelationType.AUTO,
+                EntityType.DEPLOYMENT_REVISION: RelationType.AUTO,
+                EntityType.DEPLOYMENT_POLICY: RelationType.AUTO,
+                EntityType.DEPLOYMENT_AUTO_SCALING_POLICY: RelationType.AUTO,
+                EntityType.DEPLOYMENT_HISTORY: RelationType.AUTO,
+                EntityType.DEPLOYMENT_ROUTE: RelationType.AUTO,
+                EntityType.IMAGE: RelationType.REF,
+                EntityType.USER: RelationType.REF,
+            }
+        case EntityType.ARTIFACT:
+            return {
+                EntityType.ARTIFACT_REVISION: RelationType.AUTO,
+                EntityType.ARTIFACT_REGISTRY: RelationType.REF,
+            }
+        case EntityType.NOTIFICATION_CHANNEL:
+            return {
+                EntityType.NOTIFICATION_RULE: RelationType.AUTO,
+                EntityType.USER: RelationType.REF,
+            }
+        case EntityType.SESSION_KERNEL:
+            return {
+                EntityType.KERNEL_SCHEDULING_HISTORY: RelationType.AUTO,
+                EntityType.IMAGE: RelationType.REF,
+                EntityType.AGENT: RelationType.REF,
+            }
+        case EntityType.DEPLOYMENT_ROUTE:
+            return {
+                EntityType.ROUTE_HISTORY: RelationType.AUTO,
+                EntityType.MODEL_DEPLOYMENT: RelationType.REF,
+                EntityType.SESSION: RelationType.REF,
+            }
+        case EntityType.DOMAIN:
+            return {
+                EntityType.DOMAIN_FAIR_SHARE: RelationType.AUTO,
+            }
+        case EntityType.PROJECT:
+            return {
+                EntityType.PROJECT_FAIR_SHARE: RelationType.AUTO,
+                EntityType.SESSION: RelationType.AUTO,
+                EntityType.PROJECT_RESOURCE_POLICY: RelationType.REF,
+            }
+        case EntityType.USER:
+            return {
+                EntityType.USER_FAIR_SHARE: RelationType.AUTO,
+                EntityType.USER_RESOURCE_POLICY: RelationType.REF,
+                EntityType.KEYPAIR: RelationType.REF,
+            }
+        case EntityType.ROLE:
+            return {
+                EntityType.PERMISSION: RelationType.AUTO,
+                EntityType.USER_ROLE: RelationType.AUTO,
+            }
+        case EntityType.VFOLDER_PERMISSION:
+            return {
+                EntityType.USER: RelationType.REF,
+            }
+        case EntityType.VFOLDER_INVITATION:
+            return {
+                EntityType.USER: RelationType.REF,
+            }
+        case EntityType.KEYPAIR:
+            return {
+                EntityType.KEYPAIR_RESOURCE_POLICY: RelationType.REF,
+                EntityType.USER: RelationType.REF,
+            }
+        case EntityType.NETWORK:
+            return {
+                EntityType.DOMAIN: RelationType.REF,
+                EntityType.PROJECT: RelationType.REF,
+            }
+        case EntityType.USER_ROLE:
+            return {
+                EntityType.USER: RelationType.REF,
+            }
+        case EntityType.NOTIFICATION_RULE:
+            return {
+                EntityType.USER: RelationType.REF,
+            }
+        # --- Leaf nodes (no children) ---
+        case EntityType.AUTH:
+            return {}
+        case EntityType.AUDIT_LOG:
+            return {}
+        case EntityType.CONTAINER_METRIC:
+            return {}
+        case EntityType.CONTAINER_METRIC_METADATA:
+            return {}
+        case EntityType.DEPLOYMENT:
+            return {}
+        case EntityType.ERROR_LOG:
+            return {}
+        case EntityType.EXPORT:
+            return {}
+        case EntityType.GROUP:
+            return {}
+        case EntityType.MODEL_SERVICE:
+            return {}
+        case EntityType.NOTIFICATION:
+            return {}
+        case EntityType.OBJECT_PERMISSION:
+            return {}
+        case EntityType.OBJECT_STORAGE:
+            return {}
+        case EntityType.PERMISSION:
+            return {}
+        case EntityType.RESOURCE_PRESET:
+            return {}
+        case EntityType.STORAGE_HOST:
+            return {}
+        case EntityType.STORAGE_NAMESPACE:
+            return {}
+        case EntityType.VFS_STORAGE:
+            return {}
+        case EntityType.ARTIFACT_REGISTRY:
+            return {}
+        case EntityType.APP_CONFIG:
+            return {}
+        case EntityType.DOMAIN_FAIR_SHARE:
+            return {}
+        case EntityType.PROJECT_FAIR_SHARE:
+            return {}
+        case EntityType.USER_FAIR_SHARE:
+            return {}
+        case EntityType.DOMAIN_USAGE_BUCKET:
+            return {}
+        case EntityType.PROJECT_USAGE_BUCKET:
+            return {}
+        case EntityType.USER_USAGE_BUCKET:
+            return {}
+        case EntityType.KEYPAIR_RESOURCE_POLICY:
+            return {}
+        case EntityType.PROJECT_RESOURCE_POLICY:
+            return {}
+        case EntityType.USER_RESOURCE_POLICY:
+            return {}
+        case EntityType.APP_CONFIG_DOMAIN:
+            return {}
+        case EntityType.APP_CONFIG_USER:
+            return {}
+        case EntityType.KERNEL_SCHEDULING_HISTORY:
+            return {}
+        case EntityType.SESSION_FILE:
+            return {}
+        case EntityType.SESSION_DIRECTORY:
+            return {}
+        case EntityType.SESSION_APP_SERVICE:
+            return {}
+        case EntityType.SESSION_COMMIT:
+            return {}
+        case EntityType.SESSION_STATUS_HISTORY:
+            return {}
+        case EntityType.SESSION_ABUSING_REPORT:
+            return {}
+        case EntityType.SESSION_CONTAINER_LOG:
+            return {}
+        case EntityType.SESSION_DEPENDENCY_GRAPH:
+            return {}
+        case EntityType.SESSION_DIRECT_ACCESS:
+            return {}
+        case EntityType.SESSION_HISTORY:
+            return {}
+        case EntityType.SESSION_SCOPED_HISTORY:
+            return {}
+        case EntityType.DEPLOYMENT_REPLICA:
+            return {}
+        case EntityType.DEPLOYMENT_ACCESS_TOKEN:
+            return {}
+        case EntityType.DEPLOYMENT_AUTO_SCALING_RULE:
+            return {}
+        case EntityType.DEPLOYMENT_MODEL_REVISION:
+            return {}
+        case EntityType.DEPLOYMENT_REVISION:
+            return {}
+        case EntityType.DEPLOYMENT_POLICY:
+            return {}
+        case EntityType.DEPLOYMENT_HISTORY:
+            return {}
+        case EntityType.DEPLOYMENT_SCOPED_HISTORY:
+            return {}
+        case EntityType.DEPLOYMENT_ERROR:
+            return {}
+        case EntityType.DEPLOYMENT_TOKEN:
+            return {}
+        case EntityType.DEPLOYMENT_AUTO_SCALING_POLICY:
+            return {}
+        case EntityType.IMAGE_ALIAS:
+            return {}
+        case EntityType.IMAGE_TAG:
+            return {}
+        case EntityType.IMAGE_PRELOAD:
+            return {}
+        case EntityType.IMAGE_SCAN:
+            return {}
+        case EntityType.IMAGE_AGENT:
+            return {}
+        case EntityType.IMAGE_RESOURCE_LIMIT:
+            return {}
+        case EntityType.ARTIFACT_REVISION:
+            return {}
+        case EntityType.ARTIFACT_SCAN:
+            return {}
+        case EntityType.ARTIFACT_MODEL:
+            return {}
+        case EntityType.ARTIFACT_IMPORT:
+            return {}
+        case EntityType.ARTIFACT_DOWNLOAD:
+            return {}
+        case EntityType.ARTIFACT_README:
+            return {}
+        case EntityType.ARTIFACT_VERIFICATION:
+            return {}
+        case EntityType.ARTIFACT_REVISION_STORAGE_LINK:
+            return {}
+        case EntityType.VFOLDER_FILE:
+            return {}
+        case EntityType.VFOLDER_DIRECTORY:
+            return {}
+        case EntityType.RESOURCE_GROUP_DOMAIN:
+            return {}
+        case EntityType.RESOURCE_GROUP_KEYPAIR:
+            return {}
+        case EntityType.RESOURCE_GROUP_USER_GROUP:
+            return {}
+        case EntityType.RESOURCE_GROUP_FAIR_SHARE:
+            return {}
+        case EntityType.RESOURCE_GROUP_RESOURCE:
+            return {}
+        case EntityType.ROLE_ASSIGNMENT:
+            return {}
+        case EntityType.ROLE_USER:
+            return {}
+        case EntityType.ROLE_ENTITY:
+            return {}
+        case EntityType.ROLE_SCOPE:
+            return {}
+        case EntityType.ROLE_PERMISSION:
+            return {}
+        case EntityType.ROLE_ENTITY_TYPE:
+            return {}
+        case EntityType.ROLE_SCOPE_TYPE:
+            return {}
+        case EntityType.CONTAINER_REGISTRY_IMAGE:
+            return {}
+        case EntityType.ROUTE_HISTORY:
+            return {}
+        case EntityType.ROUTE_SCOPED_HISTORY:
+            return {}
+        case EntityType.AUTH_TOKEN:
+            return {}
+        case EntityType.AUTH_ACCOUNT:
+            return {}
+        case EntityType.AUTH_SESSION:
+            return {}
+        case EntityType.AUTH_PASSWORD:
+            return {}
+        case EntityType.AUTH_PROFILE:
+            return {}
+        case EntityType.AUTH_SSH_KEYPAIR:
+            return {}
+        case EntityType.NOTIFICATION_EVENT:
+            return {}
+        case EntityType.NOTIFICATION_CHANNEL_VALIDATION:
+            return {}
+        case EntityType.NOTIFICATION_RULE_VALIDATION:
+            return {}
+        case EntityType.GROUP_USAGE:
+            return {}
+        case EntityType.USER_STATS:
+            return {}
+        case EntityType.AGENT_WATCHER:
+            return {}
+        case EntityType.AGENT_REGISTRY:
+            return {}
+        case EntityType.RESOURCE_PRESET_CHECK:
+            return {}
+        case EntityType.PERMISSION_CHECK:
+            return {}
+        case EntityType.EXPORT_REPORT:
+            return {}
+
+
+ENTITY_GRAPH: Final[dict[EntityType, dict[EntityType, RelationType]]] = {
+    entity_type: _get_entity_children(entity_type) for entity_type in EntityType
+}
+
+
+def get_relation_type(parent: EntityType, child: EntityType) -> RelationType | None:
+    return ENTITY_GRAPH.get(parent, {}).get(child)
+
+
+def scope_type_to_entity_type(scope_type: ScopeType) -> EntityType:
+    """Convert a ScopeType to its corresponding EntityType.
+
+    Raises InvalidTypeConversionError for ScopeType.GLOBAL which has no entity mapping.
+    """
+    match scope_type:
+        case ScopeType.GLOBAL:
+            raise InvalidTypeConversionError("ScopeType.GLOBAL has no corresponding EntityType")
+        case ScopeType.DOMAIN:
+            return EntityType.DOMAIN
+        case ScopeType.PROJECT:
+            return EntityType.PROJECT
+        case ScopeType.USER:
+            return EntityType.USER
+        case ScopeType.RESOURCE_GROUP:
+            return EntityType.RESOURCE_GROUP
+        case ScopeType.CONTAINER_REGISTRY:
+            return EntityType.CONTAINER_REGISTRY
+        case ScopeType.ARTIFACT_REGISTRY:
+            return EntityType.ARTIFACT_REGISTRY
+        case ScopeType.STORAGE_HOST:
+            return EntityType.STORAGE_HOST
+        case ScopeType.SESSION:
+            return EntityType.SESSION
+        case ScopeType.DEPLOYMENT:
+            return EntityType.DEPLOYMENT
+        case ScopeType.VFOLDER:
+            return EntityType.VFOLDER
+        case ScopeType.IMAGE:
+            return EntityType.IMAGE
+        case ScopeType.ARTIFACT:
+            return EntityType.ARTIFACT
+        case ScopeType.ARTIFACT_REVISION:
+            return EntityType.ARTIFACT_REVISION
+        case ScopeType.ROLE:
+            return EntityType.ROLE
+
+
+SCOPE_TO_ENTITY_MAP: Final[dict[ScopeType, EntityType]] = {
+    scope_type: scope_type_to_entity_type(scope_type)
+    for scope_type in ScopeType
+    if scope_type != ScopeType.GLOBAL
+}
+
+ENTITY_TO_SCOPE_MAP: Final[dict[EntityType, ScopeType]] = {
+    entity_type: scope_type for scope_type, entity_type in SCOPE_TO_ENTITY_MAP.items()
+}
+
+
+def entity_type_to_scope_type(entity_type: EntityType) -> ScopeType:
+    """Convert an EntityType to its corresponding ScopeType.
+
+    Raises InvalidTypeConversionError if the entity type has no scope mapping.
+    """
+    try:
+        return ENTITY_TO_SCOPE_MAP[entity_type]
+    except KeyError as e:
+        raise InvalidTypeConversionError(f"{entity_type!r} has no corresponding ScopeType") from e
