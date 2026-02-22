@@ -1333,7 +1333,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/fetch", fetch_file)
     app.router.add_route("POST", "/folder/file/download", create_download_session)
     app.router.add_route(
-        "POST", "/folder/file/download-archive", archive_download_handler.create_session
+        "POST", "/folder/file/archive-download-token", archive_download_handler.create_session
     )
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)

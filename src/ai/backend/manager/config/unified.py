@@ -2493,12 +2493,14 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
             composite=CompositeType.FIELD,
         ),
     ]
-    download_archive_file: Annotated[
+    create_archive_download_session: Annotated[
         HttpTimeoutConfig,
         Field(
             default_factory=lambda: _DEFAULT_TIMEOUT,
-            validation_alias=AliasChoices("download-archive-file", "download_archive_file"),
-            serialization_alias="download-archive-file",
+            validation_alias=AliasChoices(
+                "create-archive-download-session", "create_archive_download_session"
+            ),
+            serialization_alias="create-archive-download-session",
         ),
         BackendAIConfigMeta(
             description=(
