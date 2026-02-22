@@ -8,12 +8,14 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.user import (
     CreateUserRequest,
     CreateUserResponse,
     PurgeUserRequest,
+    UserStatus,
 )
 
 # Statically imported so that Pants includes these modules in the test PEX.
@@ -23,6 +25,9 @@ from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import user as _user_api
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
+from ai.backend.manager.models.group import association_groups_users
+from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.user import users
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.server import (
@@ -145,6 +150,7 @@ async def user_factory(
     admin_registry: BackendAIClientRegistry,
     domain_fixture: str,
     resource_policy_fixture: str,
+    db_engine: SAEngine,
 ) -> AsyncIterator[UserFactory]:
     """Factory fixture that creates users via SDK and purges them on teardown."""
     created_ids: list[uuid.UUID] = []
@@ -157,6 +163,7 @@ async def user_factory(
             "password": "test-password-1234",
             "domain_name": domain_fixture,
             "resource_policy": resource_policy_fixture,
+            "status": UserStatus.ACTIVE,
         }
         params.update(overrides)
         result = await admin_registry.user.create(CreateUserRequest(**params))
@@ -169,7 +176,16 @@ async def user_factory(
         try:
             await admin_registry.user.purge(PurgeUserRequest(user_id=uid))
         except Exception:
-            pass
+            # Fallback: remove user rows directly when the API purge cannot complete.
+            # This handles cases where the server is unreachable during teardown.
+            async with db_engine.begin() as conn:
+                await conn.execute(
+                    association_groups_users.delete().where(
+                        association_groups_users.c.user_id == str(uid)
+                    )
+                )
+                await conn.execute(keypairs.delete().where(keypairs.c.user == str(uid)))
+                await conn.execute(users.delete().where(users.c.uuid == str(uid)))
 
 
 @pytest.fixture()

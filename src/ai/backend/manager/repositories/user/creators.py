@@ -73,7 +73,7 @@ class UserCreatorSpec(CreatorSpec[UserRow]):
             description=self.description,
             status=status,
             domain_name=self.domain_name,
-            role=self.role if self.role is not None else UserRole.USER,
+            role=UserRole(self.role) if self.role is not None else UserRole.USER,
             resource_policy=self.resource_policy if self.resource_policy is not None else "default",
             allowed_client_ip=self.allowed_client_ip,
             totp_activated=self.totp_activated if self.totp_activated is not None else False,

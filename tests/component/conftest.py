@@ -492,8 +492,18 @@ async def domain_fixture(
 async def resource_policy_fixture(
     db_engine: SAEngine,
 ) -> AsyncIterator[str]:
-    """Insert resource policies (user, project, keypair) with a shared random name."""
+    """Insert resource policies (user, project, keypair) with a shared random name.
+
+    Also inserts the system-default keypair resource policy ("default") required
+    by the user-creation flow, which always assigns new keypairs to that policy
+    name regardless of the user's own resource_policy value.
+    Teardown removes both the named policy and the "default" keypair policy.
+    The "default" keypair policy is safe to delete here because user_factory
+    (which depends on this fixture) runs its teardown first, purging all
+    keypairs that reference it.
+    """
     policy_name = f"policy-{secrets.token_hex(6)}"
+    default_kp_policy_name = "default"
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(UserResourcePolicyRow.__table__).values(
@@ -524,8 +534,27 @@ async def resource_policy_fixture(
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
             )
         )
+        # The user-creation flow always assigns new keypairs to the "default"
+        # keypair resource policy (DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME).
+        await conn.execute(
+            sa.insert(keypair_resource_policies).values(
+                name=default_kp_policy_name,
+                default_for_unspecified=DefaultForUnspecified.UNLIMITED,
+                total_resource_slots=ResourceSlot(),
+                max_session_lifetime=0,
+                max_concurrent_sessions=5,
+                max_containers_per_session=1,
+                idle_timeout=3600,
+                allowed_vfolder_hosts=VFolderHostPermissionMap(),
+            )
+        )
     yield policy_name
     async with db_engine.begin() as conn:
+        await conn.execute(
+            keypair_resource_policies.delete().where(
+                keypair_resource_policies.c.name == default_kp_policy_name
+            )
+        )
         await conn.execute(
             keypair_resource_policies.delete().where(
                 keypair_resource_policies.c.name == policy_name

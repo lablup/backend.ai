@@ -129,7 +129,9 @@ class BackendAIClient:
         response_model: type[ResponseT],
         params: dict[str, str] | None = None,
     ) -> ResponseT:
-        json_body = request.model_dump(exclude_none=True) if request is not None else None
+        json_body = (
+            request.model_dump(mode="json", exclude_none=True) if request is not None else None
+        )
         data = await self._request(method, path, json=json_body, params=params)
         if data is None:
             raise BackendAPIError(
@@ -150,7 +152,9 @@ class BackendAIClient:
         request: BaseRequestModel | None = None,
         params: dict[str, str] | None = None,
     ) -> None:
-        json_body = request.model_dump(exclude_none=True) if request is not None else None
+        json_body = (
+            request.model_dump(mode="json", exclude_none=True) if request is not None else None
+        )
         await self._request(method, path, json=json_body, params=params)
 
     async def upload(
