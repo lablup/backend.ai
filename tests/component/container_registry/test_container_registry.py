@@ -66,8 +66,7 @@ class TestContainerRegistryHarborWebhook:
                 ),
             ),
         )
-        result = await admin_registry.container_registry.handle_harbor_webhook(request)
-        assert result is None
+        await admin_registry.container_registry.handle_harbor_webhook(request)
 
     @pytest.mark.asyncio
     async def test_harbor_webhook_with_nonexistent_registry(

@@ -53,6 +53,9 @@ async def _container_registry_domain_ctx(root_ctx: RootContext) -> AsyncIterator
     Only agent_registry is left as MagicMock because it requires live gRPC
     connections to real agents, which are not available in component tests.
     """
+    # @require_manager_status decorator accesses config_provider.legacy_etcd_config_loader
+    # which is not initialized in _TestConfigProvider used in component tests.
+    root_ctx.config_provider._legacy_etcd_config_loader = MagicMock()
     root_ctx.repositories = Repositories.create(
         RepositoryArgs(
             db=root_ctx.db,
