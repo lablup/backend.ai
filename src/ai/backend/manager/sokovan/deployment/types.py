@@ -17,6 +17,7 @@ class DeploymentLifecycleType(StrEnum):
     SCALING = "scaling"
     RECONCILE = "reconcile"
     DESTROYING = "destroying"
+    ROLLING_UPDATE = "rolling_update"
 
 
 @dataclass

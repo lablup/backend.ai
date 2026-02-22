@@ -2257,6 +2257,52 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             return await execute_purger(db_sess, purger)
 
+    async def search_deployment_policies(
+        self,
+        endpoint_ids: set[uuid.UUID],
+    ) -> Mapping[uuid.UUID, DeploymentPolicyData]:
+        """Search deployment policies for multiple endpoints.
+
+        Args:
+            endpoint_ids: Set of endpoint IDs to fetch policies for.
+
+        Returns:
+            Mapping of endpoint_id to DeploymentPolicyData.
+            Endpoints without policies are omitted.
+        """
+        raise NotImplementedError("search_deployment_policies is not implemented yet")
+
+    async def complete_rolling_update_bulk(
+        self,
+        updates: dict[uuid.UUID, uuid.UUID],
+    ) -> None:
+        """Complete rolling update by setting current_revision and clearing deploying_revision.
+
+        For each endpoint, atomically sets current_revision to the new revision
+        and clears deploying_revision. Groups endpoints by new_revision_id to
+        minimize database round-trips.
+
+        Args:
+            updates: Mapping of endpoint_id to new_revision_id.
+        """
+        if not updates:
+            return
+        # Group endpoint IDs by new_revision_id for batch execution
+        revision_to_endpoints: dict[uuid.UUID, list[uuid.UUID]] = {}
+        for endpoint_id, new_revision_id in updates.items():
+            revision_to_endpoints.setdefault(new_revision_id, []).append(endpoint_id)
+        async with self._begin_session_read_committed() as db_sess:
+            for new_revision_id, endpoint_ids in revision_to_endpoints.items():
+                stmt = (
+                    sa.update(EndpointRow)
+                    .where(EndpointRow.id.in_(endpoint_ids))
+                    .values(
+                        current_revision=new_revision_id,
+                        deploying_revision=None,
+                    )
+                )
+                await db_sess.execute(stmt)
+
     # ========== Access Token Operations ==========
 
     async def create_access_token(

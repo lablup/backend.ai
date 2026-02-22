@@ -326,6 +326,7 @@ class DeploymentInfo:
     network: DeploymentNetworkSpec
     model_revisions: list[ModelRevisionSpec]
     current_revision_id: UUID | None = None
+    deploying_revision_id: UUID | None = None
 
     def target_revision(self) -> ModelRevisionSpec | None:
         if self.model_revisions:
