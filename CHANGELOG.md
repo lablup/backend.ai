@@ -16,7 +16,7 @@ Changes
 
 <!-- towncrier release notes start -->
 
-## 26.2.1 (2026-02-20)
+## 26.2.1 (2026-02-22)
 
 ### Features
 * Apply prometheus_client multiprocess mode for multi-worker metric aggregation ([#8786](https://github.com/lablup/backend.ai/issues/8786))
@@ -41,12 +41,15 @@ Changes
 * Fix alembic migration naming convention for BA-4308 by renaming file and revision ID to use standard 12-char hex format. ([#9070](https://github.com/lablup/backend.ai/issues/9070))
 * Fix Prometheus metrics scrape crash when `/tmp` multiprocess directory is cleaned by OS, by using a persistent directory (`/var/run/backendai/prometheus/`) outside `/tmp`. ([#9114](https://github.com/lablup/backend.ai/issues/9114))
 * Fix FK violation on agent heartbeat by seeding `resource_slot_types` table during oneshot DB initialization. ([#9129](https://github.com/lablup/backend.ai/issues/9129))
+* Fix cross-architecture binary collision in build-scies CI job by including runner architecture in Pants cache key. ([#9185](https://github.com/lablup/backend.ai/issues/9185))
+* Pass SCIENCE_AUTH_API_GITHUB_COM_BEARER to Pants subprocess environment to prevent GitHub API rate limit errors during scie build in CI. ([#9186](https://github.com/lablup/backend.ai/issues/9186))
 
 ### Documentation Updates
 * Add /submit and /release skills ([#8819](https://github.com/lablup/backend.ai/issues/8819))
 
 ### Miscellaneous
 * Separate ClientConnectionError handling from generic exception in web proxy to prevent unnecessary 500 error responses and noisy error logs on normal client disconnections. ([#9158](https://github.com/lablup/backend.ai/issues/9158))
+* Split GitHub Release asset upload into individual `gh release upload` calls with retry to prevent API timeout on bulk upload. ([#9184](https://github.com/lablup/backend.ai/issues/9184))
 
 
 ## 26.2.0 (2026-02-13)
