@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import enum
 from datetime import datetime
 from enum import StrEnum
 from typing import Self
@@ -11,19 +12,22 @@ from strawberry.relay import Node, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.types import ServiceCatalogStatus
-from ai.backend.manager.api.gql.types import GQLFilter
+from ai.backend.manager.api.gql.base import OrderDirection
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.service_catalog.types import (
     ServiceCatalogData,
     ServiceCatalogEndpointData,
 )
 from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
-from ai.backend.manager.repositories.base import QueryCondition
+from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 __all__ = (
     "ServiceCatalogEndpointGQL",
     "ServiceCatalogFilterGQL",
     "ServiceCatalogGQL",
+    "ServiceCatalogOrderByGQL",
+    "ServiceCatalogOrderFieldGQL",
     "ServiceCatalogStatusGQL",
 )
 
@@ -114,6 +118,34 @@ class ServiceCatalogGQL(Node):
             config_hash=data.config_hash,
             endpoints=[ServiceCatalogEndpointGQL.from_data(ep) for ep in data.endpoints],
         )
+
+
+@strawberry.enum(
+    name="ServiceCatalogOrderField",
+    description="Added in 26.3.0. Fields available for ordering service catalog queries.",
+)
+class ServiceCatalogOrderFieldGQL(enum.Enum):
+    SERVICE_GROUP = "SERVICE_GROUP"
+    REGISTERED_AT = "REGISTERED_AT"
+
+
+@strawberry.input(
+    name="ServiceCatalogOrderBy",
+    description="Added in 26.3.0. Specifies the field and direction for ordering service catalog queries.",
+)
+class ServiceCatalogOrderByGQL(GQLOrderBy):
+    field: ServiceCatalogOrderFieldGQL
+    direction: OrderDirection = OrderDirection.ASC
+
+    def to_query_order(self) -> QueryOrder:
+        """Convert to repository QueryOrder."""
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case ServiceCatalogOrderFieldGQL.SERVICE_GROUP:
+                order = ServiceCatalogRow.service_group
+            case ServiceCatalogOrderFieldGQL.REGISTERED_AT:
+                order = ServiceCatalogRow.registered_at
+        return order.asc() if ascending else order.desc()
 
 
 @strawberry.input(

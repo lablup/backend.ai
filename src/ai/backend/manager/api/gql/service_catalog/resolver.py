@@ -13,7 +13,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
 from ai.backend.manager.services.service_catalog.actions.search import SearchServiceCatalogsAction
 
-from .types import ServiceCatalogFilterGQL, ServiceCatalogGQL
+from .types import ServiceCatalogFilterGQL, ServiceCatalogGQL, ServiceCatalogOrderByGQL
 
 __all__ = ("admin_service_catalogs",)
 
@@ -36,7 +36,12 @@ def _get_service_catalog_pagination_spec() -> PaginationSpec:
 async def admin_service_catalogs(
     info: Info[StrawberryGQLContext],
     filter: ServiceCatalogFilterGQL | None = None,
+    order_by: list[ServiceCatalogOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
     first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
     offset: int | None = None,
 ) -> list[ServiceCatalogGQL]:
     check_admin_only()
@@ -45,10 +50,15 @@ async def admin_service_catalogs(
     querier = ctx.gql_adapter.build_querier(
         PaginationOptions(
             first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
             offset=offset,
         ),
         _get_service_catalog_pagination_spec(),
         filter=filter,
+        order_by=order_by,
     )
 
     action = SearchServiceCatalogsAction(querier=querier)
