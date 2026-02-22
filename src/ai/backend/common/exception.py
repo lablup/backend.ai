@@ -137,6 +137,7 @@ class ErrorDomain(enum.StrEnum):
     ARTIFACT = "artifact"
     ARTIFACT_REGISTRY = "artifact-registry"
     ARTIFACT_ASSOCIATION = "artifact-association"
+    ARTIFACT_STORAGE = "artifact-storage"
     OBJECT_STORAGE = "object-storage"
     VFS_STORAGE = "vfs-storage"
     STORAGE_NAMESPACE = "storage-namespace"

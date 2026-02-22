@@ -14,7 +14,6 @@ from ai.backend.manager.types import OptionalState
 class ObjectStorageUpdaterSpec(UpdaterSpec[ObjectStorageRow]):
     """UpdaterSpec for object storage updates."""
 
-    name: OptionalState[str] = field(default_factory=OptionalState.nop)
     host: OptionalState[str] = field(default_factory=OptionalState.nop)
     access_key: OptionalState[str] = field(default_factory=OptionalState.nop)
     secret_key: OptionalState[str] = field(default_factory=OptionalState.nop)
@@ -29,7 +28,6 @@ class ObjectStorageUpdaterSpec(UpdaterSpec[ObjectStorageRow]):
     @override
     def build_values(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
-        self.name.update_dict(to_update, "name")
         self.host.update_dict(to_update, "host")
         self.access_key.update_dict(to_update, "access_key")
         self.secret_key.update_dict(to_update, "secret_key")

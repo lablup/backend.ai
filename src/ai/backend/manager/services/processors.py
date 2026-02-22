@@ -35,6 +35,8 @@ from ai.backend.manager.services.artifact_registry.processors import ArtifactReg
 from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
+from ai.backend.manager.services.artifact_storage.processors import ArtifactStorageProcessors
+from ai.backend.manager.services.artifact_storage.service import ArtifactStorageService
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.audit_log.service import AuditLogService
 from ai.backend.manager.services.auth.processors import AuthProcessors
@@ -179,6 +181,7 @@ class Services:
     artifact: ArtifactService
     artifact_revision: ArtifactRevisionService
     artifact_registry: ArtifactRegistryService
+    artifact_storage: ArtifactStorageService
     deployment: DeploymentService
     storage_namespace: StorageNamespaceService
     audit_log: AuditLogService
@@ -354,6 +357,9 @@ class Services:
             repositories.reservoir_registry.repository,
             repositories.artifact_registry.repository,
         )
+        artifact_storage_service = ArtifactStorageService(
+            artifact_storage_repository=repositories.artifact_storage.repository,
+        )
         deployment_service = DeploymentService(
             args.deployment_controller,
             args.deployment_controller._deployment_repository,
@@ -398,6 +404,7 @@ class Services:
             artifact=artifact_service,
             artifact_revision=artifact_revision_service,
             artifact_registry=artifact_registry_service,
+            artifact_storage=artifact_storage_service,
             deployment=deployment_service,
             storage_namespace=storage_namespace_service,
             audit_log=audit_log_service,
@@ -443,6 +450,7 @@ class Processors(AbstractProcessorPackage):
     artifact: ArtifactProcessors
     artifact_registry: ArtifactRegistryProcessors
     artifact_revision: ArtifactRevisionProcessors
+    artifact_storage: ArtifactStorageProcessors
     deployment: DeploymentProcessors
     storage_namespace: StorageNamespaceProcessors
     audit_log: AuditLogProcessors
@@ -508,6 +516,9 @@ class Processors(AbstractProcessorPackage):
         artifact_revision_processors = ArtifactRevisionProcessors(
             services.artifact_revision, action_monitors
         )
+        artifact_storage_processors = ArtifactStorageProcessors(
+            services.artifact_storage, action_monitors
+        )
 
         deployment_processors = DeploymentProcessors(services.deployment, action_monitors)
 
@@ -551,6 +562,7 @@ class Processors(AbstractProcessorPackage):
             artifact=artifact_processors,
             artifact_registry=artifact_registry_processors,
             artifact_revision=artifact_revision_processors,
+            artifact_storage=artifact_storage_processors,
             deployment=deployment_processors,
             storage_namespace=storage_namespace_processors,
             audit_log=audit_log_processors,
@@ -590,6 +602,7 @@ class Processors(AbstractProcessorPackage):
             *self.vfs_storage.supported_actions(),
             *self.artifact_registry.supported_actions(),
             *self.artifact_revision.supported_actions(),
+            *self.artifact_storage.supported_actions(),
             *self.artifact.supported_actions(),
             *(self.deployment.supported_actions() if self.deployment else []),
             *self.storage_namespace.supported_actions(),

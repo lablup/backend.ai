@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import uuid
+from typing import TYPE_CHECKING
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -14,6 +17,9 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.object_storage.db_source.db_source import ObjectStorageDBSource
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 
 object_storage_repository_resilience = Resilience(
     policies=[
@@ -53,11 +59,16 @@ class ObjectStorageRepository:
         return await self._db_source.get_by_namespace_id(storage_namespace_id)
 
     @object_storage_repository_resilience.apply()
-    async def create(self, creator: Creator[ObjectStorageRow]) -> ObjectStorageData:
-        return await self._db_source.create(creator)
+    async def create(
+        self, creator: Creator[ObjectStorageRow], meta_creator: Creator[ArtifactStorageRow]
+    ) -> ObjectStorageData:
+        return await self._db_source.create(creator, meta_creator)
 
     @object_storage_repository_resilience.apply()
-    async def update(self, updater: Updater[ObjectStorageRow]) -> ObjectStorageData:
+    async def update(
+        self,
+        updater: Updater[ObjectStorageRow],
+    ) -> ObjectStorageData:
         return await self._db_source.update(updater)
 
     @object_storage_repository_resilience.apply()

@@ -996,6 +996,34 @@ type ArtifactStatusChangedPayload
   artifactRevision: ArtifactRevision!
 }
 
+"""Added in 26.3.0. Artifact storage metadata"""
+type ArtifactStorage
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the artifact storage"""
+  id: ID!
+
+  """The name of the artifact storage"""
+  name: String!
+
+  """The ID of the underlying storage (ObjectStorage or VFSStorage)"""
+  storageId: ID!
+
+  """The type of the artifact storage"""
+  type: ArtifactStorageType!
+}
+
+"""
+Added in 26.3.0. The type of artifact storage backend. OBJECT_STORAGE: Object storage (e.g., S3-compatible). VFS_STORAGE: Virtual folder storage. GIT_LFS: Git LFS storage.
+"""
+enum ArtifactStorageType
+  @join__type(graph: STRAWBERRY)
+{
+  OBJECT_STORAGE @join__enumValue(graph: STRAWBERRY)
+  VFS_STORAGE @join__enumValue(graph: STRAWBERRY)
+  GIT_LFS @join__enumValue(graph: STRAWBERRY)
+}
+
 enum ArtifactType
   @join__type(graph: STRAWBERRY)
 {
@@ -7248,6 +7276,11 @@ type Mutation
   deleteVFSStorage(input: DeleteVFSStorageInput!): DeleteVFSStoragePayload! @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.3.0. Update artifact storage metadata (common fields like name)
+  """
+  adminUpdateArtifactStorage(input: UpdateArtifactStorageInput!): UpdateArtifactStoragePayload! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 25.15.0.
   
   Registers a new namespace within a storage.
@@ -11678,6 +11711,25 @@ type UpdateArtifactPayload
   artifact: Artifact!
 }
 
+"""Added in 26.3.0. Input for updating artifact storage metadata"""
+input UpdateArtifactStorageInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the artifact storage"""
+  id: ID!
+
+  """The new name for the artifact storage"""
+  name: String
+}
+
+"""Added in 26.3.0. Payload for updating artifact storage metadata"""
+type UpdateArtifactStoragePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated artifact storage"""
+  artifactStorage: ArtifactStorage!
+}
+
 input UpdateAutoScalingRuleInput
   @join__type(graph: STRAWBERRY)
 {
@@ -11785,7 +11837,6 @@ input UpdateObjectStorageInput
   @join__type(graph: STRAWBERRY)
 {
   id: ID!
-  name: String
   host: String
   accessKey: String
   secretKey: String
@@ -12001,7 +12052,6 @@ input UpdateVFSStorageInput
   @join__type(graph: STRAWBERRY)
 {
   id: ID!
-  name: String
   host: String
   basePath: String
 }

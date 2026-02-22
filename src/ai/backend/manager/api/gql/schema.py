@@ -39,6 +39,9 @@ from .artifact import (
     update_artifact,
 )
 from .artifact_registry import default_artifact_registry
+from .artifact_storage import (
+    update_artifact_storage,
+)
 from .background_task import background_task_events
 from .deployment import (
     # Revision
@@ -426,6 +429,7 @@ class Mutation:
     create_vfs_storage = create_vfs_storage
     update_vfs_storage = update_vfs_storage
     delete_vfs_storage = delete_vfs_storage
+    update_artifact_storage = update_artifact_storage
     register_storage_namespace = register_storage_namespace
     unregister_storage_namespace = unregister_storage_namespace
     create_huggingface_registry = create_huggingface_registry
