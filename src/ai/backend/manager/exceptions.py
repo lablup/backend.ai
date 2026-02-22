@@ -88,6 +88,18 @@ class MultiAgentError(TaskGroupError):
     """
 
 
+class AgentConnectionUnavailable(RuntimeError):
+    """
+    Agent connection is unavailable after multiple failures.
+    """
+
+    __slots__ = ("agent_id",)
+
+    def __init__(self, agent_id: AgentId) -> None:
+        super().__init__(f"Agent {agent_id} connection unavailable")
+        self.agent_id = agent_id
+
+
 class ErrorDetail(TypedDict):
     src: str
     name: str

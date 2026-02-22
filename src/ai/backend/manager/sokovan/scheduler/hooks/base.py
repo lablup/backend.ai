@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from ai.backend.common.types import ClusterMode
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.agent.pool import AgentPool
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -49,14 +49,14 @@ class AbstractSessionHook(ABC):
 class SessionHookArgs:
     network_plugin_ctx: NetworkPluginContext
     config_provider: ManagerConfigProvider
-    agent_pool: AgentPool
+    agent_pool: AgentClientPool
 
 
 class SessionHook(AbstractSessionHook):
     _session_hook: AbstractSessionHook
     _network_plugin_ctx: NetworkPluginContext
     _config_provider: ManagerConfigProvider
-    _agent_pool: AgentPool
+    _agent_pool: AgentClientPool
 
     def __init__(self, session_hook: AbstractSessionHook, args: SessionHookArgs) -> None:
         self._session_hook = session_hook
@@ -101,11 +101,8 @@ class SessionHook(AbstractSessionHook):
         match session.cluster_mode:
             case ClusterMode.SINGLE_NODE:
                 try:
-                    agent_client = self._agent_pool.get_agent_client(
-                        session.main_kernel.agent_id,
-                        order_key=str(session.session_id),
-                    )
-                    await agent_client.destroy_local_network(network_id)
+                    async with self._agent_pool.acquire(session.main_kernel.agent_id) as agent_client:
+                        await agent_client.destroy_local_network(network_id)
                 except Exception:
                     log.exception(f"Failed to destroy the agent-local network {network_id}")
             case ClusterMode.MULTI_NODE:
