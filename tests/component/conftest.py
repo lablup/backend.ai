@@ -261,6 +261,14 @@ EtcdCtxFactory = Callable[[RootContext], AbstractAsyncContextManager[None]]
 
 
 @pytest.fixture(scope="session")
+def redis_addr(
+    redis_container: tuple[str, HostPortPairModel],  # noqa: F811
+) -> HostPortPairModel:
+    """Expose the Redis container address for fixtures that need it directly."""
+    return redis_container[1]
+
+
+@pytest.fixture(scope="session")
 def mock_etcd_ctx(
     bootstrap_config: BootstrapConfig,
 ) -> EtcdCtxFactory:
@@ -799,6 +807,7 @@ def server_cleanup_contexts() -> list[CleanupContext]:
 @pytest.fixture()
 async def server(
     bootstrap_config: BootstrapConfig,
+    redis_addr: HostPortPairModel,
     mock_etcd_ctx: EtcdCtxFactory,
     etcd_fixture: None,
     database_fixture: None,
@@ -837,6 +846,7 @@ async def server(
         "logging": bootstrap_config.logging,
         "pyroscope": bootstrap_config.pyroscope,
         "debug": bootstrap_config.debug,
+        "redis": {"addr": {"host": redis_addr.host, "port": redis_addr.port}},
     })
     root_ctx.config_provider = _TestConfigProvider(unified_config)
 

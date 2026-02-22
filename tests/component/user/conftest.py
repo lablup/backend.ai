@@ -19,6 +19,8 @@ from ai.backend.common.dto.manager.user import (
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import user as _user_api
 from ai.backend.manager.api.context import RootContext
@@ -37,59 +39,69 @@ UserFactory = Callable[..., Coroutine[Any, Any, CreateUserResponse]]
 async def _user_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     """Set up db, repositories and processors for user-domain component tests.
 
-    Uses a real database engine and all user-related repositories.
-    All other dependencies (valkey, storage, agents, etc.) are replaced
-    with MagicMock to avoid starting unrelated production services.
+    Uses a real database engine and a real Valkey (Redis) connection for
+    valkey_stat (required by auth_middleware). All other dependencies
+    (storage, agents, etc.) are replaced with MagicMock.
     """
-    async with connect_database(root_ctx.config_provider.config.db) as db:
-        root_ctx.db = db
-        # exception_middleware accesses these on every request; use AsyncMock
-        # because the methods are awaited (report_metric, capture_exception, etc.)
-        root_ctx.error_monitor = AsyncMock()
-        root_ctx.stats_monitor = AsyncMock()
-        root_ctx.repositories = Repositories.create(
-            RepositoryArgs(
-                db=db,
-                storage_manager=MagicMock(),
-                config_provider=root_ctx.config_provider,
-                valkey_stat_client=MagicMock(),
-                valkey_schedule_client=MagicMock(),
-                valkey_image_client=MagicMock(),
-                valkey_live_client=MagicMock(),
-            )
-        )
-        root_ctx.processors = Processors.create(
-            ProcessorArgs(
-                service_args=ServiceArgs(
+    valkey_profile_target = root_ctx.config_provider.config.redis.to_valkey_profile_target()
+    valkey_stat = await ValkeyStatClient.create(
+        valkey_profile_target.profile_target(RedisRole.STATISTICS),
+        db_id=REDIS_STATISTICS_DB,
+        human_readable_name="stat",
+    )
+    root_ctx.valkey_stat = valkey_stat
+    try:
+        async with connect_database(root_ctx.config_provider.config.db) as db:
+            root_ctx.db = db
+            # exception_middleware accesses these on every request; use AsyncMock
+            # because the methods are awaited (report_metric, capture_exception, etc.)
+            root_ctx.error_monitor = AsyncMock()
+            root_ctx.stats_monitor = AsyncMock()
+            root_ctx.repositories = Repositories.create(
+                RepositoryArgs(
                     db=db,
-                    repositories=root_ctx.repositories,
-                    etcd=root_ctx.etcd,
-                    config_provider=root_ctx.config_provider,
                     storage_manager=MagicMock(),
+                    config_provider=root_ctx.config_provider,
                     valkey_stat_client=MagicMock(),
-                    valkey_live=MagicMock(),
-                    valkey_artifact_client=MagicMock(),
-                    event_fetcher=MagicMock(),
-                    background_task_manager=MagicMock(),
-                    event_hub=MagicMock(),
-                    agent_registry=MagicMock(),
-                    error_monitor=MagicMock(),
-                    idle_checker_host=MagicMock(),
-                    event_dispatcher=MagicMock(),
-                    hook_plugin_ctx=MagicMock(),
-                    scheduling_controller=MagicMock(),
-                    deployment_controller=MagicMock(),
-                    revision_generator_registry=MagicMock(),
-                    event_producer=MagicMock(),
-                    agent_cache=MagicMock(),
-                    notification_center=MagicMock(),
-                    appproxy_client_pool=MagicMock(),
-                    prometheus_client=MagicMock(),
+                    valkey_schedule_client=MagicMock(),
+                    valkey_image_client=MagicMock(),
+                    valkey_live_client=MagicMock(),
+                )
+            )
+            root_ctx.processors = Processors.create(
+                ProcessorArgs(
+                    service_args=ServiceArgs(
+                        db=db,
+                        repositories=root_ctx.repositories,
+                        etcd=root_ctx.etcd,
+                        config_provider=root_ctx.config_provider,
+                        storage_manager=MagicMock(),
+                        valkey_stat_client=MagicMock(),
+                        valkey_live=MagicMock(),
+                        valkey_artifact_client=MagicMock(),
+                        event_fetcher=MagicMock(),
+                        background_task_manager=MagicMock(),
+                        event_hub=MagicMock(),
+                        agent_registry=MagicMock(),
+                        error_monitor=MagicMock(),
+                        idle_checker_host=MagicMock(),
+                        event_dispatcher=MagicMock(),
+                        hook_plugin_ctx=MagicMock(),
+                        scheduling_controller=MagicMock(),
+                        deployment_controller=MagicMock(),
+                        revision_generator_registry=MagicMock(),
+                        event_producer=MagicMock(),
+                        agent_cache=MagicMock(),
+                        notification_center=MagicMock(),
+                        appproxy_client_pool=MagicMock(),
+                        prometheus_client=MagicMock(),
+                    ),
                 ),
-            ),
-            [],
-        )
-        yield
+                [],
+            )
+            yield
+    finally:
+        await valkey_stat.close()
 
 
 @pytest.fixture()
