@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.user import (
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
+from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import user as _user_api
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
@@ -27,7 +28,7 @@ from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
 
-_USER_SERVER_SUBAPP_MODULES = (_user_api,)
+_USER_SERVER_SUBAPP_MODULES = (_auth_api, _user_api)
 
 UserFactory = Callable[..., Coroutine[Any, Any, CreateUserResponse]]
 
@@ -94,7 +95,7 @@ async def _user_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @pytest.fixture()
 def server_subapp_pkgs() -> list[str]:
     """Load only the subapps required for user-domain tests."""
-    return [".user"]
+    return [".auth", ".user"]
 
 
 @pytest.fixture()
