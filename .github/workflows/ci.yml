@@ -545,13 +545,62 @@ jobs:
       with:
         name: SBOM report
         path: dist
-    - name: Release to GitHub
-      uses: softprops/action-gh-release@v2
+    - name: Download supergraph schema
+      uses: actions/download-artifact@v6
       with:
-        body_path: "CHANGELOG_RELEASE.md"
-        prerelease: ${{ env.IS_PRERELEASE }}
-        files: |
-          dist/*
+        name: supergraph
+        path: dist
+    - name: Create GitHub Release
+      run: |
+        if [ "${{ env.IS_PRERELEASE }}" = "true" ]; then
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --notes-file "CHANGELOG_RELEASE.md" \
+            --prerelease
+        else
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --notes-file "CHANGELOG_RELEASE.md"
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload release assets
+      run: |
+        for file in dist/*; do
+          echo "Uploading $file..."
+          for attempt in 1 2 3; do
+            if gh release upload "${{ github.ref_name }}" "$file" --clobber; then
+              echo "Successfully uploaded $file"
+              break
+            fi
+            if [ $attempt -lt 3 ]; then
+              echo "Retry attempt $attempt failed for $file, waiting 10s..."
+              sleep 10
+            else
+              echo "Failed to upload $file after 3 attempts"
+              exit 1
+            fi
+          done
+        done
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: mint API token
+      id: mint-token
+      run: |
+          # retrieve the ambient OIDC token
+          resp=$(curl --fail-with-body -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=pypi")
+          oidc_token=$(jq -r '.value' <<< "${resp}")
+
+          # exchange the OIDC token for an API token
+          resp=$(curl --fail-with-body -X POST https://pypi.org/_/oidc/mint-token -d "{\"token\": \"${oidc_token}\"}")
+          api_token=$(jq -r '.token' <<< "${resp}")
+
+          # mask the newly minted API token, so that we don't accidentally leak it
+          echo "::add-mask::${api_token}"
+
+          # see the next step in the workflow for an example of using this step output
+          echo "api-token=${api_token}" >> "${GITHUB_OUTPUT}"
     - name: Publish to PyPI
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
