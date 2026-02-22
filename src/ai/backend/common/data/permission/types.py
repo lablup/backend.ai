@@ -89,6 +89,7 @@ class EntityType(enum.StrEnum):
     # === Standalone entity types ===
     AGENT = "agent"
     AUTH = "auth"
+    SERVICE_CATALOG = "service_catalog"
     AUDIT_LOG = "audit_log"
     CONTAINER_METRIC = "container_metric"
     CONTAINER_METRIC_METADATA = "container_metric_metadata"
