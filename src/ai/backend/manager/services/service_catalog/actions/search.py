@@ -1,24 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.service_catalog.types import ServiceCatalogData
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.service_catalog.actions.base import ServiceCatalogAction
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
 
 
 @dataclass
 class SearchServiceCatalogsAction(ServiceCatalogAction):
     """Action to search service catalog entries."""
 
-    service_group: str | None = None
-    status: str | None = None
-    first: int | None = None
-    offset: int | None = None
+    querier: BatchQuerier
 
     @override
     def entity_id(self) -> str | None:
@@ -34,7 +30,10 @@ class SearchServiceCatalogsAction(ServiceCatalogAction):
 class SearchServiceCatalogsActionResult(BaseActionResult):
     """Result of searching service catalog entries."""
 
-    catalogs: list[ServiceCatalogRow]
+    data: list[ServiceCatalogData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
     @override
     def entity_id(self) -> str | None:

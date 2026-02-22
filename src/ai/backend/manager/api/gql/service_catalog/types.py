@@ -4,18 +4,21 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self
+from typing import Self
 
 import strawberry
 from strawberry.relay import Node, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.types import ServiceCatalogStatus
+from ai.backend.manager.api.gql.types import GQLFilter
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.models.service_catalog.row import (
-    ServiceCatalogEndpointRow,
-    ServiceCatalogRow,
+from ai.backend.manager.data.service_catalog.types import (
+    ServiceCatalogData,
+    ServiceCatalogEndpointData,
 )
+from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
+from ai.backend.manager.repositories.base import QueryCondition
 
 __all__ = (
     "ServiceCatalogEndpointGQL",
@@ -60,14 +63,14 @@ class ServiceCatalogEndpointGQL:
     metadata: JSON | None = strawberry.field(description="Additional metadata.", default=None)
 
     @classmethod
-    def from_row(cls, row: ServiceCatalogEndpointRow) -> Self:
+    def from_data(cls, data: ServiceCatalogEndpointData) -> Self:
         return cls(
-            role=row.role,
-            scope=row.scope,
-            address=row.address,
-            port=row.port,
-            protocol=row.protocol,
-            metadata=row.metadata_,
+            role=data.role,
+            scope=data.scope,
+            address=data.address,
+            port=data.port,
+            protocol=data.protocol,
+            metadata=data.metadata,
         )
 
 
@@ -96,20 +99,20 @@ class ServiceCatalogGQL(Node):
     )
 
     @classmethod
-    def from_row(cls, row: ServiceCatalogRow) -> Self:
+    def from_data(cls, data: ServiceCatalogData) -> Self:
         return cls(
-            id=str(row.id),
-            service_group=row.service_group,
-            instance_id=row.instance_id,
-            display_name=row.display_name,
-            version=row.version,
-            labels=row.labels,
-            status=ServiceCatalogStatusGQL.from_status(row.status),
-            startup_time=row.startup_time,
-            registered_at=row.registered_at,
-            last_heartbeat=row.last_heartbeat,
-            config_hash=row.config_hash,
-            endpoints=[ServiceCatalogEndpointGQL.from_row(ep) for ep in row.endpoints],
+            id=str(data.id),
+            service_group=data.service_group,
+            instance_id=data.instance_id,
+            display_name=data.display_name,
+            version=data.version,
+            labels=data.labels,
+            status=ServiceCatalogStatusGQL.from_status(data.status),
+            startup_time=data.startup_time,
+            registered_at=data.registered_at,
+            last_heartbeat=data.last_heartbeat,
+            config_hash=data.config_hash,
+            endpoints=[ServiceCatalogEndpointGQL.from_data(ep) for ep in data.endpoints],
         )
 
 
@@ -117,7 +120,7 @@ class ServiceCatalogGQL(Node):
     name="ServiceCatalogFilter",
     description="Added in 26.3.0. Filter for service catalog queries.",
 )
-class ServiceCatalogFilterGQL:
+class ServiceCatalogFilterGQL(GQLFilter):
     service_group: str | None = strawberry.field(
         default=None,
         description="Filter by service group name (exact match).",
@@ -127,11 +130,13 @@ class ServiceCatalogFilterGQL:
         description="Filter by health status.",
     )
 
-    def build_sa_conditions(self) -> list[Any]:
-        """Build SQLAlchemy WHERE conditions from filter fields."""
-        conditions: list[Any] = []
+    def build_conditions(self) -> list[QueryCondition]:
+        """Build query conditions from filter fields."""
+        conditions: list[QueryCondition] = []
         if self.service_group is not None:
-            conditions.append(ServiceCatalogRow.service_group == self.service_group)
+            group = self.service_group
+            conditions.append(lambda: ServiceCatalogRow.service_group == group)
         if self.status is not None:
-            conditions.append(ServiceCatalogRow.status == ServiceCatalogStatus(self.status.value))
+            status_val = ServiceCatalogStatus(self.status.value)
+            conditions.append(lambda: ServiceCatalogRow.status == status_val)
         return conditions
