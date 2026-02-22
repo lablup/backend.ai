@@ -369,7 +369,7 @@ jobs:
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v10
       with:
-        gha-cache-key: v0
+        gha-cache-key: v0-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'false'
     - name: Build both lazy and fat packages
