@@ -182,12 +182,14 @@ class ROCmPlugin(AbstractComputePlugin):
     def get_version(self) -> str:
         return __version__
 
-    async def extra_info(self) -> Mapping[str, Any]:
+    async def extra_info(self) -> Mapping[str, str | bool]:
         if self.enabled:
             try:
+                driver_version = libhip.get_driver_version()
+                # TODO: This is breaking change
                 return {
                     "rocm_support": True,
-                    "driver_version": libhip.get_driver_version(),
+                    "driver_version": f"{driver_version[0]}.{driver_version[1]}",
                 }
             except (GenericRocmError, ImportError):
                 self.enabled = False
