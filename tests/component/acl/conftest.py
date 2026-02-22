@@ -47,6 +47,7 @@ async def _acl_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     Only agent_registry is left as MagicMock because it requires live gRPC
     connections to real agents, which are not available in component tests.
     """
+    root_ctx.config_provider._legacy_etcd_config_loader = MagicMock()
     root_ctx.repositories = Repositories.create(
         RepositoryArgs(
             db=root_ctx.db,
