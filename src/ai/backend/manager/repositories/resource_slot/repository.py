@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -13,7 +14,16 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
-from ai.backend.manager.models.resource_slot import ResourceSlotTypeRow
+from ai.backend.manager.data.resource_slot.types import (
+    AgentResourceSearchResult,
+    ResourceAllocationSearchResult,
+)
+from ai.backend.manager.models.resource_slot import (
+    AgentResourceRow,
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
+from ai.backend.manager.repositories.base import BatchQuerier
 
 from .db_source import ResourceSlotDBSource
 
@@ -64,3 +74,27 @@ class ResourceSlotRepository:
     async def get_slot_type(self, slot_name: str) -> ResourceSlotTypeRow:
         """Get a specific resource slot type by name."""
         return await self._db_source.get_slot_type(slot_name)
+
+    # ==================== agent_resources ====================
+
+    @resource_slot_repository_resilience.apply()
+    async def get_agent_resources(self, agent_id: str) -> list[AgentResourceRow]:
+        """Get all slot capacity/usage rows for a given agent."""
+        return await self._db_source.get_agent_resources(agent_id)
+
+    @resource_slot_repository_resilience.apply()
+    async def search_agent_resources(self, querier: BatchQuerier) -> AgentResourceSearchResult:
+        return await self._db_source.search_agent_resources(querier)
+
+    # ==================== resource_allocations ====================
+
+    @resource_slot_repository_resilience.apply()
+    async def get_kernel_allocations(self, kernel_id: uuid.UUID) -> list[ResourceAllocationRow]:
+        """Get all per-slot allocation rows for a given kernel."""
+        return await self._db_source.get_kernel_allocations(kernel_id)
+
+    @resource_slot_repository_resilience.apply()
+    async def search_resource_allocations(
+        self, querier: BatchQuerier
+    ) -> ResourceAllocationSearchResult:
+        return await self._db_source.search_resource_allocations(querier)
