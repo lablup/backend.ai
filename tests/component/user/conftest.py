@@ -5,7 +5,7 @@ import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from contextlib import asynccontextmanager
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -42,6 +42,10 @@ async def _user_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     """
     async with connect_database(root_ctx.config_provider.config.db) as db:
         root_ctx.db = db
+        # exception_middleware accesses these on every request; use AsyncMock
+        # because the methods are awaited (report_metric, capture_exception, etc.)
+        root_ctx.error_monitor = AsyncMock()
+        root_ctx.stats_monitor = AsyncMock()
         root_ctx.repositories = Repositories.create(
             RepositoryArgs(
                 db=db,
