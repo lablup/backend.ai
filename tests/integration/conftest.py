@@ -29,7 +29,7 @@ from ai.backend.common.configs.loader import EtcdConfigWatcher, LoaderChain
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.jwt.validator import JWTValidator
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import VFolderHostPermissionMap
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
@@ -462,7 +462,7 @@ async def domain_fixture(
                 name=domain_name,
                 description=f"Test domain {domain_name}",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
             )
         )
@@ -499,7 +499,7 @@ async def resource_policy_fixture(
             sa.insert(keypair_resource_policies).values(
                 name=policy_name,
                 default_for_unspecified="UNLIMITED",
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 max_session_lifetime=0,
                 max_concurrent_sessions=5,
                 max_containers_per_session=1,
