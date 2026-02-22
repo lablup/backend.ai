@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -55,7 +55,7 @@ async def _container_registry_domain_ctx(root_ctx: RootContext) -> AsyncIterator
     """
     # @require_manager_status decorator accesses config_provider.legacy_etcd_config_loader
     # which is not initialized in _TestConfigProvider used in component tests.
-    root_ctx.config_provider._legacy_etcd_config_loader = MagicMock()
+    root_ctx.config_provider._legacy_etcd_config_loader = AsyncMock()
     root_ctx.repositories = Repositories.create(
         RepositoryArgs(
             db=root_ctx.db,
