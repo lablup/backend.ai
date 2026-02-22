@@ -26,7 +26,11 @@ from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.server import (
+    background_task_ctx,
     database_ctx,
+    event_hub_ctx,
+    event_producer_ctx,
+    message_queue_ctx,
     monitoring_ctx,
     redis_ctx,
     storage_manager_ctx,
@@ -42,12 +46,18 @@ UserFactory = Callable[..., Coroutine[Any, Any, CreateUserResponse]]
 async def _user_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     """Set up repositories and processors for user-domain component tests.
 
-    Uses real database, Valkey clients, monitors, and storage manager already
-    initialized by the preceding cleanup contexts (redis_ctx, database_ctx,
-    monitoring_ctx, storage_manager_ctx).  Infrastructure dependencies that
-    are not exercised by user-domain CRUD paths (agent_registry, event
-    dispatcher, etc.) are replaced with MagicMock to avoid requiring a full
-    agent cluster.
+    Relies on the preceding cleanup contexts having already initialized:
+    - redis_ctx      → root_ctx.valkey_* (all 8 clients)
+    - database_ctx   → root_ctx.db
+    - monitoring_ctx → root_ctx.error_monitor / stats_monitor
+    - storage_manager_ctx  → root_ctx.storage_manager
+    - message_queue_ctx    → root_ctx.message_queue
+    - event_producer_ctx   → root_ctx.event_producer / event_fetcher
+    - event_hub_ctx        → root_ctx.event_hub
+    - background_task_ctx  → root_ctx.background_task_manager
+
+    Only agent_registry is left as MagicMock because it requires live gRPC
+    connections to real agents, which are not available in component tests.
     """
     root_ctx.repositories = Repositories.create(
         RepositoryArgs(
@@ -72,10 +82,12 @@ async def _user_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 valkey_live=root_ctx.valkey_live,
                 valkey_artifact_client=root_ctx.valkey_artifact,
                 error_monitor=root_ctx.error_monitor,
-                # Infrastructure dependencies not invoked in user-domain CRUD paths:
-                event_fetcher=MagicMock(),
-                background_task_manager=MagicMock(),
-                event_hub=MagicMock(),
+                event_fetcher=root_ctx.event_fetcher,
+                background_task_manager=root_ctx.background_task_manager,
+                event_hub=root_ctx.event_hub,
+                event_producer=root_ctx.event_producer,
+                # agent_registry requires gRPC connections to real agents — not feasible
+                # in the component test environment; kept as MagicMock.
                 agent_registry=MagicMock(),
                 idle_checker_host=MagicMock(),
                 event_dispatcher=MagicMock(),
@@ -83,7 +95,6 @@ async def _user_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 scheduling_controller=MagicMock(),
                 deployment_controller=MagicMock(),
                 revision_generator_registry=MagicMock(),
-                event_producer=MagicMock(),
                 agent_cache=MagicMock(),
                 notification_center=MagicMock(),
                 appproxy_client_pool=MagicMock(),
@@ -110,9 +121,23 @@ def server_cleanup_contexts() -> list[CleanupContext]:
     - database_ctx: real database connection
     - monitoring_ctx: real (empty-plugin) error and stats monitors
     - storage_manager_ctx: real StorageSessionManager (empty proxy config)
+    - message_queue_ctx: real Redis-backed message queue
+    - event_producer_ctx: real EventProducer + EventFetcher
+    - event_hub_ctx: real EventHub
+    - background_task_ctx: real BackgroundTaskManager
     - _user_domain_ctx: repositories and processors wired with real clients
     """
-    return [redis_ctx, database_ctx, monitoring_ctx, storage_manager_ctx, _user_domain_ctx]
+    return [
+        redis_ctx,
+        database_ctx,
+        monitoring_ctx,
+        storage_manager_ctx,
+        message_queue_ctx,
+        event_producer_ctx,
+        event_hub_ctx,
+        background_task_ctx,
+        _user_domain_ctx,
+    ]
 
 
 @pytest.fixture()
