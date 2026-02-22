@@ -16,12 +16,14 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import SlotName, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.errors.resource import (
     ProjectHasActiveEndpointsError,
     ProjectHasActiveKernelsError,
@@ -56,9 +58,13 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.group.purgers import (
@@ -123,9 +129,15 @@ class GroupDBSource:
                     f"Group with name '{spec.name}' already exists in domain '{spec.domain_name}'"
                 )
 
-            # Create the group
-            creator_result = await execute_creator(db_session, creator)
-            row: GroupRow = creator_result.row
+            # Create the group with RBAC scope association
+            rbac_creator = RBACEntityCreator(
+                spec=creator.spec,
+                entity_type=EntityType.PROJECT,
+                scope_ref=ScopeId(ScopeType.DOMAIN, spec.domain_name),
+                additional_scope_refs=[],
+            )
+            result = await execute_rbac_entity_creator(db_session, rbac_creator)
+            row: GroupRow = result.row
             data = row.to_data()
             # Create RBAC role and permissions for the group
             await self._role_manager.create_system_role(db_session, data)
