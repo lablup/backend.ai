@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from unittest.mock import MagicMock
 
 import pytest
@@ -29,6 +30,7 @@ from ai.backend.manager.services.processors import ProcessorArgs, Processors, Se
 _SCHEDULING_HISTORY_SERVER_SUBAPP_MODULES = (_auth_api, _scheduling_history_api)
 
 
+@asynccontextmanager
 async def _scheduling_history_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     """Set up repositories and processors for scheduling-history component tests.
 
