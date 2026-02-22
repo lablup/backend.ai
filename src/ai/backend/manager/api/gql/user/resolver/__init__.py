@@ -2,12 +2,12 @@
 
 from .mutation import (
     admin_bulk_create_users,
+    admin_bulk_purge_users_v2,
     admin_bulk_update_users_v2,
     admin_create_user,
     admin_delete_user,
     admin_delete_users,
     admin_purge_user,
-    admin_purge_users,
     admin_update_user,
     update_user,
 )
@@ -35,5 +35,5 @@ __all__ = [
     "admin_delete_user",
     "admin_delete_users",
     "admin_purge_user",
-    "admin_purge_users",
+    "admin_bulk_purge_users_v2",
 ]

@@ -930,6 +930,40 @@ type BulkCreateUsersV2Payload {
   failed: [BulkCreateUserError!]!
 }
 
+"""Added in 26.3.0. Error information for a failed user in bulk purge."""
+type BulkPurgeUserV2Error {
+  """UUID of the user that failed to purge."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""
+Added in 26.3.0. Input for permanently deleting multiple users. This action is irreversible.
+"""
+input BulkPurgeUsersV2Input {
+  """List of user UUIDs to purge."""
+  userIds: [UUID!]!
+
+  """
+  If true, migrate shared virtual folders to the admin user before purging.
+  """
+  purgeSharedVfolders: Boolean! = false
+
+  """If true, delegate endpoint ownership to the admin user before purging."""
+  delegateEndpointOwnership: Boolean! = false
+}
+
+"""Added in 26.3.0. Payload for bulk user permanent deletion mutation."""
+type BulkPurgeUsersV2Payload {
+  """Number of users successfully purged."""
+  purgedCount: Int!
+
+  """List of errors for users that failed to purge."""
+  failed: [BulkPurgeUserV2Error!]!
+}
+
 """Added in 26.3.0. Error information for a failed user in bulk update."""
 type BulkUpdateUserError {
   """UUID of the user that failed to update."""
@@ -3873,9 +3907,9 @@ type Mutation {
   adminPurgeUser(input: PurgeUserV2Input!): PurgeUserV2Payload!
 
   """
-  Added in 26.2.0. Permanently delete multiple users (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted.
+  Added in 26.3.0. Permanently delete multiple users in bulk (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted.
   """
-  adminPurgeUsers(input: PurgeUsersV2Input!): PurgeUsersV2Payload!
+  adminBulkPurgeUsersV2(input: BulkPurgeUsersV2Input!): BulkPurgeUsersV2Payload!
 
   """Added in 26.3.0. Create a new role (admin only)."""
   adminCreateRole(input: CreateRoleInput!): Role!
@@ -4773,23 +4807,6 @@ input PurgeUserV2Input {
 type PurgeUserV2Payload {
   """Whether the purge was successful."""
   success: Boolean!
-}
-
-"""
-Added in 26.2.0. Input for permanently deleting multiple users. This action is irreversible.
-"""
-input PurgeUsersV2Input {
-  """List of user UUIDs to purge."""
-  userIds: [UUID!]!
-}
-
-"""Added in 26.2.0. Payload for bulk user permanent deletion mutation."""
-type PurgeUsersV2Payload {
-  """Number of users successfully purged."""
-  purgedCount: Int!
-
-  """List of user UUIDs that failed to purge, if any."""
-  failedUserIds: [UUID!]!
 }
 
 type Query {

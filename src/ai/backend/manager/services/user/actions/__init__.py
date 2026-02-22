@@ -24,6 +24,8 @@ from .modify_user import (
     ModifyUserActionResult,
 )
 from .purge_user import (
+    BulkPurgeUserAction,
+    BulkPurgeUserActionResult,
     PurgeUserAction,
     PurgeUserActionResult,
 )
@@ -55,6 +57,8 @@ __all__ = (
     "GetUserActionResult",
     "ModifyUserAction",
     "ModifyUserActionResult",
+    "BulkPurgeUserAction",
+    "BulkPurgeUserActionResult",
     "PurgeUserAction",
     "PurgeUserActionResult",
     "SearchUsersAction",
