@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import secrets
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 import pytest
 
@@ -22,7 +24,7 @@ from ai.backend.common.dto.manager.domain import (
 )
 from ai.backend.common.dto.manager.query import StringFilter
 
-from .conftest import DomainFactory
+DomainFactory = Callable[..., Coroutine[Any, Any, CreateDomainResponse]]
 
 
 class TestDomainCreate:
