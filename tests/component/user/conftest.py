@@ -5,7 +5,7 @@ import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from contextlib import asynccontextmanager
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -19,15 +19,18 @@ from ai.backend.common.dto.manager.user import (
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
-from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import user as _user_api
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
-from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
+from ai.backend.manager.server import (
+    database_ctx,
+    monitoring_ctx,
+    redis_ctx,
+    storage_manager_ctx,
+)
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
 
 _USER_SERVER_SUBAPP_MODULES = (_auth_api, _user_api)
@@ -37,71 +40,59 @@ UserFactory = Callable[..., Coroutine[Any, Any, CreateUserResponse]]
 
 @asynccontextmanager
 async def _user_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    """Set up db, repositories and processors for user-domain component tests.
+    """Set up repositories and processors for user-domain component tests.
 
-    Uses a real database engine and a real Valkey (Redis) connection for
-    valkey_stat (required by auth_middleware). All other dependencies
-    (storage, agents, etc.) are replaced with MagicMock.
+    Uses real database, Valkey clients, monitors, and storage manager already
+    initialized by the preceding cleanup contexts (redis_ctx, database_ctx,
+    monitoring_ctx, storage_manager_ctx).  Infrastructure dependencies that
+    are not exercised by user-domain CRUD paths (agent_registry, event
+    dispatcher, etc.) are replaced with MagicMock to avoid requiring a full
+    agent cluster.
     """
-    valkey_profile_target = root_ctx.config_provider.config.redis.to_valkey_profile_target()
-    valkey_stat = await ValkeyStatClient.create(
-        valkey_profile_target.profile_target(RedisRole.STATISTICS),
-        db_id=REDIS_STATISTICS_DB,
-        human_readable_name="stat",
+    root_ctx.repositories = Repositories.create(
+        RepositoryArgs(
+            db=root_ctx.db,
+            storage_manager=root_ctx.storage_manager,
+            config_provider=root_ctx.config_provider,
+            valkey_stat_client=root_ctx.valkey_stat,
+            valkey_schedule_client=root_ctx.valkey_schedule,
+            valkey_image_client=root_ctx.valkey_image,
+            valkey_live_client=root_ctx.valkey_live,
+        )
     )
-    root_ctx.valkey_stat = valkey_stat
-    try:
-        async with connect_database(root_ctx.config_provider.config.db) as db:
-            root_ctx.db = db
-            # exception_middleware accesses these on every request; use AsyncMock
-            # because the methods are awaited (report_metric, capture_exception, etc.)
-            root_ctx.error_monitor = AsyncMock()
-            root_ctx.stats_monitor = AsyncMock()
-            root_ctx.repositories = Repositories.create(
-                RepositoryArgs(
-                    db=db,
-                    storage_manager=MagicMock(),
-                    config_provider=root_ctx.config_provider,
-                    valkey_stat_client=MagicMock(),
-                    valkey_schedule_client=MagicMock(),
-                    valkey_image_client=MagicMock(),
-                    valkey_live_client=MagicMock(),
-                )
-            )
-            root_ctx.processors = Processors.create(
-                ProcessorArgs(
-                    service_args=ServiceArgs(
-                        db=db,
-                        repositories=root_ctx.repositories,
-                        etcd=root_ctx.etcd,
-                        config_provider=root_ctx.config_provider,
-                        storage_manager=MagicMock(),
-                        valkey_stat_client=MagicMock(),
-                        valkey_live=MagicMock(),
-                        valkey_artifact_client=MagicMock(),
-                        event_fetcher=MagicMock(),
-                        background_task_manager=MagicMock(),
-                        event_hub=MagicMock(),
-                        agent_registry=MagicMock(),
-                        error_monitor=MagicMock(),
-                        idle_checker_host=MagicMock(),
-                        event_dispatcher=MagicMock(),
-                        hook_plugin_ctx=MagicMock(),
-                        scheduling_controller=MagicMock(),
-                        deployment_controller=MagicMock(),
-                        revision_generator_registry=MagicMock(),
-                        event_producer=MagicMock(),
-                        agent_cache=MagicMock(),
-                        notification_center=MagicMock(),
-                        appproxy_client_pool=MagicMock(),
-                        prometheus_client=MagicMock(),
-                    ),
-                ),
-                [],
-            )
-            yield
-    finally:
-        await valkey_stat.close()
+    root_ctx.processors = Processors.create(
+        ProcessorArgs(
+            service_args=ServiceArgs(
+                db=root_ctx.db,
+                repositories=root_ctx.repositories,
+                etcd=root_ctx.etcd,
+                config_provider=root_ctx.config_provider,
+                storage_manager=root_ctx.storage_manager,
+                valkey_stat_client=root_ctx.valkey_stat,
+                valkey_live=root_ctx.valkey_live,
+                valkey_artifact_client=root_ctx.valkey_artifact,
+                error_monitor=root_ctx.error_monitor,
+                # Infrastructure dependencies not invoked in user-domain CRUD paths:
+                event_fetcher=MagicMock(),
+                background_task_manager=MagicMock(),
+                event_hub=MagicMock(),
+                agent_registry=MagicMock(),
+                idle_checker_host=MagicMock(),
+                event_dispatcher=MagicMock(),
+                hook_plugin_ctx=MagicMock(),
+                scheduling_controller=MagicMock(),
+                deployment_controller=MagicMock(),
+                revision_generator_registry=MagicMock(),
+                event_producer=MagicMock(),
+                agent_cache=MagicMock(),
+                notification_center=MagicMock(),
+                appproxy_client_pool=MagicMock(),
+                prometheus_client=MagicMock(),
+            ),
+        ),
+        [],
+    )
+    yield
 
 
 @pytest.fixture()
@@ -112,8 +103,16 @@ def server_subapp_pkgs() -> list[str]:
 
 @pytest.fixture()
 def server_cleanup_contexts() -> list[CleanupContext]:
-    """Provide the single cleanup context for user-domain component tests."""
-    return [_user_domain_ctx]
+    """Provide cleanup contexts for user-domain component tests.
+
+    Uses production contexts from server.py for real infrastructure:
+    - redis_ctx: all 8 Valkey clients
+    - database_ctx: real database connection
+    - monitoring_ctx: real (empty-plugin) error and stats monitors
+    - storage_manager_ctx: real StorageSessionManager (empty proxy config)
+    - _user_domain_ctx: repositories and processors wired with real clients
+    """
+    return [redis_ctx, database_ctx, monitoring_ctx, storage_manager_ctx, _user_domain_ctx]
 
 
 @pytest.fixture()
