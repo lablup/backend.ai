@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import acl as _acl_api
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api.context import RootContext
@@ -47,7 +48,9 @@ async def _acl_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     Only agent_registry is left as MagicMock because it requires live gRPC
     connections to real agents, which are not available in component tests.
     """
-    root_ctx.config_provider._legacy_etcd_config_loader = MagicMock()
+    _mock_loader = MagicMock()
+    _mock_loader.get_manager_status = AsyncMock(return_value=ManagerStatus.RUNNING)
+    root_ctx.config_provider._legacy_etcd_config_loader = _mock_loader
     root_ctx.repositories = Repositories.create(
         RepositoryArgs(
             db=root_ctx.db,
