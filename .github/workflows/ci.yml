@@ -567,13 +567,40 @@ jobs:
       with:
         name: supergraph
         path: dist
-    - name: Release to GitHub
-      uses: softprops/action-gh-release@v2
-      with:
-        body_path: "CHANGELOG_RELEASE.md"
-        prerelease: ${{ env.IS_PRERELEASE }}
-        files: |
-          dist/*
+    - name: Create GitHub Release
+      run: |
+        if [ "${{ env.IS_PRERELEASE }}" = "true" ]; then
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --notes-file "CHANGELOG_RELEASE.md" \
+            --prerelease
+        else
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --notes-file "CHANGELOG_RELEASE.md"
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload release assets
+      run: |
+        for file in dist/*; do
+          echo "Uploading $file..."
+          for attempt in 1 2 3; do
+            if gh release upload "${{ github.ref_name }}" "$file" --clobber; then
+              echo "Successfully uploaded $file"
+              break
+            fi
+            if [ $attempt -lt 3 ]; then
+              echo "Retry attempt $attempt failed for $file, waiting 10s..."
+              sleep 10
+            else
+              echo "Failed to upload $file after 3 attempts"
+              exit 1
+            fi
+          done
+        done
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: mint API token
       id: mint-token
       run: |
