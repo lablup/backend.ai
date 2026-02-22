@@ -43,6 +43,7 @@ Changes
 * Fix FK violation on agent heartbeat by seeding `resource_slot_types` table during oneshot DB initialization. ([#9129](https://github.com/lablup/backend.ai/issues/9129))
 * Fix cross-architecture binary collision in build-scies CI job by including runner architecture in Pants cache key. ([#9185](https://github.com/lablup/backend.ai/issues/9185))
 * Pass SCIENCE_AUTH_API_GITHUB_COM_BEARER to Pants subprocess environment to prevent GitHub API rate limit errors during scie build in CI. ([#9186](https://github.com/lablup/backend.ai/issues/9186))
+* Fix release CI failure where `dist/export/` directory caused asset upload loop to error with "is a directory". ([#9194](https://github.com/lablup/backend.ai/issues/9194))
 
 ### Documentation Updates
 * Add /submit and /release skills ([#8819](https://github.com/lablup/backend.ai/issues/8819))
