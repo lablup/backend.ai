@@ -154,7 +154,7 @@ class TestPresignedURLs:
         assert method == "POST"
         assert "/object-storages/presigned/upload" in url
         assert body is not None
-        assert body["artifact_revision_id"] == rev_id
+        assert body["artifact_revision_id"] == str(rev_id)
         assert body["key"] == "model.bin"
 
     @pytest.mark.asyncio
@@ -196,7 +196,7 @@ class TestPresignedURLs:
         assert method == "POST"
         assert "/object-storages/presigned/download" in url
         assert body is not None
-        assert body["artifact_revision_id"] == rev_id
+        assert body["artifact_revision_id"] == str(rev_id)
 
     @pytest.mark.asyncio
     async def test_get_presigned_download_url_with_expiration(self) -> None:

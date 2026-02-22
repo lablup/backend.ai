@@ -270,7 +270,7 @@ class TestAliasImage:
         assert "/admin/images/alias" in str(call_args[0][1])
         call_kwargs = mock_session.request.call_args.kwargs
         body = call_kwargs["json"]
-        assert body["image_id"] == _SAMPLE_IMAGE_ID
+        assert body["image_id"] == str(_SAMPLE_IMAGE_ID)
         assert body["alias"] == "python-3.11"
         assert isinstance(result, AliasImageResponse)
         assert result.alias_id == _SAMPLE_ALIAS_ID
@@ -327,7 +327,7 @@ class TestForgetImage:
         assert "/admin/images/forget" in str(call_args[0][1])
         call_kwargs = mock_session.request.call_args.kwargs
         body = call_kwargs["json"]
-        assert body["image_id"] == _SAMPLE_IMAGE_ID
+        assert body["image_id"] == str(_SAMPLE_IMAGE_ID)
         assert isinstance(result, ForgetImageResponse)
         assert result.item.id == _SAMPLE_IMAGE_ID
         assert result.item.status == "DELETED"
@@ -354,7 +354,7 @@ class TestPurgeImage:
         assert "/admin/images/purge" in str(call_args[0][1])
         call_kwargs = mock_session.request.call_args.kwargs
         body = call_kwargs["json"]
-        assert body["image_id"] == _SAMPLE_IMAGE_ID
+        assert body["image_id"] == str(_SAMPLE_IMAGE_ID)
         assert isinstance(result, PurgeImageResponse)
         assert result.item.id == _SAMPLE_IMAGE_ID
         assert result.item.status == "DELETED"

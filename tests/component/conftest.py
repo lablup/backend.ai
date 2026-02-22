@@ -28,11 +28,14 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
@@ -45,9 +48,12 @@ from ai.backend.manager.config.unified import (
     ManagerConfig,
     ManagerUnifiedConfig,
 )
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import GroupRow, association_groups_users
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import keypairs
@@ -57,6 +63,7 @@ from ai.backend.manager.models.resource_policy import (
     keypair_resource_policies,
 )
 from ai.backend.manager.models.scaling_group import scaling_groups, sgroups_for_domains
+from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import users
@@ -64,7 +71,6 @@ from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.server import (
     build_root_app,
     etcd_ctx,
-    global_subapp_pkgs,
 )
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
@@ -252,6 +258,14 @@ def bootstrap_config(
 
 
 EtcdCtxFactory = Callable[[RootContext], AbstractAsyncContextManager[None]]
+
+
+@pytest.fixture(scope="session")
+def redis_addr(
+    redis_container: tuple[str, HostPortPairModel],  # noqa: F811
+) -> HostPortPairModel:
+    """Expose the Redis container address for fixtures that need it directly."""
+    return redis_container[1]
 
 
 @pytest.fixture(scope="session")
@@ -465,8 +479,8 @@ async def domain_fixture(
                 name=domain_name,
                 description=f"Test domain {domain_name}",
                 is_active=True,
-                total_resource_slots={},
-                allowed_vfolder_hosts={},
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts=VFolderHostPermissionMap(),
             )
         )
     yield domain_name
@@ -478,8 +492,18 @@ async def domain_fixture(
 async def resource_policy_fixture(
     db_engine: SAEngine,
 ) -> AsyncIterator[str]:
-    """Insert resource policies (user, project, keypair) with a shared random name."""
+    """Insert resource policies (user, project, keypair) with a shared random name.
+
+    Also inserts the system-default keypair resource policy ("default") required
+    by the user-creation flow, which always assigns new keypairs to that policy
+    name regardless of the user's own resource_policy value.
+    Teardown removes both the named policy and the "default" keypair policy.
+    The "default" keypair policy is safe to delete here because user_factory
+    (which depends on this fixture) runs its teardown first, purging all
+    keypairs that reference it.
+    """
     policy_name = f"policy-{secrets.token_hex(6)}"
+    default_kp_policy_name = "default"
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(UserResourcePolicyRow.__table__).values(
@@ -501,17 +525,36 @@ async def resource_policy_fixture(
         await conn.execute(
             sa.insert(keypair_resource_policies).values(
                 name=policy_name,
-                default_for_unspecified="UNLIMITED",
-                total_resource_slots={},
+                default_for_unspecified=DefaultForUnspecified.UNLIMITED,
+                total_resource_slots=ResourceSlot(),
                 max_session_lifetime=0,
                 max_concurrent_sessions=5,
                 max_containers_per_session=1,
                 idle_timeout=3600,
-                allowed_vfolder_hosts={},
+                allowed_vfolder_hosts=VFolderHostPermissionMap(),
+            )
+        )
+        # The user-creation flow always assigns new keypairs to the "default"
+        # keypair resource policy (DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME).
+        await conn.execute(
+            sa.insert(keypair_resource_policies).values(
+                name=default_kp_policy_name,
+                default_for_unspecified=DefaultForUnspecified.UNLIMITED,
+                total_resource_slots=ResourceSlot(),
+                max_session_lifetime=0,
+                max_concurrent_sessions=5,
+                max_containers_per_session=1,
+                idle_timeout=3600,
+                allowed_vfolder_hosts=VFolderHostPermissionMap(),
             )
         )
     yield policy_name
     async with db_engine.begin() as conn:
+        await conn.execute(
+            keypair_resource_policies.delete().where(
+                keypair_resource_policies.c.name == default_kp_policy_name
+            )
+        )
         await conn.execute(
             keypair_resource_policies.delete().where(
                 keypair_resource_policies.c.name == policy_name
@@ -545,7 +588,7 @@ async def scaling_group_fixture(
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts={},
+                scheduler_opts=ScalingGroupOpts(),
             )
         )
         await conn.execute(
@@ -600,8 +643,8 @@ async def admin_user_fixture(
     data = UserFixtureData(
         user_uuid=uuid.uuid4(),
         keypair=KeypairFixtureData(
-            access_key=f"AKTEST{secrets.token_hex(10).upper()}",
-            secret_key=secrets.token_urlsafe(40),
+            access_key=f"AKTEST{secrets.token_hex(7).upper()}",
+            secret_key=secrets.token_hex(20),
         ),
     )
     async with db_engine.begin() as conn:
@@ -610,15 +653,20 @@ async def admin_user_fixture(
                 uuid=str(data.user_uuid),
                 username=f"admin-{unique_id}",
                 email=email,
-                password=secrets.token_urlsafe(8),
+                password=PasswordInfo(
+                    password=secrets.token_urlsafe(8),
+                    algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                    rounds=600_000,
+                    salt_size=32,
+                ),
                 need_password_change=False,
                 full_name=f"Admin {unique_id}",
                 description=f"Test admin account {unique_id}",
-                status="active",
+                status=UserStatus.ACTIVE,
                 status_info="admin-requested",
                 domain_name=domain_fixture,
                 resource_policy=resource_policy_fixture,
-                role="superadmin",
+                role=UserRole.SUPERADMIN,
             )
         )
         await conn.execute(
@@ -674,8 +722,8 @@ async def regular_user_fixture(
     data = UserFixtureData(
         user_uuid=uuid.uuid4(),
         keypair=KeypairFixtureData(
-            access_key=f"AKTEST{secrets.token_hex(10).upper()}",
-            secret_key=secrets.token_urlsafe(40),
+            access_key=f"AKTEST{secrets.token_hex(7).upper()}",
+            secret_key=secrets.token_hex(20),
         ),
     )
     async with db_engine.begin() as conn:
@@ -684,15 +732,20 @@ async def regular_user_fixture(
                 uuid=str(data.user_uuid),
                 username=f"user-{unique_id}",
                 email=email,
-                password=secrets.token_urlsafe(8),
+                password=PasswordInfo(
+                    password=secrets.token_urlsafe(8),
+                    algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                    rounds=600_000,
+                    salt_size=32,
+                ),
                 need_password_change=False,
                 full_name=f"User {unique_id}",
                 description=f"Test user account {unique_id}",
-                status="active",
+                status=UserStatus.ACTIVE,
                 status_info="admin-requested",
                 domain_name=domain_fixture,
                 resource_policy=resource_policy_fixture,
-                role="user",
+                role=UserRole.USER,
             )
         )
         await conn.execute(
@@ -754,11 +807,41 @@ class _TestConfigProvider(ManagerConfigProvider):
 
 
 @pytest.fixture()
+def server_subapp_pkgs() -> list[str]:
+    """
+    The list of manager API subapp packages to load for the test server.
+
+    Override this fixture in domain-specific conftest.py to load only the
+    subapp packages relevant to that domain's tests. Each domain conftest
+    must statically import the corresponding API modules so that Pants can
+    include them in the test PEX (build_root_app loads them via importlib
+    at runtime).
+    """
+    return []
+
+
+@pytest.fixture()
+def server_cleanup_contexts() -> list[CleanupContext]:
+    """
+    The list of cleanup contexts passed to build_root_app.
+
+    Override this fixture in domain-specific conftest.py to provide only the
+    dependencies required for that domain's tests. The default empty list
+    means no production cleanup contexts run, so each domain must provide
+    its own context to set up root_ctx.db, repositories, processors, etc.
+    """
+    return []
+
+
+@pytest.fixture()
 async def server(
     bootstrap_config: BootstrapConfig,
+    redis_addr: HostPortPairModel,
     mock_etcd_ctx: EtcdCtxFactory,
     etcd_fixture: None,
     database_fixture: None,
+    server_subapp_pkgs: list[str],
+    server_cleanup_contexts: list[CleanupContext],
 ) -> AsyncIterator[ServerInfo]:
     """
     Start a full manager server and return its connection info.
@@ -770,8 +853,8 @@ async def server(
     app = build_root_app(
         0,
         bootstrap_config,
-        cleanup_contexts=None,
-        subapp_pkgs=list(global_subapp_pkgs),
+        cleanup_contexts=server_cleanup_contexts,
+        subapp_pkgs=server_subapp_pkgs,
     )
     root_ctx: RootContext = app["_root.context"]
 
@@ -792,6 +875,7 @@ async def server(
         "logging": bootstrap_config.logging,
         "pyroscope": bootstrap_config.pyroscope,
         "debug": bootstrap_config.debug,
+        "redis": {"addr": {"host": redis_addr.host, "port": redis_addr.port}},
     })
     root_ctx.config_provider = _TestConfigProvider(unified_config)
 

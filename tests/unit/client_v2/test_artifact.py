@@ -171,7 +171,7 @@ class TestArtifactOperations:
         assert method == "POST"
         assert url.endswith("/artifacts/task/cancel")
         assert body is not None
-        assert body["artifact_revision_id"] == _SAMPLE_ARTIFACT_REVISION_ID
+        assert body["artifact_revision_id"] == str(_SAMPLE_ARTIFACT_REVISION_ID)
 
 
 # ---------------------------------------------------------------------------
