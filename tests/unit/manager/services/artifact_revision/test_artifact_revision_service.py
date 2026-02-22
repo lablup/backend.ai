@@ -6,6 +6,7 @@ Includes tests for ArtifactService methods that deal with revisions.
 
 from __future__ import annotations
 
+import dataclasses
 import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
@@ -13,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderID, VFolderUsageMode
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
@@ -23,6 +25,13 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactStatus,
     ArtifactType,
 )
+from ai.backend.manager.data.vfolder.types import (
+    VFolderData,
+    VFolderMountPermission,
+    VFolderOperationStatus,
+    VFolderOwnershipType,
+)
+from ai.backend.manager.errors.vfolder import VFolderQuotaExceededError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -528,3 +537,485 @@ class TestArtifactServiceRevisionOperations:
         assert result.result[0].revisions == [sample_artifact_revision]
         mock_artifact_repository.upsert_artifacts.assert_called_once()
         mock_artifact_repository.upsert_artifact_revisions.assert_called_once()
+
+
+class TestVFolderQuotaCheck:
+    """Tests for VFolder quota validation in ArtifactRevisionService."""
+
+    @pytest.fixture
+    def mock_artifact_repository(self) -> MagicMock:
+        return MagicMock(spec=ArtifactRepository)
+
+    @pytest.fixture
+    def mock_artifact_registry_repository(self) -> MagicMock:
+        return MagicMock(spec=ArtifactRegistryRepository)
+
+    @pytest.fixture
+    def mock_object_storage_repository(self) -> MagicMock:
+        return MagicMock(spec=ObjectStorageRepository)
+
+    @pytest.fixture
+    def mock_vfs_storage_repository(self) -> MagicMock:
+        return MagicMock(spec=VFSStorageRepository)
+
+    @pytest.fixture
+    def mock_storage_namespace_repository(self) -> MagicMock:
+        return MagicMock(spec=StorageNamespaceRepository)
+
+    @pytest.fixture
+    def mock_huggingface_repository(self) -> MagicMock:
+        return MagicMock(spec=HuggingFaceRepository)
+
+    @pytest.fixture
+    def mock_reservoir_repository(self) -> MagicMock:
+        return MagicMock(spec=ReservoirRegistryRepository)
+
+    @pytest.fixture
+    def mock_vfolder_repository(self) -> MagicMock:
+        return MagicMock(spec=VfolderRepository)
+
+    @pytest.fixture
+    def mock_storage_manager(self) -> MagicMock:
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_config_provider(self) -> MagicMock:
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_valkey_artifact_client(self) -> MagicMock:
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_background_task_manager(self) -> MagicMock:
+        return MagicMock()
+
+    @pytest.fixture
+    def artifact_revision_service(
+        self,
+        mock_artifact_repository: MagicMock,
+        mock_artifact_registry_repository: MagicMock,
+        mock_object_storage_repository: MagicMock,
+        mock_vfs_storage_repository: MagicMock,
+        mock_storage_namespace_repository: MagicMock,
+        mock_huggingface_repository: MagicMock,
+        mock_reservoir_repository: MagicMock,
+        mock_vfolder_repository: MagicMock,
+        mock_storage_manager: MagicMock,
+        mock_config_provider: MagicMock,
+        mock_valkey_artifact_client: MagicMock,
+        mock_background_task_manager: MagicMock,
+    ) -> ArtifactRevisionService:
+        return ArtifactRevisionService(
+            artifact_repository=mock_artifact_repository,
+            artifact_registry_repository=mock_artifact_registry_repository,
+            object_storage_repository=mock_object_storage_repository,
+            vfs_storage_repository=mock_vfs_storage_repository,
+            storage_namespace_repository=mock_storage_namespace_repository,
+            huggingface_registry_repository=mock_huggingface_repository,
+            reservoir_registry_repository=mock_reservoir_repository,
+            vfolder_repository=mock_vfolder_repository,
+            storage_manager=mock_storage_manager,
+            config_provider=mock_config_provider,
+            valkey_artifact_client=mock_valkey_artifact_client,
+            background_task_manager=mock_background_task_manager,
+        )
+
+    @pytest.fixture
+    def sample_vfolder_data(self) -> VFolderData:
+        """Create sample VFolderData with quota scope."""
+        return VFolderData(
+            id=uuid.uuid4(),
+            name="test-vfolder",
+            host="local:volume1",
+            domain_name="default",
+            quota_scope_id=QuotaScopeID(QuotaScopeType.USER, uuid.uuid4()),
+            usage_mode=VFolderUsageMode.MODEL,
+            permission=VFolderMountPermission.RW_DELETE,
+            max_files=1000,
+            max_size=1024 * 1024 * 1024,
+            num_files=10,
+            cur_size=100 * 1024 * 1024,
+            created_at=datetime.now(UTC),
+            last_used=None,
+            creator="testuser@example.com",
+            unmanaged_path=None,
+            ownership_type=VFolderOwnershipType.USER,
+            user=uuid.uuid4(),
+            group=None,
+            cloneable=False,
+            status=VFolderOperationStatus.READY,
+        )
+
+    async def test_check_vfolder_quota_no_quota_scope(
+        self,
+        artifact_revision_service: ArtifactRevisionService,
+        sample_vfolder_data: VFolderData,
+    ) -> None:
+        """When quota_scope_id is None, quota check should be skipped."""
+        vfolder_data = dataclasses.replace(sample_vfolder_data, quota_scope_id=None)
+
+        # Should not raise any error
+        await artifact_revision_service._check_vfolder_quota(vfolder_data, 500 * 1024 * 1024)
+
+    async def test_check_vfolder_quota_unlimited_negative_one(
+        self,
+        artifact_revision_service: ArtifactRevisionService,
+        mock_storage_manager: MagicMock,
+        mock_vfolder_repository: MagicMock,
+        sample_vfolder_data: VFolderData,
+    ) -> None:
+        """When max quota is -1 (unlimited), should not raise error."""
+        mock_storage_manager.get_proxy_and_volume.return_value = ("proxy", "volume1")
+        mock_storage_client = AsyncMock()
+        mock_storage_client.get_quota_scope = AsyncMock(
+            return_value={"used_bytes": 500 * 1024 * 1024}
+        )
+        mock_storage_manager.get_manager_facing_client.return_value = mock_storage_client
+
+        mock_vfolder_repository.get_user_resource_info = AsyncMock(
+            return_value=("user_uuid", -1, "policy")
+        )
+
+        # Should not raise any error even with large additional size
+        await artifact_revision_service._check_vfolder_quota(
+            sample_vfolder_data, 10 * 1024 * 1024 * 1024
+        )
+
+    async def test_check_vfolder_quota_unlimited_zero(
+        self,
+        artifact_revision_service: ArtifactRevisionService,
+        mock_storage_manager: MagicMock,
+        mock_vfolder_repository: MagicMock,
+        sample_vfolder_data: VFolderData,
+    ) -> None:
+        """When max quota is 0 (unlimited), should not raise error."""
+        mock_storage_manager.get_proxy_and_volume.return_value = ("proxy", "volume1")
+        mock_storage_client = AsyncMock()
+        mock_storage_client.get_quota_scope = AsyncMock(
+            return_value={"used_bytes": 500 * 1024 * 1024}
+        )
+        mock_storage_manager.get_manager_facing_client.return_value = mock_storage_client
+
+        mock_vfolder_repository.get_user_resource_info = AsyncMock(
+            return_value=("user_uuid", 0, "policy")
+        )
+
+        await artifact_revision_service._check_vfolder_quota(
+            sample_vfolder_data, 10 * 1024 * 1024 * 1024
+        )
+
+    async def test_check_vfolder_quota_within_limit(
+        self,
+        artifact_revision_service: ArtifactRevisionService,
+        mock_storage_manager: MagicMock,
+        mock_vfolder_repository: MagicMock,
+        sample_vfolder_data: VFolderData,
+    ) -> None:
+        """When within quota limit, should not raise error."""
+        mock_storage_manager.get_proxy_and_volume.return_value = ("proxy", "volume1")
+        mock_storage_client = AsyncMock()
+        mock_storage_client.get_quota_scope = AsyncMock(
+            return_value={"used_bytes": 100 * 1024 * 1024}
+        )
+        mock_storage_manager.get_manager_facing_client.return_value = mock_storage_client
+
+        mock_vfolder_repository.get_user_resource_info = AsyncMock(
+            return_value=("user_uuid", 1024 * 1024 * 1024, "policy")
+        )
+
+        # 100MB (used) + 500MB (additional) < 1GB (max) → OK
+        await artifact_revision_service._check_vfolder_quota(sample_vfolder_data, 500 * 1024 * 1024)
+
+    async def test_check_vfolder_quota_exactly_at_limit(
+        self,
+        artifact_revision_service: ArtifactRevisionService,
+        mock_storage_manager: MagicMock,
+        mock_vfolder_repository: MagicMock,
+        sample_vfolder_data: VFolderData,
+    ) -> None:
+        """When exactly at quota limit, should not raise error."""
+        mock_storage_manager.get_proxy_and_volume.return_value = ("proxy", "volume1")
+        mock_storage_client = AsyncMock()
+        mock_storage_client.get_quota_scope = AsyncMock(
+            return_value={"used_bytes": 500 * 1024 * 1024}
+        )
+        mock_storage_manager.get_manager_facing_client.return_value = mock_storage_client
+
+        mock_vfolder_repository.get_user_resource_info = AsyncMock(
+            return_value=("user_uuid", 1024 * 1024 * 1024, "policy")
+        )
+
+        # 500MB (used) + 524MB (additional) = 1024MB (max) → OK (exactly at limit)
+        await artifact_revision_service._check_vfolder_quota(sample_vfolder_data, 524 * 1024 * 1024)
+
+    async def test_check_vfolder_quota_exceeded(
+        self,
+        artifact_revision_service: ArtifactRevisionService,
+        mock_storage_manager: MagicMock,
+        mock_vfolder_repository: MagicMock,
+        sample_vfolder_data: VFolderData,
+    ) -> None:
+        """When quota would be exceeded, should raise VFolderQuotaExceededError."""
+        mock_storage_manager.get_proxy_and_volume.return_value = ("proxy", "volume1")
+        mock_storage_client = AsyncMock()
+        mock_storage_client.get_quota_scope = AsyncMock(
+            return_value={"used_bytes": 900 * 1024 * 1024}
+        )
+        mock_storage_manager.get_manager_facing_client.return_value = mock_storage_client
+
+        mock_vfolder_repository.get_user_resource_info = AsyncMock(
+            return_value=("user_uuid", 1024 * 1024 * 1024, "policy")
+        )
+
+        # 900MB (used) + 200MB (additional) > 1GB (max) → Error
+        with pytest.raises(VFolderQuotaExceededError) as exc_info:
+            await artifact_revision_service._check_vfolder_quota(
+                sample_vfolder_data, 200 * 1024 * 1024
+            )
+
+        error = exc_info.value
+        assert error.current_size == 900 * 1024 * 1024
+        assert error.max_size == 1024 * 1024 * 1024
+        assert error.requested_size == 200 * 1024 * 1024
+
+    async def test_check_vfolder_quota_project_scope(
+        self,
+        artifact_revision_service: ArtifactRevisionService,
+        mock_storage_manager: MagicMock,
+        mock_vfolder_repository: MagicMock,
+        sample_vfolder_data: VFolderData,
+    ) -> None:
+        """Test quota check with PROJECT scope type."""
+        project_id = uuid.uuid4()
+        vfolder_data = dataclasses.replace(
+            sample_vfolder_data,
+            quota_scope_id=QuotaScopeID(QuotaScopeType.PROJECT, project_id),
+        )
+
+        mock_storage_manager.get_proxy_and_volume.return_value = ("proxy", "volume1")
+        mock_storage_client = AsyncMock()
+        mock_storage_client.get_quota_scope = AsyncMock(
+            return_value={"used_bytes": 100 * 1024 * 1024}
+        )
+        mock_storage_manager.get_manager_facing_client.return_value = mock_storage_client
+
+        mock_vfolder_repository.get_group_resource_info = AsyncMock(
+            return_value=("group_name", "domain", 2 * 1024 * 1024 * 1024, "policy")
+        )
+
+        # Should not raise error
+        await artifact_revision_service._check_vfolder_quota(vfolder_data, 500 * 1024 * 1024)
+
+        mock_vfolder_repository.get_group_resource_info.assert_called_once_with(
+            project_id, "default"
+        )
+
+
+class TestGetQuotaScopeLimit:
+    """Tests for _get_quota_scope_limit method."""
+
+    @pytest.fixture
+    def mock_artifact_repository(self) -> MagicMock:
+        return MagicMock(spec=ArtifactRepository)
+
+    @pytest.fixture
+    def mock_artifact_registry_repository(self) -> MagicMock:
+        return MagicMock(spec=ArtifactRegistryRepository)
+
+    @pytest.fixture
+    def mock_object_storage_repository(self) -> MagicMock:
+        return MagicMock(spec=ObjectStorageRepository)
+
+    @pytest.fixture
+    def mock_vfs_storage_repository(self) -> MagicMock:
+        return MagicMock(spec=VFSStorageRepository)
+
+    @pytest.fixture
+    def mock_storage_namespace_repository(self) -> MagicMock:
+        return MagicMock(spec=StorageNamespaceRepository)
+
+    @pytest.fixture
+    def mock_huggingface_repository(self) -> MagicMock:
+        return MagicMock(spec=HuggingFaceRepository)
+
+    @pytest.fixture
+    def mock_reservoir_repository(self) -> MagicMock:
+        return MagicMock(spec=ReservoirRegistryRepository)
+
+    @pytest.fixture
+    def mock_vfolder_repository(self) -> MagicMock:
+        return MagicMock(spec=VfolderRepository)
+
+    @pytest.fixture
+    def mock_storage_manager(self) -> MagicMock:
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_config_provider(self) -> MagicMock:
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_valkey_artifact_client(self) -> MagicMock:
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_background_task_manager(self) -> MagicMock:
+        return MagicMock()
+
+    @pytest.fixture
+    def artifact_revision_service(
+        self,
+        mock_artifact_repository: MagicMock,
+        mock_artifact_registry_repository: MagicMock,
+        mock_object_storage_repository: MagicMock,
+        mock_vfs_storage_repository: MagicMock,
+        mock_storage_namespace_repository: MagicMock,
+        mock_huggingface_repository: MagicMock,
+        mock_reservoir_repository: MagicMock,
+        mock_vfolder_repository: MagicMock,
+        mock_storage_manager: MagicMock,
+        mock_config_provider: MagicMock,
+        mock_valkey_artifact_client: MagicMock,
+        mock_background_task_manager: MagicMock,
+    ) -> ArtifactRevisionService:
+        return ArtifactRevisionService(
+            artifact_repository=mock_artifact_repository,
+            artifact_registry_repository=mock_artifact_registry_repository,
+            object_storage_repository=mock_object_storage_repository,
+            vfs_storage_repository=mock_vfs_storage_repository,
+            storage_namespace_repository=mock_storage_namespace_repository,
+            huggingface_registry_repository=mock_huggingface_repository,
+            reservoir_registry_repository=mock_reservoir_repository,
+            vfolder_repository=mock_vfolder_repository,
+            storage_manager=mock_storage_manager,
+            config_provider=mock_config_provider,
+            valkey_artifact_client=mock_valkey_artifact_client,
+            background_task_manager=mock_background_task_manager,
+        )
+
+    async def test_get_quota_scope_limit_user_type(
+        self,
+        artifact_revision_service: ArtifactRevisionService,
+        mock_vfolder_repository: MagicMock,
+    ) -> None:
+        """Test _get_quota_scope_limit with USER scope type."""
+        user_id = uuid.uuid4()
+        quota_scope_id = QuotaScopeID(QuotaScopeType.USER, user_id)
+
+        mock_vfolder_repository.get_user_resource_info = AsyncMock(
+            return_value=("user_uuid", 1024 * 1024 * 1024, "policy")
+        )
+
+        result = await artifact_revision_service._get_quota_scope_limit(quota_scope_id, "default")
+
+        assert result == 1024 * 1024 * 1024
+        mock_vfolder_repository.get_user_resource_info.assert_called_once_with(user_id)
+
+    async def test_get_quota_scope_limit_project_type(
+        self,
+        artifact_revision_service: ArtifactRevisionService,
+        mock_vfolder_repository: MagicMock,
+    ) -> None:
+        """Test _get_quota_scope_limit with PROJECT scope type."""
+        project_id = uuid.uuid4()
+        quota_scope_id = QuotaScopeID(QuotaScopeType.PROJECT, project_id)
+
+        mock_vfolder_repository.get_group_resource_info = AsyncMock(
+            return_value=("group_name", "domain", 2 * 1024 * 1024 * 1024, "policy")
+        )
+
+        result = await artifact_revision_service._get_quota_scope_limit(quota_scope_id, "default")
+
+        assert result == 2 * 1024 * 1024 * 1024
+        mock_vfolder_repository.get_group_resource_info.assert_called_once_with(
+            project_id, "default"
+        )
+
+    async def test_get_quota_scope_limit_user_not_found(
+        self,
+        artifact_revision_service: ArtifactRevisionService,
+        mock_vfolder_repository: MagicMock,
+    ) -> None:
+        """When user is not found, should return -1 (unlimited)."""
+        user_id = uuid.uuid4()
+        quota_scope_id = QuotaScopeID(QuotaScopeType.USER, user_id)
+
+        mock_vfolder_repository.get_user_resource_info = AsyncMock(return_value=None)
+
+        result = await artifact_revision_service._get_quota_scope_limit(quota_scope_id, "default")
+
+        assert result == -1
+
+    async def test_get_quota_scope_limit_project_not_found(
+        self,
+        artifact_revision_service: ArtifactRevisionService,
+        mock_vfolder_repository: MagicMock,
+    ) -> None:
+        """When project is not found, should return -1 (unlimited)."""
+        project_id = uuid.uuid4()
+        quota_scope_id = QuotaScopeID(QuotaScopeType.PROJECT, project_id)
+
+        mock_vfolder_repository.get_group_resource_info = AsyncMock(return_value=None)
+
+        result = await artifact_revision_service._get_quota_scope_limit(quota_scope_id, "default")
+
+        assert result == -1
+
+
+class TestVFolderQuotaExceededError:
+    """Tests for VFolderQuotaExceededError."""
+
+    def test_error_message_format(self) -> None:
+        """Test error message contains all relevant information."""
+        quota_scope_id = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
+        vfolder_id = VFolderID(quota_scope_id, uuid.uuid4())
+
+        error = VFolderQuotaExceededError(
+            vfolder_id=vfolder_id,
+            quota_scope_id=quota_scope_id,
+            current_size=900,
+            max_size=1000,
+            requested_size=200,
+        )
+
+        error_message = str(error)
+        assert "900" in error_message
+        assert "1000" in error_message
+        assert "200" in error_message
+        assert "100" in error_message  # available bytes
+
+    def test_error_data_structure(self) -> None:
+        """Test error_data returns correct structure."""
+        quota_scope_id = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
+        vfolder_id = VFolderID(quota_scope_id, uuid.uuid4())
+
+        error = VFolderQuotaExceededError(
+            vfolder_id=vfolder_id,
+            quota_scope_id=quota_scope_id,
+            current_size=900,
+            max_size=1000,
+            requested_size=200,
+        )
+
+        data = error.error_data()
+        assert data["current_size_bytes"] == 900
+        assert data["max_size_bytes"] == 1000
+        assert data["requested_size_bytes"] == 200
+        assert data["available_bytes"] == 100
+
+    def test_error_code(self) -> None:
+        """Test error_code returns correct ErrorCode."""
+        quota_scope_id = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
+        vfolder_id = VFolderID(quota_scope_id, uuid.uuid4())
+
+        error = VFolderQuotaExceededError(
+            vfolder_id=vfolder_id,
+            quota_scope_id=quota_scope_id,
+            current_size=900,
+            max_size=1000,
+            requested_size=200,
+        )
+
+        error_code = error.error_code()
+        assert error_code is not None
