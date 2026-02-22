@@ -3357,40 +3357,32 @@ class GQLMetricMiddleware:
         operation_name = (
             info.operation.name.value if info.operation.name is not None else "anonymous"
         )
+
+        def _observe(*, duration: float, error: BaseException | None = None) -> None:
+            match error:
+                case None:
+                    error_code = None
+                case BackendAIError():
+                    error_code = error.error_code()
+                case _:
+                    error_code = ErrorCode.default()
+            graph_ctx.metric_observer.observe_request(
+                operation_type=operation_type,
+                field_name=field_name,
+                parent_type=parent_type,
+                operation_name=operation_name,
+                error_code=error_code,
+                success=error is None,
+                duration=duration,
+            )
+
         start = time.perf_counter()
         try:
             res = next(root, info, **args)
-            graph_ctx.metric_observer.observe_request(
-                operation_type=operation_type,
-                field_name=field_name,
-                parent_type=parent_type,
-                operation_name=operation_name,
-                error_code=None,
-                success=True,
-                duration=time.perf_counter() - start,
-            )
-        except BackendAIError as e:
-            graph_ctx.metric_observer.observe_request(
-                operation_type=operation_type,
-                field_name=field_name,
-                parent_type=parent_type,
-                operation_name=operation_name,
-                error_code=e.error_code(),
-                success=False,
-                duration=time.perf_counter() - start,
-            )
-            raise e
+            _observe(duration=time.perf_counter() - start)
         except BaseException as e:
-            graph_ctx.metric_observer.observe_request(
-                operation_type=operation_type,
-                field_name=field_name,
-                parent_type=parent_type,
-                operation_name=operation_name,
-                error_code=ErrorCode.default(),
-                success=False,
-                duration=time.perf_counter() - start,
-            )
-            raise e
+            _observe(duration=time.perf_counter() - start, error=e)
+            raise
         return res
 
 
