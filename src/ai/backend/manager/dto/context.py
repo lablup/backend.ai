@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import uuid
 from collections.abc import Mapping
-from typing import Any, Self, override
+from typing import TYPE_CHECKING, Any, Self, override
 
 from aiohttp import web
 from pydantic import ConfigDict
@@ -13,7 +15,9 @@ from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.config.unified import AuthConfig, ExportConfig
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.export import ExportRepository
-from ai.backend.manager.services.processors import Processors
+
+if TYPE_CHECKING:
+    from ai.backend.manager.services.processors import Processors
 
 
 class StorageSessionManagerCtx(MiddlewareParam):
