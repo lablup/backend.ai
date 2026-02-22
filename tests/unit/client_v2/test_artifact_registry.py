@@ -171,7 +171,9 @@ class TestScanOperations:
         assert method == "POST"
         assert url.endswith("/artifact-registries/delegation/scan")
         assert body is not None
-        assert body["delegatee_target"]["delegatee_reservoir_id"] == str(_SAMPLE_DELEGATEE_RESERVOIR_ID)
+        assert body["delegatee_target"]["delegatee_reservoir_id"] == str(
+            _SAMPLE_DELEGATEE_RESERVOIR_ID
+        )
 
     @pytest.mark.asyncio
     async def test_delegate_import_artifacts(self) -> None:
