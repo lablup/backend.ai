@@ -7,6 +7,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
@@ -24,6 +25,7 @@ from ai.backend.manager.api import domain as _domain_api
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.server import (
@@ -142,9 +144,41 @@ def server_cleanup_contexts() -> list[CleanupContext]:
 
 
 @pytest.fixture()
+async def project_resource_policy_fixture(
+    db_engine: SAEngine,
+) -> AsyncIterator[None]:
+    """Insert the 'default' project_resource_policy required for domain group creation.
+
+    When a domain is created, the API internally creates a default group that
+    references resource_policy="default" in project_resource_policies.  This
+    fixture seeds that row so the FK constraint is satisfied.
+    Uses on_conflict_do_nothing() for idempotency in case the row already exists.
+    """
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(ProjectResourcePolicyRow.__table__)
+            .values(
+                name="default",
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=3,
+            )
+            .on_conflict_do_nothing()
+        )
+    yield
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            ProjectResourcePolicyRow.__table__.delete().where(
+                ProjectResourcePolicyRow.__table__.c.name == "default"
+            )
+        )
+
+
+@pytest.fixture()
 async def domain_factory(
     admin_registry: BackendAIClientRegistry,
     db_engine: SAEngine,
+    project_resource_policy_fixture: None,
 ) -> AsyncIterator[DomainFactory]:
     """Factory fixture that creates domains via SDK and purges them on teardown."""
     created_names: list[str] = []
