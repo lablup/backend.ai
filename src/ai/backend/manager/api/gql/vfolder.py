@@ -23,6 +23,7 @@ class VFolder:
 class ExtraVFolderMount(Node):
     id: NodeID[str]
     mount_destination: str
+    subpath: str
     _vfolder_id: strawberry.Private[UUID]
 
     @strawberry.field
@@ -36,6 +37,7 @@ class ExtraVFolderMount(Node):
             # TODO: fix id generation logic
             id=ID(f"{data.vfolder_id}:{data.mount_destination}"),
             mount_destination=data.mount_destination,
+            subpath=data.subpath,
             _vfolder_id=data.vfolder_id,
         )
 

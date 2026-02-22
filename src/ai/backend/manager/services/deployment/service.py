@@ -200,6 +200,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
                 ExtraVFolderMountData(
                     vfolder_id=m.vfid.folder_id,
                     mount_destination=m.kernel_path.as_posix(),
+                    subpath=str(m.vfsubpath),
                 )
                 for m in rev.mounts.extra_mounts
             ],

@@ -829,6 +829,11 @@ class ModelServingRepository:
                                 if mount.permission.optional_value() is not None
                                 else None
                             ),
+                            subpath=(
+                                mount.subpath.value()
+                                if mount.subpath.optional_value() is not None
+                                else "."
+                            ),
                         )
                         for mount in extra_mounts_input
                     }
@@ -902,7 +907,10 @@ class ModelServingRepository:
                             },
                         },
                         "mount_options": {
-                            m.vfid.folder_id: {"permission": m.mount_perm}
+                            m.vfid.folder_id: {
+                                "permission": m.mount_perm,
+                                "subpath": str(m.vfsubpath),
+                            }
                             for m in endpoint_row.extra_mounts
                         },
                         "environ": endpoint_row.environ,

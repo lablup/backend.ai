@@ -212,12 +212,14 @@ class MountSpec:
     mounts: list[UUID]
     mount_map: Mapping[UUID, str]
     mount_options: Mapping[UUID, dict[str, Any]]
+    mount_subpaths: Mapping[UUID, str] = field(default_factory=dict)
 
 
 @dataclass
 class MountInfo:
     vfolder_id: UUID
     kernel_path: PurePosixPath
+    subpath: str = "."
 
 
 @dataclass
@@ -237,7 +239,15 @@ class MountMetadata:
             **{m.vfid.folder_id: m.kernel_path.as_posix() for m in self.extra_mounts},
         }
         mount_options = {m.vfid.folder_id: {"permission": m.mount_perm} for m in self.extra_mounts}
-        return MountSpec(mounts=mounts, mount_map=mount_map, mount_options=mount_options)
+        mount_subpaths = {
+            m.vfid.folder_id: str(m.vfsubpath) for m in self.extra_mounts if str(m.vfsubpath) != "."
+        }
+        return MountSpec(
+            mounts=mounts,
+            mount_map=mount_map,
+            mount_options=mount_options,
+            mount_subpaths=mount_subpaths,
+        )
 
 
 @dataclass
@@ -451,6 +461,7 @@ class ModelMountConfigData:
 class ExtraVFolderMountData:
     vfolder_id: UUID
     mount_destination: str  # PurePosixPath should be converted to str
+    subpath: str = "."
 
 
 @dataclass

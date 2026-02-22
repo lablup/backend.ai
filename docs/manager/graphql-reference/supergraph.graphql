@@ -4331,6 +4331,11 @@ input ExtraMountInput
   Added in 24.03.4. Set permission of this mount. Should be one of (ro,rw,wd). Default is null
   """
   permission: String
+
+  """
+  Added in 26.3.0. Subpath within the vfolder to mount. Default is root ('.').
+  """
+  subpath: String
 }
 
 type ExtraVFolderMount implements Node
@@ -4340,6 +4345,7 @@ type ExtraVFolderMount implements Node
   """The Globally Unique ID of this object"""
   id: ID!
   mountDestination: String!
+  subpath: String!
   vfolder: VirtualFolderNode!
 }
 
@@ -4372,6 +4378,7 @@ input ExtraVFolderMountInput
 {
   vfolderId: ID!
   mountDestination: String
+  subpath: String = null
 }
 
 """

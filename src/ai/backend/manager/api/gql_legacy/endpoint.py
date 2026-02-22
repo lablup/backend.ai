@@ -977,6 +977,9 @@ class ExtraMountInput(graphene.InputObjectType):  # type: ignore[misc]
     permission = graphene.String(
         description=f"Added in 24.03.4. Set permission of this mount. Should be one of ({','.join([perm.value for perm in MountPermission])}). Default is null"
     )
+    subpath = graphene.String(
+        description="Added in 26.3.0. Subpath within the vfolder to mount. Default is root ('.')."
+    )
 
     def to_action_field(self, info: graphene.ResolveInfo) -> ExtraMount:
         _, raw_vfolder_id = AsyncNode.resolve_global_id(info, self.vfolder_id)
@@ -987,6 +990,7 @@ class ExtraMountInput(graphene.InputObjectType):  # type: ignore[misc]
             mount_destination=OptionalState.from_graphql(self.mount_destination),
             type=OptionalState.from_graphql(self.type),
             permission=OptionalState.from_graphql(self.permission),
+            subpath=OptionalState.from_graphql(self.subpath),
         )
 
 

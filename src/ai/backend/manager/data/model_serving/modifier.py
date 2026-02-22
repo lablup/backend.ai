@@ -26,6 +26,7 @@ class ExtraMount:
     mount_destination: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     type: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     permission: OptionalState[str] = field(default_factory=OptionalState[str].nop)
+    subpath: OptionalState[str] = field(default_factory=OptionalState[str].nop)
 
 
 @dataclass

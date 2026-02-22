@@ -437,6 +437,7 @@ class CreateDeploymentAdapter:
                 MountInfo(
                     vfolder_id=mount.vfolder_id,
                     kernel_path=PurePosixPath(mount.mount_destination or ""),
+                    subpath=mount.subpath or ".",
                 )
                 for mount in revision_input.extra_mounts
             ]

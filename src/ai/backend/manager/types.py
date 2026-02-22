@@ -64,6 +64,10 @@ class MountOptionModel(BaseModel):
         MountPermission | None,
         Field(validation_alias=AliasChoices("permission", "perm"), default=None),
     ]
+    subpath: Annotated[
+        str | None,
+        Field(description="Subpath within the vfolder to mount.", default=None),
+    ]
 
 
 class PartialModifier(ABC):
