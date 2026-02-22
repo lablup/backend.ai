@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 
-from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
+from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.scaling_group import ListScalingGroupsResponse
 
@@ -40,16 +40,26 @@ class TestScalingGroupList:
         assert any(sg.name == scaling_group_fixture for sg in result.scaling_groups)
 
     @pytest.mark.asyncio
-    async def test_regular_user_cannot_list_scaling_groups(
+    async def test_regular_user_lists_public_scaling_groups(
         self,
         user_registry: BackendAIClientRegistry,
+        scaling_group_fixture: str,
         group_fixture: uuid.UUID,
     ) -> None:
-        """Regular users are not permitted to list scaling groups."""
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.scaling_group.list_scaling_groups(
-                group=str(group_fixture),
-            )
+        """Regular users can list scaling groups; only public ones are returned.
+
+        The list_available_sgroups handler does NOT enforce admin-only access.
+        Non-admin users receive a 200 response filtered to public scaling groups.
+        The test fixture scaling group uses the DB default (is_public=True), so
+        it should appear in the regular user's result as well.
+        """
+        result = await user_registry.scaling_group.list_scaling_groups(
+            group=str(group_fixture),
+        )
+        assert isinstance(result, ListScalingGroupsResponse)
+        # The fixture sgroup defaults to is_public=True, so it is visible.
+        names = [sg.name for sg in result.scaling_groups]
+        assert scaling_group_fixture in names
 
 
 class TestScalingGroupWsproxyVersion:
@@ -82,13 +92,18 @@ class TestScalingGroupWsproxyVersion:
             )
 
     @pytest.mark.asyncio
-    async def test_regular_user_cannot_get_wsproxy_version(
+    async def test_regular_user_gets_wsproxy_version_not_found(
         self,
         user_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
     ) -> None:
-        """Regular users are not permitted to query the wsproxy version."""
-        with pytest.raises(PermissionDeniedError):
+        """Regular users are not blocked from querying wsproxy version.
+
+        The get_wsproxy_version handler does NOT enforce admin-only access.
+        It raises ObjectNotFound when wsproxy_addr is not configured (the fixture
+        default), so both admin and regular users receive NotFoundError.
+        """
+        with pytest.raises(NotFoundError):
             await user_registry.scaling_group.get_wsproxy_version(
                 scaling_group=scaling_group_fixture,
             )

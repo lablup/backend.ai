@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import scaling_group as _scaling_group_api
 from ai.backend.manager.api.context import RootContext
@@ -47,6 +48,15 @@ async def _scaling_group_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None
     Only agent_registry is left as MagicMock because it requires live gRPC
     connections to real agents, which are not available in component tests.
     """
+    # _TestConfigProvider skips super().__init__() so _legacy_etcd_config_loader
+    # is never set.  The @server_status_required decorator (used by both
+    # scaling-group handlers) calls
+    # config_provider.legacy_etcd_config_loader.get_manager_status() which is
+    # async.  Inject a MagicMock with an AsyncMock method so the check passes.
+    mock_legacy_loader = MagicMock()
+    mock_legacy_loader.get_manager_status = AsyncMock(return_value=ManagerStatus.RUNNING)
+    root_ctx.config_provider._legacy_etcd_config_loader = mock_legacy_loader
+
     root_ctx.repositories = Repositories.create(
         RepositoryArgs(
             db=root_ctx.db,
