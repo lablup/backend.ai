@@ -3,7 +3,9 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
+from contextlib import asynccontextmanager
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -14,7 +16,89 @@ from ai.backend.common.dto.manager.user import (
     PurgeUserRequest,
 )
 
+# Statically imported so that Pants includes these modules in the test PEX.
+# build_root_app() loads them at runtime via importlib.import_module(),
+# which Pants cannot trace statically.
+from ai.backend.manager.api import auth as _auth_api
+from ai.backend.manager.api import ratelimit as _ratelimit_api
+from ai.backend.manager.api import user as _user_api
+from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.types import CleanupContext
+from ai.backend.manager.models.utils import connect_database
+from ai.backend.manager.repositories.repositories import Repositories
+from ai.backend.manager.repositories.types import RepositoryArgs
+from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
+
+_USER_SERVER_SUBAPP_MODULES = (_auth_api, _ratelimit_api, _user_api)
+
 UserFactory = Callable[..., Coroutine[Any, Any, CreateUserResponse]]
+
+
+@asynccontextmanager
+async def _user_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    """Set up db, repositories and processors for user-domain component tests.
+
+    Uses a real database engine and all user-related repositories.
+    All other dependencies (valkey, storage, agents, etc.) are replaced
+    with MagicMock to avoid starting unrelated production services.
+    """
+    async with connect_database(root_ctx.config_provider.config.db) as db:
+        root_ctx.db = db
+        root_ctx.repositories = Repositories.create(
+            RepositoryArgs(
+                db=db,
+                storage_manager=MagicMock(),
+                config_provider=root_ctx.config_provider,
+                valkey_stat_client=MagicMock(),
+                valkey_schedule_client=MagicMock(),
+                valkey_image_client=MagicMock(),
+                valkey_live_client=MagicMock(),
+            )
+        )
+        root_ctx.processors = Processors.create(
+            ProcessorArgs(
+                service_args=ServiceArgs(
+                    db=db,
+                    repositories=root_ctx.repositories,
+                    etcd=root_ctx.etcd,
+                    config_provider=root_ctx.config_provider,
+                    storage_manager=MagicMock(),
+                    valkey_stat_client=MagicMock(),
+                    valkey_live=MagicMock(),
+                    valkey_artifact_client=MagicMock(),
+                    event_fetcher=MagicMock(),
+                    background_task_manager=MagicMock(),
+                    event_hub=MagicMock(),
+                    agent_registry=MagicMock(),
+                    error_monitor=MagicMock(),
+                    idle_checker_host=MagicMock(),
+                    event_dispatcher=MagicMock(),
+                    hook_plugin_ctx=MagicMock(),
+                    scheduling_controller=MagicMock(),
+                    deployment_controller=MagicMock(),
+                    revision_generator_registry=MagicMock(),
+                    event_producer=MagicMock(),
+                    agent_cache=MagicMock(),
+                    notification_center=MagicMock(),
+                    appproxy_client_pool=MagicMock(),
+                    prometheus_client=MagicMock(),
+                ),
+            ),
+            [],
+        )
+        yield
+
+
+@pytest.fixture()
+def server_subapp_pkgs() -> list[str]:
+    """Load only the subapps required for user-domain tests."""
+    return [".auth", ".ratelimit", ".user"]
+
+
+@pytest.fixture()
+def server_cleanup_contexts() -> list[CleanupContext]:
+    """Provide the single cleanup context for user-domain component tests."""
+    return [_user_domain_ctx]
 
 
 @pytest.fixture()

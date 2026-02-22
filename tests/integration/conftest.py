@@ -27,9 +27,10 @@ from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.loader import EtcdConfigWatcher, LoaderChain
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.jwt.validator import JWTValidator
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
@@ -47,9 +48,12 @@ from ai.backend.manager.config.unified import (
     ManagerConfig,
     ManagerUnifiedConfig,
 )
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import GroupRow, association_groups_users
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import keypairs
@@ -59,6 +63,7 @@ from ai.backend.manager.models.resource_policy import (
     keypair_resource_policies,
 )
 from ai.backend.manager.models.scaling_group import scaling_groups, sgroups_for_domains
+from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import users
@@ -498,7 +503,7 @@ async def resource_policy_fixture(
         await conn.execute(
             sa.insert(keypair_resource_policies).values(
                 name=policy_name,
-                default_for_unspecified="UNLIMITED",
+                default_for_unspecified=DefaultForUnspecified.UNLIMITED,
                 total_resource_slots=ResourceSlot(),
                 max_session_lifetime=0,
                 max_concurrent_sessions=5,
@@ -542,7 +547,7 @@ async def scaling_group_fixture(
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts={},
+                scheduler_opts=ScalingGroupOpts(),
             )
         )
         await conn.execute(
@@ -597,8 +602,8 @@ async def admin_user_fixture(
     data = UserFixtureData(
         user_uuid=uuid.uuid4(),
         keypair=KeypairFixtureData(
-            access_key=f"AKTEST{secrets.token_hex(10).upper()}",
-            secret_key=secrets.token_urlsafe(40),
+            access_key=f"AKTEST{secrets.token_hex(7).upper()}",
+            secret_key=secrets.token_hex(20),
         ),
     )
     async with db_engine.begin() as conn:
@@ -607,15 +612,20 @@ async def admin_user_fixture(
                 uuid=str(data.user_uuid),
                 username=f"admin-{unique_id}",
                 email=email,
-                password=secrets.token_urlsafe(8),
+                password=PasswordInfo(
+                    password=secrets.token_urlsafe(8),
+                    algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                    rounds=600_000,
+                    salt_size=32,
+                ),
                 need_password_change=False,
                 full_name=f"Admin {unique_id}",
                 description=f"Test admin account {unique_id}",
-                status="active",
+                status=UserStatus.ACTIVE,
                 status_info="admin-requested",
                 domain_name=domain_fixture,
                 resource_policy=resource_policy_fixture,
-                role="superadmin",
+                role=UserRole.SUPERADMIN,
             )
         )
         await conn.execute(
@@ -671,8 +681,8 @@ async def regular_user_fixture(
     data = UserFixtureData(
         user_uuid=uuid.uuid4(),
         keypair=KeypairFixtureData(
-            access_key=f"AKTEST{secrets.token_hex(10).upper()}",
-            secret_key=secrets.token_urlsafe(40),
+            access_key=f"AKTEST{secrets.token_hex(7).upper()}",
+            secret_key=secrets.token_hex(20),
         ),
     )
     async with db_engine.begin() as conn:
@@ -681,15 +691,20 @@ async def regular_user_fixture(
                 uuid=str(data.user_uuid),
                 username=f"user-{unique_id}",
                 email=email,
-                password=secrets.token_urlsafe(8),
+                password=PasswordInfo(
+                    password=secrets.token_urlsafe(8),
+                    algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                    rounds=600_000,
+                    salt_size=32,
+                ),
                 need_password_change=False,
                 full_name=f"User {unique_id}",
                 description=f"Test user account {unique_id}",
-                status="active",
+                status=UserStatus.ACTIVE,
                 status_info="admin-requested",
                 domain_name=domain_fixture,
                 resource_policy=resource_policy_fixture,
-                role="user",
+                role=UserRole.USER,
             )
         )
         await conn.execute(
