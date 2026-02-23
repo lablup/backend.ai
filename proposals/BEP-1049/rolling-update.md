@@ -15,13 +15,20 @@ RollingUpdateSpec:
   max_unavailable: int = 0     # Max unavailable routes to allow relative to target count
 ```
 
+## Revision Tracking
+
+The `endpoints` table has two columns for revision management:
+
+- `deploying_revision` — The revision currently being deployed (NULL when no deployment is in progress)
+- `current_revision` — The revision currently serving traffic
+
 ## Cycle FSM
 
 The coordinator periodically calls `execute_rolling_update_cycle`. Each invocation follows this FSM:
 
 ```
   ┌──────────────────────────────────────┐
-  │  No deploying_revision_id?           │──Yes──→ in_progress (skip)
+  │  No deploying_revision?              │──Yes──→ in_progress (skip)
   └──────────────────┬───────────────────┘
                      No
                      ▼
@@ -209,8 +216,8 @@ Example with `target_count = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │                                                              │
   │  Route classification:                                       │
   │  ┌────────────────────────────────────────────────────┐      │
-  │  │  old_routes:  revision != deploying_revision_id    │      │
-  │  │  new_routes:  revision == deploying_revision_id    │      │
+  │  │  old_routes:  revision != deploying_revision       │      │
+  │  │  new_routes:  revision == deploying_revision       │      │
   │  │                                                    │      │
   │  │  new_provisioning: new + PROVISIONING              │      │
   │  │  new_healthy:      new + HEALTHY                   │      │
@@ -220,7 +227,7 @@ Example with `target_count = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │  Actions applied:                                            │
   │  ┌────────────────────────────────────────────────────┐      │
   │  │  scale_out: RouteCreatorSpec(                      │      │
-  │  │    revision_id = deploying_revision_id,            │      │
+  │  │    revision_id = deploying_revision,               │      │
   │  │    traffic_status = ACTIVE  ← differs from BG      │      │
   │  │  )                                                 │      │
   │  │                                                    │      │
@@ -240,10 +247,10 @@ When all Old routes are removed and New routes reach target count or above as he
   completed determination
        │
        ▼
-  complete_deployment_revision_update_bulk({endpoint_id: deploying_revision_id})
+  complete_deployment_revision_update_bulk({endpoint_id: deploying_revision})
        │
-       ├─ current_revision_id = deploying_revision_id
-       └─ deploying_revision_id = NULL
+       ├─ current_revision = deploying_revision
+       └─ deploying_revision = NULL
 
              │
              ▼

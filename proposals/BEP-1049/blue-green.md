@@ -17,13 +17,20 @@ BlueGreenSpec:
 
 On strategy failure (all Green routes fail), automatic rollback always occurs.
 
+## Revision Tracking
+
+The `endpoints` table has two columns for revision management:
+
+- `deploying_revision` — The revision currently being deployed (NULL when no deployment is in progress)
+- `current_revision` — The revision currently serving traffic
+
 ## Cycle FSM
 
 The coordinator periodically calls `execute_blue_green_cycle`. Each invocation follows this FSM:
 
 ```
   ┌──────────────────────────────────────┐
-  │  No deploying_revision_id?           │──Yes──→ in_progress (skip)
+  │  No deploying_revision?              │──Yes──→ in_progress (skip)
   └──────────────────┬───────────────────┘
                      No
                      ▼
@@ -185,7 +192,7 @@ With `auto_promote=False`:
   │                                                     │
   │  All Green failed                                   │
   │  → Terminate all Green (TERMINATING)                │
-  │  → deploying_revision_id = NULL (rollback)          │
+  │  → deploying_revision = NULL (rollback)             │
   │  → completed                                        │
   └─────────────────────────────────────────────────────┘
 
@@ -237,8 +244,8 @@ With `auto_promote=False`:
   │                                                              │
   │  Route classification:                                       │
   │  ┌────────────────────────────────────────────────────┐      │
-  │  │  blue_routes:  revision != deploying_revision_id   │      │
-  │  │  green_routes: revision == deploying_revision_id   │      │
+  │  │  blue_routes:  revision != deploying_revision      │      │
+  │  │  green_routes: revision == deploying_revision      │      │
   │  │                                                    │      │
   │  │  green_provisioning: green + PROVISIONING          │      │
   │  │  green_healthy:      green + HEALTHY               │      │
@@ -250,7 +257,7 @@ With `auto_promote=False`:
   │  ┌────────────────────────────────────────────────────┐      │
   │  │  ● Green creation:                                 │      │
   │  │    RouteCreatorSpec(                                │     │
-  │  │      revision_id = deploying_revision_id,          │      │
+  │  │      revision_id = deploying_revision,             │      │
   │  │      traffic_status = INACTIVE  ← differs from RU  │      │
   │  │    ) × target_count                                │      │
   │  │                                                    │      │
@@ -279,10 +286,10 @@ When all Green routes become ACTIVE and Blue routes are terminated:
   completed determination
        │
        ▼
-  complete_deployment_revision_update_bulk({endpoint_id: deploying_revision_id})
+  complete_deployment_revision_update_bulk({endpoint_id: deploying_revision})
        │
-       ├─ current_revision_id = deploying_revision_id
-       └─ deploying_revision_id = NULL
+       ├─ current_revision = deploying_revision
+       └─ deploying_revision = NULL
 
              │
              ▼
