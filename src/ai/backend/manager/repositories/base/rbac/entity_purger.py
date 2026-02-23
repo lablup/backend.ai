@@ -15,8 +15,8 @@ from sqlalchemy.orm import (
     selectinload,
 )
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.id import ObjectId
-from ai.backend.manager.data.permission.types import EntityType
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -52,8 +52,14 @@ class RBACEntityPurgerSpec(ABC):
     """Spec for building RBAC entity info for single-row purge.
 
     Implementations specify which entity to purge by providing:
+    - element_type(): Returns the RBACElementType identifying this entity kind
     - entity(): Returns RBACEntity with the ObjectId to delete
     """
+
+    @abstractmethod
+    def element_type(self) -> RBACElementType:
+        """Return the RBAC element type for this entity."""
+        raise NotImplementedError
 
     @abstractmethod
     def entity(self) -> RBACEntity:
@@ -66,12 +72,12 @@ class RBACEntityBatchPurgerSpec(BatchPurgerSpec[TRow], ABC):
 
     Inherits build_subquery() from BatchPurgerSpec.
     Implementations must provide:
-    - entity_type(): Returns the EntityType for constructing ObjectIds from row PKs
+    - element_type(): Returns the RBACElementType for constructing ObjectIds from row PKs
     """
 
     @abstractmethod
-    def entity_type(self) -> EntityType:
-        """Return the entity type for constructing ObjectIds from row primary keys."""
+    def element_type(self) -> RBACElementType:
+        """Return the RBAC element type for constructing ObjectIds from row primary keys."""
         raise NotImplementedError
 
 
@@ -483,7 +489,7 @@ async def execute_rbac_entity_batch_purger(
         )
 
     pk_col = pk_columns[0]
-    entity_type = purger.spec.entity_type()
+    entity_type = purger.spec.element_type().to_entity_type()
 
     while True:
         # 1. DELETE with RETURNING - get PKs and delete in one query
