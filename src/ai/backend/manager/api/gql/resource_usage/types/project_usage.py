@@ -9,6 +9,7 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.manager.api.gql.base import (
     DateFilter,
     OrderDirection,
@@ -162,7 +163,9 @@ class ProjectUsageBucketGQL(Node):
             limit=limit,
             offset=offset,
             base_conditions=[
-                UserUsageBucketConditions.by_project_id(self.project_id),
+                UserUsageBucketConditions.by_project_id(
+                    UUIDEqualMatchSpec(value=self.project_id, negated=False)
+                ),
                 UserUsageBucketConditions.by_resource_group(self.resource_group_name),
                 UserUsageBucketConditions.by_period_start(self.metadata.period_start),
             ],
@@ -247,44 +250,28 @@ class ProjectUsageBucketFilter(GQLFilter):
 
         if self.resource_group:
             sg_condition = self.resource_group.build_query_condition(
-                contains_factory=lambda spec: ProjectUsageBucketConditions.by_resource_group_contains(
-                    spec.value
-                ),
-                equals_factory=lambda spec: ProjectUsageBucketConditions.by_resource_group_equals(
-                    spec.value
-                ),
-                starts_with_factory=lambda spec: ProjectUsageBucketConditions.by_resource_group_starts_with(
-                    spec.value
-                ),
-                ends_with_factory=lambda spec: ProjectUsageBucketConditions.by_resource_group_ends_with(
-                    spec.value
-                ),
+                contains_factory=ProjectUsageBucketConditions.by_resource_group_contains,
+                equals_factory=ProjectUsageBucketConditions.by_resource_group_equals,
+                starts_with_factory=ProjectUsageBucketConditions.by_resource_group_starts_with,
+                ends_with_factory=ProjectUsageBucketConditions.by_resource_group_ends_with,
             )
             if sg_condition:
                 conditions.append(sg_condition)
 
         if self.project_id:
             pid_condition = self.project_id.build_query_condition(
-                equals_factory=lambda spec: ProjectUsageBucketConditions.by_project_id(spec.value),
-                in_factory=lambda spec: ProjectUsageBucketConditions.by_project_id(spec.values[0]),
+                equals_factory=ProjectUsageBucketConditions.by_project_id,
+                in_factory=ProjectUsageBucketConditions.by_project_ids,
             )
             if pid_condition:
                 conditions.append(pid_condition)
 
         if self.domain_name:
             dn_condition = self.domain_name.build_query_condition(
-                contains_factory=lambda spec: ProjectUsageBucketConditions.by_domain_name_contains(
-                    spec.value
-                ),
-                equals_factory=lambda spec: ProjectUsageBucketConditions.by_domain_name_equals(
-                    spec.value
-                ),
-                starts_with_factory=lambda spec: ProjectUsageBucketConditions.by_domain_name_starts_with(
-                    spec.value
-                ),
-                ends_with_factory=lambda spec: ProjectUsageBucketConditions.by_domain_name_ends_with(
-                    spec.value
-                ),
+                contains_factory=ProjectUsageBucketConditions.by_domain_name_contains,
+                equals_factory=ProjectUsageBucketConditions.by_domain_name_equals,
+                starts_with_factory=ProjectUsageBucketConditions.by_domain_name_starts_with,
+                ends_with_factory=ProjectUsageBucketConditions.by_domain_name_ends_with,
             )
             if dn_condition:
                 conditions.append(dn_condition)

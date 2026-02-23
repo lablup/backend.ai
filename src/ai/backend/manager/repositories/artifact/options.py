@@ -7,7 +7,7 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
-from ai.backend.manager.api.gql.base import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactRemoteStatus,

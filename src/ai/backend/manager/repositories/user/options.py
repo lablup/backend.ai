@@ -8,8 +8,8 @@ from typing import Any
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.manager.api.gql.base import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow

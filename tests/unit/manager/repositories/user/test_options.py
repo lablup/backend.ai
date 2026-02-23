@@ -9,8 +9,8 @@ from dataclasses import dataclass
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.models.agent import AgentRow
