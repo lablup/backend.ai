@@ -14,7 +14,11 @@ import uuid
 from ai.backend.common.contexts.user import current_user
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.auth import GroupMembershipNotFoundError, InsufficientPrivilege
+from ai.backend.manager.errors.auth import (
+    AuthorizationFailed,
+    GroupMembershipNotFoundError,
+    InsufficientPrivilege,
+)
 from ai.backend.manager.errors.storage import DotfileNotFound
 from ai.backend.manager.models.domain import verify_dotfile_name
 from ai.backend.manager.repositories.project_config.repository import ProjectConfigRepository
@@ -63,7 +67,8 @@ class ProjectConfigService:
         Validates that admin has permission to modify the project's dotfiles.
         """
         user = current_user()
-        assert user is not None
+        if user is None:
+            raise AuthorizationFailed
 
         project = await self._project_config_repository.resolve_project(
             domain_name, project_id_or_name
@@ -88,7 +93,8 @@ class ProjectConfigService:
         Validates that user has permission to access the project's dotfiles.
         """
         user = current_user()
-        assert user is not None
+        if user is None:
+            raise AuthorizationFailed
 
         project = await self._project_config_repository.resolve_project(
             domain_name, project_id_or_name
