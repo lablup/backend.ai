@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.types import ResourceSlot, SessionId
+from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import kernels
@@ -70,7 +70,7 @@ async def session_seed(
                 id=session_id,
                 creation_id=f"cid-{unique}",
                 name=session_name,
-                session_type="INTERACTIVE",
+                session_type=SessionTypes.INTERACTIVE,
                 cluster_size=1,
                 cluster_mode="single-node",
                 domain_name=domain_fixture,
@@ -92,7 +92,7 @@ async def session_seed(
                 session_id=session_id,
                 session_creation_id=f"cid-{unique}",
                 session_name=session_name,
-                session_type="INTERACTIVE",
+                session_type=SessionTypes.INTERACTIVE,
                 cluster_role="main",
                 cluster_idx=0,
                 cluster_hostname="main0",

@@ -7,14 +7,14 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.types import ResourceSlot, SessionId
+from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -79,10 +79,10 @@ async def _session_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     - background_task_ctx  -> root_ctx.background_task_manager
 
     agent_registry, scheduling_controller, and other agent-dependent services
-    are left as MagicMock because they require live gRPC connections to real
+    are left as AsyncMock because they require live gRPC connections to real
     agents, which are not available in component tests.
     """
-    root_ctx.registry = MagicMock()
+    root_ctx.registry = AsyncMock()
     root_ctx.repositories = Repositories.create(
         RepositoryArgs(
             db=root_ctx.db,
@@ -110,17 +110,17 @@ async def _session_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 background_task_manager=root_ctx.background_task_manager,
                 event_hub=root_ctx.event_hub,
                 event_producer=root_ctx.event_producer,
-                agent_registry=MagicMock(),
-                idle_checker_host=MagicMock(),
-                event_dispatcher=MagicMock(),
-                hook_plugin_ctx=MagicMock(),
-                scheduling_controller=MagicMock(),
-                deployment_controller=MagicMock(),
-                revision_generator_registry=MagicMock(),
-                agent_cache=MagicMock(),
-                notification_center=MagicMock(),
-                appproxy_client_pool=MagicMock(),
-                prometheus_client=MagicMock(),
+                agent_registry=AsyncMock(),
+                idle_checker_host=AsyncMock(),
+                event_dispatcher=AsyncMock(),
+                hook_plugin_ctx=AsyncMock(),
+                scheduling_controller=AsyncMock(),
+                deployment_controller=AsyncMock(),
+                revision_generator_registry=AsyncMock(),
+                agent_cache=AsyncMock(),
+                notification_center=AsyncMock(),
+                appproxy_client_pool=AsyncMock(),
+                prometheus_client=AsyncMock(),
             ),
         ),
         [],
@@ -182,7 +182,7 @@ async def session_seed(
                 id=session_id,
                 creation_id=f"cid-{unique}",
                 name=session_name,
-                session_type="INTERACTIVE",
+                session_type=SessionTypes.INTERACTIVE,
                 cluster_size=1,
                 cluster_mode="single-node",
                 domain_name=domain_fixture,
@@ -204,7 +204,7 @@ async def session_seed(
                 session_id=session_id,
                 session_creation_id=f"cid-{unique}",
                 session_name=session_name,
-                session_type="INTERACTIVE",
+                session_type=SessionTypes.INTERACTIVE,
                 cluster_role="main",
                 cluster_idx=0,
                 cluster_hostname="main0",
@@ -272,7 +272,7 @@ async def terminated_session_seed(
                 id=session_id,
                 creation_id=f"cid-{unique}",
                 name=session_name,
-                session_type="INTERACTIVE",
+                session_type=SessionTypes.INTERACTIVE,
                 cluster_size=1,
                 cluster_mode="single-node",
                 domain_name=domain_fixture,
@@ -295,7 +295,7 @@ async def terminated_session_seed(
                 session_id=session_id,
                 session_creation_id=f"cid-{unique}",
                 session_name=session_name,
-                session_type="INTERACTIVE",
+                session_type=SessionTypes.INTERACTIVE,
                 cluster_role="main",
                 cluster_idx=0,
                 cluster_hostname="main0",
