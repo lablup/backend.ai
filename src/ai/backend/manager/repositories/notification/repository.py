@@ -19,7 +19,8 @@ from ai.backend.manager.data.notification import (
     NotificationRuleData,
     NotificationRuleListResult,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 
 from .db_source import NotificationDBSource
@@ -69,7 +70,7 @@ class NotificationRepository:
     @notification_repository_resilience.apply()
     async def create_channel(
         self,
-        creator: Creator[NotificationChannelRow],
+        creator: RBACEntityCreator[NotificationChannelRow],
     ) -> NotificationChannelData:
         """Creates a new notification channel."""
         return await self._db_source.create_channel(creator)
@@ -90,7 +91,7 @@ class NotificationRepository:
     @notification_repository_resilience.apply()
     async def create_rule(
         self,
-        creator: Creator[NotificationRuleRow],
+        creator: RBACEntityCreator[NotificationRuleRow],
     ) -> NotificationRuleData:
         """Creates a new notification rule."""
         return await self._db_source.create_rule(creator)

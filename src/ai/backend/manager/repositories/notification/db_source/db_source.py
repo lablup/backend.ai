@@ -26,9 +26,11 @@ from ai.backend.manager.models.notification import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    Creator,
     execute_batch_querier,
-    execute_creator,
+)
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
@@ -93,11 +95,11 @@ class NotificationDBSource:
 
     async def create_channel(
         self,
-        creator: Creator[NotificationChannelRow],
+        creator: RBACEntityCreator[NotificationChannelRow],
     ) -> NotificationChannelData:
         """Creates a new notification channel."""
         async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
+            result = await execute_rbac_entity_creator(db_sess, creator)
             return result.row.to_data()
 
     async def update_channel(
@@ -122,11 +124,11 @@ class NotificationDBSource:
 
     async def create_rule(
         self,
-        creator: Creator[NotificationRuleRow],
+        creator: RBACEntityCreator[NotificationRuleRow],
     ) -> NotificationRuleData:
         """Creates a new notification rule."""
         async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
+            result = await execute_rbac_entity_creator(db_sess, creator)
             # Explicitly load the channel relationship for to_data()
             stmt = (
                 sa.select(NotificationRuleRow)

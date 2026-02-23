@@ -8,8 +8,11 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, cast
 
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
+from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, RBACElementType, ScopeType
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.notification.types import ProcessRuleParams
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.notification.creators import NotificationRuleCreatorSpec
 from ai.backend.manager.repositories.notification.updaters import NotificationRuleUpdaterSpec
 
@@ -112,7 +115,12 @@ class NotificationService:
         action: CreateChannelAction,
     ) -> CreateChannelActionResult:
         """Creates a new notification channel."""
-        channel_data = await self._repository.create_channel(action.creator)
+        rbac_creator = RBACEntityCreator(
+            spec=action.creator.spec,
+            element_type=RBACElementType.NOTIFICATION_CHANNEL,
+            scope_ref=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
+        )
+        channel_data = await self._repository.create_channel(rbac_creator)
 
         return CreateChannelActionResult(
             channel_data=channel_data,
@@ -128,7 +136,12 @@ class NotificationService:
         if len(spec.message_template) > 65536:
             raise ValueError("message_template must not exceed 65536 characters (64KB)")
 
-        rule_data = await self._repository.create_rule(action.creator)
+        rbac_creator = RBACEntityCreator(
+            spec=action.creator.spec,
+            element_type=RBACElementType.NOTIFICATION_RULE,
+            scope_ref=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
+        )
+        rule_data = await self._repository.create_rule(rbac_creator)
 
         return CreateRuleActionResult(
             rule_data=rule_data,
