@@ -256,16 +256,14 @@ class ProjectFairShareProjectNestedFilter:
         if self.name:
             name_condition = self.name.build_query_condition(
                 contains_factory=lambda spec: ProjectFairShareConditions.by_project_name_contains(
-                    spec.value
+                    spec
                 ),
-                equals_factory=lambda spec: ProjectFairShareConditions.by_project_name_equals(
-                    spec.value
-                ),
+                equals_factory=lambda spec: ProjectFairShareConditions.by_project_name_equals(spec),
                 starts_with_factory=lambda spec: ProjectFairShareConditions.by_project_name_starts_with(
-                    spec.value
+                    spec
                 ),
                 ends_with_factory=lambda spec: ProjectFairShareConditions.by_project_name_ends_with(
-                    spec.value
+                    spec
                 ),
             )
             if name_condition:
@@ -365,16 +363,16 @@ class ProjectFairShareFilter(GQLFilter):
         if self.resource_group:
             sg_condition = self.resource_group.build_query_condition(
                 contains_factory=lambda spec: ProjectFairShareConditions.by_resource_group_contains(
-                    spec.value
+                    spec
                 ),
                 equals_factory=lambda spec: ProjectFairShareConditions.by_resource_group_equals(
-                    spec.value
+                    spec
                 ),
                 starts_with_factory=lambda spec: ProjectFairShareConditions.by_resource_group_starts_with(
-                    spec.value
+                    spec
                 ),
                 ends_with_factory=lambda spec: ProjectFairShareConditions.by_resource_group_ends_with(
-                    spec.value
+                    spec
                 ),
             )
             if sg_condition:
@@ -391,16 +389,14 @@ class ProjectFairShareFilter(GQLFilter):
         if self.domain_name:
             dn_condition = self.domain_name.build_query_condition(
                 contains_factory=lambda spec: ProjectFairShareConditions.by_domain_name_contains(
-                    spec.value
+                    spec
                 ),
-                equals_factory=lambda spec: ProjectFairShareConditions.by_domain_name_equals(
-                    spec.value
-                ),
+                equals_factory=lambda spec: ProjectFairShareConditions.by_domain_name_equals(spec),
                 starts_with_factory=lambda spec: ProjectFairShareConditions.by_domain_name_starts_with(
-                    spec.value
+                    spec
                 ),
                 ends_with_factory=lambda spec: ProjectFairShareConditions.by_domain_name_ends_with(
-                    spec.value
+                    spec
                 ),
             )
             if dn_condition:
