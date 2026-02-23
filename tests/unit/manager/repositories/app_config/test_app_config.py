@@ -211,14 +211,14 @@ class TestAppConfigRepository:
     ) -> None:
         """Test creating domain-level configuration"""
         creator = RBACEntityCreator(
-     spec=AppConfigCreatorSpec(
-         scope_type=AppConfigScopeType.DOMAIN,
-         scope_id=test_domain_name,
-         extra_config={"theme": "dark", "language": "en"},
-     ),
-     element_type=RBACElementType.APP_CONFIG,
-     scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
- )
+            spec=AppConfigCreatorSpec(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=test_domain_name,
+                extra_config={"theme": "dark", "language": "en"},
+            ),
+            element_type=RBACElementType.APP_CONFIG,
+            scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
+        )
 
         config = await app_config_repository.create_config(creator)
 
@@ -234,14 +234,14 @@ class TestAppConfigRepository:
     ) -> None:
         """Test creating user-level configuration"""
         creator = RBACEntityCreator(
-     spec=AppConfigCreatorSpec(
-         scope_type=AppConfigScopeType.USER,
-         scope_id=test_user_id,
-         extra_config={"theme": "light", "notifications": True},
-     ),
-     element_type=RBACElementType.APP_CONFIG,
-     scope_ref=ScopeId(ScopeType.USER, test_user_id),
- )
+            spec=AppConfigCreatorSpec(
+                scope_type=AppConfigScopeType.USER,
+                scope_id=test_user_id,
+                extra_config={"theme": "light", "notifications": True},
+            ),
+            element_type=RBACElementType.APP_CONFIG,
+            scope_ref=ScopeId(ScopeType.USER, test_user_id),
+        )
 
         config = await app_config_repository.create_config(creator)
 
@@ -259,14 +259,14 @@ class TestAppConfigRepository:
         """Test getting merged config with only domain-level config"""
         # Create domain config
         domain_creator = RBACEntityCreator(
-     spec=AppConfigCreatorSpec(
-         scope_type=AppConfigScopeType.DOMAIN,
-         scope_id=test_domain_name,
-         extra_config={"theme": "dark", "language": "en"},
-     ),
-     element_type=RBACElementType.APP_CONFIG,
-     scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
- )
+            spec=AppConfigCreatorSpec(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=test_domain_name,
+                extra_config={"theme": "dark", "language": "en"},
+            ),
+            element_type=RBACElementType.APP_CONFIG,
+            scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
+        )
         await app_config_repository.create_config(domain_creator)
 
         # Get merged config
@@ -284,26 +284,26 @@ class TestAppConfigRepository:
         """Test getting merged config with user config overriding domain config"""
         # Create domain config
         domain_creator = RBACEntityCreator(
-     spec=AppConfigCreatorSpec(
-         scope_type=AppConfigScopeType.DOMAIN,
-         scope_id=test_domain_name,
-         extra_config={"theme": "dark", "language": "en", "sidebar": "expanded"},
-     ),
-     element_type=RBACElementType.APP_CONFIG,
-     scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
- )
+            spec=AppConfigCreatorSpec(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=test_domain_name,
+                extra_config={"theme": "dark", "language": "en", "sidebar": "expanded"},
+            ),
+            element_type=RBACElementType.APP_CONFIG,
+            scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
+        )
         await app_config_repository.create_config(domain_creator)
 
         # Create user config that overrides theme
         user_creator = RBACEntityCreator(
-     spec=AppConfigCreatorSpec(
-         scope_type=AppConfigScopeType.USER,
-         scope_id=test_user_id,
-         extra_config={"theme": "light", "notifications": True},
-     ),
-     element_type=RBACElementType.APP_CONFIG,
-     scope_ref=ScopeId(ScopeType.USER, test_user_id),
- )
+            spec=AppConfigCreatorSpec(
+                scope_type=AppConfigScopeType.USER,
+                scope_id=test_user_id,
+                extra_config={"theme": "light", "notifications": True},
+            ),
+            element_type=RBACElementType.APP_CONFIG,
+            scope_ref=ScopeId(ScopeType.USER, test_user_id),
+        )
         await app_config_repository.create_config(user_creator)
 
         # Get merged config
@@ -343,14 +343,14 @@ class TestAppConfigRepository:
         """Test upserting config when it exists (update)"""
         # Create initial config
         creator = RBACEntityCreator(
-     spec=AppConfigCreatorSpec(
-         scope_type=AppConfigScopeType.DOMAIN,
-         scope_id=test_domain_name,
-         extra_config={"theme": "dark", "language": "en"},
-     ),
-     element_type=RBACElementType.APP_CONFIG,
-     scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
- )
+            spec=AppConfigCreatorSpec(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=test_domain_name,
+                extra_config={"theme": "dark", "language": "en"},
+            ),
+            element_type=RBACElementType.APP_CONFIG,
+            scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
+        )
         initial_config = await app_config_repository.create_config(creator)
 
         # Update config
@@ -373,14 +373,14 @@ class TestAppConfigRepository:
         """Test deleting configuration"""
         # Create config
         creator = RBACEntityCreator(
-     spec=AppConfigCreatorSpec(
-         scope_type=AppConfigScopeType.DOMAIN,
-         scope_id=test_domain_name,
-         extra_config={"theme": "dark"},
-     ),
-     element_type=RBACElementType.APP_CONFIG,
-     scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
- )
+            spec=AppConfigCreatorSpec(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=test_domain_name,
+                extra_config={"theme": "dark"},
+            ),
+            element_type=RBACElementType.APP_CONFIG,
+            scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
+        )
         await app_config_repository.create_config(creator)
 
         # Delete config
@@ -428,14 +428,14 @@ class TestAppConfigRepository:
         """Test cache invalidation when domain config is updated"""
         # Create domain config
         domain_creator = RBACEntityCreator(
-     spec=AppConfigCreatorSpec(
-         scope_type=AppConfigScopeType.DOMAIN,
-         scope_id=test_domain_name,
-         extra_config={"theme": "dark"},
-     ),
-     element_type=RBACElementType.APP_CONFIG,
-     scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
- )
+            spec=AppConfigCreatorSpec(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=test_domain_name,
+                extra_config={"theme": "dark"},
+            ),
+            element_type=RBACElementType.APP_CONFIG,
+            scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
+        )
         await app_config_repository.create_config(domain_creator)
 
         # First call - cache miss, fetch from DB

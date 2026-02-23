@@ -109,9 +109,7 @@ class AppConfigDBSource:
                 merged_config=merged_config,
             )
 
-    async def create_config(
-        self, creator: RBACEntityCreator[AppConfigRow]
-    ) -> AppConfigData:
+    async def create_config(self, creator: RBACEntityCreator[AppConfigRow]) -> AppConfigData:
         """Create a new app configuration."""
         async with self._db.begin_session() as db_sess:
             result = await execute_rbac_entity_creator(db_sess, creator)
