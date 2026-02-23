@@ -5,7 +5,7 @@ import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from contextlib import asynccontextmanager
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.config import (
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
+from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import domainconfig as _domainconfig_api
 from ai.backend.manager.api import groupconfig as _groupconfig_api
@@ -70,6 +71,14 @@ async def _config_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     - event_hub_ctx        → root_ctx.event_hub
     - background_task_ctx  → root_ctx.background_task_manager
     """
+    # _TestConfigProvider skips super().__init__() so _legacy_etcd_config_loader
+    # is never set.  The @server_status_required decorator calls
+    # config_provider.legacy_etcd_config_loader.get_manager_status() which is
+    # async.  Inject a MagicMock with an AsyncMock method so the check passes.
+    mock_legacy_loader = MagicMock()
+    mock_legacy_loader.get_manager_status = AsyncMock(return_value=ManagerStatus.RUNNING)
+    root_ctx.config_provider._legacy_etcd_config_loader = mock_legacy_loader
+
     root_ctx.repositories = Repositories.create(
         RepositoryArgs(
             db=root_ctx.db,
