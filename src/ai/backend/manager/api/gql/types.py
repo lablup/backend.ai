@@ -8,7 +8,6 @@ import strawberry
 
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.services.processors import Processors
 
@@ -60,7 +59,6 @@ class StrawberryGQLContext:
     event_fetcher: EventFetcher
     gql_adapter: BaseGQLAdapter
     data_loaders: DataLoaders
-    db: ExtendedAsyncSAEngine | None = None
 
 
 # Scope input types for BEP-1041 Resource Group scoped APIs

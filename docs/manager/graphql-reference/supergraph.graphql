@@ -9211,7 +9211,7 @@ type Query
   adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. Query service catalog entries. Admin only."""
-  adminServiceCatalogs(filter: ServiceCatalogFilter = null, first: Int = null, offset: Int = null): [ServiceCatalog!]! @join__field(graph: STRAWBERRY)
+  adminServiceCatalogs(filter: ServiceCatalogFilter = null, orderBy: [ServiceCatalogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): [ServiceCatalog!]! @join__field(graph: STRAWBERRY)
 
   """List session scheduling history (admin only)"""
   adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection @join__field(graph: STRAWBERRY)
@@ -10894,6 +10894,26 @@ input ServiceCatalogFilter
 
   """Filter by health status."""
   status: ServiceCatalogStatus = null
+}
+
+"""
+Added in 26.3.0. Specifies the field and direction for ordering service catalog queries.
+"""
+input ServiceCatalogOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: ServiceCatalogOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.3.0. Fields available for ordering service catalog queries.
+"""
+enum ServiceCatalogOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  SERVICE_GROUP @join__enumValue(graph: STRAWBERRY)
+  REGISTERED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.3.0. Health status of a service in the catalog."""
