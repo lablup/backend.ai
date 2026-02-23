@@ -7,8 +7,8 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import ImageID
-from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder

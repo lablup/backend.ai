@@ -11,7 +11,7 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-from ai.backend.manager.api.gql.base import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.repositories.fair_share.options import (
     DomainFairShareConditions,
     ProjectFairShareConditions,

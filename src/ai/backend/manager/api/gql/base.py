@@ -15,6 +15,7 @@ from graphql_relay.utils import base64, unbase64
 from strawberry.relay import Edge, Node
 from strawberry.types import get_object_definition, has_object_definition
 
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.data.common.types import IntFilterData, SearchResult, StringFilterData
 
 if TYPE_CHECKING:
@@ -22,31 +23,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.types import (
         PaginationOptions,
     )
-
-
-@dataclass(frozen=True)
-class StringMatchSpec:
-    """Specification for string matching operations in query conditions."""
-
-    value: str
-    case_insensitive: bool
-    negated: bool
-
-
-@dataclass(frozen=True)
-class UUIDEqualMatchSpec:
-    """Specification for UUID equality operations (=, !=)."""
-
-    value: uuid.UUID
-    negated: bool
-
-
-@dataclass(frozen=True)
-class UUIDInMatchSpec:
-    """Specification for UUID IN operations (IN, NOT IN)."""
-
-    values: list[uuid.UUID]
-    negated: bool
 
 
 @strawberry.scalar
