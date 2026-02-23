@@ -494,14 +494,31 @@ class ExtraVFolderMountInput:
     description="Added in 25.19.0. Input for specifying revision configuration within a deployment."
 )
 class CreateRevisionInput:
-    deployment_id: ID
-    name: str | None = None
-    cluster_config: ClusterConfigInput
-    resource_config: ResourceConfigInput
-    image: ImageInput
-    model_runtime_config: ModelRuntimeConfigInput
-    model_mount_config: ModelMountConfigInput
-    extra_mounts: list[ExtraVFolderMountInput] | None
+    deployment_id: ID = strawberry.field(
+        description="The ID of the model deployment that this revision belongs to."
+    )
+    name: str | None = strawberry.field(
+        description="Optional human-readable name for this revision. If not provided, a name will be auto-generated.",
+        default=None,
+    )
+    cluster_config: ClusterConfigInput = strawberry.field(
+        description="Cluster configuration including the clustering mode (e.g., SINGLE_NODE) and the number of replicas."
+    )
+    resource_config: ResourceConfigInput = strawberry.field(
+        description="Compute resource allocation settings including the resource group, resource slots (CPU, memory, accelerators), and additional resource options."
+    )
+    image: ImageInput = strawberry.field(
+        description="The container image to use for running the inference server."
+    )
+    model_runtime_config: ModelRuntimeConfigInput = strawberry.field(
+        description="Runtime configuration for the inference framework, including the runtime variant (e.g., vllm, triton), framework-specific settings, and environment variables."
+    )
+    model_mount_config: ModelMountConfigInput = strawberry.field(
+        description="Configuration for mounting the model data into the inference container, specifying the source virtual folder, mount destination path, and model definition file path."
+    )
+    extra_mounts: list[ExtraVFolderMountInput] | None = strawberry.field(
+        description="Optional list of additional virtual folder mounts to attach to the inference container (e.g., for supplementary data or configuration files).",
+    )
 
     def to_model_revision_creator(self) -> ModelRevisionCreator:
         resource_slots = {

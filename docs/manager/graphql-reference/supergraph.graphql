@@ -2518,13 +2518,40 @@ Added in 25.19.0. Input for specifying revision configuration within a deploymen
 input CreateRevisionInput
   @join__type(graph: STRAWBERRY)
 {
+  """The ID of the model deployment that this revision belongs to."""
   deploymentId: ID!
+
+  """
+  Optional human-readable name for this revision. If not provided, a name will be auto-generated.
+  """
   name: String = null
+
+  """
+  Cluster configuration including the clustering mode (e.g., SINGLE_NODE) and the number of replicas.
+  """
   clusterConfig: ClusterConfigInput!
+
+  """
+  Compute resource allocation settings including the resource group, resource slots (CPU, memory, accelerators), and additional resource options.
+  """
   resourceConfig: ResourceConfigInput!
+
+  """The container image to use for running the inference server."""
   image: ImageInput!
+
+  """
+  Runtime configuration for the inference framework, including the runtime variant (e.g., vllm, triton), framework-specific settings, and environment variables.
+  """
   modelRuntimeConfig: ModelRuntimeConfigInput!
+
+  """
+  Configuration for mounting the model data into the inference container, specifying the source virtual folder, mount destination path, and model definition file path.
+  """
   modelMountConfig: ModelMountConfigInput!
+
+  """
+  Optional list of additional virtual folder mounts to attach to the inference container (e.g., for supplementary data or configuration files).
+  """
   extraMounts: [ExtraVFolderMountInput!]
 }
 
