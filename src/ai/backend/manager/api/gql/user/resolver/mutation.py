@@ -399,17 +399,18 @@ async def admin_bulk_purge_users_v2(
     if me is None:
         raise UnreachableError("User context is not available after check_admin_only()")
 
+    options = input.options
     action = BulkPurgeUserAction(
         user_ids=input.user_ids,
         admin_user_id=me.user_id,
         purge_shared_vfolders=(
-            OptionalState.update(input.purge_shared_vfolders)
-            if input.purge_shared_vfolders
+            OptionalState.update(options.purge_shared_vfolders)
+            if options and options.purge_shared_vfolders
             else OptionalState.nop()
         ),
         delegate_endpoint_ownership=(
-            OptionalState.update(input.delegate_endpoint_ownership)
-            if input.delegate_endpoint_ownership
+            OptionalState.update(options.delegate_endpoint_ownership)
+            if options and options.delegate_endpoint_ownership
             else OptionalState.nop()
         ),
     )

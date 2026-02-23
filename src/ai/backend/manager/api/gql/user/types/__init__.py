@@ -16,6 +16,7 @@ from .filters import (
 from .inputs import (
     BulkCreateUserV2InputGQL,
     BulkPurgeUsersV2InputGQL,
+    BulkPurgeUsersV2OptionsGQL,
     BulkUpdateUserV2InputGQL,
     BulkUpdateUserV2ItemInputGQL,
     CreateUserInputGQL,
@@ -90,6 +91,7 @@ __all__ = [
     "DeleteUsersInputGQL",
     "PurgeUserInputGQL",
     "BulkPurgeUsersV2InputGQL",
+    "BulkPurgeUsersV2OptionsGQL",
     # Payloads
     "CreateUserPayloadGQL",
     "BulkCreateUserV2ErrorGQL",
