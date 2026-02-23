@@ -589,7 +589,7 @@ class StorageProxyManagerFacingClient:
         )
 
     @storage_proxy_client_resilience.apply()
-    async def download_archive_file(
+    async def create_archive_download_token(
         self,
         *,
         volume: str,
@@ -597,7 +597,7 @@ class StorageProxyManagerFacingClient:
         files: list[str],
     ) -> Mapping[str, Any]:
         """
-        Create an archive download session for multiple files from the storage proxy.
+        Request a JWT token for archive download from the storage proxy.
 
         :param volume: Volume name
         :param virtual_folder_id: Virtual folder ID
@@ -606,13 +606,13 @@ class StorageProxyManagerFacingClient:
         """
         return await self._client.request_with_response(
             "POST",
-            "folder/file/download-archive",
+            "folder/file/archive-download-token",
             body={
                 "volume": volume,
                 "virtual_folder_id": virtual_folder_id,
                 "files": files,
             },
-            request_timeout=self._timeout_config.download_archive_file.to_client_timeout(),
+            request_timeout=self._timeout_config.create_archive_download_session.to_client_timeout(),
         )
 
     @storage_proxy_client_resilience.apply()

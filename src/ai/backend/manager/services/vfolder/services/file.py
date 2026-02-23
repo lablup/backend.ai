@@ -154,7 +154,7 @@ class VFolderFileService:
             url=str(client_api_url / "download"),
         )
 
-    async def download_archive_file(
+    async def create_archive_download_session(
         self, action: CreateArchiveDownloadSessionAction
     ) -> CreateArchiveDownloadSessionActionResult:
         allowed_vfolder_types = (
@@ -173,7 +173,7 @@ class VFolderFileService:
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(info.host, False)
         manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
-        storage_reply = await manager_client.download_archive_file(
+        storage_reply = await manager_client.create_archive_download_token(
             volume=volume_name,
             virtual_folder_id=str(info.vfolder_id),
             files=action.files,

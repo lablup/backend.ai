@@ -167,8 +167,8 @@ class TestVFolderServicePurge:
         mock_vfolder_repository.purge_vfolder.assert_called_once_with(sample_action.purger)
 
 
-class TestVFolderFileServiceDownloadArchive:
-    """Tests for VFolderFileService.download_archive_file() method."""
+class TestVFolderFileServiceCreateArchiveDownload:
+    """Tests for VFolderFileService.create_archive_download_session() method."""
 
     STORAGE_URL = yarl.URL("https://storage.example.com")
     PROXY_NAME = "proxy1"
@@ -182,7 +182,9 @@ class TestVFolderFileServiceDownloadArchive:
         manager.get_proxy_and_volume.return_value = (self.PROXY_NAME, self.VOLUME_NAME)
         manager.get_client_api_url.return_value = self.STORAGE_URL
         mock_client = MagicMock()
-        mock_client.download_archive_file = AsyncMock(return_value={"token": self.STORAGE_TOKEN})
+        mock_client.create_archive_download_token = AsyncMock(
+            return_value={"token": self.STORAGE_TOKEN}
+        )
         manager.get_manager_facing_client.return_value = mock_client
         return manager
 
@@ -228,7 +230,7 @@ class TestVFolderFileServiceDownloadArchive:
         sample_vfolder_uuid: uuid.UUID,
     ) -> None:
         """Test successful archive download session creation."""
-        result = await file_service.download_archive_file(sample_action)
+        result = await file_service.create_archive_download_session(sample_action)
 
         assert isinstance(result, CreateArchiveDownloadSessionActionResult)
         assert result.token == self.STORAGE_TOKEN
@@ -254,7 +256,7 @@ class TestVFolderFileServiceDownloadArchive:
         )
 
         with pytest.raises(AuthorizationFailed):
-            await file_service.download_archive_file(sample_action)
+            await file_service.create_archive_download_session(sample_action)
 
     async def test_download_archive_calls_storage_proxy_with_correct_params(
         self,
@@ -263,10 +265,10 @@ class TestVFolderFileServiceDownloadArchive:
         sample_action: CreateArchiveDownloadSessionAction,
     ) -> None:
         """Test that storage proxy client is called with correct parameters."""
-        await file_service.download_archive_file(sample_action)
+        await file_service.create_archive_download_session(sample_action)
 
         mock_client = mock_storage_manager.get_manager_facing_client.return_value
-        mock_client.download_archive_file.assert_called_once()
-        call_kwargs = mock_client.download_archive_file.call_args.kwargs
+        mock_client.create_archive_download_token.assert_called_once()
+        call_kwargs = mock_client.create_archive_download_token.call_args.kwargs
         assert call_kwargs["volume"] == self.VOLUME_NAME
         assert call_kwargs["files"] == sample_action.files

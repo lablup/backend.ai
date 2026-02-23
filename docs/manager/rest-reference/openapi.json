@@ -11667,7 +11667,7 @@
     },
     "/folders/{name}/request-download-archive": {
       "post": {
-        "operationId": "folders.create_download_archive_session",
+        "operationId": "folders.create_archive_download_session",
         "tags": [
           "folders"
         ],

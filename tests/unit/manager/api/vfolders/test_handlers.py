@@ -10,7 +10,7 @@ from aiohttp import web
 
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import vfolder as vfolder_module
-from ai.backend.manager.api.vfolder import create_download_archive_session
+from ai.backend.manager.api.vfolder import create_archive_download_session
 from ai.backend.manager.models.vfolder import VFolderOperationStatus
 from ai.backend.manager.services.vfolder.actions.file import (
     CreateArchiveDownloadSessionAction,
@@ -71,7 +71,7 @@ async def client(
     app["_root.context"] = mock_root_ctx
     app.router.add_post(
         "/folders/{name}/request-download-archive",
-        create_download_archive_session,
+        create_archive_download_session,
     )
     return await aiohttp_client(app)
 
@@ -79,8 +79,8 @@ async def client(
 # --- Test classes (scenarios) ---
 
 
-class TestCreateDownloadArchiveSession:
-    """Tests for create_download_archive_session handler via aiohttp client."""
+class TestCreateArchiveDownloadSession:
+    """Tests for create_archive_download_session handler via aiohttp client."""
 
     EXPECTED_TOKEN = "test-token"
     EXPECTED_URL = "https://storage/download-archive"
@@ -96,7 +96,7 @@ class TestCreateDownloadArchiveSession:
         mock_processor = AsyncMock(
             return_value=MagicMock(token=self.EXPECTED_TOKEN, url=self.EXPECTED_URL),
         )
-        mock_root_ctx.processors.vfolder_file.download_archive_file.wait_for_complete = (
+        mock_root_ctx.processors.vfolder_file.create_archive_download_session.wait_for_complete = (
             mock_processor
         )
 
