@@ -1299,6 +1299,7 @@ type CreateReservoirRegistryPayload {
 Added in 25.19.0. Input for specifying revision configuration within a deployment.
 """
 input CreateRevisionInput {
+  deploymentId: ID!
   name: String = null
   clusterConfig: ClusterConfigInput!
   resourceConfig: ResourceConfigInput!

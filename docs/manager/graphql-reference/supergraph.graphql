@@ -2518,6 +2518,7 @@ Added in 25.19.0. Input for specifying revision configuration within a deploymen
 input CreateRevisionInput
   @join__type(graph: STRAWBERRY)
 {
+  deploymentId: ID!
   name: String = null
   clusterConfig: ClusterConfigInput!
   resourceConfig: ResourceConfigInput!
