@@ -16,6 +16,7 @@ from ai.backend.common.types import (
     QuotaScopeType,
     VFolderHostPermission,
     VFolderHostPermissionMap,
+    VFolderUsageMode,
 )
 
 # Statically imported so that Pants includes these modules in the test PEX.
@@ -26,6 +27,7 @@ from ai.backend.manager.api import vfolder as _vfolder_api
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.data.vfolder.types import (
+    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -229,8 +231,8 @@ async def vfolder_factory(
             "host": "local",
             "domain_name": domain_fixture,
             "quota_scope_id": str(quota_scope_id),
-            "usage_mode": "general",
-            "permission": "rw",
+            "usage_mode": VFolderUsageMode.GENERAL,
+            "permission": VFolderMountPermission.READ_WRITE,
             "ownership_type": VFolderOwnershipType.USER,
             "user": str(user_uuid),
             "creator": "admin-test@test.local",

@@ -9,6 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.client.v2.exceptions import BackendAPIError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.vfolder import (
     DeleteInvitationReq,
     DeleteVFolderByIDReq,
@@ -19,6 +20,7 @@ from ai.backend.common.dto.manager.vfolder import (
     VFolderGetInfoResponse,
     VFolderListResponse,
 )
+from ai.backend.manager.data.vfolder.types import VFolderMountPermission
 from ai.backend.manager.models.vfolder import vfolder_invitations
 
 VFolderFixtureData = dict[str, Any]
@@ -105,7 +107,7 @@ class TestVFolderLifecycle:
         result = await admin_registry.vfolder.invite(
             vf["name"],
             InviteVFolderReq(
-                permission="ro",
+                permission=VFolderPermissionField.READ_ONLY,
                 emails=["user-invite@test.local"],
             ),
         )
@@ -125,7 +127,7 @@ class TestVFolderLifecycle:
             await conn.execute(
                 sa.insert(vfolder_invitations).values(
                     id=inv_id,
-                    permission="ro",
+                    permission=VFolderMountPermission.READ_ONLY,
                     inviter="someone@test.local",
                     invitee="admin@test.local",
                     state="pending",
