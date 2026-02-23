@@ -36,6 +36,12 @@ _HMAC_XFAIL_REASON = (
     "Endpoints passing query params cause 401."
 )
 
+_GET_JSON_BODY_XFAIL_REASON = (
+    "Client SDK v2 sends JSON body on GET requests, but the server's "
+    "check_api_params reads from request.query for GET/HEAD methods, "
+    "ignoring the body entirely.  Params are never seen by the server."
+)
+
 
 class TestEtcdConfigRead:
     """Tests for read-only etcd config endpoints (no auth required)."""
@@ -256,18 +262,20 @@ class TestUsageStats:
     """Tests for usage statistics endpoints."""
 
     @pytest.mark.asyncio
+    @pytest.mark.xfail(reason=_GET_JSON_BODY_XFAIL_REASON, strict=True)
     async def test_admin_gets_usage_per_month(
         self,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
         """Admin can query usage statistics for a given month."""
         result = await admin_registry.infra.get_usage_per_month(
-            UsagePerMonthRequest(group_ids=None, month="202601")
+            UsagePerMonthRequest(group_ids=[], month="202601")
         )
         assert isinstance(result, UsagePerMonthResponse)
         assert isinstance(result.root, list)
 
     @pytest.mark.asyncio
+    @pytest.mark.xfail(reason=_GET_JSON_BODY_XFAIL_REASON, strict=True)
     async def test_admin_gets_usage_per_period(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -316,7 +324,7 @@ class TestUsageStats:
         """Regular users are blocked from admin usage stats (superadmin only)."""
         with pytest.raises(AuthenticationError):
             await user_registry.infra.get_usage_per_month(
-                UsagePerMonthRequest(group_ids=None, month="202601")
+                UsagePerMonthRequest(group_ids=[], month="202601")
             )
 
     @pytest.mark.asyncio

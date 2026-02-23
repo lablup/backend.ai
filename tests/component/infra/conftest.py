@@ -9,7 +9,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotName, SlotTypes, current_resource_slots
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -37,6 +37,13 @@ from ai.backend.manager.server import (
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
 
 _INFRA_SERVER_SUBAPP_MODULES = (_auth_api, _etcd_api, _resource_api)
+
+
+def _make_mock_agent_registry() -> MagicMock:
+    """Create a MagicMock agent_registry with awaitable async stubs."""
+    mock = MagicMock()
+    mock.recalc_resource_usage = AsyncMock(return_value=None)
+    return mock
 
 
 @asynccontextmanager
@@ -67,7 +74,18 @@ async def _infra_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     mock_legacy_loader.get_resource_slots = AsyncMock(return_value={"cpu": "count", "mem": "bytes"})
     mock_legacy_loader.get_vfolder_types = AsyncMock(return_value=["user", "group"])
     mock_legacy_loader.register_myself = AsyncMock(return_value=None)
+    mock_legacy_loader.deregister_myself = AsyncMock(return_value=None)
+    # check_presets reads group_resource_visibility via get_raw(); return None
+    # so the repository treats it as "no visibility restriction".
+    mock_legacy_loader.get_raw = AsyncMock(return_value=None)
     root_ctx.config_provider._legacy_etcd_config_loader = mock_legacy_loader
+
+    # ResourceSlot.normalize_slots() reads this ContextVar; set it so that
+    # list_presets / check_presets do not raise LookupError.
+    current_resource_slots.set({
+        SlotName("cpu"): SlotTypes("count"),
+        SlotName("mem"): SlotTypes("bytes"),
+    })
 
     root_ctx.repositories = Repositories.create(
         RepositoryArgs(
@@ -97,8 +115,9 @@ async def _infra_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 event_hub=root_ctx.event_hub,
                 event_producer=root_ctx.event_producer,
                 # agent_registry requires gRPC connections to real agents — not feasible
-                # in the component test environment; kept as MagicMock.
-                agent_registry=MagicMock(),
+                # in the component test environment; kept as MagicMock with async stubs
+                # for methods that are awaited (e.g. recalculate_usage).
+                agent_registry=_make_mock_agent_registry(),
                 idle_checker_host=MagicMock(),
                 event_dispatcher=MagicMock(),
                 hook_plugin_ctx=MagicMock(),
