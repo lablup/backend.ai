@@ -917,6 +917,8 @@ async def service_discovery_ctx(config: WebServerUnifiedConfig) -> AsyncGenerato
             endpoint=config.otel.endpoint,
             service_instance_id=uuid.uuid4(),
             service_instance_name=instance_name,
+            max_queue_size=config.otel.max_queue_size,
+            max_export_batch_size=config.otel.max_export_batch_size,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
     yield
