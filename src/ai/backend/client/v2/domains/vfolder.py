@@ -96,12 +96,12 @@ class VFolderClient(BaseDomainClient):
             if request is not None
             else None
         )
-        return await self._client.typed_request(
-            "GET",
-            "/folders",
-            params=params,
-            response_model=VFolderListResponse,
-        )
+        data = await self._client._request("GET", "/folders", params=params)
+        # The legacy /folders API returns a bare JSON list while the newer
+        # /vfolders API wraps the result in {"items": [...]}.
+        if isinstance(data, list):
+            return VFolderListResponse.model_validate({"items": data})
+        return VFolderListResponse.model_validate(data)
 
     async def get_info(self, name: str) -> VFolderGetInfoResponse:
         return await self._client.typed_request(

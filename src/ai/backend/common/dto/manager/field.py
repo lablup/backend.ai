@@ -37,7 +37,6 @@ class VFolderItemField(BaseFieldModel):
     usage_mode: VFolderUsageMode
     created_at: str
     permission: VFolderPermissionField
-    max_size: int
     creator: str
     ownership_type: VFolderOwnershipTypeField
     user: str | None
@@ -45,8 +44,11 @@ class VFolderItemField(BaseFieldModel):
     cloneable: bool
     status: VFolderOperationStatusField
     is_owner: bool
-    user_email: str
-    group_name: str
-    type: str  # legacy
-    max_files: int
-    cur_size: int
+    # Fields below are only available from the new /vfolders API;
+    # the legacy /folders API does not include them.
+    max_size: int = 0
+    user_email: str = ""
+    group_name: str = ""
+    type: str = ""  # legacy
+    max_files: int = 0
+    cur_size: int = 0
