@@ -2,7 +2,6 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import AgentId
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.models.agent import AgentRow

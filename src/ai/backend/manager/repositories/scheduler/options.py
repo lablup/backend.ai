@@ -12,7 +12,6 @@ from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 
 if TYPE_CHECKING:
     from ai.backend.common.data.filter_specs import (
-        StringMatchSpec,
         UUIDEqualMatchSpec,
         UUIDInMatchSpec,
     )

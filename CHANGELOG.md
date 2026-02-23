@@ -16,6 +16,16 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.2.2 (2026-02-23)
+
+### Fixes
+* Filter out zero-valued resource slots from the `resource_allocation_limit_for_sessions` scaling group response. ([#9221](https://github.com/lablup/backend.ai/issues/9221))
+* Fix fair share StringFilter ignoring negation and case-insensitivity flags in Domain, Project, and User filter conditions ([#9222](https://github.com/lablup/backend.ai/issues/9222))
+* Fix resourceInfo quantity values serialized with excessive decimal places (scale=6) by normalizing Decimals in the GQL layer. ([#9223](https://github.com/lablup/backend.ai/issues/9223))
+* Fix search_rg_* fair share queries incorrectly excluding entities without fair share records when top-level filters are applied, by using INNER JOIN'd columns in RG-context condition factories. ([#9225](https://github.com/lablup/backend.ai/issues/9225))
+* Move filter specs to common and add build_query_condition to REST filters ([#9247](https://github.com/lablup/backend.ai/issues/9247))
+
+
 ## 26.2.1 (2026-02-22)
 
 ### Features
