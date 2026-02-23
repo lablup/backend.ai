@@ -96,7 +96,7 @@ class BackendAIClient:
         *,
         json: Any | None = None,
         params: dict[str, str] | None = None,
-    ) -> dict[str, Any] | None:
+    ) -> dict[str, Any] | list[Any] | None:
         session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
@@ -117,7 +117,7 @@ class BackendAIClient:
                 raise map_status_to_exception(resp.status, resp.reason or "", data)
             if resp.status == 204:
                 return None
-            result: dict[str, Any] = await resp.json()
+            result: dict[str, Any] | list[Any] = await resp.json()
             return result
 
     async def typed_request(
