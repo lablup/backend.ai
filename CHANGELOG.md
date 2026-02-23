@@ -16,6 +16,17 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.15.11 (2026-02-23)
+
+### Fixes
+* Fix cross-architecture binary collision in build-scies CI job by including runner architecture in Pants cache key. ([#9185](https://github.com/lablup/backend.ai/issues/9185))
+* Pass SCIENCE_AUTH_API_GITHUB_COM_BEARER to Pants subprocess environment to prevent GitHub API rate limit errors during scie build in CI. ([#9186](https://github.com/lablup/backend.ai/issues/9186))
+* Fix release CI failure where `dist/export/` directory caused asset upload loop to error with "is a directory". ([#9194](https://github.com/lablup/backend.ai/issues/9194))
+
+### Miscellaneous
+* Split GitHub Release asset upload into individual `gh release upload` calls with retry to prevent API timeout on bulk upload. ([#9184](https://github.com/lablup/backend.ai/issues/9184))
+
+
 ## 25.15.10 (2026-02-20)
 
 ### External Dependency Updates
