@@ -25,7 +25,7 @@ from ai.backend.manager.services.deployment.actions.deployment_policy.update_dep
 # Mutation resolvers
 
 
-@strawberry.mutation(description="Added in 25.19.0")  # type: ignore[misc]
+@strawberry.mutation(description="Added in 26.3.0")  # type: ignore[misc]
 async def create_deployment_policy(
     input: CreateDeploymentPolicyInput, info: Info[StrawberryGQLContext]
 ) -> CreateDeploymentPolicyPayload:
@@ -42,7 +42,7 @@ async def create_deployment_policy(
     )
 
 
-@strawberry.mutation(description="Added in 25.19.0")  # type: ignore[misc]
+@strawberry.mutation(description="Added in 26.3.0")  # type: ignore[misc]
 async def update_deployment_policy(
     input: UpdateDeploymentPolicyInput, info: Info[StrawberryGQLContext]
 ) -> UpdateDeploymentPolicyPayload:

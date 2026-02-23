@@ -1216,6 +1216,20 @@ type CreateDeploymentPayload {
   deployment: ModelDeployment!
 }
 
+"""Added in 26.3.0. Input for creating a deployment policy."""
+input CreateDeploymentPolicyInput {
+  deploymentId: ID!
+  strategy: DeploymentStrategyType!
+  rollbackOnFailure: Boolean! = false
+  rollingUpdate: RollingUpdateConfigInput = null
+  blueGreen: BlueGreenConfigInput = null
+}
+
+"""Added in 26.3.0. Payload for creating a deployment policy."""
+type CreateDeploymentPolicyPayload {
+  deploymentPolicy: DeploymentPolicy!
+}
+
 """Added in 25.14.0"""
 input CreateHuggingFaceRegistryInput {
   url: String!
@@ -3715,6 +3729,12 @@ type Mutation {
 
   """Added in 25.16.0"""
   deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload!
+
+  """Added in 26.3.0"""
+  createDeploymentPolicy(input: CreateDeploymentPolicyInput!): CreateDeploymentPolicyPayload!
+
+  """Added in 26.3.0"""
+  updateDeploymentPolicy(input: UpdateDeploymentPolicyInput!): UpdateDeploymentPolicyPayload!
 
   """Added in 25.14.0"""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload!
@@ -6944,6 +6964,20 @@ input UpdateDeploymentInput {
 """Added in 25.19.0"""
 type UpdateDeploymentPayload {
   deployment: ModelDeployment!
+}
+
+"""Added in 26.3.0. Input for updating a deployment policy."""
+input UpdateDeploymentPolicyInput {
+  id: ID!
+  strategy: DeploymentStrategyType = null
+  rollbackOnFailure: Boolean = null
+  rollingUpdate: RollingUpdateConfigInput = null
+  blueGreen: BlueGreenConfigInput = null
+}
+
+"""Added in 26.3.0. Payload for updating a deployment policy."""
+type UpdateDeploymentPolicyPayload {
+  deploymentPolicy: DeploymentPolicy!
 }
 
 """Added in 25.14.0"""

@@ -2267,6 +2267,24 @@ type CreateDeploymentPayload
   deployment: ModelDeployment!
 }
 
+"""Added in 26.3.0. Input for creating a deployment policy."""
+input CreateDeploymentPolicyInput
+  @join__type(graph: STRAWBERRY)
+{
+  deploymentId: ID!
+  strategy: DeploymentStrategyType!
+  rollbackOnFailure: Boolean! = false
+  rollingUpdate: RollingUpdateConfigInput = null
+  blueGreen: BlueGreenConfigInput = null
+}
+
+"""Added in 26.3.0. Payload for creating a deployment policy."""
+type CreateDeploymentPolicyPayload
+  @join__type(graph: STRAWBERRY)
+{
+  deploymentPolicy: DeploymentPolicy!
+}
+
 type CreateDomain
   @join__type(graph: GRAPHENE)
 {
@@ -7283,6 +7301,12 @@ type Mutation
   """Added in 25.16.0"""
   deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload! @join__field(graph: STRAWBERRY)
 
+  """Added in 26.3.0"""
+  createDeploymentPolicy(input: CreateDeploymentPolicyInput!): CreateDeploymentPolicyPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.3.0"""
+  updateDeploymentPolicy(input: UpdateDeploymentPolicyInput!): UpdateDeploymentPolicyPayload! @join__field(graph: STRAWBERRY)
+
   """Added in 25.14.0"""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload! @join__field(graph: STRAWBERRY)
 
@@ -11856,6 +11880,24 @@ type UpdateDeploymentPayload
   @join__type(graph: STRAWBERRY)
 {
   deployment: ModelDeployment!
+}
+
+"""Added in 26.3.0. Input for updating a deployment policy."""
+input UpdateDeploymentPolicyInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
+  strategy: DeploymentStrategyType = null
+  rollbackOnFailure: Boolean = null
+  rollingUpdate: RollingUpdateConfigInput = null
+  blueGreen: BlueGreenConfigInput = null
+}
+
+"""Added in 26.3.0. Payload for updating a deployment policy."""
+type UpdateDeploymentPolicyPayload
+  @join__type(graph: STRAWBERRY)
+{
+  deploymentPolicy: DeploymentPolicy!
 }
 
 """Added in 25.14.0"""

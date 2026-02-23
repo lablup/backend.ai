@@ -140,7 +140,7 @@ class BlueGreenConfigInputGQL:
 
 @strawberry.input(
     name="CreateDeploymentPolicyInput",
-    description="Added in 25.19.0. Input for creating a deployment policy.",
+    description="Added in 26.3.0. Input for creating a deployment policy.",
 )
 class CreateDeploymentPolicyInput:
     deployment_id: ID
@@ -175,7 +175,7 @@ class CreateDeploymentPolicyInput:
 
 @strawberry.input(
     name="UpdateDeploymentPolicyInput",
-    description="Added in 25.19.0. Input for updating a deployment policy.",
+    description="Added in 26.3.0. Input for updating a deployment policy.",
 )
 class UpdateDeploymentPolicyInput:
     id: ID
@@ -206,7 +206,7 @@ class UpdateDeploymentPolicyInput:
 
 @strawberry.type(
     name="CreateDeploymentPolicyPayload",
-    description="Added in 25.19.0. Payload for creating a deployment policy.",
+    description="Added in 26.3.0. Payload for creating a deployment policy.",
 )
 class CreateDeploymentPolicyPayload:
     deployment_policy: DeploymentPolicyGQL
@@ -214,7 +214,7 @@ class CreateDeploymentPolicyPayload:
 
 @strawberry.type(
     name="UpdateDeploymentPolicyPayload",
-    description="Added in 25.19.0. Payload for updating a deployment policy.",
+    description="Added in 26.3.0. Payload for updating a deployment policy.",
 )
 class UpdateDeploymentPolicyPayload:
     deployment_policy: DeploymentPolicyGQL
