@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 
-from ai.backend.manager.api.gql.base import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow

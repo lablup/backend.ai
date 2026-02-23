@@ -11,7 +11,11 @@ import sqlalchemy as sa
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.gql.base import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+    from ai.backend.common.data.filter_specs import (
+        StringMatchSpec,
+        UUIDEqualMatchSpec,
+        UUIDInMatchSpec,
+    )
     from ai.backend.manager.api.gql.kernel.types import KernelStatusInMatchSpec
 
 from ai.backend.common.types import KernelId, SessionId

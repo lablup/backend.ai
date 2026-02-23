@@ -7,6 +7,7 @@ from datetime import date, datetime
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
     KernelUsageRecordRow,
@@ -92,58 +93,106 @@ class DomainUsageBucketConditions:
         return inner
 
     @staticmethod
-    def by_resource_group_contains(resource_group: str) -> QueryCondition:
+    def by_resource_group_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainUsageBucketRow.resource_group.like(f"%{resource_group}%")
+            if spec.case_insensitive:
+                condition = DomainUsageBucketRow.resource_group.ilike(f"%{spec.value}%")
+            else:
+                condition = DomainUsageBucketRow.resource_group.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_equals(resource_group: str) -> QueryCondition:
+    def by_resource_group_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainUsageBucketRow.resource_group == resource_group
+            if spec.case_insensitive:
+                condition = sa.func.lower(DomainUsageBucketRow.resource_group) == spec.value.lower()
+            else:
+                condition = DomainUsageBucketRow.resource_group == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_starts_with(resource_group: str) -> QueryCondition:
+    def by_resource_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainUsageBucketRow.resource_group.like(f"{resource_group}%")
+            if spec.case_insensitive:
+                condition = DomainUsageBucketRow.resource_group.ilike(f"{spec.value}%")
+            else:
+                condition = DomainUsageBucketRow.resource_group.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_ends_with(resource_group: str) -> QueryCondition:
+    def by_resource_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainUsageBucketRow.resource_group.like(f"%{resource_group}")
+            if spec.case_insensitive:
+                condition = DomainUsageBucketRow.resource_group.ilike(f"%{spec.value}")
+            else:
+                condition = DomainUsageBucketRow.resource_group.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_contains(domain_name: str) -> QueryCondition:
+    def by_domain_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainUsageBucketRow.domain_name.like(f"%{domain_name}%")
+            if spec.case_insensitive:
+                condition = DomainUsageBucketRow.domain_name.ilike(f"%{spec.value}%")
+            else:
+                condition = DomainUsageBucketRow.domain_name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_equals(domain_name: str) -> QueryCondition:
+    def by_domain_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainUsageBucketRow.domain_name == domain_name
+            if spec.case_insensitive:
+                condition = sa.func.lower(DomainUsageBucketRow.domain_name) == spec.value.lower()
+            else:
+                condition = DomainUsageBucketRow.domain_name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_starts_with(domain_name: str) -> QueryCondition:
+    def by_domain_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainUsageBucketRow.domain_name.like(f"{domain_name}%")
+            if spec.case_insensitive:
+                condition = DomainUsageBucketRow.domain_name.ilike(f"{spec.value}%")
+            else:
+                condition = DomainUsageBucketRow.domain_name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_ends_with(domain_name: str) -> QueryCondition:
+    def by_domain_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainUsageBucketRow.domain_name.like(f"%{domain_name}")
+            if spec.case_insensitive:
+                condition = DomainUsageBucketRow.domain_name.ilike(f"%{spec.value}")
+            else:
+                condition = DomainUsageBucketRow.domain_name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -285,65 +334,128 @@ class ProjectUsageBucketConditions:
         return inner
 
     @staticmethod
-    def by_resource_group_contains(resource_group: str) -> QueryCondition:
+    def by_resource_group_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ProjectUsageBucketRow.resource_group.like(f"%{resource_group}%")
+            if spec.case_insensitive:
+                condition = ProjectUsageBucketRow.resource_group.ilike(f"%{spec.value}%")
+            else:
+                condition = ProjectUsageBucketRow.resource_group.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_equals(resource_group: str) -> QueryCondition:
+    def by_resource_group_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ProjectUsageBucketRow.resource_group == resource_group
+            if spec.case_insensitive:
+                condition = (
+                    sa.func.lower(ProjectUsageBucketRow.resource_group) == spec.value.lower()
+                )
+            else:
+                condition = ProjectUsageBucketRow.resource_group == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_starts_with(resource_group: str) -> QueryCondition:
+    def by_resource_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ProjectUsageBucketRow.resource_group.like(f"{resource_group}%")
+            if spec.case_insensitive:
+                condition = ProjectUsageBucketRow.resource_group.ilike(f"{spec.value}%")
+            else:
+                condition = ProjectUsageBucketRow.resource_group.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_ends_with(resource_group: str) -> QueryCondition:
+    def by_resource_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ProjectUsageBucketRow.resource_group.like(f"%{resource_group}")
+            if spec.case_insensitive:
+                condition = ProjectUsageBucketRow.resource_group.ilike(f"%{spec.value}")
+            else:
+                condition = ProjectUsageBucketRow.resource_group.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_contains(domain_name: str) -> QueryCondition:
+    def by_domain_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ProjectUsageBucketRow.domain_name.like(f"%{domain_name}%")
+            if spec.case_insensitive:
+                condition = ProjectUsageBucketRow.domain_name.ilike(f"%{spec.value}%")
+            else:
+                condition = ProjectUsageBucketRow.domain_name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_equals(domain_name: str) -> QueryCondition:
+    def by_domain_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ProjectUsageBucketRow.domain_name == domain_name
+            if spec.case_insensitive:
+                condition = sa.func.lower(ProjectUsageBucketRow.domain_name) == spec.value.lower()
+            else:
+                condition = ProjectUsageBucketRow.domain_name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_starts_with(domain_name: str) -> QueryCondition:
+    def by_domain_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ProjectUsageBucketRow.domain_name.like(f"{domain_name}%")
+            if spec.case_insensitive:
+                condition = ProjectUsageBucketRow.domain_name.ilike(f"{spec.value}%")
+            else:
+                condition = ProjectUsageBucketRow.domain_name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_ends_with(domain_name: str) -> QueryCondition:
+    def by_domain_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ProjectUsageBucketRow.domain_name.like(f"%{domain_name}")
+            if spec.case_insensitive:
+                condition = ProjectUsageBucketRow.domain_name.ilike(f"%{spec.value}")
+            else:
+                condition = ProjectUsageBucketRow.domain_name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_project_id(project_id: uuid.UUID) -> QueryCondition:
+    def by_project_id(spec: UUIDEqualMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ProjectUsageBucketRow.project_id == project_id
+            condition = ProjectUsageBucketRow.project_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_project_ids(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = ProjectUsageBucketRow.project_id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -485,72 +597,146 @@ class UserUsageBucketConditions:
         return inner
 
     @staticmethod
-    def by_resource_group_contains(resource_group: str) -> QueryCondition:
+    def by_resource_group_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserUsageBucketRow.resource_group.like(f"%{resource_group}%")
+            if spec.case_insensitive:
+                condition = UserUsageBucketRow.resource_group.ilike(f"%{spec.value}%")
+            else:
+                condition = UserUsageBucketRow.resource_group.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_equals(resource_group: str) -> QueryCondition:
+    def by_resource_group_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserUsageBucketRow.resource_group == resource_group
+            if spec.case_insensitive:
+                condition = sa.func.lower(UserUsageBucketRow.resource_group) == spec.value.lower()
+            else:
+                condition = UserUsageBucketRow.resource_group == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_starts_with(resource_group: str) -> QueryCondition:
+    def by_resource_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserUsageBucketRow.resource_group.like(f"{resource_group}%")
+            if spec.case_insensitive:
+                condition = UserUsageBucketRow.resource_group.ilike(f"{spec.value}%")
+            else:
+                condition = UserUsageBucketRow.resource_group.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_ends_with(resource_group: str) -> QueryCondition:
+    def by_resource_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserUsageBucketRow.resource_group.like(f"%{resource_group}")
+            if spec.case_insensitive:
+                condition = UserUsageBucketRow.resource_group.ilike(f"%{spec.value}")
+            else:
+                condition = UserUsageBucketRow.resource_group.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_contains(domain_name: str) -> QueryCondition:
+    def by_domain_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserUsageBucketRow.domain_name.like(f"%{domain_name}%")
+            if spec.case_insensitive:
+                condition = UserUsageBucketRow.domain_name.ilike(f"%{spec.value}%")
+            else:
+                condition = UserUsageBucketRow.domain_name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_equals(domain_name: str) -> QueryCondition:
+    def by_domain_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserUsageBucketRow.domain_name == domain_name
+            if spec.case_insensitive:
+                condition = sa.func.lower(UserUsageBucketRow.domain_name) == spec.value.lower()
+            else:
+                condition = UserUsageBucketRow.domain_name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_starts_with(domain_name: str) -> QueryCondition:
+    def by_domain_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserUsageBucketRow.domain_name.like(f"{domain_name}%")
+            if spec.case_insensitive:
+                condition = UserUsageBucketRow.domain_name.ilike(f"{spec.value}%")
+            else:
+                condition = UserUsageBucketRow.domain_name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_ends_with(domain_name: str) -> QueryCondition:
+    def by_domain_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserUsageBucketRow.domain_name.like(f"%{domain_name}")
+            if spec.case_insensitive:
+                condition = UserUsageBucketRow.domain_name.ilike(f"%{spec.value}")
+            else:
+                condition = UserUsageBucketRow.domain_name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_user_uuid(user_uuid: uuid.UUID) -> QueryCondition:
+    def by_user_uuid(spec: UUIDEqualMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserUsageBucketRow.user_uuid == user_uuid
+            condition = UserUsageBucketRow.user_uuid == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_project_id(project_id: uuid.UUID) -> QueryCondition:
+    def by_user_uuids(spec: UUIDInMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserUsageBucketRow.project_id == project_id
+            condition = UserUsageBucketRow.user_uuid.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_project_id(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = UserUsageBucketRow.project_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_project_ids(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = UserUsageBucketRow.project_id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 

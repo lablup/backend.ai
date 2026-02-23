@@ -13,6 +13,7 @@ from aiohttp import web
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.dto.manager.fair_share import (
     BulkUpsertDomainFairShareWeightRequest,
     BulkUpsertDomainFairShareWeightResponse,
@@ -70,7 +71,6 @@ from ai.backend.common.dto.manager.fair_share import (
 )
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.manager.api.auth import auth_required_for_method
-from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.api.types import CORSOptions, WebMiddleware
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.repositories.base import (

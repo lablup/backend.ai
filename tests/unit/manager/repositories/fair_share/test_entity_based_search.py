@@ -19,6 +19,7 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
@@ -497,7 +498,9 @@ class TestSearchDomainFairSharesEntityBased:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                RGDomainFairShareConditions.by_domain_name_equals(domain_without_record),
+                RGDomainFairShareConditions.by_domain_name_equals(
+                    StringMatchSpec(domain_without_record, case_insensitive=False, negated=False)
+                ),
             ],
             orders=[],
         )
@@ -524,7 +527,9 @@ class TestSearchDomainFairSharesEntityBased:
         querier_without = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                RGDomainFairShareConditions.by_domain_name_equals(domain_without_record),
+                RGDomainFairShareConditions.by_domain_name_equals(
+                    StringMatchSpec(domain_without_record, case_insensitive=False, negated=False)
+                ),
             ],
             orders=[],
         )
@@ -539,7 +544,9 @@ class TestSearchDomainFairSharesEntityBased:
         querier_with = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                RGDomainFairShareConditions.by_domain_name_equals(domain_with_record),
+                RGDomainFairShareConditions.by_domain_name_equals(
+                    StringMatchSpec(domain_with_record, case_insensitive=False, negated=False)
+                ),
             ],
             orders=[],
         )
@@ -855,7 +862,9 @@ class TestSearchProjectFairSharesEntityBased:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                RGProjectFairShareConditions.by_project_id(project_without_record),
+                RGProjectFairShareConditions.by_project_id(
+                    UUIDEqualMatchSpec(value=project_without_record, negated=False)
+                ),
             ],
             orders=[],
         )
@@ -1246,7 +1255,9 @@ class TestSearchUserFairSharesEntityBased:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
-                RGUserFairShareConditions.by_user_uuid(user_without_record),
+                RGUserFairShareConditions.by_user_uuid(
+                    UUIDEqualMatchSpec(value=user_without_record, negated=False)
+                ),
             ],
             orders=[],
         )

@@ -5,7 +5,7 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
-from ai.backend.manager.api.gql.base import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, RoleSource, ScopeType

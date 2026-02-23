@@ -7,7 +7,7 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
-from ai.backend.manager.api.gql.base import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain import DomainRow
@@ -225,16 +225,22 @@ class ProjectFairShareConditions:
         return inner
 
     @staticmethod
-    def by_project_id(project_id: uuid.UUID) -> QueryCondition:
+    def by_project_id(spec: UUIDEqualMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ProjectFairShareRow.project_id == project_id
+            condition = ProjectFairShareRow.project_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_project_ids(project_ids: Collection[uuid.UUID]) -> QueryCondition:
+    def by_project_ids(spec: UUIDInMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ProjectFairShareRow.project_id.in_(project_ids)
+            condition = ProjectFairShareRow.project_id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -494,30 +500,42 @@ class UserFairShareConditions:
         return inner
 
     @staticmethod
-    def by_user_uuid(user_uuid: uuid.UUID) -> QueryCondition:
+    def by_user_uuid(spec: UUIDEqualMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserFairShareRow.user_uuid == user_uuid
+            condition = UserFairShareRow.user_uuid == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_project_id(project_id: uuid.UUID) -> QueryCondition:
+    def by_project_id(spec: UUIDEqualMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserFairShareRow.project_id == project_id
+            condition = UserFairShareRow.project_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_user_uuids(user_uuids: Collection[uuid.UUID]) -> QueryCondition:
+    def by_user_uuids(spec: UUIDInMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserFairShareRow.user_uuid.in_(user_uuids)
+            condition = UserFairShareRow.user_uuid.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_project_ids(project_ids: Collection[uuid.UUID]) -> QueryCondition:
+    def by_project_ids(spec: UUIDInMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserFairShareRow.project_id.in_(project_ids)
+            condition = UserFairShareRow.project_id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -828,30 +846,54 @@ class RGDomainFairShareConditions:
         return inner
 
     @staticmethod
-    def by_domain_name_contains(domain_name: str) -> QueryCondition:
+    def by_domain_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForDomainRow.domain.like(f"%{domain_name}%")
+            if spec.case_insensitive:
+                condition = ScalingGroupForDomainRow.domain.ilike(f"%{spec.value}%")
+            else:
+                condition = ScalingGroupForDomainRow.domain.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_equals(domain_name: str) -> QueryCondition:
+    def by_domain_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForDomainRow.domain == domain_name
+            if spec.case_insensitive:
+                condition = sa.func.lower(ScalingGroupForDomainRow.domain) == spec.value.lower()
+            else:
+                condition = ScalingGroupForDomainRow.domain == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_starts_with(domain_name: str) -> QueryCondition:
+    def by_domain_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForDomainRow.domain.like(f"{domain_name}%")
+            if spec.case_insensitive:
+                condition = ScalingGroupForDomainRow.domain.ilike(f"{spec.value}%")
+            else:
+                condition = ScalingGroupForDomainRow.domain.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_ends_with(domain_name: str) -> QueryCondition:
+    def by_domain_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForDomainRow.domain.like(f"%{domain_name}")
+            if spec.case_insensitive:
+                condition = ScalingGroupForDomainRow.domain.ilike(f"%{spec.value}")
+            else:
+                condition = ScalingGroupForDomainRow.domain.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -863,30 +905,56 @@ class RGDomainFairShareConditions:
         return inner
 
     @staticmethod
-    def by_resource_group_contains(resource_group: str) -> QueryCondition:
+    def by_resource_group_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForDomainRow.scaling_group.like(f"%{resource_group}%")
+            if spec.case_insensitive:
+                condition = ScalingGroupForDomainRow.scaling_group.ilike(f"%{spec.value}%")
+            else:
+                condition = ScalingGroupForDomainRow.scaling_group.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_equals(resource_group: str) -> QueryCondition:
+    def by_resource_group_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForDomainRow.scaling_group == resource_group
+            if spec.case_insensitive:
+                condition = (
+                    sa.func.lower(ScalingGroupForDomainRow.scaling_group) == spec.value.lower()
+                )
+            else:
+                condition = ScalingGroupForDomainRow.scaling_group == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_starts_with(resource_group: str) -> QueryCondition:
+    def by_resource_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForDomainRow.scaling_group.like(f"{resource_group}%")
+            if spec.case_insensitive:
+                condition = ScalingGroupForDomainRow.scaling_group.ilike(f"{spec.value}%")
+            else:
+                condition = ScalingGroupForDomainRow.scaling_group.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_ends_with(resource_group: str) -> QueryCondition:
+    def by_resource_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForDomainRow.scaling_group.like(f"%{resource_group}")
+            if spec.case_insensitive:
+                condition = ScalingGroupForDomainRow.scaling_group.ilike(f"%{spec.value}")
+            else:
+                condition = ScalingGroupForDomainRow.scaling_group.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -911,16 +979,22 @@ class RGProjectFairShareConditions:
     """
 
     @staticmethod
-    def by_project_id(project_id: uuid.UUID) -> QueryCondition:
+    def by_project_id(spec: UUIDEqualMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForProjectRow.group == project_id
+            condition = ScalingGroupForProjectRow.group == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_project_ids(project_ids: Collection[uuid.UUID]) -> QueryCondition:
+    def by_project_ids(spec: UUIDInMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForProjectRow.group.in_(project_ids)
+            condition = ScalingGroupForProjectRow.group.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -932,30 +1006,54 @@ class RGProjectFairShareConditions:
         return inner
 
     @staticmethod
-    def by_domain_name_contains(domain_name: str) -> QueryCondition:
+    def by_domain_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainRow.name.like(f"%{domain_name}%")
+            if spec.case_insensitive:
+                condition = DomainRow.name.ilike(f"%{spec.value}%")
+            else:
+                condition = DomainRow.name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_equals(domain_name: str) -> QueryCondition:
+    def by_domain_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainRow.name == domain_name
+            if spec.case_insensitive:
+                condition = sa.func.lower(DomainRow.name) == spec.value.lower()
+            else:
+                condition = DomainRow.name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_starts_with(domain_name: str) -> QueryCondition:
+    def by_domain_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainRow.name.like(f"{domain_name}%")
+            if spec.case_insensitive:
+                condition = DomainRow.name.ilike(f"{spec.value}%")
+            else:
+                condition = DomainRow.name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_ends_with(domain_name: str) -> QueryCondition:
+    def by_domain_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainRow.name.like(f"%{domain_name}")
+            if spec.case_insensitive:
+                condition = DomainRow.name.ilike(f"%{spec.value}")
+            else:
+                condition = DomainRow.name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -967,30 +1065,56 @@ class RGProjectFairShareConditions:
         return inner
 
     @staticmethod
-    def by_resource_group_contains(resource_group: str) -> QueryCondition:
+    def by_resource_group_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForProjectRow.scaling_group.like(f"%{resource_group}%")
+            if spec.case_insensitive:
+                condition = ScalingGroupForProjectRow.scaling_group.ilike(f"%{spec.value}%")
+            else:
+                condition = ScalingGroupForProjectRow.scaling_group.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_equals(resource_group: str) -> QueryCondition:
+    def by_resource_group_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForProjectRow.scaling_group == resource_group
+            if spec.case_insensitive:
+                condition = (
+                    sa.func.lower(ScalingGroupForProjectRow.scaling_group) == spec.value.lower()
+                )
+            else:
+                condition = ScalingGroupForProjectRow.scaling_group == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_starts_with(resource_group: str) -> QueryCondition:
+    def by_resource_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForProjectRow.scaling_group.like(f"{resource_group}%")
+            if spec.case_insensitive:
+                condition = ScalingGroupForProjectRow.scaling_group.ilike(f"{spec.value}%")
+            else:
+                condition = ScalingGroupForProjectRow.scaling_group.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_ends_with(resource_group: str) -> QueryCondition:
+    def by_resource_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForProjectRow.scaling_group.like(f"%{resource_group}")
+            if spec.case_insensitive:
+                condition = ScalingGroupForProjectRow.scaling_group.ilike(f"%{spec.value}")
+            else:
+                condition = ScalingGroupForProjectRow.scaling_group.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -1003,30 +1127,42 @@ class RGUserFairShareConditions:
     """
 
     @staticmethod
-    def by_user_uuid(user_uuid: uuid.UUID) -> QueryCondition:
+    def by_user_uuid(spec: UUIDEqualMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AssocGroupUserRow.user_id == user_uuid
+            condition = AssocGroupUserRow.user_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_user_uuids(user_uuids: Collection[uuid.UUID]) -> QueryCondition:
+    def by_user_uuids(spec: UUIDInMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AssocGroupUserRow.user_id.in_(user_uuids)
+            condition = AssocGroupUserRow.user_id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_project_id(project_id: uuid.UUID) -> QueryCondition:
+    def by_project_id(spec: UUIDEqualMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AssocGroupUserRow.group_id == project_id
+            condition = AssocGroupUserRow.group_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_project_ids(project_ids: Collection[uuid.UUID]) -> QueryCondition:
+    def by_project_ids(spec: UUIDInMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AssocGroupUserRow.group_id.in_(project_ids)
+            condition = AssocGroupUserRow.group_id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -1038,30 +1174,54 @@ class RGUserFairShareConditions:
         return inner
 
     @staticmethod
-    def by_domain_name_contains(domain_name: str) -> QueryCondition:
+    def by_domain_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainRow.name.like(f"%{domain_name}%")
+            if spec.case_insensitive:
+                condition = DomainRow.name.ilike(f"%{spec.value}%")
+            else:
+                condition = DomainRow.name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_equals(domain_name: str) -> QueryCondition:
+    def by_domain_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainRow.name == domain_name
+            if spec.case_insensitive:
+                condition = sa.func.lower(DomainRow.name) == spec.value.lower()
+            else:
+                condition = DomainRow.name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_starts_with(domain_name: str) -> QueryCondition:
+    def by_domain_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainRow.name.like(f"{domain_name}%")
+            if spec.case_insensitive:
+                condition = DomainRow.name.ilike(f"{spec.value}%")
+            else:
+                condition = DomainRow.name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_domain_name_ends_with(domain_name: str) -> QueryCondition:
+    def by_domain_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainRow.name.like(f"%{domain_name}")
+            if spec.case_insensitive:
+                condition = DomainRow.name.ilike(f"%{spec.value}")
+            else:
+                condition = DomainRow.name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -1073,29 +1233,55 @@ class RGUserFairShareConditions:
         return inner
 
     @staticmethod
-    def by_resource_group_contains(resource_group: str) -> QueryCondition:
+    def by_resource_group_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForProjectRow.scaling_group.like(f"%{resource_group}%")
+            if spec.case_insensitive:
+                condition = ScalingGroupForProjectRow.scaling_group.ilike(f"%{spec.value}%")
+            else:
+                condition = ScalingGroupForProjectRow.scaling_group.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_equals(resource_group: str) -> QueryCondition:
+    def by_resource_group_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForProjectRow.scaling_group == resource_group
+            if spec.case_insensitive:
+                condition = (
+                    sa.func.lower(ScalingGroupForProjectRow.scaling_group) == spec.value.lower()
+                )
+            else:
+                condition = ScalingGroupForProjectRow.scaling_group == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_starts_with(resource_group: str) -> QueryCondition:
+    def by_resource_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForProjectRow.scaling_group.like(f"{resource_group}%")
+            if spec.case_insensitive:
+                condition = ScalingGroupForProjectRow.scaling_group.ilike(f"{spec.value}%")
+            else:
+                condition = ScalingGroupForProjectRow.scaling_group.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_resource_group_ends_with(resource_group: str) -> QueryCondition:
+    def by_resource_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForProjectRow.scaling_group.like(f"%{resource_group}")
+            if spec.case_insensitive:
+                condition = ScalingGroupForProjectRow.scaling_group.ilike(f"%{spec.value}")
+            else:
+                condition = ScalingGroupForProjectRow.scaling_group.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
