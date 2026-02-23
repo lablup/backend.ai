@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql.base import PGDialect as _PostgreSQLDialect
+from sqlalchemy.dialects import postgresql
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.fair_share.types.domain import (
@@ -224,7 +226,9 @@ class TestUserFairShareEntityOrderField:
         assert query_order is not None
 
 
-_PG_DIALECT: sa.engine.Dialect = _PostgreSQLDialect()
+# postgresql.dialect (PGDialect) has untyped __init__; assign via Any to avoid [no-untyped-call].
+_pg_dialect_cls: Any = postgresql.dialect
+_PG_DIALECT: sa.engine.Dialect = _pg_dialect_cls()
 
 
 def _compile_sql(expr: sa.sql.expression.ColumnElement[bool]) -> str:
