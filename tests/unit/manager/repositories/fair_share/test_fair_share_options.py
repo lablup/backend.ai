@@ -6,10 +6,8 @@ to generated SQL conditions (BA-4633).
 
 from __future__ import annotations
 
-from typing import cast
-
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+from sqlalchemy.dialects.postgresql.base import PGDialect as _PostgreSQLDialect
 
 from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.repositories.fair_share.options import (
@@ -18,7 +16,7 @@ from ai.backend.manager.repositories.fair_share.options import (
     UserFairShareConditions,
 )
 
-_PG_DIALECT = cast(sa.engine.Dialect, postgresql.dialect())
+_PG_DIALECT: sa.engine.Dialect = _PostgreSQLDialect()
 
 
 def _compile_sql(expr: sa.sql.expression.ColumnElement[bool]) -> str:
@@ -97,7 +95,7 @@ class TestProjectFairShareConditionsStringMatchSpec:
     def test_domain_name_equals_case_insensitive_negated(self) -> None:
         spec = StringMatchSpec(value="Dom", case_insensitive=True, negated=True)
         sql = _compile_sql(ProjectFairShareConditions.by_domain_name_equals(spec)())
-        assert "NOT" in sql
+        assert "!=" in sql
         assert "lower" in sql
 
     def test_project_name_contains_case_insensitive(self) -> None:

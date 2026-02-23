@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import cast
-
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+from sqlalchemy.dialects.postgresql.base import PGDialect as _PostgreSQLDialect
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.fair_share.types.domain import (
@@ -226,7 +224,7 @@ class TestUserFairShareEntityOrderField:
         assert query_order is not None
 
 
-_PG_DIALECT = cast(sa.engine.Dialect, postgresql.dialect())
+_PG_DIALECT: sa.engine.Dialect = _PostgreSQLDialect()
 
 
 def _compile_sql(expr: sa.sql.expression.ColumnElement[bool]) -> str:
