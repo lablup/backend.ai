@@ -120,7 +120,7 @@ Two new tables store preset definitions and their allowed labels.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/resource/prometheus-query-presets/{name}/execute` | Execute a preset by name |
+| `POST` | `/resource/prometheus-query-presets/{id}/execute` | Execute a preset by id |
 
 **Execute Request:**
 
@@ -334,7 +334,7 @@ backend.ai admin prometheus-query-preset delete <ID>
 **Execute (all authenticated users):**
 
 ```
-backend.ai prometheus-query-preset execute <NAME> \
+backend.ai prometheus-query-preset execute <ID> \
     --start <ISO8601> \
     --end <ISO8601> \
     --step <STEP> \
@@ -360,7 +360,7 @@ sequenceDiagram
 
     Client->>+Handler: Execute preset (name, labels, group_labels, window, time_range)
     Handler->>+Service: ExecutePresetAction
-    Service->>+DB: Lookup preset by name
+    Service->>+DB: Lookup preset by ID
     DB-->>-Service: Preset + allowed labels
     Service->>Service: Validate labels & group_labels & window
     Service->>+Preset: Build MetricPreset (template, labels, group_by, window)
