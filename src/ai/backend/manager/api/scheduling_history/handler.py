@@ -25,6 +25,7 @@ from ai.backend.common.dto.manager.scheduling_history import (
 from ai.backend.manager.api.auth import auth_required_for_method
 from ai.backend.manager.api.types import CORSOptions, WebMiddleware
 from ai.backend.manager.dto.context import ProcessorsCtx
+from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.services.scheduling_history.actions import (
     SearchDeploymentHistoryAction,
     SearchRouteHistoryAction,
@@ -53,7 +54,7 @@ class SchedulingHistoryAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can search scheduling history.")
+            raise GenericForbidden()
 
         querier = self._adapter.build_session_history_querier(body.parsed)
 
@@ -86,7 +87,7 @@ class SchedulingHistoryAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can search scheduling history.")
+            raise GenericForbidden()
 
         querier = self._adapter.build_deployment_history_querier(body.parsed)
 
@@ -119,7 +120,7 @@ class SchedulingHistoryAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can search scheduling history.")
+            raise GenericForbidden()
 
         querier = self._adapter.build_route_history_querier(body.parsed)
 
