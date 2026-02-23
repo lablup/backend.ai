@@ -34,7 +34,7 @@ class TestSessionLifecycle:
         # LegacySessionInfo.asdict() uses camelCase keys and does not include
         # session id/name — verify via fields that are present.
         assert info_result.root["status"] == "RUNNING"
-        assert info_result.root["domainName"] == "default"
+        assert info_result.root["domainName"] == session_seed.domain_name
 
         # 2. rename
         new_name = f"{session_seed.session_name}-renamed"
@@ -47,7 +47,7 @@ class TestSessionLifecycle:
         renamed_result = await admin_registry.session.get_info(new_name)
         assert isinstance(renamed_result, GetSessionInfoResponse)
         assert renamed_result.root["status"] == "RUNNING"
-        assert renamed_result.root["domainName"] == "default"
+        assert renamed_result.root["domainName"] == session_seed.domain_name
 
         # 4. match_sessions
         match_result = await admin_registry.session.match_sessions(

@@ -4,7 +4,7 @@ import ssl
 from collections.abc import AsyncIterator, Iterable, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import aiohttp
 
@@ -143,7 +143,7 @@ class BackendAIClient:
                     "title": f"Expected a JSON response from {method} {path}, but got 204 No Content",
                 },
             )
-        return response_model.model_validate(data)
+        return cast(ResponseT, response_model.model_validate(data))
 
     async def typed_request_no_content(
         self,
