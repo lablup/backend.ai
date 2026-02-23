@@ -142,10 +142,17 @@ class ServiceCatalogOrderByGQL(GQLOrderBy):
         ascending = self.direction == OrderDirection.ASC
         match self.field:
             case ServiceCatalogOrderFieldGQL.SERVICE_GROUP:
-                order = ServiceCatalogRow.service_group
+                return (
+                    ServiceCatalogRow.service_group.asc()
+                    if ascending
+                    else ServiceCatalogRow.service_group.desc()
+                )
             case ServiceCatalogOrderFieldGQL.REGISTERED_AT:
-                order = ServiceCatalogRow.registered_at
-        return order.asc() if ascending else order.desc()
+                return (
+                    ServiceCatalogRow.registered_at.asc()
+                    if ascending
+                    else ServiceCatalogRow.registered_at.desc()
+                )
 
 
 @strawberry.input(
