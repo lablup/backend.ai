@@ -730,7 +730,8 @@ class TestExecuteRBACEntityCreators:
     ) -> None:
         """Test batch creating with empty list returns empty result."""
         async with database_connection.begin_session() as db_sess:
-            result = await execute_rbac_entity_creators(db_sess, [])
+            creators: list[RBACEntityCreator[RBACEntityCreatorTestRow]] = []
+            result = await execute_rbac_entity_creators(db_sess, creators)
 
             assert isinstance(result, RBACBulkEntityCreatorResult)
             assert len(result.rows) == 0
