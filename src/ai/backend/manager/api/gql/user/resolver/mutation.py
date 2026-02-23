@@ -10,9 +10,9 @@ from strawberry import Info
 
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types import (
-    BulkCreateUserErrorGQL,
-    BulkCreateUserInputGQL,
-    BulkCreateUsersPayloadGQL,
+    BulkCreateUsersV2PayloadGQL,
+    BulkCreateUserV2ErrorGQL,
+    BulkCreateUserV2InputGQL,
     BulkUpdateUsersV2PayloadGQL,
     BulkUpdateUserV2ErrorGQL,
     BulkUpdateUserV2InputGQL,
@@ -82,10 +82,10 @@ async def admin_create_user(
         "Each user has individual specifications."
     )
 )  # type: ignore[misc]
-async def admin_bulk_create_users(
+async def admin_bulk_create_users_v2(
     info: Info[StrawberryGQLContext],
-    input: BulkCreateUserInputGQL,
-) -> BulkCreateUsersPayloadGQL:
+    input: BulkCreateUserV2InputGQL,
+) -> BulkCreateUsersV2PayloadGQL:
     """Create multiple users in bulk with individual specifications.
 
     Args:
@@ -93,7 +93,7 @@ async def admin_bulk_create_users(
         input: Bulk user creation input with individual specs.
 
     Returns:
-        BulkCreateUsersPayloadGQL with created users.
+        BulkCreateUsersV2PayloadGQL with created users.
     """
     check_admin_only()
     ctx = info.context
@@ -136,7 +136,7 @@ async def admin_bulk_create_users(
 
     created_users = [UserV2GQL.from_data(user_data) for user_data in result.data.successes]
     failed = [
-        BulkCreateUserErrorGQL(
+        BulkCreateUserV2ErrorGQL(
             index=error.index,
             username=cast(UserCreatorSpec, error.spec).username,
             email=cast(UserCreatorSpec, error.spec).email,
@@ -145,7 +145,7 @@ async def admin_bulk_create_users(
         for error in result.data.failures
     ]
 
-    return BulkCreateUsersPayloadGQL(
+    return BulkCreateUsersV2PayloadGQL(
         created_users=created_users,
         failed=failed,
     )

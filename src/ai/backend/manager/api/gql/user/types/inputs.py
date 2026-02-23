@@ -84,7 +84,7 @@ class CreateUserInputGQL:
         "Each user has individual specifications."
     ),
 )
-class BulkCreateUserInputGQL:
+class BulkCreateUserV2InputGQL:
     """Input for bulk creating users with individual specs."""
 
     users: list[CreateUserInputGQL] = strawberry.field(description="List of user creation inputs.")

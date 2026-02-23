@@ -14,7 +14,7 @@ from .filters import (
     UserStatusEnumFilterGQL,
 )
 from .inputs import (
-    BulkCreateUserInputGQL,
+    BulkCreateUserV2InputGQL,
     BulkUpdateUserV2InputGQL,
     BulkUpdateUserV2ItemInputGQL,
     CreateUserInputGQL,
@@ -37,8 +37,8 @@ from .node import (
     UserV2GQL,
 )
 from .payloads import (
-    BulkCreateUserErrorGQL,
-    BulkCreateUsersPayloadGQL,
+    BulkCreateUsersV2PayloadGQL,
+    BulkCreateUserV2ErrorGQL,
     BulkUpdateUsersV2PayloadGQL,
     BulkUpdateUserV2ErrorGQL,
     CreateUserPayloadGQL,
@@ -81,7 +81,7 @@ __all__ = [
     "ProjectUserScopeGQL",
     # Inputs
     "CreateUserInputGQL",
-    "BulkCreateUserInputGQL",
+    "BulkCreateUserV2InputGQL",
     "BulkUpdateUserV2ItemInputGQL",
     "BulkUpdateUserV2InputGQL",
     "UpdateUserV2InputGQL",
@@ -90,8 +90,8 @@ __all__ = [
     "PurgeUsersInputGQL",
     # Payloads
     "CreateUserPayloadGQL",
-    "BulkCreateUserErrorGQL",
-    "BulkCreateUsersPayloadGQL",
+    "BulkCreateUserV2ErrorGQL",
+    "BulkCreateUsersV2PayloadGQL",
     "BulkUpdateUserV2ErrorGQL",
     "BulkUpdateUsersV2PayloadGQL",
     "UpdateUserPayloadGQL",
