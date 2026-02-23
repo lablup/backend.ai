@@ -393,7 +393,9 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
         result: ResourceSlot | None = None
         for agent_row in agent_list:
             result = _compare_each_resource_and_get_max(agent_row.available_slots, result)
-        return dict(result.to_json()) if result is not None else {}
+        if result is None:
+            return {}
+        return {k: v for k, v in result.to_json().items() if v != "0"}
 
     # TODO: Replace this field with a generic resource slot query API
     async def resolve_own_session_occupied_resource_slots(
