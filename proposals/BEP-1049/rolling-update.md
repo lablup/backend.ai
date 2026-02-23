@@ -244,7 +244,8 @@ When all Old routes are removed and New routes reach target count or above as he
        │
        ├─ current_revision_id = deploying_revision_id
        └─ deploying_revision_id = NULL
-       │
-       ▼
+
+             │
+             ▼
   Coordinator: DEPLOYING → READY state transition
 ```

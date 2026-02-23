@@ -283,8 +283,9 @@ When all Green routes become ACTIVE and Blue routes are terminated:
        │
        ├─ current_revision_id = deploying_revision_id
        └─ deploying_revision_id = NULL
-       │
-       ▼
+
+             │
+             ▼
   Coordinator: DEPLOYING → READY state transition
 ```
 

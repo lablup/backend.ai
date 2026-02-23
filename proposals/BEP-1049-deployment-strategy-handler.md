@@ -53,11 +53,11 @@ Why `DeploymentHandler` cannot express this pattern:
 │                                                                              │
 │  DeploymentTaskSpec (for handlers)        StrategyTaskSpec (for strategies)  │
 │  ┌────────────────────────────┐           ┌──────────────────────────────┐   │
-│  │ check_pending: 2s / 30s   │           │ ROLLING:    5s / 30s         │   │
-│  │ check_replica: 5s / 30s   │           │ BLUE_GREEN: 5s / 30s         │   │
-│  │ scaling:       5s / 30s   │           │                              │   │
-│  │ reconcile:     — / 30s    │           │                              │   │
-│  │ destroying:    5s / 60s   │           │                              │   │
+│  │ check_pending: 2s / 30s    │           │ ROLLING:    5s / 30s         │   │
+│  │ check_replica: 5s / 30s    │           │ BLUE_GREEN: 5s / 30s         │   │
+│  │ scaling:       5s / 30s    │           │                              │   │
+│  │ reconcile:     -- / 30s    │           │                              │   │
+│  │ destroying:    5s / 60s    │           │                              │   │
 │  └─────────────┬──────────────┘           └──────────────┬───────────────┘   │
 │                │                                         │                   │
 │                ▼                                         ▼                   │
@@ -78,7 +78,7 @@ Why `DeploymentHandler` cannot express this pattern:
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                         DeploymentCoordinator                                │
 │                                                                              │
-│  ┌─── Handler Path ────────────────┐    ┌─── Strategy Path ──────────────┐  │
+│  ┌─── Handler Path ─────────────┐    ┌─── Strategy Path ──────────────────┐  │
 │  │                              │    │                                    │  │
 │  │  process_deployment_         │    │  process_deployment_               │  │
 │  │    lifecycle(type)           │    │    strategy(strategy)              │  │
@@ -108,13 +108,13 @@ Why `DeploymentHandler` cannot express this pattern:
 │  name() → str                │    │  name() → str                            │
 │  target_statuses() → [...]   │    │  strategy() → DeploymentStrategy         │
 │  next_status() → Lifecycle   │    │  lock_id → LockID | None                 │
-│  failure_status() → ...      │    │  execute(deployments, policy_map)         │
-│  execute(deployments)        │    │    → DeploymentStrategyResult             │
+│  failure_status() → ...      │    │  execute(deployments, policy_map)        │
+│  execute(deployments)        │    │    → DeploymentStrategyResult            │
 │    → DeploymentExecResult    │    │                                          │
 │                              │    │                                          │
 │  Implementations:            │    │  Implementations:                        │
-│  ├─ CheckPendingDeployment   │    │  ├─ RollingUpdateStrategyHandler          │
-│  ├─ ScalingDeployment        │    │  └─ BlueGreenStrategyHandler              │
+│  ├─ CheckPendingDeployment   │    │  ├─ RollingUpdateStrategyHandler         │
+│  ├─ ScalingDeployment        │    │  └─ BlueGreenStrategyHandler             │
 │  ├─ CheckReplicaDeployment   │    │                                          │
 │  ├─ ReconcileDeployment      │    │                                          │
 │  └─ DestroyingDeployment     │    │                                          │
@@ -144,7 +144,7 @@ Lifecycle and strategy use **separate event types**. This separates event handle
 
 ```
 ┌─────────────────────────────┐    ┌─────────────────────────────┐
-│  Lifecycle Events            │    │  Strategy Events             │
+│  Lifecycle Events           │    │  Strategy Events            │
 │                             │    │                             │
 │  DoDeploymentLifecycle*     │    │  DoDeploymentStrategy*      │
 │  Event                      │    │  Event                      │
