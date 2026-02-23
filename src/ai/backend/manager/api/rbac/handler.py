@@ -501,46 +501,46 @@ def create_app(
     """Create aiohttp application for RBAC API endpoints."""
     app = web.Application()
     app["api_versions"] = (4, 5)
-    app["prefix"] = "v2.0"
+    app["prefix"] = "admin/rbac"
 
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     api_handler = RBACAPIHandler()
 
     # Role management routes
-    cors.add(app.router.add_route("POST", "/admin/rbac/roles", api_handler.create_role))
-    cors.add(app.router.add_route("POST", "/admin/rbac/roles/search", api_handler.search_roles))
-    cors.add(app.router.add_route("GET", "/admin/rbac/roles/{role_id}", api_handler.get_role))
-    cors.add(app.router.add_route("PATCH", "/admin/rbac/roles/{role_id}", api_handler.update_role))
-    cors.add(app.router.add_route("POST", "/admin/rbac/roles/delete", api_handler.delete_role))
-    cors.add(app.router.add_route("POST", "/admin/rbac/roles/purge", api_handler.purge_role))
+    cors.add(app.router.add_route("POST", "/roles", api_handler.create_role))
+    cors.add(app.router.add_route("POST", "/roles/search", api_handler.search_roles))
+    cors.add(app.router.add_route("GET", "/roles/{role_id}", api_handler.get_role))
+    cors.add(app.router.add_route("PATCH", "/roles/{role_id}", api_handler.update_role))
+    cors.add(app.router.add_route("POST", "/roles/delete", api_handler.delete_role))
+    cors.add(app.router.add_route("POST", "/roles/purge", api_handler.purge_role))
 
     # Role assignment routes
-    cors.add(app.router.add_route("POST", "/admin/rbac/roles/assign", api_handler.assign_role))
-    cors.add(app.router.add_route("POST", "/admin/rbac/roles/revoke", api_handler.revoke_role))
+    cors.add(app.router.add_route("POST", "/roles/assign", api_handler.assign_role))
+    cors.add(app.router.add_route("POST", "/roles/revoke", api_handler.revoke_role))
     cors.add(
         app.router.add_route(
             "POST",
-            "/admin/rbac/roles/{role_id}/assigned-users/search",
+            "/roles/{role_id}/assigned-users/search",
             api_handler.search_assigned_users,
         )
     )
 
     # Scope routes
-    cors.add(app.router.add_route("GET", "/admin/rbac/scope-types", api_handler.get_scope_types))
+    cors.add(app.router.add_route("GET", "/scope-types", api_handler.get_scope_types))
     cors.add(
         app.router.add_route(
             "POST",
-            "/admin/rbac/scopes/{scope_type}/search",
+            "/scopes/{scope_type}/search",
             api_handler.search_scopes,
         )
     )
 
     # Entity routes
-    cors.add(app.router.add_route("GET", "/admin/rbac/entity-types", api_handler.get_entity_types))
+    cors.add(app.router.add_route("GET", "/entity-types", api_handler.get_entity_types))
     cors.add(
         app.router.add_route(
             "POST",
-            "/admin/rbac/scopes/{scope_type}/{scope_id}/entities/{entity_type}/search",
+            "/scopes/{scope_type}/{scope_id}/entities/{entity_type}/search",
             api_handler.search_entities,
         )
     )
