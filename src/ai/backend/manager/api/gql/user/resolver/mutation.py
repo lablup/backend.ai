@@ -8,11 +8,16 @@ from uuid import UUID
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.contexts.user import current_user
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types import (
     BulkCreateUsersV2PayloadGQL,
     BulkCreateUserV2ErrorGQL,
     BulkCreateUserV2InputGQL,
+    BulkPurgeUsersV2InputGQL,
+    BulkPurgeUsersV2PayloadGQL,
+    BulkPurgeUserV2ErrorGQL,
     BulkUpdateUsersV2PayloadGQL,
     BulkUpdateUserV2ErrorGQL,
     BulkUpdateUserV2InputGQL,
@@ -23,8 +28,6 @@ from ai.backend.manager.api.gql.user.types import (
     DeleteUsersPayloadGQL,
     PurgeUserInputGQL,
     PurgeUserPayloadGQL,
-    PurgeUsersInputGQL,
-    PurgeUsersPayloadGQL,
     UpdateUserPayloadGQL,
     UpdateUserV2InputGQL,
     UserV2GQL,
@@ -44,6 +47,7 @@ from ai.backend.manager.services.user.actions.modify_user import (
     BulkModifyUserAction,
     UserUpdateSpec,
 )
+from ai.backend.manager.services.user.actions.purge_user import BulkPurgeUserAction
 from ai.backend.manager.types import OptionalState, TriState
 
 # Create Mutations
@@ -370,25 +374,57 @@ async def admin_purge_user(
 
 @strawberry.mutation(
     description=(
-        "Added in 26.2.0. Permanently delete multiple users (admin only). "
+        "Added in 26.3.0. Permanently delete multiple users in bulk (admin only). "
         "Requires superadmin privileges. "
         "This action is IRREVERSIBLE. All user data will be deleted."
     )
 )  # type: ignore[misc]
-async def admin_purge_users(
+async def admin_bulk_purge_users_v2(
     info: Info[StrawberryGQLContext],
-    input: PurgeUsersInputGQL,
-) -> PurgeUsersPayloadGQL:
-    """Permanently delete multiple users.
+    input: BulkPurgeUsersV2InputGQL,
+) -> BulkPurgeUsersV2PayloadGQL:
+    """Permanently delete multiple users in bulk.
 
     Args:
         info: Strawberry GraphQL context.
-        input: Purge input with emails and options.
+        input: Bulk purge input with user IDs and options.
 
     Returns:
-        PurgeUsersPayloadGQL with count of purged users.
-
-    Raises:
-        NotImplementedError: This mutation is not yet implemented.
+        BulkPurgeUsersV2PayloadGQL with purged count and failures.
     """
-    raise NotImplementedError("admin_purge_users is not yet implemented")
+    check_admin_only()
+    ctx = info.context
+
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available after check_admin_only()")
+
+    options = input.options
+    action = BulkPurgeUserAction(
+        user_ids=input.user_ids,
+        admin_user_id=me.user_id,
+        purge_shared_vfolders=(
+            OptionalState.update(options.purge_shared_vfolders)
+            if options and options.purge_shared_vfolders
+            else OptionalState.nop()
+        ),
+        delegate_endpoint_ownership=(
+            OptionalState.update(options.delegate_endpoint_ownership)
+            if options and options.delegate_endpoint_ownership
+            else OptionalState.nop()
+        ),
+    )
+    result = await ctx.processors.user.bulk_purge_users.wait_for_complete(action)
+
+    failed = [
+        BulkPurgeUserV2ErrorGQL(
+            user_id=error.user_id,
+            message=str(error.exception),
+        )
+        for error in result.data.failures
+    ]
+
+    return BulkPurgeUsersV2PayloadGQL(
+        purged_count=result.data.purged_count(),
+        failed=failed,
+    )

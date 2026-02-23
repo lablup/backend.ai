@@ -134,6 +134,11 @@ class UserRepository:
         await self._db_source.purge_user(email)
 
     @user_repository_resilience.apply()
+    async def purge_user_by_uuid(self, user_uuid: UUID) -> None:
+        """Completely purge user and all associated data by UUID."""
+        await self._db_source.purge_user_by_uuid(user_uuid)
+
+    @user_repository_resilience.apply()
     async def check_user_vfolder_mounted_to_active_kernels(self, user_uuid: UUID) -> bool:
         """Check if user's vfolders are mounted to active kernels."""
         return await self._db_source.check_user_vfolder_mounted_to_active_kernels(user_uuid)
