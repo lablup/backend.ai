@@ -249,6 +249,7 @@ class TestSignup:
         self,
         admin_registry: BackendAIClientRegistry,
         domain_fixture: str,
+        resource_policy_fixture: str,
         db_engine: SAEngine,
     ) -> None:
         unique = secrets.token_hex(4)

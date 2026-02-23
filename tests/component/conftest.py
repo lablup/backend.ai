@@ -494,16 +494,17 @@ async def resource_policy_fixture(
 ) -> AsyncIterator[str]:
     """Insert resource policies (user, project, keypair) with a shared random name.
 
-    Also inserts the system-default keypair resource policy ("default") required
-    by the user-creation flow, which always assigns new keypairs to that policy
-    name regardless of the user's own resource_policy value.
-    Teardown removes both the named policy and the "default" keypair policy.
-    The "default" keypair policy is safe to delete here because user_factory
+    Also inserts system-default resource policies ("default") required
+    by the user-creation flow:
+    - "default" keypair resource policy: always assigned to new keypairs
+    - "default" user resource policy: always assigned to new users (e.g. signup)
+    Teardown removes both the named policies and the "default" policies.
+    The "default" policies are safe to delete here because user_factory
     (which depends on this fixture) runs its teardown first, purging all
-    keypairs that reference it.
+    users and keypairs that reference them.
     """
     policy_name = f"policy-{secrets.token_hex(6)}"
-    default_kp_policy_name = "default"
+    default_policy_name = "default"
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(UserResourcePolicyRow.__table__).values(
@@ -538,7 +539,7 @@ async def resource_policy_fixture(
         # keypair resource policy (DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME).
         await conn.execute(
             sa.insert(keypair_resource_policies).values(
-                name=default_kp_policy_name,
+                name=default_policy_name,
                 default_for_unspecified=DefaultForUnspecified.UNLIMITED,
                 total_resource_slots=ResourceSlot(),
                 max_session_lifetime=0,
@@ -548,16 +549,31 @@ async def resource_policy_fixture(
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
             )
         )
+        # The signup flow always assigns "default" as the user's resource_policy.
+        await conn.execute(
+            sa.insert(UserResourcePolicyRow.__table__).values(
+                name=default_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=10,
+                max_customized_image_count=3,
+            )
+        )
     yield policy_name
     async with db_engine.begin() as conn:
         await conn.execute(
             keypair_resource_policies.delete().where(
-                keypair_resource_policies.c.name == default_kp_policy_name
+                keypair_resource_policies.c.name == default_policy_name
             )
         )
         await conn.execute(
             keypair_resource_policies.delete().where(
                 keypair_resource_policies.c.name == policy_name
+            )
+        )
+        await conn.execute(
+            UserResourcePolicyRow.__table__.delete().where(
+                UserResourcePolicyRow.__table__.c.name == default_policy_name
             )
         )
         await conn.execute(
