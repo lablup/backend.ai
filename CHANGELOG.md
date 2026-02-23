@@ -16,7 +16,7 @@ Changes
 
 <!-- towncrier release notes start -->
 
-## 25.15.11 (2026-02-23)
+## 25.15.11 (2026-02-24)
 
 ### Fixes
 * Fix cross-architecture binary collision in build-scies CI job by including runner architecture in Pants cache key. ([#9185](https://github.com/lablup/backend.ai/issues/9185))
