@@ -11,7 +11,7 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import (
     ResourceSlot,
 )
@@ -31,7 +31,7 @@ from ai.backend.manager.data.deployment.types import (
     ResourceConfigData,
     RouteInfo,
 )
-from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base import Creator
@@ -337,7 +337,9 @@ class DeploymentService:
         creator: RBACEntityCreator[EndpointRow] = RBACEntityCreator(
             spec=creator_spec,
             element_type=RBACElementType.MODEL_DEPLOYMENT,
-            scope_ref=ScopeId(scope_type=ScopeType.USER, scope_id=str(metadata.created_user)),
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.USER, element_id=str(metadata.created_user)
+            ),
             additional_scope_refs=[],
         )
 

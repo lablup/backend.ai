@@ -11,8 +11,12 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.manager.data.permission.id import ScopeId as ScopeRef
-from ai.backend.manager.data.permission.types import EntityType, RBACElementType, ScopeType
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    RBACElementRef,
+    RBACElementType,
+    ScopeType,
+)
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -184,7 +188,7 @@ def single_creator_user_scope(
             scope_id=user_scope_id,
         ),
         element_type=RBACElementType.VFOLDER,
-        scope_ref=ScopeRef(ScopeType.USER, user_scope_id),
+        scope_ref=RBACElementRef(RBACElementType.USER, user_scope_id),
         additional_scope_refs=[],
     )
 
@@ -200,7 +204,7 @@ def single_creator_project_scope(
             scope_id=project_scope_id,
         ),
         element_type=RBACElementType.VFOLDER,
-        scope_ref=ScopeRef(ScopeType.PROJECT, project_scope_id),
+        scope_ref=RBACElementRef(RBACElementType.PROJECT, project_scope_id),
         additional_scope_refs=[],
     )
 
@@ -217,7 +221,7 @@ def sequential_creators(
                 scope_id=user_scope_id,
             ),
             element_type=RBACElementType.VFOLDER,
-            scope_ref=ScopeRef(ScopeType.USER, user_scope_id),
+            scope_ref=RBACElementRef(RBACElementType.USER, user_scope_id),
             additional_scope_refs=[],
         )
         for i in range(5)
@@ -236,8 +240,8 @@ def multi_scope_creator(
             scope_id=project_scope_id,
         ),
         element_type=RBACElementType.VFOLDER,
-        scope_ref=ScopeRef(ScopeType.PROJECT, project_scope_id),
-        additional_scope_refs=[ScopeRef(ScopeType.USER, user_scope_id)],
+        scope_ref=RBACElementRef(RBACElementType.PROJECT, project_scope_id),
+        additional_scope_refs=[RBACElementRef(RBACElementType.USER, user_scope_id)],
     )
 
 
@@ -259,7 +263,7 @@ def idempotent_creator(
             entity_id=fixed_entity_id,
         ),
         element_type=RBACElementType.VFOLDER,
-        scope_ref=ScopeRef(ScopeType.USER, user_scope_id),
+        scope_ref=RBACElementRef(RBACElementType.USER, user_scope_id),
         additional_scope_refs=[],
     )
 
@@ -294,7 +298,7 @@ def bulk_creator_five_entities(
             for i in range(5)
         ],
         element_type=RBACElementType.VFOLDER,
-        scope_ref=ScopeRef(ScopeType.USER, user_scope_id),
+        scope_ref=RBACElementRef(RBACElementType.USER, user_scope_id),
     )
 
 
@@ -303,7 +307,7 @@ def bulk_creator_empty() -> RBACBulkEntityCreator[RBACEntityCreatorTestRow]:
     return RBACBulkEntityCreator(
         specs=[],
         element_type=RBACElementType.VFOLDER,
-        scope_ref=ScopeRef(ScopeType.USER, "dummy"),
+        scope_ref=RBACElementRef(RBACElementType.USER, "dummy"),
     )
 
 
@@ -325,7 +329,7 @@ def bulk_creator_two_same_scope(
             ),
         ],
         element_type=RBACElementType.VFOLDER,
-        scope_ref=ScopeRef(ScopeType.USER, user_scope_id),
+        scope_ref=RBACElementRef(RBACElementType.USER, user_scope_id),
     )
 
 
@@ -346,7 +350,7 @@ def batch_creators_same_scope(
                 scope_id=user_scope_id,
             ),
             element_type=RBACElementType.VFOLDER,
-            scope_ref=ScopeRef(ScopeType.USER, user_scope_id),
+            scope_ref=RBACElementRef(RBACElementType.USER, user_scope_id),
             additional_scope_refs=[],
         )
         for i in range(5)
@@ -366,7 +370,7 @@ def batch_creators_different_scopes(
                 scope_id=user_scope_id,
             ),
             element_type=RBACElementType.VFOLDER,
-            scope_ref=ScopeRef(ScopeType.USER, user_scope_id),
+            scope_ref=RBACElementRef(RBACElementType.USER, user_scope_id),
             additional_scope_refs=[],
         ),
         RBACEntityCreator(
@@ -376,7 +380,7 @@ def batch_creators_different_scopes(
                 scope_id=project_scope_id,
             ),
             element_type=RBACElementType.VFOLDER,
-            scope_ref=ScopeRef(ScopeType.PROJECT, project_scope_id),
+            scope_ref=RBACElementRef(RBACElementType.PROJECT, project_scope_id),
             additional_scope_refs=[],
         ),
     ]
@@ -396,8 +400,8 @@ def batch_creators_additional_scopes(
                 scope_id=project_scope_id,
             ),
             element_type=RBACElementType.VFOLDER,
-            scope_ref=ScopeRef(ScopeType.PROJECT, project_scope_id),
-            additional_scope_refs=[ScopeRef(ScopeType.USER, user_scope_id)],
+            scope_ref=RBACElementRef(RBACElementType.PROJECT, project_scope_id),
+            additional_scope_refs=[RBACElementRef(RBACElementType.USER, user_scope_id)],
         ),
         RBACEntityCreator(
             spec=SimpleCreatorSpec(
@@ -406,8 +410,8 @@ def batch_creators_additional_scopes(
                 scope_id=user_scope_id_2,
             ),
             element_type=RBACElementType.VFOLDER,
-            scope_ref=ScopeRef(ScopeType.USER, user_scope_id_2),
-            additional_scope_refs=[ScopeRef(ScopeType.PROJECT, project_scope_id)],
+            scope_ref=RBACElementRef(RBACElementType.USER, user_scope_id_2),
+            additional_scope_refs=[RBACElementRef(RBACElementType.PROJECT, project_scope_id)],
         ),
     ]
 
@@ -422,7 +426,7 @@ def composite_pk_single_creator() -> RBACEntityCreator[CompositePKTestRow]:
     return RBACEntityCreator(
         spec=CompositePKCreatorSpec(tenant_id=1, item_id=1, name="test"),
         element_type=RBACElementType.VFOLDER,
-        scope_ref=ScopeRef(ScopeType.USER, "user-123"),
+        scope_ref=RBACElementRef(RBACElementType.USER, "user-123"),
         additional_scope_refs=[],
     )
 
@@ -432,7 +436,7 @@ def composite_pk_bulk_creator() -> RBACBulkEntityCreator[CompositePKTestRow]:
     return RBACBulkEntityCreator(
         specs=[CompositePKCreatorSpec(tenant_id=1, item_id=i, name=f"test-{i}") for i in range(3)],
         element_type=RBACElementType.VFOLDER,
-        scope_ref=ScopeRef(ScopeType.USER, "user-123"),
+        scope_ref=RBACElementRef(RBACElementType.USER, "user-123"),
     )
 
 
@@ -442,7 +446,7 @@ def composite_pk_batch_creators() -> list[RBACEntityCreator[CompositePKTestRow]]
         RBACEntityCreator(
             spec=CompositePKCreatorSpec(tenant_id=1, item_id=i, name=f"test-{i}"),
             element_type=RBACElementType.VFOLDER,
-            scope_ref=ScopeRef(ScopeType.USER, "user-123"),
+            scope_ref=RBACElementRef(RBACElementType.USER, "user-123"),
             additional_scope_refs=[],
         )
         for i in range(3)

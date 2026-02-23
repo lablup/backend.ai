@@ -16,6 +16,7 @@ from ai.backend.common.data.permission.types import OperationType, RBACElementTy
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
+    RBACElementRef,
     RoleSource,
 )
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
@@ -26,7 +27,6 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
-    RBACEntity,
     RBACEntityBatchPurger,
     RBACEntityBatchPurgerResult,
     RBACEntityBatchPurgerSpec,
@@ -81,12 +81,10 @@ class SimpleRBACEntityPurgerSpec(RBACEntityPurgerSpec):
     def element_type(self) -> RBACElementType:
         return RBACElementType.VFOLDER
 
-    def entity(self) -> RBACEntity:
-        return RBACEntity(
-            entity=ObjectId(
-                entity_type=self.element_type().to_entity_type(),
-                entity_id=str(self._entity_uuid),
-            )
+    def entity_ref(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=self.element_type(),
+            element_id=str(self._entity_uuid),
         )
 
 
@@ -874,12 +872,10 @@ class CompositePKPurgerSpec(RBACEntityPurgerSpec):
     def element_type(self) -> RBACElementType:
         return RBACElementType.VFOLDER
 
-    def entity(self) -> RBACEntity:
-        return RBACEntity(
-            entity=ObjectId(
-                entity_type=self.element_type().to_entity_type(),
-                entity_id=self._entity_uuid,
-            )
+    def entity_ref(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=self.element_type(),
+            element_id=self._entity_uuid,
         )
 
 

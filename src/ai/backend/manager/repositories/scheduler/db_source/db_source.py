@@ -25,7 +25,6 @@ from ai.backend.common.data.permission.types import (
     EntityType,
     FieldType,
     RBACElementType,
-    ScopeType,
 )
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.resource.types import TotalResourceData
@@ -45,7 +44,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
-from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
@@ -1190,9 +1189,9 @@ class ScheduleDBSource:
             rbac_creator = RBACEntityCreator(
                 spec=SessionRowCreatorSpec(row=session),
                 element_type=RBACElementType.SESSION,
-                scope_ref=ScopeId(
-                    scope_type=ScopeType.USER,
-                    scope_id=str(session_data.user_uuid),
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.USER,
+                    element_id=str(session_data.user_uuid),
                 ),
                 additional_scope_refs=[],
             )

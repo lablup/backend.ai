@@ -12,7 +12,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.data.permission.id import ObjectId
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -20,22 +20,6 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec, Purger, PurgerResult, TRow
-
-# =============================================================================
-# Data Classes
-# =============================================================================
-
-
-@dataclass
-class RBACEntity:
-    """Represents an RBAC entity to be purged.
-
-    Attributes:
-        entity: ObjectId representing the entity to delete.
-    """
-
-    entity: ObjectId
-
 
 # =============================================================================
 # Spec Classes
@@ -47,7 +31,7 @@ class RBACEntityPurgerSpec(ABC):
 
     Implementations specify which entity to purge by providing:
     - element_type(): Returns the RBACElementType identifying this entity kind
-    - entity(): Returns RBACEntity with the ObjectId to delete
+    - entity_ref(): Returns the RBACElementRef to delete
     """
 
     @abstractmethod
@@ -56,8 +40,8 @@ class RBACEntityPurgerSpec(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def entity(self) -> RBACEntity:
-        """Return the RBAC entity information for deletion."""
+    def entity_ref(self) -> RBACElementRef:
+        """Return the RBAC element reference for the entity to delete."""
         raise NotImplementedError
 
 
@@ -66,12 +50,12 @@ class RBACEntityBatchPurgerSpec(BatchPurgerSpec[TRow], ABC):
 
     Inherits build_subquery() from BatchPurgerSpec.
     Implementations must provide:
-    - element_type(): Returns the RBACElementType for constructing ObjectIds from row PKs
+    - element_type(): Returns the RBACElementType for constructing RBACElementRefs from row PKs
     """
 
     @abstractmethod
     def element_type(self) -> RBACElementType:
-        """Return the RBAC element type for constructing ObjectIds from row primary keys."""
+        """Return the RBAC element type for constructing RBACElementRefs from row primary keys."""
         raise NotImplementedError
 
 
@@ -146,21 +130,22 @@ async def _delete_entity_scope_permissions(
 
 async def _delete_scope_associations_bidirectional(
     db_sess: SASession,
-    entity_id: ObjectId,
+    entity_ref: RBACElementRef,
     element_type: RBACElementType,
 ) -> None:
     """Delete all scope associations where the entity is the target or the scope."""
     scope_type = element_type.to_scope_type()
+    entity_type = element_type.to_entity_type()
     await db_sess.execute(
         sa.delete(AssociationScopesEntitiesRow).where(
             sa.or_(
                 sa.and_(
-                    AssociationScopesEntitiesRow.entity_id == entity_id.entity_id,
-                    AssociationScopesEntitiesRow.entity_type == entity_id.entity_type,
+                    AssociationScopesEntitiesRow.entity_id == entity_ref.element_id,
+                    AssociationScopesEntitiesRow.entity_type == entity_type,
                 ),
                 sa.and_(
                     AssociationScopesEntitiesRow.scope_type == scope_type,
-                    AssociationScopesEntitiesRow.scope_id == entity_id.entity_id,
+                    AssociationScopesEntitiesRow.scope_id == entity_ref.element_id,
                 ),
             )
         )
@@ -175,14 +160,14 @@ async def _delete_scope_associations_bidirectional(
 async def _batch_delete_entity_scope_permissions(
     db_sess: SASession,
     element_type: RBACElementType,
-    entity_ids: Collection[ObjectId],
+    entity_refs: Collection[RBACElementRef],
 ) -> int:
     """Delete permissions where the entities are used as scope. Returns count of deleted rows."""
-    if not entity_ids:
+    if not entity_refs:
         return 0
 
     scope_type = element_type.to_scope_type()
-    scope_id_values = [eid.entity_id for eid in entity_ids]
+    scope_id_values = [ref.element_id for ref in entity_refs]
     result = await db_sess.execute(
         sa.delete(PermissionRow).where(
             sa.and_(
@@ -197,21 +182,22 @@ async def _batch_delete_entity_scope_permissions(
 async def _batch_delete_scope_associations_bidirectional(
     db_sess: SASession,
     element_type: RBACElementType,
-    entity_ids: Collection[ObjectId],
+    entity_refs: Collection[RBACElementRef],
 ) -> int:
     """Delete scope associations where entities are the target or the scope. Returns count."""
-    if not entity_ids:
+    if not entity_refs:
         return 0
 
     scope_type = element_type.to_scope_type()
-    scope_id_values = [eid.entity_id for eid in entity_ids]
+    entity_type = element_type.to_entity_type()
+    scope_id_values = [ref.element_id for ref in entity_refs]
 
     entity_conditions = [
         sa.and_(
-            AssociationScopesEntitiesRow.entity_id == eid.entity_id,
-            AssociationScopesEntitiesRow.entity_type == eid.entity_type,
+            AssociationScopesEntitiesRow.entity_id == ref.element_id,
+            AssociationScopesEntitiesRow.entity_type == entity_type,
         )
-        for eid in entity_ids
+        for ref in entity_refs
     ]
 
     result = await db_sess.execute(
@@ -248,7 +234,7 @@ class _RBACEntityBatchCleanupCounts:
 
 async def _delete_rbac_for_entity(
     db_sess: SASession,
-    entity_id: ObjectId,
+    entity_ref: RBACElementRef,
     element_type: RBACElementType,
 ) -> None:
     """
@@ -259,15 +245,15 @@ async def _delete_rbac_for_entity(
     2. AssociationScopesEntitiesRows - bidirectional (entity as target + entity as scope)
     """
     # 1. Delete permissions where entity is the scope
-    await _delete_entity_scope_permissions(db_sess, element_type, entity_id.entity_id)
+    await _delete_entity_scope_permissions(db_sess, element_type, entity_ref.element_id)
 
     # 2. Delete scope associations in both directions
-    await _delete_scope_associations_bidirectional(db_sess, entity_id, element_type)
+    await _delete_scope_associations_bidirectional(db_sess, entity_ref, element_type)
 
 
 async def _batch_delete_rbac_for_entities(
     db_sess: SASession,
-    entity_ids: Collection[ObjectId],
+    entity_refs: Collection[RBACElementRef],
     element_type: RBACElementType,
 ) -> _RBACEntityBatchCleanupCounts:
     """Delete all RBAC entries for multiple entities.
@@ -279,11 +265,11 @@ async def _batch_delete_rbac_for_entities(
     2. AssociationScopesEntitiesRows - bidirectional (entities as target + entities as scope)
     """
     # 1. Delete permissions where entities are the scope
-    perm_count = await _batch_delete_entity_scope_permissions(db_sess, element_type, entity_ids)
+    perm_count = await _batch_delete_entity_scope_permissions(db_sess, element_type, entity_refs)
 
     # 2. Delete scope associations in both directions
     scope_assoc_count = await _batch_delete_scope_associations_bidirectional(
-        db_sess, element_type, entity_ids
+        db_sess, element_type, entity_refs
     )
 
     return _RBACEntityBatchCleanupCounts(
@@ -341,11 +327,11 @@ async def execute_rbac_entity_purger(
         RBACEntityPurgerResult containing the deleted row, or None if no row matched
     """
     # 1. Get entity info from spec
-    entity_id = purger.spec.entity().entity
+    entity_ref = purger.spec.entity_ref()
     element_type = purger.spec.element_type()
 
     # 2. Delete RBAC entries
-    await _delete_rbac_for_entity(db_sess, entity_id, element_type)
+    await _delete_rbac_for_entity(db_sess, entity_ref, element_type)
 
     # 3. Delete main row with RETURNING
     row = await _delete_row_by_pk_returning(db_sess, purger)
@@ -389,7 +375,6 @@ async def execute_rbac_entity_batch_purger(
 
     pk_col = pk_columns[0]
     element_type = purger.spec.element_type()
-    entity_type = element_type.to_entity_type()
 
     while True:
         # 1. DELETE with RETURNING - get PKs and delete in one query
@@ -407,13 +392,13 @@ async def execute_rbac_entity_batch_purger(
         batch_deleted = len(pk_values)
         total_deleted += batch_deleted
 
-        # 2. Construct entity_ids from deleted PKs
-        entity_ids: list[ObjectId] = [
-            ObjectId(entity_type=entity_type, entity_id=str(pk)) for pk in pk_values
+        # 2. Construct entity refs from deleted PKs
+        entity_refs: list[RBACElementRef] = [
+            RBACElementRef(element_type=element_type, element_id=str(pk)) for pk in pk_values
         ]
 
         # 3. Clean up RBAC entries (after main row deletion - no FK constraint)
-        cleanup = await _batch_delete_rbac_for_entities(db_sess, entity_ids, element_type)
+        cleanup = await _batch_delete_rbac_for_entities(db_sess, entity_refs, element_type)
         total_perm += cleanup.permission_count
         total_scope_assoc += cleanup.scope_association_count
 
