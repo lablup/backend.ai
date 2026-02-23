@@ -58,7 +58,7 @@ The coordinator periodically calls `execute_blue_green_cycle`. Each invocation f
                     Yes
                      ▼
   ┌──────────────────────────────────────┐
-  │  Execute promotion                    │
+  │  Execute promotion                   │
   │  → Green INACTIVE → ACTIVE           │
   │  → Blue  ACTIVE   → TERMINATING      │
   └──────────────────────────────────────┘
@@ -76,19 +76,19 @@ Auto-promotion can wait a specified duration before switching. The timestamp is 
        │
        ▼
   ┌──────────────────────────────────────────────────┐
-  │  Store promote_ready_at in Valkey                 │
-  │                                                    │
-  │  Key: deployment:{endpoint_id}:promote_ready_at    │
-  │  Value: now() + promote_delay_seconds              │
-  │  TTL: promote_delay_seconds + buffer               │
+  │  Store promote_ready_at in Valkey                │
+  │                                                  │
+  │  Key: deployment:{endpoint_id}:promote_ready_at  │
+  │  Value: now() + promote_delay_seconds            │
+  │  TTL: promote_delay_seconds + buffer             │
   └──────────────────────────────────────────────────┘
        │
        ▼ (next cycle)
   ┌──────────────────────────────────────────────────┐
-  │  Query promote_ready_at                            │
-  │                                                    │
+  │  Query promote_ready_at                          │
+  │                                                  │
   │  now() >= promote_ready_at? ──Yes──→ Execute promotion │
-  │                              No───→ in_progress    │
+  │                              No───→ in_progress  │
   └──────────────────────────────────────────────────┘
 
   On loss: if promote_ready_at missing, re-store → delay restarts (safe side)
@@ -102,28 +102,28 @@ Auto-promotion can wait a specified duration before switching. The timestamp is 
   Cycle 0 (initial state)
   ┌─────────────────────────────────────────────────────┐
   │  Blue:  [■ ■ ■]  (3 healthy, ACTIVE)                │
-  │  Green: []                                           │
-  │                                                      │
-  │  No Green routes                                     │
-  │  → Create all 3 Green (INACTIVE)                     │
+  │  Green: []                                          │
+  │                                                     │
+  │  No Green routes                                    │
+  │  → Create all 3 Green (INACTIVE)                    │
   └─────────────────────────────────────────────────────┘
                           │
                           ▼
   Cycle 1 (Green provisioning)
   ┌─────────────────────────────────────────────────────┐
   │  Blue:  [■ ■ ■]  (3 healthy, ACTIVE)                │
-  │  Green: [◇ ◇ ◇]  (3 provisioning, INACTIVE)        │
-  │                                                      │
-  │  → PROVISIONING exists → wait                        │
+  │  Green: [◇ ◇ ◇]  (3 provisioning, INACTIVE)         │
+  │                                                     │
+  │  → PROVISIONING exists → wait                       │
   └─────────────────────────────────────────────────────┘
                           │
                           ▼
   Cycle 2 (some Green healthy)
   ┌─────────────────────────────────────────────────────┐
   │  Blue:  [■ ■ ■]  (3 healthy, ACTIVE)                │
-  │  Green: [■ ◇ ◇]  (1 healthy, 2 provisioning)       │
-  │                                                      │
-  │  → PROVISIONING exists → wait                        │
+  │  Green: [■ ◇ ◇]  (1 healthy, 2 provisioning)        │
+  │                                                     │
+  │  → PROVISIONING exists → wait                       │
   └─────────────────────────────────────────────────────┘
                           │
                           ▼
@@ -131,21 +131,21 @@ Auto-promotion can wait a specified duration before switching. The timestamp is 
   ┌─────────────────────────────────────────────────────┐
   │  Blue:  [■ ■ ■]  (3 healthy, ACTIVE)                │
   │  Green: [■ ■ ■]  (3 healthy, INACTIVE)              │
-  │                                                      │
-  │  All Green healthy + auto_promote + delay=0          │
-  │  → Green: INACTIVE → ACTIVE                          │
-  │  → Blue:  ACTIVE → TERMINATING                       │
-  │  → completed                                         │
+  │                                                     │
+  │  All Green healthy + auto_promote + delay=0         │
+  │  → Green: INACTIVE → ACTIVE                         │
+  │  → Blue:  ACTIVE → TERMINATING                      │
+  │  → completed                                        │
   └─────────────────────────────────────────────────────┘
                           │
                           ▼
   Final state
   ┌─────────────────────────────────────────────────────┐
-  │  Blue:  []                                           │
+  │  Blue:  []                                          │
   │  Green: [■ ■ ■]  (3 healthy, ACTIVE)                │
-  │                                                      │
-  │  → deploying_revision → current_revision swap        │
-  │  → DEPLOYING → READY state transition                │
+  │                                                     │
+  │  → deploying_revision → current_revision swap       │
+  │  → DEPLOYING → READY state transition               │
   └─────────────────────────────────────────────────────┘
 
   Legend: ■ = healthy, ◇ = provisioning
@@ -160,18 +160,18 @@ With `auto_promote=False`:
   ┌─────────────────────────────────────────────────────┐
   │  Blue:  [■ ■ ■]  (3 healthy, ACTIVE)                │
   │  Green: [■ ■ ■]  (3 healthy, INACTIVE)              │
-  │                                                      │
-  │  All Green healthy but auto_promote=False             │
-  │  → in_progress (waiting for manual promotion)        │
+  │                                                     │
+  │  All Green healthy but auto_promote=False           │
+  │  → in_progress (waiting for manual promotion)       │
   └─────────────────────────────────────────────────────┘
                           │
                   Operator calls manual promotion API
                           │
                           ▼
   ┌─────────────────────────────────────────────────────┐
-  │  Green: INACTIVE → ACTIVE                            │
-  │  Blue:  ACTIVE → TERMINATING                         │
-  │  → completed                                         │
+  │  Green: INACTIVE → ACTIVE                           │
+  │  Blue:  ACTIVE → TERMINATING                        │
+  │  → completed                                        │
   └─────────────────────────────────────────────────────┘
 ```
 
@@ -182,11 +182,11 @@ With `auto_promote=False`:
   ┌─────────────────────────────────────────────────────┐
   │  Blue:  [■ ■ ■]  (3 healthy, ACTIVE)                │
   │  Green: [✗ ✗ ✗]  (3 failed)                         │
-  │                                                      │
-  │  All Green failed                                    │
-  │  → Terminate all Green (TERMINATING)                 │
-  │  → deploying_revision_id = NULL (rollback)           │
-  │  → completed                                         │
+  │                                                     │
+  │  All Green failed                                   │
+  │  → Terminate all Green (TERMINATING)                │
+  │  → deploying_revision_id = NULL (rollback)          │
+  │  → completed                                        │
   └─────────────────────────────────────────────────────┘
 
   Legend: ■ = healthy, ✗ = failed
@@ -202,7 +202,7 @@ With `auto_promote=False`:
   │    1. Query DEPLOYING deployments                            │
   │    2. Load policy_map                                        │
   │    3. Filter deployments with strategy == BLUE_GREEN         │
-  │    4. handler.execute(matching, policy_map)                   │
+  │    4. handler.execute(matching, policy_map)                  │
   │    5. completed → transition to READY                        │
   │       in_progress → mark_deployment_needed reschedule        │
   │       errors → log history                                   │
@@ -216,8 +216,8 @@ With `auto_promote=False`:
   │  strategy() → DeploymentStrategy.BLUE_GREEN                  │
   │  lock_id → LOCKID_DEPLOYMENT_BLUE_GREEN                      │
   │                                                              │
-  │  execute(deployments, policy_map)                             │
-  │    → executor.execute_blue_green_cycle(...)                   │
+  │  execute(deployments, policy_map)                            │
+  │    → executor.execute_blue_green_cycle(...)                  │
   └──────────────────────────┬───────────────────────────────────┘
                              │
                              ▼
@@ -227,7 +227,7 @@ With `auto_promote=False`:
   │  1. fetch_active_routes_by_endpoint_ids (bulk)               │
   │  2. Execute _evaluate_blue_green_cycle per deployment        │
   │  3. completed deployments →                                  │
-  │       complete_deployment_revision_update_bulk                │
+  │       complete_deployment_revision_update_bulk               │
   │  4. Return DeploymentStrategyResult                          │
   └──────────────────────────┬───────────────────────────────────┘
                              │
@@ -249,22 +249,22 @@ With `auto_promote=False`:
   │  Actions applied:                                            │
   │  ┌────────────────────────────────────────────────────┐      │
   │  │  ● Green creation:                                 │      │
-  │  │    RouteCreatorSpec(                                │      │
+  │  │    RouteCreatorSpec(                                │     │
   │  │      revision_id = deploying_revision_id,          │      │
   │  │      traffic_status = INACTIVE  ← differs from RU  │      │
   │  │    ) × target_count                                │      │
   │  │                                                    │      │
   │  │  ● Promotion (traffic switch):                     │      │
-  │  │    Green: RouteBatchUpdaterSpec(                    │      │
+  │  │    Green: RouteBatchUpdaterSpec(                    │     │
   │  │      traffic_status = ACTIVE                       │      │
   │  │    )                                               │      │
-  │  │    Blue: RouteBatchUpdaterSpec(                     │      │
+  │  │    Blue: RouteBatchUpdaterSpec(                     │     │
   │  │      status = TERMINATING,                         │      │
   │  │      traffic_status = INACTIVE                     │      │
   │  │    )                                               │      │
   │  │                                                    │      │
   │  │  ● Rollback:                                       │      │
-  │  │    Green: RouteBatchUpdaterSpec(                    │      │
+  │  │    Green: RouteBatchUpdaterSpec(                    │     │
   │  │      status = TERMINATING                          │      │
   │  │    )                                               │      │
   │  └────────────────────────────────────────────────────┘      │

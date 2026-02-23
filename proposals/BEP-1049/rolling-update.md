@@ -39,9 +39,9 @@ The coordinator periodically calls `execute_rolling_update_cycle`. Each invocati
   │  Calculate max_surge/max_unavailable │
   │                                      │
   │  to_create = min(can_create,         │
-  │                  need_create)         │
+  │                  need_create)        │
   │  to_terminate = min(can_terminate,   │
-  │                     old_active)       │
+  │                     old_active)      │
   │                                      │
   │  → Create New routes (ACTIVE)        │
   │  → Terminate Old routes (TERMINATING)│
@@ -58,7 +58,7 @@ Example with `target_count = 3`, `max_surge = 1`, `max_unavailable = 1`:
 ```
   Constraints:
   ┌──────────────────────────────────────────────────────────┐
-  │  max_total = target_count + max_surge = 4               │
+  │  max_total = target_count + max_surge = 4                │
   │  → Total active routes cannot exceed 4                   │
   │                                                          │
   │  min_available = target_count - max_unavailable = 2      │
@@ -74,9 +74,9 @@ Example with `target_count = 3`, `max_surge = 1`, `max_unavailable = 1`:
 
   Termination calculation:
   ┌──────────────────────────────────────────────────────────┐
-  │  healthy_count = new_healthy + old_active                 │
-  │  can_terminate = max(0, healthy_count - min_available)    │
-  │  to_terminate = min(can_terminate, old_active)            │
+  │  healthy_count = new_healthy + old_active                │
+  │  can_terminate = max(0, healthy_count - min_available)   │
+  │  to_terminate = min(can_terminate, old_active)           │
   └──────────────────────────────────────────────────────────┘
 ```
 
@@ -88,77 +88,77 @@ Example with `target_count = 3`, `max_surge = 1`, `max_unavailable = 1`:
   Cycle 0 (initial state)
   ┌─────────────────────────────────────────────────────┐
   │  Old: [■ ■ ■]  (3 healthy)                          │
-  │  New: []                                             │
-  │                                                      │
-  │  total_active=3, max_total=4 → can_create=1          │
-  │  need_create=3 → to_create=1                         │
-  │  healthy=3, min_available=2 → can_terminate=1        │
-  │                                                      │
-  │  → Create 1 New, Terminate 1 Old                     │
+  │  New: []                                            │
+  │                                                     │
+  │  total_active=3, max_total=4 → can_create=1         │
+  │  need_create=3 → to_create=1                        │
+  │  healthy=3, min_available=2 → can_terminate=1       │
+  │                                                     │
+  │  → Create 1 New, Terminate 1 Old                    │
   └─────────────────────────────────────────────────────┘
                           │
                           ▼
   Cycle 1 (New provisioning)
   ┌─────────────────────────────────────────────────────┐
-  │  Old: [■ ■]    (2 healthy)                           │
-  │  New: [◇]      (1 provisioning)                      │
-  │                                                      │
-  │  → PROVISIONING exists → wait                        │
+  │  Old: [■ ■]    (2 healthy)                          │
+  │  New: [◇]      (1 provisioning)                     │
+  │                                                     │
+  │  → PROVISIONING exists → wait                       │
   └─────────────────────────────────────────────────────┘
                           │
                           ▼
   Cycle 2 (1 New healthy)
   ┌─────────────────────────────────────────────────────┐
-  │  Old: [■ ■]    (2 healthy)                           │
-  │  New: [■]      (1 healthy)                           │
-  │                                                      │
-  │  total_active=3, max_total=4 → can_create=1          │
-  │  need_create=2 → to_create=1                         │
-  │  healthy=3, min_available=2 → can_terminate=1        │
-  │                                                      │
-  │  → Create 1 New, Terminate 1 Old                     │
+  │  Old: [■ ■]    (2 healthy)                          │
+  │  New: [■]      (1 healthy)                          │
+  │                                                     │
+  │  total_active=3, max_total=4 → can_create=1         │
+  │  need_create=2 → to_create=1                        │
+  │  healthy=3, min_available=2 → can_terminate=1       │
+  │                                                     │
+  │  → Create 1 New, Terminate 1 Old                    │
   └─────────────────────────────────────────────────────┘
                           │
                           ▼
   Cycle 3 (New provisioning)
   ┌─────────────────────────────────────────────────────┐
-  │  Old: [■]      (1 healthy)                           │
-  │  New: [■ ◇]    (1 healthy, 1 provisioning)           │
-  │                                                      │
-  │  → PROVISIONING exists → wait                        │
+  │  Old: [■]      (1 healthy)                          │
+  │  New: [■ ◇]    (1 healthy, 1 provisioning)          │
+  │                                                     │
+  │  → PROVISIONING exists → wait                       │
   └─────────────────────────────────────────────────────┘
                           │
                           ▼
   Cycle 4 (2 New healthy)
   ┌─────────────────────────────────────────────────────┐
-  │  Old: [■]      (1 healthy)                           │
-  │  New: [■ ■]    (2 healthy)                           │
-  │                                                      │
-  │  total_active=3, max_total=4 → can_create=1          │
-  │  need_create=1 → to_create=1                         │
-  │  healthy=3, min_available=2 → can_terminate=1        │
-  │                                                      │
-  │  → Create 1 New, Terminate 1 Old                     │
+  │  Old: [■]      (1 healthy)                          │
+  │  New: [■ ■]    (2 healthy)                          │
+  │                                                     │
+  │  total_active=3, max_total=4 → can_create=1         │
+  │  need_create=1 → to_create=1                        │
+  │  healthy=3, min_available=2 → can_terminate=1       │
+  │                                                     │
+  │  → Create 1 New, Terminate 1 Old                    │
   └─────────────────────────────────────────────────────┘
                           │
                           ▼
   Cycle 5 (waiting for provisioning)
   ┌─────────────────────────────────────────────────────┐
-  │  Old: []                                             │
+  │  Old: []                                            │
   │  New: [■ ■ ◇]  (2 healthy, 1 provisioning)          │
-  │                                                      │
-  │  → PROVISIONING exists → wait                        │
+  │                                                     │
+  │  → PROVISIONING exists → wait                       │
   └─────────────────────────────────────────────────────┘
                           │
                           ▼
   Cycle 6 (completed)
   ┌─────────────────────────────────────────────────────┐
-  │  Old: []                                             │
-  │  New: [■ ■ ■]  (3 healthy)                           │
-  │                                                      │
-  │  No Old and New >= target → completed                │
-  │  → deploying_revision → current_revision swap        │
-  │  → DEPLOYING → READY state transition                │
+  │  Old: []                                            │
+  │  New: [■ ■ ■]  (3 healthy)                          │
+  │                                                     │
+  │  No Old and New >= target → completed               │
+  │  → deploying_revision → current_revision swap       │
+  │  → DEPLOYING → READY state transition               │
   └─────────────────────────────────────────────────────┘
 
   Legend: ■ = healthy, ◇ = provisioning
@@ -174,7 +174,7 @@ Example with `target_count = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │    1. Query DEPLOYING deployments                            │
   │    2. Load policy_map                                        │
   │    3. Filter deployments with strategy == ROLLING            │
-  │    4. handler.execute(matching, policy_map)                   │
+  │    4. handler.execute(matching, policy_map)                  │
   │    5. completed → transition to READY                        │
   │       in_progress → mark_deployment_needed reschedule        │
   │       errors → log history                                   │
@@ -188,8 +188,8 @@ Example with `target_count = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │  strategy() → DeploymentStrategy.ROLLING                     │
   │  lock_id → LOCKID_DEPLOYMENT_ROLLING_UPDATE                  │
   │                                                              │
-  │  execute(deployments, policy_map)                             │
-  │    → executor.execute_rolling_update_cycle(...)               │
+  │  execute(deployments, policy_map)                            │
+  │    → executor.execute_rolling_update_cycle(...)              │
   └──────────────────────────┬───────────────────────────────────┘
                              │
                              ▼
@@ -199,7 +199,7 @@ Example with `target_count = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │  1. fetch_active_routes_by_endpoint_ids (bulk)               │
   │  2. Execute _evaluate_rolling_update_cycle per deployment    │
   │  3. completed deployments →                                  │
-  │       complete_deployment_revision_update_bulk                │
+  │       complete_deployment_revision_update_bulk               │
   │  4. Return DeploymentStrategyResult                          │
   └──────────────────────────┬───────────────────────────────────┘
                              │
