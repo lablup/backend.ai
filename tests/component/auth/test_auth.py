@@ -143,6 +143,7 @@ class TestSSHKeypair:
                 serialization.PublicFormat.OpenSSH,
             )
             .decode()
+            .strip()
         )
         result = await admin_registry.auth.upload_ssh_keypair(
             UploadSSHKeypairRequest(pubkey=pubkey, privkey=privkey),

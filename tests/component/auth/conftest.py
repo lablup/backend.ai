@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -103,11 +103,11 @@ async def _auth_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 background_task_manager=root_ctx.background_task_manager,
                 event_hub=root_ctx.event_hub,
                 event_producer=root_ctx.event_producer,
-                agent_registry=AsyncMock(),
-                idle_checker_host=AsyncMock(),
-                event_dispatcher=AsyncMock(),
-                hook_plugin_ctx=AsyncMock(),
-                scheduling_controller=AsyncMock(),
+                agent_registry=MagicMock(),
+                idle_checker_host=MagicMock(),
+                event_dispatcher=MagicMock(),
+                hook_plugin_ctx=MagicMock(),
+                scheduling_controller=MagicMock(),
                 deployment_controller=MagicMock(),
                 revision_generator_registry=MagicMock(),
                 agent_cache=MagicMock(),
