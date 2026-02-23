@@ -22,6 +22,7 @@ from ai.backend.manager.repositories.base import (
     negate_conditions,
 )
 from ai.backend.manager.repositories.fair_share.options import (
+    RGUserFairShareConditions,
     UserFairShareConditions,
     UserFairShareOrders,
 )
@@ -466,6 +467,135 @@ class UserFairShareOrderBy(GQLOrderBy):
                 return UserFairShareOrders.by_user_username(ascending)
             case UserFairShareOrderField.USER_EMAIL:
                 return UserFairShareOrders.by_user_email(ascending)
+
+
+class RGUserFairShareFilter(UserFairShareFilter):
+    """RG-context filter that uses INNER JOIN'd columns for conditions.
+
+    Not a Strawberry GQL type — used internally by fetchers to build
+    conditions that reference AssocGroupUserRow/DomainRow/ScalingGroupForProjectRow
+    instead of UserFairShareRow, preventing NULL exclusion of entities
+    without records.
+    """
+
+    @override
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+
+        if self.resource_group:
+            sg_condition = self.resource_group.build_query_condition(
+                contains_factory=lambda spec: RGUserFairShareConditions.by_resource_group_contains(
+                    spec.value
+                ),
+                equals_factory=lambda spec: RGUserFairShareConditions.by_resource_group_equals(
+                    spec.value
+                ),
+                starts_with_factory=lambda spec: RGUserFairShareConditions.by_resource_group_starts_with(
+                    spec.value
+                ),
+                ends_with_factory=lambda spec: RGUserFairShareConditions.by_resource_group_ends_with(
+                    spec.value
+                ),
+            )
+            if sg_condition:
+                conditions.append(sg_condition)
+
+        if self.user_uuid:
+            uuid_condition = self.user_uuid.build_query_condition(
+                equals_factory=lambda spec: RGUserFairShareConditions.by_user_uuid(spec.value),
+                in_factory=lambda spec: RGUserFairShareConditions.by_user_uuids(spec.values),
+            )
+            if uuid_condition:
+                conditions.append(uuid_condition)
+
+        if self.project_id:
+            pid_condition = self.project_id.build_query_condition(
+                equals_factory=lambda spec: RGUserFairShareConditions.by_project_id(spec.value),
+                in_factory=lambda spec: RGUserFairShareConditions.by_project_ids(spec.values),
+            )
+            if pid_condition:
+                conditions.append(pid_condition)
+
+        if self.domain_name:
+            dn_condition = self.domain_name.build_query_condition(
+                contains_factory=lambda spec: RGUserFairShareConditions.by_domain_name_contains(
+                    spec.value
+                ),
+                equals_factory=lambda spec: RGUserFairShareConditions.by_domain_name_equals(
+                    spec.value
+                ),
+                starts_with_factory=lambda spec: RGUserFairShareConditions.by_domain_name_starts_with(
+                    spec.value
+                ),
+                ends_with_factory=lambda spec: RGUserFairShareConditions.by_domain_name_ends_with(
+                    spec.value
+                ),
+            )
+            if dn_condition:
+                conditions.append(dn_condition)
+
+        if self.user:
+            conditions.extend(self.user.build_conditions())
+
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(RGUserFairShareFilter._wrap(sub_filter).build_conditions())
+
+        if self.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_conditions.extend(RGUserFairShareFilter._wrap(sub_filter).build_conditions())
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+
+        if self.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_conditions.extend(RGUserFairShareFilter._wrap(sub_filter).build_conditions())
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+
+        return conditions
+
+    @staticmethod
+    def _wrap(f: UserFairShareFilter) -> RGUserFairShareFilter:
+        """Re-wrap a parent-type filter as RG-context."""
+        rg = RGUserFairShareFilter()
+        rg.resource_group = f.resource_group
+        rg.user_uuid = f.user_uuid
+        rg.project_id = f.project_id
+        rg.domain_name = f.domain_name
+        rg.user = f.user
+        rg.AND = f.AND
+        rg.OR = f.OR
+        rg.NOT = f.NOT
+        return rg
+
+    @classmethod
+    def from_filter(cls, f: UserFairShareFilter | None) -> RGUserFairShareFilter | None:
+        """Convert a base filter to RG-context filter."""
+        if f is None:
+            return None
+        return cls._wrap(f)
+
+
+class RGUserFairShareOrderBy(UserFairShareOrderBy):
+    """RG-context order — currently all order fields are safe (use UserRow)."""
+
+    @classmethod
+    def from_order_list(
+        cls, orders: list[UserFairShareOrderBy] | None
+    ) -> list[RGUserFairShareOrderBy] | None:
+        """Convert base order list to RG-context order list."""
+        if orders is None:
+            return None
+        result = []
+        for o in orders:
+            rg = RGUserFairShareOrderBy()
+            rg.field = o.field
+            rg.direction = o.direction
+            result.append(rg)
+        return result
 
 
 # Mutation Input/Payload Types

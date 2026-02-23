@@ -25,6 +25,7 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.fair_share.options import (
     ProjectFairShareConditions,
     ProjectFairShareOrders,
+    RGProjectFairShareConditions,
 )
 
 from .common import (
@@ -480,6 +481,126 @@ class ProjectFairShareOrderBy(GQLOrderBy):
                 return ProjectFairShareOrders.by_project_name(ascending)
             case ProjectFairShareOrderField.PROJECT_IS_ACTIVE:
                 return ProjectFairShareOrders.by_project_is_active(ascending)
+
+
+class RGProjectFairShareFilter(ProjectFairShareFilter):
+    """RG-context filter that uses INNER JOIN'd columns for conditions.
+
+    Not a Strawberry GQL type — used internally by fetchers to build
+    conditions that reference ScalingGroupForProjectRow/GroupRow/DomainRow
+    instead of ProjectFairShareRow, preventing NULL exclusion of entities
+    without records.
+    """
+
+    @override
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+
+        if self.resource_group:
+            sg_condition = self.resource_group.build_query_condition(
+                contains_factory=lambda spec: RGProjectFairShareConditions.by_resource_group_contains(
+                    spec.value
+                ),
+                equals_factory=lambda spec: RGProjectFairShareConditions.by_resource_group_equals(
+                    spec.value
+                ),
+                starts_with_factory=lambda spec: RGProjectFairShareConditions.by_resource_group_starts_with(
+                    spec.value
+                ),
+                ends_with_factory=lambda spec: RGProjectFairShareConditions.by_resource_group_ends_with(
+                    spec.value
+                ),
+            )
+            if sg_condition:
+                conditions.append(sg_condition)
+
+        if self.project_id:
+            pid_condition = self.project_id.build_query_condition(
+                equals_factory=lambda spec: RGProjectFairShareConditions.by_project_id(spec.value),
+                in_factory=lambda spec: RGProjectFairShareConditions.by_project_ids(spec.values),
+            )
+            if pid_condition:
+                conditions.append(pid_condition)
+
+        if self.domain_name:
+            dn_condition = self.domain_name.build_query_condition(
+                contains_factory=lambda spec: RGProjectFairShareConditions.by_domain_name_contains(
+                    spec.value
+                ),
+                equals_factory=lambda spec: RGProjectFairShareConditions.by_domain_name_equals(
+                    spec.value
+                ),
+                starts_with_factory=lambda spec: RGProjectFairShareConditions.by_domain_name_starts_with(
+                    spec.value
+                ),
+                ends_with_factory=lambda spec: RGProjectFairShareConditions.by_domain_name_ends_with(
+                    spec.value
+                ),
+            )
+            if dn_condition:
+                conditions.append(dn_condition)
+
+        if self.project:
+            conditions.extend(self.project.build_conditions())
+
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(RGProjectFairShareFilter._wrap(sub_filter).build_conditions())
+
+        if self.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_conditions.extend(RGProjectFairShareFilter._wrap(sub_filter).build_conditions())
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+
+        if self.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_conditions.extend(RGProjectFairShareFilter._wrap(sub_filter).build_conditions())
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+
+        return conditions
+
+    @staticmethod
+    def _wrap(f: ProjectFairShareFilter) -> RGProjectFairShareFilter:
+        """Re-wrap a parent-type filter as RG-context."""
+        rg = RGProjectFairShareFilter()
+        rg.resource_group = f.resource_group
+        rg.project_id = f.project_id
+        rg.domain_name = f.domain_name
+        rg.project = f.project
+        rg.AND = f.AND
+        rg.OR = f.OR
+        rg.NOT = f.NOT
+        return rg
+
+    @classmethod
+    def from_filter(cls, f: ProjectFairShareFilter | None) -> RGProjectFairShareFilter | None:
+        """Convert a base filter to RG-context filter."""
+        if f is None:
+            return None
+        return cls._wrap(f)
+
+
+class RGProjectFairShareOrderBy(ProjectFairShareOrderBy):
+    """RG-context order — currently all order fields are safe (use GroupRow)."""
+
+    @classmethod
+    def from_order_list(
+        cls, orders: list[ProjectFairShareOrderBy] | None
+    ) -> list[RGProjectFairShareOrderBy] | None:
+        """Convert base order list to RG-context order list."""
+        if orders is None:
+            return None
+        result = []
+        for o in orders:
+            rg = RGProjectFairShareOrderBy()
+            rg.field = o.field
+            rg.direction = o.direction
+            result.append(rg)
+        return result
 
 
 # Mutation Input/Payload Types

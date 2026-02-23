@@ -11,6 +11,8 @@ from strawberry.relay import PageInfo
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.fair_share.types import (
+    RGUserFairShareFilter,
+    RGUserFairShareOrderBy,
     UserFairShareConnection,
     UserFairShareEdge,
     UserFairShareFilter,
@@ -121,8 +123,12 @@ async def fetch_rg_user_fair_shares(
     """Fetch user fair shares using resource group scope.
 
     Returns all users in the scope, including those without records (with defaults).
+    Uses RG-context filters/orders to reference INNER JOIN'd columns.
     """
     processors = info.context.processors
+
+    rg_filter = RGUserFairShareFilter.from_filter(filter)
+    rg_order_by = RGUserFairShareOrderBy.from_order_list(order_by)
 
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
@@ -134,8 +140,8 @@ async def fetch_rg_user_fair_shares(
             offset=offset,
         ),
         get_user_fair_share_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
+        filter=rg_filter,
+        order_by=rg_order_by,
         base_conditions=base_conditions,
     )
 

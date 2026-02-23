@@ -59,6 +59,11 @@ from ai.backend.manager.repositories.fair_share import (
     ProjectFairShareCreatorSpec,
     UserFairShareCreatorSpec,
 )
+from ai.backend.manager.repositories.fair_share.options import (
+    RGDomainFairShareConditions,
+    RGProjectFairShareConditions,
+    RGUserFairShareConditions,
+)
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareSearchScope,
     ProjectFairShareSearchScope,
@@ -473,6 +478,76 @@ class TestSearchDomainFairSharesEntityBased:
         assert len(result.items) == 2
         assert result.has_next_page is True
 
+    # ==================== RG-Context Filter Regression Tests ====================
+
+    @pytest.mark.asyncio
+    async def test_rg_filter_by_domain_name_includes_entity_without_record(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_without_record: str,
+    ) -> None:
+        """RG-context domain_name filter should include entities without fair share records.
+
+        Regression: Non-RG conditions reference DomainFairShareRow.domain_name (LEFT JOIN'd),
+        which is NULL for entities without records, causing SQL to exclude them.
+        RG conditions reference ScalingGroupForDomainRow.domain (INNER JOIN'd), which is never NULL.
+        """
+        scope = DomainFairShareSearchScope(resource_group=scaling_group)
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[
+                RGDomainFairShareConditions.by_domain_name_equals(domain_without_record),
+            ],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
+
+        assert result.total_count == 1
+        assert len(result.items) == 1
+        assert result.items[0].domain_name == domain_without_record
+        assert result.items[0].data.use_default is True
+
+    @pytest.mark.asyncio
+    async def test_rg_filter_by_domain_name_with_mixed_records(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_with_record: str,
+        domain_without_record: str,
+    ) -> None:
+        """RG-context filter should return both domains (with and without records)."""
+        scope = DomainFairShareSearchScope(resource_group=scaling_group)
+
+        # Filter for domain_without_record only
+        querier_without = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[
+                RGDomainFairShareConditions.by_domain_name_equals(domain_without_record),
+            ],
+            orders=[],
+        )
+        result_without = await fair_share_repository.search_rg_domain_fair_shares(
+            scope, querier_without
+        )
+        assert result_without.total_count == 1
+        assert result_without.items[0].domain_name == domain_without_record
+        assert result_without.items[0].data.use_default is True
+
+        # Filter for domain_with_record only
+        querier_with = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[
+                RGDomainFairShareConditions.by_domain_name_equals(domain_with_record),
+            ],
+            orders=[],
+        )
+        result_with = await fair_share_repository.search_rg_domain_fair_shares(scope, querier_with)
+        assert result_with.total_count == 1
+        assert result_with.items[0].domain_name == domain_with_record
+        assert result_with.items[0].data.use_default is False
+
 
 class TestSearchProjectFairSharesEntityBased:
     """Test project fair share search with Scope pattern."""
@@ -756,6 +831,41 @@ class TestSearchProjectFairSharesEntityBased:
         # Project without record: has default-generated data
         assert result_projects[project_without_record].data.use_default is True
         assert result_projects[project_without_record].data.metadata is None
+
+    # ==================== RG-Context Filter Regression Tests ====================
+
+    @pytest.mark.asyncio
+    async def test_rg_filter_by_project_id_includes_entity_without_record(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_name: str,
+        project_without_record: uuid.UUID,
+    ) -> None:
+        """RG-context project_id filter should include entities without fair share records.
+
+        Regression: Non-RG conditions reference ProjectFairShareRow.project_id (LEFT JOIN'd),
+        which is NULL for entities without records. RG conditions reference
+        ScalingGroupForProjectRow.group (INNER JOIN'd), which is never NULL.
+        """
+        scope = ProjectFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+        )
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[
+                RGProjectFairShareConditions.by_project_id(project_without_record),
+            ],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_project_fair_shares(scope, querier)
+
+        assert result.total_count == 1
+        assert len(result.items) == 1
+        assert result.items[0].project_id == project_without_record
+        assert result.items[0].data.use_default is True
 
 
 class TestSearchUserFairSharesEntityBased:
@@ -1110,3 +1220,40 @@ class TestSearchUserFairSharesEntityBased:
         # User without record: has default-generated data
         assert result_users[user_without_record].data.use_default is True
         assert result_users[user_without_record].data.metadata is None
+
+    # ==================== RG-Context Filter Regression Tests ====================
+
+    @pytest.mark.asyncio
+    async def test_rg_filter_by_user_uuid_includes_entity_without_record(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_name: str,
+        project_id: uuid.UUID,
+        user_without_record: uuid.UUID,
+    ) -> None:
+        """RG-context user_uuid filter should include entities without fair share records.
+
+        Regression: Non-RG conditions reference UserFairShareRow.user_uuid (LEFT JOIN'd),
+        which is NULL for entities without records. RG conditions reference
+        AssocGroupUserRow.user_id (INNER JOIN'd), which is never NULL.
+        """
+        scope = UserFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+            project_id=project_id,
+        )
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[
+                RGUserFairShareConditions.by_user_uuid(user_without_record),
+            ],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_user_fair_shares(scope, querier)
+
+        assert result.total_count == 1
+        assert len(result.items) == 1
+        assert result.items[0].user_uuid == user_without_record
+        assert result.items[0].data.use_default is True
