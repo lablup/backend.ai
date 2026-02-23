@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.fair_share.types.domain import (
@@ -225,7 +226,7 @@ class TestUserFairShareEntityOrderField:
 
 def _compile_sql(expr: sa.sql.expression.ColumnElement) -> str:
     """Compile a SQLAlchemy expression to a string for assertion."""
-    return str(expr.compile(compile_kwargs={"literal_binds": True}))
+    return str(expr.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
 
 
 class TestDomainFairShareFilterNegatedCaseInsensitive:

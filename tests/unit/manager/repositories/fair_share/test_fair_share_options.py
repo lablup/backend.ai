@@ -7,6 +7,7 @@ to generated SQL conditions (BA-4633).
 from __future__ import annotations
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.repositories.fair_share.options import (
@@ -18,7 +19,7 @@ from ai.backend.manager.repositories.fair_share.options import (
 
 def _compile_sql(expr: sa.sql.expression.ColumnElement) -> str:
     """Compile a SQLAlchemy expression to a string for assertion."""
-    return str(expr.compile(compile_kwargs={"literal_binds": True}))
+    return str(expr.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
 
 
 class TestDomainFairShareConditionsStringMatchSpec:
