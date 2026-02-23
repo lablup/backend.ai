@@ -615,7 +615,7 @@ jobs:
           echo "api-token=${api_token}" >> "${GITHUB_OUTPUT}"
     - name: Publish to PyPI
       env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ steps.mint-token.outputs.api-token }}
       # We don't use `pants publish ::` because we manually rename the
       # wheels after buildling them to add arch-specific tags.
