@@ -142,7 +142,7 @@ class BlueGreenConfigInputGQL:
     name="CreateDeploymentPolicyInput",
     description="Added in 26.3.0. Input for creating a deployment policy.",
 )
-class CreateDeploymentPolicyInput:
+class CreateDeploymentPolicyInputGQL:
     deployment_id: ID
     strategy: DeploymentStrategyTypeGQL
     rollback_on_failure: bool = False
@@ -177,7 +177,7 @@ class CreateDeploymentPolicyInput:
     name="UpdateDeploymentPolicyInput",
     description="Added in 26.3.0. Input for updating a deployment policy.",
 )
-class UpdateDeploymentPolicyInput:
+class UpdateDeploymentPolicyInputGQL:
     id: ID
     strategy: DeploymentStrategyTypeGQL | None = None
     rollback_on_failure: bool | None = None
@@ -208,7 +208,7 @@ class UpdateDeploymentPolicyInput:
     name="CreateDeploymentPolicyPayload",
     description="Added in 26.3.0. Payload for creating a deployment policy.",
 )
-class CreateDeploymentPolicyPayload:
+class CreateDeploymentPolicyPayloadGQL:
     deployment_policy: DeploymentPolicyGQL
 
 
@@ -216,5 +216,5 @@ class CreateDeploymentPolicyPayload:
     name="UpdateDeploymentPolicyPayload",
     description="Added in 26.3.0. Payload for updating a deployment policy.",
 )
-class UpdateDeploymentPolicyPayload:
+class UpdateDeploymentPolicyPayloadGQL:
     deployment_policy: DeploymentPolicyGQL
