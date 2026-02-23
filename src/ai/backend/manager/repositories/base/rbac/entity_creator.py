@@ -189,3 +189,64 @@ async def execute_rbac_bulk_entity_creator[TRow: Base](
     db_sess.add_all(associations)
 
     return RBACBulkEntityCreatorResult(rows=rows)
+
+
+async def execute_rbac_entity_creators[TRow: Base](
+    db_sess: SASession,
+    creators: Sequence[RBACEntityCreator[TRow]],
+) -> RBACBulkEntityCreatorResult[TRow]:
+    """Create multiple entities from individual RBACEntityCreator instances in a single batch.
+
+    Unlike execute_rbac_bulk_entity_creator which shares a single scope across all entities,
+    this function accepts a sequence of RBACEntityCreator instances where each entity can have
+    its own primary scope and additional scope references.
+
+    Operations:
+    1. Build and insert all entity rows from each creator's spec
+    2. Single flush to get all DB-generated IDs
+    3. Collect all scope associations (primary + additional per entity), bulk insert
+    4. Return RBACBulkEntityCreatorResult with all rows
+
+    Args:
+        db_sess: Async SQLAlchemy session (must be writable).
+        creators: Sequence of RBACEntityCreator instances, each with its own scope refs.
+
+    Returns:
+        RBACBulkEntityCreatorResult containing all created rows.
+    """
+    if not creators:
+        return RBACBulkEntityCreatorResult(rows=[])
+
+    # 1. Build and add all rows
+    rows = [creator.spec.build_row() for creator in creators]
+    db_sess.add_all(rows)
+
+    mapper = inspect(type(rows[0]))
+    pk_columns = mapper.primary_key
+    if len(pk_columns) != 1:
+        raise UnsupportedCompositePrimaryKeyError(
+            f"Purger only supports single-column primary keys (table: {mapper.local_table.name})",
+        )
+
+    # 2. Single flush to get all DB-generated IDs
+    await db_sess.flush()
+
+    # 3. Collect all associations from each creator's scope refs
+    associations: list[AssociationScopesEntitiesRow] = []
+    for creator, row in zip(creators, rows, strict=True):
+        pk_value = inspect(row).identity[0]
+        entity_type = creator.element_type.to_entity_type()
+        all_scope_refs = [creator.scope_ref, *creator.additional_scope_refs]
+        for scope_ref in all_scope_refs:
+            associations.append(
+                AssociationScopesEntitiesRow(
+                    scope_type=scope_ref.scope_type,
+                    scope_id=scope_ref.scope_id,
+                    entity_type=entity_type,
+                    entity_id=str(pk_value),
+                    relation_type=creator.relation_type,
+                ),
+            )
+    db_sess.add_all(associations)
+
+    return RBACBulkEntityCreatorResult(rows=rows)

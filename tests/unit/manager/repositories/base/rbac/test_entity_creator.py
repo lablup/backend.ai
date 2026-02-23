@@ -26,6 +26,7 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreatorResult,
     execute_rbac_bulk_entity_creator,
     execute_rbac_entity_creator,
+    execute_rbac_entity_creators,
 )
 from ai.backend.manager.repositories.base.rbac.utils import insert_on_conflict_do_nothing
 from ai.backend.testutils.db import with_tables
@@ -533,3 +534,207 @@ class TestRBACEntityCreatorCompositePK:
         finally:
             async with database_connection.begin() as conn:
                 await conn.run_sync(lambda c: CompositePKTestRow.__table__.drop(c, checkfirst=True))
+
+    async def test_batch_creators_rejects_composite_pk(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test that batch entity creators rejects composite PK tables."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(lambda c: CompositePKTestRow.__table__.create(c, checkfirst=True))
+
+        try:
+            async with database_connection.begin_session() as db_sess:
+                creators = [
+                    RBACEntityCreator(
+                        spec=CompositePKCreatorSpec(tenant_id=1, item_id=i, name=f"test-{i}"),
+                        element_type=RBACElementType.VFOLDER,
+                        scope_ref=ScopeRef(ScopeType.USER, "user-123"),
+                        additional_scope_refs=[],
+                    )
+                    for i in range(3)
+                ]
+
+                with pytest.raises(UnsupportedCompositePrimaryKeyError):
+                    await execute_rbac_entity_creators(db_sess, creators)
+        finally:
+            async with database_connection.begin() as conn:
+                await conn.run_sync(lambda c: CompositePKTestRow.__table__.drop(c, checkfirst=True))
+
+
+# =============================================================================
+# Batch Entity Creators Tests (execute_rbac_entity_creators)
+# =============================================================================
+
+
+class TestExecuteRBACEntityCreators:
+    """Tests for batch execution of multiple RBACEntityCreator instances."""
+
+    async def test_batch_create_with_empty_list(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> None:
+        """Test batch creating with empty list returns empty result."""
+        async with database_connection.begin_session() as db_sess:
+            result = await execute_rbac_entity_creators(db_sess, [])
+
+            assert isinstance(result, RBACBulkEntityCreatorResult)
+            assert len(result.rows) == 0
+
+    async def test_batch_create_entities_with_same_scope(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> None:
+        """Test batch creating entities all sharing the same scope."""
+        user_id = str(uuid.uuid4())
+
+        async with database_connection.begin_session() as db_sess:
+            creators: list[RBACEntityCreator[RBACEntityCreatorTestRow]] = [
+                RBACEntityCreator(
+                    spec=SimpleCreatorSpec(
+                        name=f"entity-{i}",
+                        scope_type=ScopeType.USER,
+                        scope_id=user_id,
+                    ),
+                    element_type=RBACElementType.VFOLDER,
+                    scope_ref=ScopeRef(ScopeType.USER, user_id),
+                    additional_scope_refs=[],
+                )
+                for i in range(5)
+            ]
+            result = await execute_rbac_entity_creators(db_sess, creators)
+
+            assert isinstance(result, RBACBulkEntityCreatorResult)
+            assert len(result.rows) == 5
+            for i, row in enumerate(result.rows):
+                assert row.name == f"entity-{i}"
+                assert row.id is not None
+
+            # Verify DB counts
+            entity_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(RBACEntityCreatorTestRow)
+            )
+            assoc_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            )
+            assert entity_count == 5
+            assert assoc_count == 5
+
+    async def test_batch_create_entities_with_different_scopes(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> None:
+        """Test batch creating entities where each has a different scope."""
+        user_id = str(uuid.uuid4())
+        project_id = str(uuid.uuid4())
+
+        async with database_connection.begin_session() as db_sess:
+            creators: list[RBACEntityCreator[RBACEntityCreatorTestRow]] = [
+                RBACEntityCreator(
+                    spec=SimpleCreatorSpec(
+                        name="user-entity",
+                        scope_type=ScopeType.USER,
+                        scope_id=user_id,
+                    ),
+                    element_type=RBACElementType.VFOLDER,
+                    scope_ref=ScopeRef(ScopeType.USER, user_id),
+                    additional_scope_refs=[],
+                ),
+                RBACEntityCreator(
+                    spec=SimpleCreatorSpec(
+                        name="project-entity",
+                        scope_type=ScopeType.PROJECT,
+                        scope_id=project_id,
+                    ),
+                    element_type=RBACElementType.VFOLDER,
+                    scope_ref=ScopeRef(ScopeType.PROJECT, project_id),
+                    additional_scope_refs=[],
+                ),
+            ]
+            result = await execute_rbac_entity_creators(db_sess, creators)
+
+            assert len(result.rows) == 2
+            assert result.rows[0].name == "user-entity"
+            assert result.rows[1].name == "project-entity"
+
+            # Verify associations have different scopes
+            assoc_rows = (await db_sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
+            assert len(assoc_rows) == 2
+
+            scope_map = {row.entity_id: (row.scope_type, row.scope_id) for row in assoc_rows}
+            assert scope_map[str(result.rows[0].id)] == (ScopeType.USER, user_id)
+            assert scope_map[str(result.rows[1].id)] == (ScopeType.PROJECT, project_id)
+
+    async def test_batch_create_entities_with_additional_scopes(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> None:
+        """Test batch creating entities where each has additional scope refs."""
+        user_id_1 = str(uuid.uuid4())
+        user_id_2 = str(uuid.uuid4())
+        project_id = str(uuid.uuid4())
+
+        async with database_connection.begin_session() as db_sess:
+            creators: list[RBACEntityCreator[RBACEntityCreatorTestRow]] = [
+                RBACEntityCreator(
+                    spec=SimpleCreatorSpec(
+                        name="multi-scope-1",
+                        scope_type=ScopeType.PROJECT,
+                        scope_id=project_id,
+                    ),
+                    element_type=RBACElementType.VFOLDER,
+                    scope_ref=ScopeRef(ScopeType.PROJECT, project_id),
+                    additional_scope_refs=[ScopeRef(ScopeType.USER, user_id_1)],
+                ),
+                RBACEntityCreator(
+                    spec=SimpleCreatorSpec(
+                        name="multi-scope-2",
+                        scope_type=ScopeType.USER,
+                        scope_id=user_id_2,
+                    ),
+                    element_type=RBACElementType.VFOLDER,
+                    scope_ref=ScopeRef(ScopeType.USER, user_id_2),
+                    additional_scope_refs=[ScopeRef(ScopeType.PROJECT, project_id)],
+                ),
+            ]
+            result = await execute_rbac_entity_creators(db_sess, creators)
+
+            assert len(result.rows) == 2
+
+            # 2 entities, each with 2 scope refs = 4 associations total
+            assoc_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            )
+            assert assoc_count == 4
+
+            # Verify each entity has exactly 2 associations
+            entity_1_id = str(result.rows[0].id)
+            entity_2_id = str(result.rows[1].id)
+
+            entity_1_assocs = (
+                await db_sess.scalars(
+                    sa.select(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.entity_id == entity_1_id,
+                    )
+                )
+            ).all()
+            assert len(entity_1_assocs) == 2
+            entity_1_scope_types = {a.scope_type for a in entity_1_assocs}
+            assert ScopeType.PROJECT in entity_1_scope_types
+            assert ScopeType.USER in entity_1_scope_types
+
+            entity_2_assocs = (
+                await db_sess.scalars(
+                    sa.select(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.entity_id == entity_2_id,
+                    )
+                )
+            ).all()
+            assert len(entity_2_assocs) == 2
+            entity_2_scope_types = {a.scope_type for a in entity_2_assocs}
+            assert ScopeType.USER in entity_2_scope_types
+            assert ScopeType.PROJECT in entity_2_scope_types
