@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 
+from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
@@ -50,22 +51,26 @@ class TestProjectFairShareEntityConditions:
     """Tests for project entity conditions on ProjectFairShareConditions."""
 
     def test_by_project_name_contains(self) -> None:
-        condition = ProjectFairShareConditions.by_project_name_contains("test")
+        spec = StringMatchSpec(value="test", case_insensitive=False, negated=False)
+        condition = ProjectFairShareConditions.by_project_name_contains(spec)
         expr = condition()
         assert isinstance(expr, sa.sql.expression.ColumnElement)
 
     def test_by_project_name_equals(self) -> None:
-        condition = ProjectFairShareConditions.by_project_name_equals("test-project")
+        spec = StringMatchSpec(value="test-project", case_insensitive=False, negated=False)
+        condition = ProjectFairShareConditions.by_project_name_equals(spec)
         expr = condition()
         assert isinstance(expr, sa.sql.expression.ColumnElement)
 
     def test_by_project_name_starts_with(self) -> None:
-        condition = ProjectFairShareConditions.by_project_name_starts_with("test")
+        spec = StringMatchSpec(value="test", case_insensitive=False, negated=False)
+        condition = ProjectFairShareConditions.by_project_name_starts_with(spec)
         expr = condition()
         assert isinstance(expr, sa.sql.expression.ColumnElement)
 
     def test_by_project_name_ends_with(self) -> None:
-        condition = ProjectFairShareConditions.by_project_name_ends_with("project")
+        spec = StringMatchSpec(value="project", case_insensitive=False, negated=False)
+        condition = ProjectFairShareConditions.by_project_name_ends_with(spec)
         expr = condition()
         assert isinstance(expr, sa.sql.expression.ColumnElement)
 
@@ -121,42 +126,50 @@ class TestUserFairShareEntityConditions:
     """Tests for user entity conditions on UserFairShareConditions."""
 
     def test_by_user_username_contains(self) -> None:
-        condition = UserFairShareConditions.by_user_username_contains("admin")
+        spec = StringMatchSpec(value="admin", case_insensitive=False, negated=False)
+        condition = UserFairShareConditions.by_user_username_contains(spec)
         expr = condition()
         assert isinstance(expr, sa.sql.expression.ColumnElement)
 
     def test_by_user_username_equals(self) -> None:
-        condition = UserFairShareConditions.by_user_username_equals("admin")
+        spec = StringMatchSpec(value="admin", case_insensitive=False, negated=False)
+        condition = UserFairShareConditions.by_user_username_equals(spec)
         expr = condition()
         assert isinstance(expr, sa.sql.expression.ColumnElement)
 
     def test_by_user_username_starts_with(self) -> None:
-        condition = UserFairShareConditions.by_user_username_starts_with("adm")
+        spec = StringMatchSpec(value="adm", case_insensitive=False, negated=False)
+        condition = UserFairShareConditions.by_user_username_starts_with(spec)
         expr = condition()
         assert isinstance(expr, sa.sql.expression.ColumnElement)
 
     def test_by_user_username_ends_with(self) -> None:
-        condition = UserFairShareConditions.by_user_username_ends_with("min")
+        spec = StringMatchSpec(value="min", case_insensitive=False, negated=False)
+        condition = UserFairShareConditions.by_user_username_ends_with(spec)
         expr = condition()
         assert isinstance(expr, sa.sql.expression.ColumnElement)
 
     def test_by_user_email_contains(self) -> None:
-        condition = UserFairShareConditions.by_user_email_contains("@example")
+        spec = StringMatchSpec(value="@example", case_insensitive=False, negated=False)
+        condition = UserFairShareConditions.by_user_email_contains(spec)
         expr = condition()
         assert isinstance(expr, sa.sql.expression.ColumnElement)
 
     def test_by_user_email_equals(self) -> None:
-        condition = UserFairShareConditions.by_user_email_equals("user@example.com")
+        spec = StringMatchSpec(value="user@example.com", case_insensitive=False, negated=False)
+        condition = UserFairShareConditions.by_user_email_equals(spec)
         expr = condition()
         assert isinstance(expr, sa.sql.expression.ColumnElement)
 
     def test_by_user_email_starts_with(self) -> None:
-        condition = UserFairShareConditions.by_user_email_starts_with("user")
+        spec = StringMatchSpec(value="user", case_insensitive=False, negated=False)
+        condition = UserFairShareConditions.by_user_email_starts_with(spec)
         expr = condition()
         assert isinstance(expr, sa.sql.expression.ColumnElement)
 
     def test_by_user_email_ends_with(self) -> None:
-        condition = UserFairShareConditions.by_user_email_ends_with(".com")
+        spec = StringMatchSpec(value=".com", case_insensitive=False, negated=False)
+        condition = UserFairShareConditions.by_user_email_ends_with(spec)
         expr = condition()
         assert isinstance(expr, sa.sql.expression.ColumnElement)
 
