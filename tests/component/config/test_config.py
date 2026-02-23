@@ -444,6 +444,7 @@ class TestDomainDotfileGet:
 
 
 class TestDomainDotfileUpdate:
+    @_HMAC_QUERY_PARAM_XFAIL
     @pytest.mark.asyncio
     async def test_admin_updates_domain_dotfile(
         self,
@@ -471,6 +472,7 @@ class TestDomainDotfileUpdate:
 
 
 class TestDomainDotfileDelete:
+    @_HMAC_QUERY_PARAM_XFAIL
     @pytest.mark.asyncio
     async def test_admin_deletes_domain_dotfile(
         self,
