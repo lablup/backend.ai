@@ -60,7 +60,7 @@ from ai.backend.manager.types import OptionalState, TriState
         "Automatically creates a default keypair for the user."
     )
 )  # type: ignore[misc]
-async def admin_create_user(
+async def admin_create_user_v2(
     info: Info[StrawberryGQLContext],
     input: CreateUserInputGQL,
 ) -> CreateUserPayloadGQL:
@@ -76,7 +76,7 @@ async def admin_create_user(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("admin_create_user is not yet implemented")
+    raise NotImplementedError("admin_create_user_v2 is not yet implemented")
 
 
 @strawberry.mutation(
@@ -165,7 +165,7 @@ async def admin_bulk_create_users_v2(
         "Only provided fields will be updated."
     )
 )  # type: ignore[misc]
-async def admin_update_user(
+async def admin_update_user_v2(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
     input: UpdateUserV2InputGQL,
@@ -183,7 +183,7 @@ async def admin_update_user(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("admin_update_user is not yet implemented")
+    raise NotImplementedError("admin_update_user_v2 is not yet implemented")
 
 
 @strawberry.mutation(
@@ -269,7 +269,7 @@ async def admin_bulk_update_users_v2(
         "Some fields may be restricted based on user role."
     )
 )  # type: ignore[misc]
-async def update_user(
+async def update_user_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateUserV2InputGQL,
 ) -> UpdateUserPayloadGQL:
@@ -285,7 +285,7 @@ async def update_user(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("update_user is not yet implemented")
+    raise NotImplementedError("update_user_v2 is not yet implemented")
 
 
 # Delete UpdateUserV2InputGQLlete)
@@ -298,7 +298,7 @@ async def update_user(
         "Sets the user status to DELETED but preserves data."
     )
 )  # type: ignore[misc]
-async def admin_delete_user(
+async def admin_delete_user_v2(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
 ) -> DeleteUserPayloadGQL:
@@ -314,7 +314,7 @@ async def admin_delete_user(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("admin_delete_user is not yet implemented")
+    raise NotImplementedError("admin_delete_user_v2 is not yet implemented")
 
 
 @strawberry.mutation(
@@ -324,7 +324,7 @@ async def admin_delete_user(
         "Sets user status to DELETED but preserves data."
     )
 )  # type: ignore[misc]
-async def admin_delete_users(
+async def admin_delete_users_v2(
     info: Info[StrawberryGQLContext],
     input: DeleteUsersInputGQL,
 ) -> DeleteUsersPayloadGQL:
@@ -340,7 +340,7 @@ async def admin_delete_users(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("admin_delete_users is not yet implemented")
+    raise NotImplementedError("admin_delete_users_v2 is not yet implemented")
 
 
 # Purge Mutations (Hard Delete)
@@ -353,7 +353,7 @@ async def admin_delete_users(
         "This action is IRREVERSIBLE. All user data, sessions, and resources will be deleted."
     )
 )  # type: ignore[misc]
-async def admin_purge_user(
+async def admin_purge_user_v2(
     info: Info[StrawberryGQLContext],
     input: PurgeUserInputGQL,
 ) -> PurgeUserPayloadGQL:
@@ -369,7 +369,7 @@ async def admin_purge_user(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("admin_purge_user is not yet implemented")
+    raise NotImplementedError("admin_purge_user_v2 is not yet implemented")
 
 
 @strawberry.mutation(

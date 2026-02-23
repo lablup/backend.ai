@@ -232,18 +232,18 @@ from .user import (
     admin_bulk_create_users_v2,
     admin_bulk_purge_users_v2,
     admin_bulk_update_users_v2,
-    admin_create_user,
-    admin_delete_user,
-    admin_delete_users,
-    admin_purge_user,
-    admin_update_user,
+    admin_create_user_v2,
+    admin_delete_user_v2,
+    admin_delete_users_v2,
+    admin_purge_user_v2,
+    admin_update_user_v2,
     # Queries
     admin_user_v2,
     admin_users_v2,
     domain_users_v2,
     my_user_v2,
     project_users_v2,
-    update_user,
+    update_user_v2,
 )
 from .vfs_storage import (
     create_vfs_storage,
@@ -461,14 +461,14 @@ class Mutation:
     # Resource Group - Legacy (deprecated)
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
     # User V2 APIs
-    admin_create_user = admin_create_user
+    admin_create_user_v2 = admin_create_user_v2
     admin_bulk_create_users_v2 = admin_bulk_create_users_v2
     admin_bulk_update_users_v2 = admin_bulk_update_users_v2
-    admin_update_user = admin_update_user
-    update_user = update_user
-    admin_delete_user = admin_delete_user
-    admin_delete_users = admin_delete_users
-    admin_purge_user = admin_purge_user
+    admin_update_user_v2 = admin_update_user_v2
+    update_user_v2 = update_user_v2
+    admin_delete_user_v2 = admin_delete_user_v2
+    admin_delete_users_v2 = admin_delete_users_v2
+    admin_purge_user_v2 = admin_purge_user_v2
     admin_bulk_purge_users_v2 = admin_bulk_purge_users_v2
     # RBAC Admin APIs
     admin_create_role = admin_create_role
