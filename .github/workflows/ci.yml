@@ -507,6 +507,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
     environment: deploy-to-pypi
     steps:
     - uses: actions/checkout@v4
@@ -614,8 +615,8 @@ jobs:
           echo "api-token=${api_token}" >> "${GITHUB_OUTPUT}"
     - name: Publish to PyPI
       env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ steps.mint-token.outputs.api-token }}
       # We don't use `pants publish ::` because we manually rename the
       # wheels after buildling them to add arch-specific tags.
       run: |
