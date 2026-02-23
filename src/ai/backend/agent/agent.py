@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import enum
+import errno
 import logging
 import pickle
 import re
@@ -1234,15 +1235,23 @@ class AbstractAgent[
 
         try:
             await loop.run_in_executor(None, _map_commit_status)
-        except Exception:
+            # Update kernel commit statuses using ValkeyStatClient
+            await self.valkey_stat_client.update_kernel_commit_statuses(
+                list(commit_kernels),
+                COMMIT_STATUS_EXPIRE,
+            )
+        except OSError as e:
+            if e.errno == errno.EMFILE:
+                log.warning(
+                    "skipping commit status report due to FD exhaustion",
+                )
+                return
+
             log.exception("error while scanning kernel commit statuses")
             return
-
-        # Update kernel commit statuses using ValkeyStatClient
-        await self.valkey_stat_client.update_kernel_commit_statuses(
-            list(commit_kernels),
-            COMMIT_STATUS_EXPIRE,
-        )
+        except Exception:
+            log.exception("unexpected error in commit status reporting")
+            return
 
     async def heartbeat(self, interval: float) -> None:
         """

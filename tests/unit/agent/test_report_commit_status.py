@@ -7,6 +7,7 @@ filesystem errors gracefully and prevents FD leaks.
 
 from __future__ import annotations
 
+import errno
 from collections.abc import Generator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -39,6 +40,11 @@ class TestReportAllKernelCommitStatusMap:
         agent.valkey_stat_client = AsyncMock()
         agent.valkey_stat_client.update_kernel_commit_statuses = AsyncMock()
         return agent
+
+    @pytest.fixture
+    def mock_log(self) -> Generator[Mock, None, None]:
+        with patch("ai.backend.agent.agent.log") as _mock_log:
+            yield _mock_log
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -96,24 +102,19 @@ class TestReportAllKernelCommitStatusMap:
         # When: Call the method under test
         await AbstractAgent._report_all_kernel_commit_status_map(mock_agent, 7.0)
 
-        # Then: Verify update_kernel_commit_statuses called with empty list and expire time
+        # Then: Verify update_kernel_commit_statuses called with empty list
         call_args = mock_agent.valkey_stat_client.update_kernel_commit_statuses.call_args
         kernel_ids = call_args[0][0]
         assert kernel_ids == []
 
-    @pytest.fixture
-    def mock_log(self) -> Generator[Mock, None, None]:
-        with patch("ai.backend.agent.agent.log") as _mock_log:
-            yield _mock_log
-
     @pytest.mark.asyncio
-    async def test_exception_during_scan_is_caught_and_logged(
+    async def test_oserror_during_scan_is_caught_and_logged(
         self,
         mock_agent: AsyncMock,
         mock_log: Mock,
         tmp_path: Path,
     ) -> None:
-        # Given: Create a file instead of a directory to cause an exception during scanning
+        # Given: Point image_commit_path to a file so iterdir() raises NotADirectoryError (OSError)
         file_path = tmp_path / "a-file"
         file_path.touch()
         mock_agent.local_config.agent.image_commit_path = file_path
@@ -121,6 +122,45 @@ class TestReportAllKernelCommitStatusMap:
         # When: Call the method under test
         await AbstractAgent._report_all_kernel_commit_status_map(mock_agent, 7.0)
 
-        # Then: Verify exception was logged and update_kernel_commit_statuses was not called
+        # Then: Verify exception was logged and valkey update was skipped
+        mock_log.exception.assert_called_once()
+        mock_agent.valkey_stat_client.update_kernel_commit_statuses.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_emfile_during_scan_logs_warning(
+        self,
+        mock_agent: AsyncMock,
+        mock_log: Mock,
+    ) -> None:
+        # Given: Mock path to raise EMFILE (too many open files) on iterdir()
+        mock_path = Mock(spec=Path)
+        mock_path.exists.return_value = True
+        mock_path.iterdir.side_effect = OSError(errno.EMFILE, "Too many open files")
+        mock_agent.local_config.agent.image_commit_path = mock_path
+
+        # When: Call the method under test
+        await AbstractAgent._report_all_kernel_commit_status_map(mock_agent, 7.0)
+
+        # Then: Verify warning was logged (not exception) and valkey update was skipped
+        mock_log.warning.assert_called_once()
+        mock_log.exception.assert_not_called()
+        mock_agent.valkey_stat_client.update_kernel_commit_statuses.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_non_oserror_exception_is_caught_and_logged(
+        self,
+        mock_agent: AsyncMock,
+        mock_log: Mock,
+    ) -> None:
+        # Given: Mock path to raise a non-OSError exception
+        mock_path = Mock(spec=Path)
+        mock_path.exists.return_value = True
+        mock_path.iterdir.side_effect = RuntimeError("unexpected failure")
+        mock_agent.local_config.agent.image_commit_path = mock_path
+
+        # When: Call the method under test
+        await AbstractAgent._report_all_kernel_commit_status_map(mock_agent, 7.0)
+
+        # Then: Verify exception was logged with correct message and valkey update was skipped
         mock_log.exception.assert_called_once()
         mock_agent.valkey_stat_client.update_kernel_commit_statuses.assert_not_called()
