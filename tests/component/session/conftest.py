@@ -92,6 +92,13 @@ async def _session_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.config_provider._legacy_etcd_config_loader = mock_legacy_loader
 
     root_ctx.registry = AsyncMock()
+
+    # idle_checker_host.get_idle_check_report() must return a JSON-serializable
+    # value; the default AsyncMock return (another AsyncMock object) causes
+    # TypeError in web.json_response().
+    mock_idle_checker = AsyncMock()
+    mock_idle_checker.get_idle_check_report = AsyncMock(return_value={})
+
     root_ctx.repositories = Repositories.create(
         RepositoryArgs(
             db=root_ctx.db,
@@ -120,7 +127,7 @@ async def _session_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 event_hub=root_ctx.event_hub,
                 event_producer=root_ctx.event_producer,
                 agent_registry=AsyncMock(),
-                idle_checker_host=AsyncMock(),
+                idle_checker_host=mock_idle_checker,
                 event_dispatcher=AsyncMock(),
                 hook_plugin_ctx=AsyncMock(),
                 scheduling_controller=AsyncMock(),
