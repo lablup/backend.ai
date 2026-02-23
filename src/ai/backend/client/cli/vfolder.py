@@ -131,7 +131,7 @@ def create(
     name: str,
     host: str,
     group: str | None,
-    _host_path: bool,
+    host_path: bool,  # type: ignore
     unmanaged_path: str | None,
     usage_mode: str,
     permission: str,
