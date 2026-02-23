@@ -27,9 +27,7 @@ class ResourceSlotProcessors(AbstractProcessorPackage):
         SearchResourceAllocationsAction, SearchResourceAllocationsResult
     ]
 
-    def __init__(
-        self, service: ResourceSlotService, action_monitors: list[ActionMonitor]
-    ) -> None:
+    def __init__(self, service: ResourceSlotService, action_monitors: list[ActionMonitor]) -> None:
         self.get_agent_resources = ActionProcessor(service.get_agent_resources, action_monitors)
         self.search_agent_resources = ActionProcessor(
             service.search_agent_resources, action_monitors

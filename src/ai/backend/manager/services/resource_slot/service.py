@@ -18,9 +18,7 @@ class ResourceSlotService:
     def __init__(self, repository: ResourceSlotRepository) -> None:
         self._repository = repository
 
-    async def get_agent_resources(
-        self, action: GetAgentResourcesAction
-    ) -> GetAgentResourcesResult:
+    async def get_agent_resources(self, action: GetAgentResourcesAction) -> GetAgentResourcesResult:
         rows = await self._repository.get_agent_resources(action.agent_id)
         items = [
             AgentResourceData(
