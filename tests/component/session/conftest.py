@@ -13,7 +13,6 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
-from tests.component.conftest import UserFixtureData
 
 from ai.backend.common.types import ResourceSlot, SessionId
 
@@ -43,6 +42,18 @@ from ai.backend.manager.server import (
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
 
 _SESSION_SERVER_SUBAPP_MODULES = (_auth_api, _session_api)
+
+
+@dataclass
+class KeypairFixtureData:
+    access_key: str
+    secret_key: str
+
+
+@dataclass
+class UserFixtureData:
+    user_uuid: uuid.UUID
+    keypair: KeypairFixtureData
 
 
 @dataclass
