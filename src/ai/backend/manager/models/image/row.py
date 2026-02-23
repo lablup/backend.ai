@@ -940,7 +940,9 @@ class ImageRow(Base):  # type: ignore[misc]
             size_bytes=self.size_bytes,
             status=self.status,
             resource_limits=[
-                ResourceLimit(key=str(k), min=v.get("min", Decimal(0)), max=Decimal("Infinity"))
+                ResourceLimit(
+                    key=str(k), min=v.get("min", Decimal(0)), max=v.get("max", Decimal("Infinity"))
+                )
                 for k, v in self.resources.items()
             ],
             supported_accelerators=self.accelerators.split(",") if self.accelerators else ["*"],
