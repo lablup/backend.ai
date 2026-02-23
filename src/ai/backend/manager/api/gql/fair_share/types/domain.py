@@ -355,6 +355,8 @@ class RGDomainFairShareFilter(DomainFairShareFilter):
     Not a Strawberry GQL type — used internally by fetchers to build
     conditions that reference ScalingGroupForDomainRow instead of
     DomainFairShareRow, preventing NULL exclusion of entities without records.
+
+    Convert from a base filter using ``RGDomainFairShareFilter(**vars(f))``.
     """
 
     @override
@@ -402,46 +404,30 @@ class RGDomainFairShareFilter(DomainFairShareFilter):
 
         if self.AND:
             for sub_filter in self.AND:
-                conditions.extend(RGDomainFairShareFilter._wrap(sub_filter).build_conditions())
+                conditions.extend(type(self)(**vars(sub_filter)).build_conditions())
 
         if self.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in self.OR:
-                or_conditions.extend(RGDomainFairShareFilter._wrap(sub_filter).build_conditions())
+                or_conditions.extend(type(self)(**vars(sub_filter)).build_conditions())
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
 
         if self.NOT:
             not_conditions: list[QueryCondition] = []
             for sub_filter in self.NOT:
-                not_conditions.extend(RGDomainFairShareFilter._wrap(sub_filter).build_conditions())
+                not_conditions.extend(type(self)(**vars(sub_filter)).build_conditions())
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
 
         return conditions
 
-    @staticmethod
-    def _wrap(f: DomainFairShareFilter) -> RGDomainFairShareFilter:
-        """Re-wrap a parent-type filter as RG-context."""
-        rg = RGDomainFairShareFilter()
-        rg.resource_group = f.resource_group
-        rg.domain_name = f.domain_name
-        rg.domain = f.domain
-        rg.AND = f.AND
-        rg.OR = f.OR
-        rg.NOT = f.NOT
-        return rg
-
-    @classmethod
-    def from_filter(cls, f: DomainFairShareFilter | None) -> RGDomainFairShareFilter | None:
-        """Convert a base filter to RG-context filter."""
-        if f is None:
-            return None
-        return cls._wrap(f)
-
 
 class RGDomainFairShareOrderBy(DomainFairShareOrderBy):
-    """RG-context order that uses INNER JOIN'd columns where available."""
+    """RG-context order that uses INNER JOIN'd columns where available.
+
+    Convert from a base order using ``RGDomainFairShareOrderBy(**vars(o))``.
+    """
 
     @override
     def to_query_order(self) -> QueryOrder:
@@ -455,21 +441,6 @@ class RGDomainFairShareOrderBy(DomainFairShareOrderBy):
                 return DomainFairShareOrders.by_created_at(ascending)
             case DomainFairShareOrderField.DOMAIN_IS_ACTIVE:
                 return DomainFairShareOrders.by_domain_is_active(ascending)
-
-    @classmethod
-    def from_order_list(
-        cls, orders: list[DomainFairShareOrderBy] | None
-    ) -> list[RGDomainFairShareOrderBy] | None:
-        """Convert base order list to RG-context order list."""
-        if orders is None:
-            return None
-        result = []
-        for o in orders:
-            rg = RGDomainFairShareOrderBy()
-            rg.field = o.field
-            rg.direction = o.direction
-            result.append(rg)
-        return result
 
 
 # Mutation Input/Payload Types

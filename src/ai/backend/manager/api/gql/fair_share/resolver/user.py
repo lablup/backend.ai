@@ -16,6 +16,7 @@ from ai.backend.manager.api.gql.fair_share.fetcher import (
 from ai.backend.manager.api.gql.fair_share.types import (
     BulkUpsertUserFairShareWeightInput,
     BulkUpsertUserFairShareWeightPayload,
+    RGUserFairShareFilter,
     UpsertUserFairShareWeightInput,
     UpsertUserFairShareWeightPayload,
     UserFairShareConnection,
@@ -136,7 +137,7 @@ async def rg_user_fair_shares(
     return await fetch_rg_user_fair_shares(
         info=info,
         scope=repo_scope,
-        filter=filter,
+        filter=RGUserFairShareFilter(**vars(filter)) if filter else None,
         order_by=order_by,
         before=before,
         after=after,

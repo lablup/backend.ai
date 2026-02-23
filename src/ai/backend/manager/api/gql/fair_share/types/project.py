@@ -490,6 +490,8 @@ class RGProjectFairShareFilter(ProjectFairShareFilter):
     conditions that reference ScalingGroupForProjectRow/GroupRow/DomainRow
     instead of ProjectFairShareRow, preventing NULL exclusion of entities
     without records.
+
+    Convert from a base filter using ``RGProjectFairShareFilter(**vars(f))``.
     """
 
     @override
@@ -545,62 +547,23 @@ class RGProjectFairShareFilter(ProjectFairShareFilter):
 
         if self.AND:
             for sub_filter in self.AND:
-                conditions.extend(RGProjectFairShareFilter._wrap(sub_filter).build_conditions())
+                conditions.extend(type(self)(**vars(sub_filter)).build_conditions())
 
         if self.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in self.OR:
-                or_conditions.extend(RGProjectFairShareFilter._wrap(sub_filter).build_conditions())
+                or_conditions.extend(type(self)(**vars(sub_filter)).build_conditions())
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
 
         if self.NOT:
             not_conditions: list[QueryCondition] = []
             for sub_filter in self.NOT:
-                not_conditions.extend(RGProjectFairShareFilter._wrap(sub_filter).build_conditions())
+                not_conditions.extend(type(self)(**vars(sub_filter)).build_conditions())
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
 
         return conditions
-
-    @staticmethod
-    def _wrap(f: ProjectFairShareFilter) -> RGProjectFairShareFilter:
-        """Re-wrap a parent-type filter as RG-context."""
-        rg = RGProjectFairShareFilter()
-        rg.resource_group = f.resource_group
-        rg.project_id = f.project_id
-        rg.domain_name = f.domain_name
-        rg.project = f.project
-        rg.AND = f.AND
-        rg.OR = f.OR
-        rg.NOT = f.NOT
-        return rg
-
-    @classmethod
-    def from_filter(cls, f: ProjectFairShareFilter | None) -> RGProjectFairShareFilter | None:
-        """Convert a base filter to RG-context filter."""
-        if f is None:
-            return None
-        return cls._wrap(f)
-
-
-class RGProjectFairShareOrderBy(ProjectFairShareOrderBy):
-    """RG-context order — currently all order fields are safe (use GroupRow)."""
-
-    @classmethod
-    def from_order_list(
-        cls, orders: list[ProjectFairShareOrderBy] | None
-    ) -> list[RGProjectFairShareOrderBy] | None:
-        """Convert base order list to RG-context order list."""
-        if orders is None:
-            return None
-        result = []
-        for o in orders:
-            rg = RGProjectFairShareOrderBy()
-            rg.field = o.field
-            rg.direction = o.direction
-            result.append(rg)
-        return result
 
 
 # Mutation Input/Payload Types

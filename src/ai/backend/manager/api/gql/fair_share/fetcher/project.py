@@ -16,8 +16,6 @@ from ai.backend.manager.api.gql.fair_share.types import (
     ProjectFairShareFilter,
     ProjectFairShareGQL,
     ProjectFairShareOrderBy,
-    RGProjectFairShareFilter,
-    RGProjectFairShareOrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.fair_share.row import ProjectFairShareRow
@@ -127,9 +125,6 @@ async def fetch_rg_project_fair_shares(
     """
     processors = info.context.processors
 
-    rg_filter = RGProjectFairShareFilter.from_filter(filter)
-    rg_order_by = RGProjectFairShareOrderBy.from_order_list(order_by)
-
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
             first=first,
@@ -140,8 +135,8 @@ async def fetch_rg_project_fair_shares(
             offset=offset,
         ),
         get_project_fair_share_pagination_spec(),
-        filter=rg_filter,
-        order_by=rg_order_by,
+        filter=filter,
+        order_by=order_by,
         base_conditions=base_conditions,
     )
 

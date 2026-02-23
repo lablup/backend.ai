@@ -476,6 +476,8 @@ class RGUserFairShareFilter(UserFairShareFilter):
     conditions that reference AssocGroupUserRow/DomainRow/ScalingGroupForProjectRow
     instead of UserFairShareRow, preventing NULL exclusion of entities
     without records.
+
+    Convert from a base filter using ``RGUserFairShareFilter(**vars(f))``.
     """
 
     @override
@@ -539,63 +541,23 @@ class RGUserFairShareFilter(UserFairShareFilter):
 
         if self.AND:
             for sub_filter in self.AND:
-                conditions.extend(RGUserFairShareFilter._wrap(sub_filter).build_conditions())
+                conditions.extend(type(self)(**vars(sub_filter)).build_conditions())
 
         if self.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in self.OR:
-                or_conditions.extend(RGUserFairShareFilter._wrap(sub_filter).build_conditions())
+                or_conditions.extend(type(self)(**vars(sub_filter)).build_conditions())
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
 
         if self.NOT:
             not_conditions: list[QueryCondition] = []
             for sub_filter in self.NOT:
-                not_conditions.extend(RGUserFairShareFilter._wrap(sub_filter).build_conditions())
+                not_conditions.extend(type(self)(**vars(sub_filter)).build_conditions())
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
 
         return conditions
-
-    @staticmethod
-    def _wrap(f: UserFairShareFilter) -> RGUserFairShareFilter:
-        """Re-wrap a parent-type filter as RG-context."""
-        rg = RGUserFairShareFilter()
-        rg.resource_group = f.resource_group
-        rg.user_uuid = f.user_uuid
-        rg.project_id = f.project_id
-        rg.domain_name = f.domain_name
-        rg.user = f.user
-        rg.AND = f.AND
-        rg.OR = f.OR
-        rg.NOT = f.NOT
-        return rg
-
-    @classmethod
-    def from_filter(cls, f: UserFairShareFilter | None) -> RGUserFairShareFilter | None:
-        """Convert a base filter to RG-context filter."""
-        if f is None:
-            return None
-        return cls._wrap(f)
-
-
-class RGUserFairShareOrderBy(UserFairShareOrderBy):
-    """RG-context order — currently all order fields are safe (use UserRow)."""
-
-    @classmethod
-    def from_order_list(
-        cls, orders: list[UserFairShareOrderBy] | None
-    ) -> list[RGUserFairShareOrderBy] | None:
-        """Convert base order list to RG-context order list."""
-        if orders is None:
-            return None
-        result = []
-        for o in orders:
-            rg = RGUserFairShareOrderBy()
-            rg.field = o.field
-            rg.direction = o.direction
-            result.append(rg)
-        return result
 
 
 # Mutation Input/Payload Types
