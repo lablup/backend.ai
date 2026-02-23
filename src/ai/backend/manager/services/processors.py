@@ -87,6 +87,8 @@ from ai.backend.manager.services.project_resource_policy.processors import (
 from ai.backend.manager.services.project_resource_policy.service import ProjectResourcePolicyService
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
+from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
+from ai.backend.manager.services.resource_slot.service import ResourceSlotService
 from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
 from ai.backend.manager.services.resource_usage.service import ResourceUsageService
 from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
@@ -168,6 +170,7 @@ class Services:
     user_resource_policy: UserResourcePolicyService
     project_resource_policy: ProjectResourcePolicyService
     resource_preset: ResourcePresetService
+    resource_slot: ResourceSlotService
     resource_usage: ResourceUsageService
     scaling_group: ScalingGroupService
     utilization_metric: UtilizationMetricService
@@ -275,6 +278,7 @@ class Services:
         resource_preset_service = ResourcePresetService(
             repositories.resource_preset.repository,
         )
+        resource_slot_service = ResourceSlotService(repositories.resource_slot.repository)
         resource_usage_service = ResourceUsageService(
             repository=repositories.resource_usage_history.repository,
         )
@@ -389,6 +393,7 @@ class Services:
             user_resource_policy=user_resource_policy_service,
             project_resource_policy=project_resource_policy_service,
             resource_preset=resource_preset_service,
+            resource_slot=resource_slot_service,
             resource_usage=resource_usage_service,
             scaling_group=scaling_group_service,
             utilization_metric=utilization_metric_service,
@@ -435,6 +440,7 @@ class Processors(AbstractProcessorPackage):
     user_resource_policy: UserResourcePolicyProcessors
     project_resource_policy: ProjectResourcePolicyProcessors
     resource_preset: ResourcePresetProcessors
+    resource_slot: ResourceSlotProcessors
     resource_usage: ResourceUsageProcessors
     scaling_group: ScalingGroupProcessors
     utilization_metric: UtilizationMetricProcessors
@@ -487,6 +493,7 @@ class Processors(AbstractProcessorPackage):
         resource_preset_processors = ResourcePresetProcessors(
             services.resource_preset, action_monitors
         )
+        resource_slot_processors = ResourceSlotProcessors(services.resource_slot, action_monitors)
         resource_usage_processors = ResourceUsageProcessors(
             services.resource_usage, action_monitors
         )
@@ -547,6 +554,7 @@ class Processors(AbstractProcessorPackage):
             user_resource_policy=user_resource_policy_processors,
             project_resource_policy=project_resource_policy_processors,
             resource_preset=resource_preset_processors,
+            resource_slot=resource_slot_processors,
             resource_usage=resource_usage_processors,
             scaling_group=scaling_group_processors,
             utilization_metric=utilization_metric_processors,
@@ -588,6 +596,7 @@ class Processors(AbstractProcessorPackage):
             *self.user_resource_policy.supported_actions(),
             *self.project_resource_policy.supported_actions(),
             *self.resource_preset.supported_actions(),
+            *self.resource_slot.supported_actions(),
             *self.resource_usage.supported_actions(),
             *self.scaling_group.supported_actions(),
             *self.utilization_metric.supported_actions(),

@@ -103,6 +103,8 @@ class EntityType(enum.StrEnum):
     OBJECT_PERMISSION = "object_permission"
     OBJECT_STORAGE = "object_storage"
     PERMISSION = "permission"
+    AGENT_RESOURCE = "agent_resource"
+    RESOURCE_ALLOCATION = "resource_allocation"
     RESOURCE_GROUP = "resource_group"
     RESOURCE_PRESET = "resource_preset"
     ROLE = "role"
