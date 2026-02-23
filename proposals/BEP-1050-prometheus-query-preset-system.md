@@ -41,7 +41,7 @@ This proposal introduces a **Prometheus Query Preset System** that stores PromQL
 
 ### DB Schema
 
-Two new tables store preset definitions and their allowed labels.
+A single new table stores preset definitions including their allowed label configuration as an embedded JSONB column.
 
 **Table: `prometheus_query_presets`**
 
@@ -52,19 +52,24 @@ Two new tables store preset definitions and their allowed labels.
 | `metric_name` | `VARCHAR(256)` | NOT NULL | Prometheus metric name (e.g., `backendai_container_utilization`) |
 | `query_template` | `TEXT` | NOT NULL | PromQL template with `{labels}`, `{window}`, `{group_by}` placeholders |
 | `time_window` | `VARCHAR(32)` | NULLABLE | Preset-specific default window; falls back to server config `metric.timewindow` if NULL |
+| `labels` | `JSONB` | NOT NULL, default `'{}'` | Label configuration stored as `PydanticColumn(PresetLabels)`. Keys are Prometheus label names, values define `filterable`/`groupable` permissions |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL, default `now()` | Creation timestamp |
 | `updated_at` | `TIMESTAMPTZ` | NOT NULL, default `now()` | Last update timestamp |
 
-**Table: `prometheus_query_preset_labels`**
+The `labels` column uses `PydanticColumn` with a Pydantic `RootModel` for type-safe JSONB storage
 
-| Column | Type | Constraints | Description |
-|--------|------|------------|-------------|
-| `id` | `UUID` | PK, default `uuid_generate_v4()` | Primary key |
-| `preset_id` | `UUID` | NOT NULL, FK → `prometheus_query_presets(id)` ON DELETE CASCADE | Parent preset |
-| `label_name` | `VARCHAR(128)` | NOT NULL | Prometheus label name |
-| `filterable` | `BOOLEAN` | NOT NULL, default `true` | Whether this label can appear in `{labels}` filter |
-| `groupable` | `BOOLEAN` | NOT NULL, default `false` | Whether this label can appear in `by ({group_by})` |
-| | | UNIQUE(`preset_id`, `label_name`) | One definition per label per preset |
+```python
+class LabelConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    filterable: bool
+    groupable: bool
+
+class PresetLabels(RootModel[dict[str, LabelConfig]]):
+    """Label configuration for a Prometheus query preset.
+    Keys are Prometheus label names, values define their allowed roles.
+    """
+    pass
+```
 
 
 ### API Design
@@ -87,12 +92,12 @@ Two new tables store preset definitions and their allowed labels.
   "metric_name": "backendai_container_utilization",
   "query_template": "sum by ({group_by})(rate({metric_name}{{{labels}}}[{window}]))",
   "time_window": "5m",
-  "labels": [
-    {"label_name": "container_metric_name", "filterable": true, "groupable": false},
-    {"label_name": "kernel_id", "filterable": true, "groupable": true},
-    {"label_name": "session_id", "filterable": true, "groupable": true},
-    {"label_name": "value_type", "filterable": true, "groupable": true}
-  ]
+  "labels": {
+    "container_metric_name": {"filterable": true, "groupable": false},
+    "kernel_id": {"filterable": true, "groupable": true},
+    "session_id": {"filterable": true, "groupable": true},
+    "value_type": {"filterable": true, "groupable": true}
+  }
 }
 ```
 
@@ -105,12 +110,12 @@ Two new tables store preset definitions and their allowed labels.
   "metric_name": "backendai_container_utilization",
   "query_template": "sum by ({group_by})(rate({metric_name}{{{labels}}}[{window}]))",
   "time_window": "5m",
-  "labels": [
-    {"id": "...", "label_name": "container_metric_name", "filterable": true, "groupable": false},
-    {"id": "...", "label_name": "kernel_id", "filterable": true, "groupable": true},
-    {"id": "...", "label_name": "session_id", "filterable": true, "groupable": true},
-    {"id": "...", "label_name": "value_type", "filterable": true, "groupable": true}
-  ],
+  "labels": {
+    "container_metric_name": {"filterable": true, "groupable": false},
+    "kernel_id": {"filterable": true, "groupable": true},
+    "session_id": {"filterable": true, "groupable": true},
+    "value_type": {"filterable": true, "groupable": true}
+  },
   "created_at": "2025-02-20T10:00:00Z",
   "updated_at": "2025-02-20T10:00:00Z"
 }
@@ -167,8 +172,7 @@ The `metric` field uses a key-value entries pattern instead of fixed fields, all
 **CRUD types:**
 
 ```python
-class PrometheusQueryPresetLabel(BaseModel):
-    label_name: str
+class LabelConfig(BaseModel):
     filterable: bool
     groupable: bool
 
@@ -177,14 +181,14 @@ class PrometheusQueryPresetCreate(BaseModel):
     metric_name: str
     query_template: str
     time_window: str | None
-    labels: list[PrometheusQueryPresetLabel]
+    labels: dict[str, LabelConfig]
 
 class PrometheusQueryPresetModify(BaseModel):
     name: str | None
     metric_name: str | None
     query_template: str | None
     time_window: str | None
-    labels: list[PrometheusQueryPresetLabel] | None
+    labels: dict[str, LabelConfig] | None
 ```
 
 **Execute types:**
@@ -221,24 +225,29 @@ The preset system also exposes a Strawberry GraphQL interface following existing
 **Types:**
 
 ```graphql
+type LabelConfigGQL {
+  filterable: Boolean!
+  groupable: Boolean!
+}
+
+type LabelEntryGQL {
+  labelName: String!
+  config: LabelConfigGQL!
+}
+
 type PrometheusQueryPreset implements Node {
   id: ID!
   name: String!
   metricName: String!
   queryTemplate: String!
   timeWindow: String
-  labels: [PrometheusQueryPresetLabel!]!
+  labels: [LabelEntryGQL!]!
   createdAt: DateTime!
   updatedAt: DateTime!
 }
-
-type PrometheusQueryPresetLabel {
-  id: ID!
-  labelName: String!
-  filterable: Boolean!
-  groupable: Boolean!
-}
 ```
+
+Since GraphQL does not natively support dict/map types, the `labels` JSONB dict is converted to a list of `LabelEntryGQL` entries in the resolver.
 
 **Admin Queries (SUPERADMIN only):**
 
@@ -327,6 +336,7 @@ backend.ai admin prometheus-query-preset add \
     --query-template <TEMPLATE> \
     [--time-window <WINDOW>] \
     [--labels <JSON>]
+    # --labels example: '{"kernel_id": {"filterable": true, "groupable": true}, "container_metric_name": {"filterable": true, "groupable": false}}'
 backend.ai admin prometheus-query-preset modify <ID> [--name ...] [--query-template ...] [--labels ...]
 backend.ai admin prometheus-query-preset delete <ID>
 ```
@@ -375,8 +385,8 @@ sequenceDiagram
 
 **Validation rules:**
 
-- Each label key in the request must have `filterable = true` in the preset's allowed labels
-- Each entry in `group_labels` must have `groupable = true` in the preset's allowed labels
+- Each label key in the request must exist in the preset's `labels` dict with `filterable = true`
+- Each entry in `group_labels` must exist in the preset's `labels` dict with `groupable = true`
 - `window` must match `^\d+[smhdw]$` (single-unit durations only; compound durations like `1h30m` or `500ms` are intentionally not supported); if absent, falls back to the preset's `time_window` or the server config `metric.timewindow`
 
 ### Security
@@ -384,7 +394,7 @@ sequenceDiagram
 | Threat | Mitigation |
 |--------|-----------|
 | **Label value injection** | Reuse `_escape_label_value()` from `preset.py` — escapes `\`, `"`, `\n`, `\r` |
-| **Arbitrary label keys** | Only labels marked `filterable=true` can be used in `{labels}`, only `groupable=true` in `{group_by}` |
+| **Arbitrary label keys** | Only labels present in the `labels` JSONB dict with `filterable=true` can be used in `{labels}`, only those with `groupable=true` in `{group_by}` |
 | **Window format injection** | Validate against `^\d+[smhdw]$` regex before substitution |
 | **Template modification** | CRUD operations restricted to SUPERADMIN role |
 | **Metric name substitution** | `{metric_name}` is resolved from the preset's `metric_name` field (DB-stored, admin-controlled), not from user input |
@@ -403,7 +413,7 @@ sequenceDiagram
 
 ### Database Migration
 
-- Two new tables: `prometheus_query_presets` and `prometheus_query_preset_labels`
+- One new table: `prometheus_query_presets` (with `labels` JSONB column using `PydanticColumn`)
 - Alembic migration: `CREATE TABLE` only — no existing tables are modified
 - No data migration needed
 
