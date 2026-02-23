@@ -4,9 +4,11 @@ import secrets
 import uuid
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.client.v2.exceptions import AuthenticationError
+from ai.backend.client.v2.exceptions import AuthenticationError, InvalidRequestError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
@@ -125,8 +127,23 @@ class TestSSHKeypair:
         self,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        pubkey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQDtest test@test"
-        privkey = "-----BEGIN RSA PRIVATE KEY-----\nMIICXAIBAAtest\n-----END RSA PRIVATE KEY-----"
+        private_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048,
+        )
+        privkey = private_key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.TraditionalOpenSSL,
+            serialization.NoEncryption(),
+        ).decode()
+        pubkey = (
+            private_key.public_key()
+            .public_bytes(
+                serialization.Encoding.OpenSSH,
+                serialization.PublicFormat.OpenSSH,
+            )
+            .decode()
+        )
         result = await admin_registry.auth.upload_ssh_keypair(
             UploadSSHKeypairRequest(pubkey=pubkey, privkey=privkey),
         )
@@ -178,15 +195,14 @@ class TestUpdatePassword:
         auth_user_registry: BackendAIClientRegistry,
         auth_user_fixture: AuthUserFixtureData,
     ) -> None:
-        result = await auth_user_registry.auth.update_password(
-            UpdatePasswordRequest(
-                old_password=auth_user_fixture.password,
-                new_password="NewP@ssw0rd!",
-                new_password2="MismatchP@ss!",
-            ),
-        )
-        assert isinstance(result, UpdatePasswordResponse)
-        assert result.error_msg is not None
+        with pytest.raises(InvalidRequestError):
+            await auth_user_registry.auth.update_password(
+                UpdatePasswordRequest(
+                    old_password=auth_user_fixture.password,
+                    new_password="NewP@ssw0rd!",
+                    new_password2="MismatchP@ss!",
+                ),
+            )
 
 
 class TestAuthorize:
