@@ -899,7 +899,7 @@ input BlueGreenConfigInput {
 }
 
 """Added in 26.2.0. Error information for a failed user in bulk creation."""
-type BulkCreateUserError {
+type BulkCreateUserV2Error {
   """Original position in the input list."""
   index: Int!
 
@@ -927,7 +927,7 @@ type BulkCreateUsersV2Payload {
   createdUsers: [UserV2!]!
 
   """List of errors for users that failed to create."""
-  failed: [BulkCreateUserError!]!
+  failed: [BulkCreateUserV2Error!]!
 }
 
 """Added in 26.3.0. Error information for a failed user in bulk purge."""
@@ -946,6 +946,12 @@ input BulkPurgeUsersV2Input {
   """List of user UUIDs to purge."""
   userIds: [UUID!]!
 
+  """Options for the purge operation."""
+  options: BulkPurgeUsersV2Options = null
+}
+
+"""Added in 26.3.0. Options for bulk user purge operation."""
+input BulkPurgeUsersV2Options {
   """
   If true, migrate shared virtual folders to the admin user before purging.
   """
@@ -965,7 +971,7 @@ type BulkPurgeUsersV2Payload {
 }
 
 """Added in 26.3.0. Error information for a failed user in bulk update."""
-type BulkUpdateUserError {
+type BulkUpdateUserV2Error {
   """UUID of the user that failed to update."""
   userId: UUID!
 
@@ -998,7 +1004,7 @@ type BulkUpdateUsersV2Payload {
   updatedUsers: [UserV2!]!
 
   """List of errors for users that failed to update."""
-  failed: [BulkUpdateUserError!]!
+  failed: [BulkUpdateUserV2Error!]!
 }
 
 """
@@ -3874,7 +3880,7 @@ type Mutation {
   """
   Added in 26.2.0. Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications.
   """
-  adminBulkCreateUsers(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload!
+  adminBulkCreateUsersV2(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload!
 
   """
   Added in 26.3.0. Update multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual update specifications.
