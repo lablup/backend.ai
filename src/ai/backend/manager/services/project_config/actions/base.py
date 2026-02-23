@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseAction
 
 
@@ -16,5 +17,5 @@ class ProjectConfigAction(BaseAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "project_config"
+    def entity_type(cls) -> EntityType:
+        return EntityType.PROJECT_CONFIG

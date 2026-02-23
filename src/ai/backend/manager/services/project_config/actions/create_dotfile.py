@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.project_config.actions.base import ProjectConfigAction
 
 
@@ -20,8 +21,8 @@ class CreateDotfileAction(ProjectConfigAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "create_dotfile"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass

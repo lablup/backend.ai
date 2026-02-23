@@ -91,7 +91,7 @@ class ProjectConfigDBSource:
         """
         async with self._db.begin_readonly_session() as session:
             conn = await session.connection()
-            dotfiles, leftover_space = await query_group_dotfiles(conn, project_id)  # type: ignore[arg-type]
+            dotfiles, leftover_space = await query_group_dotfiles(conn, project_id)
             if dotfiles is None:
                 raise DotfileNotFound
             return ProjectDotfilesResult(dotfiles=dotfiles, leftover_space=leftover_space)
@@ -110,7 +110,7 @@ class ProjectConfigDBSource:
         """Add a new dotfile to the project in a single session."""
         async with self._db.begin_session() as session:
             conn = await session.connection()
-            dotfiles, leftover_space = await query_group_dotfiles(conn, project_id)  # type: ignore[arg-type]
+            dotfiles, leftover_space = await query_group_dotfiles(conn, project_id)
             if dotfiles is None:
                 raise DotfileNotFound
 
@@ -142,7 +142,7 @@ class ProjectConfigDBSource:
         """Update an existing dotfile in the project in a single session."""
         async with self._db.begin_session() as session:
             conn = await session.connection()
-            dotfiles, _ = await query_group_dotfiles(conn, project_id)  # type: ignore[arg-type]
+            dotfiles, _ = await query_group_dotfiles(conn, project_id)
             if dotfiles is None:
                 raise DotfileNotFound
 
@@ -168,7 +168,7 @@ class ProjectConfigDBSource:
         """Remove a dotfile from the project in a single session."""
         async with self._db.begin_session() as session:
             conn = await session.connection()
-            dotfiles, _ = await query_group_dotfiles(conn, project_id)  # type: ignore[arg-type]
+            dotfiles, _ = await query_group_dotfiles(conn, project_id)
             if dotfiles is None:
                 raise DotfileNotFound
 
