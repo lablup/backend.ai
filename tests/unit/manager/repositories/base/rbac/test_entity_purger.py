@@ -12,7 +12,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.permission.types import OperationType
+from ai.backend.common.data.permission.types import OperationType, RBACElementType
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
@@ -82,9 +82,15 @@ class SimpleRBACEntityPurgerSpec(RBACEntityPurgerSpec):
     def __init__(self, entity_uuid: UUID) -> None:
         self._entity_uuid = entity_uuid
 
+    def element_type(self) -> RBACElementType:
+        return RBACElementType.VFOLDER
+
     def entity(self) -> RBACEntity:
         return RBACEntity(
-            entity=ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(self._entity_uuid))
+            entity=ObjectId(
+                entity_type=self.element_type().to_entity_type(),
+                entity_id=str(self._entity_uuid),
+            )
         )
 
 
@@ -704,8 +710,8 @@ class TestEntityBatchPurgerSpec(RBACEntityBatchPurgerSpec[RBACEntityPurgerTestRo
     def build_subquery(self) -> sa.sql.Select[tuple[RBACEntityPurgerTestRow]]:
         return sa.select(RBACEntityPurgerTestRow)
 
-    def entity_type(self) -> EntityType:
-        return EntityType.VFOLDER
+    def element_type(self) -> RBACElementType:
+        return RBACElementType.VFOLDER
 
 
 class TestRBACEntityBatchPurger:
@@ -945,9 +951,15 @@ class CompositePKPurgerSpec(RBACEntityPurgerSpec):
     def __init__(self, entity_uuid: str) -> None:
         self._entity_uuid = entity_uuid
 
+    def element_type(self) -> RBACElementType:
+        return RBACElementType.VFOLDER
+
     def entity(self) -> RBACEntity:
         return RBACEntity(
-            entity=ObjectId(entity_type=EntityType.VFOLDER, entity_id=self._entity_uuid)
+            entity=ObjectId(
+                entity_type=self.element_type().to_entity_type(),
+                entity_id=self._entity_uuid,
+            )
         )
 
 
@@ -957,8 +969,8 @@ class CompositePKBatchPurgerSpec(RBACEntityBatchPurgerSpec[CompositePKPurgerTest
     def build_subquery(self) -> sa.Select[Any]:
         return sa.select(CompositePKPurgerTestRow)
 
-    def entity_type(self) -> EntityType:
-        return EntityType.VFOLDER
+    def element_type(self) -> RBACElementType:
+        return RBACElementType.VFOLDER
 
 
 class TestRBACEntityPurgerCompositePK:
