@@ -6,7 +6,6 @@ from collections.abc import Callable, Coroutine
 from typing import Any
 
 import pytest
-from tests.component.conftest import UserFixtureData
 
 from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
@@ -255,7 +254,7 @@ class TestRoleAssignment:
         self,
         admin_registry: BackendAIClientRegistry,
         target_role: CreateRoleResponse,
-        admin_user_fixture: UserFixtureData,
+        admin_user_fixture: Any,
     ) -> None:
         result = await admin_registry.rbac.assign_role(
             AssignRoleRequest(
@@ -280,7 +279,7 @@ class TestRoleAssignment:
         self,
         admin_registry: BackendAIClientRegistry,
         target_role: CreateRoleResponse,
-        admin_user_fixture: UserFixtureData,
+        admin_user_fixture: Any,
     ) -> None:
         # Assign first
         await admin_registry.rbac.assign_role(
@@ -305,7 +304,7 @@ class TestRoleAssignment:
         self,
         admin_registry: BackendAIClientRegistry,
         target_role: CreateRoleResponse,
-        admin_user_fixture: UserFixtureData,
+        admin_user_fixture: Any,
     ) -> None:
         # Assign role
         await admin_registry.rbac.assign_role(
@@ -336,7 +335,7 @@ class TestRoleAssignment:
         self,
         user_registry: BackendAIClientRegistry,
         target_role: CreateRoleResponse,
-        regular_user_fixture: UserFixtureData,
+        regular_user_fixture: Any,
     ) -> None:
         with pytest.raises(PermissionDeniedError):
             await user_registry.rbac.assign_role(
@@ -351,7 +350,7 @@ class TestRoleAssignment:
         self,
         user_registry: BackendAIClientRegistry,
         target_role: CreateRoleResponse,
-        regular_user_fixture: UserFixtureData,
+        regular_user_fixture: Any,
     ) -> None:
         with pytest.raises(PermissionDeniedError):
             await user_registry.rbac.revoke_role(

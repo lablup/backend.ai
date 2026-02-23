@@ -362,7 +362,7 @@ class TestSearchScopes:
 class TestEntityTypes:
     @pytest.mark.asyncio
     async def test_get_entity_types(self) -> None:
-        resp = _json_response({"items": ["user", "keypair"]})
+        resp = _json_response({"items": ["user", "project"]})
         mock_session = _make_request_session(resp)
         rc = _make_rbac_client(mock_session)
 
