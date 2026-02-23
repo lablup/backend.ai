@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
@@ -224,9 +226,12 @@ class TestUserFairShareEntityOrderField:
         assert query_order is not None
 
 
-def _compile_sql(expr: sa.sql.expression.ColumnElement) -> str:
+_PG_DIALECT = cast(sa.engine.Dialect, postgresql.dialect())
+
+
+def _compile_sql(expr: sa.sql.expression.ColumnElement[bool]) -> str:
     """Compile a SQLAlchemy expression to a string for assertion."""
-    return str(expr.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
+    return str(expr.compile(dialect=_PG_DIALECT, compile_kwargs={"literal_binds": True}))
 
 
 class TestDomainFairShareFilterNegatedCaseInsensitive:
