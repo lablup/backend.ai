@@ -11,6 +11,7 @@ from strawberry.relay import PageInfo
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.fair_share.types import (
+    RGUserFairShareFilter,
     UserFairShareConnection,
     UserFairShareEdge,
     UserFairShareFilter,
@@ -108,7 +109,7 @@ async def fetch_user_fair_shares(
 async def fetch_rg_user_fair_shares(
     info: Info[StrawberryGQLContext],
     scope: UserFairShareSearchScope,
-    filter: UserFairShareFilter | None = None,
+    filter: RGUserFairShareFilter | None = None,
     order_by: list[UserFairShareOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
@@ -121,13 +122,10 @@ async def fetch_rg_user_fair_shares(
     """Fetch user fair shares using resource group scope.
 
     Returns all users in the scope, including those without records (with defaults).
-    Filter conditions are built via build_rg_conditions() which references INNER JOIN'd
-    columns, then passed as base_conditions to avoid NULL exclusion.
+    Uses RGUserFairShareFilter whose build_conditions() references INNER JOIN'd
+    columns to avoid NULL exclusion.
     """
     processors = info.context.processors
-
-    rg_conditions = filter.build_rg_conditions() if filter else []
-    all_base = [*(base_conditions or []), *rg_conditions]
 
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
@@ -139,9 +137,9 @@ async def fetch_rg_user_fair_shares(
             offset=offset,
         ),
         get_user_fair_share_pagination_spec(),
-        filter=None,
+        filter=filter,
         order_by=order_by,
-        base_conditions=all_base,
+        base_conditions=base_conditions,
     )
 
     action_result = await processors.fair_share.search_rg_user_fair_shares.wait_for_complete(

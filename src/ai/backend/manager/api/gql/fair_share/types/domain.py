@@ -294,12 +294,39 @@ class DomainFairShareFilter(GQLFilter):
 
         return conditions
 
-    def build_rg_conditions(self) -> list[QueryCondition]:
-        """Build conditions using INNER JOIN'd columns for RG-context queries.
 
-        References ScalingGroupForDomainRow instead of DomainFairShareRow,
-        preventing NULL exclusion of entities without fair share records.
-        """
+@strawberry.input(
+    name="RGDomainFairShareFilter",
+    description=(
+        "Added in 26.2.0. Filter for domain fair shares within a resource group scope. "
+        "References resource group membership columns to avoid excluding domains without fair share records."
+    ),
+)
+class RGDomainFairShareFilter(GQLFilter):
+    """Filter for domain fair shares in RG context (uses INNER JOIN'd columns)."""
+
+    resource_group: StringFilter | None = strawberry.field(
+        default=None, description="Filter by scaling group name."
+    )
+    domain_name: StringFilter | None = strawberry.field(
+        default=None, description="Filter by domain name."
+    )
+    domain: DomainFairShareDomainNestedFilter | None = strawberry.field(
+        default=None, description="Filter by domain properties."
+    )
+
+    AND: list[RGDomainFairShareFilter] | None = strawberry.field(
+        default=None, description="Combine with AND logic."
+    )
+    OR: list[RGDomainFairShareFilter] | None = strawberry.field(
+        default=None, description="Combine with OR logic."
+    )
+    NOT: list[RGDomainFairShareFilter] | None = strawberry.field(
+        default=None, description="Negate filters."
+    )
+
+    @override
+    def build_conditions(self) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
 
         if self.resource_group:
@@ -343,19 +370,19 @@ class DomainFairShareFilter(GQLFilter):
 
         if self.AND:
             for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_rg_conditions())
+                conditions.extend(sub_filter.build_conditions())
 
         if self.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in self.OR:
-                or_conditions.extend(sub_filter.build_rg_conditions())
+                or_conditions.extend(sub_filter.build_conditions())
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
 
         if self.NOT:
             not_conditions: list[QueryCondition] = []
             for sub_filter in self.NOT:
-                not_conditions.extend(sub_filter.build_rg_conditions())
+                not_conditions.extend(sub_filter.build_conditions())
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
 

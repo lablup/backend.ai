@@ -16,6 +16,7 @@ from ai.backend.manager.api.gql.fair_share.types import (
     ProjectFairShareFilter,
     ProjectFairShareGQL,
     ProjectFairShareOrderBy,
+    RGProjectFairShareFilter,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.fair_share.row import ProjectFairShareRow
@@ -108,7 +109,7 @@ async def fetch_project_fair_shares(
 async def fetch_rg_project_fair_shares(
     info: Info[StrawberryGQLContext],
     scope: ProjectFairShareSearchScope,
-    filter: ProjectFairShareFilter | None = None,
+    filter: RGProjectFairShareFilter | None = None,
     order_by: list[ProjectFairShareOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
@@ -121,13 +122,10 @@ async def fetch_rg_project_fair_shares(
     """Fetch project fair shares using resource group scope.
 
     Returns all projects in the scope, including those without records (with defaults).
-    Filter conditions are built via build_rg_conditions() which references INNER JOIN'd
-    columns, then passed as base_conditions to avoid NULL exclusion.
+    Uses RGProjectFairShareFilter whose build_conditions() references INNER JOIN'd
+    columns to avoid NULL exclusion.
     """
     processors = info.context.processors
-
-    rg_conditions = filter.build_rg_conditions() if filter else []
-    all_base = [*(base_conditions or []), *rg_conditions]
 
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
@@ -139,9 +137,9 @@ async def fetch_rg_project_fair_shares(
             offset=offset,
         ),
         get_project_fair_share_pagination_spec(),
-        filter=None,
+        filter=filter,
         order_by=order_by,
-        base_conditions=all_base,
+        base_conditions=base_conditions,
     )
 
     action_result = await processors.fair_share.search_rg_project_fair_shares.wait_for_complete(

@@ -415,13 +415,45 @@ class UserFairShareFilter(GQLFilter):
 
         return conditions
 
-    def build_rg_conditions(self) -> list[QueryCondition]:
-        """Build conditions using INNER JOIN'd columns for RG-context queries.
 
-        References AssocGroupUserRow/DomainRow/ScalingGroupForProjectRow instead
-        of UserFairShareRow, preventing NULL exclusion of entities without
-        fair share records.
-        """
+@strawberry.input(
+    name="RGUserFairShareFilter",
+    description=(
+        "Added in 26.2.0. Filter for user fair shares within a resource group scope. "
+        "References resource group membership columns to avoid excluding users without fair share records."
+    ),
+)
+class RGUserFairShareFilter(GQLFilter):
+    """Filter for user fair shares in RG context (uses INNER JOIN'd columns)."""
+
+    resource_group: StringFilter | None = strawberry.field(
+        default=None, description="Filter by scaling group name."
+    )
+    user_uuid: UUIDFilter | None = strawberry.field(
+        default=None, description="Filter by user UUID."
+    )
+    project_id: UUIDFilter | None = strawberry.field(
+        default=None, description="Filter by project UUID."
+    )
+    domain_name: StringFilter | None = strawberry.field(
+        default=None, description="Filter by domain name."
+    )
+    user: UserFairShareUserNestedFilter | None = strawberry.field(
+        default=None, description="Filter by user properties."
+    )
+
+    AND: list[RGUserFairShareFilter] | None = strawberry.field(
+        default=None, description="Combine with AND logic."
+    )
+    OR: list[RGUserFairShareFilter] | None = strawberry.field(
+        default=None, description="Combine with OR logic."
+    )
+    NOT: list[RGUserFairShareFilter] | None = strawberry.field(
+        default=None, description="Negate filters."
+    )
+
+    @override
+    def build_conditions(self) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
 
         if self.resource_group:
@@ -481,19 +513,19 @@ class UserFairShareFilter(GQLFilter):
 
         if self.AND:
             for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_rg_conditions())
+                conditions.extend(sub_filter.build_conditions())
 
         if self.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in self.OR:
-                or_conditions.extend(sub_filter.build_rg_conditions())
+                or_conditions.extend(sub_filter.build_conditions())
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
 
         if self.NOT:
             not_conditions: list[QueryCondition] = []
             for sub_filter in self.NOT:
-                not_conditions.extend(sub_filter.build_rg_conditions())
+                not_conditions.extend(sub_filter.build_conditions())
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
 
