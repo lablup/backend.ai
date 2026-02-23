@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Sequence
 from datetime import datetime
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
@@ -509,9 +509,7 @@ class CreateRevisionInput:
         }
         resource_opts: dict[str, Any] | None = None
         if self.resource_config.resource_opts is not None:
-            resource_opts = {
-                e.name: e.value for e in self.resource_config.resource_opts.entries
-            }
+            resource_opts = {e.name: e.value for e in self.resource_config.resource_opts.entries}
         resource_spec = ResourceSpec(
             cluster_mode=CommonClusterMode(self.cluster_config.mode),
             cluster_size=self.cluster_config.size,
@@ -577,9 +575,7 @@ class AddRevisionInput:
         }
         resource_opts: dict[str, Any] | None = None
         if self.resource_config.resource_opts is not None:
-            resource_opts = {
-                e.name: e.value for e in self.resource_config.resource_opts.entries
-            }
+            resource_opts = {e.name: e.value for e in self.resource_config.resource_opts.entries}
         resource_spec = ResourceSpec(
             cluster_mode=CommonClusterMode(self.cluster_config.mode),
             cluster_size=self.cluster_config.size,
