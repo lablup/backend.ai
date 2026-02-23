@@ -333,6 +333,9 @@ class StatTaskObserver:
     _task_trigger_count: Counter
     _task_success_count: Counter
     _task_failure_count: Counter
+    _task_cancelled_count: Counter
+    _task_duration_sec: Histogram
+    _lock_wait_duration_sec: Histogram
 
     def __init__(self) -> None:
         self._task_trigger_count = Counter(
@@ -349,6 +352,23 @@ class StatTaskObserver:
             name="backendai_stat_task_failure_count",
             documentation="Number of stat() task failed",
             labelnames=["agent_id", "stat_scope", "exception"],
+        )
+        self._task_cancelled_count = Counter(
+            name="backendai_stat_task_cancelled_count",
+            documentation="Number of stat() task cancelled (skipped due to timer policy)",
+            labelnames=["agent_id", "stat_scope"],
+        )
+        self._task_duration_sec = Histogram(
+            name="backendai_stat_task_duration_sec",
+            documentation="Duration of stat collection task in seconds",
+            labelnames=["agent_id", "stat_scope"],
+            buckets=[0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 300.0, 600.0],
+        )
+        self._lock_wait_duration_sec = Histogram(
+            name="backendai_stat_task_lock_wait_duration_sec",
+            documentation="Time spent waiting to acquire per-scope lock in seconds",
+            labelnames=["agent_id", "stat_scope"],
+            buckets=[0.001, 0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0],
         )
 
     @classmethod
@@ -384,3 +404,31 @@ class StatTaskObserver:
         self._task_failure_count.labels(
             agent_id=agent_id, stat_scope=stat_scope, exception=exception_name
         ).inc()
+
+    def observe_stat_task_cancelled(
+        self,
+        *,
+        agent_id: AgentId,
+        stat_scope: StatScope,
+    ) -> None:
+        self._task_cancelled_count.labels(agent_id=agent_id, stat_scope=stat_scope).inc()
+
+    def observe_stat_task_duration(
+        self,
+        *,
+        agent_id: AgentId,
+        stat_scope: StatScope,
+        duration: float,
+    ) -> None:
+        self._task_duration_sec.labels(agent_id=agent_id, stat_scope=stat_scope).observe(duration)
+
+    def observe_lock_wait_duration(
+        self,
+        *,
+        agent_id: AgentId,
+        stat_scope: StatScope,
+        duration: float,
+    ) -> None:
+        self._lock_wait_duration_sec.labels(agent_id=agent_id, stat_scope=stat_scope).observe(
+            duration
+        )

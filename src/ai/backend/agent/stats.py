@@ -40,7 +40,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 
 from .errors import InvalidContainerMeasurementError
-from .metrics.metric import UtilizationMetricObserver
+from .metrics.metric import StatScope, StatTaskObserver, UtilizationMetricObserver
 from .metrics.types import (
     CAPACITY_METRIC_KEY,
     CURRENT_METRIC_KEY,
@@ -343,6 +343,7 @@ class StatContext:
     kernel_metrics: dict[KernelId, dict[MetricKey, Metric]]
     process_metrics: dict[ContainerId, dict[PID, dict[MetricKey, Metric]]]
     _utilization_metric_observer: UtilizationMetricObserver
+    _stat_task_observer: StatTaskObserver
     _stage_observer: StageObserver
 
     def __init__(
@@ -366,6 +367,7 @@ class StatContext:
         self._process_lock = asyncio.Lock()
         self._timestamps: MutableMapping[str, float] = {}
         self._utilization_metric_observer = UtilizationMetricObserver.instance()
+        self._stat_task_observer = StatTaskObserver.instance()
         self._stage_observer = StageObserver.instance()
 
     def update_timestamp(self, timestamp_key: str) -> tuple[float, float]:
@@ -496,7 +498,14 @@ class StatContext:
             stage="before_lock",
             upper_layer="collect_node_stat",
         )
+        lock_wait_start = time.perf_counter()
         async with self._node_lock:
+            self._stat_task_observer.observe_lock_wait_duration(
+                agent_id=self.agent.id,
+                stat_scope=StatScope.NODE,
+                duration=time.perf_counter() - lock_wait_start,
+            )
+
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.
@@ -727,7 +736,13 @@ class StatContext:
             stage="before_lock",
             upper_layer="collect_container_stat",
         )
+        lock_wait_start = time.perf_counter()
         async with self._container_lock:
+            self._stat_task_observer.observe_lock_wait_duration(
+                agent_id=self.agent.id,
+                stat_scope=StatScope.CONTAINER,
+                duration=time.perf_counter() - lock_wait_start,
+            )
             kernel_id_map: dict[ContainerId, KernelId] = {}
             kernel_obj_map: dict[KernelId, AbstractKernel] = {}
             for kid, info in self.agent.kernel_registry.items():
@@ -896,7 +911,13 @@ class StatContext:
             stage="before_lock",
             upper_layer="collect_per_container_process_stat",
         )
+        lock_wait_start = time.perf_counter()
         async with self._process_lock:
+            self._stat_task_observer.observe_lock_wait_duration(
+                agent_id=self.agent.id,
+                stat_scope=StatScope.PROCESS,
+                duration=time.perf_counter() - lock_wait_start,
+            )
             kernel_id_map: dict[ContainerId, KernelId] = {}
             for kid, info in self.agent.kernel_registry.items():
                 try:

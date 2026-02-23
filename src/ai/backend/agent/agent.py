@@ -8,6 +8,7 @@ import pickle
 import re
 import signal
 import sys
+import time
 import traceback
 import weakref
 import zlib
@@ -797,15 +798,26 @@ def _observe_stat_task(
     ) -> Callable[Concatenate[AbstractAgent[Any, Any], P], Coroutine[Any, Any, None]]:
         async def wrapper(self: AbstractAgent[Any, Any], *args: P.args, **kwargs: P.kwargs) -> None:
             stat_task_observer.observe_stat_task_triggered(agent_id=self.id, stat_scope=stat_scope)
+            start = time.perf_counter()
             try:
                 await func(self, *args, **kwargs)
             except asyncio.CancelledError:
-                pass
+                stat_task_observer.observe_stat_task_cancelled(
+                    agent_id=self.id, stat_scope=stat_scope
+                )
             except Exception as e:
+                duration = time.perf_counter() - start
+                stat_task_observer.observe_stat_task_duration(
+                    agent_id=self.id, stat_scope=stat_scope, duration=duration
+                )
                 stat_task_observer.observe_stat_task_failure(
                     agent_id=self.id, stat_scope=stat_scope, exception=e
                 )
             else:
+                duration = time.perf_counter() - start
+                stat_task_observer.observe_stat_task_duration(
+                    agent_id=self.id, stat_scope=stat_scope, duration=duration
+                )
                 stat_task_observer.observe_stat_task_success(
                     agent_id=self.id, stat_scope=stat_scope
                 )
