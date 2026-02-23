@@ -20,6 +20,8 @@ from .resolver import (
     create_access_token,
     # Auto Scaling
     create_auto_scaling_rule,
+    # Deployment Policy
+    create_deployment_policy,
     # Deployment
     create_model_deployment,
     create_model_revision,
@@ -41,6 +43,7 @@ from .resolver import (
     routes,
     sync_replicas,
     update_auto_scaling_rule,
+    update_deployment_policy,
     update_model_deployment,
     update_route_traffic_status,
 )
@@ -77,6 +80,8 @@ from .types import (
     # Deployment
     CreateDeploymentInput,
     CreateDeploymentPayload,
+    CreateDeploymentPolicyInput,
+    CreateDeploymentPolicyPayload,
     CreateRevisionInput,
     CreateRevisionPayload,
     DeleteAutoScalingRuleInput,
@@ -146,6 +151,8 @@ from .types import (
     UpdateAutoScalingRulePayload,
     UpdateDeploymentInput,
     UpdateDeploymentPayload,
+    UpdateDeploymentPolicyInput,
+    UpdateDeploymentPolicyPayload,
     UpdateRouteTrafficStatusInputGQL,
     UpdateRouteTrafficStatusPayloadGQL,
     get_route_pagination_spec,
@@ -201,11 +208,15 @@ __all__ = [
     # Policy Types
     "BlueGreenConfigInputGQL",
     "BlueGreenStrategySpecGQL",
+    "CreateDeploymentPolicyInput",
+    "CreateDeploymentPolicyPayload",
     "DeploymentPolicyGQL",
     "DeploymentStrategySpecGQL",
     "DeploymentStrategyTypeGQL",
     "RollingUpdateConfigInputGQL",
     "RollingUpdateStrategySpecGQL",
+    "UpdateDeploymentPolicyInput",
+    "UpdateDeploymentPolicyPayload",
     # Replica Types
     "ActivenessStatus",
     "LivenessStatus",
@@ -262,6 +273,9 @@ __all__ = [
     "create_auto_scaling_rule",
     "delete_auto_scaling_rule",
     "update_auto_scaling_rule",
+    # Resolvers - Deployment Policy
+    "create_deployment_policy",
+    "update_deployment_policy",
     # Resolvers - Deployment
     "create_model_deployment",
     "delete_model_deployment",

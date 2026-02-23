@@ -10,9 +10,13 @@ from strawberry import ID
 from strawberry.relay import Node, NodeID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
 from ai.backend.manager.errors.deployment import InvalidDeploymentStrategySpec
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
+from ai.backend.manager.repositories.deployment.updaters import DeploymentPolicyUpdaterSpec
+from ai.backend.manager.types import OptionalState
 
 # Enum defined here to avoid circular import with deployment.py
 DeploymentStrategyTypeGQL: type[DeploymentStrategy] = strawberry.enum(
@@ -129,3 +133,88 @@ class BlueGreenConfigInputGQL:
             auto_promote=self.auto_promote,
             promote_delay_seconds=self.promote_delay_seconds,
         )
+
+
+# ========== Deployment Policy Mutation Types ==========
+
+
+@strawberry.input(
+    name="CreateDeploymentPolicyInput",
+    description="Added in 25.19.0. Input for creating a deployment policy.",
+)
+class CreateDeploymentPolicyInput:
+    deployment_id: ID
+    strategy: DeploymentStrategyTypeGQL
+    rollback_on_failure: bool = False
+    rolling_update: RollingUpdateConfigInputGQL | None = None
+    blue_green: BlueGreenConfigInputGQL | None = None
+
+    def to_policy_config(self) -> DeploymentPolicyConfig:
+        """Convert to DeploymentPolicyConfig for service layer."""
+        strategy = DeploymentStrategy(self.strategy.value)
+        match strategy:
+            case DeploymentStrategy.ROLLING:
+                if self.rolling_update is None:
+                    raise InvalidAPIParameters(
+                        "rolling_update config required for ROLLING strategy"
+                    )
+                return DeploymentPolicyConfig(
+                    strategy=strategy,
+                    strategy_spec=self.rolling_update.to_spec(),
+                    rollback_on_failure=self.rollback_on_failure,
+                )
+            case DeploymentStrategy.BLUE_GREEN:
+                if self.blue_green is None:
+                    raise InvalidAPIParameters("blue_green config required for BLUE_GREEN strategy")
+                return DeploymentPolicyConfig(
+                    strategy=strategy,
+                    strategy_spec=self.blue_green.to_spec(),
+                    rollback_on_failure=self.rollback_on_failure,
+                )
+
+
+@strawberry.input(
+    name="UpdateDeploymentPolicyInput",
+    description="Added in 25.19.0. Input for updating a deployment policy.",
+)
+class UpdateDeploymentPolicyInput:
+    id: ID
+    strategy: DeploymentStrategyTypeGQL | None = None
+    rollback_on_failure: bool | None = None
+    rolling_update: RollingUpdateConfigInputGQL | None = None
+    blue_green: BlueGreenConfigInputGQL | None = None
+
+    def to_updater_spec(self) -> DeploymentPolicyUpdaterSpec:
+        """Convert to DeploymentPolicyUpdaterSpec for service layer."""
+        spec = DeploymentPolicyUpdaterSpec()
+        if self.strategy is not None:
+            spec.strategy = OptionalState[DeploymentStrategy].update(
+                DeploymentStrategy(self.strategy.value)
+            )
+        if self.rollback_on_failure is not None:
+            spec.rollback_on_failure = OptionalState[bool].update(self.rollback_on_failure)
+        if self.rolling_update is not None:
+            spec.strategy_spec = OptionalState[RollingUpdateSpec | BlueGreenSpec].update(
+                self.rolling_update.to_spec()
+            )
+        if self.blue_green is not None:
+            spec.strategy_spec = OptionalState[RollingUpdateSpec | BlueGreenSpec].update(
+                self.blue_green.to_spec()
+            )
+        return spec
+
+
+@strawberry.type(
+    name="CreateDeploymentPolicyPayload",
+    description="Added in 25.19.0. Payload for creating a deployment policy.",
+)
+class CreateDeploymentPolicyPayload:
+    deployment_policy: DeploymentPolicyGQL
+
+
+@strawberry.type(
+    name="UpdateDeploymentPolicyPayload",
+    description="Added in 25.19.0. Payload for updating a deployment policy.",
+)
+class UpdateDeploymentPolicyPayload:
+    deployment_policy: DeploymentPolicyGQL

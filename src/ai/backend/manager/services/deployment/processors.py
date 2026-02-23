@@ -44,10 +44,14 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
     CreateLegacyDeploymentActionResult,
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
+    CreateDeploymentPolicyAction,
+    CreateDeploymentPolicyActionResult,
     GetDeploymentPolicyAction,
     GetDeploymentPolicyActionResult,
     SearchDeploymentPoliciesAction,
     SearchDeploymentPoliciesActionResult,
+    UpdateDeploymentPolicyAction,
+    UpdateDeploymentPolicyActionResult,
 )
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
@@ -126,6 +130,12 @@ class DeploymentProcessors(AbstractProcessorPackage):
     search_deployment_policies: ActionProcessor[
         SearchDeploymentPoliciesAction, SearchDeploymentPoliciesActionResult
     ]
+    create_deployment_policy: ActionProcessor[
+        CreateDeploymentPolicyAction, CreateDeploymentPolicyActionResult
+    ]
+    update_deployment_policy: ActionProcessor[
+        UpdateDeploymentPolicyAction, UpdateDeploymentPolicyActionResult
+    ]
 
     # Revision operations
     create_model_revision: ActionProcessor[
@@ -180,6 +190,12 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.search_deployment_policies = ActionProcessor(
             service.search_deployment_policies, action_monitors
         )
+        self.create_deployment_policy = ActionProcessor(
+            service.create_deployment_policy, action_monitors
+        )
+        self.update_deployment_policy = ActionProcessor(
+            service.update_deployment_policy, action_monitors
+        )
 
         # Revision operations
         self.create_model_revision = ActionProcessor(service.create_model_revision, action_monitors)
@@ -230,6 +246,8 @@ class DeploymentProcessors(AbstractProcessorPackage):
             GetDeploymentByIdAction.spec(),
             GetDeploymentPolicyAction.spec(),
             SearchDeploymentPoliciesAction.spec(),
+            CreateDeploymentPolicyAction.spec(),
+            UpdateDeploymentPolicyAction.spec(),
             # Revision operations
             CreateModelRevisionAction.spec(),
             AddModelRevisionAction.spec(),

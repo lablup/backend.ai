@@ -21,6 +21,10 @@ from .deployment import (
     sync_replicas,
     update_model_deployment,
 )
+from .deployment_policy import (
+    create_deployment_policy,
+    update_deployment_policy,
+)
 from .replica import (
     replica,
     replica_status_changed,
@@ -48,6 +52,9 @@ __all__ = [
     "create_auto_scaling_rule",
     "update_auto_scaling_rule",
     "delete_auto_scaling_rule",
+    # Deployment Policy
+    "create_deployment_policy",
+    "update_deployment_policy",
     # Deployment
     "deployments",
     "deployment",

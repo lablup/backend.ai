@@ -52,11 +52,15 @@ from .deployment import (
 from .policy import (
     BlueGreenConfigInputGQL,
     BlueGreenStrategySpecGQL,
+    CreateDeploymentPolicyInput,
+    CreateDeploymentPolicyPayload,
     DeploymentPolicyGQL,
     DeploymentStrategySpecGQL,
     DeploymentStrategyTypeGQL,
     RollingUpdateConfigInputGQL,
     RollingUpdateStrategySpecGQL,
+    UpdateDeploymentPolicyInput,
+    UpdateDeploymentPolicyPayload,
 )
 from .replica import (
     ActivenessStatus,
@@ -162,11 +166,15 @@ __all__ = [
     # Policy
     "BlueGreenConfigInputGQL",
     "BlueGreenStrategySpecGQL",
+    "CreateDeploymentPolicyInput",
+    "CreateDeploymentPolicyPayload",
     "DeploymentPolicyGQL",
     "DeploymentStrategySpecGQL",
     "DeploymentStrategyTypeGQL",
     "RollingUpdateConfigInputGQL",
     "RollingUpdateStrategySpecGQL",
+    "UpdateDeploymentPolicyInput",
+    "UpdateDeploymentPolicyPayload",
     # Replica
     "ActivenessStatus",
     "LivenessStatus",
