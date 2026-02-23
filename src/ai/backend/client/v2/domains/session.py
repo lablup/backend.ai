@@ -343,7 +343,7 @@ class SessionClient(BaseDomainClient):
         self,
         request: SyncAgentRegistryRequest,
     ) -> dict[str, Any] | None:
-        result = await self._client._request(
+        result: dict[str, Any] | list[Any] | None = await self._client._request(
             "POST",
             f"{_BASE_PATH}/_/sync-agent-registry",
             json=request.model_dump(exclude_none=True),
