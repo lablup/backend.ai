@@ -21,7 +21,7 @@ from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.server import (
@@ -198,7 +198,7 @@ class ImageFactoryHelper:
                     registry="registry.test.local",
                     registry_id=self._registry_id,
                     architecture=architecture,
-                    config_digest=f"sha256:{image_id.hex}{'0' * 8}",
+                    config_digest=f"sha256:{image_id.hex * 2}",
                     size_bytes=1024000,
                     is_local=False,
                     type=image_type,
@@ -212,10 +212,19 @@ class ImageFactoryHelper:
         return image_id
 
     async def cleanup(self) -> None:
-        """Remove all images created by this factory."""
+        """Remove all images created by this factory.
+
+        Deletes ImageAliasRow entries first to avoid FK violations,
+        since image_aliases.image references images.id.
+        """
         if not self._created_ids:
             return
         async with self._db_engine.begin() as conn:
+            await conn.execute(
+                ImageAliasRow.__table__.delete().where(
+                    ImageAliasRow.__table__.c.image.in_(self._created_ids)
+                )
+            )
             await conn.execute(
                 ImageRow.__table__.delete().where(ImageRow.__table__.c.id.in_(self._created_ids))
             )
