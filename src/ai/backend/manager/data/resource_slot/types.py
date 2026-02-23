@@ -33,6 +33,8 @@ class AgentResourceData:
 class AgentResourceSearchResult:
     items: list[AgentResourceData]
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
 
 @dataclass(frozen=True)
@@ -47,3 +49,5 @@ class ResourceAllocationData:
 class ResourceAllocationSearchResult:
     items: list[ResourceAllocationData]
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool

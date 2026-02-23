@@ -115,7 +115,12 @@ class ResourceSlotDBSource:
                 )
                 for row in result.rows
             ]
-            return AgentResourceSearchResult(items=items, total_count=result.total_count)
+            return AgentResourceSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     # ==================== resource_allocations Read ====================
 
@@ -147,4 +152,9 @@ class ResourceSlotDBSource:
                 )
                 for row in result.rows
             ]
-            return ResourceAllocationSearchResult(items=items, total_count=result.total_count)
+            return ResourceAllocationSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
