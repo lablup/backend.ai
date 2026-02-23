@@ -1412,7 +1412,7 @@ input BlueGreenConfigInput
 }
 
 """Added in 26.2.0. Error information for a failed user in bulk creation."""
-type BulkCreateUserError
+type BulkCreateUserV2Error
   @join__type(graph: STRAWBERRY)
 {
   """Original position in the input list."""
@@ -1436,7 +1436,7 @@ type BulkCreateUsersV2Payload
   createdUsers: [UserV2!]!
 
   """List of errors for users that failed to create."""
-  failed: [BulkCreateUserError!]!
+  failed: [BulkCreateUserV2Error!]!
 }
 
 """
@@ -1450,7 +1450,7 @@ input BulkCreateUserV2Input
 }
 
 """Added in 26.3.0. Error information for a failed user in bulk update."""
-type BulkUpdateUserError
+type BulkUpdateUserV2Error
   @join__type(graph: STRAWBERRY)
 {
   """UUID of the user that failed to update."""
@@ -1468,7 +1468,7 @@ type BulkUpdateUsersV2Payload
   updatedUsers: [UserV2!]!
 
   """List of errors for users that failed to update."""
-  failed: [BulkUpdateUserError!]!
+  failed: [BulkUpdateUserV2Error!]!
 }
 
 """
@@ -7399,7 +7399,7 @@ type Mutation
   """
   Added in 26.2.0. Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications.
   """
-  adminBulkCreateUsers(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload! @join__field(graph: STRAWBERRY)
+  adminBulkCreateUsersV2(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.3.0. Update multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual update specifications.

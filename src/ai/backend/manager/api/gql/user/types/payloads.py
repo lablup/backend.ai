@@ -26,10 +26,10 @@ class CreateUserPayloadGQL:
 
 
 @strawberry.type(
-    name="BulkCreateUserError",
+    name="BulkCreateUserV2Error",
     description="Added in 26.2.0. Error information for a failed user in bulk creation.",
 )
-class BulkCreateUserErrorGQL:
+class BulkCreateUserV2ErrorGQL:
     """Error information for a single user that failed during bulk creation."""
 
     index: int = strawberry.field(description="Original position in the input list.")
@@ -42,13 +42,13 @@ class BulkCreateUserErrorGQL:
     name="BulkCreateUsersV2Payload",
     description="Added in 26.2.0. Payload for bulk user creation mutation.",
 )
-class BulkCreateUsersPayloadGQL:
+class BulkCreateUsersV2PayloadGQL:
     """Payload for bulk user creation."""
 
     created_users: list[UserV2GQL] = strawberry.field(
         description="List of successfully created users."
     )
-    failed: list[BulkCreateUserErrorGQL] = strawberry.field(
+    failed: list[BulkCreateUserV2ErrorGQL] = strawberry.field(
         description="List of errors for users that failed to create."
     )
 
@@ -67,7 +67,7 @@ class UpdateUserPayloadGQL:
 
 
 @strawberry.type(
-    name="BulkUpdateUserError",
+    name="BulkUpdateUserV2Error",
     description="Added in 26.3.0. Error information for a failed user in bulk update.",
 )
 class BulkUpdateUserV2ErrorGQL:
