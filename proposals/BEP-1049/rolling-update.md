@@ -1,14 +1,3 @@
-<!-- context-for-ai
-type: sub-document
-parent: BEP-1049
-scope: Rolling update deployment strategy - gradual route replacement with max_surge/max_unavailable constraints
-key-constraints:
-  - Uses DeploymentStrategyHandler interface from BEP-1049
-  - All routes use ACTIVE traffic status (unlike Blue-Green which uses INACTIVE)
-  - max_surge and max_unavailable control the pace of replacement
-  - Each cycle waits for provisioning routes before taking further action
--->
-
 # Rolling Update Deployment Strategy
 
 - Parent: [BEP-1049: Zero-Downtime Deployment Strategy Architecture](../BEP-1049-deployment-strategy-handler.md)

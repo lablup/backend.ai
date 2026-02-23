@@ -1,27 +1,11 @@
 ---
-Author: HyeokJin Kim (hyeokjin@lablup.com)
+Author: Gyubong Lee (gbl@lablup.com)
 Status: Draft
-Created: 2026-02-20
+Created: 2026-02-23
 Created-Version: 26.3.0
 Target-Version:
 Implemented-Version:
 ---
-
-<!-- context-for-ai
-type: master-bep
-scope: Introduce DeploymentStrategyHandler interface for multi-cycle deployment strategies (blue-green, rolling update) separate from one-shot DeploymentHandler
-key-constraints:
-  - DeploymentHandler interface must NOT be modified
-  - Strategy handlers process DEPLOYING state only
-  - DeploymentLifecycleType is for handler operations only; strategy tasks use DeploymentStrategy enum directly
-key-decisions:
-  - Separate interface (DeploymentStrategyHandler) instead of extending DeploymentHandler
-  - Strategy filtering happens in coordinator, not executor
-  - DeploymentStrategyResult uses completed/in_progress/errors instead of successes/skipped/errors
-  - Strategy periodic tasks use DeploymentStrategy enum, not DeploymentLifecycleType
-  - Separate event types (DoDeploymentStrategyEvent) instead of reusing lifecycle events with string prefix dispatching
-phases: 2
--->
 
 # Zero-Downtime Deployment Strategy Architecture
 

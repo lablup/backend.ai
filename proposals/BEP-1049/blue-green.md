@@ -1,15 +1,3 @@
-<!-- context-for-ai
-type: sub-document
-parent: BEP-1049
-scope: Blue-Green deployment strategy - atomic traffic switch with INACTIVE staging and auto/manual promotion
-key-constraints:
-  - Uses DeploymentStrategyHandler interface from BEP-1049
-  - Green routes created with INACTIVE traffic status (unlike Rolling Update which uses ACTIVE)
-  - All green routes created at once (not gradual)
-  - Traffic switch is atomic: activate all green + terminate all blue simultaneously
-  - promote_delay_seconds stored in Valkey, checked by executor
--->
-
 # Blue-Green Deployment Strategy
 
 - Parent: [BEP-1049: Zero-Downtime Deployment Strategy Architecture](../BEP-1049-deployment-strategy-handler.md)
