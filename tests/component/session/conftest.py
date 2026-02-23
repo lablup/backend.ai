@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -19,6 +19,7 @@ from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
+from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import session as _session_api
 from ai.backend.manager.api.context import RootContext
@@ -82,6 +83,14 @@ async def _session_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     are left as AsyncMock because they require live gRPC connections to real
     agents, which are not available in component tests.
     """
+    # _TestConfigProvider skips super().__init__() so _legacy_etcd_config_loader
+    # is never set.  The @server_status_required decorator (used by session
+    # handlers) calls config_provider._legacy_etcd_config_loader.get_manager_status()
+    # which is async.  Inject a MagicMock with an AsyncMock method so the check passes.
+    mock_legacy_loader = MagicMock()
+    mock_legacy_loader.get_manager_status = AsyncMock(return_value=ManagerStatus.RUNNING)
+    root_ctx.config_provider._legacy_etcd_config_loader = mock_legacy_loader
+
     root_ctx.registry = AsyncMock()
     root_ctx.repositories = Repositories.create(
         RepositoryArgs(
