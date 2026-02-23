@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import Select
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.data.artifact.types import (
@@ -29,6 +30,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactWithRevisionsListResult,
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.errors.artifact import (
     ArtifactAssociationDeletionError,
     ArtifactAssociationNotFoundError,
@@ -42,6 +44,7 @@ from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.artifact.creators import ArtifactCreatorSpec
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactRemoteStatusFilterType,
     ArtifactRevisionFilterOptions,
@@ -49,6 +52,10 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactStatusFilterType,
 )
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.types import (
     BaseFilterApplier,
@@ -313,21 +320,28 @@ class ArtifactDBSource:
                 existing_artifact = artifact_query_result.scalar_one_or_none()
 
                 if existing_artifact is None:
-                    # Create new artifact
-                    new_artifact = ArtifactRow(
-                        id=artifact_data.id,
-                        name=artifact_data.name,
-                        type=artifact_data.type,
-                        description=artifact_data.description,
-                        registry_id=artifact_data.registry_id,
-                        source_registry_id=artifact_data.source_registry_id,
-                        registry_type=artifact_data.registry_type,
-                        source_registry_type=artifact_data.source_registry_type,
-                        readonly=True,  # always overwrite readonly to True
-                        extra=artifact_data.extra,
+                    # Create new artifact with RBAC scope association
+                    rbac_creator = RBACEntityCreator(
+                        spec=ArtifactCreatorSpec(
+                            id=artifact_data.id,
+                            name=artifact_data.name,
+                            type=artifact_data.type,
+                            description=artifact_data.description,
+                            registry_id=artifact_data.registry_id,
+                            registry_type=artifact_data.registry_type,
+                            source_registry_id=artifact_data.source_registry_id,
+                            source_registry_type=artifact_data.source_registry_type,
+                            readonly=True,
+                            extra=artifact_data.extra,
+                        ),
+                        element_type=RBACElementType.ARTIFACT,
+                        scope_ref=ScopeId(
+                            ScopeType.ARTIFACT_REGISTRY,
+                            str(artifact_data.registry_id),
+                        ),
                     )
-                    db_sess.add(new_artifact)
-                    await db_sess.flush()
+                    creator_result = await execute_rbac_entity_creator(db_sess, rbac_creator)
+                    new_artifact = creator_result.row
                     await db_sess.refresh(
                         new_artifact, attribute_names=["scanned_at", "updated_at"]
                     )
@@ -460,19 +474,26 @@ class ArtifactDBSource:
                 artifact_row = artifact_query_result.scalar_one_or_none()
 
                 if artifact_row is None:
-                    # Create new artifact
-                    artifact_row = ArtifactRow(
-                        type=ArtifactType.MODEL,
-                        name=model.id,
-                        registry_id=registry_id,
-                        registry_type=ArtifactRegistryType.HUGGINGFACE,
-                        source_registry_id=registry_id,
-                        source_registry_type=ArtifactRegistryType.HUGGINGFACE,
-                        readonly=True,
-                        extra=model.extra,
+                    # Create new artifact with RBAC scope association
+                    rbac_creator = RBACEntityCreator(
+                        spec=ArtifactCreatorSpec(
+                            name=model.id,
+                            type=ArtifactType.MODEL,
+                            registry_id=registry_id,
+                            registry_type=ArtifactRegistryType.HUGGINGFACE,
+                            source_registry_id=registry_id,
+                            source_registry_type=ArtifactRegistryType.HUGGINGFACE,
+                            readonly=True,
+                            extra=model.extra,
+                        ),
+                        element_type=RBACElementType.ARTIFACT,
+                        scope_ref=ScopeId(
+                            ScopeType.ARTIFACT_REGISTRY,
+                            str(registry_id),
+                        ),
                     )
-                    db_sess.add(artifact_row)
-                    await db_sess.flush()
+                    creator_result = await execute_rbac_entity_creator(db_sess, rbac_creator)
+                    artifact_row = creator_result.row
                     await db_sess.refresh(
                         artifact_row, attribute_names=["scanned_at", "updated_at"]
                     )
