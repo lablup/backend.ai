@@ -21,7 +21,7 @@ import trafaret as t
 import yarl
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.docker import (
     ImageRef,
     LabelName,
@@ -167,8 +167,11 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         result: list[ScopeId] = []
         owner_label = labels.get(LabelName.CUSTOMIZED_OWNER)
         if owner_label is not None:
-            _, _, scope_id = owner_label.partition(":")
-            result.append(ScopeId(scope_type=ScopeType.USER, scope_id=scope_id))
+            prefix, sep, scope_id = owner_label.partition(":")
+            if prefix and sep and scope_id:
+                result.append(ScopeId(scope_type=ScopeType.USER, scope_id=scope_id))
+            else:
+                log.warning("Invalid {} label value: {!r}", LabelName.CUSTOMIZED_OWNER, owner_label)
         return result
 
     async def commit_rescan_result(self) -> list[ImageData]:
@@ -246,7 +249,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         additional_scope_refs=self._determine_additional_image_scopes(
                             update["labels"]
                         ),
-                        entity_type=EntityType.IMAGE,
+                        element_type=RBACElementType.IMAGE,
                     )
                     result = await execute_rbac_entity_creator(session, rbac_creator)
                     scanned_images.append(result.row.to_dataclass())
