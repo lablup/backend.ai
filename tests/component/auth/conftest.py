@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -17,6 +17,7 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.plugin.hook import HookResult, HookResults
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -87,6 +88,11 @@ async def _auth_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             valkey_live_client=root_ctx.valkey_live,
         )
     )
+    hook_mock = MagicMock()
+    hook_mock.dispatch = AsyncMock(
+        return_value=HookResult(status=HookResults.PASSED, result=None, reason=None),
+    )
+    hook_mock.notify = AsyncMock(return_value=None)
     root_ctx.processors = Processors.create(
         ProcessorArgs(
             service_args=ServiceArgs(
@@ -106,7 +112,7 @@ async def _auth_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 agent_registry=MagicMock(),
                 idle_checker_host=MagicMock(),
                 event_dispatcher=MagicMock(),
-                hook_plugin_ctx=MagicMock(),
+                hook_plugin_ctx=hook_mock,
                 scheduling_controller=MagicMock(),
                 deployment_controller=MagicMock(),
                 revision_generator_registry=MagicMock(),

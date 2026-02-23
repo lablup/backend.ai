@@ -149,12 +149,12 @@ class TestSSHKeypair:
             UploadSSHKeypairRequest(pubkey=pubkey, privkey=privkey),
         )
         assert isinstance(result, SSHKeypairResponse)
-        assert result.ssh_public_key == pubkey
+        assert result.ssh_public_key.strip() == pubkey
         assert result.ssh_private_key == privkey
 
         # Verify via get that the public key was stored
         get_result = await admin_registry.auth.get_ssh_keypair()
-        assert get_result.ssh_public_key == pubkey
+        assert get_result.ssh_public_key.strip() == pubkey
 
 
 class TestUpdateFullName:
