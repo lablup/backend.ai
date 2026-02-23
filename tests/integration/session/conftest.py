@@ -77,7 +77,7 @@ async def session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_fixture,
+                scaling_group_name=scaling_group_fixture,
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
