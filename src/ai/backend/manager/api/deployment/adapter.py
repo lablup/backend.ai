@@ -408,7 +408,9 @@ class CreateDeploymentAdapter:
         )
 
         # Build model revision creator
-        model_revision = self._build_revision_creator(request.initial_revision)
+        # deployment_id is not yet known during deployment creation;
+        # it will be assigned by the repository layer.
+        model_revision = self._build_revision_creator(uuid4(), request.initial_revision)
 
         # Build policy config
         policy = self._build_policy_config(request.default_deployment_strategy)
@@ -423,6 +425,7 @@ class CreateDeploymentAdapter:
 
     def _build_revision_creator(
         self,
+        deployment_id: UUID,
         revision_input: RevisionInput,
     ) -> ModelRevisionCreator:
         """Build ModelRevisionCreator from revision input."""
@@ -473,6 +476,7 @@ class CreateDeploymentAdapter:
         )
 
         return ModelRevisionCreator(
+            model_deployment_id=deployment_id,
             image_id=revision_input.image.id,
             resource_spec=resource_spec,
             mounts=mounts,

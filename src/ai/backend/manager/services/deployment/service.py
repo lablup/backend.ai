@@ -538,17 +538,17 @@ class DeploymentService:
     async def add_model_revision(
         self, action: AddModelRevisionAction
     ) -> AddModelRevisionActionResult:
-        endpoint_info = await self._deployment_repository.get_endpoint_info(
-            action.model_deployment_id
-        )
+        adder = action.adder
+        deployment_id = adder.model_deployment_id
+
+        endpoint_info = await self._deployment_repository.get_endpoint_info(deployment_id)
         latest_revision_number = await self._deployment_repository.get_latest_revision_number(
-            action.model_deployment_id
+            deployment_id
         )
         next_revision_number = (latest_revision_number or 0) + 1
 
-        adder = action.adder
         spec = DeploymentRevisionCreatorSpec(
-            endpoint_id=action.model_deployment_id,
+            endpoint_id=deployment_id,
             revision_number=next_revision_number,
             image_id=adder.image_id,
             resource_group=endpoint_info.metadata.resource_group,
