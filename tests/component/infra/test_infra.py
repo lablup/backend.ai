@@ -33,8 +33,7 @@ from ai.backend.common.dto.manager.infra import (
 _HMAC_XFAIL_REASON = (
     "Client SDK v2 HMAC signing omits query params; "
     "server verifies against request.raw_path (including ?param=...). "
-    "Endpoints passing query params cause 401. "
-    "Tracked in BA-XXXX (Client SDK v2 HMAC signing bug)."
+    "Endpoints passing query params cause 401."
 )
 
 

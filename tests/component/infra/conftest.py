@@ -66,6 +66,7 @@ async def _infra_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     # return minimal valid data so the endpoints respond successfully.
     mock_legacy_loader.get_resource_slots = AsyncMock(return_value={"cpu": "count", "mem": "bytes"})
     mock_legacy_loader.get_vfolder_types = AsyncMock(return_value=["user", "group"])
+    mock_legacy_loader.register_myself = AsyncMock(return_value=None)
     root_ctx.config_provider._legacy_etcd_config_loader = mock_legacy_loader
 
     root_ctx.repositories = Repositories.create(
@@ -161,7 +162,7 @@ async def group_name_fixture(
         )
         row = result.first()
         assert row is not None
-        return row[0]
+        return str(row[0])
 
 
 @pytest.fixture()
