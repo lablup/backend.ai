@@ -554,6 +554,8 @@ class CloneVFolderActionResult(VFolderSingleEntityActionResult):
 
 @dataclass
 class GetTaskLogsAction(VFolderSingleEntityAction):
+    # TODO: Migrate to a session/kernel action with RBACElementRef(SESSION, session_id).
+    # Currently target_element() returns USER scope which always passes validation.
     user_id: uuid.UUID
     domain_name: str
     user_role: UserRole
@@ -578,7 +580,6 @@ class GetTaskLogsAction(VFolderSingleEntityAction):
 
     @override
     def target_element(self) -> RBACElementRef:
-        # TODO: Migrate GetTaskLogsAction to a session/kernel action.
         return RBACElementRef(
             element_type=RBACElementType.USER,
             element_id=str(self.user_id),
