@@ -60,27 +60,12 @@ Two new tables store preset definitions and their allowed labels.
 | Column | Type | Constraints | Description |
 |--------|------|------------|-------------|
 | `id` | `UUID` | PK, default `uuid_generate_v4()` | Primary key |
-| `preset_id` | `UUID` | NOT NULL, FK → `presets(id)` ON DELETE CASCADE | Parent preset |
+| `preset_id` | `UUID` | NOT NULL, FK → `prometheus_query_presets(id)` ON DELETE CASCADE | Parent preset |
 | `label_name` | `VARCHAR(128)` | NOT NULL | Prometheus label name |
 | `filterable` | `BOOLEAN` | NOT NULL, default `true` | Whether this label can appear in `{labels}` filter |
 | `groupable` | `BOOLEAN` | NOT NULL, default `false` | Whether this label can appear in `by ({group_by})` |
 | | | UNIQUE(`preset_id`, `label_name`) | One definition per label per preset |
 
-### Architecture
-
-The system follows the Backend.AI layered architecture:
-
-```
-REST API Handler
-     ↓
-  Service Layer  ←→  PrometheusClient (for execute)
-     ↓
-  Repository Layer
-     ↓
-  Data Layer (DTOs)
-     ↓
-  Model Layer (ORM rows)
-```
 
 ### API Design
 
@@ -176,6 +161,58 @@ REST API Handler
 ```
 
 The `metric` field uses a key-value entries pattern instead of fixed fields, allowing each preset to return a different set of labels.
+
+#### REST
+
+**CRUD types:**
+
+```python
+class PrometheusQueryPresetLabelCreate(BaseModel):
+    label_name: str
+    filterable: bool
+    groupable: bool
+
+class PrometheusQueryPresetCreate(BaseModel):
+    name: str
+    metric_name: str
+    query_template: str
+    time_window: str | None = None
+    labels: list[PrometheusQueryPresetLabelCreate]
+
+class PrometheusQueryPresetModify(BaseModel):
+    name: str | None = None
+    metric_name: str | None = None
+    query_template: str | None = None
+    time_window: str | None = None
+    labels: list[PrometheusQueryPresetLabelCreate] | None = None
+```
+
+**Execute types:**
+
+```python
+class MetricLabelEntry(BaseModel):
+    key: str
+    value: str
+
+class ExecutePresetRequest(BaseModel):
+    labels: list[MetricLabelEntry] | None = None
+    group_labels: list[str] | None = None
+    window: str | None = None
+    time_range: QueryTimeRange
+
+class PresetMetricResult(BaseModel):
+    metric: list[MetricLabelEntry]
+    values: list[tuple[float, str]]
+
+class PresetExecuteData(BaseModel):
+    result_type: str
+    result: list[PresetMetricResult]
+
+class PresetExecuteResponse(BaseModel):
+    status: str
+    data: PresetExecuteData
+```
+
 
 #### GraphQL API
 
@@ -301,12 +338,13 @@ backend.ai prometheus-query-preset execute <NAME> \
     --start <ISO8601> \
     --end <ISO8601> \
     --step <STEP> \
-    [--labels '{"key": "value", ...}'] \
+    [--label container_metric_name=cpu_util] \
+    [--label kernel_id=abc-123] \
     [--group-labels label1,label2] \
     [--window <WINDOW>]
 ```
 
-The execute command is a top-level (non-admin) command because it is available to all authenticated users.
+`--label` is a repeatable flag using `key=value` format. The execute command is a top-level (non-admin) command because it is available to all authenticated users.
 
 ### Execute Flow
 
@@ -339,7 +377,7 @@ sequenceDiagram
 
 - Each label key in the request must have `filterable = true` in the preset's allowed labels
 - Each entry in `group_labels` must have `groupable = true` in the preset's allowed labels
-- `window` must match `^\d+[smhdw]$`; if absent, falls back to the preset's `time_window` or the server config `metric.timewindow`
+- `window` must match `^\d+[smhdw]$` (single-unit durations only; compound durations like `1h30m` or `500ms` are intentionally not supported); if absent, falls back to the preset's `time_window` or the server config `metric.timewindow`
 
 ### Security
 
@@ -350,6 +388,8 @@ sequenceDiagram
 | **Window format injection** | Validate against `^\d+[smhdw]$` regex before substitution |
 | **Template modification** | CRUD operations restricted to SUPERADMIN role |
 | **Metric name substitution** | `{metric_name}` is resolved from the preset's `metric_name` field (DB-stored, admin-controlled), not from user input |
+| **Query resource exhaustion** | Validate `time_range` duration and `step` size at the service layer — reject excessively large ranges or sub-second steps to prevent Prometheus overload |
+
 
 ### Reused Infrastructure
 
@@ -372,14 +412,6 @@ sequenceDiagram
 - **No breaking changes**: Existing `ContainerUtilizationMetricService` continues to work with its hardcoded templates
 - **Additive only**: New REST endpoints and DB tables; no modifications to existing APIs
 - **Future migration path**: Once presets are populated, `ContainerUtilizationMetricService._build_preset()` can be refactored to look up presets from the repository instead of using hardcoded templates. This is out of scope for this BEP.
-
-## Open Questions
-
-1. **`{metric_name}` placeholder**: Should the template support a `{metric_name}` placeholder that resolves to the preset's `metric_name` field, or should administrators inline the metric name directly in the template? Supporting the placeholder adds flexibility; inlining is simpler and avoids an extra substitution step.
-
-2. **Seed data**: Should we provide default presets (gauge, rate, diff for `backendai_container_utilization`) as part of the migration, or leave the table empty and let administrators populate it?
-
-3. **Preset versioning**: If a preset is modified while a query is in-flight, should we add an optimistic locking mechanism (e.g., `version` column), or is the current read-then-execute approach sufficient?
 
 ## References
 
