@@ -504,11 +504,19 @@ class CreateRevisionInput:
     extra_mounts: list[ExtraVFolderMountInput] | None
 
     def to_model_revision_creator(self) -> ModelRevisionCreator:
+        resource_slots = {
+            e.resource_type: e.quantity for e in self.resource_config.resource_slots.entries
+        }
+        resource_opts: dict[str, Any] | None = None
+        if self.resource_config.resource_opts is not None:
+            resource_opts = {
+                e.name: e.value for e in self.resource_config.resource_opts.entries
+            }
         resource_spec = ResourceSpec(
             cluster_mode=CommonClusterMode(self.cluster_config.mode),
             cluster_size=self.cluster_config.size,
-            resource_slots=cast(Mapping[str, Any], self.resource_config.resource_slots),
-            resource_opts=cast(Mapping[str, Any] | None, self.resource_config.resource_opts),
+            resource_slots=resource_slots,
+            resource_opts=resource_opts,
         )
 
         extra_mounts = []
@@ -564,11 +572,19 @@ class AddRevisionInput:
 
     def to_model_revision_creator(self) -> ModelRevisionCreator:
         """Build ModelRevisionCreator from input fields."""
+        resource_slots = {
+            e.resource_type: e.quantity for e in self.resource_config.resource_slots.entries
+        }
+        resource_opts: dict[str, Any] | None = None
+        if self.resource_config.resource_opts is not None:
+            resource_opts = {
+                e.name: e.value for e in self.resource_config.resource_opts.entries
+            }
         resource_spec = ResourceSpec(
             cluster_mode=CommonClusterMode(self.cluster_config.mode),
             cluster_size=self.cluster_config.size,
-            resource_slots=cast(Mapping[str, Any], self.resource_config.resource_slots),
-            resource_opts=cast(Mapping[str, Any] | None, self.resource_config.resource_opts),
+            resource_slots=resource_slots,
+            resource_opts=resource_opts,
         )
 
         extra_mounts = []
