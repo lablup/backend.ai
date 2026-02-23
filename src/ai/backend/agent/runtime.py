@@ -166,7 +166,7 @@ class AgentRuntime:
             aiotools.create_timer(
                 self._collect_node_stat,
                 UTILIZATION_METRIC_INTERVAL,
-                aiotools.TimerDelayPolicy.CANCEL,
+                delay_policy=aiotools.TimerDelayPolicy.CANCEL,
             ),
         ]
 

@@ -1034,14 +1034,14 @@ class AbstractAgent[
             aiotools.create_timer(
                 self.collect_container_stat,
                 UTILIZATION_METRIC_INTERVAL,
-                aiotools.TimerDelayPolicy.CANCEL,
+                delay_policy=aiotools.TimerDelayPolicy.CANCEL,
             )
         )
         self.timer_tasks.append(
             aiotools.create_timer(
                 self.collect_process_stat,
                 UTILIZATION_METRIC_INTERVAL,
-                aiotools.TimerDelayPolicy.CANCEL,
+                delay_policy=aiotools.TimerDelayPolicy.CANCEL,
             )
         )
 
