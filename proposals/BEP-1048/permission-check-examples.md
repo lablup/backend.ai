@@ -1,11 +1,6 @@
----
-Author: Sanghun Lee (sanghun@lablup.com)
-Status: Draft
-Created: 2026-02-21
-Parent: BEP-1048-RBAC-entity-relationship-model.md
----
-
 # BEP-1048 Permission Check Examples
+
+> Detail document for [BEP-1048](../BEP-1048-RBAC-entity-relationship-model.md)
 
 This document provides concrete examples of how `check_permission_with_scope_chain()` resolves permissions by walking the `association_scopes_entities` table. Each scenario shows the exact DB records required and how the two-layer check (self-scope direct match + CTE scope chain traversal) produces a result.
 
