@@ -7442,7 +7442,7 @@ type Mutation
   """
   Added in 26.2.0. Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user.
   """
-  adminCreateUser(input: CreateUserV2Input!): CreateUserV2Payload! @join__field(graph: STRAWBERRY)
+  adminCreateUserV2(input: CreateUserV2Input!): CreateUserV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications.
@@ -7457,27 +7457,27 @@ type Mutation
   """
   Added in 26.3.0. Update a user's information (admin only). Requires superadmin privileges. Only provided fields will be updated.
   """
-  adminUpdateUser(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload! @join__field(graph: STRAWBERRY)
+  adminUpdateUserV2(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Update the current user's information. Users can only update their own profile. Some fields may be restricted based on user role.
   """
-  updateUser(input: UpdateUserV2Input!): UpdateUserV2Payload! @join__field(graph: STRAWBERRY)
+  updateUserV2(input: UpdateUserV2Input!): UpdateUserV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Soft-delete a user (admin only). Requires superadmin privileges. Sets the user status to DELETED but preserves data.
   """
-  adminDeleteUser(userId: UUID!): DeleteUserV2Payload! @join__field(graph: STRAWBERRY)
+  adminDeleteUserV2(userId: UUID!): DeleteUserV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Soft-delete multiple users (admin only). Requires superadmin privileges. Sets user status to DELETED but preserves data.
   """
-  adminDeleteUsers(input: DeleteUsersV2Input!): DeleteUsersV2Payload! @join__field(graph: STRAWBERRY)
+  adminDeleteUsersV2(input: DeleteUsersV2Input!): DeleteUsersV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Permanently delete a user and all associated data (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data, sessions, and resources will be deleted.
   """
-  adminPurgeUser(input: PurgeUserV2Input!): PurgeUserV2Payload! @join__field(graph: STRAWBERRY)
+  adminPurgeUserV2(input: PurgeUserV2Input!): PurgeUserV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.3.0. Permanently delete multiple users in bulk (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted.
