@@ -415,73 +415,13 @@ class UserFairShareFilter(GQLFilter):
 
         return conditions
 
+    def build_rg_conditions(self) -> list[QueryCondition]:
+        """Build conditions using INNER JOIN'd columns for RG-context queries.
 
-@strawberry.enum(
-    name="UserFairShareOrderField",
-    description=(
-        "Added in 26.1.0. Fields available for ordering user fair share query results. "
-        "FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). "
-        "CREATED_AT: Order by record creation timestamp. "
-        "USER_USERNAME: Order alphabetically by username (added in 26.2.0). "
-        "USER_EMAIL: Order alphabetically by email (added in 26.2.0)."
-    ),
-)
-class UserFairShareOrderField(StrEnum):
-    FAIR_SHARE_FACTOR = "fair_share_factor"
-    CREATED_AT = "created_at"
-    USER_USERNAME = "user_username"
-    USER_EMAIL = "user_email"
-
-
-@strawberry.input(
-    name="UserFairShareOrderBy",
-    description=(
-        "Added in 26.1.0. Specifies ordering for user fair share query results. "
-        "Combine field selection with direction to sort results. "
-        "Default direction is DESC (descending)."
-    ),
-)
-class UserFairShareOrderBy(GQLOrderBy):
-    """OrderBy for user fair shares."""
-
-    field: UserFairShareOrderField = strawberry.field(
-        description="The field to order by. See UserFairShareOrderField for available options."
-    )
-    direction: OrderDirection = strawberry.field(
-        default=OrderDirection.DESC,
-        description=(
-            "Sort direction. ASC for ascending (lowest first), DESC for descending (highest first). "
-            "For fair_share_factor, ASC shows highest priority users first."
-        ),
-    )
-
-    @override
-    def to_query_order(self) -> QueryOrder:
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case UserFairShareOrderField.FAIR_SHARE_FACTOR:
-                return UserFairShareOrders.by_fair_share_factor(ascending)
-            case UserFairShareOrderField.CREATED_AT:
-                return UserFairShareOrders.by_created_at(ascending)
-            case UserFairShareOrderField.USER_USERNAME:
-                return UserFairShareOrders.by_user_username(ascending)
-            case UserFairShareOrderField.USER_EMAIL:
-                return UserFairShareOrders.by_user_email(ascending)
-
-
-class RGUserFairShareFilter(UserFairShareFilter):
-    """RG-context filter that uses INNER JOIN'd columns for conditions.
-
-    Not a Strawberry GQL type — used internally by fetchers to build
-    conditions that reference AssocGroupUserRow/DomainRow/ScalingGroupForProjectRow
-    instead of UserFairShareRow, preventing NULL exclusion of entities
-    without records.
-
-    Convert from a base filter using ``RGUserFairShareFilter(**vars(f))``.
-    """
-
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
+        References AssocGroupUserRow/DomainRow/ScalingGroupForProjectRow instead
+        of UserFairShareRow, preventing NULL exclusion of entities without
+        fair share records.
+        """
         conditions: list[QueryCondition] = []
 
         if self.resource_group:
@@ -541,23 +481,76 @@ class RGUserFairShareFilter(UserFairShareFilter):
 
         if self.AND:
             for sub_filter in self.AND:
-                conditions.extend(type(self)(**vars(sub_filter)).build_conditions())
+                conditions.extend(sub_filter.build_rg_conditions())
 
         if self.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in self.OR:
-                or_conditions.extend(type(self)(**vars(sub_filter)).build_conditions())
+                or_conditions.extend(sub_filter.build_rg_conditions())
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
 
         if self.NOT:
             not_conditions: list[QueryCondition] = []
             for sub_filter in self.NOT:
-                not_conditions.extend(type(self)(**vars(sub_filter)).build_conditions())
+                not_conditions.extend(sub_filter.build_rg_conditions())
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
 
         return conditions
+
+
+@strawberry.enum(
+    name="UserFairShareOrderField",
+    description=(
+        "Added in 26.1.0. Fields available for ordering user fair share query results. "
+        "FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). "
+        "CREATED_AT: Order by record creation timestamp. "
+        "USER_USERNAME: Order alphabetically by username (added in 26.2.0). "
+        "USER_EMAIL: Order alphabetically by email (added in 26.2.0)."
+    ),
+)
+class UserFairShareOrderField(StrEnum):
+    FAIR_SHARE_FACTOR = "fair_share_factor"
+    CREATED_AT = "created_at"
+    USER_USERNAME = "user_username"
+    USER_EMAIL = "user_email"
+
+
+@strawberry.input(
+    name="UserFairShareOrderBy",
+    description=(
+        "Added in 26.1.0. Specifies ordering for user fair share query results. "
+        "Combine field selection with direction to sort results. "
+        "Default direction is DESC (descending)."
+    ),
+)
+class UserFairShareOrderBy(GQLOrderBy):
+    """OrderBy for user fair shares."""
+
+    field: UserFairShareOrderField = strawberry.field(
+        description="The field to order by. See UserFairShareOrderField for available options."
+    )
+    direction: OrderDirection = strawberry.field(
+        default=OrderDirection.DESC,
+        description=(
+            "Sort direction. ASC for ascending (lowest first), DESC for descending (highest first). "
+            "For fair_share_factor, ASC shows highest priority users first."
+        ),
+    )
+
+    @override
+    def to_query_order(self) -> QueryOrder:
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case UserFairShareOrderField.FAIR_SHARE_FACTOR:
+                return UserFairShareOrders.by_fair_share_factor(ascending)
+            case UserFairShareOrderField.CREATED_AT:
+                return UserFairShareOrders.by_created_at(ascending)
+            case UserFairShareOrderField.USER_USERNAME:
+                return UserFairShareOrders.by_user_username(ascending)
+            case UserFairShareOrderField.USER_EMAIL:
+                return UserFairShareOrders.by_user_email(ascending)
 
 
 # Mutation Input/Payload Types

@@ -120,9 +120,13 @@ async def fetch_rg_domain_fair_shares(
     """Fetch domain fair shares using resource group scope.
 
     Returns all domains in the scope, including those without records (with defaults).
-    Uses RG-context filters/orders to reference INNER JOIN'd columns.
+    Filter conditions are built via build_rg_conditions() which references INNER JOIN'd
+    columns, then passed as base_conditions to avoid NULL exclusion.
     """
     processors = info.context.processors
+
+    rg_conditions = filter.build_rg_conditions() if filter else []
+    all_base = [*(base_conditions or []), *rg_conditions]
 
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
@@ -134,9 +138,9 @@ async def fetch_rg_domain_fair_shares(
             offset=offset,
         ),
         get_domain_fair_share_pagination_spec(),
-        filter=filter,
+        filter=None,
         order_by=order_by,
-        base_conditions=base_conditions,
+        base_conditions=all_base,
     )
 
     action_result = await processors.fair_share.search_rg_domain_fair_shares.wait_for_complete(

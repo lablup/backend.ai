@@ -20,7 +20,6 @@ from ai.backend.manager.api.gql.fair_share.types import (
     ProjectFairShareFilter,
     ProjectFairShareGQL,
     ProjectFairShareOrderBy,
-    RGProjectFairShareFilter,
     UpsertProjectFairShareWeightInput,
     UpsertProjectFairShareWeightPayload,
 )
@@ -133,7 +132,7 @@ async def rg_project_fair_shares(
     return await fetch_rg_project_fair_shares(
         info=info,
         scope=repo_scope,
-        filter=RGProjectFairShareFilter(**vars(filter)) if filter else None,
+        filter=filter,
         order_by=order_by,
         before=before,
         after=after,

@@ -18,8 +18,6 @@ from ai.backend.manager.api.gql.fair_share.types import (
     DomainFairShareFilter,
     DomainFairShareGQL,
     DomainFairShareOrderBy,
-    RGDomainFairShareFilter,
-    RGDomainFairShareOrderBy,
     UpsertDomainFairShareWeightInput,
     UpsertDomainFairShareWeightPayload,
 )
@@ -129,8 +127,8 @@ async def rg_domain_fair_shares(
     return await fetch_rg_domain_fair_shares(
         info=info,
         scope=repo_scope,
-        filter=RGDomainFairShareFilter(**vars(filter)) if filter else None,
-        order_by=[RGDomainFairShareOrderBy(**vars(o)) for o in order_by] if order_by else None,
+        filter=filter,
+        order_by=order_by,
         before=before,
         after=after,
         first=first,
