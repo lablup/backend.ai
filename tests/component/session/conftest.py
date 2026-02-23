@@ -63,6 +63,7 @@ class SessionSeedData:
     session_name: str
     kernel_id: uuid.UUID
     access_key: str
+    domain_name: str
 
 
 @asynccontextmanager
@@ -248,6 +249,7 @@ async def session_seed(
         session_name=session_name,
         kernel_id=kernel_id,
         access_key=admin_user_fixture.keypair.access_key,
+        domain_name=domain_fixture,
     )
 
     async with db_engine.begin() as conn:
@@ -341,6 +343,7 @@ async def terminated_session_seed(
         session_name=session_name,
         kernel_id=kernel_id,
         access_key=admin_user_fixture.keypair.access_key,
+        domain_name=domain_fixture,
     )
 
     async with db_engine.begin() as conn:

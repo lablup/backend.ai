@@ -33,7 +33,7 @@ class TestSessionGetInfo:
         # session id/name — verify that the returned dict contains expected
         # fields from the seeded row instead.
         assert result.root["status"] == "RUNNING"
-        assert result.root["domainName"] == "default"
+        assert result.root["domainName"] == session_seed.domain_name
 
     @pytest.mark.asyncio
     async def test_get_nonexistent_session_returns_not_found(

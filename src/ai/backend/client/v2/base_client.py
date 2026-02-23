@@ -12,6 +12,7 @@ from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.common.api_handlers import (
     BaseRequestModel,
     BaseResponseModel,
+    BaseRootResponseModel,
 )
 
 from .auth import AuthStrategy
@@ -19,7 +20,7 @@ from .config import ClientConfig
 from .exceptions import SSEError, WebSocketError, map_status_to_exception
 from .streaming_types import SSEConnection, WebSocketSession
 
-ResponseT = TypeVar("ResponseT", bound=BaseResponseModel)
+ResponseT = TypeVar("ResponseT", bound=BaseResponseModel | BaseRootResponseModel[Any])
 
 
 class BackendAIClient:
