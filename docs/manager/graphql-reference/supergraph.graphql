@@ -9337,7 +9337,7 @@ type Query
   rgDomainFairShare(scope: ResourceGroupDomainScope!, domainName: String!): DomainFairShare @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. List domain fair shares within resource group scope."""
-  rgDomainFairShares(scope: ResourceGroupDomainScope!, filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection @join__field(graph: STRAWBERRY)
+  rgDomainFairShares(scope: ResourceGroupDomainScope!, filter: RGDomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Get project fair share data within resource group scope.
@@ -9345,13 +9345,13 @@ type Query
   rgProjectFairShare(scope: ResourceGroupProjectScope!, projectId: UUID!): ProjectFairShare @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. List project fair shares within resource group scope."""
-  rgProjectFairShares(scope: ResourceGroupProjectScope!, filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection @join__field(graph: STRAWBERRY)
+  rgProjectFairShares(scope: ResourceGroupProjectScope!, filter: RGProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. Get user fair share data within resource group scope."""
   rgUserFairShare(scope: ResourceGroupUserScope!, userUuid: UUID!): UserFairShare @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. List user fair shares within resource group scope."""
-  rgUserFairShares(scope: ResourceGroupUserScope!, filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection @join__field(graph: STRAWBERRY)
+  rgUserFairShares(scope: ResourceGroupUserScope!, filter: RGUserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. List domain usage buckets within resource group scope. This API is not yet implemented.
@@ -10213,6 +10213,90 @@ input RevokeRoleInput
 {
   userId: UUID!
   roleId: UUID!
+}
+
+"""
+Added in 26.2.0. Filter for domain fair shares within a resource group scope. References resource group membership columns to avoid excluding domains without fair share records.
+"""
+input RGDomainFairShareFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by scaling group name."""
+  resourceGroup: StringFilter = null
+
+  """Filter by domain name."""
+  domainName: StringFilter = null
+
+  """Filter by domain properties."""
+  domain: DomainFairShareDomainNestedFilter = null
+
+  """Combine with AND logic."""
+  AND: [RGDomainFairShareFilter!] = null
+
+  """Combine with OR logic."""
+  OR: [RGDomainFairShareFilter!] = null
+
+  """Negate filters."""
+  NOT: [RGDomainFairShareFilter!] = null
+}
+
+"""
+Added in 26.2.0. Filter for project fair shares within a resource group scope. References resource group membership columns to avoid excluding projects without fair share records.
+"""
+input RGProjectFairShareFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by scaling group name."""
+  resourceGroup: StringFilter = null
+
+  """Filter by project UUID."""
+  projectId: UUIDFilter = null
+
+  """Filter by domain name."""
+  domainName: StringFilter = null
+
+  """Filter by project properties."""
+  project: ProjectFairShareProjectNestedFilter = null
+
+  """Combine with AND logic."""
+  AND: [RGProjectFairShareFilter!] = null
+
+  """Combine with OR logic."""
+  OR: [RGProjectFairShareFilter!] = null
+
+  """Negate filters."""
+  NOT: [RGProjectFairShareFilter!] = null
+}
+
+"""
+Added in 26.2.0. Filter for user fair shares within a resource group scope. References resource group membership columns to avoid excluding users without fair share records.
+"""
+input RGUserFairShareFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by scaling group name."""
+  resourceGroup: StringFilter = null
+
+  """Filter by user UUID."""
+  userUuid: UUIDFilter = null
+
+  """Filter by project UUID."""
+  projectId: UUIDFilter = null
+
+  """Filter by domain name."""
+  domainName: StringFilter = null
+
+  """Filter by user properties."""
+  user: UserFairShareUserNestedFilter = null
+
+  """Combine with AND logic."""
+  AND: [RGUserFairShareFilter!] = null
+
+  """Combine with OR logic."""
+  OR: [RGUserFairShareFilter!] = null
+
+  """Negate filters."""
+  NOT: [RGUserFairShareFilter!] = null
 }
 
 """Added in 26.3.0. RBAC role"""
