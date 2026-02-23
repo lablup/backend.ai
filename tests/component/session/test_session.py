@@ -32,8 +32,8 @@ class TestSessionGetInfo:
         # LegacySessionInfo.asdict() uses camelCase keys and does not include
         # session id/name — verify that the returned dict contains expected
         # fields from the seeded row instead.
-        assert result.result["status"] == "RUNNING"
-        assert result.result["domainName"] == "default"
+        assert result.root["status"] == "RUNNING"
+        assert result.root["domainName"] == "default"
 
     @pytest.mark.asyncio
     async def test_get_nonexistent_session_returns_not_found(
@@ -59,7 +59,7 @@ class TestSessionRename:
         # Verify the rename took effect by fetching with the new name
         result = await admin_registry.session.get_info(new_name)
         assert isinstance(result, GetSessionInfoResponse)
-        assert result.result["status"] == "RUNNING"
+        assert result.root["status"] == "RUNNING"
 
     @pytest.mark.asyncio
     async def test_rename_nonexistent_session_returns_not_found(
