@@ -21,7 +21,12 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import load_only, selectinload
 
-from ai.backend.common.data.permission.types import EntityType, FieldType, ScopeType
+from ai.backend.common.data.permission.types import (
+    EntityType,
+    FieldType,
+    RBACElementType,
+    ScopeType,
+)
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
@@ -1184,12 +1189,12 @@ class ScheduleDBSource:
             # Use RBACEntityCreator to create session with RBAC scope association
             rbac_creator = RBACEntityCreator(
                 spec=SessionRowCreatorSpec(row=session),
+                element_type=RBACElementType.SESSION,
                 scope_ref=ScopeId(
                     scope_type=ScopeType.USER,
                     scope_id=str(session_data.user_uuid),
                 ),
                 additional_scope_refs=[],
-                entity_type=EntityType.SESSION,
             )
             await execute_rbac_entity_creator(db_sess, rbac_creator)
 
