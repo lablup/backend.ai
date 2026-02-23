@@ -82,6 +82,7 @@ async def _session_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     are left as MagicMock because they require live gRPC connections to real
     agents, which are not available in component tests.
     """
+    root_ctx.registry = MagicMock()
     root_ctx.repositories = Repositories.create(
         RepositoryArgs(
             db=root_ctx.db,
@@ -188,7 +189,7 @@ async def session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_fixture,
+                scaling_group_name=scaling_group_fixture,
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
@@ -278,7 +279,7 @@ async def terminated_session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_fixture,
+                scaling_group_name=scaling_group_fixture,
                 status=SessionStatus.TERMINATED,
                 status_info="user-requested",
                 status_history=status_history,
