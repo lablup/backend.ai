@@ -14,7 +14,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.types import (
     AccessKey,
@@ -3498,7 +3498,7 @@ class TestDeploymentRepositoryDuplicateName:
         )
         return RBACEntityCreator(
             spec=spec,
-            element_type=RBACElementType.MODEL_DEPLOYMENT,
+            entity_type=EntityType.MODEL_DEPLOYMENT,
             scope_ref=ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(group.id)),
         )
 
