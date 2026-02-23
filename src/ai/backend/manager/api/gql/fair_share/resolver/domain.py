@@ -18,6 +18,7 @@ from ai.backend.manager.api.gql.fair_share.types import (
     DomainFairShareFilter,
     DomainFairShareGQL,
     DomainFairShareOrderBy,
+    RGDomainFairShareFilter,
     UpsertDomainFairShareWeightInput,
     UpsertDomainFairShareWeightPayload,
 )
@@ -113,7 +114,7 @@ async def rg_domain_fair_share(
 async def rg_domain_fair_shares(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupDomainScope,
-    filter: DomainFairShareFilter | None = None,
+    filter: RGDomainFairShareFilter | None = None,
     order_by: list[DomainFairShareOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,

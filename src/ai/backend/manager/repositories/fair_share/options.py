@@ -15,7 +15,11 @@ from ai.backend.manager.models.fair_share import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForDomainRow,
+    ScalingGroupForProjectRow,
+)
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.types import QueryCondition, QueryOrder
 
@@ -583,3 +587,298 @@ class UserFairShareOrders:
     def by_user_email(ascending: bool = True) -> QueryOrder:
         col = UserRow.email
         return col.asc() if ascending else col.desc()
+
+
+# ==================== RG-context conditions ====================
+# These condition classes reference INNER JOIN'd columns instead of
+# LEFT JOIN'd FairShareRow columns, so they work correctly in
+# search_rg_* queries where FairShareRow columns can be NULL for
+# entities without fair share records.
+
+
+class RGDomainFairShareConditions:
+    """Query conditions for rg-scoped domain fair share queries.
+
+    References ScalingGroupForDomainRow (INNER JOIN'd base table)
+    instead of DomainFairShareRow (LEFT JOIN'd).
+    """
+
+    @staticmethod
+    def by_domain_name(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForDomainRow.domain == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_contains(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForDomainRow.domain.like(f"%{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_equals(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForDomainRow.domain == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_starts_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForDomainRow.domain.like(f"{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_ends_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForDomainRow.domain.like(f"%{domain_name}")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForDomainRow.scaling_group == resource_group
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_contains(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForDomainRow.scaling_group.like(f"%{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_equals(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForDomainRow.scaling_group == resource_group
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_starts_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForDomainRow.scaling_group.like(f"{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_ends_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForDomainRow.scaling_group.like(f"%{resource_group}")
+
+        return inner
+
+
+class RGDomainFairShareOrders:
+    """Query orders for rg-scoped domain fair share queries.
+
+    Uses INNER JOIN'd columns where available to avoid NULL sorting issues.
+    """
+
+    @staticmethod
+    def by_domain_name(ascending: bool = True) -> QueryOrder:
+        col = ScalingGroupForDomainRow.domain
+        return col.asc() if ascending else col.desc()
+
+
+class RGProjectFairShareConditions:
+    """Query conditions for rg-scoped project fair share queries.
+
+    References ScalingGroupForProjectRow/GroupRow/DomainRow (INNER JOIN'd)
+    instead of ProjectFairShareRow (LEFT JOIN'd).
+    """
+
+    @staticmethod
+    def by_project_id(project_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForProjectRow.group == project_id
+
+        return inner
+
+    @staticmethod
+    def by_project_ids(project_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForProjectRow.group.in_(project_ids)
+
+        return inner
+
+    @staticmethod
+    def by_domain_name(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_contains(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.name.like(f"%{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_equals(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_starts_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.name.like(f"{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_ends_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.name.like(f"%{domain_name}")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForProjectRow.scaling_group == resource_group
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_contains(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForProjectRow.scaling_group.like(f"%{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_equals(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForProjectRow.scaling_group == resource_group
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_starts_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForProjectRow.scaling_group.like(f"{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_ends_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForProjectRow.scaling_group.like(f"%{resource_group}")
+
+        return inner
+
+
+class RGUserFairShareConditions:
+    """Query conditions for rg-scoped user fair share queries.
+
+    References AssocGroupUserRow/DomainRow/ScalingGroupForProjectRow (INNER JOIN'd)
+    instead of UserFairShareRow (LEFT JOIN'd).
+    """
+
+    @staticmethod
+    def by_user_uuid(user_uuid: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssocGroupUserRow.user_id == user_uuid
+
+        return inner
+
+    @staticmethod
+    def by_user_uuids(user_uuids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssocGroupUserRow.user_id.in_(user_uuids)
+
+        return inner
+
+    @staticmethod
+    def by_project_id(project_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssocGroupUserRow.group_id == project_id
+
+        return inner
+
+    @staticmethod
+    def by_project_ids(project_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssocGroupUserRow.group_id.in_(project_ids)
+
+        return inner
+
+    @staticmethod
+    def by_domain_name(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_contains(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.name.like(f"%{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_equals(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_starts_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.name.like(f"{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_ends_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.name.like(f"%{domain_name}")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForProjectRow.scaling_group == resource_group
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_contains(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForProjectRow.scaling_group.like(f"%{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_equals(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForProjectRow.scaling_group == resource_group
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_starts_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForProjectRow.scaling_group.like(f"{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_ends_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupForProjectRow.scaling_group.like(f"%{resource_group}")
+
+        return inner

@@ -23,6 +23,7 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.fair_share.options import (
     DomainFairShareConditions,
     DomainFairShareOrders,
+    RGDomainFairShareConditions,
 )
 
 from .common import (
@@ -264,6 +265,100 @@ class DomainFairShareFilter(GQLFilter):
                     spec.value
                 ),
                 ends_with_factory=lambda spec: DomainFairShareConditions.by_domain_name_ends_with(
+                    spec.value
+                ),
+            )
+            if dn_condition:
+                conditions.append(dn_condition)
+
+        if self.domain:
+            conditions.extend(self.domain.build_conditions())
+
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        if self.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_conditions.extend(sub_filter.build_conditions())
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+
+        if self.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_conditions.extend(sub_filter.build_conditions())
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+
+        return conditions
+
+
+@strawberry.input(
+    name="RGDomainFairShareFilter",
+    description=(
+        "Added in 26.2.0. Filter for domain fair shares within a resource group scope. "
+        "References resource group membership columns to avoid excluding domains without fair share records."
+    ),
+)
+class RGDomainFairShareFilter(GQLFilter):
+    """Filter for domain fair shares in RG context (uses INNER JOIN'd columns)."""
+
+    resource_group: StringFilter | None = strawberry.field(
+        default=None, description="Filter by scaling group name."
+    )
+    domain_name: StringFilter | None = strawberry.field(
+        default=None, description="Filter by domain name."
+    )
+    domain: DomainFairShareDomainNestedFilter | None = strawberry.field(
+        default=None, description="Filter by domain properties."
+    )
+
+    AND: list[RGDomainFairShareFilter] | None = strawberry.field(
+        default=None, description="Combine with AND logic."
+    )
+    OR: list[RGDomainFairShareFilter] | None = strawberry.field(
+        default=None, description="Combine with OR logic."
+    )
+    NOT: list[RGDomainFairShareFilter] | None = strawberry.field(
+        default=None, description="Negate filters."
+    )
+
+    @override
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+
+        if self.resource_group:
+            sg_condition = self.resource_group.build_query_condition(
+                contains_factory=lambda spec: RGDomainFairShareConditions.by_resource_group_contains(
+                    spec.value
+                ),
+                equals_factory=lambda spec: RGDomainFairShareConditions.by_resource_group_equals(
+                    spec.value
+                ),
+                starts_with_factory=lambda spec: RGDomainFairShareConditions.by_resource_group_starts_with(
+                    spec.value
+                ),
+                ends_with_factory=lambda spec: RGDomainFairShareConditions.by_resource_group_ends_with(
+                    spec.value
+                ),
+            )
+            if sg_condition:
+                conditions.append(sg_condition)
+
+        if self.domain_name:
+            dn_condition = self.domain_name.build_query_condition(
+                contains_factory=lambda spec: RGDomainFairShareConditions.by_domain_name_contains(
+                    spec.value
+                ),
+                equals_factory=lambda spec: RGDomainFairShareConditions.by_domain_name_equals(
+                    spec.value
+                ),
+                starts_with_factory=lambda spec: RGDomainFairShareConditions.by_domain_name_starts_with(
+                    spec.value
+                ),
+                ends_with_factory=lambda spec: RGDomainFairShareConditions.by_domain_name_ends_with(
                     spec.value
                 ),
             )

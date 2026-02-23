@@ -71,6 +71,10 @@ from ai.backend.manager.repositories.fair_share.options import (
     DomainFairShareOrders,
     ProjectFairShareConditions,
     ProjectFairShareOrders,
+    RGDomainFairShareConditions,
+    RGDomainFairShareOrders,
+    RGProjectFairShareConditions,
+    RGUserFairShareConditions,
     UserFairShareConditions,
     UserFairShareOrders,
 )
@@ -139,6 +143,56 @@ class FairShareAdapter:
                 return DomainFairShareOrders.by_fair_share_factor(ascending=ascending)
             case DomainFairShareOrderField.DOMAIN_NAME:
                 return DomainFairShareOrders.by_domain_name(ascending=ascending)
+            case DomainFairShareOrderField.CREATED_AT:
+                return DomainFairShareOrders.by_created_at(ascending=ascending)
+
+        raise ValueError(f"Unknown order field: {order.field}")
+
+    def build_domain_fair_share_querier_rg(
+        self, request: SearchDomainFairSharesRequest
+    ) -> BatchQuerier:
+        """Build a BatchQuerier for rg-scoped domain fair shares.
+
+        Uses RG-context conditions that reference INNER JOIN'd columns
+        to avoid excluding entities without fair share records.
+        """
+        conditions = (
+            self._convert_domain_fair_share_filter_rg(request.filter) if request.filter else []
+        )
+        orders = (
+            [self._convert_domain_fair_share_order_rg(o) for o in request.order]
+            if request.order
+            else []
+        )
+        pagination = OffsetPagination(limit=request.limit, offset=request.offset)
+
+        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+
+    def _convert_domain_fair_share_filter_rg(
+        self, filter: DomainFairShareFilter
+    ) -> list[QueryCondition]:
+        """Convert domain fair share filter using RG-context conditions."""
+        conditions: list[QueryCondition] = []
+
+        if filter.resource_group is not None and filter.resource_group.equals is not None:
+            conditions.append(
+                RGDomainFairShareConditions.by_resource_group(filter.resource_group.equals)
+            )
+
+        if filter.domain_name is not None and filter.domain_name.equals is not None:
+            conditions.append(RGDomainFairShareConditions.by_domain_name(filter.domain_name.equals))
+
+        return conditions
+
+    def _convert_domain_fair_share_order_rg(self, order: DomainFairShareOrder) -> QueryOrder:
+        """Convert domain fair share order using RG-context orders."""
+        ascending = order.direction == OrderDirection.ASC
+
+        match order.field:
+            case DomainFairShareOrderField.FAIR_SHARE_FACTOR:
+                return DomainFairShareOrders.by_fair_share_factor(ascending=ascending)
+            case DomainFairShareOrderField.DOMAIN_NAME:
+                return RGDomainFairShareOrders.by_domain_name(ascending=ascending)
             case DomainFairShareOrderField.CREATED_AT:
                 return DomainFairShareOrders.by_created_at(ascending=ascending)
 
@@ -225,6 +279,53 @@ class FairShareAdapter:
 
         raise ValueError(f"Unknown order field: {order.field}")
 
+    def build_project_fair_share_querier_rg(
+        self, request: SearchProjectFairSharesRequest
+    ) -> BatchQuerier:
+        """Build a BatchQuerier for rg-scoped project fair shares.
+
+        Uses RG-context conditions that reference INNER JOIN'd columns.
+        """
+        conditions = (
+            self._convert_project_fair_share_filter_rg(request.filter) if request.filter else []
+        )
+        orders = (
+            [self._convert_project_fair_share_order(o) for o in request.order]
+            if request.order
+            else []
+        )
+        pagination = OffsetPagination(limit=request.limit, offset=request.offset)
+
+        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+
+    def _convert_project_fair_share_filter_rg(
+        self, filter: ProjectFairShareFilter
+    ) -> list[QueryCondition]:
+        """Convert project fair share filter using RG-context conditions."""
+        conditions: list[QueryCondition] = []
+
+        if filter.resource_group is not None and filter.resource_group.equals is not None:
+            conditions.append(
+                RGProjectFairShareConditions.by_resource_group(filter.resource_group.equals)
+            )
+
+        if filter.project_id is not None:
+            if filter.project_id.equals is not None:
+                conditions.append(
+                    RGProjectFairShareConditions.by_project_id(filter.project_id.equals)
+                )
+            elif filter.project_id.in_ is not None:
+                conditions.append(
+                    RGProjectFairShareConditions.by_project_ids(filter.project_id.in_)
+                )
+
+        if filter.domain_name is not None and filter.domain_name.equals is not None:
+            conditions.append(
+                RGProjectFairShareConditions.by_domain_name(filter.domain_name.equals)
+            )
+
+        return conditions
+
     def convert_project_fair_share_to_dto(self, data: ProjectFairShareData) -> ProjectFairShareDTO:
         """Convert ProjectFairShareData to DTO."""
 
@@ -302,6 +403,51 @@ class FairShareAdapter:
                 return UserFairShareOrders.by_created_at(ascending=ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
+
+    def build_user_fair_share_querier_rg(
+        self, request: SearchUserFairSharesRequest
+    ) -> BatchQuerier:
+        """Build a BatchQuerier for rg-scoped user fair shares.
+
+        Uses RG-context conditions that reference INNER JOIN'd columns.
+        """
+        conditions = (
+            self._convert_user_fair_share_filter_rg(request.filter) if request.filter else []
+        )
+        orders = (
+            [self._convert_user_fair_share_order(o) for o in request.order] if request.order else []
+        )
+        pagination = OffsetPagination(limit=request.limit, offset=request.offset)
+
+        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+
+    def _convert_user_fair_share_filter_rg(
+        self, filter: UserFairShareFilter
+    ) -> list[QueryCondition]:
+        """Convert user fair share filter using RG-context conditions."""
+        conditions: list[QueryCondition] = []
+
+        if filter.resource_group is not None and filter.resource_group.equals is not None:
+            conditions.append(
+                RGUserFairShareConditions.by_resource_group(filter.resource_group.equals)
+            )
+
+        if filter.user_uuid is not None:
+            if filter.user_uuid.equals is not None:
+                conditions.append(RGUserFairShareConditions.by_user_uuid(filter.user_uuid.equals))
+            elif filter.user_uuid.in_ is not None:
+                conditions.append(RGUserFairShareConditions.by_user_uuids(filter.user_uuid.in_))
+
+        if filter.project_id is not None:
+            if filter.project_id.equals is not None:
+                conditions.append(RGUserFairShareConditions.by_project_id(filter.project_id.equals))
+            elif filter.project_id.in_ is not None:
+                conditions.append(RGUserFairShareConditions.by_project_ids(filter.project_id.in_))
+
+        if filter.domain_name is not None and filter.domain_name.equals is not None:
+            conditions.append(RGUserFairShareConditions.by_domain_name(filter.domain_name.equals))
+
+        return conditions
 
     def convert_user_fair_share_to_dto(self, data: UserFairShareData) -> UserFairShareDTO:
         """Convert UserFairShareData to DTO."""

@@ -16,6 +16,7 @@ from ai.backend.manager.api.gql.fair_share.fetcher import (
 from ai.backend.manager.api.gql.fair_share.types import (
     BulkUpsertUserFairShareWeightInput,
     BulkUpsertUserFairShareWeightPayload,
+    RGUserFairShareFilter,
     UpsertUserFairShareWeightInput,
     UpsertUserFairShareWeightPayload,
     UserFairShareConnection,
@@ -118,7 +119,7 @@ async def rg_user_fair_share(
 async def rg_user_fair_shares(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupUserScope,
-    filter: UserFairShareFilter | None = None,
+    filter: RGUserFairShareFilter | None = None,
     order_by: list[UserFairShareOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,

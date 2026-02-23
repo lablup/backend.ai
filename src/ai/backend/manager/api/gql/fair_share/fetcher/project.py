@@ -16,6 +16,7 @@ from ai.backend.manager.api.gql.fair_share.types import (
     ProjectFairShareFilter,
     ProjectFairShareGQL,
     ProjectFairShareOrderBy,
+    RGProjectFairShareFilter,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.fair_share.row import ProjectFairShareRow
@@ -108,7 +109,7 @@ async def fetch_project_fair_shares(
 async def fetch_rg_project_fair_shares(
     info: Info[StrawberryGQLContext],
     scope: ProjectFairShareSearchScope,
-    filter: ProjectFairShareFilter | None = None,
+    filter: RGProjectFairShareFilter | None = None,
     order_by: list[ProjectFairShareOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
@@ -121,6 +122,8 @@ async def fetch_rg_project_fair_shares(
     """Fetch project fair shares using resource group scope.
 
     Returns all projects in the scope, including those without records (with defaults).
+    Uses RGProjectFairShareFilter whose build_conditions() references INNER JOIN'd
+    columns to avoid NULL exclusion.
     """
     processors = info.context.processors
 

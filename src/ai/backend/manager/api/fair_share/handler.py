@@ -637,7 +637,7 @@ class FairShareAPIHandler:
         """Search domain fair shares within RG scope."""
         processors = processors_ctx.processors
 
-        querier = self._adapter.build_domain_fair_share_querier(body.parsed)
+        querier = self._adapter.build_domain_fair_share_querier_rg(body.parsed)
         scope = DomainFairShareSearchScope(resource_group=path.parsed.resource_group)
 
         action_result = await processors.fair_share.search_rg_domain_fair_shares.wait_for_complete(
@@ -695,7 +695,7 @@ class FairShareAPIHandler:
         """Search project fair shares within RG scope."""
         processors = processors_ctx.processors
 
-        querier = self._adapter.build_project_fair_share_querier(body.parsed)
+        querier = self._adapter.build_project_fair_share_querier_rg(body.parsed)
         scope = ProjectFairShareSearchScope(
             resource_group=path.parsed.resource_group,
             domain_name=path.parsed.domain_name,
@@ -758,7 +758,7 @@ class FairShareAPIHandler:
         """Search user fair shares within RG scope."""
         processors = processors_ctx.processors
 
-        querier = self._adapter.build_user_fair_share_querier(body.parsed)
+        querier = self._adapter.build_user_fair_share_querier_rg(body.parsed)
         scope = UserFairShareSearchScope(
             resource_group=path.parsed.resource_group,
             domain_name=path.parsed.domain_name,
