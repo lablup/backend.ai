@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TypeVar
 
+import sqlalchemy as sa
 from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
@@ -17,6 +18,10 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.repositories.base.creator import CreatorSpec
+from ai.backend.manager.repositories.base.integrity import (
+    _match_integrity_error,
+    parse_integrity_error,
+)
 
 TRow = TypeVar("TRow", bound=Base)
 
@@ -90,7 +95,11 @@ async def execute_rbac_entity_creator[TRow: Base](
     db_sess.add(row)
 
     # 2. Flush to get DB-generated ID
-    await db_sess.flush()
+    try:
+        await db_sess.flush()
+    except sa.exc.IntegrityError as e:
+        parsed = parse_integrity_error(e)
+        _match_integrity_error(parsed, spec.integrity_error_checks)
 
     # 3. Extract RBAC info and insert associations for all scopes
     instance_state = inspect(row)
@@ -173,7 +182,13 @@ async def execute_rbac_bulk_entity_creator[TRow: Base](
         )
 
     # 2. Flush to get DB-generated IDs and insert associations
-    await db_sess.flush()
+    try:
+        await db_sess.flush()
+    except sa.exc.IntegrityError as e:
+        parsed = parse_integrity_error(e)
+        # Use first spec's checks (all specs share the same CreatorSpec subclass)
+        checks = creator.specs[0].integrity_error_checks
+        _match_integrity_error(parsed, checks)
 
     entity_type = creator.element_type.to_entity_type()
     associations = [
@@ -229,7 +244,13 @@ async def execute_rbac_entity_creators[TRow: Base](
         )
 
     # 2. Single flush to get all DB-generated IDs
-    await db_sess.flush()
+    try:
+        await db_sess.flush()
+    except sa.exc.IntegrityError as e:
+        parsed = parse_integrity_error(e)
+        # Use first creator's spec checks (all creators share the same CreatorSpec subclass)
+        checks = creators[0].spec.integrity_error_checks
+        _match_integrity_error(parsed, checks)
 
     # 3. Collect all associations from each creator's scope refs
     associations: list[AssociationScopesEntitiesRow] = []
