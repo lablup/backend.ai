@@ -253,6 +253,7 @@ class TestDeploymentCRUD:
 
 
 class TestRevisionOperations:
+    @pytest.mark.asyncio
     async def test_search_revisions(self) -> None:
         resp = _json_response({
             "revisions": [_SAMPLE_REVISION_DTO],
