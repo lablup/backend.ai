@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from ai.backend.manager.api.gql.base import UUIDEqualMatchSpec
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.service import RouteNotFound

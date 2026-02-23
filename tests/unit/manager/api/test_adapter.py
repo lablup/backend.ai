@@ -11,9 +11,9 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.manager.api.adapter import BaseFilterAdapter
-from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.repositories.base import QueryCondition
 
 if TYPE_CHECKING:

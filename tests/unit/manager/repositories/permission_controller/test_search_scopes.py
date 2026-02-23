@@ -10,9 +10,9 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, ScopeType
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow

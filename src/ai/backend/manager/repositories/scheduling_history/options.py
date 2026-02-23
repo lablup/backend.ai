@@ -7,8 +7,8 @@ from typing import cast
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.types import KernelId, SessionId
-from ai.backend.manager.api.gql.base import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus

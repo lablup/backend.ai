@@ -8,8 +8,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import final
 
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
-from ai.backend.manager.api.gql.base import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.repositories.base import QueryCondition
 
 

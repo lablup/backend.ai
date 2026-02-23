@@ -123,13 +123,25 @@ class FairShareAdapter:
         """Convert domain fair share filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None and filter.resource_group.equals is not None:
-            conditions.append(
-                DomainFairShareConditions.by_resource_group(filter.resource_group.equals)
+        if filter.resource_group is not None:
+            cond = filter.resource_group.build_query_condition(
+                contains_factory=DomainFairShareConditions.by_resource_group_contains,
+                equals_factory=DomainFairShareConditions.by_resource_group_equals,
+                starts_with_factory=DomainFairShareConditions.by_resource_group_starts_with,
+                ends_with_factory=DomainFairShareConditions.by_resource_group_ends_with,
             )
+            if cond is not None:
+                conditions.append(cond)
 
-        if filter.domain_name is not None and filter.domain_name.equals is not None:
-            conditions.append(DomainFairShareConditions.by_domain_name(filter.domain_name.equals))
+        if filter.domain_name is not None:
+            cond = filter.domain_name.build_query_condition(
+                contains_factory=DomainFairShareConditions.by_domain_name_contains,
+                equals_factory=DomainFairShareConditions.by_domain_name_equals,
+                starts_with_factory=DomainFairShareConditions.by_domain_name_starts_with,
+                ends_with_factory=DomainFairShareConditions.by_domain_name_ends_with,
+            )
+            if cond is not None:
+                conditions.append(cond)
 
         return conditions
 
@@ -173,13 +185,25 @@ class FairShareAdapter:
         """Convert domain fair share filter using RG-context conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None and filter.resource_group.equals is not None:
-            conditions.append(
-                RGDomainFairShareConditions.by_resource_group(filter.resource_group.equals)
+        if filter.resource_group is not None:
+            cond = filter.resource_group.build_query_condition(
+                contains_factory=RGDomainFairShareConditions.by_resource_group_contains,
+                equals_factory=RGDomainFairShareConditions.by_resource_group_equals,
+                starts_with_factory=RGDomainFairShareConditions.by_resource_group_starts_with,
+                ends_with_factory=RGDomainFairShareConditions.by_resource_group_ends_with,
             )
+            if cond is not None:
+                conditions.append(cond)
 
-        if filter.domain_name is not None and filter.domain_name.equals is not None:
-            conditions.append(RGDomainFairShareConditions.by_domain_name(filter.domain_name.equals))
+        if filter.domain_name is not None:
+            cond = filter.domain_name.build_query_condition(
+                contains_factory=RGDomainFairShareConditions.by_domain_name_contains,
+                equals_factory=RGDomainFairShareConditions.by_domain_name_equals,
+                starts_with_factory=RGDomainFairShareConditions.by_domain_name_starts_with,
+                ends_with_factory=RGDomainFairShareConditions.by_domain_name_ends_with,
+            )
+            if cond is not None:
+                conditions.append(cond)
 
         return conditions
 
@@ -248,21 +272,33 @@ class FairShareAdapter:
         """Convert project fair share filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None and filter.resource_group.equals is not None:
-            conditions.append(
-                ProjectFairShareConditions.by_resource_group(filter.resource_group.equals)
+        if filter.resource_group is not None:
+            cond = filter.resource_group.build_query_condition(
+                contains_factory=ProjectFairShareConditions.by_resource_group_contains,
+                equals_factory=ProjectFairShareConditions.by_resource_group_equals,
+                starts_with_factory=ProjectFairShareConditions.by_resource_group_starts_with,
+                ends_with_factory=ProjectFairShareConditions.by_resource_group_ends_with,
             )
+            if cond is not None:
+                conditions.append(cond)
 
         if filter.project_id is not None:
-            if filter.project_id.equals is not None:
-                conditions.append(
-                    ProjectFairShareConditions.by_project_id(filter.project_id.equals)
-                )
-            elif filter.project_id.in_ is not None:
-                conditions.append(ProjectFairShareConditions.by_project_ids(filter.project_id.in_))
+            cond = filter.project_id.build_query_condition(
+                equals_factory=ProjectFairShareConditions.by_project_id,
+                in_factory=ProjectFairShareConditions.by_project_ids,
+            )
+            if cond is not None:
+                conditions.append(cond)
 
-        if filter.domain_name is not None and filter.domain_name.equals is not None:
-            conditions.append(ProjectFairShareConditions.by_domain_name(filter.domain_name.equals))
+        if filter.domain_name is not None:
+            cond = filter.domain_name.build_query_condition(
+                contains_factory=ProjectFairShareConditions.by_domain_name_contains,
+                equals_factory=ProjectFairShareConditions.by_domain_name_equals,
+                starts_with_factory=ProjectFairShareConditions.by_domain_name_starts_with,
+                ends_with_factory=ProjectFairShareConditions.by_domain_name_ends_with,
+            )
+            if cond is not None:
+                conditions.append(cond)
 
         return conditions
 
@@ -303,25 +339,33 @@ class FairShareAdapter:
         """Convert project fair share filter using RG-context conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None and filter.resource_group.equals is not None:
-            conditions.append(
-                RGProjectFairShareConditions.by_resource_group(filter.resource_group.equals)
+        if filter.resource_group is not None:
+            cond = filter.resource_group.build_query_condition(
+                contains_factory=RGProjectFairShareConditions.by_resource_group_contains,
+                equals_factory=RGProjectFairShareConditions.by_resource_group_equals,
+                starts_with_factory=RGProjectFairShareConditions.by_resource_group_starts_with,
+                ends_with_factory=RGProjectFairShareConditions.by_resource_group_ends_with,
             )
+            if cond is not None:
+                conditions.append(cond)
 
         if filter.project_id is not None:
-            if filter.project_id.equals is not None:
-                conditions.append(
-                    RGProjectFairShareConditions.by_project_id(filter.project_id.equals)
-                )
-            elif filter.project_id.in_ is not None:
-                conditions.append(
-                    RGProjectFairShareConditions.by_project_ids(filter.project_id.in_)
-                )
-
-        if filter.domain_name is not None and filter.domain_name.equals is not None:
-            conditions.append(
-                RGProjectFairShareConditions.by_domain_name(filter.domain_name.equals)
+            cond = filter.project_id.build_query_condition(
+                equals_factory=RGProjectFairShareConditions.by_project_id,
+                in_factory=RGProjectFairShareConditions.by_project_ids,
             )
+            if cond is not None:
+                conditions.append(cond)
+
+        if filter.domain_name is not None:
+            cond = filter.domain_name.build_query_condition(
+                contains_factory=RGProjectFairShareConditions.by_domain_name_contains,
+                equals_factory=RGProjectFairShareConditions.by_domain_name_equals,
+                starts_with_factory=RGProjectFairShareConditions.by_domain_name_starts_with,
+                ends_with_factory=RGProjectFairShareConditions.by_domain_name_ends_with,
+            )
+            if cond is not None:
+                conditions.append(cond)
 
         return conditions
 
@@ -369,25 +413,41 @@ class FairShareAdapter:
         """Convert user fair share filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None and filter.resource_group.equals is not None:
-            conditions.append(
-                UserFairShareConditions.by_resource_group(filter.resource_group.equals)
+        if filter.resource_group is not None:
+            cond = filter.resource_group.build_query_condition(
+                contains_factory=UserFairShareConditions.by_resource_group_contains,
+                equals_factory=UserFairShareConditions.by_resource_group_equals,
+                starts_with_factory=UserFairShareConditions.by_resource_group_starts_with,
+                ends_with_factory=UserFairShareConditions.by_resource_group_ends_with,
             )
+            if cond is not None:
+                conditions.append(cond)
 
         if filter.user_uuid is not None:
-            if filter.user_uuid.equals is not None:
-                conditions.append(UserFairShareConditions.by_user_uuid(filter.user_uuid.equals))
-            elif filter.user_uuid.in_ is not None:
-                conditions.append(UserFairShareConditions.by_user_uuids(filter.user_uuid.in_))
+            cond = filter.user_uuid.build_query_condition(
+                equals_factory=UserFairShareConditions.by_user_uuid,
+                in_factory=UserFairShareConditions.by_user_uuids,
+            )
+            if cond is not None:
+                conditions.append(cond)
 
         if filter.project_id is not None:
-            if filter.project_id.equals is not None:
-                conditions.append(UserFairShareConditions.by_project_id(filter.project_id.equals))
-            elif filter.project_id.in_ is not None:
-                conditions.append(UserFairShareConditions.by_project_ids(filter.project_id.in_))
+            cond = filter.project_id.build_query_condition(
+                equals_factory=UserFairShareConditions.by_project_id,
+                in_factory=UserFairShareConditions.by_project_ids,
+            )
+            if cond is not None:
+                conditions.append(cond)
 
-        if filter.domain_name is not None and filter.domain_name.equals is not None:
-            conditions.append(UserFairShareConditions.by_domain_name(filter.domain_name.equals))
+        if filter.domain_name is not None:
+            cond = filter.domain_name.build_query_condition(
+                contains_factory=UserFairShareConditions.by_domain_name_contains,
+                equals_factory=UserFairShareConditions.by_domain_name_equals,
+                starts_with_factory=UserFairShareConditions.by_domain_name_starts_with,
+                ends_with_factory=UserFairShareConditions.by_domain_name_ends_with,
+            )
+            if cond is not None:
+                conditions.append(cond)
 
         return conditions
 
@@ -426,25 +486,41 @@ class FairShareAdapter:
         """Convert user fair share filter using RG-context conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None and filter.resource_group.equals is not None:
-            conditions.append(
-                RGUserFairShareConditions.by_resource_group(filter.resource_group.equals)
+        if filter.resource_group is not None:
+            cond = filter.resource_group.build_query_condition(
+                contains_factory=RGUserFairShareConditions.by_resource_group_contains,
+                equals_factory=RGUserFairShareConditions.by_resource_group_equals,
+                starts_with_factory=RGUserFairShareConditions.by_resource_group_starts_with,
+                ends_with_factory=RGUserFairShareConditions.by_resource_group_ends_with,
             )
+            if cond is not None:
+                conditions.append(cond)
 
         if filter.user_uuid is not None:
-            if filter.user_uuid.equals is not None:
-                conditions.append(RGUserFairShareConditions.by_user_uuid(filter.user_uuid.equals))
-            elif filter.user_uuid.in_ is not None:
-                conditions.append(RGUserFairShareConditions.by_user_uuids(filter.user_uuid.in_))
+            cond = filter.user_uuid.build_query_condition(
+                equals_factory=RGUserFairShareConditions.by_user_uuid,
+                in_factory=RGUserFairShareConditions.by_user_uuids,
+            )
+            if cond is not None:
+                conditions.append(cond)
 
         if filter.project_id is not None:
-            if filter.project_id.equals is not None:
-                conditions.append(RGUserFairShareConditions.by_project_id(filter.project_id.equals))
-            elif filter.project_id.in_ is not None:
-                conditions.append(RGUserFairShareConditions.by_project_ids(filter.project_id.in_))
+            cond = filter.project_id.build_query_condition(
+                equals_factory=RGUserFairShareConditions.by_project_id,
+                in_factory=RGUserFairShareConditions.by_project_ids,
+            )
+            if cond is not None:
+                conditions.append(cond)
 
-        if filter.domain_name is not None and filter.domain_name.equals is not None:
-            conditions.append(RGUserFairShareConditions.by_domain_name(filter.domain_name.equals))
+        if filter.domain_name is not None:
+            cond = filter.domain_name.build_query_condition(
+                contains_factory=RGUserFairShareConditions.by_domain_name_contains,
+                equals_factory=RGUserFairShareConditions.by_domain_name_equals,
+                starts_with_factory=RGUserFairShareConditions.by_domain_name_starts_with,
+                ends_with_factory=RGUserFairShareConditions.by_domain_name_ends_with,
+            )
+            if cond is not None:
+                conditions.append(cond)
 
         return conditions
 
@@ -501,13 +577,25 @@ class FairShareAdapter:
         """Convert domain usage bucket filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None and filter.resource_group.equals is not None:
-            conditions.append(
-                DomainUsageBucketConditions.by_resource_group(filter.resource_group.equals)
+        if filter.resource_group is not None:
+            cond = filter.resource_group.build_query_condition(
+                contains_factory=DomainUsageBucketConditions.by_resource_group_contains,
+                equals_factory=DomainUsageBucketConditions.by_resource_group_equals,
+                starts_with_factory=DomainUsageBucketConditions.by_resource_group_starts_with,
+                ends_with_factory=DomainUsageBucketConditions.by_resource_group_ends_with,
             )
+            if cond is not None:
+                conditions.append(cond)
 
-        if filter.domain_name is not None and filter.domain_name.equals is not None:
-            conditions.append(DomainUsageBucketConditions.by_domain_name(filter.domain_name.equals))
+        if filter.domain_name is not None:
+            cond = filter.domain_name.build_query_condition(
+                contains_factory=DomainUsageBucketConditions.by_domain_name_contains,
+                equals_factory=DomainUsageBucketConditions.by_domain_name_equals,
+                starts_with_factory=DomainUsageBucketConditions.by_domain_name_starts_with,
+                ends_with_factory=DomainUsageBucketConditions.by_domain_name_ends_with,
+            )
+            if cond is not None:
+                conditions.append(cond)
 
         return conditions
 
@@ -571,13 +659,23 @@ class FairShareAdapter:
         """Convert project usage bucket filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None and filter.resource_group.equals is not None:
-            conditions.append(
-                ProjectUsageBucketConditions.by_resource_group(filter.resource_group.equals)
+        if filter.resource_group is not None:
+            cond = filter.resource_group.build_query_condition(
+                contains_factory=ProjectUsageBucketConditions.by_resource_group_contains,
+                equals_factory=ProjectUsageBucketConditions.by_resource_group_equals,
+                starts_with_factory=ProjectUsageBucketConditions.by_resource_group_starts_with,
+                ends_with_factory=ProjectUsageBucketConditions.by_resource_group_ends_with,
             )
+            if cond is not None:
+                conditions.append(cond)
 
-        if filter.project_id is not None and filter.project_id.equals is not None:
-            conditions.append(ProjectUsageBucketConditions.by_project_id(filter.project_id.equals))
+        if filter.project_id is not None:
+            cond = filter.project_id.build_query_condition(
+                equals_factory=ProjectUsageBucketConditions.by_project_id,
+                in_factory=ProjectUsageBucketConditions.by_project_ids,
+            )
+            if cond is not None:
+                conditions.append(cond)
 
         return conditions
 
@@ -642,16 +740,31 @@ class FairShareAdapter:
         """Convert user usage bucket filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None and filter.resource_group.equals is not None:
-            conditions.append(
-                UserUsageBucketConditions.by_resource_group(filter.resource_group.equals)
+        if filter.resource_group is not None:
+            cond = filter.resource_group.build_query_condition(
+                contains_factory=UserUsageBucketConditions.by_resource_group_contains,
+                equals_factory=UserUsageBucketConditions.by_resource_group_equals,
+                starts_with_factory=UserUsageBucketConditions.by_resource_group_starts_with,
+                ends_with_factory=UserUsageBucketConditions.by_resource_group_ends_with,
             )
+            if cond is not None:
+                conditions.append(cond)
 
-        if filter.user_uuid is not None and filter.user_uuid.equals is not None:
-            conditions.append(UserUsageBucketConditions.by_user_uuid(filter.user_uuid.equals))
+        if filter.user_uuid is not None:
+            cond = filter.user_uuid.build_query_condition(
+                equals_factory=UserUsageBucketConditions.by_user_uuid,
+                in_factory=UserUsageBucketConditions.by_user_uuids,
+            )
+            if cond is not None:
+                conditions.append(cond)
 
-        if filter.project_id is not None and filter.project_id.equals is not None:
-            conditions.append(UserUsageBucketConditions.by_project_id(filter.project_id.equals))
+        if filter.project_id is not None:
+            cond = filter.project_id.build_query_condition(
+                equals_factory=UserUsageBucketConditions.by_project_id,
+                in_factory=UserUsageBucketConditions.by_project_ids,
+            )
+            if cond is not None:
+                conditions.append(cond)
 
         return conditions
 
