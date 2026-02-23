@@ -36,6 +36,7 @@ from ai.backend.manager.dto.domain_request import (
     GetDomainPathParam,
     UpdateDomainPathParam,
 )
+from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
@@ -67,7 +68,7 @@ class DomainAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can create domains.")
+            raise GenericForbidden()
 
         creator = Creator(
             spec=DomainCreatorSpec(
@@ -108,7 +109,7 @@ class DomainAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can get domains.")
+            raise GenericForbidden()
 
         action_result = await processors.domain.get_domain.wait_for_complete(
             GetDomainAction(domain_name=path.parsed.domain_name)
@@ -128,7 +129,7 @@ class DomainAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can search domains.")
+            raise GenericForbidden()
 
         querier = self.adapter.build_querier(body.parsed)
 
@@ -158,7 +159,7 @@ class DomainAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can update domains.")
+            raise GenericForbidden()
 
         domain_name = path.parsed.domain_name
         updater = self.adapter.build_updater(body.parsed, domain_name)
@@ -186,7 +187,7 @@ class DomainAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can delete domains.")
+            raise GenericForbidden()
 
         user_info = UserInfo(
             id=me.user_id,
@@ -212,7 +213,7 @@ class DomainAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can purge domains.")
+            raise GenericForbidden()
 
         user_info = UserInfo(
             id=me.user_id,

@@ -5,6 +5,7 @@ from collections.abc import Callable, Coroutine
 from typing import Any
 
 import pytest
+from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
@@ -23,6 +24,7 @@ from ai.backend.common.dto.manager.domain import (
     UpdateDomainResponse,
 )
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.manager.models.group import groups
 
 DomainFactory = Callable[..., Coroutine[Any, Any, CreateDomainResponse]]
 
@@ -190,8 +192,13 @@ class TestDomainPurge:
         self,
         admin_registry: BackendAIClientRegistry,
         domain_factory: DomainFactory,
+        db_engine: SAEngine,
     ) -> None:
         r = await domain_factory()
+        # Domain creation implicitly creates a default group. Purge requires no
+        # groups to exist first, so remove them directly via DB before purging.
+        async with db_engine.begin() as conn:
+            await conn.execute(groups.delete().where(groups.c.domain_name == r.domain.name))
         purge_result = await admin_registry.domain.purge(PurgeDomainRequest(name=r.domain.name))
         assert isinstance(purge_result, PurgeDomainResponse)
         assert purge_result.purged is True
