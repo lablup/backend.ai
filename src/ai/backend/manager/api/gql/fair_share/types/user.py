@@ -237,33 +237,27 @@ class UserFairShareUserNestedFilter:
         if self.username:
             username_condition = self.username.build_query_condition(
                 contains_factory=lambda spec: UserFairShareConditions.by_user_username_contains(
-                    spec.value
+                    spec
                 ),
-                equals_factory=lambda spec: UserFairShareConditions.by_user_username_equals(
-                    spec.value
-                ),
+                equals_factory=lambda spec: UserFairShareConditions.by_user_username_equals(spec),
                 starts_with_factory=lambda spec: UserFairShareConditions.by_user_username_starts_with(
-                    spec.value
+                    spec
                 ),
                 ends_with_factory=lambda spec: UserFairShareConditions.by_user_username_ends_with(
-                    spec.value
+                    spec
                 ),
             )
             if username_condition:
                 conditions.append(username_condition)
         if self.email:
             email_condition = self.email.build_query_condition(
-                contains_factory=lambda spec: UserFairShareConditions.by_user_email_contains(
-                    spec.value
-                ),
-                equals_factory=lambda spec: UserFairShareConditions.by_user_email_equals(
-                    spec.value
-                ),
+                contains_factory=lambda spec: UserFairShareConditions.by_user_email_contains(spec),
+                equals_factory=lambda spec: UserFairShareConditions.by_user_email_equals(spec),
                 starts_with_factory=lambda spec: UserFairShareConditions.by_user_email_starts_with(
-                    spec.value
+                    spec
                 ),
                 ends_with_factory=lambda spec: UserFairShareConditions.by_user_email_ends_with(
-                    spec.value
+                    spec
                 ),
             )
             if email_condition:
@@ -342,16 +336,14 @@ class UserFairShareFilter(GQLFilter):
         if self.resource_group:
             sg_condition = self.resource_group.build_query_condition(
                 contains_factory=lambda spec: UserFairShareConditions.by_resource_group_contains(
-                    spec.value
+                    spec
                 ),
-                equals_factory=lambda spec: UserFairShareConditions.by_resource_group_equals(
-                    spec.value
-                ),
+                equals_factory=lambda spec: UserFairShareConditions.by_resource_group_equals(spec),
                 starts_with_factory=lambda spec: UserFairShareConditions.by_resource_group_starts_with(
-                    spec.value
+                    spec
                 ),
                 ends_with_factory=lambda spec: UserFairShareConditions.by_resource_group_ends_with(
-                    spec.value
+                    spec
                 ),
             )
             if sg_condition:
@@ -375,17 +367,13 @@ class UserFairShareFilter(GQLFilter):
 
         if self.domain_name:
             dn_condition = self.domain_name.build_query_condition(
-                contains_factory=lambda spec: UserFairShareConditions.by_domain_name_contains(
-                    spec.value
-                ),
-                equals_factory=lambda spec: UserFairShareConditions.by_domain_name_equals(
-                    spec.value
-                ),
+                contains_factory=lambda spec: UserFairShareConditions.by_domain_name_contains(spec),
+                equals_factory=lambda spec: UserFairShareConditions.by_domain_name_equals(spec),
                 starts_with_factory=lambda spec: UserFairShareConditions.by_domain_name_starts_with(
-                    spec.value
+                    spec
                 ),
                 ends_with_factory=lambda spec: UserFairShareConditions.by_domain_name_ends_with(
-                    spec.value
+                    spec
                 ),
             )
             if dn_condition:

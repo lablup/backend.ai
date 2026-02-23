@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sqlalchemy as sa
+
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.fair_share.types.domain import (
     DomainFairShareDomainNestedFilter,
@@ -219,3 +221,95 @@ class TestUserFairShareEntityOrderField:
         )
         query_order = order_by.to_query_order()
         assert query_order is not None
+
+
+def _compile_sql(expr: sa.sql.expression.ColumnElement) -> str:
+    """Compile a SQLAlchemy expression to a string for assertion."""
+    return str(expr.compile(compile_kwargs={"literal_binds": True}))
+
+
+class TestDomainFairShareFilterNegatedCaseInsensitive:
+    """Regression tests: negated/case-insensitive filters go through GQL → SQL correctly (BA-4633)."""
+
+    def test_not_contains_filter(self) -> None:
+        f = DomainFairShareFilter(resource_group=StringFilter(not_contains="a"))
+        conditions = f.build_conditions()
+        assert len(conditions) == 1
+        sql = _compile_sql(conditions[0]())
+        assert "NOT" in sql
+        assert "LIKE" in sql
+
+    def test_i_contains_filter(self) -> None:
+        f = DomainFairShareFilter(domain_name=StringFilter(i_contains="a"))
+        conditions = f.build_conditions()
+        assert len(conditions) == 1
+        sql = _compile_sql(conditions[0]())
+        assert "ILIKE" in sql
+
+    def test_i_not_contains_filter(self) -> None:
+        f = DomainFairShareFilter(resource_group=StringFilter(i_not_contains="a"))
+        conditions = f.build_conditions()
+        assert len(conditions) == 1
+        sql = _compile_sql(conditions[0]())
+        assert "NOT" in sql
+        assert "ILIKE" in sql
+
+
+class TestProjectFairShareFilterNegatedCaseInsensitive:
+    """Regression tests: negated/case-insensitive project filters (BA-4633)."""
+
+    def test_project_name_not_contains(self) -> None:
+        nested = ProjectFairShareProjectNestedFilter(
+            name=StringFilter(not_contains="test"),
+        )
+        conditions = nested.build_conditions()
+        assert len(conditions) == 1
+        sql = _compile_sql(conditions[0]())
+        assert "NOT" in sql
+
+    def test_project_name_i_contains(self) -> None:
+        nested = ProjectFairShareProjectNestedFilter(
+            name=StringFilter(i_contains="test"),
+        )
+        conditions = nested.build_conditions()
+        assert len(conditions) == 1
+        sql = _compile_sql(conditions[0]())
+        assert "ILIKE" in sql
+
+    def test_resource_group_i_not_contains(self) -> None:
+        f = ProjectFairShareFilter(resource_group=StringFilter(i_not_contains="rg"))
+        conditions = f.build_conditions()
+        assert len(conditions) == 1
+        sql = _compile_sql(conditions[0]())
+        assert "NOT" in sql
+        assert "ILIKE" in sql
+
+
+class TestUserFairShareFilterNegatedCaseInsensitive:
+    """Regression tests: negated/case-insensitive user filters (BA-4633)."""
+
+    def test_username_not_contains(self) -> None:
+        nested = UserFairShareUserNestedFilter(
+            username=StringFilter(not_contains="admin"),
+        )
+        conditions = nested.build_conditions()
+        assert len(conditions) == 1
+        sql = _compile_sql(conditions[0]())
+        assert "NOT" in sql
+
+    def test_email_i_contains(self) -> None:
+        nested = UserFairShareUserNestedFilter(
+            email=StringFilter(i_contains="@EXAMPLE"),
+        )
+        conditions = nested.build_conditions()
+        assert len(conditions) == 1
+        sql = _compile_sql(conditions[0]())
+        assert "ILIKE" in sql
+
+    def test_domain_name_i_not_contains(self) -> None:
+        f = UserFairShareFilter(domain_name=StringFilter(i_not_contains="dom"))
+        conditions = f.build_conditions()
+        assert len(conditions) == 1
+        sql = _compile_sql(conditions[0]())
+        assert "NOT" in sql
+        assert "ILIKE" in sql
