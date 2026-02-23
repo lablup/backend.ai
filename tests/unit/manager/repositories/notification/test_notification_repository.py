@@ -16,7 +16,9 @@ from ai.backend.common.data.notification import (
     NotificationRuleType,
     WebhookSpec,
 )
+from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, RBACElementType, ScopeType
 from ai.backend.common.types import BinarySize, ResourceSlot
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
     NotificationRuleNotFound,
@@ -54,7 +56,8 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.notification import NotificationRepository
 from ai.backend.manager.repositories.notification.creators import (
@@ -386,7 +389,7 @@ class TestNotificationRepository:
             success_status_codes=[200, 201, 202],
         )
 
-        creator = Creator(
+        creator = RBACEntityCreator(
             spec=NotificationChannelCreatorSpec(
                 name="Test Webhook",
                 channel_type=NotificationChannelType.WEBHOOK,
@@ -394,7 +397,9 @@ class TestNotificationRepository:
                 created_by=test_user,
                 description="Test webhook channel",
                 enabled=True,
-            )
+            ),
+            element_type=RBACElementType.NOTIFICATION_CHANNEL,
+            scope_ref=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
         )
 
         channel = await notification_repository.create_channel(creator)
@@ -527,18 +532,20 @@ class TestNotificationRepository:
         """Test creating notification rule"""
         config = WebhookSpec(url="https://example.com/webhook")
 
-        channel_creator = Creator(
+        channel_creator = RBACEntityCreator(
             spec=NotificationChannelCreatorSpec(
                 name="Test Channel",
                 channel_type=NotificationChannelType.WEBHOOK,
                 spec=config,
                 created_by=test_user,
-            )
+            ),
+            element_type=RBACElementType.NOTIFICATION_CHANNEL,
+            scope_ref=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
         )
 
         channel = await notification_repository.create_channel(channel_creator)
 
-        rule_creator = Creator(
+        rule_creator = RBACEntityCreator(
             spec=NotificationRuleCreatorSpec(
                 name="Session Started Rule",
                 rule_type=NotificationRuleType.SESSION_STARTED,
@@ -547,7 +554,9 @@ class TestNotificationRepository:
                 created_by=test_user,
                 description="Notify when session starts",
                 enabled=True,
-            )
+            ),
+            element_type=RBACElementType.NOTIFICATION_RULE,
+            scope_ref=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
         )
 
         rule = await notification_repository.create_rule(rule_creator)
