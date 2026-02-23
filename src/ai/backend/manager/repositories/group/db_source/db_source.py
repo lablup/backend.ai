@@ -16,7 +16,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import SlotName, VFolderID
 from ai.backend.common.utils import nmget
@@ -132,7 +132,7 @@ class GroupDBSource:
             # Create the group with RBAC scope association
             rbac_creator = RBACEntityCreator(
                 spec=creator.spec,
-                entity_type=EntityType.PROJECT,
+                element_type=RBACElementType.PROJECT,
                 scope_ref=ScopeId(ScopeType.DOMAIN, spec.domain_name),
                 additional_scope_refs=[],
             )
