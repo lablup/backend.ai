@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.manager.data.permission.id import ScopeId as ScopeRef
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.permission.types import EntityType, RBACElementType, ScopeType
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -133,9 +133,9 @@ class TestRBACEntityCreatorBasic:
             )
             creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                 spec=spec,
+                element_type=RBACElementType.VFOLDER,
                 scope_ref=ScopeRef(ScopeType.USER, user_id),
                 additional_scope_refs=[],
-                entity_type=EntityType.VFOLDER,
             )
             result = await execute_rbac_entity_creator(db_sess, creator)
 
@@ -180,9 +180,9 @@ class TestRBACEntityCreatorBasic:
             )
             creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                 spec=spec,
+                element_type=RBACElementType.VFOLDER,
                 scope_ref=ScopeRef(ScopeType.PROJECT, project_id),
                 additional_scope_refs=[],
-                entity_type=EntityType.VFOLDER,
             )
             await execute_rbac_entity_creator(db_sess, creator)
 
@@ -209,9 +209,9 @@ class TestRBACEntityCreatorBasic:
                 )
                 creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                     spec=spec,
+                    element_type=RBACElementType.VFOLDER,
                     scope_ref=ScopeRef(ScopeType.USER, user_id),
                     additional_scope_refs=[],
-                    entity_type=EntityType.VFOLDER,
                 )
                 result = await execute_rbac_entity_creator(db_sess, creator)
                 assert result.row.name == f"entity-{i}"
@@ -243,9 +243,9 @@ class TestRBACEntityCreatorBasic:
             )
             creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                 spec=spec,
+                element_type=RBACElementType.VFOLDER,
                 scope_ref=ScopeRef(ScopeType.PROJECT, project_id),
                 additional_scope_refs=[ScopeRef(ScopeType.USER, user_id)],
-                entity_type=EntityType.VFOLDER,
             )
             result = await execute_rbac_entity_creator(db_sess, creator)
 
@@ -307,9 +307,9 @@ class TestRBACEntityCreatorIdempotent:
             )
             creator1: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                 spec=spec1,
+                element_type=RBACElementType.VFOLDER,
                 scope_ref=ScopeRef(ScopeType.USER, user_id),
                 additional_scope_refs=[],
-                entity_type=EntityType.VFOLDER,
             )
             result1 = await execute_rbac_entity_creator(db_sess, creator1)
             assert result1.row.id == entity_id
@@ -365,9 +365,8 @@ class TestRBACBulkEntityCreator:
             ]
             creator: RBACBulkEntityCreator[RBACEntityCreatorTestRow] = RBACBulkEntityCreator(
                 specs=specs,
-                scope_type=ScopeType.USER,
-                scope_id=user_id,
-                entity_type=EntityType.VFOLDER,
+                element_type=RBACElementType.VFOLDER,
+                scope_ref=ScopeRef(ScopeType.USER, user_id),
             )
             result = await execute_rbac_bulk_entity_creator(db_sess, creator)
 
@@ -396,9 +395,8 @@ class TestRBACBulkEntityCreator:
         async with database_connection.begin_session() as db_sess:
             creator: RBACBulkEntityCreator[RBACEntityCreatorTestRow] = RBACBulkEntityCreator(
                 specs=[],
-                scope_type=ScopeType.USER,
-                scope_id="dummy",
-                entity_type=EntityType.VFOLDER,
+                element_type=RBACElementType.VFOLDER,
+                scope_ref=ScopeRef(ScopeType.USER, "dummy"),
             )
             result = await execute_rbac_bulk_entity_creator(db_sess, creator)
 
@@ -434,9 +432,8 @@ class TestRBACBulkEntityCreator:
             ]
             creator: RBACBulkEntityCreator[RBACEntityCreatorTestRow] = RBACBulkEntityCreator(
                 specs=specs,
-                scope_type=ScopeType.USER,
-                scope_id=user_id,
-                entity_type=EntityType.VFOLDER,
+                element_type=RBACElementType.VFOLDER,
+                scope_ref=ScopeRef(ScopeType.USER, user_id),
             )
             result = await execute_rbac_bulk_entity_creator(db_sess, creator)
 
@@ -500,9 +497,9 @@ class TestRBACEntityCreatorCompositePK:
                 spec = CompositePKCreatorSpec(tenant_id=1, item_id=1, name="test")
                 creator = RBACEntityCreator(
                     spec=spec,
+                    element_type=RBACElementType.VFOLDER,
                     scope_ref=ScopeRef(ScopeType.USER, "user-123"),
                     additional_scope_refs=[],
-                    entity_type=EntityType.VFOLDER,
                 )
 
                 with pytest.raises(UnsupportedCompositePrimaryKeyError):
@@ -527,9 +524,8 @@ class TestRBACEntityCreatorCompositePK:
                 ]
                 creator = RBACBulkEntityCreator(
                     specs=specs,
-                    scope_type=ScopeType.USER,
-                    scope_id="user-123",
-                    entity_type=EntityType.VFOLDER,
+                    element_type=RBACElementType.VFOLDER,
+                    scope_ref=ScopeRef(ScopeType.USER, "user-123"),
                 )
 
                 with pytest.raises(UnsupportedCompositePrimaryKeyError):
