@@ -83,7 +83,7 @@ async def execute_rbac_entity_creator[TRow: Base](
     pk_columns = mapper.primary_key
     if len(pk_columns) != 1:
         raise UnsupportedCompositePrimaryKeyError(
-            f"Purger only supports single-column primary keys (table: {mapper.local_table.name})",
+            f"Entity creator only supports single-column primary keys (table: {mapper.local_table.name})",
         )
 
     # 1. Build and insert row
@@ -169,7 +169,7 @@ async def execute_rbac_bulk_entity_creator[TRow: Base](
     pk_columns = mapper.primary_key
     if len(pk_columns) != 1:
         raise UnsupportedCompositePrimaryKeyError(
-            f"Purger only supports single-column primary keys (table: {mapper.local_table.name})",
+            f"Entity creator only supports single-column primary keys (table: {mapper.local_table.name})",
         )
 
     # 2. Flush to get DB-generated IDs and insert associations
@@ -225,7 +225,7 @@ async def execute_rbac_entity_creators[TRow: Base](
     pk_columns = mapper.primary_key
     if len(pk_columns) != 1:
         raise UnsupportedCompositePrimaryKeyError(
-            f"Purger only supports single-column primary keys (table: {mapper.local_table.name})",
+            f"Entity creator only supports single-column primary keys (table: {mapper.local_table.name})",
         )
 
     # 2. Single flush to get all DB-generated IDs
