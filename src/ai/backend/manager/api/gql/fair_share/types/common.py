@@ -13,6 +13,28 @@ from ai.backend.manager.data.fair_share.types import FairShareSpec
 from ai.backend.manager.errors.fair_share import FairShareError
 
 
+def _normalize_quantity(value: Decimal) -> Decimal:
+    """Normalize a Decimal by removing trailing zeros without scientific notation.
+
+    PostgreSQL NUMERIC(24, 6) preserves scale=6 through SUM() aggregation,
+    producing values like Decimal('7.000000'). This function strips trailing
+    zeros while avoiding scientific notation for large integer values.
+
+    Examples:
+        Decimal('7.000000') -> Decimal('7')
+        Decimal('0.500000') -> Decimal('0.5')
+        Decimal('4294967296.000000') -> Decimal('4294967296')
+    """
+    normalized = value.normalize()
+    sign, digits, exponent = normalized.as_tuple()
+    if isinstance(exponent, int) and exponent > 0:
+        # normalize() may produce scientific notation for large integers
+        # (e.g., Decimal('1000000000') -> Decimal('1E+9')).
+        # Convert back to plain integer representation.
+        return Decimal(int(normalized))
+    return normalized
+
+
 @strawberry.type(
     name="ResourceSlotEntry",
     description=(
@@ -96,6 +118,17 @@ class ResourceSlotGQL:
                 quantity=Decimal(v) if isinstance(v, str) else v,
             )
             for k, v in slot.items()
+        ]
+        return cls(entries=entries)
+
+    @classmethod
+    def from_slot_quantities(cls, quantities: Sequence[SlotQuantity]) -> ResourceSlotGQL:
+        """Convert a list of SlotQuantity to GraphQL type."""
+        entries = [
+            ResourceSlotEntryGQL(
+                resource_type=sq.slot_name, quantity=_normalize_quantity(sq.quantity)
+            )
+            for sq in quantities
         ]
         return cls(entries=entries)
 
