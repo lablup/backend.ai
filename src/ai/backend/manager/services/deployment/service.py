@@ -16,6 +16,7 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.deployment.creator import ModelRevisionCreator
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     DeploymentInfo,
@@ -151,6 +152,9 @@ from ai.backend.manager.services.deployment.actions.update_deployment import (
     UpdateDeploymentActionResult,
 )
 from ai.backend.manager.sokovan.deployment import DeploymentController
+from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
+    RevisionGeneratorRegistry,
+)
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -268,15 +272,18 @@ class DeploymentService:
 
     _deployment_controller: DeploymentController
     _deployment_repository: DeploymentRepository
+    _revision_generator_registry: RevisionGeneratorRegistry
 
     def __init__(
         self,
         deployment_controller: DeploymentController,
         deployment_repository: DeploymentRepository,
+        revision_generator_registry: RevisionGeneratorRegistry,
     ) -> None:
         """Initialize deployment service with controller and repository."""
         self._deployment_controller = deployment_controller
         self._deployment_repository = deployment_repository
+        self._revision_generator_registry = revision_generator_registry
 
     # ========== Deployment CRUD ==========
 
@@ -535,11 +542,55 @@ class DeploymentService:
 
     # ========== Revision Operations ==========
 
-    async def add_model_revision(
-        self, action: AddModelRevisionAction
-    ) -> AddModelRevisionActionResult:
-        adder = action.adder
-        deployment_id = adder.model_deployment_id
+    async def _merge_service_definition(
+        self,
+        revision_creator: ModelRevisionCreator,
+    ) -> ModelRevisionCreator:
+        """Merge service-definition.toml defaults into the revision creator.
+
+        Loads the service definition from the model vfolder and merges
+        environ and resource_slots. The creator's values take precedence
+        over service definition defaults.
+        """
+        generator = self._revision_generator_registry.get(
+            revision_creator.execution.runtime_variant
+        )
+        service_def = await generator.load_service_definition(
+            vfolder_id=revision_creator.mounts.model_vfolder_id,
+            runtime_variant=revision_creator.execution.runtime_variant.value,
+        )
+        if service_def is None:
+            return revision_creator
+
+        merged_environ = revision_creator.execution.environ
+        if service_def.environ:
+            merged_environ = {**service_def.environ, **(revision_creator.execution.environ or {})}
+
+        merged_resource_slots = revision_creator.resource_spec.resource_slots
+        if service_def.resource_slots:
+            merged_resource_slots = {
+                **service_def.resource_slots,
+                **revision_creator.resource_spec.resource_slots,
+            }
+
+        return ModelRevisionCreator(
+            model_deployment_id=revision_creator.model_deployment_id,
+            image_id=revision_creator.image_id,
+            resource_spec=revision_creator.resource_spec.model_copy(
+                update={"resource_slots": merged_resource_slots},
+            ),
+            mounts=revision_creator.mounts,
+            execution=revision_creator.execution.model_copy(
+                update={"environ": merged_environ},
+            ),
+        )
+
+    async def _build_revision(
+        self,
+        revision_creator: ModelRevisionCreator,
+    ) -> ModelRevisionData:
+        """Build and create a revision from the given creator."""
+        deployment_id = revision_creator.model_deployment_id
 
         endpoint_info = await self._deployment_repository.get_endpoint_info(deployment_id)
         latest_revision_number = await self._deployment_repository.get_latest_revision_number(
@@ -547,29 +598,36 @@ class DeploymentService:
         )
         next_revision_number = (latest_revision_number or 0) + 1
 
+        merged_creator = await self._merge_service_definition(revision_creator)
+
         spec = DeploymentRevisionCreatorSpec(
             endpoint_id=deployment_id,
             revision_number=next_revision_number,
-            image_id=adder.image_id,
+            image_id=merged_creator.image_id,
             resource_group=endpoint_info.metadata.resource_group,
-            resource_slots=ResourceSlot(adder.resource_spec.resource_slots),
-            resource_opts=adder.resource_spec.resource_opts or {},
-            cluster_mode=adder.resource_spec.cluster_mode,
-            cluster_size=adder.resource_spec.cluster_size,
-            model_id=adder.mounts.model_vfolder_id,
-            model_mount_destination=adder.mounts.model_mount_destination,
-            model_definition_path=adder.mounts.model_definition_path,
+            resource_slots=ResourceSlot(merged_creator.resource_spec.resource_slots),
+            resource_opts=merged_creator.resource_spec.resource_opts or {},
+            cluster_mode=merged_creator.resource_spec.cluster_mode,
+            cluster_size=merged_creator.resource_spec.cluster_size,
+            model_id=merged_creator.mounts.model_vfolder_id,
+            model_mount_destination=merged_creator.mounts.model_mount_destination,
+            model_definition_path=merged_creator.mounts.model_definition_path,
             model_definition=None,
-            startup_command=adder.execution.startup_command,
-            bootstrap_script=adder.execution.bootstrap_script,
-            environ=adder.execution.environ or {},
-            callback_url=str(adder.execution.callback_url)
-            if adder.execution.callback_url
+            startup_command=merged_creator.execution.startup_command,
+            bootstrap_script=merged_creator.execution.bootstrap_script,
+            environ=merged_creator.execution.environ or {},
+            callback_url=str(merged_creator.execution.callback_url)
+            if merged_creator.execution.callback_url
             else None,
-            runtime_variant=adder.execution.runtime_variant,
+            runtime_variant=merged_creator.execution.runtime_variant,
             extra_mounts=[],
         )
-        revision_data = await self._deployment_repository.create_revision(Creator(spec=spec))
+        return await self._deployment_repository.create_revision(Creator(spec=spec))
+
+    async def add_model_revision(
+        self, action: AddModelRevisionAction
+    ) -> AddModelRevisionActionResult:
+        revision_data = await self._build_revision(action.adder)
         return AddModelRevisionActionResult(revision=revision_data)
 
     async def get_revision_by_id(

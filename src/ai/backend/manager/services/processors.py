@@ -409,6 +409,7 @@ class Services:
         deployment_service = DeploymentService(
             args.deployment_controller,
             args.deployment_controller._deployment_repository,
+            args.revision_generator_registry,
         )
         storage_namespace_service = StorageNamespaceService(
             repositories.storage_namespace.repository
