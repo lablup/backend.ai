@@ -167,7 +167,7 @@ The `metric` field uses a key-value entries pattern instead of fixed fields, all
 **CRUD types:**
 
 ```python
-class PrometheusQueryPresetLabelCreate(BaseModel):
+class PrometheusQueryPresetLabel(BaseModel):
     label_name: str
     filterable: bool
     groupable: bool
@@ -176,15 +176,15 @@ class PrometheusQueryPresetCreate(BaseModel):
     name: str
     metric_name: str
     query_template: str
-    time_window: str | None = None
-    labels: list[PrometheusQueryPresetLabelCreate]
+    time_window: str | None
+    labels: list[PrometheusQueryPresetLabel]
 
 class PrometheusQueryPresetModify(BaseModel):
-    name: str | None = None
-    metric_name: str | None = None
-    query_template: str | None = None
-    time_window: str | None = None
-    labels: list[PrometheusQueryPresetLabelCreate] | None = None
+    name: str | None
+    metric_name: str | None
+    query_template: str | None
+    time_window: str | None
+    labels: list[PrometheusQueryPresetLabel] | None
 ```
 
 **Execute types:**
@@ -195,14 +195,14 @@ class MetricLabelEntry(BaseModel):
     value: str
 
 class ExecutePresetRequest(BaseModel):
-    labels: list[MetricLabelEntry] | None = None
-    group_labels: list[str] | None = None
-    window: str | None = None
+    labels: list[MetricLabelEntry]
+    group_labels: list[str]
+    window: str | None
     time_range: QueryTimeRange
 
 class PresetMetricResult(BaseModel):
     metric: list[MetricLabelEntry]
-    values: list[tuple[float, str]]
+    values: list[tuple[Decimal, str]]
 
 class PresetExecuteData(BaseModel):
     result_type: str
