@@ -36,7 +36,7 @@ class BulkPurgeUserAction(UserAction):
     """Action for bulk purging multiple users."""
 
     user_ids: list[UUID]
-    user_info_ctx: UserInfoContext
+    admin_user_id: UUID
     purge_shared_vfolders: OptionalState[bool] = field(default_factory=OptionalState.nop)
     delegate_endpoint_ownership: OptionalState[bool] = field(default_factory=OptionalState.nop)
 

@@ -21,8 +21,6 @@ from .inputs import (
     CreateUserInputGQL,
     DeleteUsersInputGQL,
     PurgeUserInputGQL,
-    PurgeUsersInputGQL,
-    UpdateUserInputGQL,
     UpdateUserV2InputGQL,
 )
 from .nested import (

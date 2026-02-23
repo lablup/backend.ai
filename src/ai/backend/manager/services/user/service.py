@@ -6,8 +6,13 @@ from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.types import AccessKey
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.user.types import BulkPurgeError, BulkUserPurgeResultData
+from ai.backend.manager.data.user.types import (
+    BulkPurgeError,
+    BulkUserPurgeResultData,
+    UserInfoContext,
+)
 from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.registry import AgentRegistry
@@ -209,6 +214,7 @@ class UserService:
         self,
         user_uuid: UUID,
         action: BulkPurgeUserAction,
+        user_info_ctx: UserInfoContext,
     ) -> None:
         """Purge a single user by UUID.
 
@@ -226,16 +232,16 @@ class UserService:
         if action.purge_shared_vfolders.optional_value():
             await self._user_repository.migrate_shared_vfolders(
                 deleted_user_uuid=user_uuid,
-                target_user_uuid=action.user_info_ctx.uuid,
-                target_user_email=action.user_info_ctx.email,
+                target_user_uuid=user_info_ctx.uuid,
+                target_user_email=user_info_ctx.email,
             )
 
         # Handle endpoint ownership delegation
         if action.delegate_endpoint_ownership.optional_value():
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
-                target_user_uuid=action.user_info_ctx.uuid,
-                target_main_access_key=action.user_info_ctx.main_access_key,
+                target_user_uuid=user_info_ctx.uuid,
+                target_main_access_key=user_info_ctx.main_access_key,
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,
@@ -279,12 +285,19 @@ class UserService:
         self,
         action: BulkPurgeUserAction,
     ) -> BulkPurgeUserActionResult:
+        admin_user = await self._user_repository.get_user_by_uuid(action.admin_user_id)
+        user_info_ctx = UserInfoContext(
+            uuid=admin_user.uuid,
+            email=admin_user.email,
+            main_access_key=AccessKey(admin_user.main_access_key or ""),
+        )
+
         purged_user_ids: list[UUID] = []
         failures: list[BulkPurgeError] = []
 
         for user_uuid in action.user_ids:
             try:
-                await self._purge_single_user(user_uuid, action)
+                await self._purge_single_user(user_uuid, action, user_info_ctx)
                 purged_user_ids.append(user_uuid)
             except Exception as e:
                 log.error(f"Failed to purge user {user_uuid}: {e}")

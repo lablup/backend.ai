@@ -644,19 +644,23 @@ class TestBulkPurgeUsers:
         )
 
     @pytest.fixture
-    def admin_user_info_ctx(self) -> UserInfoContext:
-        return UserInfoContext(
-            uuid=uuid.uuid4(),
-            email="admin@example.com",
-            main_access_key=AccessKey("ADMINKEY123456789"),
-        )
+    def mock_admin_user(
+        self,
+        mock_user_repository: MagicMock,
+    ) -> MagicMock:
+        admin_user = MagicMock()
+        admin_user.uuid = uuid.uuid4()
+        admin_user.email = "admin@example.com"
+        admin_user.main_access_key = "ADMINKEY123456789"
+        mock_user_repository.get_user_by_uuid = AsyncMock(return_value=admin_user)
+        return admin_user
 
     @pytest.mark.asyncio
     async def test_bulk_purge_users_all_success(
         self,
         service: UserService,
         mock_user_repository: MagicMock,
-        admin_user_info_ctx: UserInfoContext,
+        mock_admin_user: MagicMock,
     ) -> None:
         """Bulk purge with all users succeeding."""
         user_ids = [uuid.uuid4() for _ in range(3)]
@@ -671,7 +675,7 @@ class TestBulkPurgeUsers:
 
         action = BulkPurgeUserAction(
             user_ids=user_ids,
-            user_info_ctx=admin_user_info_ctx,
+            admin_user_id=mock_admin_user.uuid,
         )
 
         result = await service.bulk_purge_users(action)
@@ -685,7 +689,7 @@ class TestBulkPurgeUsers:
         self,
         service: UserService,
         mock_user_repository: MagicMock,
-        admin_user_info_ctx: UserInfoContext,
+        mock_admin_user: MagicMock,
     ) -> None:
         """Bulk purge with partial failure - one user has active vfolder mounts."""
         user_ids = [uuid.uuid4() for _ in range(3)]
@@ -701,7 +705,7 @@ class TestBulkPurgeUsers:
 
         action = BulkPurgeUserAction(
             user_ids=user_ids,
-            user_info_ctx=admin_user_info_ctx,
+            admin_user_id=mock_admin_user.uuid,
         )
 
         result = await service.bulk_purge_users(action)
@@ -718,7 +722,7 @@ class TestBulkPurgeUsers:
         self,
         service: UserService,
         mock_user_repository: MagicMock,
-        admin_user_info_ctx: UserInfoContext,
+        mock_admin_user: MagicMock,
     ) -> None:
         """Bulk purge with all users failing."""
         user_ids = [uuid.uuid4() for _ in range(3)]
@@ -729,7 +733,7 @@ class TestBulkPurgeUsers:
 
         action = BulkPurgeUserAction(
             user_ids=user_ids,
-            user_info_ctx=admin_user_info_ctx,
+            admin_user_id=mock_admin_user.uuid,
         )
 
         result = await service.bulk_purge_users(action)
@@ -743,12 +747,12 @@ class TestBulkPurgeUsers:
     async def test_bulk_purge_users_empty_list(
         self,
         service: UserService,
-        admin_user_info_ctx: UserInfoContext,
+        mock_admin_user: MagicMock,
     ) -> None:
         """Bulk purge with empty user list."""
         action = BulkPurgeUserAction(
             user_ids=[],
-            user_info_ctx=admin_user_info_ctx,
+            admin_user_id=mock_admin_user.uuid,
         )
 
         result = await service.bulk_purge_users(action)

@@ -9,7 +9,7 @@ import strawberry
 from strawberry import Info
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.types import AccessKey
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types import (
     BulkCreateUsersV2PayloadGQL,
@@ -28,20 +28,16 @@ from ai.backend.manager.api.gql.user.types import (
     DeleteUsersPayloadGQL,
     PurgeUserInputGQL,
     PurgeUserPayloadGQL,
-    PurgeUsersInputGQL,
-    PurgeUsersPayloadGQL,
-    UpdateUserInputGQL,
     UpdateUserPayloadGQL,
     UpdateUserV2InputGQL,
     UserV2GQL,
 )
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.data.user.types import UserInfoContext, UserStatus
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
-from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
@@ -400,18 +396,12 @@ async def admin_bulk_purge_users_v2(
     ctx = info.context
 
     me = current_user()
-    if me is None or ctx.db is None:
-        raise RuntimeError("User context or database not available")
-    user_repo = UserRepository(db=ctx.db)
-    admin_user = await user_repo.get_user_by_uuid(me.user_id)
+    if me is None:
+        raise UnreachableError("User context is not available after check_admin_only()")
 
     action = BulkPurgeUserAction(
         user_ids=input.user_ids,
-        user_info_ctx=UserInfoContext(
-            uuid=admin_user.uuid,
-            email=admin_user.email,
-            main_access_key=AccessKey(admin_user.main_access_key or ""),
-        ),
+        admin_user_id=me.user_id,
         purge_shared_vfolders=(
             OptionalState.update(input.purge_shared_vfolders)
             if input.purge_shared_vfolders
