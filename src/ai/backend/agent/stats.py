@@ -361,7 +361,9 @@ class StatContext:
         self.kernel_metrics = {}
         self.process_metrics = {}
 
-        self._lock = asyncio.Lock()
+        self._node_lock = asyncio.Lock()
+        self._container_lock = asyncio.Lock()
+        self._process_lock = asyncio.Lock()
         self._timestamps: MutableMapping[str, float] = {}
         self._utilization_metric_observer = UtilizationMetricObserver.instance()
         self._stage_observer = StageObserver.instance()
@@ -494,7 +496,7 @@ class StatContext:
             stage="before_lock",
             upper_layer="collect_node_stat",
         )
-        async with self._lock:
+        async with self._node_lock:
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.
@@ -725,7 +727,7 @@ class StatContext:
             stage="before_lock",
             upper_layer="collect_container_stat",
         )
-        async with self._lock:
+        async with self._container_lock:
             kernel_id_map: dict[ContainerId, KernelId] = {}
             kernel_obj_map: dict[KernelId, AbstractKernel] = {}
             for kid, info in self.agent.kernel_registry.items():
@@ -894,7 +896,7 @@ class StatContext:
             stage="before_lock",
             upper_layer="collect_per_container_process_stat",
         )
-        async with self._lock:
+        async with self._process_lock:
             kernel_id_map: dict[ContainerId, KernelId] = {}
             for kid, info in self.agent.kernel_registry.items():
                 try:
