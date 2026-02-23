@@ -76,7 +76,7 @@ async def admin_create_user_v2(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("admin_create_user is not yet implemented")
+    raise NotImplementedError("admin_create_user_v2 is not yet implemented")
 
 
 @strawberry.mutation(
@@ -183,7 +183,7 @@ async def admin_update_user_v2(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("admin_update_user is not yet implemented")
+    raise NotImplementedError("admin_update_user_v2 is not yet implemented")
 
 
 @strawberry.mutation(
@@ -285,7 +285,7 @@ async def update_user_v2(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("update_user is not yet implemented")
+    raise NotImplementedError("update_user_v2 is not yet implemented")
 
 
 # Delete UpdateUserV2InputGQLlete)
@@ -314,7 +314,7 @@ async def admin_delete_user_v2(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("admin_delete_user is not yet implemented")
+    raise NotImplementedError("admin_delete_user_v2 is not yet implemented")
 
 
 @strawberry.mutation(
@@ -340,7 +340,7 @@ async def admin_delete_users_v2(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("admin_delete_users is not yet implemented")
+    raise NotImplementedError("admin_delete_users_v2 is not yet implemented")
 
 
 # Purge Mutations (Hard Delete)
@@ -369,7 +369,7 @@ async def admin_purge_user_v2(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("admin_purge_user is not yet implemented")
+    raise NotImplementedError("admin_purge_user_v2 is not yet implemented")
 
 
 @strawberry.mutation(
