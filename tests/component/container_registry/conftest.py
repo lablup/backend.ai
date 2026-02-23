@@ -14,6 +14,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
+from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import container_registry as _container_registry_api
 from ai.backend.manager.api.context import RootContext
@@ -55,7 +56,9 @@ async def _container_registry_domain_ctx(root_ctx: RootContext) -> AsyncIterator
     """
     # @require_manager_status decorator accesses config_provider.legacy_etcd_config_loader
     # which is not initialized in _TestConfigProvider used in component tests.
-    root_ctx.config_provider._legacy_etcd_config_loader = AsyncMock()
+    _mock_loader = MagicMock()
+    _mock_loader.get_manager_status = AsyncMock(return_value=ManagerStatus.RUNNING)
+    root_ctx.config_provider._legacy_etcd_config_loader = _mock_loader
     root_ctx.repositories = Repositories.create(
         RepositoryArgs(
             db=root_ctx.db,
