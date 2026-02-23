@@ -11,7 +11,7 @@ from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.models.app_config import AppConfigRow, AppConfigScopeType
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
-from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 
 from .cache_source import AppConfigCacheSource
 from .db_source import AppConfigDBSource
@@ -77,7 +77,7 @@ class AppConfigRepository:
 
         return merged_config.merged_config
 
-    async def create_config(self, creator: Creator[AppConfigRow]) -> AppConfigData:
+    async def create_config(self, creator: RBACEntityCreator[AppConfigRow]) -> AppConfigData:
         """Create a new app configuration."""
         return await self._db_source.create_config(creator)
 
