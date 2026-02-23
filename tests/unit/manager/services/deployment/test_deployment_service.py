@@ -7,6 +7,7 @@ Tests verify service layer business logic using mocked repositories.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
@@ -368,6 +369,18 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
         mock_generator.load_service_definition = AsyncMock(return_value=None)
         mock_revision_generator_registry.get.return_value = mock_generator
 
+    @pytest.fixture(autouse=True)
+    def _setup_default_repository_mocks(
+        self,
+        mock_deployment_repository: MagicMock,
+        endpoint_info: DeploymentInfo,
+        revision_data: ModelRevisionData,
+    ) -> None:
+        """Set up default mock responses for repository methods used in _build_revision."""
+        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
+        mock_deployment_repository.get_latest_revision_number = AsyncMock(return_value=None)
+        mock_deployment_repository.create_revision = AsyncMock(return_value=revision_data)
+
     @pytest.fixture
     def deployment_id(self) -> uuid.UUID:
         return uuid.uuid4()
@@ -455,6 +468,29 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
         )
 
+    @pytest.fixture
+    def revision_creator_with_none_environ(
+        self, deployment_id: uuid.UUID, image_id: uuid.UUID, model_vfolder_id: uuid.UUID
+    ) -> ModelRevisionCreator:
+        """Creator with None environ and resource_opts for edge case testing."""
+        return ModelRevisionCreator(
+            model_deployment_id=deployment_id,
+            image_id=image_id,
+            resource_spec=ResourceSpec(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots={"cpu": "2"},
+                resource_opts=None,
+            ),
+            mounts=VFolderMountsCreator(
+                model_vfolder_id=model_vfolder_id,
+            ),
+            execution=ExecutionSpec(
+                runtime_variant=RuntimeVariant.VLLM,
+                environ=None,
+            ),
+        )
+
 
 class TestAddModelRevision(ModelRevisionFixtures):
     """Tests for DeploymentService.add_model_revision"""
@@ -469,10 +505,6 @@ class TestAddModelRevision(ModelRevisionFixtures):
         revision_data: ModelRevisionData,
     ) -> None:
         """Adding the first revision should use revision_number=1."""
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
-        mock_deployment_repository.get_latest_revision_number = AsyncMock(return_value=None)
-        mock_deployment_repository.create_revision = AsyncMock(return_value=revision_data)
-
         action = AddModelRevisionAction(adder=revision_creator)
         result = await processors.add_model_revision.wait_for_complete(action)
 
@@ -494,15 +526,11 @@ class TestAddModelRevision(ModelRevisionFixtures):
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
-        deployment_id: uuid.UUID,
-        endpoint_info: DeploymentInfo,
         revision_creator: ModelRevisionCreator,
         revision_data: ModelRevisionData,
     ) -> None:
         """Adding a revision when revisions exist should increment the number."""
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
         mock_deployment_repository.get_latest_revision_number = AsyncMock(return_value=3)
-        mock_deployment_repository.create_revision = AsyncMock(return_value=revision_data)
 
         action = AddModelRevisionAction(adder=revision_creator)
         result = await processors.add_model_revision.wait_for_complete(action)
@@ -515,16 +543,9 @@ class TestAddModelRevision(ModelRevisionFixtures):
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
-        deployment_id: uuid.UUID,
-        endpoint_info: DeploymentInfo,
         revision_creator: ModelRevisionCreator,
-        revision_data: ModelRevisionData,
     ) -> None:
         """All fields from ModelRevisionCreator should be mapped to the spec correctly."""
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
-        mock_deployment_repository.get_latest_revision_number = AsyncMock(return_value=None)
-        mock_deployment_repository.create_revision = AsyncMock(return_value=revision_data)
-
         action = AddModelRevisionAction(adder=revision_creator)
         await processors.add_model_revision.wait_for_complete(action)
 
@@ -547,36 +568,10 @@ class TestAddModelRevision(ModelRevisionFixtures):
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
-        deployment_id: uuid.UUID,
-        endpoint_info: DeploymentInfo,
-        image_id: uuid.UUID,
-        model_vfolder_id: uuid.UUID,
-        revision_data: ModelRevisionData,
+        revision_creator_with_none_environ: ModelRevisionCreator,
     ) -> None:
         """None environ and resource_opts should be converted to empty dict."""
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
-        mock_deployment_repository.get_latest_revision_number = AsyncMock(return_value=None)
-        mock_deployment_repository.create_revision = AsyncMock(return_value=revision_data)
-
-        creator_with_none = ModelRevisionCreator(
-            model_deployment_id=deployment_id,
-            image_id=image_id,
-            resource_spec=ResourceSpec(
-                cluster_mode=ClusterMode.SINGLE_NODE,
-                cluster_size=1,
-                resource_slots={"cpu": "2"},
-                resource_opts=None,
-            ),
-            mounts=VFolderMountsCreator(
-                model_vfolder_id=model_vfolder_id,
-            ),
-            execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.VLLM,
-                environ=None,
-            ),
-        )
-
-        action = AddModelRevisionAction(adder=creator_with_none)
+        action = AddModelRevisionAction(adder=revision_creator_with_none_environ)
         await processors.add_model_revision.wait_for_complete(action)
 
         creator_arg = mock_deployment_repository.create_revision.call_args[0][0]
@@ -588,26 +583,32 @@ class TestAddModelRevision(ModelRevisionFixtures):
 class TestServiceDefinitionMerge(ModelRevisionFixtures):
     """Tests for service definition merging in revision creation."""
 
+    @pytest.fixture
+    def setup_mock_service_definition(
+        self, mock_revision_generator_registry: MagicMock
+    ) -> Callable[[ModelServiceDefinition], None]:
+        """Factory fixture to inject a service definition into the mock generator registry."""
+
+        def _setup(service_def: ModelServiceDefinition) -> None:
+            mock_generator = MagicMock()
+            mock_generator.load_service_definition = AsyncMock(return_value=service_def)
+            mock_revision_generator_registry.get.return_value = mock_generator
+
+        return _setup
+
     async def test_merge_environ_from_service_definition(
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
-        mock_revision_generator_registry: MagicMock,
-        endpoint_info: DeploymentInfo,
         revision_creator: ModelRevisionCreator,
-        revision_data: ModelRevisionData,
+        setup_mock_service_definition: Callable[[ModelServiceDefinition], None],
     ) -> None:
         """Service definition environ should be merged with creator environ as base."""
-        service_def = ModelServiceDefinition(
-            environ={"SERVICE_VAR": "from_def", "CUDA_VISIBLE_DEVICES": "1"},
+        setup_mock_service_definition(
+            ModelServiceDefinition(
+                environ={"SERVICE_VAR": "from_def", "CUDA_VISIBLE_DEVICES": "1"},
+            )
         )
-        mock_generator = MagicMock()
-        mock_generator.load_service_definition = AsyncMock(return_value=service_def)
-        mock_revision_generator_registry.get.return_value = mock_generator
-
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
-        mock_deployment_repository.get_latest_revision_number = AsyncMock(return_value=None)
-        mock_deployment_repository.create_revision = AsyncMock(return_value=revision_data)
 
         action = AddModelRevisionAction(adder=revision_creator)
         await processors.add_model_revision.wait_for_complete(action)
@@ -622,22 +623,15 @@ class TestServiceDefinitionMerge(ModelRevisionFixtures):
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
-        mock_revision_generator_registry: MagicMock,
-        endpoint_info: DeploymentInfo,
         revision_creator: ModelRevisionCreator,
-        revision_data: ModelRevisionData,
+        setup_mock_service_definition: Callable[[ModelServiceDefinition], None],
     ) -> None:
         """Service definition resource_slots should be merged with creator slots as base."""
-        service_def = ModelServiceDefinition(
-            resource_slots={"cpu": "2", "mem": "4g", "cuda.shares": "1.0"},
+        setup_mock_service_definition(
+            ModelServiceDefinition(
+                resource_slots={"cpu": "2", "mem": "4g", "cuda.shares": "1.0"},
+            )
         )
-        mock_generator = MagicMock()
-        mock_generator.load_service_definition = AsyncMock(return_value=service_def)
-        mock_revision_generator_registry.get.return_value = mock_generator
-
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
-        mock_deployment_repository.get_latest_revision_number = AsyncMock(return_value=None)
-        mock_deployment_repository.create_revision = AsyncMock(return_value=revision_data)
 
         action = AddModelRevisionAction(adder=revision_creator)
         await processors.add_model_revision.wait_for_complete(action)
@@ -650,16 +644,9 @@ class TestServiceDefinitionMerge(ModelRevisionFixtures):
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
-        endpoint_info: DeploymentInfo,
         revision_creator: ModelRevisionCreator,
-        revision_data: ModelRevisionData,
     ) -> None:
         """When no service definition exists, creator values are used unchanged."""
-        # autouse fixture already sets load_service_definition to return None
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
-        mock_deployment_repository.get_latest_revision_number = AsyncMock(return_value=None)
-        mock_deployment_repository.create_revision = AsyncMock(return_value=revision_data)
-
         action = AddModelRevisionAction(adder=revision_creator)
         await processors.add_model_revision.wait_for_complete(action)
 
@@ -671,20 +658,11 @@ class TestServiceDefinitionMerge(ModelRevisionFixtures):
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
-        mock_revision_generator_registry: MagicMock,
-        endpoint_info: DeploymentInfo,
         revision_creator: ModelRevisionCreator,
-        revision_data: ModelRevisionData,
+        setup_mock_service_definition: Callable[[ModelServiceDefinition], None],
     ) -> None:
         """Service definition with None environ/resource_slots should not affect creator."""
-        service_def = ModelServiceDefinition(environ=None, resource_slots=None)
-        mock_generator = MagicMock()
-        mock_generator.load_service_definition = AsyncMock(return_value=service_def)
-        mock_revision_generator_registry.get.return_value = mock_generator
-
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
-        mock_deployment_repository.get_latest_revision_number = AsyncMock(return_value=None)
-        mock_deployment_repository.create_revision = AsyncMock(return_value=revision_data)
+        setup_mock_service_definition(ModelServiceDefinition(environ=None, resource_slots=None))
 
         action = AddModelRevisionAction(adder=revision_creator)
         await processors.add_model_revision.wait_for_complete(action)
@@ -697,42 +675,17 @@ class TestServiceDefinitionMerge(ModelRevisionFixtures):
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
-        mock_revision_generator_registry: MagicMock,
-        deployment_id: uuid.UUID,
-        endpoint_info: DeploymentInfo,
-        image_id: uuid.UUID,
-        model_vfolder_id: uuid.UUID,
-        revision_data: ModelRevisionData,
+        revision_creator_with_none_environ: ModelRevisionCreator,
+        setup_mock_service_definition: Callable[[ModelServiceDefinition], None],
     ) -> None:
         """Service definition environ should apply when creator environ is None."""
-        service_def = ModelServiceDefinition(
-            environ={"SERVICE_VAR": "value"},
-        )
-        mock_generator = MagicMock()
-        mock_generator.load_service_definition = AsyncMock(return_value=service_def)
-        mock_revision_generator_registry.get.return_value = mock_generator
-
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
-        mock_deployment_repository.get_latest_revision_number = AsyncMock(return_value=None)
-        mock_deployment_repository.create_revision = AsyncMock(return_value=revision_data)
-
-        creator_with_none_environ = ModelRevisionCreator(
-            model_deployment_id=deployment_id,
-            image_id=image_id,
-            resource_spec=ResourceSpec(
-                cluster_mode=ClusterMode.SINGLE_NODE,
-                cluster_size=1,
-                resource_slots={"cpu": "2"},
-                resource_opts=None,
-            ),
-            mounts=VFolderMountsCreator(model_vfolder_id=model_vfolder_id),
-            execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.VLLM,
-                environ=None,
-            ),
+        setup_mock_service_definition(
+            ModelServiceDefinition(
+                environ={"SERVICE_VAR": "value"},
+            )
         )
 
-        action = AddModelRevisionAction(adder=creator_with_none_environ)
+        action = AddModelRevisionAction(adder=revision_creator_with_none_environ)
         await processors.add_model_revision.wait_for_complete(action)
 
         spec = mock_deployment_repository.create_revision.call_args[0][0].spec
