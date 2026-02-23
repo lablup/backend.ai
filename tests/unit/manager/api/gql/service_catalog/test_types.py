@@ -166,7 +166,7 @@ class TestServiceCatalogFilterGQL:
         f = ServiceCatalogFilterGQL(service_group="manager")
         conditions = f.build_conditions()
         assert len(conditions) == 1
-        assert str(conditions[0].compile(compile_kwargs={"literal_binds": True}))
+        assert str(conditions[0]().compile(compile_kwargs={"literal_binds": True}))
 
     def test_build_conditions_status(self) -> None:
         """Filter by status should produce one condition."""
