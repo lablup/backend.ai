@@ -24,6 +24,7 @@ from ai.backend.manager.api.types import CORSOptions, WebMiddleware
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.dto.context import StorageSessionManagerCtx
 from ai.backend.manager.dto.quota_scope_request import GetQuotaScopePathParam
+from ai.backend.manager.errors.permission import NotEnoughPermission
 
 from .adapter import QuotaScopeAdapter
 
@@ -37,7 +38,7 @@ class QuotaScopeAPIHandler:
     def _check_superadmin(self) -> None:
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can manage quota scopes.")
+            raise NotEnoughPermission("Only superadmin can manage quota scopes.")
 
     @auth_required_for_method
     @api_handler
