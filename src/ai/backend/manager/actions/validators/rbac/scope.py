@@ -4,8 +4,6 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.scope import BaseScopeAction
 from ai.backend.manager.actions.validator.scope import ScopeActionValidator
-from ai.backend.manager.data.permission.id import ScopeId
-from ai.backend.manager.data.permission.role import ScopePermissionCheckInput
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -21,21 +19,12 @@ class ScopeActionRBACValidator(ScopeActionValidator):
 
     @override
     async def validate(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
-        entity_type = action.entity_type()
-        scope_type = action.scope_type()
-        scope_id = action.scope_id()
         user = current_user()
         if user is None:
             raise UserNotFound("User not found in context")
 
-        await self._repository.check_permission_in_scope(
-            ScopePermissionCheckInput(
-                user_id=user.user_id,
-                operation=action.operation_type().to_permission_operation(),
-                target_entity_type=entity_type,
-                target_scope_id=ScopeId(
-                    scope_type=scope_type,
-                    scope_id=scope_id,
-                ),
-            )
+        await self._repository.check_permission_with_scope_chain(
+            user_id=user.user_id,
+            target_element_ref=action.target_element(),
+            operation=action.operation_type().to_permission_operation(),
         )
