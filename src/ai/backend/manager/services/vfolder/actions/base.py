@@ -578,9 +578,11 @@ class GetTaskLogsAction(VFolderSingleEntityAction):
 
     @override
     def target_element(self) -> RBACElementRef:
-        # TODO: GetTaskLogsAction is deprecated and needs migration
-        # away from BaseSingleEntityAction.
-        raise NotImplementedError
+        # TODO: Migrate GetTaskLogsAction to a session/kernel action.
+        return RBACElementRef(
+            element_type=RBACElementType.USER,
+            element_id=str(self.user_id),
+        )
 
 
 @dataclass
