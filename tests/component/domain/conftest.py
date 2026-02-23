@@ -7,7 +7,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
@@ -156,7 +156,7 @@ async def project_resource_policy_fixture(
     """
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(ProjectResourcePolicyRow.__table__)
+            pg_insert(ProjectResourcePolicyRow.__table__)
             .values(
                 name="default",
                 max_vfolder_count=0,
