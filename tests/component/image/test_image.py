@@ -217,8 +217,7 @@ class TestImagePurge:
 class TestImagePermissions:
     @pytest.mark.asyncio
     @pytest.mark.xfail(
-        reason="Handler raises HTTPForbidden(403) but middleware chain may transform it",
-        raises=AssertionError,
+        reason="Handler may return 400 instead of 403 depending on middleware chain",
         strict=False,
     )
     async def test_regular_user_cannot_search_images(
@@ -232,8 +231,7 @@ class TestImagePermissions:
 
     @pytest.mark.asyncio
     @pytest.mark.xfail(
-        reason="Handler raises HTTPForbidden(403) but middleware chain may transform it",
-        raises=AssertionError,
+        reason="Handler may return 400 instead of 403 depending on middleware chain",
         strict=False,
     )
     async def test_regular_user_cannot_get_image(

@@ -204,7 +204,10 @@ class ImageFactoryHelper:
                     type=image_type,
                     accelerators=None,
                     labels={},
-                    resources={},
+                    resources={
+                        "cpu": {"min": "1", "max": "4"},
+                        "mem": {"min": "256m", "max": "4g"},
+                    },
                     status=status,
                 )
             )
