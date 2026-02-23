@@ -206,7 +206,7 @@ class ImageFactoryHelper:
                     labels={},
                     resources={
                         "cpu": {"min": "1", "max": "4"},
-                        "mem": {"min": "256m", "max": "4g"},
+                        "mem": {"min": "268435456", "max": "4294967296"},
                     },
                     status=status,
                 )
