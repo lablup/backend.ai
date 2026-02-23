@@ -115,20 +115,9 @@ class ResourceSlotGQL:
         entries = [
             ResourceSlotEntryGQL(
                 resource_type=k,
-                quantity=Decimal(v) if isinstance(v, str) else v,
+                quantity=_normalize_quantity(Decimal(v) if isinstance(v, str) else v),
             )
             for k, v in slot.items()
-        ]
-        return cls(entries=entries)
-
-    @classmethod
-    def from_slot_quantities(cls, quantities: Sequence[SlotQuantity]) -> ResourceSlotGQL:
-        """Convert a list of SlotQuantity to GraphQL type."""
-        entries = [
-            ResourceSlotEntryGQL(
-                resource_type=sq.slot_name, quantity=_normalize_quantity(sq.quantity)
-            )
-            for sq in quantities
         ]
         return cls(entries=entries)
 
