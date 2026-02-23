@@ -22,6 +22,7 @@ from ai.backend.manager.repositories.base import (
     negate_conditions,
 )
 from ai.backend.manager.repositories.fair_share.options import (
+    RGUserFairShareConditions,
     UserFairShareConditions,
     UserFairShareOrders,
 )
@@ -374,6 +375,122 @@ class UserFairShareFilter(GQLFilter):
                 ),
                 ends_with_factory=lambda spec: UserFairShareConditions.by_domain_name_ends_with(
                     spec
+                ),
+            )
+            if dn_condition:
+                conditions.append(dn_condition)
+
+        if self.user:
+            conditions.extend(self.user.build_conditions())
+
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        if self.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_conditions.extend(sub_filter.build_conditions())
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+
+        if self.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_conditions.extend(sub_filter.build_conditions())
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+
+        return conditions
+
+
+@strawberry.input(
+    name="RGUserFairShareFilter",
+    description=(
+        "Added in 26.2.0. Filter for user fair shares within a resource group scope. "
+        "References resource group membership columns to avoid excluding users without fair share records."
+    ),
+)
+class RGUserFairShareFilter(GQLFilter):
+    """Filter for user fair shares in RG context (uses INNER JOIN'd columns)."""
+
+    resource_group: StringFilter | None = strawberry.field(
+        default=None, description="Filter by scaling group name."
+    )
+    user_uuid: UUIDFilter | None = strawberry.field(
+        default=None, description="Filter by user UUID."
+    )
+    project_id: UUIDFilter | None = strawberry.field(
+        default=None, description="Filter by project UUID."
+    )
+    domain_name: StringFilter | None = strawberry.field(
+        default=None, description="Filter by domain name."
+    )
+    user: UserFairShareUserNestedFilter | None = strawberry.field(
+        default=None, description="Filter by user properties."
+    )
+
+    AND: list[RGUserFairShareFilter] | None = strawberry.field(
+        default=None, description="Combine with AND logic."
+    )
+    OR: list[RGUserFairShareFilter] | None = strawberry.field(
+        default=None, description="Combine with OR logic."
+    )
+    NOT: list[RGUserFairShareFilter] | None = strawberry.field(
+        default=None, description="Negate filters."
+    )
+
+    @override
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+
+        if self.resource_group:
+            sg_condition = self.resource_group.build_query_condition(
+                contains_factory=lambda spec: RGUserFairShareConditions.by_resource_group_contains(
+                    spec.value
+                ),
+                equals_factory=lambda spec: RGUserFairShareConditions.by_resource_group_equals(
+                    spec.value
+                ),
+                starts_with_factory=lambda spec: RGUserFairShareConditions.by_resource_group_starts_with(
+                    spec.value
+                ),
+                ends_with_factory=lambda spec: RGUserFairShareConditions.by_resource_group_ends_with(
+                    spec.value
+                ),
+            )
+            if sg_condition:
+                conditions.append(sg_condition)
+
+        if self.user_uuid:
+            uuid_condition = self.user_uuid.build_query_condition(
+                equals_factory=lambda spec: RGUserFairShareConditions.by_user_uuid(spec.value),
+                in_factory=lambda spec: RGUserFairShareConditions.by_user_uuids(spec.values),
+            )
+            if uuid_condition:
+                conditions.append(uuid_condition)
+
+        if self.project_id:
+            pid_condition = self.project_id.build_query_condition(
+                equals_factory=lambda spec: RGUserFairShareConditions.by_project_id(spec.value),
+                in_factory=lambda spec: RGUserFairShareConditions.by_project_ids(spec.values),
+            )
+            if pid_condition:
+                conditions.append(pid_condition)
+
+        if self.domain_name:
+            dn_condition = self.domain_name.build_query_condition(
+                contains_factory=lambda spec: RGUserFairShareConditions.by_domain_name_contains(
+                    spec.value
+                ),
+                equals_factory=lambda spec: RGUserFairShareConditions.by_domain_name_equals(
+                    spec.value
+                ),
+                starts_with_factory=lambda spec: RGUserFairShareConditions.by_domain_name_starts_with(
+                    spec.value
+                ),
+                ends_with_factory=lambda spec: RGUserFairShareConditions.by_domain_name_ends_with(
+                    spec.value
                 ),
             )
             if dn_condition:

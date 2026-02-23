@@ -20,6 +20,7 @@ from ai.backend.manager.api.gql.fair_share.types import (
     ProjectFairShareFilter,
     ProjectFairShareGQL,
     ProjectFairShareOrderBy,
+    RGProjectFairShareFilter,
     UpsertProjectFairShareWeightInput,
     UpsertProjectFairShareWeightPayload,
 )
@@ -115,7 +116,7 @@ async def rg_project_fair_share(
 async def rg_project_fair_shares(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupProjectScope,
-    filter: ProjectFairShareFilter | None = None,
+    filter: RGProjectFairShareFilter | None = None,
     order_by: list[ProjectFairShareOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,

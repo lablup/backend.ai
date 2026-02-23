@@ -25,6 +25,7 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.fair_share.options import (
     ProjectFairShareConditions,
     ProjectFairShareOrders,
+    RGProjectFairShareConditions,
 )
 
 from .common import (
@@ -396,6 +397,111 @@ class ProjectFairShareFilter(GQLFilter):
                 ),
                 ends_with_factory=lambda spec: ProjectFairShareConditions.by_domain_name_ends_with(
                     spec
+                ),
+            )
+            if dn_condition:
+                conditions.append(dn_condition)
+
+        if self.project:
+            conditions.extend(self.project.build_conditions())
+
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        if self.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_conditions.extend(sub_filter.build_conditions())
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+
+        if self.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_conditions.extend(sub_filter.build_conditions())
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+
+        return conditions
+
+
+@strawberry.input(
+    name="RGProjectFairShareFilter",
+    description=(
+        "Added in 26.2.0. Filter for project fair shares within a resource group scope. "
+        "References resource group membership columns to avoid excluding projects without fair share records."
+    ),
+)
+class RGProjectFairShareFilter(GQLFilter):
+    """Filter for project fair shares in RG context (uses INNER JOIN'd columns)."""
+
+    resource_group: StringFilter | None = strawberry.field(
+        default=None, description="Filter by scaling group name."
+    )
+    project_id: UUIDFilter | None = strawberry.field(
+        default=None, description="Filter by project UUID."
+    )
+    domain_name: StringFilter | None = strawberry.field(
+        default=None, description="Filter by domain name."
+    )
+    project: ProjectFairShareProjectNestedFilter | None = strawberry.field(
+        default=None, description="Filter by project properties."
+    )
+
+    AND: list[RGProjectFairShareFilter] | None = strawberry.field(
+        default=None, description="Combine with AND logic."
+    )
+    OR: list[RGProjectFairShareFilter] | None = strawberry.field(
+        default=None, description="Combine with OR logic."
+    )
+    NOT: list[RGProjectFairShareFilter] | None = strawberry.field(
+        default=None, description="Negate filters."
+    )
+
+    @override
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+
+        if self.resource_group:
+            sg_condition = self.resource_group.build_query_condition(
+                contains_factory=lambda spec: RGProjectFairShareConditions.by_resource_group_contains(
+                    spec.value
+                ),
+                equals_factory=lambda spec: RGProjectFairShareConditions.by_resource_group_equals(
+                    spec.value
+                ),
+                starts_with_factory=lambda spec: RGProjectFairShareConditions.by_resource_group_starts_with(
+                    spec.value
+                ),
+                ends_with_factory=lambda spec: RGProjectFairShareConditions.by_resource_group_ends_with(
+                    spec.value
+                ),
+            )
+            if sg_condition:
+                conditions.append(sg_condition)
+
+        if self.project_id:
+            pid_condition = self.project_id.build_query_condition(
+                equals_factory=lambda spec: RGProjectFairShareConditions.by_project_id(spec.value),
+                in_factory=lambda spec: RGProjectFairShareConditions.by_project_ids(spec.values),
+            )
+            if pid_condition:
+                conditions.append(pid_condition)
+
+        if self.domain_name:
+            dn_condition = self.domain_name.build_query_condition(
+                contains_factory=lambda spec: RGProjectFairShareConditions.by_domain_name_contains(
+                    spec.value
+                ),
+                equals_factory=lambda spec: RGProjectFairShareConditions.by_domain_name_equals(
+                    spec.value
+                ),
+                starts_with_factory=lambda spec: RGProjectFairShareConditions.by_domain_name_starts_with(
+                    spec.value
+                ),
+                ends_with_factory=lambda spec: RGProjectFairShareConditions.by_domain_name_ends_with(
+                    spec.value
                 ),
             )
             if dn_condition:
