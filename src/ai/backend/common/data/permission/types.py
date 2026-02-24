@@ -339,7 +339,6 @@ class RBACElementType(enum.StrEnum):
     """
 
     # === Scope hierarchy ===
-    GLOBAL = "global"
     DOMAIN = "domain"
     PROJECT = "project"
     USER = "user"
