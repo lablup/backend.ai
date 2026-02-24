@@ -20,8 +20,7 @@ from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.keypair.types import KeyPairCreator
-from ai.backend.manager.data.permission.id import ScopeId
-from ai.backend.manager.data.permission.types import RBACElementRef, ScopeType
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
     BulkUserUpdateResultData,
@@ -166,13 +165,15 @@ class UserDBSource:
             project_ids = await self._get_project_scope_ids_for_user(
                 db_session, domain_name, [UUID(gid) for gid in group_ids or []]
             )
-            project_scope_refs = [ScopeId(ScopeType.PROJECT, str(pid)) for pid in project_ids]
+            project_scope_refs = [
+                RBACElementRef(RBACElementType.PROJECT, str(pid)) for pid in project_ids
+            ]
 
             # Insert user with RBAC scope associations (domain + projects)
             rbac_creator = RBACEntityCreator(
                 spec=creator.spec,
                 element_type=RBACElementType.USER,
-                scope_ref=ScopeId(ScopeType.DOMAIN, domain_name),
+                scope_ref=RBACElementRef(RBACElementType.DOMAIN, domain_name),
                 additional_scope_refs=project_scope_refs,
             )
             result = await execute_rbac_entity_creator(db_session, rbac_creator)
@@ -264,13 +265,15 @@ class UserDBSource:
         project_ids = await self._get_project_scope_ids_for_user(
             db_session, spec.domain_name, [UUID(gid) for gid in item.group_ids or []]
         )
-        project_scope_refs = [ScopeId(ScopeType.PROJECT, str(pid)) for pid in project_ids]
+        project_scope_refs = [
+            RBACElementRef(RBACElementType.PROJECT, str(pid)) for pid in project_ids
+        ]
 
         # Insert user with RBAC scope associations (domain + projects)
         rbac_creator = RBACEntityCreator(
             spec=item.creator.spec,
             element_type=RBACElementType.USER,
-            scope_ref=ScopeId(ScopeType.DOMAIN, spec.domain_name),
+            scope_ref=RBACElementRef(RBACElementType.DOMAIN, spec.domain_name),
             additional_scope_refs=project_scope_refs,
         )
         result = await execute_rbac_entity_creator(db_session, rbac_creator)
