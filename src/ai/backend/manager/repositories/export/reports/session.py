@@ -5,9 +5,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import sqlalchemy as sa
-
-from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
@@ -70,15 +67,6 @@ USER_JOIN = JoinDef(
 KERNEL_JOIN = JoinDef(
     table=KernelRow.__table__,
     condition=SessionRow.id == KernelRow.session_id,
-)
-
-# Main Kernel JOIN (N:1, no duplication - main kernel only)
-MAIN_KERNEL_JOIN = JoinDef(
-    table=KernelRow.__table__,
-    condition=sa.and_(
-        SessionRow.id == KernelRow.session_id,
-        KernelRow.cluster_role == DEFAULT_ROLE,
-    ),
 )
 
 # Scaling Group JOIN (N:1, no duplication)
@@ -178,41 +166,6 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         field_type=ExportFieldType.DATETIME,
         column=SessionRow.terminated_at,
         formatter=lambda v: v.isoformat() if v else "",
-    ),
-    # =========================================================================
-    # Main Kernel Fields (N:1, no duplication)
-    # =========================================================================
-    ExportFieldDef(
-        key="main_kernel_image",
-        name="Main Kernel Image",
-        description="Main kernel image canonical name",
-        field_type=ExportFieldType.STRING,
-        column=KernelRow.image,
-        joins=frozenset({MAIN_KERNEL_JOIN}),
-    ),
-    ExportFieldDef(
-        key="main_kernel_architecture",
-        name="Main Kernel Architecture",
-        description="Main kernel architecture",
-        field_type=ExportFieldType.STRING,
-        column=KernelRow.architecture,
-        joins=frozenset({MAIN_KERNEL_JOIN}),
-    ),
-    ExportFieldDef(
-        key="main_kernel_registry",
-        name="Main Kernel Registry",
-        description="Main kernel container registry",
-        field_type=ExportFieldType.STRING,
-        column=KernelRow.registry,
-        joins=frozenset({MAIN_KERNEL_JOIN}),
-    ),
-    ExportFieldDef(
-        key="main_kernel_tag",
-        name="Main Kernel Tag",
-        description="Main kernel image tag",
-        field_type=ExportFieldType.STRING,
-        column=KernelRow.tag,
-        joins=frozenset({MAIN_KERNEL_JOIN}),
     ),
     # =========================================================================
     # Project Fields (N:1, no duplication)
@@ -407,6 +360,30 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         description="Kernel image name",
         field_type=ExportFieldType.STRING,
         column=KernelRow.image,
+        joins=frozenset({KERNEL_JOIN}),
+    ),
+    ExportFieldDef(
+        key="kernel_architecture",
+        name="Kernel Architecture",
+        description="Kernel architecture",
+        field_type=ExportFieldType.STRING,
+        column=KernelRow.architecture,
+        joins=frozenset({KERNEL_JOIN}),
+    ),
+    ExportFieldDef(
+        key="kernel_registry",
+        name="Kernel Registry",
+        description="Kernel container registry",
+        field_type=ExportFieldType.STRING,
+        column=KernelRow.registry,
+        joins=frozenset({KERNEL_JOIN}),
+    ),
+    ExportFieldDef(
+        key="kernel_tag",
+        name="Kernel Tag",
+        description="Kernel image tag",
+        field_type=ExportFieldType.STRING,
+        column=KernelRow.tag,
         joins=frozenset({KERNEL_JOIN}),
     ),
     ExportFieldDef(
