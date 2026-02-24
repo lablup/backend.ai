@@ -491,7 +491,6 @@ class ModelRevisionData:
     created_at: datetime
     image_id: UUID
     extra_vfolder_mounts: list[ExtraVFolderMountData] = field(default_factory=list)
-    endpoint_id: UUID | None = None
 
 
 @dataclass

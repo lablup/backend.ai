@@ -73,11 +73,10 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     __tablename__ = "deployment_revisions"
 
     __table_args__ = (
-        sa.Index(
-            "uq_deployment_revisions_endpoint_revision_number",
+        sa.UniqueConstraint(
             "endpoint",
             "revision_number",
-            unique=True,
+            name="uq_deployment_revisions_endpoint_revision_number",
         ),
         sa.Index("ix_deployment_revisions_endpoint", "endpoint"),
     )
@@ -213,5 +212,4 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
                 )
                 for mount in (self.extra_mounts or [])
             ],
-            endpoint_id=self.endpoint,
         )
