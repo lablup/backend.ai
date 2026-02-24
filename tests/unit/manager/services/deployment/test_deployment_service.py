@@ -171,26 +171,55 @@ class TestSearchDeploymentPolicies(DeploymentServiceBaseFixtures):
 class TestCreateDeploymentPolicy(DeploymentServiceBaseFixtures):
     """Tests for DeploymentService.create_deployment_policy"""
 
+    @pytest.fixture
+    def rolling_policy_config(self) -> DeploymentPolicyConfig:
+        """Policy config for rolling update strategy."""
+        return DeploymentPolicyConfig(
+            strategy=DeploymentStrategy.ROLLING,
+            strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
+            rollback_on_failure=False,
+        )
+
+    @pytest.fixture
+    def blue_green_policy_config(self) -> DeploymentPolicyConfig:
+        """Policy config for blue-green strategy."""
+        return DeploymentPolicyConfig(
+            strategy=DeploymentStrategy.BLUE_GREEN,
+            strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
+            rollback_on_failure=True,
+        )
+
+    @pytest.fixture
+    def blue_green_deployment_policy_data(
+        self,
+        blue_green_policy_config: DeploymentPolicyConfig,
+    ) -> DeploymentPolicyData:
+        """Sample blue-green deployment policy data for testing."""
+        return DeploymentPolicyData(
+            id=uuid.uuid4(),
+            endpoint=uuid.uuid4(),
+            strategy=blue_green_policy_config.strategy,
+            strategy_spec=blue_green_policy_config.strategy_spec,
+            rollback_on_failure=blue_green_policy_config.rollback_on_failure,
+            created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
+            updated_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
+        )
+
     async def test_create_deployment_policy_success(
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
         deployment_policy_data: DeploymentPolicyData,
+        rolling_policy_config: DeploymentPolicyConfig,
     ) -> None:
         """Create deployment policy should return the created policy data."""
         mock_deployment_repository.create_deployment_policy = AsyncMock(
             return_value=deployment_policy_data,
         )
 
-        endpoint_id = deployment_policy_data.endpoint
-        policy_config = DeploymentPolicyConfig(
-            strategy=DeploymentStrategy.ROLLING,
-            strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
-            rollback_on_failure=False,
-        )
         action = CreateDeploymentPolicyAction(
-            endpoint_id=endpoint_id,
-            policy_config=policy_config,
+            endpoint_id=deployment_policy_data.endpoint,
+            policy_config=rolling_policy_config,
         )
 
         result = await processors.create_deployment_policy.wait_for_complete(action)
@@ -203,35 +232,22 @@ class TestCreateDeploymentPolicy(DeploymentServiceBaseFixtures):
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
+        blue_green_deployment_policy_data: DeploymentPolicyData,
+        blue_green_policy_config: DeploymentPolicyConfig,
     ) -> None:
         """Create deployment policy with BLUE_GREEN strategy."""
-        blue_green_spec = BlueGreenSpec(auto_promote=True, promote_delay_seconds=30)
-        policy_data = DeploymentPolicyData(
-            id=uuid.uuid4(),
-            endpoint=uuid.uuid4(),
-            strategy=DeploymentStrategy.BLUE_GREEN,
-            strategy_spec=blue_green_spec,
-            rollback_on_failure=True,
-            created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
-            updated_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
-        )
         mock_deployment_repository.create_deployment_policy = AsyncMock(
-            return_value=policy_data,
+            return_value=blue_green_deployment_policy_data,
         )
 
-        policy_config = DeploymentPolicyConfig(
-            strategy=DeploymentStrategy.BLUE_GREEN,
-            strategy_spec=blue_green_spec,
-            rollback_on_failure=True,
-        )
         action = CreateDeploymentPolicyAction(
-            endpoint_id=policy_data.endpoint,
-            policy_config=policy_config,
+            endpoint_id=blue_green_deployment_policy_data.endpoint,
+            policy_config=blue_green_policy_config,
         )
 
         result = await processors.create_deployment_policy.wait_for_complete(action)
 
-        assert result.data == policy_data
+        assert result.data == blue_green_deployment_policy_data
         assert result.data.strategy == DeploymentStrategy.BLUE_GREEN
         assert result.data.rollback_on_failure is True
 
@@ -239,26 +255,51 @@ class TestCreateDeploymentPolicy(DeploymentServiceBaseFixtures):
 class TestUpdateDeploymentPolicy(DeploymentServiceBaseFixtures):
     """Tests for DeploymentService.update_deployment_policy"""
 
+    @pytest.fixture
+    def full_updater_spec(self) -> DeploymentPolicyUpdaterSpec:
+        """Updater spec that changes both strategy and strategy_spec."""
+        return DeploymentPolicyUpdaterSpec(
+            strategy=OptionalState[DeploymentStrategy].update(DeploymentStrategy.ROLLING),
+            strategy_spec=OptionalState[RollingUpdateSpec | BlueGreenSpec].update(
+                RollingUpdateSpec(max_surge=2, max_unavailable=1)
+            ),
+        )
+
+    @pytest.fixture
+    def partial_updater_spec(self) -> DeploymentPolicyUpdaterSpec:
+        """Updater spec that only changes rollback_on_failure."""
+        return DeploymentPolicyUpdaterSpec(
+            rollback_on_failure=OptionalState[bool].update(True),
+        )
+
+    @pytest.fixture
+    def partially_updated_policy_data(self) -> DeploymentPolicyData:
+        """Policy data reflecting a partial update (rollback_on_failure changed)."""
+        return DeploymentPolicyData(
+            id=uuid.uuid4(),
+            endpoint=uuid.uuid4(),
+            strategy=DeploymentStrategy.ROLLING,
+            strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
+            rollback_on_failure=True,
+            created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
+            updated_at=datetime(2024, 6, 1, 0, 0, 0, tzinfo=UTC),
+        )
+
     async def test_update_deployment_policy_success(
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
         deployment_policy_data: DeploymentPolicyData,
+        full_updater_spec: DeploymentPolicyUpdaterSpec,
     ) -> None:
         """Update deployment policy should return the updated policy data."""
         mock_deployment_repository.update_deployment_policy = AsyncMock(
             return_value=deployment_policy_data,
         )
 
-        updater_spec = DeploymentPolicyUpdaterSpec(
-            strategy=OptionalState[DeploymentStrategy].update(DeploymentStrategy.ROLLING),
-            strategy_spec=OptionalState[RollingUpdateSpec | BlueGreenSpec].update(
-                RollingUpdateSpec(max_surge=2, max_unavailable=1)
-            ),
-        )
         action = UpdateDeploymentPolicyAction(
             policy_id=deployment_policy_data.id,
-            updater_spec=updater_spec,
+            updater_spec=full_updater_spec,
         )
 
         result = await processors.update_deployment_policy.wait_for_complete(action)
@@ -271,31 +312,21 @@ class TestUpdateDeploymentPolicy(DeploymentServiceBaseFixtures):
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
+        partially_updated_policy_data: DeploymentPolicyData,
+        partial_updater_spec: DeploymentPolicyUpdaterSpec,
     ) -> None:
         """Update deployment policy with partial update (only rollback_on_failure)."""
-        updated_data = DeploymentPolicyData(
-            id=uuid.uuid4(),
-            endpoint=uuid.uuid4(),
-            strategy=DeploymentStrategy.ROLLING,
-            strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
-            rollback_on_failure=True,
-            created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
-            updated_at=datetime(2024, 6, 1, 0, 0, 0, tzinfo=UTC),
-        )
         mock_deployment_repository.update_deployment_policy = AsyncMock(
-            return_value=updated_data,
+            return_value=partially_updated_policy_data,
         )
 
-        updater_spec = DeploymentPolicyUpdaterSpec(
-            rollback_on_failure=OptionalState[bool].update(True),
-        )
         action = UpdateDeploymentPolicyAction(
-            policy_id=updated_data.id,
-            updater_spec=updater_spec,
+            policy_id=partially_updated_policy_data.id,
+            updater_spec=partial_updater_spec,
         )
 
         result = await processors.update_deployment_policy.wait_for_complete(action)
 
-        assert result.data == updated_data
+        assert result.data == partially_updated_policy_data
         assert result.data.rollback_on_failure is True
         mock_deployment_repository.update_deployment_policy.assert_called_once()
