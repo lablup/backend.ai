@@ -11,6 +11,9 @@ This document provides concrete examples of how ResourceGroup ↔ Domain/Project
 - **user_roles** = `user_roles` table (columns: `user_id`, `role_id`)
 - UUIDs are abbreviated for readability (e.g., `user-A`, `rg-1`, `proj-1`)
 - CTE traversal follows only `AUTO` edges; `REF` edges terminate the chain
+- **RBAC vs Listing separation**:
+  - **RBAC**: Validates whether the user has permission at the **query scope** (e.g., `resource_group:read` at Project P1). This is a simple scope-level check — it does not traverse entity mappings.
+  - **Listing**: Uses CTE scope chain traversal to collect all entities visible from the query scope upward. This is where domain-level mappings cascade to child scopes.
 
 ---
 
@@ -57,65 +60,56 @@ Note: No per-project entries for RG-1 exist. The domain-level mapping alone prov
 | role-p2-user | project    | proj-P2  | resource_group | read      |
 | role-p2-user | project    | proj-P2  | session        | create    |
 
-### Check: User A reads ResourceGroup RG-1
+### Check: User A lists ResourceGroups from Project P1 scope
 
-`check_permission_with_scope_chain(user_id=user-A, target=ResourceGroup:rg-1, op=read)`
+**Step 1 — RBAC validation (query scope check):**
 
-**Layer 1 — Self-scope direct match:**
+Does User A have `resource_group:read` at the query scope (Project P1)?
+
 ```sql
-permissions WHERE scope_type='resource_group' AND scope_id='rg-1'
+permissions WHERE scope_type='project' AND scope_id='proj-P1'
   AND entity_type='resource_group' AND operation='read'
   AND role_id IN (User A's active roles)
-→ NO MATCH
+→ MATCH (role-p1-user has resource_group:read at proj-P1)
 ```
+Result: **passed** — User A is authorized to list ResourceGroups from Project P1 scope.
 
-**Layer 2 — CTE scope chain traversal:**
+**Step 2 — Listing (CTE scope chain traversal):**
+
+Build scope chain upward from the query scope, then collect all RGs at each level:
+
 ```sql
--- Base: AUTO edges for ResourceGroup:rg-1
-ase WHERE entity_type='resource_group' AND entity_id='rg-1' AND relation_type='auto'
-→ (domain, dom-D)
+-- Scope chain: (project, proj-P1) → (domain, dom-D)
+-- Find RGs mapped at each scope in the chain:
 
--- Recurse from (domain, dom-D): no AUTO parent → stop
+ase WHERE scope_type='project' AND scope_id='proj-P1'
+  AND entity_type='resource_group' AND relation_type='auto'
+→ (none)
 
--- Final scope set: {(domain, dom-D)}
+ase WHERE scope_type='domain' AND scope_id='dom-D'
+  AND entity_type='resource_group' AND relation_type='auto'
+→ rg-1
 
--- Check permissions at discovered scopes
-permissions WHERE (scope_type, scope_id) IN {(domain, dom-D)}
-  AND entity_type='resource_group' AND operation='read'
-  AND role_id IN (User A's active roles)
-→ NO MATCH (User A has resource_group:read at project scope, not domain scope)
+Result = {rg-1}
 ```
 
-Result: **denied** — User A's `resource_group:read` is scoped to `proj-P1`, but the CTE only discovers `dom-D`. The permission scope does not match the discovered scope.
+Result: **{rg-1}** — RG-1 is visible to User A via domain-level mapping, even though no project-level entry exists.
 
-**Why?** This is the correct behavior. The CTE finds *where the entity lives* (Domain D), but the user's permission must cover that scope. To fix this, User A's role needs `resource_group:read` at domain scope, OR the admin creates a project-level mapping.
+### Check: User B lists ResourceGroups from Project P2 scope
 
-### Fix: Add project-level mapping OR domain-scope permission
+**Step 1 — RBAC:** `resource_group:read` at `proj-P2`? → **passed**.
 
-**Option A — Add project-level ase entries (admin maps RG-1 to projects):**
+**Step 2 — Listing:**
+```
+Scope chain: (project, proj-P2) → (domain, dom-D)
 
-| scope_type | scope_id | entity_type    | entity_id | relation_type |
-|------------|----------|----------------|-----------|---------------|
-| domain     | dom-D    | resource_group | rg-1      | auto          |
-| project    | proj-P1  | resource_group | rg-1      | auto          |
-| project    | proj-P2  | resource_group | rg-1      | auto          |
+At (project, proj-P2): (none)
+At (domain, dom-D):    rg-1
 
-Now the CTE for RG-1 discovers: `{(domain, dom-D), (project, proj-P1), (project, proj-P2)}`
-User A's `resource_group:read` at `proj-P1` matches → **allowed**.
+Result = {rg-1}
+```
 
-**Option B — Grant domain-scope permission:**
-
-| role_id      | scope_type | scope_id | entity_type    | operation |
-|--------------|------------|----------|----------------|-----------|
-| role-p1-user | domain     | dom-D    | resource_group | read      |
-
-Now User A's permission matches `(domain, dom-D)` → **allowed**.
-
-### Recommendation
-
-Option A is the typical pattern. When an admin maps a ResourceGroup to a Domain, the system should also create per-project entries for all existing projects in that domain, and auto-create entries when new projects are added. This matches the current Backend.AI behavior where `sgroups_for_domains` cascades to all projects.
-
-Alternatively, the system can implement "domain-level mapping implies project-level visibility" as a query-time expansion, without materializing per-project rows. This is covered in Section 5.
+Result: **{rg-1}** — Same domain-level mapping cascades to all projects within the domain.
 
 ---
 
@@ -141,39 +135,35 @@ User A (in Project P1) should see RG-2. User B (in Project P2) should not.
 | role-p1-user | project    | proj-P1  | resource_group | read      |
 | role-p2-user | project    | proj-P2  | resource_group | read      |
 
-### Check: User A reads ResourceGroup RG-2
+### Check: User A lists ResourceGroups from Project P1 scope
 
-`check_permission_with_scope_chain(user_id=user-A, target=ResourceGroup:rg-2, op=read)`
+**Step 1 — RBAC:** `resource_group:read` at `proj-P1`? → **passed**.
 
-**Layer 2 — CTE:**
+**Step 2 — Listing:**
 ```
-Base: AUTO edges for ResourceGroup:rg-2
-  → (project, proj-P1)
+Scope chain: (project, proj-P1) → (domain, dom-D)
 
-Recurse from (project, proj-P1): AUTO parent
-  → (domain, dom-D)
+At (project, proj-P1): rg-2
+At (domain, dom-D):    (none)
 
-Final scope set: {(project, proj-P1), (domain, dom-D)}
-
-Check permissions for User A's roles at these scopes,
-  entity_type=resource_group, op=read
-→ MATCH at (project, proj-P1)
+Result = {rg-2}
 ```
-Result: **allowed**.
+Result: **{rg-2}** — User A sees RG-2 via project-level mapping.
 
-### Check: User B reads ResourceGroup RG-2
+### Check: User B lists ResourceGroups from Project P2 scope
 
-`check_permission_with_scope_chain(user_id=user-B, target=ResourceGroup:rg-2, op=read)`
+**Step 1 — RBAC:** `resource_group:read` at `proj-P2`? → **passed**.
 
-**Layer 2 — CTE:**
+**Step 2 — Listing:**
 ```
-Same scope set: {(project, proj-P1), (domain, dom-D)}
+Scope chain: (project, proj-P2) → (domain, dom-D)
 
-Check permissions for User B's roles at these scopes,
-  entity_type=resource_group, op=read
-→ NO MATCH (User B has resource_group:read at proj-P2, not proj-P1 or dom-D)
+At (project, proj-P2): (none)
+At (domain, dom-D):    (none)
+
+Result = {}
 ```
-Result: **denied** — RG-2 is not mapped to Project P2 or Domain D. User B cannot access it.
+Result: **{}** — RG-2 is not mapped to Project P2 or Domain D. User B cannot see it.
 
 ---
 
@@ -194,44 +184,38 @@ Result: **denied** — RG-2 is not mapped to Project P2 or Domain D. User B cann
 | scope_type | scope_id | entity_type    | entity_id | relation_type |
 |------------|----------|----------------|-----------|---------------|
 | domain     | dom-D    | resource_group | rg-A      | auto          |
-| project    | proj-P1  | resource_group | rg-A      | auto          |
-| project    | proj-P2  | resource_group | rg-A      | auto          |
 | project    | proj-P1  | resource_group | rg-B      | auto          |
 | project    | proj-P2  | resource_group | rg-C      | auto          |
 
-Note: RG-A has both domain-level and per-project entries (materialized from domain mapping).
+Note: RG-A has only a domain-level entry. No per-project materialization is needed — the CTE scope chain traversal naturally cascades domain-level mappings to child scopes.
 
-### Listing: User A's accessible ResourceGroups
+### Listing: User A's accessible ResourceGroups from Project P1
 
-To list all ResourceGroups accessible to User A in Project P1 scope:
+**Step 1 — RBAC:** `resource_group:read` at `proj-P1`? → **passed**.
 
-```sql
--- Find all ResourceGroups reachable from User A's scope chain
-WITH RECURSIVE scope_chain AS (
-    -- Base: direct project-level RG mappings
-    SELECT entity_id AS rg_id
-    FROM ase
-    WHERE scope_type = 'project' AND scope_id = 'proj-P1'
-      AND entity_type = 'resource_group' AND relation_type = 'auto'
+**Step 2 — Listing:**
+```
+Scope chain: (project, proj-P1) → (domain, dom-D)
 
-    UNION
+At (project, proj-P1): rg-B
+At (domain, dom-D):    rg-A
 
-    -- Recurse: domain-level RG mappings (parent scope)
-    SELECT entity_id AS rg_id
-    FROM ase
-    WHERE scope_type = 'domain' AND scope_id = 'dom-D'
-      AND entity_type = 'resource_group' AND relation_type = 'auto'
-)
-SELECT DISTINCT rg_id FROM scope_chain;
+Result = {rg-A, rg-B}
 ```
 
-Result: `{rg-A, rg-B}` — Union of domain-level (rg-A) and project-level (rg-A, rg-B).
+### Listing: User B's accessible ResourceGroups from Project P2
 
-### Listing: User B's accessible ResourceGroups
+**Step 1 — RBAC:** `resource_group:read` at `proj-P2`? → **passed**.
 
-Same query with `proj-P2`:
+**Step 2 — Listing:**
+```
+Scope chain: (project, proj-P2) → (domain, dom-D)
 
-Result: `{rg-A, rg-C}` — Union of domain-level (rg-A) and project-level (rg-A, rg-C).
+At (project, proj-P2): rg-C
+At (domain, dom-D):    rg-A
+
+Result = {rg-A, rg-C}
+```
 
 This matches the current `query_allowed_sgroups()` behavior:
 ```
@@ -244,7 +228,7 @@ User's RGs = (domain RGs) ∪ (project RGs) ∪ (user RGs)
 
 ### Situation
 
-ResourceGroup RG-shared is a cross-domain resource pool mapped to both Domain D1 and Domain D2. Each domain has its own projects and users.
+ResourceGroup RG-shared is a cross-domain resource pool mapped to both Domain D1 and Domain D2. Domain D1 admin lists RGs from their domain scope and sees RG-shared.
 
 ### DB Records
 
@@ -255,55 +239,49 @@ ResourceGroup RG-shared is a cross-domain resource pool mapped to both Domain D1
 | domain     | dom-D1   | resource_group | rg-shared  | auto          |
 | domain     | dom-D2   | resource_group | rg-shared  | auto          |
 
-**ase (agent composition):**
+### Check: Domain D1 admin lists ResourceGroups
 
-| scope_type     | scope_id  | entity_type | entity_id | relation_type |
-|----------------|-----------|-------------|-----------|---------------|
-| resource_group | rg-shared | agent       | ag-1      | auto          |
+**Step 1 — RBAC:** `resource_group:read` at `dom-D1`? → **passed**.
 
-**permissions:**
-
-| role_id     | scope_type | scope_id | entity_type | operation |
-|-------------|------------|----------|-------------|-----------|
-| role-d1-adm | domain     | dom-D1   | agent       | read      |
-| role-d2-adm | domain     | dom-D2   | agent       | read      |
-
-### Check: Domain D1 admin reads Agent ag-1
-
-`check_permission_with_scope_chain(user_id=user-D1-admin, target=Agent:ag-1, op=read)`
-
-**Layer 2 — CTE:**
+**Step 2 — Listing:**
 ```
-Base: AUTO edges for Agent:ag-1
-  → (resource_group, rg-shared)
+Scope chain: (domain, dom-D1) → (global)
 
-Recurse from (resource_group, rg-shared): AUTO edges
-  → (domain, dom-D1), (domain, dom-D2)
+At (domain, dom-D1): rg-shared
 
-Final scope set: {(resource_group, rg-shared), (domain, dom-D1), (domain, dom-D2)}
-
-Check permissions for user-D1-admin's roles,
-  entity_type=agent, op=read
-→ MATCH at (domain, dom-D1)
+Result = {rg-shared}
 ```
-Result: **allowed** — even though RG-shared is also mapped to D2, D1 admin's permission at D1 scope suffices.
+Result: **{rg-shared}** — D1 admin sees RG-shared via domain-level mapping.
 
-### Note: Cross-domain visibility boundary
+Note: D2 also has RG-shared mapped, but D1 admin's scope chain does not include D2, so the listing only returns RGs visible from D1's scope chain. The N:N mapping does not create cross-domain visibility.
 
-Domain D1 admin can see Agent ag-1 because the CTE reaches `dom-D1` through `rg-shared`. However, this does **not** grant any permission over Domain D2's resources — the scope set merely includes `dom-D2` as a reachable scope, but D1 admin has no roles at `dom-D2` scope.
+For Agent access through cross-domain ResourceGroups (entity-centric permission checks), see [permission-check-scope-chain-examples.md Section 3](permission-check-scope-chain-examples.md#3-domainproject--resourcegroup--agent-access-auto-edge-chain).
 
 ---
 
 ## 5. CTE Query — Full ResourceGroup Listing with Scope Chain
 
-This section provides the complete SQL pattern for listing accessible ResourceGroups for a user, implementing the scope chain traversal.
+This section provides the complete SQL pattern for listing accessible ResourceGroups. The process is two-phase: RBAC validates the query scope permission first, then the listing query collects visible entities.
 
-### Query: List ResourceGroups accessible to User A in Project P1
+### Phase 1: RBAC Validation (application layer)
+
+Before executing the listing query, verify the user has `resource_group:read` at the query scope:
 
 ```sql
--- Step 1: Build scope chain upward from the user's active scope
+SELECT 1 FROM permissions p
+JOIN user_roles ur ON ur.role_id = p.role_id
+WHERE ur.user_id = 'user-A'
+  AND p.scope_type = 'project' AND p.scope_id = 'proj-P1'
+  AND p.entity_type = 'resource_group' AND p.operation = 'read';
+-- → EXISTS → proceed to listing
+```
+
+### Phase 2: Listing Query (CTE scope chain traversal)
+
+```sql
+-- Step 1: Build scope chain upward from the query scope
 WITH RECURSIVE user_scope_chain AS (
-    -- Base: the user's direct scope (project)
+    -- Base: the user's query scope (project)
     SELECT 'project'::text AS scope_type, 'proj-P1'::text AS scope_id
 
     UNION
@@ -344,52 +322,9 @@ user_scope_chain:
 
 **ResourceGroups found:**
 ```
-At (project, proj-P1): rg-A, rg-B
+At (project, proj-P1): rg-B
 At (domain, dom-D):    rg-A
 → UNION = {rg-A, rg-B}
-```
-
-### Query: Permission-filtered ResourceGroup listing
-
-To additionally verify that the user has `resource_group:read` permission at the discovered scopes:
-
-```sql
-WITH RECURSIVE user_scope_chain AS (
-    SELECT 'project'::text AS scope_type, 'proj-P1'::text AS scope_id
-    UNION
-    SELECT ase.scope_type, ase.scope_id
-    FROM association_scopes_entities ase
-    JOIN user_scope_chain usc
-      ON ase.entity_type = usc.scope_type
-     AND ase.entity_id = usc.scope_id
-     AND ase.relation_type = 'auto'
-),
--- Scopes where user has resource_group:read permission
-permitted_scopes AS (
-    SELECT p.scope_type, p.scope_id
-    FROM permissions p
-    JOIN user_roles ur ON ur.role_id = p.role_id
-    JOIN user_scope_chain usc
-      ON p.scope_type = usc.scope_type
-     AND p.scope_id = usc.scope_id
-    WHERE ur.user_id = 'user-A'
-      AND p.entity_type = 'resource_group'
-      AND p.operation = 'read'
-),
-accessible_rgs AS (
-    SELECT DISTINCT ase.entity_id AS rg_id
-    FROM association_scopes_entities ase
-    JOIN permitted_scopes ps
-      ON ase.scope_type = ps.scope_type
-     AND ase.scope_id = ps.scope_id
-    WHERE ase.entity_type = 'resource_group'
-      AND ase.relation_type = 'auto'
-)
-SELECT sg.*
-FROM scaling_groups sg
-JOIN accessible_rgs ar ON sg.name = ar.rg_id
-WHERE sg.is_active = true
-ORDER BY sg.name;
 ```
 
 ---
@@ -418,22 +353,20 @@ User A creates a session in Project P1, selecting ResourceGroup RG-1. The system
 
 ### Check: Is RG-1 accessible from Project P1?
 
-Before creating the session, the system verifies ResourceGroup accessibility:
+Before creating the session, the system verifies:
 
-`check_permission_with_scope_chain(user_id=user-A, target=ResourceGroup:rg-1, op=read)`
+**Step 1 — RBAC:** `session:create` at `proj-P1`? → **passed**.
 
-**Layer 2 — CTE:**
+**Step 2 — RG visibility check (scope chain listing):**
 ```
-Base: AUTO edges for ResourceGroup:rg-1
-  → (domain, dom-D), (project, proj-P1)
+Scope chain: (project, proj-P1) → (domain, dom-D)
 
-Final scope set: {(domain, dom-D), (project, proj-P1)}
+At (project, proj-P1): rg-1
+At (domain, dom-D):    rg-1
 
-Check permissions for User A's roles,
-  entity_type=resource_group, op=read
-→ MATCH at (project, proj-P1)
+rg-1 ∈ {rg-1} → visible
 ```
-Result: **allowed** — RG-1 is accessible. Session creation proceeds.
+Result: **allowed** — RG-1 is accessible from Project P1's scope chain. Session creation proceeds.
 
 ### Check: Is RG-X (unmapped) accessible from Project P1?
 
@@ -445,17 +378,16 @@ User A tries to select RG-X which is only mapped to Domain D2 (a different domai
 |------------|----------|----------------|-----------|---------------|
 | domain     | dom-D2   | resource_group | rg-X      | auto          |
 
-**Layer 2 — CTE:**
+**Step 2 — RG visibility check:**
 ```
-Base: AUTO edges for ResourceGroup:rg-X
-  → (domain, dom-D2)
+Scope chain: (project, proj-P1) → (domain, dom-D)
 
-Final scope set: {(domain, dom-D2)}
+At (project, proj-P1): (none matching rg-X)
+At (domain, dom-D):    (none matching rg-X)
 
-Check permissions for User A's roles at {(domain, dom-D2)}
-→ NO MATCH (User A has no roles at dom-D2)
+rg-X ∉ {} → not visible
 ```
-Result: **denied** — RG-X is not reachable from User A's scope chain.
+Result: **denied** — RG-X is not in the scope chain. It exists only at Domain D2, which is outside User A's scope.
 
 ---
 
