@@ -10,7 +10,7 @@ from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import RBACElementType, RelationType
-from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -43,8 +43,8 @@ class RBACEntityCreator[TRow: Base]:
 
     spec: CreatorSpec[TRow]
     element_type: RBACElementType
-    scope_ref: ScopeId
-    additional_scope_refs: Sequence[ScopeId] = field(default_factory=list)
+    scope_ref: RBACElementRef
+    additional_scope_refs: Sequence[RBACElementRef] = field(default_factory=list)
     relation_type: RelationType = RelationType.AUTO
 
 
@@ -100,8 +100,8 @@ async def execute_rbac_entity_creator[TRow: Base](
     for scope_ref in all_scope_refs:
         db_sess.add(
             AssociationScopesEntitiesRow(
-                scope_type=scope_ref.scope_type,
-                scope_id=scope_ref.scope_id,
+                scope_type=scope_ref.element_type.to_scope_type(),
+                scope_id=scope_ref.element_id,
                 entity_type=entity_type,
                 entity_id=str(pk_value),
                 relation_type=creator.relation_type,
@@ -129,7 +129,7 @@ class RBACBulkEntityCreator[TRow: Base]:
 
     specs: Sequence[CreatorSpec[TRow]]
     element_type: RBACElementType
-    scope_ref: ScopeId
+    scope_ref: RBACElementRef
     relation_type: RelationType = RelationType.AUTO
 
 
@@ -178,8 +178,8 @@ async def execute_rbac_bulk_entity_creator[TRow: Base](
     entity_type = creator.element_type.to_entity_type()
     associations = [
         AssociationScopesEntitiesRow(
-            scope_type=creator.scope_ref.scope_type,
-            scope_id=creator.scope_ref.scope_id,
+            scope_type=creator.scope_ref.element_type.to_scope_type(),
+            scope_id=creator.scope_ref.element_id,
             entity_type=entity_type,
             entity_id=str(inspect(row).identity[0]),
             relation_type=creator.relation_type,
@@ -240,8 +240,8 @@ async def execute_rbac_entity_creators[TRow: Base](
         for scope_ref in all_scope_refs:
             associations.append(
                 AssociationScopesEntitiesRow(
-                    scope_type=scope_ref.scope_type,
-                    scope_id=scope_ref.scope_id,
+                    scope_type=scope_ref.element_type.to_scope_type(),
+                    scope_id=scope_ref.element_id,
                     entity_type=entity_type,
                     entity_id=str(pk_value),
                     relation_type=creator.relation_type,

@@ -5,7 +5,7 @@ import uuid
 from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -18,7 +18,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteSearchResult,
     RouteTrafficStatus,
 )
-from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -120,7 +120,9 @@ class DeploymentController:
         creator = RBACEntityCreator(
             spec=spec,
             element_type=RBACElementType.MODEL_DEPLOYMENT,
-            scope_ref=ScopeId(scope_type=ScopeType.USER, scope_id=str(draft.metadata.created_user)),
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.USER, element_id=str(draft.metadata.created_user)
+            ),
             additional_scope_refs=[],
         )
         return await self._deployment_repository.create_endpoint_legacy(creator)

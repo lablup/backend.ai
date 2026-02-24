@@ -20,6 +20,7 @@ from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
+    RBACElementRef,
     RBACElementType,
     RoleSource,
     ScopeType,
@@ -272,14 +273,14 @@ class VfolderRepository:
         """
         async with self._db.begin_session() as session:
             # Determine scope based on ownership type
-            scope_type: ScopeType
+            element_type: RBACElementType
             scope_id: str
             match params.ownership_type:
                 case VFolderOwnershipType.USER:
-                    scope_type = ScopeType.USER
+                    element_type = RBACElementType.USER
                     scope_id = str(params.user)
                 case VFolderOwnershipType.GROUP:
-                    scope_type = ScopeType.PROJECT
+                    element_type = RBACElementType.PROJECT
                     scope_id = str(params.group)
 
             # Create VFolderCreatorSpec from params
@@ -304,7 +305,7 @@ class VfolderRepository:
             rbac_creator = RBACEntityCreator(
                 spec=spec,
                 element_type=RBACElementType.VFOLDER,
-                scope_ref=ScopeId(scope_type=scope_type, scope_id=scope_id),
+                scope_ref=RBACElementRef(element_type=element_type, element_id=scope_id),
                 additional_scope_refs=[],
             )
             result = await execute_rbac_entity_creator(session, rbac_creator)
@@ -329,7 +330,7 @@ class VfolderRepository:
                         entity_type=EntityType.VFOLDER,
                         entity_id=str(params.id),
                     ),
-                    granted_entity_scope_id=ScopeId(scope_type, scope_id),
+                    granted_entity_scope_id=ScopeId(element_type.to_scope_type(), scope_id),
                     target_role_ids=[user_role_id],
                     operations=[OperationType.READ],
                 )

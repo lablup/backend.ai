@@ -16,14 +16,14 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import SlotName, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import GroupData
-from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import (
     ProjectHasActiveEndpointsError,
     ProjectHasActiveKernelsError,
@@ -133,7 +133,9 @@ class GroupDBSource:
             rbac_creator = RBACEntityCreator(
                 spec=creator.spec,
                 element_type=RBACElementType.PROJECT,
-                scope_ref=ScopeId(ScopeType.DOMAIN, spec.domain_name),
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.DOMAIN, element_id=spec.domain_name
+                ),
                 additional_scope_refs=[],
             )
             result = await execute_rbac_entity_creator(db_session, rbac_creator)
