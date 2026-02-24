@@ -9,10 +9,10 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import BinarySize, ResourceSlot, ValkeyTarget
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.app_config import AppConfigRow, AppConfigScopeType
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -217,7 +217,7 @@ class TestAppConfigRepository:
                 extra_config={"theme": "dark", "language": "en"},
             ),
             element_type=RBACElementType.APP_CONFIG,
-            scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
+            scope_ref=RBACElementRef(RBACElementType.DOMAIN, test_domain_name),
         )
 
         config = await app_config_repository.create_config(creator)
@@ -240,7 +240,7 @@ class TestAppConfigRepository:
                 extra_config={"theme": "light", "notifications": True},
             ),
             element_type=RBACElementType.APP_CONFIG,
-            scope_ref=ScopeId(ScopeType.USER, test_user_id),
+            scope_ref=RBACElementRef(RBACElementType.USER, test_user_id),
         )
 
         config = await app_config_repository.create_config(creator)
@@ -265,7 +265,7 @@ class TestAppConfigRepository:
                 extra_config={"theme": "dark", "language": "en"},
             ),
             element_type=RBACElementType.APP_CONFIG,
-            scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
+            scope_ref=RBACElementRef(RBACElementType.DOMAIN, test_domain_name),
         )
         await app_config_repository.create_config(domain_creator)
 
@@ -290,7 +290,7 @@ class TestAppConfigRepository:
                 extra_config={"theme": "dark", "language": "en", "sidebar": "expanded"},
             ),
             element_type=RBACElementType.APP_CONFIG,
-            scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
+            scope_ref=RBACElementRef(RBACElementType.DOMAIN, test_domain_name),
         )
         await app_config_repository.create_config(domain_creator)
 
@@ -302,7 +302,7 @@ class TestAppConfigRepository:
                 extra_config={"theme": "light", "notifications": True},
             ),
             element_type=RBACElementType.APP_CONFIG,
-            scope_ref=ScopeId(ScopeType.USER, test_user_id),
+            scope_ref=RBACElementRef(RBACElementType.USER, test_user_id),
         )
         await app_config_repository.create_config(user_creator)
 
@@ -349,7 +349,7 @@ class TestAppConfigRepository:
                 extra_config={"theme": "dark", "language": "en"},
             ),
             element_type=RBACElementType.APP_CONFIG,
-            scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
+            scope_ref=RBACElementRef(RBACElementType.DOMAIN, test_domain_name),
         )
         initial_config = await app_config_repository.create_config(creator)
 
@@ -379,7 +379,7 @@ class TestAppConfigRepository:
                 extra_config={"theme": "dark"},
             ),
             element_type=RBACElementType.APP_CONFIG,
-            scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
+            scope_ref=RBACElementRef(RBACElementType.DOMAIN, test_domain_name),
         )
         await app_config_repository.create_config(creator)
 
@@ -434,7 +434,7 @@ class TestAppConfigRepository:
                 extra_config={"theme": "dark"},
             ),
             element_type=RBACElementType.APP_CONFIG,
-            scope_ref=ScopeId(ScopeType.DOMAIN, test_domain_name),
+            scope_ref=RBACElementRef(RBACElementType.DOMAIN, test_domain_name),
         )
         await app_config_repository.create_config(domain_creator)
 
