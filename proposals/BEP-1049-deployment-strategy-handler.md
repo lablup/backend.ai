@@ -53,8 +53,8 @@ Why `DeploymentHandler` cannot express this pattern:
 │                                                                              │
 │  DeploymentTaskSpec (for handlers)        StrategyTaskSpec (for strategies)  │
 │  ┌────────────────────────────┐           ┌──────────────────────────────┐   │
-│  │ check_pending: 2s / 30s    │           │ ROLLING:    5s / 30s         │   │
-│  │ check_replica: 5s / 30s    │           │ BLUE_GREEN: 5s / 30s         │   │
+│  │ check_pending: 2s / 30s    │           │ deployment_strategy: 5s / 30s│   │
+│  │ check_replica: 5s / 30s    │           │                              │   │
 │  │ scaling:       5s / 30s    │           │                              │   │
 │  │ reconcile:     -- / 30s    │           │                              │   │
 │  │ destroying:    5s / 60s    │           │                              │   │
@@ -63,7 +63,7 @@ Why `DeploymentHandler` cannot express this pattern:
 │                ▼                                         ▼                   │
 │  DoDeploymentLifecycleEvent              DoDeploymentStrategyEvent           │
 │  DoDeploymentLifecycleIfNeededEvent      DoDeploymentStrategyIfNeededEvent   │
-│  (lifecycle_type: str)                   (strategy_type: str)                │
+│  (lifecycle_type: str)                                                      │
 └────────────────┬─────────────────────────────────────────┬───────────────────┘
                  │                                         │
                  ▼                                         ▼
@@ -71,7 +71,7 @@ Why `DeploymentHandler` cannot express this pattern:
 │                          ScheduleEventHandler                                │
 │                                                                              │
 │  handle_do_deployment_lifecycle*()       handle_do_deployment_strategy*()    │
-│  → DeploymentLifecycleType conversion    → DeploymentStrategy conversion     │
+│  → DeploymentLifecycleType conversion                                       │
 └────────────────┬─────────────────────────────────────────┬───────────────────┘
                  │                                         │
                  ▼                                         ▼
@@ -81,21 +81,25 @@ Why `DeploymentHandler` cannot express this pattern:
 │  ┌─── Handler Path ─────────────┐    ┌─── Strategy Path ──────────────────┐  │
 │  │                              │    │                                    │  │
 │  │  process_deployment_         │    │  process_deployment_               │  │
-│  │    lifecycle(type)           │    │    strategy(strategy)              │  │
+│  │    lifecycle(type)           │    │    strategy()                      │  │
 │  │                              │    │                                    │  │
-│  │  1. handler = handlers[type] │    │  1. deployments = DEPLOYING        │  │
-│  │  2. deployments =            │    │  2. Load policy_map                │  │
-│  │       by_statuses(target)    │    │  3. Filter by policy strategy      │  │
-│  │  3. result = execute(deps)   │    │  4. evaluator =                    │  │
-│  │  4. transitions()            │    │       registry[strategy]           │  │
-│  │  5. post_process()           │    │  5. result = evaluator.execute()   │  │
-│  │                              │    │  6. strategy_transitions()         │  │
-│  │  Result:                     │    │  7. progressing/provisioning/      │  │
-│  │    successes → next_status   │    │       waiting → reschedule         │  │
-│  │    errors → failure_status   │    │                                    │  │
-│  │    skipped → keep            │    │  Result:                           │  │
-│  │                              │    │    completed → READY               │  │
-│  └──────────────────────────────┘    │    rolled_back → NULL + READY      │  │
+│  │  1. handler = handlers[type] │    │  Short (if_needed):               │  │
+│  │  2. deployments =            │    │    scan marked keys               │  │
+│  │       by_statuses(target)    │    │    "strategy:{id}" → collect ids  │  │
+│  │  3. result = execute(deps)   │    │    → load deployments by ids       │  │
+│  │  4. transitions()            │    │  Long (unconditional):            │  │
+│  │  5. post_process()           │    │    → query DEPLOYING from DB       │  │
+│  │                              │    │                                    │  │
+│  │  Result:                     │    │  2. Load policy_map                │  │
+│  │    successes → next_status   │    │  3. Group by policy strategy       │  │
+│  │    errors → failure_status   │    │  4. For each (strategy, group):   │  │
+│  │    skipped → keep            │    │       evaluator = registry[strat]  │  │
+│  │                              │    │       result = evaluator.execute() │  │
+│  │                              │    │  5. strategy_transitions()         │  │
+│  └──────────────────────────────┘    │                                    │  │
+│                                      │  Result:                           │  │
+│                                      │    completed → READY               │  │
+│                                      │    rolled_back → NULL + READY      │  │
 │                                      │    progressing → keep DEPLOYING    │  │
 │                                      │    provisioning → keep DEPLOYING   │  │
 │                                      │    waiting → keep DEPLOYING        │  │
@@ -162,10 +166,10 @@ Lifecycle and strategy use **separate event types**. This separates event handle
 │                             │    │                             │
 │  DoDeploymentLifecycle*     │    │  DoDeploymentStrategy*      │
 │  Event                      │    │  Event                      │
-│  ┌───────────────────────┐  │    │  ┌───────────────────────┐  │
-│  │ lifecycle_type: str   │  │    │  │ strategy_type: str    │  │
-│  │ ("check_pending" etc) │  │    │  │ ("ROLLING" etc)       │  │
-│  └───────────────────────┘  │    │  └───────────────────────┘  │
+│  ┌───────────────────────┐  │    │  (no parameters)            │
+│  │ lifecycle_type: str   │  │    │                             │
+│  │ ("check_pending" etc) │  │    │                             │
+│  └───────────────────────┘  │    │                             │
 │           │                 │    │           │                 │
 │           ▼                 │    │           ▼                 │
 │  handle_do_deployment_      │    │  handle_do_deployment_      │
@@ -182,7 +186,9 @@ Valkey markings share a unified keyspace but are distinguished by key convention
 | Type | Key Format | Example |
 |------|-----------|---------|
 | Handler lifecycle | `{DeploymentLifecycleType.value}` | `"check_pending"`, `"scaling"` |
-| Strategy | `"strategy_{DeploymentStrategy.value.lower()}"` | `"strategy_rolling"` |
+| Strategy | `"strategy:{deployment_id}"` | `"strategy:abc-123"` |
+
+Each deployment is marked with an independent key. The short cycle (`IfNeeded`) scans these keys for fast response. The long cycle (unconditional) queries `DEPLOYING` deployments from DB as a fallback — ensuring correctness even if individual marks are lost (e.g., flush).
 
 ### Revision Activation Trigger Branching
 
@@ -200,8 +206,7 @@ activate_revision(deployment_id, revision_id)
     └─ Policy exists (strategy deployment)
          → deploying_revision = revision_id
          → lifecycle = DEPLOYING
-         ├─ BLUE_GREEN → mark("strategy_blue_green")
-         └─ ROLLING    → mark("strategy_rolling")
+         → mark("strategy:{deployment_id}")
 
 update_deployment(replica_count, metadata, ...)
     │

@@ -187,15 +187,20 @@ Example with `target_count = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │    ROLLING:    RollingUpdateCycleEvaluator,                   │
   │  }                                                           │
   │                                                              │
-  │  process_deployment_strategy(strategy)                       │
-  │    1. Query DEPLOYING deployments                            │
-  │    2. Load policy_map                                        │
-  │    3. Filter deployments by policy strategy                  │
-  │    4. evaluator = strategy_registry[strategy]                │
-  │    5. result = evaluator.execute(deployments, policy_map)    │
-  │    6. completed    → transition to READY                     │
-  │       progressing  → mark_deployment_needed reschedule       │
-  │       provisioning → mark_deployment_needed reschedule       │
+  │  process_deployment_strategy()                               │
+  │    Short (if_needed):                                        │
+  │      scan "strategy:{id}" marks → load by ids               │
+  │    Long (unconditional):                                     │
+  │      query DEPLOYING from DB                                 │
+  │                                                              │
+  │    1. Load policy_map                                        │
+  │    2. Group by policy strategy                               │
+  │    3. For each (strategy, group):                            │
+  │         evaluator = strategy_registry[strategy]              │
+  │         result = evaluator.execute(group, policy_map)        │
+  │    4. completed    → transition to READY                     │
+  │       progressing  → keep DEPLOYING                          │
+  │       provisioning → keep DEPLOYING                          │
   │       errors → log history                                   │
   └──────────────────────────┬───────────────────────────────────┘
                              │
