@@ -28,12 +28,12 @@ The coordinator periodically calls `execute_rolling_update_cycle`. Each invocati
 
 ```
   ┌──────────────────────────────────────┐
-  │  No deploying_revision?              │──Yes──→ in_progress (skip)
+  │  No deploying_revision?              │──Yes──→ idle
   └──────────────────┬───────────────────┘
                      No
                      ▼
   ┌──────────────────────────────────────┐
-  │  Any New routes PROVISIONING?        │──Yes──→ in_progress (wait)
+  │  Any New routes PROVISIONING?        │──Yes──→ provisioning
   └──────────────────┬───────────────────┘
                      No
                      ▼
@@ -55,8 +55,19 @@ The coordinator periodically calls `execute_rolling_update_cycle`. Each invocati
   └──────────────────────────────────────┘
                      │
                      ▼
-                in_progress
+                progressing
 ```
+
+### CycleStatus Variants
+
+Each cycle evaluation returns one of the following statuses:
+
+| Status | Condition | Coordinator Action |
+|--------|-----------|-------------------|
+| **idle** | `deploying_revision` is NULL | No action (not a strategy target) |
+| **provisioning** | New routes are PROVISIONING | `mark_deployment_needed` reschedule |
+| **progressing** | Calculated surge/unavailable, created/terminated routes | `mark_deployment_needed` reschedule |
+| **completed** | No Old routes and New healthy >= target | Revision swap, DEPLOYING → READY |
 
 ## max_surge / max_unavailable Calculation
 
@@ -182,8 +193,10 @@ Example with `target_count = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │    2. Load policy_map                                        │
   │    3. Filter deployments with strategy == ROLLING            │
   │    4. handler.execute(matching, policy_map)                  │
-  │    5. completed → transition to READY                        │
-  │       in_progress → mark_deployment_needed reschedule        │
+  │    5. completed    → transition to READY                     │
+  │       progressing → mark_deployment_needed reschedule        │
+  │       provisioning → mark_deployment_needed reschedule       │
+  │       idle → no action                                       │
   │       errors → log history                                   │
   └──────────────────────────┬───────────────────────────────────┘
                              │

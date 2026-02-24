@@ -30,37 +30,37 @@ The coordinator periodically calls `execute_blue_green_cycle`. Each invocation f
 
 ```
   ┌──────────────────────────────────────┐
-  │  No deploying_revision?              │──Yes──→ in_progress (skip)
+  │  No deploying_revision?              │──Yes──→ idle
   └──────────────────┬───────────────────┘
                      No
                      ▼
   ┌──────────────────────────────────────┐
   │  No Green routes?                    │──Yes──→ Create all Green (INACTIVE)
-  └──────────────────┬───────────────────┘        → in_progress
+  └──────────────────┬───────────────────┘        → creating
                      No
                      ▼
   ┌──────────────────────────────────────┐
-  │  Any Green PROVISIONING?             │──Yes──→ in_progress (wait)
+  │  Any Green PROVISIONING?             │──Yes──→ provisioning
   └──────────────────┬───────────────────┘
                      No
                      ▼
   ┌──────────────────────────────────────┐
-  │  All Green failed?                   │──Yes──→ Terminate Green → completed (rollback)
+  │  All Green failed?                   │──Yes──→ Terminate Green → rolled_back
   └──────────────────┬───────────────────┘
                      No
                      ▼
   ┌──────────────────────────────────────┐
-  │  All Green healthy?                  │──No───→ in_progress (mixed state)
+  │  All Green healthy?                  │──No───→ waiting
   └──────────────────┬───────────────────┘
                     Yes
                      ▼
   ┌──────────────────────────────────────┐
-  │  auto_promote?                       │──No───→ in_progress (manual wait)
+  │  auto_promote?                       │──No───→ waiting_promotion (manual)
   └──────────────────┬───────────────────┘
                     Yes
                      ▼
   ┌──────────────────────────────────────┐
-  │  promote_delay elapsed?              │──No───→ in_progress (delay wait)
+  │  promote_delay elapsed?              │──No───→ waiting_promotion (delay)
   └──────────────────┬───────────────────┘
                     Yes
                      ▼
@@ -73,6 +73,20 @@ The coordinator periodically calls `execute_blue_green_cycle`. Each invocation f
                      ▼
                  completed
 ```
+
+### CycleStatus Variants
+
+Each cycle evaluation returns one of the following statuses:
+
+| Status | Condition | Coordinator Action |
+|--------|-----------|-------------------|
+| **idle** | `deploying_revision` is NULL | No action (not a strategy target) |
+| **creating** | No Green routes → created all as INACTIVE | `mark_deployment_needed` reschedule |
+| **provisioning** | Green routes are PROVISIONING | `mark_deployment_needed` reschedule |
+| **waiting** | Not all Green healthy (mixed state, no PROVISIONING) | `mark_deployment_needed` reschedule |
+| **waiting_promotion** | All Green healthy, waiting for promotion trigger | Manual: no reschedule (promotion API triggers mark). Delay: reschedule aligned to `promote_ready_at` |
+| **completed** | Promotion executed (Green→ACTIVE, Blue→TERMINATING) | Revision swap, DEPLOYING → READY |
+| **rolled_back** | All Green failed → terminate Green | `deploying_revision` = NULL, DEPLOYING → READY |
 
 ## promote_delay_seconds Handling
 
@@ -94,8 +108,8 @@ Auto-promotion can wait a specified duration before switching. The timestamp is 
   ┌──────────────────────────────────────────────────┐
   │  Query promote_ready_at                          │
   │                                                  │
-  │  now() >= promote_ready_at? ──Yes──→ Execute promotion │
-  │                              No───→ in_progress  │
+  │  now() >= promote_ready_at? ──Yes──→ Execute promotion      │
+  │                              No───→ waiting_promotion     │
   └──────────────────────────────────────────────────┘
 
   On loss: if promote_ready_at missing, re-store → delay restarts (safe side)
@@ -169,7 +183,7 @@ With `auto_promote=False`:
   │  Green: [■ ■ ■]  (3 healthy, INACTIVE)              │
   │                                                     │
   │  All Green healthy but auto_promote=False           │
-  │  → in_progress (waiting for manual promotion)       │
+  │  → waiting_promotion (manual)                      │
   └─────────────────────────────────────────────────────┘
                           │
                   Operator calls manual promotion API
@@ -193,7 +207,7 @@ With `auto_promote=False`:
   │  All Green failed                                   │
   │  → Terminate all Green (TERMINATING)                │
   │  → deploying_revision = NULL (rollback)             │
-  │  → completed                                        │
+  │  → rolled_back                                      │
   └─────────────────────────────────────────────────────┘
 
   Legend: ■ = healthy, ✗ = failed
@@ -210,8 +224,14 @@ With `auto_promote=False`:
   │    2. Load policy_map                                        │
   │    3. Filter deployments with strategy == BLUE_GREEN         │
   │    4. handler.execute(matching, policy_map)                  │
-  │    5. completed → transition to READY                        │
-  │       in_progress → mark_deployment_needed reschedule        │
+  │    5. completed   → transition to READY                      │
+  │       rolled_back → deploying_revision=NULL, READY           │
+  │       creating  → mark_deployment_needed reschedule       │
+  │       provisioning → mark_deployment_needed reschedule      │
+  │       waiting      → mark_deployment_needed reschedule      │
+  │       waiting_promotion → manual: no reschedule             │
+  │                            delay: reschedule on timer        │
+  │       idle → no action                                       │
   │       errors → log history                                   │
   └──────────────────────────┬───────────────────────────────────┘
                              │

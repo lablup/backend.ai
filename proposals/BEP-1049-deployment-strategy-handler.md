@@ -32,7 +32,7 @@ Why `DeploymentHandler` cannot express this pattern:
 
 | Aspect | `DeploymentHandler` (existing) | What deployment strategies need |
 |--------|-------------------------------|--------------------------------|
-| **State transition** | Static: `successes` → `next_status` | `completed` → `READY`, `in_progress` → keep |
+| **State transition** | Static: `successes` → `next_status` | `completed` / `rolled_back` → `READY`, `progressing` / `provisioning` / `waiting` / `waiting_promotion` → keep |
 | **Routing** | Based on `target_statuses()` | Shared `DEPLOYING` → needs policy(`strategy`)-based branching |
 | **Cycles** | One-shot execution | Multi-cycle (reschedule) |
 
@@ -91,11 +91,17 @@ Why `DeploymentHandler` cannot express this pattern:
 │  │  5. post_process()           │    │  5. result = execute(deps,         │  │
 │  │                              │    │       policy_map)                  │  │
 │  │  Result:                     │    │  6. strategy_transitions()         │  │
-│  │    successes → next_status   │    │  7. in_progress → reschedule       │  │
+│  │    successes → next_status   │    │  7. progressing/provisioning/       │  │
+│  │                              │    │       waiting → reschedule         │  │
 │  │    errors → failure_status   │    │                                    │  │
 │  │    skipped → keep            │    │  Result:                           │  │
 │  │                              │    │    completed → READY               │  │
-│  └──────────────────────────────┘    │    in_progress → keep DEPLOYING    │  │
+│  └──────────────────────────────┘    │    rolled_back → NULL + READY      │  │
+│                                      │    progressing → keep DEPLOYING    │  │
+│                                      │    provisioning → keep DEPLOYING   │  │
+│                                      │    waiting → keep DEPLOYING        │  │
+│                                      │    waiting_promotion → see below  │  │
+│                                      │    idle → no action                │  │
 │                                      │    errors → keep DEPLOYING + log   │  │
 │                                      └────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────────────────┘
