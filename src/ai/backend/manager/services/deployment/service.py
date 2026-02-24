@@ -657,9 +657,6 @@ class DeploymentService:
     ) -> ActivateRevisionActionResult:
         """Activate a specific revision to be the current revision.
 
-        If the revision is an orphan (not attached to any deployment),
-        it will be linked to the deployment first.
-
         Args:
             action: Action containing deployment and revision IDs
 
@@ -669,22 +666,12 @@ class DeploymentService:
         # 1. Validate revision exists (raises exception if not found)
         _revision = await self._deployment_repository.get_revision(action.revision_id)
 
-        # 2. If orphan revision, link it to the deployment first
-        if _revision.is_orphan:
-            latest_revision_number = await self._deployment_repository.get_latest_revision_number(
-                action.deployment_id
-            )
-            next_revision_number = (latest_revision_number or 0) + 1
-            await self._deployment_repository.link_revision_to_deployment(
-                action.revision_id, action.deployment_id, next_revision_number
-            )
-
-        # 3. Update endpoint.current_revision and get previous revision
+        # 2. Update endpoint.current_revision and get previous revision
         previous_revision_id = await self._deployment_repository.update_current_revision(
             action.deployment_id, action.revision_id
         )
 
-        # 4. Trigger lifecycle check to update routes with new revision
+        # 3. Trigger lifecycle check to update routes with new revision
         await self._deployment_controller.mark_lifecycle_needed(
             DeploymentLifecycleType.CHECK_REPLICA
         )
@@ -696,7 +683,7 @@ class DeploymentService:
             previous_revision_id,
         )
 
-        # 5. Get updated deployment info
+        # 4. Get updated deployment info
         deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
 
         return ActivateRevisionActionResult(

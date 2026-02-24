@@ -1931,7 +1931,7 @@ class DeploymentDBSource:
 
     async def create_revision(
         self,
-        deployment_id: uuid.UUID | None,
+        deployment_id: uuid.UUID,
         creator: Creator[DeploymentRevisionRow],
     ) -> ModelRevisionData:
         """Create a new deployment revision.
@@ -1941,7 +1941,7 @@ class DeploymentDBSource:
         before calling this method.
 
         Args:
-            deployment_id: The deployment to attach to. None for orphan revisions.
+            deployment_id: The deployment to attach to.
             creator: Creator containing the revision spec.
 
         If a unique constraint violation occurs, the caller should retry.
@@ -1958,7 +1958,7 @@ class DeploymentDBSource:
             db_sess.add(
                 EntityFieldRow(
                     entity_type=EntityType.MODEL_DEPLOYMENT,
-                    entity_id=str(deployment_id) if deployment_id is not None else "",
+                    entity_id=str(deployment_id),
                     field_type=FieldType.MODEL_REVISION,
                     field_id=str(pk_value),
                 )

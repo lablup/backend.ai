@@ -493,11 +493,6 @@ class ModelRevisionData:
     extra_vfolder_mounts: list[ExtraVFolderMountData] = field(default_factory=list)
     endpoint_id: UUID | None = None
 
-    @property
-    def is_orphan(self) -> bool:
-        """Check if this revision is not attached to any deployment."""
-        return self.endpoint_id is None
-
 
 @dataclass
 class ModelDeploymentMetadataInfo:

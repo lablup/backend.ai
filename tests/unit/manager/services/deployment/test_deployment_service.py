@@ -630,6 +630,7 @@ class TestServiceDefinitionMerge(ModelRevisionFixtures):
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
+        deployment_id: uuid.UUID,
         revision_creator: ModelRevisionCreator,
         setup_mock_service_definition: Callable[[ModelServiceDefinition], None],
     ) -> None:
@@ -640,7 +641,7 @@ class TestServiceDefinitionMerge(ModelRevisionFixtures):
             )
         )
 
-        action = AddModelRevisionAction(adder=revision_creator)
+        action = AddModelRevisionAction(deployment_id=deployment_id, adder=revision_creator)
         await processors.add_model_revision.wait_for_complete(action)
 
         spec = mock_deployment_repository.create_revision.call_args[0][1].spec
@@ -666,13 +667,14 @@ class TestServiceDefinitionMerge(ModelRevisionFixtures):
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
+        deployment_id: uuid.UUID,
         revision_creator: ModelRevisionCreator,
         setup_mock_service_definition: Callable[[ModelServiceDefinition], None],
     ) -> None:
         """Service definition with None environ/resource_slots should not affect creator."""
         setup_mock_service_definition(ModelServiceDefinition(environ=None, resource_slots=None))
 
-        action = AddModelRevisionAction(adder=revision_creator)
+        action = AddModelRevisionAction(deployment_id=deployment_id, adder=revision_creator)
         await processors.add_model_revision.wait_for_complete(action)
 
         spec = mock_deployment_repository.create_revision.call_args[0][1].spec

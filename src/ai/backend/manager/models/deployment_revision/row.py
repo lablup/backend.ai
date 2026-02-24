@@ -78,7 +78,6 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
             "endpoint",
             "revision_number",
             unique=True,
-            postgresql_where=sa.text("endpoint IS NOT NULL"),
         ),
         sa.Index("ix_deployment_revisions_endpoint", "endpoint"),
     )
@@ -86,7 +85,7 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    endpoint: Mapped[uuid.UUID | None] = mapped_column("endpoint", GUID, nullable=True)
+    endpoint: Mapped[uuid.UUID] = mapped_column("endpoint", GUID, nullable=False)
     revision_number: Mapped[int] = mapped_column("revision_number", sa.Integer, nullable=False)
 
     # Image configuration
