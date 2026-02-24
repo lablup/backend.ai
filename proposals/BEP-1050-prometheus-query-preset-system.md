@@ -41,8 +41,6 @@ This proposal introduces a **Prometheus Query Preset System** that stores PromQL
 
 ### DB Schema
 
-A single new table stores preset definitions including their allowed label configuration as an embedded JSONB column.
-
 **Table: `prometheus_query_presets`**
 
 | Column | Type | Constraints | Description |
@@ -52,25 +50,25 @@ A single new table stores preset definitions including their allowed label confi
 | `metric_name` | `VARCHAR(256)` | NOT NULL | Prometheus metric name (e.g., `backendai_container_utilization`) |
 | `query_template` | `TEXT` | NOT NULL | PromQL template with `{labels}`, `{window}`, `{group_by}` placeholders |
 | `time_window` | `VARCHAR(32)` | NULLABLE | Preset-specific default window; falls back to server config `metric.timewindow` if NULL |
-| `labels` | `JSONB` | NOT NULL, default `'{}'` | Label configuration stored as `PydanticColumn(PresetLabels)`. Keys are Prometheus label names, values define `filterable`/`groupable` permissions |
+| `options` | `JSONB` | NOT NULL, default `'{"labels":[]}'` | Preset options stored as `PydanticColumn(PresetOptions)` |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL, default `now()` | Creation timestamp |
 | `updated_at` | `TIMESTAMPTZ` | NOT NULL, default `now()` | Last update timestamp |
 
-The `labels` column uses `PydanticColumn` with a Pydantic `RootModel` for type-safe JSONB storage
-
 ```python
-class LabelConfig(BaseModel):
-    model_config = ConfigDict(frozen=True)
-    filterable: bool
-    groupable: bool
+class LabelInfo(BaseModel):
+    name: str
+    filter: bool
+    group: bool
 
-class PresetLabels(RootModel[dict[str, LabelConfig]]):
-    """Label configuration for a Prometheus query preset.
-    Keys are Prometheus label names, values define their allowed roles.
-    """
-    pass
+    model_config = ConfigDict(frozen=True)
+
+class PresetOptions(BaseModel):
+    labels: list[LabelInfo]
+
+    model_config = ConfigDict(frozen=True)
 ```
 
+The `PresetOptions` wrapper model allows adding future preset-level settings (e.g., caching, rate limiting) without schema migration.
 
 ### API Design
 
@@ -92,11 +90,13 @@ class PresetLabels(RootModel[dict[str, LabelConfig]]):
   "metric_name": "backendai_container_utilization",
   "query_template": "sum by ({group_by})(rate({metric_name}{{{labels}}}[{window}]))",
   "time_window": "5m",
-  "labels": {
-    "container_metric_name": {"filterable": true, "groupable": false},
-    "kernel_id": {"filterable": true, "groupable": true},
-    "session_id": {"filterable": true, "groupable": true},
-    "value_type": {"filterable": true, "groupable": true}
+  "options": {
+    "labels": [
+      {"name": "container_metric_name", "filter": true, "group": false},
+      {"name": "kernel_id", "filter": true, "group": true},
+      {"name": "session_id", "filter": true, "group": true},
+      {"name": "value_type", "filter": true, "group": true}
+    ]
   }
 }
 ```
@@ -110,11 +110,13 @@ class PresetLabels(RootModel[dict[str, LabelConfig]]):
   "metric_name": "backendai_container_utilization",
   "query_template": "sum by ({group_by})(rate({metric_name}{{{labels}}}[{window}]))",
   "time_window": "5m",
-  "labels": {
-    "container_metric_name": {"filterable": true, "groupable": false},
-    "kernel_id": {"filterable": true, "groupable": true},
-    "session_id": {"filterable": true, "groupable": true},
-    "value_type": {"filterable": true, "groupable": true}
+  "options": {
+    "labels": [
+      {"name": "container_metric_name", "filter": true, "group": false},
+      {"name": "kernel_id", "filter": true, "group": true},
+      {"name": "session_id", "filter": true, "group": true},
+      {"name": "value_type", "filter": true, "group": true}
+    ]
   },
   "created_at": "2025-02-20T10:00:00Z",
   "updated_at": "2025-02-20T10:00:00Z"
@@ -172,23 +174,27 @@ The `metric` field uses a key-value entries pattern instead of fixed fields, all
 **CRUD types:**
 
 ```python
-class LabelConfig(BaseModel):
-    filterable: bool
-    groupable: bool
+class LabelInfo(BaseModel):
+    name: str
+    filter: bool
+    group: bool
+
+class PresetOptions(BaseModel):
+    labels: list[LabelInfo]
 
 class PrometheusQueryPresetCreate(BaseModel):
     name: str
     metric_name: str
     query_template: str
     time_window: str | None
-    labels: dict[str, LabelConfig]
+    options: PresetOptions
 
 class PrometheusQueryPresetModify(BaseModel):
     name: str | None
     metric_name: str | None
     query_template: str | None
     time_window: str | None
-    labels: dict[str, LabelConfig] | None
+    options: PresetOptions | None
 ```
 
 **Execute types:**
@@ -225,14 +231,14 @@ The preset system also exposes a Strawberry GraphQL interface following existing
 **Types:**
 
 ```graphql
-type LabelConfigGQL {
-  filterable: Boolean!
-  groupable: Boolean!
+type PrometheusLabelInfoGQL {
+  name: String!
+  filter: Boolean!
+  group: Boolean!
 }
 
-type LabelEntryGQL {
-  labelName: String!
-  config: LabelConfigGQL!
+type PrometheusPresetOptionsGQL {
+  labels: [PrometheusLabelInfoGQL!]!
 }
 
 type PrometheusQueryPreset implements Node {
@@ -241,13 +247,11 @@ type PrometheusQueryPreset implements Node {
   metricName: String!
   queryTemplate: String!
   timeWindow: String
-  labels: [LabelEntryGQL!]!
+  options: PrometheusPresetOptionsGQL!
   createdAt: DateTime!
   updatedAt: DateTime!
 }
 ```
-
-Since GraphQL does not natively support dict/map types, the `labels` JSONB dict is converted to a list of `LabelEntryGQL` entries in the resolver.
 
 **Admin Queries (SUPERADMIN only):**
 
@@ -335,9 +339,9 @@ backend.ai admin prometheus-query-preset add \
     --metric-name <METRIC> \
     --query-template <TEMPLATE> \
     [--time-window <WINDOW>] \
-    [--labels <JSON>]
-    # --labels example: '{"kernel_id": {"filterable": true, "groupable": true}, "container_metric_name": {"filterable": true, "groupable": false}}'
-backend.ai admin prometheus-query-preset modify <ID> [--name ...] [--query-template ...] [--labels ...]
+    [--options <JSON>]
+    # --options example: '{"labels": [{"name": "kernel_id", "filter": true, "group": true}, {"name": "container_metric_name", "filter": true, "group": false}]}'
+backend.ai admin prometheus-query-preset modify <ID> [--name ...] [--query-template ...] [--options ...]
 backend.ai admin prometheus-query-preset delete <ID>
 ```
 
@@ -385,8 +389,8 @@ sequenceDiagram
 
 **Validation rules:**
 
-- Each label key in the request must exist in the preset's `labels` dict with `filterable = true`
-- Each entry in `group_labels` must exist in the preset's `labels` dict with `groupable = true`
+- Each label key in the request must exist in the preset's `options.labels` list with `filter = true`
+- Each entry in `group_labels` must exist in the preset's `options.labels` list with `group = true`
 - `window` must match `^\d+[smhdw]$` (single-unit durations only; compound durations like `1h30m` or `500ms` are intentionally not supported); if absent, falls back to the preset's `time_window` or the server config `metric.timewindow`
 
 ### Security
@@ -394,7 +398,7 @@ sequenceDiagram
 | Threat | Mitigation |
 |--------|-----------|
 | **Label value injection** | Reuse `_escape_label_value()` from `preset.py` — escapes `\`, `"`, `\n`, `\r` |
-| **Arbitrary label keys** | Only labels present in the `labels` JSONB dict with `filterable=true` can be used in `{labels}`, only those with `groupable=true` in `{group_by}` |
+| **Arbitrary label keys** | Only labels defined in `options.labels` with `filter=true` can be used in `{labels}`, only those with `group=true` in `{group_by}` |
 | **Window format injection** | Validate against `^\d+[smhdw]$` regex before substitution |
 | **Template modification** | CRUD operations restricted to SUPERADMIN role |
 | **Metric name substitution** | `{metric_name}` is resolved from the preset's `metric_name` field (DB-stored, admin-controlled), not from user input |
@@ -413,7 +417,7 @@ sequenceDiagram
 
 ### Database Migration
 
-- One new table: `prometheus_query_presets` (with `labels` JSONB column using `PydanticColumn`)
+- One new table: `prometheus_query_presets` (with `options` JSONB column using `PydanticColumn`)
 - Alembic migration: `CREATE TABLE` only — no existing tables are modified
 - No data migration needed
 
