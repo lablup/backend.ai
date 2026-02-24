@@ -6,6 +6,7 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from ai.backend.common.dto.manager.deployment.types import OrderDirection
@@ -19,6 +20,7 @@ from ai.backend.common.dto.manager.group import (
 )
 from ai.backend.manager.api.adapter import BaseFilterAdapter
 from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -42,6 +44,8 @@ class GroupAdapter(BaseFilterAdapter):
 
     def convert_to_dto(self, data: GroupData) -> GroupDTO:
         """Convert GroupData to DTO."""
+        if data.created_at is None or data.modified_at is None:
+            raise DataTransformationFailed("GroupData.created_at and modified_at must not be None")
         return GroupDTO(
             id=data.id,
             name=data.name,
@@ -62,8 +66,8 @@ class GroupAdapter(BaseFilterAdapter):
         name = OptionalState[str].nop()
         description = TriState[str].nop()
         is_active = OptionalState[bool].nop()
-        total_resource_slots = OptionalState.nop()
-        allowed_vfolder_hosts = OptionalState.nop()
+        total_resource_slots: OptionalState[dict[str, Any]] = OptionalState.nop()
+        allowed_vfolder_hosts: OptionalState[dict[str, Any]] = OptionalState.nop()
         integration_id = OptionalState[str].nop()
         resource_policy = OptionalState[str].nop()
 
@@ -96,7 +100,7 @@ class GroupAdapter(BaseFilterAdapter):
     def build_querier(self, request: SearchGroupsRequest) -> BatchQuerier:
         """Build a BatchQuerier for groups from search request."""
         conditions = self._convert_filter(request.filter) if request.filter else []
-        orders = [self._convert_order(o) for o in request.order] if request.order else []
+        orders = [self._convert_order(request.order)] if request.order else []
         pagination = self._build_pagination(request.limit, request.offset)
 
         return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)

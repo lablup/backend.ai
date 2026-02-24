@@ -8,19 +8,16 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.dto.manager.domain import (
-    CreateDomainRequest,
-    CreateDomainResponse,
-    PurgeDomainRequest,
-)
 from ai.backend.common.dto.manager.group import (
     CreateGroupRequest,
     CreateGroupResponse,
 )
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -48,7 +45,6 @@ from ai.backend.manager.services.processors import ProcessorArgs, Processors, Se
 
 _GROUP_SERVER_SUBAPP_MODULES = (_auth_api, _groups_api)
 
-DomainFactory = Callable[..., Coroutine[Any, Any, CreateDomainResponse]]
 GroupFactory = Callable[..., Coroutine[Any, Any, CreateGroupResponse]]
 
 
@@ -171,31 +167,31 @@ async def project_resource_policy_fixture(
 
 @pytest.fixture()
 async def domain_for_group_fixture(
-    admin_registry: BackendAIClientRegistry,
     db_engine: SAEngine,
     project_resource_policy_fixture: None,
 ) -> AsyncIterator[str]:
-    """Create a domain via SDK for group creation tests, purge on teardown."""
+    """Insert a test domain directly into the DB for group creation tests.
+
+    Uses direct DB insertion instead of SDK calls because the `.domain`
+    subapp is not loaded in group component tests.
+    """
     unique = secrets.token_hex(4)
     domain_name = f"test-grp-domain-{unique}"
-    await admin_registry.domain.create(
-        CreateDomainRequest(
-            name=domain_name,
-            description=f"Test domain for groups {unique}",
-            is_active=True,
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(domains).values(
+                name=domain_name,
+                description=f"Test domain for groups {unique}",
+                is_active=True,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts=VFolderHostPermissionMap(),
+            )
         )
-    )
     yield domain_name
 
-    try:
-        # Delete all groups in the domain first
-        async with db_engine.begin() as conn:
-            await conn.execute(groups.delete().where(groups.c.domain_name == domain_name))
-        await admin_registry.domain.purge(PurgeDomainRequest(name=domain_name))
-    except Exception:
-        async with db_engine.begin() as conn:
-            await conn.execute(groups.delete().where(groups.c.domain_name == domain_name))
-            await conn.execute(domains.delete().where(domains.c.name == domain_name))
+    async with db_engine.begin() as conn:
+        await conn.execute(groups.delete().where(groups.c.domain_name == domain_name))
+        await conn.execute(domains.delete().where(domains.c.name == domain_name))
 
 
 @pytest.fixture()
