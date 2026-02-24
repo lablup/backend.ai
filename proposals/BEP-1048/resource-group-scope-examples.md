@@ -306,6 +306,8 @@ accessible_rgs AS (
       AND ase.relation_type = 'auto'
 )
 -- Step 3: Join with scaling_groups table and filter active
+-- Note: Current scaling_groups uses `name` (string) as PK.
+-- After ResourceGroup migration, this join key may change to a UUID `id` column.
 SELECT sg.*
 FROM scaling_groups sg
 JOIN accessible_rgs ar ON sg.name = ar.rg_id

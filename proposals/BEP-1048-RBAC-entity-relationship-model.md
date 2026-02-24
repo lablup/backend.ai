@@ -220,7 +220,7 @@ These are N:N scope-accessibility mappings — entity visibility propagates to c
 | `ScalingGroupForDomainRow` | Domain ━━auto━━► ResourceGroup | `auto` |
 | `ScalingGroupForProjectRow` | Project ━━auto━━► ResourceGroup | `auto` |
 | `ScalingGroupForKeypairsRow` | User ━━auto━━► ResourceGroup | `auto` |
-| `AssociationContainerRegistriesGroupsRow` | Domain ━━auto━━► ContainerRegistry | `auto` |
+| (new) | Domain ━━auto━━► ContainerRegistry | `auto` |
 | `AssociationContainerRegistriesGroupsRow` | Project ━━auto━━► ContainerRegistry | `auto` |
 | `AssocGroupUserRow` | Project ━━ref━━► User | `ref` |
 | `VFolderPermissionRow` | User ━━ref━━► VFolder (+ entity-scope permissions) | `ref` |

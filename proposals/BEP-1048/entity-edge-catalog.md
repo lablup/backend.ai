@@ -196,5 +196,5 @@ Each requires an independent Root Query with its own RBAC check.
 - UserResourcePolicyRow, KeyPairResourcePolicyRow, ProjectResourcePolicyRow
 - RoleRow
 
-**Read-only (Root Query, no Mutation):**
+**Superadmin Read-only (Root Query, no Mutation):**
 - AuditLogRow, EventLogRow
