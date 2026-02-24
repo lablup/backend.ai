@@ -1,0 +1,194 @@
+from __future__ import annotations
+
+import pytest
+
+from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.dto.manager.export import (
+    GetExportReportResponse,
+    ListExportReportsResponse,
+    UserExportCSVRequest,
+)
+
+
+class TestListReports:
+    @pytest.mark.asyncio
+    async def test_admin_lists_reports(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        result = await admin_registry.export.list_reports()
+        assert isinstance(result, ListExportReportsResponse)
+        assert isinstance(result.reports, list)
+        assert len(result.reports) > 0
+        report_keys = [r.report_key for r in result.reports]
+        assert "users" in report_keys
+
+    @pytest.mark.asyncio
+    async def test_regular_user_forbidden(
+        self,
+        user_registry: BackendAIClientRegistry,
+    ) -> None:
+        with pytest.raises(Exception) as exc_info:
+            await user_registry.export.list_reports()
+        assert "403" in str(exc_info.value)
+
+
+class TestGetReport:
+    @pytest.mark.asyncio
+    async def test_admin_gets_users_report(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        result = await admin_registry.export.get_report("users")
+        assert isinstance(result, GetExportReportResponse)
+        assert result.report.report_key == "users"
+        assert len(result.report.fields) > 0
+
+    @pytest.mark.asyncio
+    async def test_admin_gets_sessions_report(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        result = await admin_registry.export.get_report("sessions")
+        assert isinstance(result, GetExportReportResponse)
+        assert result.report.report_key == "sessions"
+        assert len(result.report.fields) > 0
+
+    @pytest.mark.asyncio
+    async def test_admin_gets_projects_report(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        result = await admin_registry.export.get_report("projects")
+        assert isinstance(result, GetExportReportResponse)
+        assert result.report.report_key == "projects"
+        assert len(result.report.fields) > 0
+
+    @pytest.mark.asyncio
+    async def test_get_nonexistent_report(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        with pytest.raises(Exception) as exc_info:
+            await admin_registry.export.get_report("nonexistent")
+        # The server should return an error for unknown report keys
+        assert "400" in str(exc_info.value) or "404" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_regular_user_forbidden(
+        self,
+        user_registry: BackendAIClientRegistry,
+    ) -> None:
+        with pytest.raises(Exception) as exc_info:
+            await user_registry.export.get_report("users")
+        assert "403" in str(exc_info.value)
+
+
+class TestDownloadUsersCSV:
+    @pytest.mark.asyncio
+    async def test_admin_downloads_users_csv(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        result = await admin_registry.export.download_users_csv()
+        assert isinstance(result, bytes)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_admin_downloads_with_fields(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        request = UserExportCSVRequest(fields=["uuid", "email"])
+        result = await admin_registry.export.download_users_csv(request)
+        assert isinstance(result, bytes)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_regular_user_forbidden(
+        self,
+        user_registry: BackendAIClientRegistry,
+    ) -> None:
+        with pytest.raises(Exception) as exc_info:
+            await user_registry.export.download_users_csv()
+        assert "403" in str(exc_info.value)
+
+
+class TestDownloadSessionsCSV:
+    @pytest.mark.asyncio
+    async def test_admin_downloads_sessions_csv(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        result = await admin_registry.export.download_sessions_csv()
+        assert isinstance(result, bytes)
+        # May be empty CSV (headers only) if no sessions exist
+
+    @pytest.mark.asyncio
+    async def test_regular_user_forbidden(
+        self,
+        user_registry: BackendAIClientRegistry,
+    ) -> None:
+        with pytest.raises(Exception) as exc_info:
+            await user_registry.export.download_sessions_csv()
+        assert "403" in str(exc_info.value)
+
+
+class TestDownloadProjectsCSV:
+    @pytest.mark.asyncio
+    async def test_admin_downloads_projects_csv(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        result = await admin_registry.export.download_projects_csv()
+        assert isinstance(result, bytes)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_regular_user_forbidden(
+        self,
+        user_registry: BackendAIClientRegistry,
+    ) -> None:
+        with pytest.raises(Exception) as exc_info:
+            await user_registry.export.download_projects_csv()
+        assert "403" in str(exc_info.value)
+
+
+class TestDownloadKeypairsCSV:
+    @pytest.mark.asyncio
+    async def test_admin_downloads_keypairs_csv(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        result = await admin_registry.export.download_keypairs_csv()
+        assert isinstance(result, bytes)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_regular_user_forbidden(
+        self,
+        user_registry: BackendAIClientRegistry,
+    ) -> None:
+        with pytest.raises(Exception) as exc_info:
+            await user_registry.export.download_keypairs_csv()
+        assert "403" in str(exc_info.value)
+
+
+class TestDownloadAuditLogsCSV:
+    @pytest.mark.asyncio
+    async def test_admin_downloads_audit_logs_csv(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        result = await admin_registry.export.download_audit_logs_csv()
+        assert isinstance(result, bytes)
+        # May be empty CSV (headers only) if no audit logs exist
+
+    @pytest.mark.asyncio
+    async def test_regular_user_forbidden(
+        self,
+        user_registry: BackendAIClientRegistry,
+    ) -> None:
+        with pytest.raises(Exception) as exc_info:
+            await user_registry.export.download_audit_logs_csv()
+        assert "403" in str(exc_info.value)
