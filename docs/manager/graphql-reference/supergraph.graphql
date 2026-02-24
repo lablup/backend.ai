@@ -2513,7 +2513,7 @@ input CreateResourcePresetInput
 }
 
 """
-Added in 25.19.0. Input for creating a revision without attaching to a deployment.
+Added in 25.19.0. Input for specifying revision configuration within a deployment.
 """
 input CreateRevisionInput
   @join__type(graph: STRAWBERRY)
@@ -2525,13 +2525,6 @@ input CreateRevisionInput
   modelRuntimeConfig: ModelRuntimeConfigInput!
   modelMountConfig: ModelMountConfigInput!
   extraMounts: [ExtraVFolderMountInput!]
-}
-
-"""Added in 25.16.0"""
-type CreateRevisionPayload
-  @join__type(graph: STRAWBERRY)
-{
-  revision: ModelRevision!
 }
 
 """Added in 26.3.0. Input for creating a role"""
@@ -7174,11 +7167,6 @@ type Mutation
 
   """Added in 25.16.0"""
   addModelRevision(input: AddRevisionInput!): AddRevisionPayload! @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 25.16.0. Create model revision which is not attached to any deployment.
-  """
-  createModelRevision(input: CreateRevisionInput!): CreateRevisionPayload! @join__field(graph: STRAWBERRY)
 
   """Create a new notification channel (admin only)"""
   adminCreateNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload! @join__field(graph: STRAWBERRY)
