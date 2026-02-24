@@ -346,11 +346,13 @@ class SessionClient(BaseDomainClient):
         self,
         request: SyncAgentRegistryRequest,
     ) -> dict[str, Any] | None:
-        result: dict[str, Any] | None = await self._client._request(
+        result: dict[str, Any] | list[Any] | None = await self._client._request(
             "POST",
             f"{_BASE_PATH}/_/sync-agent-registry",
             json=request.model_dump(exclude_none=True),
         )
+        if isinstance(result, list):
+            raise TypeError("Unexpected list response from sync_agent_registry")
         return result
 
     async def transit_session_status(

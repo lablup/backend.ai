@@ -102,6 +102,7 @@ class KeypairFixtureData:
 class UserFixtureData:
     user_uuid: uuid.UUID
     keypair: KeypairFixtureData
+    email: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -662,6 +663,7 @@ async def admin_user_fixture(
             access_key=f"AKTEST{secrets.token_hex(7).upper()}",
             secret_key=secrets.token_hex(20),
         ),
+        email=email,
     )
     async with db_engine.begin() as conn:
         await conn.execute(
@@ -741,6 +743,7 @@ async def regular_user_fixture(
             access_key=f"AKTEST{secrets.token_hex(7).upper()}",
             secret_key=secrets.token_hex(20),
         ),
+        email=email,
     )
     async with db_engine.begin() as conn:
         await conn.execute(
