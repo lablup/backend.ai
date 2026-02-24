@@ -17,6 +17,7 @@ from ai.backend.manager.data.scaling_group.types import (
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import (
@@ -126,13 +127,7 @@ class ScalingGroupDBSource:
         self,
         purger: Purger[ScalingGroupRow],
     ) -> ScalingGroupData:
-        """Purges a scaling group and all related sessions and routes using a purger.
-
-        Cascade delete order:
-        1. RoutingRow (session FK with RESTRICT)
-        2. EndpointRow (resource_group FK with RESTRICT, has CASCADE to routing)
-        3. SessionRow (scaling_group FK)
-        4. ScalingGroupRow
+        """Purges a scaling group and all related sessions, routes, endpoints, and kernels.
 
         Raises ScalingGroupNotFound if scaling group doesn't exist.
         """
@@ -159,13 +154,20 @@ class ScalingGroupDBSource:
             )
             await session.execute(delete_endpoints_stmt)
 
-            # Step 4: Delete all sessions belonging to this scaling group
+            # Step 4: Delete all kernels belonging to these sessions
+            if session_ids:
+                delete_kernels_stmt = sa.delete(KernelRow).where(
+                    KernelRow.session_id.in_(session_ids)
+                )
+                await session.execute(delete_kernels_stmt)
+
+            # Step 5: Delete all sessions belonging to this scaling group
             delete_sessions_stmt = sa.delete(SessionRow).where(
                 SessionRow.scaling_group_name == scaling_group_name
             )
             await session.execute(delete_sessions_stmt)
 
-            # Step 5: Delete the scaling group itself using purger
+            # Step 6: Delete the scaling group itself using purger
             result = await execute_purger(session, purger)
 
             if result is None:
