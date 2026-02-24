@@ -15,6 +15,7 @@ from ai.backend.manager.api.gql.deployment.types.policy import (
     UpdateDeploymentPolicyPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
 from ai.backend.manager.services.deployment.actions.deployment_policy.create_deployment_policy import (
     CreateDeploymentPolicyAction,
 )
@@ -25,11 +26,19 @@ from ai.backend.manager.services.deployment.actions.deployment_policy.update_dep
 # Mutation resolvers
 
 
-@strawberry.mutation(description="Added in 26.3.0")  # type: ignore[misc]
-async def create_deployment_policy(
+@strawberry.mutation(  # type: ignore[misc]
+    description=dedent_strip("""
+        Added in 26.3.0.
+        Create a new deployment policy for a model serving endpoint,
+        specifying the deployment strategy (rolling update or blue-green)
+        and its configuration.
+    """),
+)
+async def admin_create_deployment_policy(
     input: CreateDeploymentPolicyInputGQL, info: Info[StrawberryGQLContext]
 ) -> CreateDeploymentPolicyPayloadGQL:
     """Create a new deployment policy for an endpoint."""
+    check_admin_only()
     processor = info.context.processors.deployment
     result = await processor.create_deployment_policy.wait_for_complete(
         action=CreateDeploymentPolicyAction(
@@ -42,11 +51,19 @@ async def create_deployment_policy(
     )
 
 
-@strawberry.mutation(description="Added in 26.3.0")  # type: ignore[misc]
-async def update_deployment_policy(
+@strawberry.mutation(  # type: ignore[misc]
+    description=dedent_strip("""
+        Added in 26.3.0.
+        Update an existing deployment policy,
+        allowing changes to the deployment strategy,
+        strategy configuration, and rollback settings.
+    """),
+)
+async def admin_update_deployment_policy(
     input: UpdateDeploymentPolicyInputGQL, info: Info[StrawberryGQLContext]
 ) -> UpdateDeploymentPolicyPayloadGQL:
     """Update an existing deployment policy."""
+    check_admin_only()
     processor = info.context.processors.deployment
     result = await processor.update_deployment_policy.wait_for_complete(
         action=UpdateDeploymentPolicyAction(

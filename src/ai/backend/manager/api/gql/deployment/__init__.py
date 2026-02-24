@@ -16,12 +16,13 @@ from .resolver import (
     # Revision
     activate_deployment_revision,
     add_model_revision,
+    # Deployment Policy
+    admin_create_deployment_policy,
+    admin_update_deployment_policy,
     # Access Token
     create_access_token,
     # Auto Scaling
     create_auto_scaling_rule,
-    # Deployment Policy
-    create_deployment_policy,
     # Deployment
     create_model_deployment,
     create_model_revision,
@@ -43,7 +44,6 @@ from .resolver import (
     routes,
     sync_replicas,
     update_auto_scaling_rule,
-    update_deployment_policy,
     update_model_deployment,
     update_route_traffic_status,
 )
@@ -274,8 +274,8 @@ __all__ = [
     "delete_auto_scaling_rule",
     "update_auto_scaling_rule",
     # Resolvers - Deployment Policy
-    "create_deployment_policy",
-    "update_deployment_policy",
+    "admin_create_deployment_policy",
+    "admin_update_deployment_policy",
     # Resolvers - Deployment
     "create_model_deployment",
     "delete_model_deployment",

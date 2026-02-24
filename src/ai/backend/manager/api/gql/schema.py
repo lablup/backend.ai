@@ -44,12 +44,13 @@ from .deployment import (
     # Revision
     activate_deployment_revision,
     add_model_revision,
+    # Deployment Policy
+    admin_create_deployment_policy,
+    admin_update_deployment_policy,
     # Access Token
     create_access_token,
     # Auto Scaling
     create_auto_scaling_rule,
-    # Deployment Policy
-    create_deployment_policy,
     # Deployment
     create_model_deployment,
     create_model_revision,
@@ -71,7 +72,6 @@ from .deployment import (
     routes,
     sync_replicas,
     update_auto_scaling_rule,
-    update_deployment_policy,
     update_model_deployment,
     update_route_traffic_status,
 )
@@ -425,8 +425,8 @@ class Mutation:
     create_auto_scaling_rule = create_auto_scaling_rule
     update_auto_scaling_rule = update_auto_scaling_rule
     delete_auto_scaling_rule = delete_auto_scaling_rule
-    create_deployment_policy = create_deployment_policy
-    update_deployment_policy = update_deployment_policy
+    admin_create_deployment_policy = admin_create_deployment_policy
+    admin_update_deployment_policy = admin_update_deployment_policy
     delete_object_storage = delete_object_storage
     create_vfs_storage = create_vfs_storage
     update_vfs_storage = update_vfs_storage

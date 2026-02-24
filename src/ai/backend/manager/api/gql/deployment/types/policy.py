@@ -151,6 +151,10 @@ class CreateDeploymentPolicyInputGQL:
 
     def to_policy_config(self) -> DeploymentPolicyConfig:
         """Convert to DeploymentPolicyConfig for service layer."""
+        if self.rolling_update is not None and self.blue_green is not None:
+            raise InvalidAPIParameters(
+                "Cannot provide both rolling_update and blue_green; only one strategy config is allowed."
+            )
         strategy = DeploymentStrategy(self.strategy.value)
         match strategy:
             case DeploymentStrategy.ROLLING:
@@ -171,6 +175,8 @@ class CreateDeploymentPolicyInputGQL:
                     strategy_spec=self.blue_green.to_spec(),
                     rollback_on_failure=self.rollback_on_failure,
                 )
+            case _:
+                raise InvalidAPIParameters(f"Unsupported deployment strategy: {strategy}")
 
 
 @strawberry.input(
@@ -186,6 +192,10 @@ class UpdateDeploymentPolicyInputGQL:
 
     def to_updater_spec(self) -> DeploymentPolicyUpdaterSpec:
         """Convert to DeploymentPolicyUpdaterSpec for service layer."""
+        if self.rolling_update is not None and self.blue_green is not None:
+            raise InvalidAPIParameters(
+                "Cannot provide both rolling_update and blue_green; only one strategy config is allowed."
+            )
         spec = DeploymentPolicyUpdaterSpec()
         if self.strategy is not None:
             spec.strategy = OptionalState[DeploymentStrategy].update(

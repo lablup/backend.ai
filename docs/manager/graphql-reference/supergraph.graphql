@@ -7301,11 +7301,21 @@ type Mutation
   """Added in 25.16.0"""
   deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 26.3.0"""
-  createDeploymentPolicy(input: CreateDeploymentPolicyInput!): CreateDeploymentPolicyPayload! @join__field(graph: STRAWBERRY)
+  """
+  Added in 26.3.0.
+  Create a new deployment policy for a model serving endpoint,
+  specifying the deployment strategy (rolling update or blue-green)
+  and its configuration.
+  """
+  adminCreateDeploymentPolicy(input: CreateDeploymentPolicyInput!): CreateDeploymentPolicyPayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 26.3.0"""
-  updateDeploymentPolicy(input: UpdateDeploymentPolicyInput!): UpdateDeploymentPolicyPayload! @join__field(graph: STRAWBERRY)
+  """
+  Added in 26.3.0.
+  Update an existing deployment policy,
+  allowing changes to the deployment strategy,
+  strategy configuration, and rollback settings.
+  """
+  adminUpdateDeploymentPolicy(input: UpdateDeploymentPolicyInput!): UpdateDeploymentPolicyPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload! @join__field(graph: STRAWBERRY)
