@@ -21,7 +21,7 @@ import trafaret as t
 import yarl
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.docker import (
     ImageRef,
     LabelName,
@@ -44,7 +44,7 @@ from ai.backend.manager.data.image.types import (
     ImageType,
     RescanImagesResult,
 )
-from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
 from ai.backend.manager.exceptions import ScanImageError, ScanTagError
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow
@@ -159,17 +159,17 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     def _determine_additional_image_scopes(
         self,
         labels: dict[str, str],
-    ) -> list[ScopeId]:
+    ) -> list[RBACElementRef]:
         """
         Parse the customized image owner label and return a USER scope
         if present, allowing user-level access restriction for customized images.
         """
-        result: list[ScopeId] = []
+        result: list[RBACElementRef] = []
         owner_label = labels.get(LabelName.CUSTOMIZED_OWNER)
         if owner_label is not None:
             prefix, sep, scope_id = owner_label.partition(":")
             if prefix and sep and scope_id:
-                result.append(ScopeId(scope_type=ScopeType.USER, scope_id=scope_id))
+                result.append(RBACElementRef(RBACElementType.USER, scope_id))
             else:
                 log.warning("Invalid {} label value: {!r}", LabelName.CUSTOMIZED_OWNER, owner_label)
         return result
@@ -244,9 +244,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                                 labels=update["labels"],
                                 status=ImageStatus.ALIVE,
                             ),
-                            scope_ref=ScopeId(
-                                scope_type=ScopeType.CONTAINER_REGISTRY,
-                                scope_id=str(self.registry_info.id),
+                            scope_ref=RBACElementRef(
+                                RBACElementType.CONTAINER_REGISTRY,
+                                str(self.registry_info.id),
                             ),
                             additional_scope_refs=self._determine_additional_image_scopes(
                                 update["labels"]
