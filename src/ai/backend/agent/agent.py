@@ -1031,10 +1031,18 @@ class AbstractAgent[
 
         # Prepare stat collector tasks.
         self.timer_tasks.append(
-            aiotools.create_timer(self.collect_container_stat, UTILIZATION_METRIC_INTERVAL)
+            aiotools.create_timer(
+                self.collect_container_stat,
+                UTILIZATION_METRIC_INTERVAL,
+                delay_policy=aiotools.TimerDelayPolicy.CANCEL,
+            )
         )
         self.timer_tasks.append(
-            aiotools.create_timer(self.collect_process_stat, UTILIZATION_METRIC_INTERVAL)
+            aiotools.create_timer(
+                self.collect_process_stat,
+                UTILIZATION_METRIC_INTERVAL,
+                delay_policy=aiotools.TimerDelayPolicy.CANCEL,
+            )
         )
 
         # Prepare heartbeats.
