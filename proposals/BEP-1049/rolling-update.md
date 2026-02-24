@@ -32,9 +32,9 @@ The coordinator periodically calls `execute_rolling_update_cycle`. Each invocati
   └──────────────────┬───────────────────┘
                      No
                      ▼
-  ┌──────────────────────────────────────┐
-  │  No Old and New healthy >= desired_replicas?   │──Yes──→ completed (replacement done)
-  └──────────────────┬───────────────────┘
+  ┌──────────────────────────────────────────────────┐
+  │  No Old and New healthy >= desired_replicas?     │──Yes──→ completed (replacement done)
+  └──────────────────┬───────────────────────────────┘
                      No
                      ▼
   ┌──────────────────────────────────────┐
@@ -70,19 +70,19 @@ Example with `desired_replicas = 3`, `max_surge = 1`, `max_unavailable = 1`:
 ```
   Constraints:
   ┌──────────────────────────────────────────────────────────┐
-  │  max_total = desired_replicas + max_surge = 4                       │
+  │  max_total = desired_replicas + max_surge = 4            │
   │  → Total active routes cannot exceed 4                   │
   │                                                          │
-  │  min_available = desired_replicas - max_unavailable = 2            │
+  │  min_available = desired_replicas - max_unavailable = 2  │
   │  → Healthy routes must not drop below 2                  │
   └──────────────────────────────────────────────────────────┘
 
   Creation calculation:
-  ┌──────────────────────────────────────────────────────────┐
-  │  can_create = max(0, max_total - total_active)           │
+  ┌────────────────────────────────────────────────────────────────────┐
+  │  can_create = max(0, max_total - total_active)                     │
   │  need_create = max(0, desired_replicas - new_healthy - new_prov)   │
-  │  to_create = min(can_create, need_create)                │
-  └──────────────────────────────────────────────────────────┘
+  │  to_create = min(can_create, need_create)                          │
+  └────────────────────────────────────────────────────────────────────┘
 
   Termination calculation:
   ┌──────────────────────────────────────────────────────────┐
@@ -168,7 +168,7 @@ Example with `desired_replicas = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │  Old: []                                            │
   │  New: [■ ■ ■]  (3 healthy)                          │
   │                                                     │
-  │  No Old and New >= desired_replicas → completed               │
+  │  No Old and New >= desired_replicas → completed     │
   │  → deploying_revision → current_revision swap       │
   │  → DEPLOYING → READY state transition               │
   └─────────────────────────────────────────────────────┘

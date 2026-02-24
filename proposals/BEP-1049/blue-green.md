@@ -255,22 +255,22 @@ With `auto_promote=False`:
   │  Actions applied:                                            │
   │  ┌────────────────────────────────────────────────────┐      │
   │  │  ● Green creation:                                 │      │
-  │  │    RouteCreatorSpec(                                │     │
+  │  │    RouteCreatorSpec(                               │      │
   │  │      revision_id = deploying_revision,             │      │
   │  │      traffic_status = INACTIVE  ← differs from RU  │      │
   │  │    ) × target_count                                │      │
   │  │                                                    │      │
   │  │  ● Promotion (traffic switch):                     │      │
-  │  │    Green: RouteBatchUpdaterSpec(                    │     │
+  │  │    Green: RouteBatchUpdaterSpec(                   │      │
   │  │      traffic_status = ACTIVE                       │      │
   │  │    )                                               │      │
-  │  │    Blue: RouteBatchUpdaterSpec(                     │     │
+  │  │    Blue: RouteBatchUpdaterSpec(                    │      │
   │  │      status = TERMINATING,                         │      │
   │  │      traffic_status = INACTIVE                     │      │
   │  │    )                                               │      │
   │  │                                                    │      │
   │  │  ● Rollback:                                       │      │
-  │  │    Green: RouteBatchUpdaterSpec(                    │     │
+  │  │    Green: RouteBatchUpdaterSpec(                   │      │
   │  │      status = TERMINATING                          │      │
   │  │    )                                               │      │
   │  └────────────────────────────────────────────────────┘      │
