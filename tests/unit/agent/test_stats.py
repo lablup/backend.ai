@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 from decimal import Decimal
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from ai.backend.agent.agent import AbstractAgent
-from ai.backend.agent.stats import MovingStatistics, StatContext
+from ai.backend.agent.stats import MovingStatistics
 
 
 class TestMovingStatistics:
@@ -86,20 +84,3 @@ class TestMovingStatistics:
             stats.update(case.second_value)
 
         assert stats.rate == case.expected_rate
-
-
-class TestStatContextLockIndependence:
-    """Verify per-scope locks do not block each other."""
-
-    @pytest.mark.asyncio
-    async def test_different_scopes_do_not_block_each_other(self) -> None:
-        mock_agent = AsyncMock(spec=AbstractAgent)
-        ctx = StatContext(mock_agent)
-
-        # If locks were shared, acquiring _container_lock / _process_lock
-        # while _node_lock is held would deadlock and hit the timeout.
-        async with ctx._node_lock:
-            async with asyncio.timeout(1.0):
-                async with ctx._container_lock:
-                    async with ctx._process_lock:
-                        pass  # all three locks held concurrently = independent

@@ -361,9 +361,6 @@ class StatContext:
         self.kernel_metrics = {}
         self.process_metrics = {}
 
-        self._node_lock = asyncio.Lock()
-        self._container_lock = asyncio.Lock()
-        self._process_lock = asyncio.Lock()
         self._timestamps: MutableMapping[str, float] = {}
         self._utilization_metric_observer = UtilizationMetricObserver.instance()
         self._stage_observer = StageObserver.instance()
@@ -492,81 +489,77 @@ class StatContext:
 
         Intended to be used by the agent.
         """
+
+        # Here we use asyncio.gather() instead of aiotools.TaskGroup
+        # to keep methods of other plugins running when a plugin raises an error
+        # instead of cancelling them.
+        async def gather_node_measures_with_slots(
+            instance: AbstractComputePlugin,
+        ) -> tuple[list[SlotName], Sequence[NodeMeasurement]]:
+            result = await instance.gather_node_measures(self)
+            return [slot_name for slot_name, _ in instance.slot_types], result
+
+        _tasks = [
+            asyncio.create_task(gather_node_measures_with_slots(computer.instance))
+            for computer in self.agent.computers.values()
+        ]
         self._stage_observer.observe_stage(
-            stage="before_lock",
+            stage="before_gather_measures",
             upper_layer="collect_node_stat",
         )
-        async with self._node_lock:
-            # Here we use asyncio.gather() instead of aiotools.TaskGroup
-            # to keep methods of other plugins running when a plugin raises an error
-            # instead of cancelling them.
-            async def gather_node_measures_with_slots(
-                instance: AbstractComputePlugin,
-            ) -> tuple[list[SlotName], Sequence[NodeMeasurement]]:
-                result = await instance.gather_node_measures(self)
-                return [slot_name for slot_name, _ in instance.slot_types], result
-
-            _tasks = [
-                asyncio.create_task(gather_node_measures_with_slots(computer.instance))
-                for computer in self.agent.computers.values()
-            ]
-            self._stage_observer.observe_stage(
-                stage="before_gather_measures",
-                upper_layer="collect_node_stat",
-            )
-            results = await asyncio.gather(*_tasks, return_exceptions=True)
-            self._stage_observer.observe_stage(
-                stage="before_observe",
-                upper_layer="collect_node_stat",
-            )
-            for res in results:
-                if isinstance(res, BaseException):
-                    log.error("collect_node_stat(): gather_node_measures() error", exc_info=res)
-                    continue
-                slot_names, result = res
-                for node_measure in result:
-                    metric_key = node_measure.key
-                    # update node metric
-                    slot_scale_factor = self._extract_slot_measurement_scale_factor(
-                        resource_scaling_factors, slot_names, metric_key
+        results = await asyncio.gather(*_tasks, return_exceptions=True)
+        self._stage_observer.observe_stage(
+            stage="before_observe",
+            upper_layer="collect_node_stat",
+        )
+        for res in results:
+            if isinstance(res, BaseException):
+                log.error("collect_node_stat(): gather_node_measures() error", exc_info=res)
+                continue
+            slot_names, result = res
+            for node_measure in result:
+                metric_key = node_measure.key
+                # update node metric
+                slot_scale_factor = self._extract_slot_measurement_scale_factor(
+                    resource_scaling_factors, slot_names, metric_key
+                )
+                per_node = node_measure.per_node.apply_scale_factor(slot_scale_factor)
+                if metric_key not in self.node_metrics:
+                    self.node_metrics[metric_key] = Metric(
+                        metric_key,
+                        node_measure.type,
+                        current=per_node.value,
+                        capacity=per_node.capacity,
+                        unit_hint=node_measure.unit_hint,
+                        stats=MovingStatistics(per_node.value),
+                        stats_filter=frozenset(node_measure.stats_filter),
+                        current_hook=node_measure.current_hook,
                     )
-                    per_node = node_measure.per_node.apply_scale_factor(slot_scale_factor)
-                    if metric_key not in self.node_metrics:
-                        self.node_metrics[metric_key] = Metric(
+                else:
+                    self.node_metrics[metric_key].update(per_node)
+                # update per-device metric
+                for dev_id, measure in node_measure.per_device.items():
+                    measure = measure.apply_scale_factor(slot_scale_factor)
+                    self.observe_node_metric(
+                        device_id=dev_id,
+                        metric_key=metric_key,
+                        measure=measure,
+                    )
+                    if metric_key not in self.device_metrics:
+                        self.device_metrics[metric_key] = {}
+                    if dev_id not in self.device_metrics[metric_key]:
+                        self.device_metrics[metric_key][dev_id] = Metric(
                             metric_key,
                             node_measure.type,
-                            current=per_node.value,
-                            capacity=per_node.capacity,
+                            current=measure.value,
+                            capacity=measure.capacity,
                             unit_hint=node_measure.unit_hint,
-                            stats=MovingStatistics(per_node.value),
+                            stats=MovingStatistics(measure.value),
                             stats_filter=frozenset(node_measure.stats_filter),
                             current_hook=node_measure.current_hook,
                         )
                     else:
-                        self.node_metrics[metric_key].update(per_node)
-                    # update per-device metric
-                    for dev_id, measure in node_measure.per_device.items():
-                        measure = measure.apply_scale_factor(slot_scale_factor)
-                        self.observe_node_metric(
-                            device_id=dev_id,
-                            metric_key=metric_key,
-                            measure=measure,
-                        )
-                        if metric_key not in self.device_metrics:
-                            self.device_metrics[metric_key] = {}
-                        if dev_id not in self.device_metrics[metric_key]:
-                            self.device_metrics[metric_key][dev_id] = Metric(
-                                metric_key,
-                                node_measure.type,
-                                current=measure.value,
-                                capacity=measure.capacity,
-                                unit_hint=node_measure.unit_hint,
-                                stats=MovingStatistics(measure.value),
-                                stats_filter=frozenset(node_measure.stats_filter),
-                                current_hook=node_measure.current_hook,
-                            )
-                        else:
-                            self.device_metrics[metric_key][dev_id].update(measure)
+                        self.device_metrics[metric_key][dev_id].update(measure)
         agent_id = self.agent.id
         device_metrics: dict[MetricKey, dict[DeviceId, MetricValue]] = {}
         flattened_metrics: list[FlattenedDeviceMetric] = []
@@ -723,83 +716,78 @@ class StatContext:
 
         Intended to be used by the agent and triggered by container cgroup synchronization processes.
         """
+        kernel_id_map: dict[ContainerId, KernelId] = {}
+        kernel_obj_map: dict[KernelId, AbstractKernel] = {}
+        for kid, info in self.agent.kernel_registry.items():
+            try:
+                cid = info["container_id"]
+            except KeyError:
+                log.warning("collect_container_stat(): no container for kernel {}", kid)
+            else:
+                kernel_id_map[ContainerId(cid)] = kid
+                kernel_obj_map[kid] = info
+
+        # Here we use asyncio.gather() instead of aiotools.TaskGroup
+        # to keep methods of other plugins running when a plugin raises an error
+        # instead of cancelling them.
+        _tasks: list[asyncio.Task[Sequence[ContainerMeasurement]]] = []
+        kernel_id = None
+        for computer in self.agent.computers.values():
+            _tasks.append(
+                asyncio.create_task(
+                    computer.instance.gather_container_measures(self, container_ids),
+                )
+            )
         self._stage_observer.observe_stage(
-            stage="before_lock",
+            stage="before_gather_measures",
             upper_layer="collect_container_stat",
         )
-        async with self._container_lock:
-            kernel_id_map: dict[ContainerId, KernelId] = {}
-            kernel_obj_map: dict[KernelId, AbstractKernel] = {}
-            for kid, info in self.agent.kernel_registry.items():
-                try:
-                    cid = info["container_id"]
-                except KeyError:
-                    log.warning("collect_container_stat(): no container for kernel {}", kid)
-                else:
-                    kernel_id_map[ContainerId(cid)] = kid
-                    kernel_obj_map[kid] = info
-
-            # Here we use asyncio.gather() instead of aiotools.TaskGroup
-            # to keep methods of other plugins running when a plugin raises an error
-            # instead of cancelling them.
-            _tasks: list[asyncio.Task[Sequence[ContainerMeasurement]]] = []
-            kernel_id = None
-            for computer in self.agent.computers.values():
-                _tasks.append(
-                    asyncio.create_task(
-                        computer.instance.gather_container_measures(self, container_ids),
-                    )
+        results = await asyncio.gather(*_tasks, return_exceptions=True)
+        updated_kernel_ids: set[KernelId] = set()
+        self._stage_observer.observe_stage(
+            stage="before_observe",
+            upper_layer="collect_container_stat",
+        )
+        for result in results:
+            if isinstance(result, BaseException):
+                log.error(
+                    "collect_container_stat(): gather_container_measures() error",
+                    exc_info=result,
                 )
-            self._stage_observer.observe_stage(
-                stage="before_gather_measures",
-                upper_layer="collect_container_stat",
-            )
-            results = await asyncio.gather(*_tasks, return_exceptions=True)
-            updated_kernel_ids: set[KernelId] = set()
-            self._stage_observer.observe_stage(
-                stage="before_observe",
-                upper_layer="collect_container_stat",
-            )
-            for result in results:
-                if isinstance(result, BaseException):
-                    log.error(
-                        "collect_container_stat(): gather_container_measures() error",
-                        exc_info=result,
+                continue
+            for ctnr_measure in result:
+                if not isinstance(ctnr_measure, ContainerMeasurement):
+                    raise InvalidContainerMeasurementError(
+                        f"Expected ContainerMeasurement, got {type(ctnr_measure).__name__}."
                     )
-                    continue
-                for ctnr_measure in result:
-                    if not isinstance(ctnr_measure, ContainerMeasurement):
-                        raise InvalidContainerMeasurementError(
-                            f"Expected ContainerMeasurement, got {type(ctnr_measure).__name__}."
-                        )
-                    metric_key = ctnr_measure.key
-                    # update per-container metric
-                    for cid, measure in ctnr_measure.per_container.items():
-                        try:
-                            kernel_id = kernel_id_map[ContainerId(cid)]
-                        except KeyError:
-                            continue
-                        self.observe_container_metric(
-                            kernel_id,
+                metric_key = ctnr_measure.key
+                # update per-container metric
+                for cid, measure in ctnr_measure.per_container.items():
+                    try:
+                        kernel_id = kernel_id_map[ContainerId(cid)]
+                    except KeyError:
+                        continue
+                    self.observe_container_metric(
+                        kernel_id,
+                        metric_key,
+                        measure,
+                    )
+                    updated_kernel_ids.add(kernel_id)
+                    if kernel_id not in self.kernel_metrics:
+                        self.kernel_metrics[kernel_id] = {}
+                    if metric_key not in self.kernel_metrics[kernel_id]:
+                        self.kernel_metrics[kernel_id][metric_key] = Metric(
                             metric_key,
-                            measure,
+                            ctnr_measure.type,
+                            current=measure.value,
+                            capacity=measure.capacity or measure.value,
+                            unit_hint=ctnr_measure.unit_hint,
+                            stats=MovingStatistics(measure.value),
+                            stats_filter=frozenset(ctnr_measure.stats_filter),
+                            current_hook=ctnr_measure.current_hook,
                         )
-                        updated_kernel_ids.add(kernel_id)
-                        if kernel_id not in self.kernel_metrics:
-                            self.kernel_metrics[kernel_id] = {}
-                        if metric_key not in self.kernel_metrics[kernel_id]:
-                            self.kernel_metrics[kernel_id][metric_key] = Metric(
-                                metric_key,
-                                ctnr_measure.type,
-                                current=measure.value,
-                                capacity=measure.capacity or measure.value,
-                                unit_hint=ctnr_measure.unit_hint,
-                                stats=MovingStatistics(measure.value),
-                                stats_filter=frozenset(ctnr_measure.stats_filter),
-                                current_hook=ctnr_measure.current_hook,
-                            )
-                        else:
-                            self.kernel_metrics[kernel_id][metric_key].update(measure)
+                    else:
+                        self.kernel_metrics[kernel_id][metric_key].update(measure)
 
         kernel_updates: list[FlattenedKernelMetric] = []
         kernel_serialized_updates: list[tuple[KernelId, bytes]] = []
@@ -892,120 +880,113 @@ class StatContext:
         # mypy evaluates sys.platform at type-check time, so:
         # - On macOS: code after return appears unreachable (needs type: ignore[unreachable])
         # - On Linux: type: ignore is unused (needs type: ignore[unused-ignore])
-        self._stage_observer.observe_stage(  # type: ignore[unreachable,unused-ignore]
-            stage="before_lock",
+        kernel_id_map: dict[ContainerId, KernelId] = {}  # type: ignore[unreachable,unused-ignore]
+        for kid, info in self.agent.kernel_registry.items():
+            try:
+                cid = info["container_id"]
+            except KeyError:
+                log.warning("collect_per_container_process_stat(): no container for kernel {}", kid)
+            else:
+                kernel_id_map[ContainerId(cid)] = kid
+
+        pid_map: dict[PID, ContainerId] = {}
+        async with aiodocker.Docker() as docker:
+            for cid in container_ids:
+                active_pids = await self._get_processes(cid, docker)
+                for pid_ in active_pids:
+                    pid_map[pid_] = cid
+        # Here we use asyncio.gather() instead of aiotools.TaskGroup
+        # to keep methods of other plugins running when a plugin raises an error
+        # instead of cancelling them.
+        _tasks: list[asyncio.Task[Sequence[ProcessMeasurement]]] = []
+        for computer in self.agent.computers.values():
+            _tasks.append(
+                asyncio.create_task(
+                    computer.instance.gather_process_measures(
+                        self, cast(Mapping[int, str], pid_map)
+                    ),
+                )
+            )
+        self._stage_observer.observe_stage(
+            stage="before_gather_measures",
             upper_layer="collect_per_container_process_stat",
         )
-        async with self._process_lock:
-            kernel_id_map: dict[ContainerId, KernelId] = {}
-            for kid, info in self.agent.kernel_registry.items():
-                try:
-                    cid = info["container_id"]
-                except KeyError:
-                    log.warning(
-                        "collect_per_container_process_stat(): no container for kernel {}", kid
-                    )
-                else:
-                    kernel_id_map[ContainerId(cid)] = kid
-
-            pid_map: dict[PID, ContainerId] = {}
-            async with aiodocker.Docker() as docker:
-                for cid in container_ids:
-                    active_pids = await self._get_processes(cid, docker)
-                    for pid_ in active_pids:
-                        pid_map[pid_] = cid
-            # Here we use asyncio.gather() instead of aiotools.TaskGroup
-            # to keep methods of other plugins running when a plugin raises an error
-            # instead of cancelling them.
-            _tasks: list[asyncio.Task[Sequence[ProcessMeasurement]]] = []
-            for computer in self.agent.computers.values():
-                _tasks.append(
-                    asyncio.create_task(
-                        computer.instance.gather_process_measures(
-                            self, cast(Mapping[int, str], pid_map)
-                        ),
-                    )
+        results = await asyncio.gather(*_tasks, return_exceptions=True)
+        self._stage_observer.observe_stage(
+            stage="before_observe",
+            upper_layer="collect_per_container_process_stat",
+        )
+        updated_cids: set[ContainerId] = set()
+        for result in results:
+            if isinstance(result, BaseException):
+                log.error(
+                    "collect_per_container_process_stat(): gather_process_measures() error",
+                    exc_info=result,
                 )
-            self._stage_observer.observe_stage(
-                stage="before_gather_measures",
-                upper_layer="collect_per_container_process_stat",
-            )
-            results = await asyncio.gather(*_tasks, return_exceptions=True)
-            self._stage_observer.observe_stage(
-                stage="before_observe",
-                upper_layer="collect_per_container_process_stat",
-            )
-            updated_cids: set[ContainerId] = set()
-            for result in results:
-                if isinstance(result, BaseException):
-                    log.error(
-                        "collect_per_container_process_stat(): gather_process_measures() error",
-                        exc_info=result,
-                    )
-                    continue
-                for proc_measure in result:
-                    metric_key = proc_measure.key
-                    # update per-process metric
-                    for raw_pid, measure in proc_measure.per_process.items():
-                        pid = PID(raw_pid)
-                        cid = pid_map[pid]
-                        try:
-                            kernel_id = kernel_id_map[cid]
-                        except KeyError:
-                            continue
-                        updated_cids.add(cid)
-                        self.observe_process_metric(
-                            kernel_id,
-                            cid,
-                            pid,
-                            metric_key,
-                            measure,
-                        )
-                        if cid not in self.process_metrics:
-                            self.process_metrics[cid] = {}
-                        if pid not in self.process_metrics[cid]:
-                            self.process_metrics[cid][pid] = {}
-                        if metric_key not in self.process_metrics[cid][pid]:
-                            self.process_metrics[cid][pid][metric_key] = Metric(
-                                metric_key,
-                                proc_measure.type,
-                                current=measure.value,
-                                capacity=measure.capacity or measure.value,
-                                unit_hint=proc_measure.unit_hint,
-                                stats=MovingStatistics(measure.value),
-                                stats_filter=frozenset(proc_measure.stats_filter),
-                                current_hook=proc_measure.current_hook,
-                            )
-                        else:
-                            self.process_metrics[cid][pid][metric_key].update(measure)
-
-            self._stage_observer.observe_stage(
-                stage="before_report_to_redis",
-                upper_layer="collect_per_container_process_stat",
-            )
-
-            # Use ValkeyStatClient set_multiple_keys for batch operations
-            key_value_map: dict[str, bytes] = {}
-            for cid in updated_cids:
-                serializable_table = {}
-                for pid in self.process_metrics[cid].keys():
-                    metrics = self.process_metrics[cid][pid]
-                    serializable_metrics = {}
-                    for key, obj in metrics.items():
-                        try:
-                            serializable_metrics[str(key)] = obj.to_serializable_dict()
-                        except ValueError:
-                            log.warning("Failed to serialize metric {}: {}", key, str(obj.stats))
-                            continue
-                    serializable_table[pid] = serializable_metrics
-                if self.agent.local_config.debug.log_stats:
-                    log.debug(
-                        "stats: process_updates: \ncontainer_id: {}\n{}",
+                continue
+            for proc_measure in result:
+                metric_key = proc_measure.key
+                # update per-process metric
+                for raw_pid, measure in proc_measure.per_process.items():
+                    pid = PID(raw_pid)
+                    cid = pid_map[pid]
+                    try:
+                        kernel_id = kernel_id_map[cid]
+                    except KeyError:
+                        continue
+                    updated_cids.add(cid)
+                    self.observe_process_metric(
+                        kernel_id,
                         cid,
-                        serializable_table,
+                        pid,
+                        metric_key,
+                        measure,
                     )
-                serialized_metrics = msgpack.packb(serializable_table)
-                key_value_map[str(cid)] = serialized_metrics
+                    if cid not in self.process_metrics:
+                        self.process_metrics[cid] = {}
+                    if pid not in self.process_metrics[cid]:
+                        self.process_metrics[cid][pid] = {}
+                    if metric_key not in self.process_metrics[cid][pid]:
+                        self.process_metrics[cid][pid][metric_key] = Metric(
+                            metric_key,
+                            proc_measure.type,
+                            current=measure.value,
+                            capacity=measure.capacity or measure.value,
+                            unit_hint=proc_measure.unit_hint,
+                            stats=MovingStatistics(measure.value),
+                            stats_filter=frozenset(proc_measure.stats_filter),
+                            current_hook=proc_measure.current_hook,
+                        )
+                    else:
+                        self.process_metrics[cid][pid][metric_key].update(measure)
 
-            if key_value_map:
-                await self.agent.valkey_stat_client.set_multiple_keys(key_value_map, expire_sec=8)
+        self._stage_observer.observe_stage(
+            stage="before_report_to_redis",
+            upper_layer="collect_per_container_process_stat",
+        )
+
+        # Use ValkeyStatClient set_multiple_keys for batch operations
+        key_value_map: dict[str, bytes] = {}
+        for cid in updated_cids:
+            serializable_table = {}
+            for pid in self.process_metrics[cid].keys():
+                metrics = self.process_metrics[cid][pid]
+                serializable_metrics = {}
+                for key, obj in metrics.items():
+                    try:
+                        serializable_metrics[str(key)] = obj.to_serializable_dict()
+                    except ValueError:
+                        log.warning("Failed to serialize metric {}: {}", key, str(obj.stats))
+                        continue
+                serializable_table[pid] = serializable_metrics
+            if self.agent.local_config.debug.log_stats:
+                log.debug(
+                    "stats: process_updates: \ncontainer_id: {}\n{}",
+                    cid,
+                    serializable_table,
+                )
+            serialized_metrics = msgpack.packb(serializable_table)
+            key_value_map[str(cid)] = serialized_metrics
+
+        if key_value_map:
+            await self.agent.valkey_stat_client.set_multiple_keys(key_value_map, expire_sec=8)
