@@ -9,9 +9,13 @@ from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair_resource_policy.db_source.db_source import (
     KeypairResourcePolicyDBSource,
+)
+from ai.backend.manager.repositories.keypair_resource_policy.types import (
+    KeypairResourcePolicySearchResult,
 )
 
 keypair_resource_policy_repository_resilience = Resilience(
@@ -38,6 +42,16 @@ class KeypairResourcePolicyRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db_source = KeypairResourcePolicyDBSource(db)
+
+    @keypair_resource_policy_repository_resilience.apply()
+    async def get_by_name(self, name: str) -> KeyPairResourcePolicyData:
+        """Retrieves a keypair resource policy by name."""
+        return await self._db_source.get_by_name(name)
+
+    @keypair_resource_policy_repository_resilience.apply()
+    async def search(self, querier: BatchQuerier) -> KeypairResourcePolicySearchResult:
+        """Search keypair resource policies with filtering and pagination."""
+        return await self._db_source.search(querier)
 
     @keypair_resource_policy_repository_resilience.apply()
     async def create_keypair_resource_policy(

@@ -12,7 +12,11 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.user_resource_policy.types import (
+    UserResourcePolicySearchResult,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -63,6 +67,20 @@ class UserResourcePolicyDBSource:
                     f"User resource policy with name {name} not found."
                 )
             return row.to_dataclass()
+
+    @user_resource_policy_db_source_resilience.apply()
+    async def search(self, querier: BatchQuerier) -> UserResourcePolicySearchResult:
+        """Search user resource policies with filtering and pagination."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(UserResourcePolicyRow)
+            result = await execute_batch_querier(db_sess, query, querier)
+            items = [row.UserResourcePolicyRow.to_dataclass() for row in result.rows]
+            return UserResourcePolicySearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     @user_resource_policy_db_source_resilience.apply()
     async def update(self, updater: Updater[UserResourcePolicyRow]) -> UserResourcePolicyData:

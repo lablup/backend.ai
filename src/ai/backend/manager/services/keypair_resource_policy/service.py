@@ -14,9 +14,17 @@ from ai.backend.manager.services.keypair_resource_policy.actions.delete_keypair_
     DeleteKeyPairResourcePolicyAction,
     DeleteKeyPairResourcePolicyActionResult,
 )
+from ai.backend.manager.services.keypair_resource_policy.actions.get_keypair_resource_policy import (
+    GetKeyPairResourcePolicyAction,
+    GetKeyPairResourcePolicyActionResult,
+)
 from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
     ModifyKeyPairResourcePolicyAction,
     ModifyKeyPairResourcePolicyActionResult,
+)
+from ai.backend.manager.services.keypair_resource_policy.actions.search_keypair_resource_policies import (
+    SearchKeyPairResourcePoliciesAction,
+    SearchKeyPairResourcePoliciesActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -30,6 +38,23 @@ class KeypairResourcePolicyService:
         keypair_resource_policy_repository: KeypairResourcePolicyRepository,
     ) -> None:
         self._keypair_resource_policy_repository = keypair_resource_policy_repository
+
+    async def get_keypair_resource_policy(
+        self, action: GetKeyPairResourcePolicyAction
+    ) -> GetKeyPairResourcePolicyActionResult:
+        result = await self._keypair_resource_policy_repository.get_by_name(action.name)
+        return GetKeyPairResourcePolicyActionResult(keypair_resource_policy=result)
+
+    async def search_keypair_resource_policies(
+        self, action: SearchKeyPairResourcePoliciesAction
+    ) -> SearchKeyPairResourcePoliciesActionResult:
+        result = await self._keypair_resource_policy_repository.search(action.querier)
+        return SearchKeyPairResourcePoliciesActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def create_keypair_resource_policy(
         self, action: CreateKeyPairResourcePolicyAction

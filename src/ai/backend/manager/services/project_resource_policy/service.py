@@ -12,9 +12,17 @@ from ai.backend.manager.services.project_resource_policy.actions.delete_project_
     DeleteProjectResourcePolicyAction,
     DeleteProjectResourcePolicyActionResult,
 )
+from ai.backend.manager.services.project_resource_policy.actions.get_project_resource_policy import (
+    GetProjectResourcePolicyAction,
+    GetProjectResourcePolicyActionResult,
+)
 from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
     ModifyProjectResourcePolicyAction,
     ModifyProjectResourcePolicyActionResult,
+)
+from ai.backend.manager.services.project_resource_policy.actions.search_project_resource_policies import (
+    SearchProjectResourcePoliciesAction,
+    SearchProjectResourcePoliciesActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -28,6 +36,23 @@ class ProjectResourcePolicyService:
         project_resource_policy_repository: ProjectResourcePolicyRepository,
     ) -> None:
         self._project_resource_policy_repository = project_resource_policy_repository
+
+    async def get_project_resource_policy(
+        self, action: GetProjectResourcePolicyAction
+    ) -> GetProjectResourcePolicyActionResult:
+        result = await self._project_resource_policy_repository.get_by_name(action.name)
+        return GetProjectResourcePolicyActionResult(project_resource_policy=result)
+
+    async def search_project_resource_policies(
+        self, action: SearchProjectResourcePoliciesAction
+    ) -> SearchProjectResourcePoliciesActionResult:
+        result = await self._project_resource_policy_repository.search(action.querier)
+        return SearchProjectResourcePoliciesActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def create_project_resource_policy(
         self, action: CreateProjectResourcePolicyAction

@@ -365,6 +365,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".export",
     ".agent",
     ".domain",
+    ".resource_policy",
     ".quota_scope",
     ".user",
 ]

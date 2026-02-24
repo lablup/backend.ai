@@ -10,7 +10,11 @@ from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.project_resource_policy.types import (
+    ProjectResourcePolicySearchResult,
+)
 
 project_resource_policy_repository_resilience = Resilience(
     policies=[
@@ -62,6 +66,20 @@ class ProjectResourcePolicyRepository:
                     f"Project resource policy with name {updater.pk_value} not found."
                 )
             return result.row.to_dataclass()
+
+    @project_resource_policy_repository_resilience.apply()
+    async def search(self, querier: BatchQuerier) -> ProjectResourcePolicySearchResult:
+        """Search project resource policies with filtering and pagination."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ProjectResourcePolicyRow)
+            result = await execute_batch_querier(db_sess, query, querier)
+            items = [row.ProjectResourcePolicyRow.to_dataclass() for row in result.rows]
+            return ProjectResourcePolicySearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     @project_resource_policy_repository_resilience.apply()
     async def delete(self, name: str) -> ProjectResourcePolicyData:

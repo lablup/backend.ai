@@ -11,9 +11,17 @@ from ai.backend.manager.services.keypair_resource_policy.actions.delete_keypair_
     DeleteKeyPairResourcePolicyAction,
     DeleteKeyPairResourcePolicyActionResult,
 )
+from ai.backend.manager.services.keypair_resource_policy.actions.get_keypair_resource_policy import (
+    GetKeyPairResourcePolicyAction,
+    GetKeyPairResourcePolicyActionResult,
+)
 from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
     ModifyKeyPairResourcePolicyAction,
     ModifyKeyPairResourcePolicyActionResult,
+)
+from ai.backend.manager.services.keypair_resource_policy.actions.search_keypair_resource_policies import (
+    SearchKeyPairResourcePoliciesAction,
+    SearchKeyPairResourcePoliciesActionResult,
 )
 from ai.backend.manager.services.keypair_resource_policy.service import (
     KeypairResourcePolicyService,
@@ -21,6 +29,12 @@ from ai.backend.manager.services.keypair_resource_policy.service import (
 
 
 class KeypairResourcePolicyProcessors(AbstractProcessorPackage):
+    get_keypair_resource_policy: ActionProcessor[
+        GetKeyPairResourcePolicyAction, GetKeyPairResourcePolicyActionResult
+    ]
+    search_keypair_resource_policies: ActionProcessor[
+        SearchKeyPairResourcePoliciesAction, SearchKeyPairResourcePoliciesActionResult
+    ]
     create_keypair_resource_policy: ActionProcessor[
         CreateKeyPairResourcePolicyAction, CreateKeyPairResourcePolicyActionResult
     ]
@@ -34,6 +48,12 @@ class KeypairResourcePolicyProcessors(AbstractProcessorPackage):
     def __init__(
         self, service: KeypairResourcePolicyService, action_monitors: list[ActionMonitor]
     ) -> None:
+        self.get_keypair_resource_policy = ActionProcessor(
+            service.get_keypair_resource_policy, action_monitors
+        )
+        self.search_keypair_resource_policies = ActionProcessor(
+            service.search_keypair_resource_policies, action_monitors
+        )
         self.create_keypair_resource_policy = ActionProcessor(
             service.create_keypair_resource_policy, action_monitors
         )
@@ -47,6 +67,8 @@ class KeypairResourcePolicyProcessors(AbstractProcessorPackage):
     @override
     def supported_actions(self) -> list[ActionSpec]:
         return [
+            GetKeyPairResourcePolicyAction.spec(),
+            SearchKeyPairResourcePoliciesAction.spec(),
             CreateKeyPairResourcePolicyAction.spec(),
             ModifyKeyPairResourcePolicyAction.spec(),
             DeleteKeyPairResourcePolicyAction.spec(),
