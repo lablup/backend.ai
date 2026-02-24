@@ -13,7 +13,6 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.export import ExportFieldDef
 from ai.backend.manager.repositories.export.reports.session import (
     KERNEL_JOIN,
-    MAIN_KERNEL_JOIN,
     PROJECT_JOIN,
     PROJECT_POLICY_JOINS,
     PROJECT_RESOURCE_POLICY_JOIN,
@@ -39,8 +38,8 @@ class TestSessionReportDefinition:
         assert SESSION_REPORT.select_from is SessionRow.__table__
 
     def test_total_field_count(self) -> None:
-        """Should have 41 fields total (12 basic + 29 relationship)."""
-        assert len(SESSION_REPORT.fields) == 41
+        """Should have 40 fields total (12 basic + 28 relationship)."""
+        assert len(SESSION_REPORT.fields) == 40
 
 
 class TestSessionFieldDefinitions:
@@ -68,16 +67,6 @@ class TestSessionFieldDefinitions:
             "terminated_at",
         }
         assert basic_keys.issubset(field_keys)
-
-    def test_main_kernel_fields_exist(self, field_keys: set[str]) -> None:
-        """Main kernel fields should exist."""
-        main_kernel_keys = {
-            "main_kernel_image",
-            "main_kernel_architecture",
-            "main_kernel_registry",
-            "main_kernel_tag",
-        }
-        assert main_kernel_keys.issubset(field_keys)
 
     def test_project_fields_exist(self, field_keys: set[str]) -> None:
         """Project fields should exist."""
@@ -128,6 +117,9 @@ class TestSessionFieldDefinitions:
             "kernel_role",
             "kernel_status",
             "kernel_image",
+            "kernel_architecture",
+            "kernel_registry",
+            "kernel_tag",
             "kernel_agent",
             "kernel_created_at",
             "kernel_terminated_at",
@@ -160,10 +152,6 @@ class TestJoinDefinitions:
         """Kernel JOIN should use KernelRow table."""
         assert KERNEL_JOIN.table is KernelRow.__table__
 
-    def test_main_kernel_join_table(self) -> None:
-        """Main kernel JOIN should use KernelRow table."""
-        assert MAIN_KERNEL_JOIN.table is KernelRow.__table__
-
 
 class TestFieldJoinAssignments:
     """Tests for field-join assignments."""
@@ -186,20 +174,6 @@ class TestFieldJoinAssignments:
         for key in basic_keys:
             field = fields_by_key[key]
             assert field.joins is None
-
-    def test_main_kernel_fields_have_join(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
-        """Main kernel fields should have MAIN_KERNEL_JOIN."""
-        main_kernel_keys = [
-            "main_kernel_image",
-            "main_kernel_architecture",
-            "main_kernel_registry",
-            "main_kernel_tag",
-        ]
-        for key in main_kernel_keys:
-            field = fields_by_key[key]
-            assert field.joins is not None
-            assert MAIN_KERNEL_JOIN in field.joins
-            assert len(field.joins) == 1
 
     def test_project_fields_have_join(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
         """Project fields should have PROJECT_JOIN."""
@@ -252,6 +226,9 @@ class TestFieldJoinAssignments:
             "kernel_role",
             "kernel_status",
             "kernel_image",
+            "kernel_architecture",
+            "kernel_registry",
+            "kernel_tag",
             "kernel_agent",
             "kernel_created_at",
             "kernel_terminated_at",
@@ -284,20 +261,6 @@ class TestBuildSessionQueryWithRealReport:
 
         # Should be the base table, not a Join
         assert query.select_from is SessionRow.__table__
-
-    def test_main_kernel_fields_add_one_join(self, adapter: ExportAdapter) -> None:
-        """Selecting main kernel fields should add 1 JOIN."""
-        query = adapter.build_session_query(
-            report=SESSION_REPORT,
-            fields=["id", "main_kernel_image"],
-            filter=None,
-            order=None,
-            max_rows=1000,
-            statement_timeout_sec=60,
-        )
-
-        compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
-        assert "kernels" in compiled
 
     def test_project_fields_add_one_join(self, adapter: ExportAdapter) -> None:
         """Selecting project fields should add 1 JOIN."""
@@ -365,7 +328,7 @@ class TestBuildSessionQueryWithRealReport:
             fields=[
                 "id",
                 "name",
-                "main_kernel_image",
+                "kernel_image",
                 "project_name",
                 "project_policy_max_vfolder_count",
                 "user_email",
