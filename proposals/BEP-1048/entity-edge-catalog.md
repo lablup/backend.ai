@@ -7,7 +7,7 @@ See [BEP-1048](../BEP-1048-RBAC-entity-relationship-model.md) for definitions of
 
 | Type | Permission | Storage | Scope Chain |
 |------|-----------|---------|-------------|
-| `auto` | Role permissions flow through | `association_scopes_entities` (`relation_type=auto`) | CTE upward traversal propagates visibility to child scopes |
+| `auto` | Role permissions flow through | `association_scopes_entities` (`relation_type=auto`) | CTE upward traversal; parent-scope mappings are visible from descendant scopes |
 | `ref` | READ-only (no CUD delegation) | `association_scopes_entities` (`relation_type=ref`) | CTE upward traversal with READ-only constraint |
 | `guarded` | Independent RBAC check required | N/A (no edge) | N/A |
 
