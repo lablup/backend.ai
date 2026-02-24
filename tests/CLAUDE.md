@@ -3,6 +3,18 @@
 This document provides testing patterns and best practices for Backend.AI.
 For TDD workflow, see `/tdd-guide` skill.
 
+## Which Directory to Use
+
+| Test target | Directory |
+|-------------|-----------|
+| Service / handler logic (mocking) | `tests/unit/{component}/` |
+| Repository / Model (real DB, `with_tables`) | `tests/unit/{component}/repositories/` |
+| HTTP API layer (real aiohttp server + DB) | `tests/component/{component}/` |
+| E2E user scenarios (Client SDK v2) | `tests/integration/` |
+| Legacy DB tests — do NOT add new ones | `tests/manager/` |
+
+Each directory has its own `CLAUDE.md` with setup patterns.
+
 ## Test Strategy
 
 **Use the appropriate testing approach based on the component:**
