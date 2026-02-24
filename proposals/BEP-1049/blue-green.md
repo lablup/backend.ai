@@ -90,30 +90,23 @@ Each cycle evaluation returns one of the following statuses:
 
 ## promote_delay_seconds Handling
 
-Auto-promotion can wait a specified duration before switching. The timestamp is stored in Valkey:
+Auto-promotion timing is derived from the route's `status_updated_at` column — no separate state storage needed.
+
+`RoutingRow.status_updated_at` records the last time the route's status changed. When all Green routes are healthy, the latest `status_updated_at` among them indicates when the last route became healthy.
 
 ```
-  All Green confirmed healthy
-       │
-       ▼
-  ┌──────────────────────────────────────────────────┐
-  │  Store promote_ready_at in Valkey                │
-  │                                                  │
-  │  Key: deployment:{endpoint_id}:promote_ready_at  │
-  │  Value: now() + promote_delay_seconds            │
-  │  TTL: promote_delay_seconds + buffer             │
-  └──────────────────────────────────────────────────┘
-       │
-       ▼ (next cycle)
-  ┌──────────────────────────────────────────────────┐
-  │  Query promote_ready_at                          │
-  │                                                  │
-  │  now() >= promote_ready_at? ──Yes──→ Execute promotion      │
-  │                              No───→ waiting_promotion     │
-  └──────────────────────────────────────────────────┘
-
-  On loss: if promote_ready_at missing, re-store → delay restarts (safe side)
+  Each cycle (all Green healthy):
+  ┌──────────────────────────────────────────────────────────────┐
+  │  last_healthy_at = max(green_routes.status_updated_at        │
+  │                        where status == HEALTHY)              │
+  │                                                              │
+  │  now() - last_healthy_at >= promote_delay_seconds?           │
+  │    Yes → Execute promotion                                   │
+  │    No  → waiting_promotion                                   │
+  └──────────────────────────────────────────────────────────────┘
 ```
+
+If a route becomes unhealthy and recovers, `status_updated_at` is updated on recovery, so the delay timer automatically resets — ensuring promotion only occurs after stable health.
 
 ## Cycle-by-Cycle Execution Example
 
