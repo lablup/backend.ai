@@ -31,6 +31,7 @@ from ai.backend.common.dto.manager.deployment import (
     ResourceConfigDTO,
     RevisionDTO,
     RevisionFilter,
+    RevisionInput,
     RevisionOrder,
     RouteDTO,
     RouteFilter,
@@ -413,7 +414,7 @@ class CreateDeploymentAdapter:
 
     def _build_revision_creator(
         self,
-        revision_input: Any,  # RevisionInput
+        revision_input: RevisionInput,
     ) -> ModelRevisionCreator:
         """Build ModelRevisionCreator from revision input."""
         # Build resource spec
