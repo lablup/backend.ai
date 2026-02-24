@@ -594,3 +594,135 @@ class TestFairShareRepository:
 
         assert result.user_uuid == test_user_uuid
         assert result.project_id == test_project_id
+
+    # ==================== Upsert Without Resource Group Tests ====================
+
+    @pytest.mark.asyncio
+    async def test_upsert_domain_fair_share_without_scaling_group(
+        self,
+        fair_share_repository: FairShareRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test upsert domain fair share when scaling group does not exist.
+
+        Regression test for BA-4683: fair share weight updates should succeed
+        regardless of resource group membership.
+        """
+        non_existent_sg = f"non-existent-sg-{uuid.uuid4().hex[:8]}"
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+
+        # Create domain row (required for the fair share row's domain_name column)
+        async with db_with_cleanup.begin_session() as db_sess:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain",
+                is_active=True,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+            )
+            db_sess.add(domain)
+            await db_sess.commit()
+
+        upserter = Upserter(
+            spec=DomainFairShareUpserterSpec(
+                resource_group=non_existent_sg,
+                domain_name=domain_name,
+                weight=TriState.update(Decimal("2.5")),
+                fair_share_factor=OptionalState.update(Decimal("1.0")),
+            )
+        )
+
+        result = await fair_share_repository.upsert_domain_fair_share(upserter)
+
+        assert result.resource_group == non_existent_sg
+        assert result.domain_name == domain_name
+        assert result.data.spec.weight == Decimal("2.5")
+        assert result.data.calculation_snapshot.available_slots == []
+
+    @pytest.mark.asyncio
+    async def test_upsert_project_fair_share_without_scaling_group(
+        self,
+        fair_share_repository: FairShareRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+    ) -> None:
+        """Test upsert project fair share when scaling group does not exist.
+
+        Regression test for BA-4683.
+        """
+        non_existent_sg = f"non-existent-sg-{uuid.uuid4().hex[:8]}"
+        project_id = uuid.uuid4()
+
+        # Create project resource policy and project
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy_name = f"test-project-policy-{uuid.uuid4().hex[:8]}"
+            policy = ProjectResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=-1,
+                max_network_count=10,
+            )
+            db_sess.add(policy)
+            await db_sess.flush()
+
+            group = GroupRow(
+                id=project_id,
+                name=f"test-project-{project_id.hex[:8]}",
+                domain_name=test_domain_name,
+                description="Test project",
+                resource_policy=policy_name,
+            )
+            db_sess.add(group)
+            await db_sess.commit()
+
+        upserter = Upserter(
+            spec=ProjectFairShareUpserterSpec(
+                resource_group=non_existent_sg,
+                project_id=project_id,
+                domain_name=test_domain_name,
+                weight=TriState.update(Decimal("3.0")),
+                fair_share_factor=OptionalState.update(Decimal("1.0")),
+            )
+        )
+
+        result = await fair_share_repository.upsert_project_fair_share(upserter)
+
+        assert result.resource_group == non_existent_sg
+        assert result.project_id == project_id
+        assert result.data.spec.weight == Decimal("3.0")
+        assert result.data.calculation_snapshot.available_slots == []
+
+    @pytest.mark.asyncio
+    async def test_upsert_user_fair_share_without_scaling_group(
+        self,
+        fair_share_repository: FairShareRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_project_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+    ) -> None:
+        """Test upsert user fair share when scaling group does not exist.
+
+        Regression test for BA-4683.
+        """
+        non_existent_sg = f"non-existent-sg-{uuid.uuid4().hex[:8]}"
+
+        upserter = Upserter(
+            spec=UserFairShareUpserterSpec(
+                resource_group=non_existent_sg,
+                user_uuid=test_user_uuid,
+                project_id=test_project_id,
+                domain_name=test_domain_name,
+                weight=TriState.update(Decimal("1.8")),
+                fair_share_factor=OptionalState.update(Decimal("1.0")),
+            )
+        )
+
+        result = await fair_share_repository.upsert_user_fair_share(upserter)
+
+        assert result.resource_group == non_existent_sg
+        assert result.user_uuid == test_user_uuid
+        assert result.project_id == test_project_id
+        assert result.data.spec.weight == Decimal("1.8")
+        assert result.data.calculation_snapshot.available_slots == []
