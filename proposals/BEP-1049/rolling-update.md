@@ -11,8 +11,8 @@ Rolling Update is a deployment strategy that **gradually** replaces existing rou
 
 ```
 RollingUpdateSpec:
-  max_surge: int = 1           # Max additional routes to create simultaneously beyond target count
-  max_unavailable: int = 0     # Max unavailable routes to allow relative to target count
+  max_surge: int = 1           # Max additional routes to create simultaneously beyond desired_replicas
+  max_unavailable: int = 0     # Max unavailable routes to allow relative to desired_replicas
 ```
 
 ## Revision Tracking
@@ -33,7 +33,7 @@ The coordinator periodically calls `execute_rolling_update_cycle`. Each invocati
                      No
                      ▼
   ┌──────────────────────────────────────┐
-  │  No Old and New healthy >= target?   │──Yes──→ completed (replacement done)
+  │  No Old and New healthy >= desired_replicas?   │──Yes──→ completed (replacement done)
   └──────────────────┬───────────────────┘
                      No
                      ▼
@@ -61,26 +61,26 @@ Each cycle evaluation returns one of the following statuses:
 |--------|-----------|-------------------|
 | **provisioning** | New routes are PROVISIONING | `mark_deployment_needed` reschedule |
 | **progressing** | Calculated surge/unavailable, created/terminated routes | `mark_deployment_needed` reschedule |
-| **completed** | No Old routes and New healthy >= target | Revision swap, DEPLOYING → READY |
+| **completed** | No Old routes and New healthy >= desired_replicas | Revision swap, DEPLOYING → READY |
 
 ## max_surge / max_unavailable Calculation
 
-Example with `target_count = 3`, `max_surge = 1`, `max_unavailable = 1`:
+Example with `desired_replicas = 3`, `max_surge = 1`, `max_unavailable = 1`:
 
 ```
   Constraints:
   ┌──────────────────────────────────────────────────────────┐
-  │  max_total = target_count + max_surge = 4                │
+  │  max_total = desired_replicas + max_surge = 4                       │
   │  → Total active routes cannot exceed 4                   │
   │                                                          │
-  │  min_available = target_count - max_unavailable = 2      │
+  │  min_available = desired_replicas - max_unavailable = 2            │
   │  → Healthy routes must not drop below 2                  │
   └──────────────────────────────────────────────────────────┘
 
   Creation calculation:
   ┌──────────────────────────────────────────────────────────┐
   │  can_create = max(0, max_total - total_active)           │
-  │  need_create = max(0, target - new_healthy - new_prov)   │
+  │  need_create = max(0, desired_replicas - new_healthy - new_prov)   │
   │  to_create = min(can_create, need_create)                │
   └──────────────────────────────────────────────────────────┘
 
@@ -94,7 +94,7 @@ Example with `target_count = 3`, `max_surge = 1`, `max_unavailable = 1`:
 
 ## Cycle-by-Cycle Execution Example
 
-`target=3`, `max_surge=1`, `max_unavailable=1`:
+`desired_replicas=3`, `max_surge=1`, `max_unavailable=1`:
 
 ```
   Cycle 0 (initial state)
@@ -168,7 +168,7 @@ Example with `target_count = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │  Old: []                                            │
   │  New: [■ ■ ■]  (3 healthy)                          │
   │                                                     │
-  │  No Old and New >= target → completed               │
+  │  No Old and New >= desired_replicas → completed               │
   │  → deploying_revision → current_revision swap       │
   │  → DEPLOYING → READY state transition               │
   └─────────────────────────────────────────────────────┘
@@ -239,7 +239,7 @@ Example with `target_count = 3`, `max_surge = 1`, `max_unavailable = 1`:
 
 ## Revision Swap on Completion
 
-When all Old routes are removed and New routes reach target count or above as healthy:
+When all Old routes are removed and New routes reach desired_replicas or above as healthy:
 
 ```
   completed determination
