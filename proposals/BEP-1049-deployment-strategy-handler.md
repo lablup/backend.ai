@@ -100,7 +100,6 @@ Why `DeploymentHandler` cannot express this pattern:
 │                                      │    provisioning → keep DEPLOYING   │  │
 │                                      │    waiting → keep DEPLOYING        │  │
 │                                      │    waiting_promotion → see below   │  │
-│                                      │    idle → no action                │  │
 │                                      │    errors → keep DEPLOYING + log   │  │
 │                                      └────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────────────────┘

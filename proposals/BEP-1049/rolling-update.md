@@ -28,11 +28,6 @@ The coordinator periodically calls `execute_rolling_update_cycle`. Each invocati
 
 ```
   ┌──────────────────────────────────────┐
-  │  No deploying_revision?              │──Yes──→ idle
-  └──────────────────┬───────────────────┘
-                     No
-                     ▼
-  ┌──────────────────────────────────────┐
   │  Any New routes PROVISIONING?        │──Yes──→ provisioning
   └──────────────────┬───────────────────┘
                      No
@@ -64,7 +59,6 @@ Each cycle evaluation returns one of the following statuses:
 
 | Status | Condition | Coordinator Action |
 |--------|-----------|-------------------|
-| **idle** | `deploying_revision` is NULL | No action (not a strategy target) |
 | **provisioning** | New routes are PROVISIONING | `mark_deployment_needed` reschedule |
 | **progressing** | Calculated surge/unavailable, created/terminated routes | `mark_deployment_needed` reschedule |
 | **completed** | No Old routes and New healthy >= target | Revision swap, DEPLOYING → READY |
@@ -202,7 +196,6 @@ Example with `target_count = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │    6. completed    → transition to READY                     │
   │       progressing  → mark_deployment_needed reschedule       │
   │       provisioning → mark_deployment_needed reschedule       │
-  │       idle → no action                                       │
   │       errors → log history                                   │
   └──────────────────────────┬───────────────────────────────────┘
                              │

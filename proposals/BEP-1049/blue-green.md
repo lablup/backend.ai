@@ -30,11 +30,6 @@ The coordinator periodically calls `execute_blue_green_cycle`. Each invocation f
 
 ```
   ┌──────────────────────────────────────┐
-  │  No deploying_revision?              │──Yes──→ idle
-  └──────────────────┬───────────────────┘
-                     No
-                     ▼
-  ┌──────────────────────────────────────┐
   │  No Green routes?                    │──Yes──→ Create all Green (INACTIVE)
   └──────────────────┬───────────────────┘        → creating
                      No
@@ -80,7 +75,6 @@ Each cycle evaluation returns one of the following statuses:
 
 | Status | Condition | Coordinator Action |
 |--------|-----------|-------------------|
-| **idle** | `deploying_revision` is NULL | No action (not a strategy target) |
 | **creating** | No Green routes → created all as INACTIVE | `mark_deployment_needed` reschedule |
 | **provisioning** | Green routes are PROVISIONING | `mark_deployment_needed` reschedule |
 | **waiting** | Not all Green healthy (mixed state, no PROVISIONING) | `mark_deployment_needed` reschedule |
@@ -230,7 +224,6 @@ With `auto_promote=False`:
   │       waiting      → mark_deployment_needed reschedule       │
   │       waiting_promotion → manual: no reschedule              │
   │                           delay: reschedule on timer         │
-  │       idle → no action                                       │
   │       errors → log history                                   │
   └──────────────────────────┬───────────────────────────────────┘
                              │
