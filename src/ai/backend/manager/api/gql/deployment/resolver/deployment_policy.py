@@ -7,6 +7,7 @@ from uuid import UUID
 import strawberry
 from strawberry import Info
 
+from ai.backend.manager.api.gql.base import resolve_global_id
 from ai.backend.manager.api.gql.deployment.types.policy import (
     CreateDeploymentPolicyInputGQL,
     CreateDeploymentPolicyPayloadGQL,
@@ -39,10 +40,11 @@ async def admin_create_deployment_policy(
 ) -> CreateDeploymentPolicyPayloadGQL:
     """Create a new deployment policy for an endpoint."""
     check_admin_only()
+    _, endpoint_id = resolve_global_id(input.deployment_id)
     processor = info.context.processors.deployment
     result = await processor.create_deployment_policy.wait_for_complete(
         action=CreateDeploymentPolicyAction(
-            endpoint_id=UUID(input.deployment_id),
+            endpoint_id=UUID(endpoint_id),
             policy_config=input.to_policy_config(),
         )
     )
@@ -64,10 +66,11 @@ async def admin_update_deployment_policy(
 ) -> UpdateDeploymentPolicyPayloadGQL:
     """Update an existing deployment policy."""
     check_admin_only()
+    _, policy_id = resolve_global_id(input.id)
     processor = info.context.processors.deployment
     result = await processor.update_deployment_policy.wait_for_complete(
         action=UpdateDeploymentPolicyAction(
-            policy_id=UUID(input.id),
+            policy_id=UUID(policy_id),
             updater_spec=input.to_updater_spec(),
         )
     )
