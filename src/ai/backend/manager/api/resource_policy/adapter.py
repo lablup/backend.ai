@@ -32,7 +32,7 @@ from ai.backend.common.dto.manager.resource_policy.types import (
     ProjectResourcePolicyOrderField,
     UserResourcePolicyOrderField,
 )
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.manager.api.adapter import BaseFilterAdapter
 from ai.backend.manager.data.resource.types import (
     KeyPairResourcePolicyData,
@@ -101,15 +101,15 @@ class ResourcePolicyAdapter(BaseFilterAdapter):
     def build_keypair_updater(
         self, request: UpdateKeypairResourcePolicyRequest, policy_name: str
     ) -> Updater[KeyPairResourcePolicyRow]:
-        default_for_unspecified = OptionalState.nop()
-        total_resource_slots = OptionalState.nop()
-        max_session_lifetime = OptionalState.nop()
-        max_concurrent_sessions = OptionalState.nop()
+        default_for_unspecified: OptionalState[DefaultForUnspecified] = OptionalState.nop()
+        total_resource_slots: OptionalState[ResourceSlot] = OptionalState.nop()
+        max_session_lifetime: OptionalState[int] = OptionalState.nop()
+        max_concurrent_sessions: OptionalState[int] = OptionalState.nop()
         max_pending_session_count: TriState[int] = TriState.nop()
         max_pending_session_resource_slots: TriState[dict[str, Any]] = TriState.nop()
-        max_concurrent_sftp_sessions = OptionalState.nop()
-        max_containers_per_session = OptionalState.nop()
-        idle_timeout = OptionalState.nop()
+        max_concurrent_sftp_sessions: OptionalState[int] = OptionalState.nop()
+        max_containers_per_session: OptionalState[int] = OptionalState.nop()
+        idle_timeout: OptionalState[int] = OptionalState.nop()
         allowed_vfolder_hosts: OptionalState[dict[str, Any]] = OptionalState.nop()
 
         if not isinstance(request.default_for_unspecified, type(SENTINEL)):
@@ -120,14 +120,14 @@ class ResourcePolicyAdapter(BaseFilterAdapter):
             max_session_lifetime = OptionalState.update(request.max_session_lifetime)
         if not isinstance(request.max_concurrent_sessions, type(SENTINEL)):
             max_concurrent_sessions = OptionalState.update(request.max_concurrent_sessions)
-        if not isinstance(request.max_pending_session_count, type(SENTINEL)):
+        if request.max_pending_session_count is not SENTINEL:
             if request.max_pending_session_count is None:
-                max_pending_session_count = TriState.clear()
+                max_pending_session_count = TriState.nullify()
             else:
                 max_pending_session_count = TriState.update(request.max_pending_session_count)
-        if not isinstance(request.max_pending_session_resource_slots, type(SENTINEL)):
+        if request.max_pending_session_resource_slots is not SENTINEL:
             if request.max_pending_session_resource_slots is None:
-                max_pending_session_resource_slots = TriState.clear()
+                max_pending_session_resource_slots = TriState.nullify()
             else:
                 max_pending_session_resource_slots = TriState.update(
                     request.max_pending_session_resource_slots
@@ -200,10 +200,10 @@ class ResourcePolicyAdapter(BaseFilterAdapter):
     def build_user_updater(
         self, request: UpdateUserResourcePolicyRequest, policy_name: str
     ) -> Updater[UserResourcePolicyRow]:
-        max_vfolder_count = OptionalState.nop()
-        max_quota_scope_size = OptionalState.nop()
-        max_session_count_per_model_session = OptionalState.nop()
-        max_customized_image_count = OptionalState.nop()
+        max_vfolder_count: OptionalState[int] = OptionalState.nop()
+        max_quota_scope_size: OptionalState[int] = OptionalState.nop()
+        max_session_count_per_model_session: OptionalState[int] = OptionalState.nop()
+        max_customized_image_count: OptionalState[int] = OptionalState.nop()
 
         if not isinstance(request.max_vfolder_count, type(SENTINEL)):
             max_vfolder_count = OptionalState.update(request.max_vfolder_count)
@@ -266,9 +266,9 @@ class ResourcePolicyAdapter(BaseFilterAdapter):
     def build_project_updater(
         self, request: UpdateProjectResourcePolicyRequest, policy_name: str
     ) -> Updater[ProjectResourcePolicyRow]:
-        max_vfolder_count = OptionalState.nop()
-        max_quota_scope_size = OptionalState.nop()
-        max_network_count = OptionalState.nop()
+        max_vfolder_count: OptionalState[int] = OptionalState.nop()
+        max_quota_scope_size: OptionalState[int] = OptionalState.nop()
+        max_network_count: OptionalState[int] = OptionalState.nop()
 
         if not isinstance(request.max_vfolder_count, type(SENTINEL)):
             max_vfolder_count = OptionalState.update(request.max_vfolder_count)
