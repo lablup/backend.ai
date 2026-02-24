@@ -817,7 +817,7 @@ class SessionRow(Base):
     startup_command = sa.Column("startup_command", sa.Text, nullable=True)
     result = sa.Column(
         "result",
-        EnumType(SessionResult),
+        EnumType(SessionResult, name="sessionresults"),
         default=SessionResult.UNDEFINED,
         server_default=SessionResult.UNDEFINED.name,
         nullable=False,
