@@ -16,8 +16,6 @@ import sqlalchemy as sa
 from .types import QueryCondition, QueryOrder
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm.attributes import InstrumentedAttribute
-
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
@@ -81,7 +79,7 @@ class ExportFieldDef:
     name: str
     description: str
     field_type: ExportFieldType
-    column: InstrumentedAttribute[Any]
+    column: sa.ColumnElement[Any]
     formatter: ExportFormatter | None = None
     joins: tuple[JoinDef, ...] | frozenset[JoinDef] | None = None
 

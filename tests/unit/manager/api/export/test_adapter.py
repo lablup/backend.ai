@@ -16,6 +16,7 @@ from ai.backend.manager.repositories.base.export import (
     JoinDef,
     ReportDef,
 )
+from ai.backend.manager.repositories.export.reports.session import SESSION_REPORT
 
 # =============================================================================
 # Test Models
@@ -486,3 +487,132 @@ class TestBuildProjectQueryWithJoins:
         assert "test_policy" in compiled
         assert "test_child_assoc" in compiled
         assert "test_child" in compiled
+
+
+class TestDuplicateTableAliasJoin:
+    """Regression test for BA-4665: same table joined twice with different conditions.
+
+    When two JoinDefs reference the same underlying table (e.g. kernels for
+    MAIN_KERNEL_JOIN and KERNEL_JOIN), one must be aliased so PostgreSQL
+    can distinguish the two LEFT OUTER JOINs.
+    """
+
+    @pytest.fixture
+    def adapter(self) -> ExportAdapter:
+        return ExportAdapter()
+
+    def test_aliased_and_unaliased_joins_produce_valid_sql(
+        self,
+        adapter: ExportAdapter,
+    ) -> None:
+        """Both aliased and unaliased JOINs to the same table should compile."""
+        # Simulate the real-world scenario: ChildRow joined twice, once
+        # directly and once through an alias with a stricter condition.
+        aliased_child = ChildRow.__table__.alias("main_child")
+
+        all_children_join = JoinDef(
+            table=ChildRow.__table__,
+            condition=ParentRow.id == ChildRow.id,
+        )
+        main_child_join = JoinDef(
+            table=aliased_child,
+            condition=sa.and_(
+                ParentRow.id == aliased_child.c.id,
+                aliased_child.c.child_name == "main",
+            ),
+        )
+
+        field_from_all = ExportFieldDef(
+            key="child_name",
+            name="Child Name",
+            description="All children name",
+            field_type=ExportFieldType.STRING,
+            column=ChildRow.child_name,
+            joins=frozenset({all_children_join}),
+        )
+        field_from_main = ExportFieldDef(
+            key="main_child_name",
+            name="Main Child Name",
+            description="Main child name via alias",
+            field_type=ExportFieldType.STRING,
+            column=aliased_child.c.child_name,
+            joins=frozenset({main_child_join}),
+        )
+
+        report = ReportDef(
+            report_key="alias-test",
+            name="Alias Test",
+            description="Test aliased duplicate table join",
+            select_from=ParentRow.__table__,
+            fields=[
+                ExportFieldDef(
+                    key="id",
+                    name="ID",
+                    description="Parent ID",
+                    field_type=ExportFieldType.UUID,
+                    column=ParentRow.id,
+                ),
+                field_from_all,
+                field_from_main,
+            ],
+        )
+
+        query = adapter.build_session_query(
+            report=report,
+            fields=["id", "child_name", "main_child_name"],
+            filter=None,
+            order=None,
+            max_rows=1000,
+            statement_timeout_sec=60,
+        )
+
+        # Both the original table and the alias should appear in the SQL
+        compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
+        assert "test_child" in compiled
+        assert "main_child" in compiled
+
+        # Verify the full SELECT compiles without error
+        columns = [f.column for f in query.fields]
+        stmt = sa.select(*columns).select_from(query.select_from)
+        full_sql = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+        assert "LEFT OUTER JOIN" in full_sql
+        assert "main_child" in full_sql
+
+
+class TestSessionReportMainKernelAndKernelJoins:
+    """Regression test for BA-4665: SESSION_REPORT with both main_kernel and kernel fields.
+
+    Selecting fields from both MAIN_KERNEL_JOIN and KERNEL_JOIN must produce
+    valid SQL with two separate LEFT OUTER JOINs to the kernels table,
+    one aliased as 'main_kernel'.
+    """
+
+    @pytest.fixture
+    def adapter(self) -> ExportAdapter:
+        return ExportAdapter()
+
+    def test_main_kernel_and_kernel_fields_produce_valid_sql(
+        self,
+        adapter: ExportAdapter,
+    ) -> None:
+        """Selecting main_kernel_image and kernel_agent together must compile."""
+        query = adapter.build_session_query(
+            report=SESSION_REPORT,
+            fields=["id", "main_kernel_image", "kernel_agent"],
+            filter=None,
+            order=None,
+            max_rows=100,
+            statement_timeout_sec=60,
+        )
+
+        # Both the aliased main_kernel and unaliased kernels should be present
+        compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
+        assert "main_kernel" in compiled
+        assert "kernels" in compiled
+
+        # Verify the full SELECT compiles without ambiguity
+        columns = [f.column for f in query.fields]
+        stmt = sa.select(*columns).select_from(query.select_from)
+        full_sql = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+        assert full_sql.count("LEFT OUTER JOIN") == 2
+        assert "main_kernel" in full_sql

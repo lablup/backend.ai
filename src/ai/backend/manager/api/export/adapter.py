@@ -6,7 +6,7 @@ Handles conversion of report-specific filter and order parameters.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import sqlalchemy as sa
 
@@ -35,9 +35,6 @@ from ai.backend.manager.repositories.base.export import (
     ReportDef,
     StreamingExportQuery,
 )
-
-if TYPE_CHECKING:
-    from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 __all__ = ("ExportAdapter",)
 
@@ -691,7 +688,7 @@ class ExportAdapter(BaseFilterAdapter):
         column = field_def.column
 
         def make_contains_factory(
-            col: InstrumentedAttribute[Any],
+            col: sa.ColumnElement[Any],
         ) -> Callable[[StringMatchSpec], QueryCondition]:
             def factory(spec: StringMatchSpec) -> QueryCondition:
                 pattern = f"%{spec.value}%"
@@ -706,7 +703,7 @@ class ExportAdapter(BaseFilterAdapter):
             return factory
 
         def make_equals_factory(
-            col: InstrumentedAttribute[Any],
+            col: sa.ColumnElement[Any],
         ) -> Callable[[StringMatchSpec], QueryCondition]:
             def factory(spec: StringMatchSpec) -> QueryCondition:
                 if spec.case_insensitive:
@@ -720,7 +717,7 @@ class ExportAdapter(BaseFilterAdapter):
             return factory
 
         def make_starts_with_factory(
-            col: InstrumentedAttribute[Any],
+            col: sa.ColumnElement[Any],
         ) -> Callable[[StringMatchSpec], QueryCondition]:
             def factory(spec: StringMatchSpec) -> QueryCondition:
                 pattern = f"{spec.value}%"
@@ -735,7 +732,7 @@ class ExportAdapter(BaseFilterAdapter):
             return factory
 
         def make_ends_with_factory(
-            col: InstrumentedAttribute[Any],
+            col: sa.ColumnElement[Any],
         ) -> Callable[[StringMatchSpec], QueryCondition]:
             def factory(spec: StringMatchSpec) -> QueryCondition:
                 pattern = f"%{spec.value}"

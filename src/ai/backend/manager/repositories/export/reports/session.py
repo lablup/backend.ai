@@ -73,11 +73,14 @@ KERNEL_JOIN = JoinDef(
 )
 
 # Main Kernel JOIN (N:1, no duplication - main kernel only)
+# Use an alias to avoid conflicts when both KERNEL_JOIN and MAIN_KERNEL_JOIN
+# are applied together (same underlying table joined twice).
+_main_kernel_t = KernelRow.__table__.alias("main_kernel")
 MAIN_KERNEL_JOIN = JoinDef(
-    table=KernelRow.__table__,
+    table=_main_kernel_t,
     condition=sa.and_(
-        SessionRow.id == KernelRow.session_id,
-        KernelRow.cluster_role == DEFAULT_ROLE,
+        SessionRow.id == _main_kernel_t.c.session_id,
+        _main_kernel_t.c.cluster_role == DEFAULT_ROLE,
     ),
 )
 
@@ -187,7 +190,7 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         name="Main Kernel Image",
         description="Main kernel image canonical name",
         field_type=ExportFieldType.STRING,
-        column=KernelRow.image,
+        column=_main_kernel_t.c.image,
         joins=frozenset({MAIN_KERNEL_JOIN}),
     ),
     ExportFieldDef(
@@ -195,7 +198,7 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         name="Main Kernel Architecture",
         description="Main kernel architecture",
         field_type=ExportFieldType.STRING,
-        column=KernelRow.architecture,
+        column=_main_kernel_t.c.architecture,
         joins=frozenset({MAIN_KERNEL_JOIN}),
     ),
     ExportFieldDef(
@@ -203,7 +206,7 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         name="Main Kernel Registry",
         description="Main kernel container registry",
         field_type=ExportFieldType.STRING,
-        column=KernelRow.registry,
+        column=_main_kernel_t.c.registry,
         joins=frozenset({MAIN_KERNEL_JOIN}),
     ),
     ExportFieldDef(
@@ -211,7 +214,7 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         name="Main Kernel Tag",
         description="Main kernel image tag",
         field_type=ExportFieldType.STRING,
-        column=KernelRow.tag,
+        column=_main_kernel_t.c.tag,
         joins=frozenset({MAIN_KERNEL_JOIN}),
     ),
     # =========================================================================
