@@ -2518,9 +2518,6 @@ Added in 25.19.0. Input for specifying revision configuration within a deploymen
 input CreateRevisionInput
   @join__type(graph: STRAWBERRY)
 {
-  """The ID of the model deployment that this revision belongs to."""
-  deploymentId: ID!
-
   """
   Optional human-readable name for this revision. If not provided, a name will be auto-generated.
   """

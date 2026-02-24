@@ -33,10 +33,13 @@ class ModelRevisionCreator:
 
     Note: Uses image_id directly instead of image_identifier.
     The image_id is resolved by the GQL layer before being passed here.
+
+    This creator does not contain a deployment ID. The deployment ID is passed
+    separately where needed (e.g., AddModelRevisionAction.deployment_id).
     """
 
-    model_deployment_id: UUID
     image_id: UUID
+    resource_group_name: str
     resource_spec: ResourceSpec
     mounts: VFolderMountsCreator
     execution: ExecutionSpec

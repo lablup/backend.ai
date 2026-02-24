@@ -73,10 +73,12 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     __tablename__ = "deployment_revisions"
 
     __table_args__ = (
-        sa.UniqueConstraint(
+        sa.Index(
+            "uq_deployment_revisions_endpoint_revision_number",
             "endpoint",
             "revision_number",
-            name="uq_deployment_revisions_endpoint_revision_number",
+            unique=True,
+            postgresql_where=sa.text("endpoint IS NOT NULL"),
         ),
         sa.Index("ix_deployment_revisions_endpoint", "endpoint"),
     )
@@ -84,7 +86,7 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    endpoint: Mapped[uuid.UUID] = mapped_column("endpoint", GUID, nullable=False)
+    endpoint: Mapped[uuid.UUID | None] = mapped_column("endpoint", GUID, nullable=True)
     revision_number: Mapped[int] = mapped_column("revision_number", sa.Integer, nullable=False)
 
     # Image configuration
@@ -212,4 +214,5 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
                 )
                 for mount in (self.extra_mounts or [])
             ],
+            endpoint_id=self.endpoint,
         )

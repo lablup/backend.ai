@@ -117,9 +117,13 @@ async def add_model_revision(
     input: AddRevisionInput, info: Info[StrawberryGQLContext]
 ) -> AddRevisionPayload:
     """Add a model revision to a deployment."""
+    _, deployment_id = resolve_global_id(input.deployment_id)
     processor = info.context.processors.deployment
     result = await processor.add_model_revision.wait_for_complete(
-        AddModelRevisionAction(adder=input.to_model_revision_creator())
+        AddModelRevisionAction(
+            deployment_id=UUID(deployment_id),
+            adder=input.to_model_revision_creator(),
+        )
     )
 
     return AddRevisionPayload(revision=ModelRevision.from_dataclass(result.revision))

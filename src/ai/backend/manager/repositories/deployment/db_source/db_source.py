@@ -88,6 +88,7 @@ from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow, scaling_groups
 from ai.backend.manager.models.scheduling_history import (
@@ -1930,26 +1931,39 @@ class DeploymentDBSource:
 
     async def create_revision(
         self,
+        deployment_id: uuid.UUID | None,
         creator: Creator[DeploymentRevisionRow],
     ) -> ModelRevisionData:
-        """Create a new deployment revision for an endpoint.
+        """Create a new deployment revision.
 
         The Creator must contain a spec with revision_number already set.
         Service layer should calculate revision_number using get_latest_revision_number()
         before calling this method.
 
-        If a unique constraint violation occurs, the caller should retry.
+        Args:
+            deployment_id: The deployment to attach to. None for orphan revisions.
+            creator: Creator containing the revision spec.
 
-        TODO: Implement revision history pruning (similar to K8s revisionHistoryLimit).
-        After creating a new revision, old revisions beyond the limit should be deleted.
-        This requires adding a `revision_history_limit` column to EndpointRow.
+        If a unique constraint violation occurs, the caller should retry.
         """
         async with self._begin_session_read_committed() as db_sess:
             spec = cast(DeploymentRevisionCreatorSpec, creator.spec)
-
             row = spec.build_row()
+            row.endpoint = deployment_id
+
             db_sess.add(row)
             await db_sess.flush()
+
+            pk_value: str = sa.inspect(row).identity[0]
+            db_sess.add(
+                EntityFieldRow(
+                    entity_type=EntityType.MODEL_DEPLOYMENT,
+                    entity_id=str(deployment_id) if deployment_id is not None else "",
+                    field_type=FieldType.MODEL_REVISION,
+                    field_id=str(pk_value),
+                )
+            )
+
             return row.to_data()
 
     async def get_revision(

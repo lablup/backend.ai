@@ -1,6 +1,7 @@
 """Deployment service for managing model deployments."""
 
 import logging
+import uuid
 from datetime import UTC, datetime
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -574,8 +575,8 @@ class DeploymentService:
             }
 
         return ModelRevisionCreator(
-            model_deployment_id=revision_creator.model_deployment_id,
             image_id=revision_creator.image_id,
+            resource_group_name=revision_creator.resource_group_name,
             resource_spec=revision_creator.resource_spec.model_copy(
                 update={"resource_slots": merged_resource_slots},
             ),
@@ -587,11 +588,10 @@ class DeploymentService:
 
     async def _build_revision(
         self,
+        deployment_id: uuid.UUID,
         revision_creator: ModelRevisionCreator,
     ) -> ModelRevisionData:
         """Build and create a revision from the given creator."""
-        deployment_id = revision_creator.model_deployment_id
-
         endpoint_info = await self._deployment_repository.get_endpoint_info(deployment_id)
         latest_revision_number = await self._deployment_repository.get_latest_revision_number(
             deployment_id
@@ -601,7 +601,6 @@ class DeploymentService:
         merged_creator = await self._merge_service_definition(revision_creator)
 
         spec = DeploymentRevisionCreatorSpec(
-            endpoint_id=deployment_id,
             revision_number=next_revision_number,
             image_id=merged_creator.image_id,
             resource_group=endpoint_info.metadata.resource_group,
@@ -622,12 +621,12 @@ class DeploymentService:
             runtime_variant=merged_creator.execution.runtime_variant,
             extra_mounts=[],
         )
-        return await self._deployment_repository.create_revision(Creator(spec=spec))
+        return await self._deployment_repository.create_revision(deployment_id, Creator(spec=spec))
 
     async def add_model_revision(
         self, action: AddModelRevisionAction
     ) -> AddModelRevisionActionResult:
-        revision_data = await self._build_revision(action.adder)
+        revision_data = await self._build_revision(action.deployment_id, action.adder)
         return AddModelRevisionActionResult(revision=revision_data)
 
     async def get_revision_by_id(
@@ -658,6 +657,9 @@ class DeploymentService:
     ) -> ActivateRevisionActionResult:
         """Activate a specific revision to be the current revision.
 
+        If the revision is an orphan (not attached to any deployment),
+        it will be linked to the deployment first.
+
         Args:
             action: Action containing deployment and revision IDs
 
@@ -667,12 +669,22 @@ class DeploymentService:
         # 1. Validate revision exists (raises exception if not found)
         _revision = await self._deployment_repository.get_revision(action.revision_id)
 
-        # 2. Update endpoint.current_revision and get previous revision
+        # 2. If orphan revision, link it to the deployment first
+        if _revision.is_orphan:
+            latest_revision_number = await self._deployment_repository.get_latest_revision_number(
+                action.deployment_id
+            )
+            next_revision_number = (latest_revision_number or 0) + 1
+            await self._deployment_repository.link_revision_to_deployment(
+                action.revision_id, action.deployment_id, next_revision_number
+            )
+
+        # 3. Update endpoint.current_revision and get previous revision
         previous_revision_id = await self._deployment_repository.update_current_revision(
             action.deployment_id, action.revision_id
         )
 
-        # 3. Trigger lifecycle check to update routes with new revision
+        # 4. Trigger lifecycle check to update routes with new revision
         await self._deployment_controller.mark_lifecycle_needed(
             DeploymentLifecycleType.CHECK_REPLICA
         )
@@ -684,7 +696,7 @@ class DeploymentService:
             previous_revision_id,
         )
 
-        # 4. Get updated deployment info
+        # 5. Get updated deployment info
         deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
 
         return ActivateRevisionActionResult(

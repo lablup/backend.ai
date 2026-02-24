@@ -494,9 +494,6 @@ class ExtraVFolderMountInput:
     description="Added in 25.19.0. Input for specifying revision configuration within a deployment."
 )
 class CreateRevisionInput:
-    deployment_id: ID = strawberry.field(
-        description="The ID of the model deployment that this revision belongs to."
-    )
     name: str | None = strawberry.field(
         description="Optional human-readable name for this revision. If not provided, a name will be auto-generated.",
         default=None,
@@ -566,8 +563,8 @@ class CreateRevisionInput:
         )
 
         return ModelRevisionCreator(
-            model_deployment_id=UUID(str(self.deployment_id)),
             image_id=UUID(str(self.image.id)),
+            resource_group_name=self.resource_config.resource_group.name,
             resource_spec=resource_spec,
             mounts=mounts,
             execution=execution_spec,
@@ -632,8 +629,8 @@ class AddRevisionInput:
         )
 
         return ModelRevisionCreator(
-            model_deployment_id=UUID(str(self.deployment_id)),
             image_id=UUID(str(self.image.id)),
+            resource_group_name=self.resource_config.resource_group.name,
             resource_spec=resource_spec,
             mounts=mounts,
             execution=execution_spec,

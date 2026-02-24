@@ -1030,10 +1030,21 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_revision(
         self,
+        deployment_id: uuid.UUID | None,
         creator: Creator[DeploymentRevisionRow],
     ) -> ModelRevisionData:
         """Create a new deployment revision."""
-        return await self._db_source.create_revision(creator)
+        return await self._db_source.create_revision(deployment_id, creator)
+
+    @deployment_repository_resilience.apply()
+    async def link_revision_to_deployment(
+        self,
+        revision_id: uuid.UUID,
+        endpoint_id: uuid.UUID,
+        revision_number: int,
+    ) -> None:
+        """Link an orphan revision to a deployment."""
+        await self._db_source.link_revision_to_deployment(revision_id, endpoint_id, revision_number)
 
     @deployment_repository_resilience.apply()
     async def get_revision(

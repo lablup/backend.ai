@@ -24,7 +24,6 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     calculating from get_latest_revision_number().
     """
 
-    endpoint_id: uuid.UUID
     revision_number: int
     image_id: uuid.UUID
     resource_group: str
@@ -46,7 +45,6 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     @override
     def build_row(self) -> DeploymentRevisionRow:
         return DeploymentRevisionRow(
-            endpoint=self.endpoint_id,
             revision_number=self.revision_number,
             image=self.image_id,
             model=self.model_id,
