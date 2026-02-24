@@ -3017,6 +3017,7 @@
         "type": "string"
       },
       "OrderDirection": {
+        "description": "Order direction for sorting.",
         "enum": [
           "asc",
           "desc"
@@ -9688,6 +9689,351 @@
           "user_id"
         ],
         "title": "PurgeUserRequest",
+        "type": "object"
+      },
+      "CreateGroupRequest": {
+        "description": "Request to create a new group/project.",
+        "properties": {
+          "name": {
+            "description": "Group name",
+            "title": "Name",
+            "type": "string"
+          },
+          "domain_name": {
+            "description": "Domain name the group belongs to",
+            "title": "Domain Name",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Group description",
+            "title": "Description"
+          },
+          "total_resource_slots": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Total resource slot limits",
+            "title": "Total Resource Slots"
+          },
+          "allowed_vfolder_hosts": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Allowed vfolder host permissions",
+            "title": "Allowed Vfolder Hosts"
+          },
+          "integration_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "External integration ID",
+            "title": "Integration Id"
+          },
+          "resource_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Resource policy name",
+            "title": "Resource Policy"
+          }
+        },
+        "required": [
+          "name",
+          "domain_name"
+        ],
+        "title": "CreateGroupRequest",
+        "type": "object"
+      },
+      "GroupFilter": {
+        "description": "Filter for groups.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by group name"
+          },
+          "domain_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by domain name"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by active status",
+            "title": "Is Active"
+          }
+        },
+        "title": "GroupFilter",
+        "type": "object"
+      },
+      "GroupOrder": {
+        "description": "Order specification for groups.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/GroupOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "GroupOrder",
+        "type": "object"
+      },
+      "GroupOrderField": {
+        "description": "Fields that can be used for ordering groups.",
+        "enum": [
+          "name",
+          "created_at",
+          "modified_at"
+        ],
+        "title": "GroupOrderField",
+        "type": "string"
+      },
+      "SearchGroupsRequest": {
+        "description": "Request body for searching groups with filters, orders, and pagination.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GroupFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GroupOrder"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specification"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum items to return",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Number of items to skip",
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "title": "SearchGroupsRequest",
+        "type": "object"
+      },
+      "UpdateGroupRequest": {
+        "description": "Request to update a group/project. All fields are optional.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated group name",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated description",
+            "title": "Description"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated active status",
+            "title": "Is Active"
+          },
+          "total_resource_slots": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated total resource slot limits",
+            "title": "Total Resource Slots"
+          },
+          "allowed_vfolder_hosts": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated allowed vfolder host permissions",
+            "title": "Allowed Vfolder Hosts"
+          },
+          "integration_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated external integration ID",
+            "title": "Integration Id"
+          },
+          "resource_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated resource policy name",
+            "title": "Resource Policy"
+          }
+        },
+        "title": "UpdateGroupRequest",
+        "type": "object"
+      },
+      "AddGroupMembersRequest": {
+        "description": "Request to add members to a group.",
+        "properties": {
+          "user_ids": {
+            "description": "List of user IDs to add",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "User Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "user_ids"
+        ],
+        "title": "AddGroupMembersRequest",
+        "type": "object"
+      },
+      "RemoveGroupMembersRequest": {
+        "description": "Request to remove members from a group.",
+        "properties": {
+          "user_ids": {
+            "description": "List of user IDs to remove",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "User Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "user_ids"
+        ],
+        "title": "RemoveGroupMembersRequest",
         "type": "object"
       }
     }
@@ -21450,6 +21796,230 @@
         },
         "parameters": [],
         "description": "Permanently purge a user and all associated resources.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/groups": {
+      "post": {
+        "operationId": "groups.create",
+        "tags": [
+          "groups"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Create a new group.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/groups/{group_id}": {
+      "get": {
+        "operationId": "groups.get",
+        "tags": [
+          "groups"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific group by ID.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "groups.update",
+        "tags": [
+          "groups"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGroupRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an existing group.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "groups.delete",
+        "tags": [
+          "groups"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Delete (soft-delete) a group.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/groups/search": {
+      "post": {
+        "operationId": "groups.search",
+        "tags": [
+          "groups"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchGroupsRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search groups with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/groups/{group_id}/members": {
+      "post": {
+        "operationId": "groups.add_members",
+        "tags": [
+          "groups"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddGroupMembersRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Add members to a group.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "groups.remove_members",
+        "tags": [
+          "groups"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveGroupMembersRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Remove members from a group.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     }
   }
