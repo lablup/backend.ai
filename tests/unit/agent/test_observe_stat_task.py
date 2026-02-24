@@ -64,7 +64,7 @@ class TestObserveStatTaskDecorator:
 
         mock_log.warning.assert_called_once()
         mock_log.exception.assert_not_called()
-        mock_agent.produce_error_event.assert_awaited_once()
+        mock_agent.produce_error_event.assert_not_called()
         mock_stat_task_observer.observe_stat_task_failure.assert_called_once()
         mock_stat_task_observer.observe_stat_task_success.assert_not_called()
 
@@ -93,25 +93,6 @@ class TestObserveStatTaskDecorator:
         mock_agent.produce_error_event.assert_awaited_once()
         mock_stat_task_observer.observe_stat_task_failure.assert_called_once()
         mock_stat_task_observer.observe_stat_task_success.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_emfile_produces_error_event_without_traceback(
-        self,
-        mock_agent: AsyncMock,
-        mock_stat_task_observer: Mock,
-    ) -> None:
-        @_observe_stat_task(stat_scope=StatScope.CONTAINER)
-        async def emfile_task(self: object) -> None:
-            raise OSError(errno.EMFILE, "Too many open files")
-
-        await emfile_task(mock_agent)
-
-        mock_agent.produce_error_event.assert_awaited_once()
-        call_args = mock_agent.produce_error_event.call_args
-        exc_info = call_args.kwargs["exc_info"]
-        exc_type, _exc_val, exc_tb = exc_info
-        assert exc_tb is None
-        assert exc_type is OSError
 
     @pytest.mark.asyncio
     async def test_cancelled_error_is_silently_swallowed(
