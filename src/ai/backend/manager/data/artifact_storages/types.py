@@ -4,22 +4,12 @@ from dataclasses import dataclass, field
 from typing import Any, override
 
 from ai.backend.common.data.storage.types import ArtifactStorageType
-from ai.backend.common.types import ArtifactStorageId, ConcreteStorageId
+from ai.backend.common.types import ConcreteArtifactStorageId
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState
-
-
-@dataclass(frozen=True)
-class ArtifactStorageData:
-    """Data class for ArtifactStorageRow."""
-
-    id: ArtifactStorageId
-    name: str
-    storage_id: ConcreteStorageId
-    type: ArtifactStorageType
 
 
 class ArtifactStorageCreatorSpec(CreatorSpec[ArtifactStorageRow]):
@@ -28,9 +18,9 @@ class ArtifactStorageCreatorSpec(CreatorSpec[ArtifactStorageRow]):
     def __init__(self, name: str, storage_type: ArtifactStorageType) -> None:
         self._name = name
         self._storage_type = storage_type
-        self._storage_id: ConcreteStorageId | None = None
+        self._storage_id: ConcreteArtifactStorageId | None = None
 
-    def set_storage_id(self, storage_id: ConcreteStorageId) -> None:
+    def set_storage_id(self, storage_id: ConcreteArtifactStorageId) -> None:
         self._storage_id = storage_id
 
     @override

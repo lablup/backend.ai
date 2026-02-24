@@ -7,13 +7,10 @@ from typing import Self
 import strawberry
 from strawberry import ID, UNSET, Info
 
-from ai.backend.common.data.storage.types import ArtifactStorageType
+from ai.backend.common.data.storage.types import ArtifactStorageData, ArtifactStorageType
 from ai.backend.common.types import ArtifactStorageId
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.data.artifact_storages.types import (
-    ArtifactStorageData,
-    ArtifactStorageUpdaterSpec,
-)
+from ai.backend.manager.data.artifact_storages.types import ArtifactStorageUpdaterSpec
 from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.artifact_storage.actions.update import (

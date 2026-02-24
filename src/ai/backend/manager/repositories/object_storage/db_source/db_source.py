@@ -5,7 +5,7 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.types import ConcreteStorageId
+from ai.backend.common.types import ConcreteArtifactStorageId
 from ai.backend.manager.data.artifact_storages.types import ArtifactStorageCreatorSpec
 from ai.backend.manager.data.object_storage.types import ObjectStorageData, ObjectStorageListResult
 from ai.backend.manager.errors.common import InternalServerError
@@ -111,7 +111,7 @@ class ObjectStorageDBSource:
             meta_spec = meta_creator.spec
             if not isinstance(meta_spec, ArtifactStorageCreatorSpec):
                 raise InternalServerError("meta_creator.spec must be ArtifactStorageCreatorSpec")
-            meta_spec.set_storage_id(ConcreteStorageId(new_row.id))
+            meta_spec.set_storage_id(ConcreteArtifactStorageId(new_row.id))
             await execute_creator(db_session, meta_creator)
 
             # Re-query to load the meta relationship

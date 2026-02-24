@@ -1,7 +1,6 @@
-from .types import ArtifactStorageCreatorSpec, ArtifactStorageData, ArtifactStorageUpdaterSpec
+from .types import ArtifactStorageCreatorSpec, ArtifactStorageUpdaterSpec
 
 __all__ = (
     "ArtifactStorageCreatorSpec",
-    "ArtifactStorageData",
     "ArtifactStorageUpdaterSpec",
 )

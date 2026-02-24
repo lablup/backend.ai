@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import uuid
 
+from ai.backend.common.data.storage.types import ArtifactStorageData
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.artifact_storages.types import ArtifactStorageData
 from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact_storage.db_source.db_source import (

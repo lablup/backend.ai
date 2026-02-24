@@ -4,8 +4,8 @@ import uuid
 
 import sqlalchemy as sa
 
-from ai.backend.manager.data.artifact_storages.types import ArtifactStorageData
-from ai.backend.manager.errors.artifact_storage import ArtifactStorageNotFoundError
+from ai.backend.common.data.storage.exceptions import ArtifactStorageNotFoundError
+from ai.backend.common.data.storage.types import ArtifactStorageData
 from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
