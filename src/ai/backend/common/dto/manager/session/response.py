@@ -24,7 +24,7 @@ from typing import Any
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.api_handlers import BaseResponseModel, BaseRootResponseModel
 from ai.backend.common.types import SessionId
 
 __all__ = (
@@ -98,10 +98,13 @@ class DestroySessionResponse(BaseResponseModel):
     result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
 
 
-class GetSessionInfoResponse(BaseResponseModel):
-    """GET ``/{session_name}``"""
+class GetSessionInfoResponse(BaseRootResponseModel[dict[str, Any]]):
+    """GET ``/{session_name}``
 
-    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
+    The API handler returns ``session_info.asdict()`` as a flat JSON object
+    (no wrapper key), so we use ``BaseRootResponseModel`` to capture the entire
+    payload.  Access the data via ``.root``.
+    """
 
 
 class GetDirectAccessInfoResponse(BaseResponseModel):

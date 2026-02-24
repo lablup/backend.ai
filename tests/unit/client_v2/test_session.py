@@ -154,20 +154,21 @@ class TestSessionCreation:
 class TestSessionLifecycle:
     @pytest.mark.asyncio
     async def test_get_info(self) -> None:
-        resp = _json_response({"result": {"id": "s-123", "status": "RUNNING"}})
+        resp = _json_response({"status": "RUNNING", "domainName": "default"})
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 
         result = await sc.get_info("my-sess")
 
         assert isinstance(result, GetSessionInfoResponse)
+        assert result.root["status"] == "RUNNING"
         method, url, _ = _last_request_call(mock_session)
         assert method == "GET"
         assert "/session/my-sess" in url
 
     @pytest.mark.asyncio
     async def test_get_info_with_owner_access_key(self) -> None:
-        resp = _json_response({"result": {"id": "s-123"}})
+        resp = _json_response({"status": "RUNNING"})
         mock_session = _make_request_session(resp)
         sc = _make_session_client(mock_session)
 

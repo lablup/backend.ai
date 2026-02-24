@@ -116,8 +116,9 @@ class TestDestroySessionResponse:
 
 class TestGetSessionInfoResponse:
     def test_with_info(self) -> None:
-        resp = GetSessionInfoResponse(result={"name": "sess", "status": "RUNNING"})
-        assert resp.result["name"] == "sess"
+        resp = GetSessionInfoResponse.model_validate({"status": "RUNNING", "domainName": "default"})
+        assert resp.root["status"] == "RUNNING"
+        assert resp.root["domainName"] == "default"
 
 
 class TestGetDirectAccessInfoResponse:

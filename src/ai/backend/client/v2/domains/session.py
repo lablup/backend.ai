@@ -157,10 +157,13 @@ class SessionClient(BaseDomainClient):
         self,
         request: MatchSessionsRequest,
     ) -> MatchSessionsResponse:
+        # The server's check_api_params reads GET parameters from the query
+        # string only (not from the JSON body), so we must pass the request
+        # data as query params instead of a JSON body.
         return await self._client.typed_request(
             "GET",
             f"{_BASE_PATH}/_/match",
-            request=request,
+            params={"id": request.id},
             response_model=MatchSessionsResponse,
         )
 
