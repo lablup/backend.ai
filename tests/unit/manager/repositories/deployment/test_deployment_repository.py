@@ -1431,7 +1431,6 @@ class TestDeploymentRevisionOperations:
         """Create a single test revision."""
 
         spec = DeploymentRevisionCreatorSpec(
-            endpoint_id=test_endpoint_id,
             revision_number=1,
             image_id=test_image_id,
             resource_group=test_scaling_group_name,
@@ -1450,7 +1449,7 @@ class TestDeploymentRevisionOperations:
             runtime_variant=RuntimeVariant.CUSTOM,
             extra_mounts=[],
         )
-        return await deployment_repository.create_revision(Creator(spec=spec))
+        return await deployment_repository.create_revision(test_endpoint_id, Creator(spec=spec))
 
     @pytest.fixture
     async def test_multiple_revisions(
@@ -1464,7 +1463,6 @@ class TestDeploymentRevisionOperations:
         revisions: list[ModelRevisionData] = []
         for rev_num in [1, 2, 3]:
             spec = DeploymentRevisionCreatorSpec(
-                endpoint_id=test_endpoint_id,
                 revision_number=rev_num,
                 image_id=test_image_id,
                 resource_group=test_scaling_group_name,
@@ -1483,7 +1481,9 @@ class TestDeploymentRevisionOperations:
                 runtime_variant=RuntimeVariant.CUSTOM,
                 extra_mounts=[],
             )
-            revision = await deployment_repository.create_revision(Creator(spec=spec))
+            revision = await deployment_repository.create_revision(
+                test_endpoint_id, Creator(spec=spec)
+            )
             revisions.append(revision)
         return revisions
 
@@ -1499,7 +1499,6 @@ class TestDeploymentRevisionOperations:
         revisions: list[ModelRevisionData] = []
         for rev_num in range(1, 6):
             spec = DeploymentRevisionCreatorSpec(
-                endpoint_id=test_endpoint_id,
                 revision_number=rev_num,
                 image_id=test_image_id,
                 resource_group=test_scaling_group_name,
@@ -1518,7 +1517,9 @@ class TestDeploymentRevisionOperations:
                 runtime_variant=RuntimeVariant.CUSTOM,
                 extra_mounts=[],
             )
-            revision = await deployment_repository.create_revision(Creator(spec=spec))
+            revision = await deployment_repository.create_revision(
+                test_endpoint_id, Creator(spec=spec)
+            )
             revisions.append(revision)
         return revisions
 
@@ -1531,7 +1532,6 @@ class TestDeploymentRevisionOperations:
     ) -> None:
         """Test creating a deployment revision using Creator."""
         spec = DeploymentRevisionCreatorSpec(
-            endpoint_id=test_endpoint_id,
             revision_number=1,
             image_id=test_image_id,
             resource_group=test_scaling_group_name,
@@ -1552,7 +1552,7 @@ class TestDeploymentRevisionOperations:
         )
         creator = Creator(spec=spec)
 
-        result = await deployment_repository.create_revision(creator)
+        result = await deployment_repository.create_revision(test_endpoint_id, creator)
 
         assert result.id is not None
         assert result.cluster_config.mode == ClusterMode.SINGLE_NODE
