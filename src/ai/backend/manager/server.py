@@ -358,6 +358,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".vfs_storage",
     ".notification",
     ".deployment",
+    ".auto_scaling_rule",
     ".rbac",
     ".scheduling_history",
     ".compute_sessions",
