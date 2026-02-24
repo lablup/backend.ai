@@ -801,7 +801,18 @@ def _observe_stat_task(
                 await func(self, *args, **kwargs)
             except asyncio.CancelledError:
                 pass
+            except OSError as e:
+                if e.errno == errno.EMFILE:
+                    log.warning("skipping {} due to FD exhaustion", func.__name__)
+                else:
+                    log.exception("unhandled exception in {}", func.__name__)
+                await self.produce_error_event()
+                stat_task_observer.observe_stat_task_failure(
+                    agent_id=self.id, stat_scope=stat_scope, exception=e
+                )
             except Exception as e:
+                log.exception("unhandled exception in {}", func.__name__)
+                await self.produce_error_event()
                 stat_task_observer.observe_stat_task_failure(
                     agent_id=self.id, stat_scope=stat_scope, exception=e
                 )
@@ -1367,49 +1378,32 @@ class AbstractAgent[
     async def collect_node_stat(self, resource_scaling_factors: Mapping[SlotName, Decimal]) -> None:
         if self.local_config.debug.log_stats:
             log.debug("collecting node statistics")
-        try:
-            async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
-                await self.stat_ctx.collect_node_stat(resource_scaling_factors)
-        except Exception:
-            log.exception("unhandled exception while syncing node stats")
-            await self.produce_error_event()
-            raise
+        async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
+            await self.stat_ctx.collect_node_stat(resource_scaling_factors)
 
     @_observe_stat_task(stat_scope=StatScope.CONTAINER)
     async def collect_container_stat(self, interval: float) -> None:
         if self.local_config.debug.log_stats:
             log.debug("collecting container statistics")
-        try:
-            container_ids: list[ContainerId] = []
-            for kernel_obj in [*self.kernel_registry.values()]:
-                if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
-                    continue
-                container_ids.append(ContainerId(kernel_obj.container_id))
-            async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
-                await self.stat_ctx.collect_container_stat(container_ids)
-        except asyncio.CancelledError:
-            pass
-        except Exception:
-            log.exception("unhandled exception while syncing container stats")
-            await self.produce_error_event()
-            raise
+        container_ids: list[ContainerId] = []
+        for kernel_obj in [*self.kernel_registry.values()]:
+            if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
+                continue
+            container_ids.append(ContainerId(kernel_obj.container_id))
+        async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
+            await self.stat_ctx.collect_container_stat(container_ids)
 
     @_observe_stat_task(stat_scope=StatScope.PROCESS)
     async def collect_process_stat(self, interval: float) -> None:
         if self.local_config.debug.log_stats:
             log.debug("collecting process statistics in container")
-        try:
-            container_ids = []
-            for kernel_obj in [*self.kernel_registry.values()]:
-                if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
-                    continue
-                container_ids.append(ContainerId(kernel_obj.container_id))
-            async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
-                await self.stat_ctx.collect_per_container_process_stat(container_ids)
-        except Exception:
-            log.exception("unhandled exception while syncing process stats")
-            await self.produce_error_event()
-            raise
+        container_ids = []
+        for kernel_obj in [*self.kernel_registry.values()]:
+            if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
+                continue
+            container_ids.append(ContainerId(kernel_obj.container_id))
+        async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
+            await self.stat_ctx.collect_per_container_process_stat(container_ids)
 
     def _get_public_host(self) -> str:
         agent_config = self.local_config.agent
