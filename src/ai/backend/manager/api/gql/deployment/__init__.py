@@ -22,7 +22,6 @@ from .resolver import (
     create_auto_scaling_rule,
     # Deployment
     create_model_deployment,
-    create_model_revision,
     delete_auto_scaling_rule,
     delete_model_deployment,
     deployment,
@@ -78,7 +77,6 @@ from .types import (
     CreateDeploymentInput,
     CreateDeploymentPayload,
     CreateRevisionInput,
-    CreateRevisionPayload,
     DeleteAutoScalingRuleInput,
     DeleteAutoScalingRulePayload,
     DeleteDeploymentInput,
@@ -228,7 +226,6 @@ __all__ = [
     "ClusterConfig",
     "ClusterConfigInput",
     "CreateRevisionInput",
-    "CreateRevisionPayload",
     "ExtraVFolderMountInput",
     "ImageInput",
     "ModelMountConfig",
@@ -277,7 +274,6 @@ __all__ = [
     # Resolvers - Revision
     "activate_deployment_revision",
     "add_model_revision",
-    "create_model_revision",
     "inference_runtime_config",
     "inference_runtime_configs",
     "revision",
