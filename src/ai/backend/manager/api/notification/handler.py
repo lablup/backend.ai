@@ -15,6 +15,7 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, ap
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.notification import NotifiableMessage
 from ai.backend.common.data.notification.types import NotificationRuleType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.notification import (
     CreateNotificationChannelRequest,
     CreateNotificationChannelResponse,
@@ -42,6 +43,7 @@ from ai.backend.common.dto.manager.notification import (
 )
 from ai.backend.manager.api.auth import auth_required_for_method
 from ai.backend.manager.api.types import CORSOptions, WebMiddleware
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.dto.notification_request import (
     DeleteNotificationChannelPathParam,
@@ -55,7 +57,7 @@ from ai.backend.manager.dto.notification_request import (
     ValidateNotificationRulePathParam,
 )
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.notification.creators import (
     NotificationChannelCreatorSpec,
     NotificationRuleCreatorSpec,
@@ -105,7 +107,7 @@ class NotificationAPIHandler:
         # Convert request to creator
         # spec validator in request DTO ensures this is WebhookSpec or EmailSpec
         validated_spec = body.parsed.spec
-        creator = Creator(
+        creator = RBACEntityCreator(
             spec=NotificationChannelCreatorSpec(
                 name=body.parsed.name,
                 description=body.parsed.description,
@@ -113,7 +115,9 @@ class NotificationAPIHandler:
                 spec=validated_spec,
                 enabled=body.parsed.enabled,
                 created_by=me.user_id,
-            )
+            ),
+            element_type=RBACElementType.NOTIFICATION_CHANNEL,
+            scope_ref=RBACElementRef(RBACElementType.USER, str(me.user_id)),
         )
 
         # Call service action
@@ -337,7 +341,7 @@ class NotificationAPIHandler:
             raise GenericForbidden("Only superadmin can create notification rules.")
 
         # Convert request to creator
-        creator = Creator(
+        creator = RBACEntityCreator(
             spec=NotificationRuleCreatorSpec(
                 name=body.parsed.name,
                 description=body.parsed.description,
@@ -346,7 +350,11 @@ class NotificationAPIHandler:
                 message_template=body.parsed.message_template,
                 enabled=body.parsed.enabled,
                 created_by=me.user_id,
-            )
+            ),
+            element_type=RBACElementType.NOTIFICATION_RULE,
+            scope_ref=RBACElementRef(
+                RBACElementType.NOTIFICATION_CHANNEL, str(body.parsed.channel_id)
+            ),
         )
 
         # Call service action
