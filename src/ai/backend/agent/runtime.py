@@ -163,7 +163,11 @@ class AgentRuntime:
         self._stop_signal = signal.SIGTERM
         self._timer_tasks = [
             aiotools.create_timer(self._update_slots, 30.0),
-            aiotools.create_timer(self._collect_node_stat, UTILIZATION_METRIC_INTERVAL),
+            aiotools.create_timer(
+                self._collect_node_stat,
+                UTILIZATION_METRIC_INTERVAL,
+                delay_policy=aiotools.TimerDelayPolicy.CANCEL,
+            ),
         ]
 
     async def __aexit__(self, *exc_info: Any) -> None:
