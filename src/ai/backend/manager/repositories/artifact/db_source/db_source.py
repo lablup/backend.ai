@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import Select
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.data.artifact.types import (
@@ -30,7 +30,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactWithRevisionsListResult,
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
-from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.artifact import (
     ArtifactAssociationDeletionError,
     ArtifactAssociationNotFoundError,
@@ -335,8 +335,8 @@ class ArtifactDBSource:
                             extra=artifact_data.extra,
                         ),
                         element_type=RBACElementType.ARTIFACT,
-                        scope_ref=ScopeId(
-                            ScopeType.ARTIFACT_REGISTRY,
+                        scope_ref=RBACElementRef(
+                            RBACElementType.ARTIFACT_REGISTRY,
                             str(artifact_data.registry_id),
                         ),
                     )
@@ -487,8 +487,8 @@ class ArtifactDBSource:
                             extra=model.extra,
                         ),
                         element_type=RBACElementType.ARTIFACT,
-                        scope_ref=ScopeId(
-                            ScopeType.ARTIFACT_REGISTRY,
+                        scope_ref=RBACElementRef(
+                            RBACElementType.ARTIFACT_REGISTRY,
                             str(registry_id),
                         ),
                     )
