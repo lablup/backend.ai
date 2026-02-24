@@ -16,9 +16,9 @@ from ai.backend.common.data.notification import (
     NotificationRuleType,
     WebhookSpec,
 )
-from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, RBACElementType
 from ai.backend.common.types import BinarySize, ResourceSlot
-from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
     NotificationRuleNotFound,
@@ -399,7 +399,7 @@ class TestNotificationRepository:
                 enabled=True,
             ),
             element_type=RBACElementType.NOTIFICATION_CHANNEL,
-            scope_ref=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
+            scope_ref=RBACElementRef(RBACElementType.GLOBAL, GLOBAL_SCOPE_ID),
         )
 
         channel = await notification_repository.create_channel(creator)
@@ -540,7 +540,7 @@ class TestNotificationRepository:
                 created_by=test_user,
             ),
             element_type=RBACElementType.NOTIFICATION_CHANNEL,
-            scope_ref=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
+            scope_ref=RBACElementRef(RBACElementType.GLOBAL, GLOBAL_SCOPE_ID),
         )
 
         channel = await notification_repository.create_channel(channel_creator)
@@ -556,7 +556,7 @@ class TestNotificationRepository:
                 enabled=True,
             ),
             element_type=RBACElementType.NOTIFICATION_RULE,
-            scope_ref=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
+            scope_ref=RBACElementRef(RBACElementType.GLOBAL, GLOBAL_SCOPE_ID),
         )
 
         rule = await notification_repository.create_rule(rule_creator)
