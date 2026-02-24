@@ -50,20 +50,14 @@ This proposal introduces a **Prometheus Query Preset System** that stores PromQL
 | `metric_name` | `VARCHAR(256)` | NOT NULL | Prometheus metric name (e.g., `backendai_container_utilization`) |
 | `query_template` | `TEXT` | NOT NULL | PromQL template with `{labels}`, `{window}`, `{group_by}` placeholders |
 | `time_window` | `VARCHAR(32)` | NULLABLE | Preset-specific default window; falls back to server config `metric.timewindow` if NULL |
-| `options` | `JSONB` | NOT NULL, default `'{"labels":[]}'` | Preset options stored as `PydanticColumn(PresetOptions)` |
+| `options` | `JSONB` | NOT NULL, default `'{"filter_labels":[],"group_labels":[]}'` | Preset options stored as `PydanticColumn(PresetOptions)` |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL, default `now()` | Creation timestamp |
 | `updated_at` | `TIMESTAMPTZ` | NOT NULL, default `now()` | Last update timestamp |
 
 ```python
-class LabelInfo(BaseModel):
-    name: str
-    filter: bool
-    group: bool
-
-    model_config = ConfigDict(frozen=True)
-
 class PresetOptions(BaseModel):
-    labels: list[LabelInfo]
+    filter_labels: list[str]
+    group_labels: list[str]
 
     model_config = ConfigDict(frozen=True)
 ```
@@ -91,12 +85,8 @@ The `PresetOptions` wrapper model allows adding future preset-level settings (e.
   "query_template": "sum by ({group_by})(rate({metric_name}{{{labels}}}[{window}]))",
   "time_window": "5m",
   "options": {
-    "labels": [
-      {"name": "container_metric_name", "filter": true, "group": false},
-      {"name": "kernel_id", "filter": true, "group": true},
-      {"name": "session_id", "filter": true, "group": true},
-      {"name": "value_type", "filter": true, "group": true}
-    ]
+    "filter_labels": ["container_metric_name", "kernel_id", "session_id", "value_type"],
+    "group_labels": ["kernel_id", "session_id", "value_type"]
   }
 }
 ```
@@ -111,12 +101,8 @@ The `PresetOptions` wrapper model allows adding future preset-level settings (e.
   "query_template": "sum by ({group_by})(rate({metric_name}{{{labels}}}[{window}]))",
   "time_window": "5m",
   "options": {
-    "labels": [
-      {"name": "container_metric_name", "filter": true, "group": false},
-      {"name": "kernel_id", "filter": true, "group": true},
-      {"name": "session_id", "filter": true, "group": true},
-      {"name": "value_type", "filter": true, "group": true}
-    ]
+    "filter_labels": ["container_metric_name", "kernel_id", "session_id", "value_type"],
+    "group_labels": ["kernel_id", "session_id", "value_type"]
   },
   "created_at": "2025-02-20T10:00:00Z",
   "updated_at": "2025-02-20T10:00:00Z"
@@ -174,13 +160,9 @@ The `metric` field uses a key-value entries pattern instead of fixed fields, all
 **CRUD types:**
 
 ```python
-class LabelInfo(BaseModel):
-    name: str
-    filter: bool
-    group: bool
-
 class PresetOptions(BaseModel):
-    labels: list[LabelInfo]
+    filter_labels: list[str]
+    group_labels: list[str]
 
 class PrometheusQueryPresetCreate(BaseModel):
     name: str
@@ -231,14 +213,9 @@ The preset system also exposes a Strawberry GraphQL interface following existing
 **Types:**
 
 ```graphql
-type PrometheusLabelInfoGQL {
-  name: String!
-  filter: Boolean!
-  group: Boolean!
-}
-
 type PrometheusPresetOptionsGQL {
-  labels: [PrometheusLabelInfoGQL!]!
+  filterLabels: [String!]!
+  groupLabels: [String!]!
 }
 
 type PrometheusQueryPreset implements Node {
@@ -340,7 +317,7 @@ backend.ai admin prometheus-query-preset add \
     --query-template <TEMPLATE> \
     [--time-window <WINDOW>] \
     [--options <JSON>]
-    # --options example: '{"labels": [{"name": "kernel_id", "filter": true, "group": true}, {"name": "container_metric_name", "filter": true, "group": false}]}'
+    # --options example: '{"filter_labels": ["kernel_id", "container_metric_name"], "group_labels": ["kernel_id"]}'
 backend.ai admin prometheus-query-preset modify <ID> [--name ...] [--query-template ...] [--options ...]
 backend.ai admin prometheus-query-preset delete <ID>
 ```
@@ -389,8 +366,8 @@ sequenceDiagram
 
 **Validation rules:**
 
-- Each label key in the request must exist in the preset's `options.labels` list with `filter = true`
-- Each entry in `group_labels` must exist in the preset's `options.labels` list with `group = true`
+- Each label key in the request must exist in the preset's `options.filter_labels` list
+- Each entry in `group_labels` must exist in the preset's `options.group_labels` list
 - `window` must match `^\d+[smhdw]$` (single-unit durations only; compound durations like `1h30m` or `500ms` are intentionally not supported); if absent, falls back to the preset's `time_window` or the server config `metric.timewindow`
 
 ### Security
@@ -398,7 +375,7 @@ sequenceDiagram
 | Threat | Mitigation |
 |--------|-----------|
 | **Label value injection** | Reuse `_escape_label_value()` from `preset.py` — escapes `\`, `"`, `\n`, `\r` |
-| **Arbitrary label keys** | Only labels defined in `options.labels` with `filter=true` can be used in `{labels}`, only those with `group=true` in `{group_by}` |
+| **Arbitrary label keys** | Only labels in `options.filter_labels` can be used in `{labels}`, only those in `options.group_labels` in `{group_by}` |
 | **Window format injection** | Validate against `^\d+[smhdw]$` regex before substitution |
 | **Template modification** | CRUD operations restricted to SUPERADMIN role |
 | **Metric name substitution** | `{metric_name}` is resolved from the preset's `metric_name` field (DB-stored, admin-controlled), not from user input |
