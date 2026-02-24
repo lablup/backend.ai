@@ -24,6 +24,12 @@ The `endpoints` table has two columns for revision management:
 - `deploying_revision` — The revision currently being deployed (NULL when no deployment is in progress)
 - `current_revision` — The revision currently serving traffic
 
+## Green Route Traffic Isolation
+
+Green routes are created with `traffic_status=INACTIVE` and `traffic_ratio=0.0`. The coordinator's periodic sync only propagates ACTIVE routes to AppProxy, so Green routes are invisible to the proxy until promotion. Even if a route leaks through, both Traefik and legacy (HTTP/TCP) backends reject routes with `traffic_ratio=0`.
+
+On promotion, the Manager updates the DB (`Green→ACTIVE`, `Blue→INACTIVE`); the coordinator sync automatically propagates the change to AppProxy. Only the DB write is required — no separate proxy configuration is needed.
+
 ## Cycle FSM
 
 The coordinator periodically calls `execute_blue_green_cycle`. Each invocation follows this FSM:
