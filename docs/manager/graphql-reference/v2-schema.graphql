@@ -894,7 +894,14 @@ enum BgtaskEventType {
 
 """Added in 25.19.0. Configuration for blue-green deployment strategy."""
 input BlueGreenConfigInput {
+  """
+  Whether to automatically promote the new (green) deployment after readiness checks pass. Defaults to false.
+  """
   autoPromote: Boolean! = false
+
+  """
+  Number of seconds to wait before promoting the new deployment. Only effective when auto_promote is true. Defaults to 0.
+  """
   promoteDelaySeconds: Int! = 0
 }
 
@@ -1218,10 +1225,25 @@ type CreateDeploymentPayload {
 
 """Added in 26.3.0. Input for creating a deployment policy."""
 input CreateDeploymentPolicyInput {
+  """The ID of the deployment to associate with this policy."""
   deploymentId: ID!
+
+  """The deployment strategy type (ROLLING or BLUE_GREEN)."""
   strategy: DeploymentStrategyType!
+
+  """
+  Whether to automatically rollback to the previous version when the deployment fails. Defaults to false.
+  """
   rollbackOnFailure: Boolean! = false
+
+  """
+  Configuration for rolling update strategy. Required when strategy is ROLLING. Must not be provided together with blue_green.
+  """
   rollingUpdate: RollingUpdateConfigInput = null
+
+  """
+  Configuration for blue-green deployment strategy. Required when strategy is BLUE_GREEN. Must not be provided together with rolling_update.
+  """
   blueGreen: BlueGreenConfigInput = null
 }
 
@@ -6027,7 +6049,14 @@ enum RoleStatus {
 
 """Added in 25.19.0. Configuration for rolling update strategy."""
 input RollingUpdateConfigInput {
+  """
+  Maximum number of extra replicas that can be created above the desired count during an update. Defaults to 1.
+  """
   maxSurge: Int! = 1
+
+  """
+  Maximum number of replicas that can be unavailable during an update. Defaults to 0.
+  """
   maxUnavailable: Int! = 0
 }
 
@@ -6978,10 +7007,27 @@ type UpdateDeploymentPayload {
 
 """Added in 26.3.0. Input for updating a deployment policy."""
 input UpdateDeploymentPolicyInput {
+  """The ID of the deployment policy to update."""
   id: ID!
+
+  """
+  The new deployment strategy type. If changed, the corresponding strategy config (rolling_update or blue_green) should also be provided.
+  """
   strategy: DeploymentStrategyType = null
+
+  """
+  Whether to automatically rollback to the previous version when the deployment fails.
+  """
   rollbackOnFailure: Boolean = null
+
+  """
+  Updated configuration for rolling update strategy. Must not be provided together with blue_green.
+  """
   rollingUpdate: RollingUpdateConfigInput = null
+
+  """
+  Updated configuration for blue-green deployment strategy. Must not be provided together with rolling_update.
+  """
   blueGreen: BlueGreenConfigInput = null
 }
 

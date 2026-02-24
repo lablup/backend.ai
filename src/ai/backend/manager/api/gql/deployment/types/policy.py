@@ -110,8 +110,14 @@ class DeploymentPolicyGQL(Node):
     description="Added in 25.19.0. Configuration for rolling update strategy.",
 )
 class RollingUpdateConfigInputGQL:
-    max_surge: int = 1
-    max_unavailable: int = 0
+    max_surge: int = strawberry.field(
+        default=1,
+        description="Maximum number of extra replicas that can be created above the desired count during an update. Defaults to 1.",
+    )
+    max_unavailable: int = strawberry.field(
+        default=0,
+        description="Maximum number of replicas that can be unavailable during an update. Defaults to 0.",
+    )
 
     def to_spec(self) -> RollingUpdateSpec:
         return RollingUpdateSpec(
@@ -125,8 +131,14 @@ class RollingUpdateConfigInputGQL:
     description="Added in 25.19.0. Configuration for blue-green deployment strategy.",
 )
 class BlueGreenConfigInputGQL:
-    auto_promote: bool = False
-    promote_delay_seconds: int = 0
+    auto_promote: bool = strawberry.field(
+        default=False,
+        description="Whether to automatically promote the new (green) deployment after readiness checks pass. Defaults to false.",
+    )
+    promote_delay_seconds: int = strawberry.field(
+        default=0,
+        description="Number of seconds to wait before promoting the new deployment. Only effective when auto_promote is true. Defaults to 0.",
+    )
 
     def to_spec(self) -> BlueGreenSpec:
         return BlueGreenSpec(
@@ -143,11 +155,24 @@ class BlueGreenConfigInputGQL:
     description="Added in 26.3.0. Input for creating a deployment policy.",
 )
 class CreateDeploymentPolicyInputGQL:
-    deployment_id: ID
-    strategy: DeploymentStrategyTypeGQL
-    rollback_on_failure: bool = False
-    rolling_update: RollingUpdateConfigInputGQL | None = None
-    blue_green: BlueGreenConfigInputGQL | None = None
+    deployment_id: ID = strawberry.field(
+        description="The ID of the deployment to associate with this policy.",
+    )
+    strategy: DeploymentStrategyTypeGQL = strawberry.field(
+        description="The deployment strategy type (ROLLING or BLUE_GREEN).",
+    )
+    rollback_on_failure: bool = strawberry.field(
+        default=False,
+        description="Whether to automatically rollback to the previous version when the deployment fails. Defaults to false.",
+    )
+    rolling_update: RollingUpdateConfigInputGQL | None = strawberry.field(
+        default=None,
+        description="Configuration for rolling update strategy. Required when strategy is ROLLING. Must not be provided together with blue_green.",
+    )
+    blue_green: BlueGreenConfigInputGQL | None = strawberry.field(
+        default=None,
+        description="Configuration for blue-green deployment strategy. Required when strategy is BLUE_GREEN. Must not be provided together with rolling_update.",
+    )
 
     def to_policy_config(self) -> DeploymentPolicyConfig:
         """Convert to DeploymentPolicyConfig for service layer."""
@@ -184,11 +209,25 @@ class CreateDeploymentPolicyInputGQL:
     description="Added in 26.3.0. Input for updating a deployment policy.",
 )
 class UpdateDeploymentPolicyInputGQL:
-    id: ID
-    strategy: DeploymentStrategyTypeGQL | None = None
-    rollback_on_failure: bool | None = None
-    rolling_update: RollingUpdateConfigInputGQL | None = None
-    blue_green: BlueGreenConfigInputGQL | None = None
+    id: ID = strawberry.field(
+        description="The ID of the deployment policy to update.",
+    )
+    strategy: DeploymentStrategyTypeGQL | None = strawberry.field(
+        default=None,
+        description="The new deployment strategy type. If changed, the corresponding strategy config (rolling_update or blue_green) should also be provided.",
+    )
+    rollback_on_failure: bool | None = strawberry.field(
+        default=None,
+        description="Whether to automatically rollback to the previous version when the deployment fails.",
+    )
+    rolling_update: RollingUpdateConfigInputGQL | None = strawberry.field(
+        default=None,
+        description="Updated configuration for rolling update strategy. Must not be provided together with blue_green.",
+    )
+    blue_green: BlueGreenConfigInputGQL | None = strawberry.field(
+        default=None,
+        description="Updated configuration for blue-green deployment strategy. Must not be provided together with rolling_update.",
+    )
 
     def to_updater_spec(self) -> DeploymentPolicyUpdaterSpec:
         """Convert to DeploymentPolicyUpdaterSpec for service layer."""
