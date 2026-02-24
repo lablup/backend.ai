@@ -188,13 +188,19 @@ Example with `target_count = 3`, `max_surge = 1`, `max_unavailable = 1`:
   ┌──────────────────────────────────────────────────────────────┐
   │  DeploymentCoordinator                                       │
   │                                                              │
-  │  process_deployment_strategy(ROLLING)                        │
+  │  strategy_registry: {                                        │
+  │    BLUE_GREEN: BlueGreenCycleEvaluator,                      │
+  │    ROLLING:    RollingUpdateCycleEvaluator,                   │
+  │  }                                                           │
+  │                                                              │
+  │  process_deployment_strategy(strategy)                       │
   │    1. Query DEPLOYING deployments                            │
   │    2. Load policy_map                                        │
-  │    3. Filter deployments with strategy == ROLLING            │
-  │    4. handler.execute(matching, policy_map)                  │
-  │    5. completed    → transition to READY                     │
-  │       progressing → mark_deployment_needed reschedule        │
+  │    3. Filter deployments by policy strategy                  │
+  │    4. evaluator = strategy_registry[strategy]                │
+  │    5. result = evaluator.execute(deployments, policy_map)    │
+  │    6. completed    → transition to READY                     │
+  │       progressing  → mark_deployment_needed reschedule       │
   │       provisioning → mark_deployment_needed reschedule       │
   │       idle → no action                                       │
   │       errors → log history                                   │
@@ -202,30 +208,11 @@ Example with `target_count = 3`, `max_surge = 1`, `max_unavailable = 1`:
                              │
                              ▼
   ┌──────────────────────────────────────────────────────────────┐
-  │  RollingUpdateStrategyHandler                                │
+  │  RollingUpdateCycleEvaluator                                 │
   │                                                              │
-  │  name() → "rolling-update"                                   │
-  │  strategy() → DeploymentStrategy.ROLLING                     │
   │  lock_id → LOCKID_DEPLOYMENT_ROLLING_UPDATE                  │
   │                                                              │
-  │  execute(deployments, policy_map)                            │
-  │    → executor.execute_rolling_update_cycle(...)              │
-  └──────────────────────────┬───────────────────────────────────┘
-                             │
-                             ▼
-  ┌──────────────────────────────────────────────────────────────┐
-  │  DeploymentExecutor.execute_rolling_update_cycle()           │
-  │                                                              │
-  │  1. fetch_active_routes_by_endpoint_ids (bulk)               │
-  │  2. Execute _evaluate_rolling_update_cycle per deployment    │
-  │  3. completed deployments →                                  │
-  │       complete_deployment_revision_update_bulk               │
-  │  4. Return DeploymentStrategyResult                          │
-  └──────────────────────────┬───────────────────────────────────┘
-                             │
-                             ▼
-  ┌──────────────────────────────────────────────────────────────┐
-  │  _evaluate_rolling_update_cycle (single deployment)          │
+  │  evaluate(deployment, routes, policy)                        │
   │                                                              │
   │  Route classification:                                       │
   │  ┌────────────────────────────────────────────────────┐      │

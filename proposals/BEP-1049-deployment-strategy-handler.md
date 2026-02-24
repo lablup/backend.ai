@@ -83,16 +83,15 @@ Why `DeploymentHandler` cannot express this pattern:
 │  │  process_deployment_         │    │  process_deployment_               │  │
 │  │    lifecycle(type)           │    │    strategy(strategy)              │  │
 │  │                              │    │                                    │  │
-│  │  1. handler = handlers[type] │    │  1. handler = strategy_handlers    │  │
-│  │  2. deployments =            │    │       [strategy]                   │  │
-│  │       by_statuses(target)    │    │  2. deployments = DEPLOYING        │  │
-│  │  3. result = execute(deps)   │    │  3. Load policy_map                │  │
-│  │  4. transitions()            │    │  4. Filter by policy strategy      │  │
-│  │  5. post_process()           │    │  5. result = execute(deps,         │  │
-│  │                              │    │       policy_map)                  │  │
-│  │  Result:                     │    │  6. strategy_transitions()         │  │
-│  │    successes → next_status   │    │  7. progressing/provisioning/       │  │
-│  │                              │    │       waiting → reschedule         │  │
+│  │  1. handler = handlers[type] │    │  1. deployments = DEPLOYING        │  │
+│  │  2. deployments =            │    │  2. Load policy_map                │  │
+│  │       by_statuses(target)    │    │  3. Filter by policy strategy      │  │
+│  │  3. result = execute(deps)   │    │  4. evaluator =                    │  │
+│  │  4. transitions()            │    │       registry[strategy]           │  │
+│  │  5. post_process()           │    │  5. result = evaluator.execute()   │  │
+│  │                              │    │  6. strategy_transitions()         │  │
+│  │  Result:                     │    │  7. progressing/provisioning/      │  │
+│  │    successes → next_status   │    │       waiting → reschedule         │  │
 │  │    errors → failure_status   │    │                                    │  │
 │  │    skipped → keep            │    │  Result:                           │  │
 │  │                              │    │    completed → READY               │  │
@@ -100,38 +99,48 @@ Why `DeploymentHandler` cannot express this pattern:
 │                                      │    progressing → keep DEPLOYING    │  │
 │                                      │    provisioning → keep DEPLOYING   │  │
 │                                      │    waiting → keep DEPLOYING        │  │
-│                                      │    waiting_promotion → see below  │  │
+│                                      │    waiting_promotion → see below   │  │
 │                                      │    idle → no action                │  │
 │                                      │    errors → keep DEPLOYING + log   │  │
 │                                      └────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────────────────┘
                  │                                         │
-                 ▼                                         ▼
-┌──────────────────────────────┐    ┌──────────────────────────────────────────┐
-│     DeploymentHandler        │    │       DeploymentStrategyHandler          │
-│     (existing, unchanged)    │    │       (new interface)                    │
-│                              │    │                                          │
-│  name() → str                │    │  name() → str                            │
-│  target_statuses() → [...]   │    │  strategy() → DeploymentStrategy         │
-│  next_status() → Lifecycle   │    │  lock_id → LockID | None                 │
-│  failure_status() → ...      │    │  execute(deployments, policy_map)        │
-│  execute(deployments)        │    │    → DeploymentStrategyResult            │
-│    → DeploymentExecResult    │    │                                          │
-│                              │    │                                          │
-│  Implementations:            │    │  Implementations:                        │
-│  ├─ CheckPendingDeployment   │    │  ├─ RollingUpdateStrategyHandler         │
-│  ├─ ScalingDeployment        │    │  └─ BlueGreenStrategyHandler             │
-│  ├─ CheckReplicaDeployment   │    │                                          │
-│  ├─ ReconcileDeployment      │    │                                          │
-│  └─ DestroyingDeployment     │    │                                          │
-└──────────────────────────────┘    └──────────────────────────────────────────┘
-                 │                                         │
-                 └────────────────┬────────────────────────┘
-                                  ▼
-                    ┌──────────────────────────┐
-                    │   DeploymentExecutor     │
-                    │   (business logic)       │
-                    └──────────────────────────┘
+                 ▼                                         │
+┌──────────────────────────────┐                           │
+│     DeploymentHandler        │                           │
+│     (existing, unchanged)    │                           │
+│                              │                           │
+│  name() → str                │                           │
+│  target_statuses() → [...]   │                           │
+│  next_status() → Lifecycle   │                           │
+│  failure_status() → ...      │                           │
+│  execute(deployments)        │                           │
+│    → DeploymentExecResult    │                           │
+│                              │                           │
+│  Implementations:            │                           │
+│  ├─ CheckPendingDeployment   │                           │
+│  ├─ ScalingDeployment        │                           │
+│  ├─ CheckReplicaDeployment   │                           │
+│  ├─ ReconcileDeployment      │                           │
+│  └─ DestroyingDeployment     │                           │
+└──────────────┬───────────────┘                           │
+               │                                           │
+               └────────────────┬──────────────────────────┘
+                                ▼
+                  ┌──────────────────────────┐
+                  │   DeploymentExecutor     │
+                  │   (shared business logic)│
+                  └──────────────────────────┘
+                                │
+                  ┌─────────────┴─────────────┐
+                  ▼                           ▼
+┌──────────────────────────┐  ┌────────────────────────────────┐
+│ BlueGreenCycleEvaluator  │  │ RollingUpdateCycleEvaluator    │
+│                          │  │                                │
+│ lock_id → LOCKID_BG      │  │ lock_id → LOCKID_ROLLING       │
+│ evaluate(...)            │  │ evaluate(...)                  │
+│   → CycleStatus          │  │   → CycleStatus                │
+└──────────────────────────┘  └────────────────────────────────┘
 ```
 
 ### Endpoint Lifecycle State Machine

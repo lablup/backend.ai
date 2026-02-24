@@ -212,48 +212,35 @@ With `auto_promote=False`:
   ┌──────────────────────────────────────────────────────────────┐
   │  DeploymentCoordinator                                       │
   │                                                              │
-  │  process_deployment_strategy(BLUE_GREEN)                     │
+  │  strategy_registry: {                                        │
+  │    BLUE_GREEN: BlueGreenCycleEvaluator,                      │
+  │    ROLLING:    RollingUpdateCycleEvaluator,                   │
+  │  }                                                           │
+  │                                                              │
+  │  process_deployment_strategy(strategy)                       │
   │    1. Query DEPLOYING deployments                            │
   │    2. Load policy_map                                        │
-  │    3. Filter deployments with strategy == BLUE_GREEN         │
-  │    4. handler.execute(matching, policy_map)                  │
-  │    5. completed   → transition to READY                      │
+  │    3. Filter deployments by policy strategy                  │
+  │    4. evaluator = strategy_registry[strategy]                │
+  │    5. result = evaluator.execute(deployments, policy_map)    │
+  │    6. completed   → transition to READY                      │
   │       rolled_back → deploying_revision=NULL, READY           │
-  │       creating  → mark_deployment_needed reschedule       │
-  │       provisioning → mark_deployment_needed reschedule      │
-  │       waiting      → mark_deployment_needed reschedule      │
-  │       waiting_promotion → manual: no reschedule             │
-  │                            delay: reschedule on timer        │
+  │       creating     → mark_deployment_needed reschedule       │
+  │       provisioning → mark_deployment_needed reschedule       │
+  │       waiting      → mark_deployment_needed reschedule       │
+  │       waiting_promotion → manual: no reschedule              │
+  │                           delay: reschedule on timer         │
   │       idle → no action                                       │
   │       errors → log history                                   │
   └──────────────────────────┬───────────────────────────────────┘
                              │
                              ▼
   ┌──────────────────────────────────────────────────────────────┐
-  │  BlueGreenStrategyHandler                                    │
+  │  BlueGreenCycleEvaluator                                     │
   │                                                              │
-  │  name() → "blue-green"                                       │
-  │  strategy() → DeploymentStrategy.BLUE_GREEN                  │
   │  lock_id → LOCKID_DEPLOYMENT_BLUE_GREEN                      │
   │                                                              │
-  │  execute(deployments, policy_map)                            │
-  │    → executor.execute_blue_green_cycle(...)                  │
-  └──────────────────────────┬───────────────────────────────────┘
-                             │
-                             ▼
-  ┌──────────────────────────────────────────────────────────────┐
-  │  DeploymentExecutor.execute_blue_green_cycle()               │
-  │                                                              │
-  │  1. fetch_active_routes_by_endpoint_ids (bulk)               │
-  │  2. Execute _evaluate_blue_green_cycle per deployment        │
-  │  3. completed deployments →                                  │
-  │       complete_deployment_revision_update_bulk               │
-  │  4. Return DeploymentStrategyResult                          │
-  └──────────────────────────┬───────────────────────────────────┘
-                             │
-                             ▼
-  ┌──────────────────────────────────────────────────────────────┐
-  │  _evaluate_blue_green_cycle (single deployment)              │
+  │  evaluate(deployment, routes, policy)                        │
   │                                                              │
   │  Route classification:                                       │
   │  ┌────────────────────────────────────────────────────┐      │
