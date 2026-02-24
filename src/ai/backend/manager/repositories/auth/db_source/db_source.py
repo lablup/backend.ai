@@ -126,7 +126,7 @@ class AuthDBSource:
                 assoc_query = association_groups_users.insert().values(values)
                 await conn.execute(assoc_query)
 
-            return self._user_row_to_data(UserRow.from_row(user_row))
+            return self._user_row_to_data(user_row)
 
     @auth_db_source_resilience.apply()
     async def modify_user_full_name(self, email: str, domain_name: str, full_name: str) -> None:
@@ -215,7 +215,7 @@ class AuthDBSource:
             query = keypairs.update().values(data).where(keypairs.c.access_key == access_key)
             await conn.execute(query)
 
-    def _user_row_to_data(self, row: UserRow) -> UserData:
+    def _user_row_to_data(self, row: UserRow | sa.Row[Any]) -> UserData:
         """Convert UserRow to UserData."""
         return UserData(
             uuid=row.uuid,
