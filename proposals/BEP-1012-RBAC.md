@@ -279,21 +279,7 @@ Each scope is managed independently by its respective administrators:
 - **Project Admin**: Manages their project scope resources
 - **User Owner**: Manages their user scope resources
 
-**Important: No Permission Inheritance**:
-Permissions defined in a Role bound to a specific scope apply **only** to actions within that scope. They do **not** cascade to child scopes.
-
-Examples:
-- A Domain Admin role (bound to Domain-A scope) with `vfolder:read` Permission can read VFolders **at the domain level only**
-- This permission does **not** automatically grant access to VFolders in projects within Domain-A
-- To access resources in Project-A (child of Domain-A), a separate Role bound to Project-A scope is required
-- Alternatively, use Object Permissions to grant access to specific resources in child scopes
-
-**Cross-Scope Access**:
-- Scope admins cannot directly manage resources in other scopes at the same level
-- Cross-scope collaboration is achieved through Object Permissions, not hierarchical delegation
-- To work across scopes, users need either:
-  1. Multiple Role Assignments (one per scope)
-  2. Object Permissions for specific resources in other scopes
+**Note**: Permission inheritance and scope chain traversal rules are defined in [BEP-1048](./BEP-1048-RBAC-entity-relationship-model.md).
 
 ### Administrative Safeguards
 
