@@ -203,7 +203,7 @@ class TestGetManagerStatus:
                         "active_sessions": 2,
                         "status": "running",
                         "version": "24.12.0",
-                        "api_version": 8,
+                        "api_version": [9, "20250722"],
                     },
                 ],
                 "status": "running",
