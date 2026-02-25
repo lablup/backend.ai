@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import artifact as _artifact_api
@@ -22,7 +23,6 @@ from ai.backend.manager.data.artifact.types import (
 )
 from ai.backend.manager.models.artifact.row import ArtifactRow
 from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
-from ai.backend.manager.models.base import SAEngine
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.server import (

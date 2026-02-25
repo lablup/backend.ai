@@ -72,7 +72,6 @@ class TestApproveRevision:
 
 
 class TestRejectRevision:
-    @pytest.mark.xfail(strict=True, reason=STORAGE_XFAIL_REASON)
     @pytest.mark.asyncio
     async def test_admin_rejects_revision(
         self,
@@ -102,7 +101,6 @@ class TestImportArtifacts:
 
 
 class TestCancelImportTask:
-    @pytest.mark.xfail(strict=True, reason=STORAGE_XFAIL_REASON)
     @pytest.mark.asyncio
     async def test_admin_cancels_import_task(
         self,
@@ -134,7 +132,6 @@ class TestCleanupRevisions:
 
 
 class TestGetRevisionReadme:
-    @pytest.mark.xfail(strict=True, reason=STORAGE_XFAIL_REASON)
     @pytest.mark.asyncio
     async def test_admin_gets_revision_readme(
         self,
@@ -148,7 +145,6 @@ class TestGetRevisionReadme:
 
 
 class TestGetRevisionVerificationResult:
-    @pytest.mark.xfail(strict=True, reason=STORAGE_XFAIL_REASON)
     @pytest.mark.asyncio
     async def test_admin_gets_verification_result(
         self,
@@ -162,7 +158,6 @@ class TestGetRevisionVerificationResult:
 
 
 class TestGetRevisionDownloadProgress:
-    @pytest.mark.xfail(strict=True, reason=STORAGE_XFAIL_REASON)
     @pytest.mark.asyncio
     async def test_admin_gets_download_progress(
         self,
