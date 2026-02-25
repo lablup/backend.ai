@@ -81,7 +81,7 @@ async def execute_rbac_scope_binder(
     stmt = (
         pg_insert(AssociationScopesEntitiesRow)
         .values(values_list)
-        .on_conflict_do_nothing(constraint="uq_scope_id_entity_id")
+        .on_conflict_do_nothing()
         .returning(AssociationScopesEntitiesRow)
     )
     rows = list((await db_sess.scalars(stmt)).all())
