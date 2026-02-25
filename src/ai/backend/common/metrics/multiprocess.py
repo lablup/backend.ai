@@ -29,7 +29,8 @@ log = logging.getLogger(__spec__.name)
 
 _multiprocess_dir: Path | None = None
 
-_DEFAULT_BASE_DIR = Path(tempfile.gettempdir()) / "backendai" / "prometheus"
+_uid = os.getuid() if hasattr(os, "getuid") else "common"
+_DEFAULT_BASE_DIR = Path(tempfile.gettempdir()) / f"backendai.{_uid}" / "prometheus"
 
 
 def setup_prometheus_multiprocess_dir(
@@ -55,7 +56,16 @@ def setup_prometheus_multiprocess_dir(
         return _multiprocess_dir
 
     multiprocess_dir = _DEFAULT_BASE_DIR / component
-    multiprocess_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        multiprocess_dir.mkdir(parents=True, exist_ok=True)
+    except PermissionError:
+        log.error(
+            "Cannot create prometheus multiprocess dir %s — permission denied. "
+            "Ensure the directory is writable by the current user (uid=%s).",
+            multiprocess_dir,
+            _uid,
+        )
+        raise
 
     # Clean stale .db files from previous runs
     for db_file in multiprocess_dir.glob("*.db"):
