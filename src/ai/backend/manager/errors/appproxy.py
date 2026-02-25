@@ -11,7 +11,7 @@ from ai.backend.common.exception import (
 )
 
 
-class AppProxyConnectionError(BackendAIError, web.HTTPServiceUnavailable):
+class AppProxyConnectionError(BackendAIError, web.HTTPInternalServerError):
     """Raised when connection to AppProxy fails."""
 
     error_type = "https://api.backend.ai/probs/appproxy-connection-error"
