@@ -16,6 +16,21 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.2.3 (2026-02-25)
+
+### Fixes
+* Remove the unnecessary `asyncio.Lock` from `StatContext` as self-concurrency is already prevented by `TimerDelayPolicy.CANCEL` and each collect method operates on independent data structures ([#9256](https://github.com/lablup/backend.ai/issues/9256))
+* Apply CANCEL delay policy to stat collection timers to prevent task accumulation ([#9257](https://github.com/lablup/backend.ai/issues/9257))
+* Fix `DatatypeMismatchError` on session creation caused by mismatched PostgreSQL enum type name (`sessionresult` vs `sessionresults`) in `SessionRow.result` column ORM definition. ([#9278](https://github.com/lablup/backend.ai/issues/9278))
+* Fix prometheus multiprocess dir permission error by using a uid-based path (`/tmp/backendai.{uid}/prometheus/`) and logging clear errors on `mkdir()` failures. ([#9319](https://github.com/lablup/backend.ai/issues/9319))
+* Allow fair share weight updates without resource group membership by adding graceful fallback when scaling group doesn't exist. ([#9320](https://github.com/lablup/backend.ai/issues/9320))
+* Allow fair share and usage bucket queries for entities not registered in a resource group, returning default values instead of raising errors. ([#9321](https://github.com/lablup/backend.ai/issues/9321))
+* Fix session creation failure caused by mismatched PostgreSQL enum type name by standardizing on the singular form `sessionresult` (matching database convention) - removed explicit plural name from ORM and added migration to rename `sessionresults` → `sessionresult` where needed. ([#9326](https://github.com/lablup/backend.ai/issues/9326))
+* Restore AppProxyConnectionError HTTP status code from 503 to 500 to match client-side error handling ([#9330](https://github.com/lablup/backend.ai/issues/9330))
+* Skip TERMINATING state and transition directly to TERMINATED on force-terminate to immediately free resources ([#9341](https://github.com/lablup/backend.ai/issues/9341))
+* Add missing scheduling history records for enqueue (initial PENDING) and terminating state transitions ([#9342](https://github.com/lablup/backend.ai/issues/9342))
+
+
 ## 26.2.2 (2026-02-23)
 
 ### Fixes
