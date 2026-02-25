@@ -200,6 +200,62 @@ Both Blue-Green and Rolling Update cycle FSMs share a common set of **sub-step v
 
 The strategy evaluation functions (`blue_green_evaluate`, `rolling_update_evaluate`) contain the same cycle FSM logic described in the sub-documents, but are invoked as internal helpers rather than standalone evaluator objects.
 
+Core implementation sketch:
+
+```python
+# ── Coordinator: next_status guards generic transition path ──
+# DeploymentCoordinator._handle_status_transitions()
+
+next_status = handler.next_status()
+if next_status is not None and result.successes:   # ← skipped entirely when None
+    # ... batch update lifecycle + record history
+    # generic handlers: transition all successes to next_status
+
+failure_status = handler.failure_status()
+if failure_status is not None and result.errors:   # ← also skipped when None
+    # ... batch update lifecycle + record history
+
+# DeployingDeploymentHandler returns None for both → coordinator does nothing.
+# The handler must record transitions and history directly in execute() because
+# a single execute() call needs different to_status values:
+#   completed → DEPLOYING→READY, in_progress → DEPLOYING→DEPLOYING
+
+
+# ── DeployingDeploymentHandler ──
+
+class DeployingDeploymentHandler(DeploymentHandler):
+
+    @classmethod
+    def next_status(cls) -> EndpointLifecycle | None:
+        return None                          # handler owns all transitions directly
+
+    @classmethod
+    def failure_status(cls) -> EndpointLifecycle | None:
+        return None
+
+    async def execute(self, deployments) -> DeploymentExecutionResult:
+        policy_map = await self._load_policies(deployments)
+        route_map  = await self._repo.fetch_active_routes_by_endpoint_ids(...)
+
+        completed, in_progress = [], []
+        for deployment in deployments:
+            cycle_result = self._rolling_update_evaluate(deployment, routes, spec)
+            if cycle_result.sub_step in (COMPLETED, ROLLED_BACK):
+                completed.append(deployment)
+            else:                            # PROVISIONING | PROGRESSING
+                in_progress.append(deployment)
+
+        # Phase 3: apply route scale-out/scale-in
+        # Phase 4: revision swap (completed only)
+        await self._repo.complete_deployment_revision_swap(swap_ids)
+        # Phase 5: record history + lifecycle transition atomically
+        await self._record_cycle_results(completed, in_progress)
+
+        return DeploymentExecutionResult(successes=in_progress, ...)
+```
+
+`_record_cycle_results` writes both completed (DEPLOYING→READY) and in-progress (DEPLOYING→DEPLOYING) history in a single atomic transaction via `update_endpoint_lifecycle_bulk_with_history()`.
+
 ### Sub-Step Recording and Handler-Owned History
 
 Each cycle evaluation produces a sub-step variant that is recorded via the existing `DeploymentRecorderContext`. The handler records **all** history entries directly (not through the coordinator) because it needs to write different `to_status` values in a single execution:
