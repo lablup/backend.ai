@@ -221,7 +221,7 @@ async def model_deployment_fixture(
                 project=str(group_fixture),
                 resource_group=scaling_group_fixture,
                 image=image_id,
-                lifecycle_stage=EndpointLifecycle.CREATED.value,
+                lifecycle_stage=EndpointLifecycle.CREATED,
                 resource_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
                 url=None,
             )
