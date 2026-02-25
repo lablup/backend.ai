@@ -16,6 +16,7 @@ from ai.backend.manager.api import session_template as _session_template_api
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.server import (
@@ -121,3 +122,11 @@ async def group_name_fixture(
         row = result.first()
         assert row is not None
         return str(row[0])
+
+
+@pytest.fixture(autouse=True)
+async def cleanup_session_templates(db_engine: SAEngine) -> AsyncIterator[None]:
+    """Delete all session_templates after each test to avoid FK violations during teardown."""
+    yield
+    async with db_engine.begin() as conn:
+        await conn.execute(sa.delete(session_templates))
