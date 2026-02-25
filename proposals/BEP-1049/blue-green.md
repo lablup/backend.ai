@@ -32,12 +32,12 @@ On promotion, the Manager updates the DB (`Green→ACTIVE`, `Blue→INACTIVE`); 
 
 ## Cycle FSM
 
-The coordinator periodically calls `execute_blue_green_cycle`. Each invocation follows this FSM:
+The `DeployingDeploymentHandler` periodically evaluates each Blue-Green deployment. Each invocation follows this FSM:
 
 ```
   ┌──────────────────────────────────────┐
   │  No Green routes?                    │──Yes──→ Create all Green (INACTIVE)
-  └──────────────────┬───────────────────┘        → creating
+  └──────────────────┬───────────────────┘        → provisioning
                      No
                      ▼
   ┌──────────────────────────────────────┐
@@ -51,17 +51,17 @@ The coordinator periodically calls `execute_blue_green_cycle`. Each invocation f
                      No
                      ▼
   ┌──────────────────────────────────────┐
-  │  All Green healthy?                  │──No───→ waiting
+  │  All Green healthy?                  │──No───→ progressing
   └──────────────────┬───────────────────┘
                     Yes
                      ▼
   ┌──────────────────────────────────────┐
-  │  auto_promote?                       │──No───→ waiting_promotion (manual)
+  │  auto_promote?                       │──No───→ progressing (manual)
   └──────────────────┬───────────────────┘
                     Yes
                      ▼
   ┌──────────────────────────────────────┐
-  │  promote_delay elapsed?              │──No───→ waiting_promotion (delay)
+  │  promote_delay elapsed?              │──No───→ progressing (delay)
   └──────────────────┬───────────────────┘
                     Yes
                      ▼
@@ -75,18 +75,18 @@ The coordinator periodically calls `execute_blue_green_cycle`. Each invocation f
                  completed
 ```
 
-### CycleStatus Variants
+### Sub-Step Variants
 
-Each cycle evaluation returns one of the following statuses:
+Each cycle evaluation directly returns one of the shared sub-step variants:
 
-| Status | Condition | Coordinator Action |
-|--------|-----------|-------------------|
-| **creating** | No Green routes → created all as INACTIVE | `mark_deployment_needed` reschedule |
-| **provisioning** | Green routes are PROVISIONING | `mark_deployment_needed` reschedule |
-| **waiting** | Not all Green healthy (mixed state, no PROVISIONING) | `mark_deployment_needed` reschedule |
-| **waiting_promotion** | All Green healthy, waiting for promotion trigger | Manual: no reschedule (promotion API triggers mark). Delay: reschedule aligned to `promote_ready_at` |
-| **completed** | Promotion executed (Green→ACTIVE, Blue→TERMINATING) | Revision swap, DEPLOYING → READY |
-| **rolled_back** | All Green failed → terminate Green | `deploying_revision` = NULL, DEPLOYING → READY |
+| Sub-Step | Condition | Handler Action |
+|----------|-----------|----------------|
+| **provisioning** | No Green routes → created all as INACTIVE | `successes` → SUCCESS history (DEPLOYING→DEPLOYING), reschedule |
+| **provisioning** | Green routes are PROVISIONING | `successes` → SUCCESS history (DEPLOYING→DEPLOYING), reschedule |
+| **progressing** | Not all Green healthy (mixed state, no PROVISIONING) | `successes` → SUCCESS history (DEPLOYING→DEPLOYING), reschedule |
+| **progressing** | All Green healthy, waiting for promotion trigger (manual or delay) | `successes` → SUCCESS history (DEPLOYING→DEPLOYING), reschedule |
+| **completed** | Promotion executed (Green→ACTIVE, Blue→TERMINATING) | Handler transitions DEPLOYING→READY directly, revision swap |
+| **rolled_back** | All Green failed → terminate Green | Handler transitions DEPLOYING→READY directly, deploying_revision=NULL |
 
 ## promote_delay_seconds Handling
 
@@ -210,36 +210,30 @@ With `auto_promote=False`:
 
 ```
   ┌──────────────────────────────────────────────────────────────┐
-  │  DeploymentCoordinator                                       │
+  │  DeployingDeploymentHandler                                  │
   │                                                              │
-  │  strategy_registry: {                                        │
-  │    BLUE_GREEN: BlueGreenCycleEvaluator,                      │
-  │    ROLLING:    RollingUpdateCycleEvaluator,                   │
-  │  }                                                           │
+  │  name()             → "deploying"                            │
+  │  target_statuses()  → [DEPLOYING]                            │
+  │  next_status()      → None  (handler owns transitions)        │
   │                                                              │
-  │  process_deployment_strategy(strategy)                       │
-  │    1. Query DEPLOYING deployments                            │
-  │    2. Load policy_map                                        │
-  │    3. Filter deployments by policy strategy                  │
-  │    4. evaluator = strategy_registry[strategy]                │
-  │    5. result = evaluator.execute(deployments, policy_map)    │
-  │    6. completed   → transition to READY                      │
-  │       rolled_back → deploying_revision=NULL, READY           │
-  │       creating     → mark_deployment_needed reschedule       │
-  │       provisioning → mark_deployment_needed reschedule       │
-  │       waiting      → mark_deployment_needed reschedule       │
-  │       waiting_promotion → manual: no reschedule              │
-  │                           delay: reschedule on timer         │
-  │       errors → log history                                   │
+  │  execute(deployments) → DeploymentExecutionResult            │
+  │    1. Load policy_map                                        │
+  │    2. For each deployment:                                   │
+  │         policy = policy_map[deployment.id]                   │
+  │         strategy = policy.strategy                           │
+  │    3. Dispatch by strategy:                                  │
+  │         BLUE_GREEN → blue_green_evaluate(...)                │
+  │    4. Classify by sub_step:                                   │
+  │         completed    → handler transitions DEPLOYING→READY   │
+  │         rolled_back  → handler transitions, dep_rev=NULL     │
+  │         in-progress  → successes (SUCCESS history, resched.) │
+  │         errors       → errors                                │
   └──────────────────────────┬───────────────────────────────────┘
                              │
                              ▼
   ┌──────────────────────────────────────────────────────────────┐
-  │  BlueGreenCycleEvaluator                                     │
-  │                                                              │
-  │  lock_id → LOCKID_DEPLOYMENT_BLUE_GREEN                      │
-  │                                                              │
-  │  evaluate(deployment, routes, policy)                        │
+  │  blue_green_evaluate(deployment, routes, policy)             │
+  │  (internal strategy evaluation function)                     │
   │                                                              │
   │  Route classification:                                       │
   │  ┌────────────────────────────────────────────────────┐      │
@@ -285,14 +279,14 @@ When all Green routes become ACTIVE and Blue routes are terminated:
   completed determination
        │
        ▼
-  complete_deployment_revision_update_bulk({endpoint_id: deploying_revision})
+  RevisionStateUpdaterSpec(
+    current_revision = deploying_revision,
+    deploying_revision = NULL
+  )
        │
-       ├─ current_revision = deploying_revision
-       └─ deploying_revision = NULL
-
-             │
-             ▼
-  Coordinator: DEPLOYING → READY state transition
+       ▼
+  Handler records history + transitions DEPLOYING → READY directly
+  (via update_endpoint_lifecycle_bulk_with_history)
 ```
 
 ## Comparison with Rolling Update

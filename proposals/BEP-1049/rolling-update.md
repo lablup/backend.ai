@@ -24,7 +24,7 @@ The `endpoints` table has two columns for revision management:
 
 ## Cycle FSM
 
-The coordinator periodically calls `execute_rolling_update_cycle`. Each invocation follows this FSM:
+The `DeployingDeploymentHandler` periodically evaluates each Rolling Update deployment. Each invocation follows this FSM:
 
 ```
   ┌──────────────────────────────────────┐
@@ -53,15 +53,15 @@ The coordinator periodically calls `execute_rolling_update_cycle`. Each invocati
                 progressing
 ```
 
-### CycleStatus Variants
+### Sub-Step Variants
 
-Each cycle evaluation returns one of the following statuses:
+Each cycle evaluation directly returns one of the shared sub-step variants:
 
-| Status | Condition | Coordinator Action |
-|--------|-----------|-------------------|
-| **provisioning** | New routes are PROVISIONING | `mark_deployment_needed` reschedule |
-| **progressing** | Calculated surge/unavailable, created/terminated routes | `mark_deployment_needed` reschedule |
-| **completed** | No Old routes and New healthy >= desired_replicas | Revision swap, DEPLOYING → READY |
+| Sub-Step | Condition | Handler Action |
+|----------|-----------|----------------|
+| **provisioning** | New routes are PROVISIONING | `successes` → SUCCESS history (DEPLOYING→DEPLOYING), reschedule |
+| **progressing** | Calculated surge/unavailable, created/terminated routes | `successes` → SUCCESS history (DEPLOYING→DEPLOYING), reschedule |
+| **completed** | No Old routes and New healthy >= desired_replicas | Handler transitions DEPLOYING→READY directly, revision swap |
 
 ## max_surge / max_unavailable Calculation
 
@@ -180,37 +180,29 @@ Example with `desired_replicas = 3`, `max_surge = 1`, `max_unavailable = 1`:
 
 ```
   ┌──────────────────────────────────────────────────────────────┐
-  │  DeploymentCoordinator                                       │
+  │  DeployingDeploymentHandler                                  │
   │                                                              │
-  │  strategy_registry: {                                        │
-  │    BLUE_GREEN: BlueGreenCycleEvaluator,                      │
-  │    ROLLING:    RollingUpdateCycleEvaluator,                   │
-  │  }                                                           │
+  │  name()             → "deploying"                            │
+  │  target_statuses()  → [DEPLOYING]                            │
+  │  next_status()      → None  (handler owns transitions)        │
   │                                                              │
-  │  process_deployment_strategy()                               │
-  │    Short (if_needed):                                        │
-  │      scan "strategy:{id}" marks → load by ids               │
-  │    Long (unconditional):                                     │
-  │      query DEPLOYING from DB                                 │
-  │                                                              │
+  │  execute(deployments) → DeploymentExecutionResult            │
   │    1. Load policy_map                                        │
-  │    2. Group by policy strategy                               │
-  │    3. For each (strategy, group):                            │
-  │         evaluator = strategy_registry[strategy]              │
-  │         result = evaluator.execute(group, policy_map)        │
-  │    4. completed    → transition to READY                     │
-  │       progressing  → keep DEPLOYING                          │
-  │       provisioning → keep DEPLOYING                          │
-  │       errors → log history                                   │
+  │    2. For each deployment:                                   │
+  │         policy = policy_map[deployment.id]                   │
+  │         strategy = policy.strategy                           │
+  │    3. Dispatch by strategy:                                  │
+  │         ROLLING_UPDATE → rolling_update_evaluate(...)        │
+  │    4. Classify by sub_step:                                   │
+  │         completed    → handler transitions DEPLOYING→READY   │
+  │         in-progress  → successes (SUCCESS history, resched.) │
+  │         errors       → errors                                │
   └──────────────────────────┬───────────────────────────────────┘
                              │
                              ▼
   ┌──────────────────────────────────────────────────────────────┐
-  │  RollingUpdateCycleEvaluator                                 │
-  │                                                              │
-  │  lock_id → LOCKID_DEPLOYMENT_ROLLING_UPDATE                  │
-  │                                                              │
-  │  evaluate(deployment, routes, policy)                        │
+  │  rolling_update_evaluate(deployment, routes, policy)         │
+  │  (internal strategy evaluation function)                     │
   │                                                              │
   │  Route classification:                                       │
   │  ┌────────────────────────────────────────────────────┐      │
@@ -245,12 +237,12 @@ When all Old routes are removed and New routes reach desired_replicas or above a
   completed determination
        │
        ▼
-  complete_deployment_revision_update_bulk({endpoint_id: deploying_revision})
+  RevisionStateUpdaterSpec(
+    current_revision = deploying_revision,
+    deploying_revision = NULL
+  )
        │
-       ├─ current_revision = deploying_revision
-       └─ deploying_revision = NULL
-
-             │
-             ▼
-  Coordinator: DEPLOYING → READY state transition
+       ▼
+  Handler records history + transitions DEPLOYING → READY directly
+  (via update_endpoint_lifecycle_bulk_with_history)
 ```
