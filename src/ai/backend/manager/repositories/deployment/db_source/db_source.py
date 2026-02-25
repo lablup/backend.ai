@@ -2299,7 +2299,9 @@ class DeploymentDBSource:
             )
 
             return AutoScalingRuleSearchResult(
-                items=[row.to_model_deployment_data() for row in result.rows],
+                items=[
+                    row.EndpointAutoScalingRuleRow.to_model_deployment_data() for row in result.rows
+                ],
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,

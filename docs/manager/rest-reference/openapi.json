@@ -4952,6 +4952,341 @@
         "title": "UpdateRouteTrafficStatusRequest",
         "type": "object"
       },
+      "AutoScalingMetricSource": {
+        "enum": [
+          "kernel",
+          "inference_framework"
+        ],
+        "title": "AutoScalingMetricSource",
+        "type": "string"
+      },
+      "CreateAutoScalingRuleRequest": {
+        "description": "Request to create an auto-scaling rule.",
+        "properties": {
+          "model_deployment_id": {
+            "description": "ID of the deployment to attach the rule to",
+            "format": "uuid",
+            "title": "Model Deployment Id",
+            "type": "string"
+          },
+          "metric_source": {
+            "$ref": "#/components/schemas/AutoScalingMetricSource",
+            "description": "Source of the metric (e.g. KERNEL, INFERENCE_FRAMEWORK)"
+          },
+          "metric_name": {
+            "description": "Name of the metric to monitor",
+            "title": "Metric Name",
+            "type": "string"
+          },
+          "min_threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Minimum threshold for scaling",
+            "title": "Min Threshold"
+          },
+          "max_threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Maximum threshold for scaling",
+            "title": "Max Threshold"
+          },
+          "step_size": {
+            "description": "Step size for scaling",
+            "title": "Step Size",
+            "type": "integer"
+          },
+          "time_window": {
+            "description": "Time window in seconds for scaling evaluation",
+            "title": "Time Window",
+            "type": "integer"
+          },
+          "min_replicas": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Minimum number of replicas",
+            "title": "Min Replicas"
+          },
+          "max_replicas": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Maximum number of replicas",
+            "title": "Max Replicas"
+          }
+        },
+        "required": [
+          "model_deployment_id",
+          "metric_source",
+          "metric_name",
+          "step_size",
+          "time_window"
+        ],
+        "title": "CreateAutoScalingRuleRequest",
+        "type": "object"
+      },
+      "AutoScalingRuleFilter": {
+        "description": "Filter for auto-scaling rules.",
+        "properties": {
+          "model_deployment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by deployment ID",
+            "title": "Model Deployment Id"
+          }
+        },
+        "title": "AutoScalingRuleFilter",
+        "type": "object"
+      },
+      "AutoScalingRuleOrder": {
+        "description": "Order specification for auto-scaling rules.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/AutoScalingRuleOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "AutoScalingRuleOrder",
+        "type": "object"
+      },
+      "AutoScalingRuleOrderField": {
+        "description": "Fields available for ordering auto-scaling rules.",
+        "enum": [
+          "created_at"
+        ],
+        "title": "AutoScalingRuleOrderField",
+        "type": "string"
+      },
+      "SearchAutoScalingRulesRequest": {
+        "description": "Request body for searching auto-scaling rules with filters, orders, and pagination.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutoScalingRuleFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AutoScalingRuleOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum items to return",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Number of items to skip",
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "title": "SearchAutoScalingRulesRequest",
+        "type": "object"
+      },
+      "UpdateAutoScalingRuleRequest": {
+        "description": "Request to update an auto-scaling rule.",
+        "properties": {
+          "metric_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutoScalingMetricSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated metric source"
+          },
+          "metric_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated metric name",
+            "title": "Metric Name"
+          },
+          "min_threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated minimum threshold",
+            "title": "Min Threshold"
+          },
+          "max_threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated maximum threshold",
+            "title": "Max Threshold"
+          },
+          "step_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated step size",
+            "title": "Step Size"
+          },
+          "time_window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated time window in seconds",
+            "title": "Time Window"
+          },
+          "min_replicas": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated minimum replicas",
+            "title": "Min Replicas"
+          },
+          "max_replicas": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated maximum replicas",
+            "title": "Max Replicas"
+          }
+        },
+        "title": "UpdateAutoScalingRuleRequest",
+        "type": "object"
+      },
+      "DeleteAutoScalingRuleRequest": {
+        "description": "Request to delete an auto-scaling rule.",
+        "properties": {
+          "rule_id": {
+            "description": "ID of the auto-scaling rule to delete",
+            "format": "uuid",
+            "title": "Rule Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule_id"
+        ],
+        "title": "DeleteAutoScalingRuleRequest",
+        "type": "object"
+      },
       "RoleSource": {
         "description": "Definition source of the role.",
         "enum": [
@@ -19093,6 +19428,158 @@
           }
         ],
         "description": "Update traffic status of a route.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/auto-scaling-rules": {
+      "post": {
+        "operationId": "admin/auto-scaling-rules.create",
+        "tags": [
+          "admin/auto-scaling-rules"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAutoScalingRuleRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Create a new auto-scaling rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/auto-scaling-rules/{rule_id}": {
+      "get": {
+        "operationId": "admin/auto-scaling-rules.get",
+        "tags": [
+          "admin/auto-scaling-rules"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific auto-scaling rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "admin/auto-scaling-rules.update",
+        "tags": [
+          "admin/auto-scaling-rules"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAutoScalingRuleRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an existing auto-scaling rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/auto-scaling-rules/search": {
+      "post": {
+        "operationId": "admin/auto-scaling-rules.search",
+        "tags": [
+          "admin/auto-scaling-rules"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchAutoScalingRulesRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search auto-scaling rules with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/auto-scaling-rules/delete": {
+      "post": {
+        "operationId": "admin/auto-scaling-rules.delete",
+        "tags": [
+          "admin/auto-scaling-rules"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAutoScalingRuleRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Delete an auto-scaling rule.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/admin/rbac/roles": {
