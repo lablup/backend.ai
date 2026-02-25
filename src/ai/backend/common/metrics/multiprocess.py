@@ -30,7 +30,9 @@ log = logging.getLogger(__spec__.name)
 _multiprocess_dir: Path | None = None
 
 _uid = os.getuid() if hasattr(os, "getuid") else "common"
-_DEFAULT_BASE_DIR = Path(tempfile.gettempdir()) / f"backendai.{_uid}" / "prometheus"
+_DEFAULT_BASE_DIR = Path(
+    "/tmp/backend.ai/prometheus"
+)
 
 
 def setup_prometheus_multiprocess_dir(
@@ -89,31 +91,7 @@ def generate_latest_multiprocess() -> bytes:
 
     This should be used by multi-worker components (manager, agent, storage, etc.).
     """
-    try:
-        registry = CollectorRegistry()
-        MultiProcessCollector(registry)  # type: ignore[no-untyped-call]
-        return generate_latest(registry)
-    except ValueError:
-        # Directory may have been deleted (e.g., by systemd-tmpfiles-clean).
-        # Attempt to recreate it and retry once.
-        if _multiprocess_dir is not None:
-            try:
-                _multiprocess_dir.mkdir(parents=True, exist_ok=True)
-                os.environ["PROMETHEUS_MULTIPROC_DIR"] = str(_multiprocess_dir)
-                registry = CollectorRegistry()
-                MultiProcessCollector(registry)  # type: ignore[no-untyped-call]
-                log.warning(
-                    "Prometheus multiprocess dir was missing and has been recreated: %s",
-                    _multiprocess_dir,
-                )
-                return generate_latest(registry)
-            except Exception:
-                log.error(
-                    "Failed to recover prometheus multiprocess dir: %s",
-                    _multiprocess_dir,
-                    exc_info=True,
-                )
-        return b""
+    return generate_latest()
 
 
 def generate_latest_singleprocess() -> bytes:
