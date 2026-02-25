@@ -1253,7 +1253,7 @@ class FairShareDBSource:
         self,
         db_sess: SASession,
         resource_group: str,
-    ) -> tuple[FairShareScalingGroupSpec, list[SlotQuantity]]:
+    ) -> tuple[FairShareScalingGroupSpec, ResourceSlot]:
         """Fetch scaling group context for response building, with graceful fallback.
 
         Returns defaults when scaling group doesn't exist.
@@ -1265,7 +1265,7 @@ class FairShareDBSource:
             available_slots = await self._fetch_available_slots(db_sess, resource_group)
         except ScalingGroupNotFound:
             fair_share_spec = FairShareScalingGroupSpec()
-            available_slots = []
+            available_slots = ResourceSlot()
         return fair_share_spec, available_slots
 
     async def _fetch_available_slots(

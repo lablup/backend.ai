@@ -1132,7 +1132,7 @@ class TestUpsertFairShareWeightWithoutResourceGroup:
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=Decimal("1.0"),
-                    total_decayed_usage=[],
+                    total_decayed_usage=ResourceSlot(),
                     normalized_usage=Decimal("0.0"),
                     lookback_start=today,
                     lookback_end=today,
@@ -1180,7 +1180,7 @@ class TestUpsertFairShareWeightWithoutResourceGroup:
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=Decimal("1.0"),
-                    total_decayed_usage=[],
+                    total_decayed_usage=ResourceSlot(),
                     normalized_usage=Decimal("0.0"),
                     lookback_start=today,
                     lookback_end=today,
@@ -1231,7 +1231,7 @@ class TestUpsertFairShareWeightWithoutResourceGroup:
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=Decimal("1.0"),
-                    total_decayed_usage=[],
+                    total_decayed_usage=ResourceSlot(),
                     normalized_usage=Decimal("0.0"),
                     lookback_start=today,
                     lookback_end=today,
