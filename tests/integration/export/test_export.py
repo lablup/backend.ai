@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.export import (
     GetExportReportResponse,
@@ -74,30 +75,23 @@ class TestExportAccessControl:
         user_registry: BackendAIClientRegistry,
     ) -> None:
         """Regular user should get 403 on all export endpoints."""
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(PermissionDeniedError):
             await user_registry.export.list_reports()
-        assert "403" in str(exc_info.value)
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(PermissionDeniedError):
             await user_registry.export.get_report("users")
-        assert "403" in str(exc_info.value)
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(PermissionDeniedError):
             await user_registry.export.download_users_csv()
-        assert "403" in str(exc_info.value)
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(PermissionDeniedError):
             await user_registry.export.download_sessions_csv()
-        assert "403" in str(exc_info.value)
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(PermissionDeniedError):
             await user_registry.export.download_projects_csv()
-        assert "403" in str(exc_info.value)
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(PermissionDeniedError):
             await user_registry.export.download_keypairs_csv()
-        assert "403" in str(exc_info.value)
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(PermissionDeniedError):
             await user_registry.export.download_audit_logs_csv()
-        assert "403" in str(exc_info.value)
