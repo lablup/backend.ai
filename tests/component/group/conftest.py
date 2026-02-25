@@ -209,6 +209,7 @@ async def group_factory(
             "name": f"test-group-{unique}",
             "domain_name": domain_for_group_fixture,
             "description": f"Test group {unique}",
+            "resource_policy": "default",
         }
         params.update(overrides)
         result = await admin_registry.group.create(CreateGroupRequest(**params))

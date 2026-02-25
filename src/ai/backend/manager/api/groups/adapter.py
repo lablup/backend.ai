@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.group import (
     SearchGroupsRequest,
     UpdateGroupRequest,
 )
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.adapter import BaseFilterAdapter
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.errors.resource import DataTransformationFailed
@@ -66,7 +67,7 @@ class GroupAdapter(BaseFilterAdapter):
         name = OptionalState[str].nop()
         description = TriState[str].nop()
         is_active = OptionalState[bool].nop()
-        total_resource_slots: OptionalState[dict[str, Any]] = OptionalState.nop()
+        total_resource_slots: OptionalState[ResourceSlot] = OptionalState.nop()
         allowed_vfolder_hosts: OptionalState[dict[str, Any]] = OptionalState.nop()
         integration_id = OptionalState[str].nop()
         resource_policy = OptionalState[str].nop()
@@ -78,7 +79,7 @@ class GroupAdapter(BaseFilterAdapter):
         if request.is_active is not None:
             is_active = OptionalState.update(request.is_active)
         if request.total_resource_slots is not None:
-            total_resource_slots = OptionalState.update(request.total_resource_slots)
+            total_resource_slots = OptionalState.update(ResourceSlot(request.total_resource_slots))
         if request.allowed_vfolder_hosts is not None:
             allowed_vfolder_hosts = OptionalState.update(request.allowed_vfolder_hosts)
         if request.integration_id is not None:

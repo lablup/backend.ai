@@ -29,7 +29,7 @@ from ai.backend.common.dto.manager.group import (
     UpdateGroupRequest,
     UpdateGroupResponse,
 )
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.api.auth import auth_required_for_method
 from ai.backend.manager.api.types import CORSOptions, WebMiddleware
 from ai.backend.manager.dto.context import ProcessorsCtx
@@ -40,6 +40,7 @@ from ai.backend.manager.dto.group_request import (
     UpdateGroupPathParam,
 )
 from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
@@ -87,7 +88,11 @@ class GroupAPIHandler:
                     if body.parsed.total_resource_slots is not None
                     else None
                 ),
-                allowed_vfolder_hosts=body.parsed.allowed_vfolder_hosts,
+                allowed_vfolder_hosts=(
+                    VFolderHostPermissionMap(body.parsed.allowed_vfolder_hosts)
+                    if body.parsed.allowed_vfolder_hosts is not None
+                    else None
+                ),
                 integration_id=body.parsed.integration_id,
                 resource_policy=body.parsed.resource_policy,
             )
@@ -97,6 +102,8 @@ class GroupAPIHandler:
             CreateGroupAction(creator=creator)
         )
 
+        if action_result.data is None:
+            raise DataTransformationFailed("Group creation returned no data")
         resp = CreateGroupResponse(group=self.adapter.convert_to_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
