@@ -8,6 +8,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.image.types import ImageType
@@ -47,7 +48,7 @@ async def model_deployment_fixture(
                 id=registry_id,
                 url="http://test-registry.local",
                 registry_name="test-registry",
-                type="docker",
+                type=ContainerRegistryType.DOCKER,
                 project=None,
             )
         )
