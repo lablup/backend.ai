@@ -7,7 +7,7 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 
 from .base import ScalingGroupAction
 
@@ -16,7 +16,7 @@ from .base import ScalingGroupAction
 class CreateScalingGroupAction(ScalingGroupAction):
     """Action to create a scaling group."""
 
-    creator: Creator[ScalingGroupRow]
+    creator: RBACEntityCreator[ScalingGroupRow]
 
     @override
     @classmethod

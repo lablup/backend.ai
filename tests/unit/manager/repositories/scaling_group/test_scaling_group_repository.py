@@ -6,9 +6,11 @@ from typing import Any
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot, SessionTypes
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
@@ -23,7 +25,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import AssociationScopesEntitiesRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -43,8 +45,9 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.repositories.scaling_group.creators import (
@@ -85,6 +88,7 @@ class TestScalingGroupRepositoryDB:
                 # FK dependency order: parents before children
                 DomainRow,
                 ScalingGroupRow,
+                AssociationScopesEntitiesRow,
                 ScalingGroupForDomainRow,
                 ScalingGroupForProjectRow,
                 UserResourcePolicyRow,
@@ -123,7 +127,7 @@ class TestScalingGroupRepositoryDB:
         driver_opts: dict[str, Any] | None = None,
         scheduler_opts: ScalingGroupOpts | None = None,
         use_host_network: bool = False,
-    ) -> Creator[ScalingGroupRow]:
+    ) -> RBACEntityCreator[ScalingGroupRow]:
         """Create a ScalingGroupCreatorSpec with the given parameters."""
         spec = ScalingGroupCreatorSpec(
             name=name,
@@ -138,7 +142,14 @@ class TestScalingGroupRepositoryDB:
             scheduler_opts=scheduler_opts,
             use_host_network=use_host_network,
         )
-        return Creator(spec=spec)
+        return RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.RESOURCE_GROUP,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.DOMAIN,
+                element_id="default",
+            ),
+        )
 
     async def _create_scaling_groups(
         self,

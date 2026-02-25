@@ -24,8 +24,9 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupRow,
 )
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import BatchPurger, Purger
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 
 from .db_source import ScalingGroupDBSource
@@ -66,7 +67,7 @@ class ScalingGroupRepository:
     @scaling_group_repository_resilience.apply()
     async def create_scaling_group(
         self,
-        creator: Creator[ScalingGroupRow],
+        creator: RBACEntityCreator[ScalingGroupRow],
     ) -> ScalingGroupData:
         """Creates a new scaling group.
 

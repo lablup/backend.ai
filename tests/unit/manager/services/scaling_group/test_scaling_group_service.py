@@ -10,8 +10,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.types import AccessKey, AgentSelectionStrategy, ResourceSlot, SessionTypes
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupData,
     ScalingGroupDriverConfig,
@@ -37,8 +39,9 @@ from ai.backend.manager.models.scaling_group import (
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.registry import check_scaling_group
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import BatchPurger
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.repositories.scaling_group.creators import (
@@ -148,7 +151,7 @@ class TestScalingGroupService:
         )
 
     @pytest.fixture
-    def scaling_group_creator_full(self) -> Creator[ScalingGroupRow]:
+    def scaling_group_creator_full(self) -> RBACEntityCreator[ScalingGroupRow]:
         """Creator with full configuration for testing create_scaling_group success"""
         scheduler_opts = ScalingGroupOpts(
             allowed_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
@@ -169,7 +172,14 @@ class TestScalingGroupService:
             scheduler_opts=scheduler_opts,
             use_host_network=True,
         )
-        return Creator(spec=spec)
+        return RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.RESOURCE_GROUP,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.DOMAIN,
+                element_id="default",
+            ),
+        )
 
     async def test_search_scaling_groups_with_default_querier(
         self,
@@ -335,7 +345,7 @@ class TestScalingGroupService:
         scaling_group_service: ScalingGroupService,
         mock_repository: MagicMock,
         sample_scaling_group: ScalingGroupData,
-        scaling_group_creator_full: Creator[ScalingGroupRow],
+        scaling_group_creator_full: RBACEntityCreator[ScalingGroupRow],
     ) -> None:
         """Test creating a scaling group successfully"""
         mock_repository.create_scaling_group = AsyncMock(return_value=sample_scaling_group)
@@ -350,7 +360,7 @@ class TestScalingGroupService:
         self,
         scaling_group_service: ScalingGroupService,
         mock_repository: MagicMock,
-        scaling_group_creator_full: Creator[ScalingGroupRow],
+        scaling_group_creator_full: RBACEntityCreator[ScalingGroupRow],
     ) -> None:
         """Test that ScalingGroupConflict propagates through the service"""
         mock_repository.create_scaling_group = AsyncMock(

@@ -16,8 +16,10 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentStatus
 from ai.backend.manager.models.scaling_group import (
@@ -32,8 +34,9 @@ from ai.backend.manager.models.scaling_group import (
     sgroups_for_keypairs,
 )
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import BatchPurger, Purger
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupCreatorSpec,
@@ -725,7 +728,14 @@ class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
             scheduler_opts=ScalingGroupOpts.from_json(props.scheduler_opts),
             use_host_network=bool(props.use_host_network),
         )
-        creator = Creator(spec=spec)
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.RESOURCE_GROUP,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.DOMAIN,
+                element_id=graph_ctx.user["domain_name"],
+            ),
+        )
         action = CreateScalingGroupAction(creator=creator)
         result = await graph_ctx.processors.scaling_group.create_scaling_group.wait_for_complete(
             action
