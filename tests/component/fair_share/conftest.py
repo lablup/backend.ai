@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+import secrets
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import sqlalchemy as sa
+from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import fair_share as _fair_share_api
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.scaling_group import sgroups_for_groups
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.server import (
@@ -130,3 +136,38 @@ def server_cleanup_contexts() -> list[CleanupContext]:
         background_task_ctx,
         _fair_share_domain_ctx,
     ]
+
+
+@pytest.fixture()
+async def group_fixture(
+    db_engine: SAEngine,
+    domain_fixture: str,
+    resource_policy_fixture: str,
+    scaling_group_fixture: str,
+) -> AsyncIterator[uuid.UUID]:
+    """Insert a test group with scaling-group association for fair-share tests."""
+    group_id = uuid.uuid4()
+    group_name = f"group-{secrets.token_hex(6)}"
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(GroupRow.__table__).values(
+                id=group_id,
+                name=group_name,
+                description=f"Test group {group_name}",
+                is_active=True,
+                domain_name=domain_fixture,
+                resource_policy=resource_policy_fixture,
+            )
+        )
+        await conn.execute(
+            sa.insert(sgroups_for_groups).values(
+                scaling_group=scaling_group_fixture,
+                group=group_id,
+            )
+        )
+    yield group_id
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sgroups_for_groups.delete().where(sgroups_for_groups.c.group == group_id)
+        )
+        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
