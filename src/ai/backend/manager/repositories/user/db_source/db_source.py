@@ -84,8 +84,8 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
-from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
 from ai.backend.manager.repositories.base.updater import BulkUpdaterError, Updater
+from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
@@ -283,7 +283,7 @@ class UserDBSource:
 
         created_user = row.to_data()
 
-        # Create default keypair
+        # Create default keypair with RBAC scope association
         keypair_creator = KeyPairCreator(
             is_active=(created_user.status == UserStatus.ACTIVE),
             is_admin=created_user.role in ["superadmin", "admin"],
@@ -291,12 +291,22 @@ class UserDBSource:
             rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
         )
         generated = generate_keypair_data()
-        kp_row = KeyPairRow.from_creator(
-            keypair_creator, generated, created_user.id, created_user.email
+        kp_spec = KeyPairCreatorSpec(
+            creator=keypair_creator,
+            generated_data=generated,
+            user_id=created_user.id,
+            email=created_user.email,
         )
-        db_session.add(kp_row)
-        await db_session.flush()
-        kp_data = kp_row.to_data()
+        rbac_kp_creator = RBACEntityCreator(
+            spec=kp_spec,
+            element_type=RBACElementType.KEYPAIR,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.USER,
+                element_id=str(created_user.uuid),
+            ),
+        )
+        kp_result = await execute_rbac_entity_creator(db_session, rbac_kp_creator)
+        kp_data = kp_result.row.to_data()
 
         # Update user main_access_key
         row.main_access_key = kp_data.access_key
