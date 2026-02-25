@@ -7,6 +7,7 @@ entity row creation with RBAC association writes.
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -57,22 +58,23 @@ class RBACScopeBindingPair[TRow: Base]:
     relation_type: RelationType = RelationType.AUTO
 
 
-@dataclass(frozen=True)
-class RBACScopeUnbindingPair[TRow: Base]:
-    """A paired purger spec + RBAC binding for scope disassociation.
+class RBACScopeUnbindingPair[TRow: Base](ABC):
+    """Abstract base for scope unbinding operations.
 
-    Bundles a BatchPurgerSpec (for the N:N mapping row deletion) with
-    RBAC element references (for the association_scopes_entities deletion).
-
-    Attributes:
-        purger_spec: BatchPurgerSpec for the N:N mapping rows to delete.
-        entity_ref: RBAC element reference for the entity.
-        scope_ref: RBAC element reference for the scope.
+    Implementations specify what to delete by providing:
+    - build_purger_spec(): Returns a BatchPurgerSpec for business N:N row deletion.
+    - build_condition(): Returns a WHERE condition for AssociationScopesEntitiesRow deletion.
     """
 
-    purger_spec: BatchPurgerSpec[TRow]
-    entity_ref: RBACElementRef
-    scope_ref: RBACElementRef
+    @abstractmethod
+    def build_purger_spec(self) -> BatchPurgerSpec[TRow]:
+        """Build purger spec for business N:N mapping row deletion."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def build_condition(self) -> sa.ColumnElement[bool]:
+        """Build WHERE condition for AssociationScopesEntitiesRow deletion."""
+        raise NotImplementedError
 
 
 # =============================================================================
@@ -209,23 +211,16 @@ async def execute_rbac_scope_unbinder[TRow: Base](
     # 1. Delete business N:N mapping rows per pair
     total_deleted = 0
     for pair in unbinder.pairs:
-        purge_result = await execute_batch_purger(db_sess, BatchPurger(spec=pair.purger_spec))
+        purge_result = await execute_batch_purger(
+            db_sess, BatchPurger(spec=pair.build_purger_spec())
+        )
         total_deleted += purge_result.deleted_count
 
-    # 2. Delete RBAC association rows
-    assoc_conditions = [
-        sa.and_(
-            AssociationScopesEntitiesRow.entity_type
-            == pair.entity_ref.element_type.to_entity_type(),
-            AssociationScopesEntitiesRow.entity_id == pair.entity_ref.element_id,
-            AssociationScopesEntitiesRow.scope_type == pair.scope_ref.element_type.to_scope_type(),
-            AssociationScopesEntitiesRow.scope_id == pair.scope_ref.element_id,
-        )
-        for pair in unbinder.pairs
-    ]
+    # 2. Delete RBAC association rows using each pair's condition
+    conditions = [pair.build_condition() for pair in unbinder.pairs]
     assoc_stmt = (
         sa.delete(AssociationScopesEntitiesRow)
-        .where(sa.or_(*assoc_conditions))
+        .where(sa.or_(*conditions))
         .returning(AssociationScopesEntitiesRow)
     )
     association_rows = list((await db_sess.scalars(assoc_stmt)).all())
