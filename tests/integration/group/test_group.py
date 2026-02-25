@@ -84,7 +84,7 @@ class TestGroupMemberLifecycle:
         """create group -> add members -> remove members -> verify"""
         create_result = await group_factory()
         group_id = create_result.group.id
-        user_id = regular_user_fixture.user_id
+        user_id = regular_user_fixture.user_uuid
 
         # Add member
         add_result = await admin_registry.group.add_members(

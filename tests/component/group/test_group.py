@@ -213,7 +213,7 @@ class TestGroupMembers:
         target_group: CreateGroupResponse,
         regular_user_fixture: Any,
     ) -> None:
-        user_id = regular_user_fixture.user_id
+        user_id = regular_user_fixture.user_uuid
         result = await admin_registry.group.add_members(
             target_group.group.id,
             AddGroupMembersRequest(user_ids=[user_id]),
@@ -230,7 +230,7 @@ class TestGroupMembers:
         target_group: CreateGroupResponse,
         regular_user_fixture: Any,
     ) -> None:
-        user_id = regular_user_fixture.user_id
+        user_id = regular_user_fixture.user_uuid
         # First add the member
         await admin_registry.group.add_members(
             target_group.group.id,
