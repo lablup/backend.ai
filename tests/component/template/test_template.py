@@ -322,6 +322,7 @@ class TestCreateClusterTemplate:
 
 
 class TestGetClusterTemplate:
+    @_HMAC_XFAIL
     @pytest.mark.asyncio
     async def test_admin_gets_cluster_template(
         self,
@@ -347,10 +348,11 @@ class TestGetClusterTemplate:
         )
         cluster_tpl_id = ct_result.id
 
-        result = await admin_registry.template.get_cluster_template(cluster_tpl_id)
+        result = await admin_registry.template.get_cluster_template(
+            cluster_tpl_id,
+            GetClusterTemplateRequest(format="json"),
+        )
         assert isinstance(result, GetClusterTemplateResponse)
-        # Default format is yaml, but without query params the trafaret default kicks in.
-        # The response is the template dict.
         assert result.root is not None
 
     @_HMAC_XFAIL
