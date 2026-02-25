@@ -149,11 +149,14 @@ class RBACScopeUnbinder[TRow: Base](ABC):
     with RBAC association deletion (association_scopes_entities).
 
     Implementations specify what to delete by providing:
-    - purger_spec: A BatchPurgerSpec for business N:N row deletion.
-    - build_condition(): A WHERE condition for AssociationScopesEntitiesRow deletion.
+    - build_purger_spec(): Returns a BatchPurgerSpec for business N:N row deletion.
+    - build_condition(): Returns a WHERE condition for AssociationScopesEntitiesRow deletion.
     """
 
-    purger_spec: BatchPurgerSpec[TRow]
+    @abstractmethod
+    def build_purger_spec(self) -> BatchPurgerSpec[TRow]:
+        """Build purger spec for business N:N mapping row deletion."""
+        raise NotImplementedError
 
     @abstractmethod
     def build_condition(self) -> sa.ColumnElement[bool]:
@@ -192,7 +195,9 @@ async def execute_rbac_scope_unbinder[TRow: Base](
         RBACScopeUnbinderResult with deletion counts and removed associations.
     """
     # 1. Delete business N:N mapping rows
-    purge_result = await execute_batch_purger(db_sess, BatchPurger(spec=unbinder.purger_spec))
+    purge_result = await execute_batch_purger(
+        db_sess, BatchPurger(spec=unbinder.build_purger_spec())
+    )
 
     # 2. Delete RBAC association rows
     assoc_stmt = (
