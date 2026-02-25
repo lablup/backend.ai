@@ -3,12 +3,12 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
-from tests.component.conftest import UserFixtureData
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import ResourceSlot
@@ -37,6 +37,20 @@ from ai.backend.manager.server import (
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
+
+
+@dataclass
+class KeypairFixtureData:
+    access_key: str
+    secret_key: str
+
+
+@dataclass
+class UserFixtureData:
+    user_uuid: uuid.UUID
+    keypair: KeypairFixtureData
+    email: str = ""
+
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),

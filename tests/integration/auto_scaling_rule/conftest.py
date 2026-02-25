@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
-from tests.integration.conftest import UserFixtureData
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import ResourceSlot
@@ -14,6 +14,18 @@ from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.image import ImageRow
+
+
+@dataclass
+class KeypairFixtureData:
+    access_key: str
+    secret_key: str
+
+
+@dataclass
+class UserFixtureData:
+    user_uuid: uuid.UUID
+    keypair: KeypairFixtureData
 
 
 @pytest.fixture()
