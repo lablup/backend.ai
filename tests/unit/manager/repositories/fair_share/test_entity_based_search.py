@@ -438,12 +438,15 @@ class TestSearchDomainFairSharesEntityBased:
         assert result_domains[domain_without_record].data.metadata is None
 
     @pytest.mark.asyncio
-    async def test_filters_by_resource_group_in_scope(
+    async def test_returns_all_domains_regardless_of_rg_membership(
         self,
         fair_share_repository: FairShareRepository,
         two_scaling_groups_with_domains: TwoScalingGroupsFixture,
     ) -> None:
-        """Search should only return domains associated with resource_group in scope."""
+        """BA-4682: Search should return ALL domains, not just RG-registered ones.
+
+        Both domains appear in results; fair share data is from the queried RG.
+        """
         fixture = two_scaling_groups_with_domains
         scope = DomainFairShareSearchScope(resource_group=fixture.rg1)
         querier = BatchQuerier(
@@ -454,9 +457,14 @@ class TestSearchDomainFairSharesEntityBased:
 
         result = await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
 
-        assert result.total_count == 1
-        assert len(result.items) == 1
-        assert result.items[0].domain_name == fixture.domain_in_rg1
+        assert result.total_count == 2
+        assert len(result.items) == 2
+        result_domains = {d.domain_name: d for d in result.items}
+        assert fixture.domain_in_rg1 in result_domains
+        assert fixture.domain_in_rg2 in result_domains
+        # Both get default data since no fair share records exist
+        assert result_domains[fixture.domain_in_rg1].data.use_default is True
+        assert result_domains[fixture.domain_in_rg2].data.use_default is True
 
     @pytest.mark.asyncio
     async def test_pagination_includes_all_entities(
@@ -554,6 +562,56 @@ class TestSearchDomainFairSharesEntityBased:
         assert result_with.total_count == 1
         assert result_with.items[0].domain_name == domain_with_record
         assert result_with.items[0].data.use_default is False
+
+    # ==================== BA-4682: Non-RG-member entity search regression ====================
+
+    @pytest.fixture
+    async def domain_not_in_rg(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create a domain NOT associated with any scaling group."""
+        domain_name = f"no-rg-domain-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    name=domain_name,
+                    description="Domain not in any RG",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+            await db_sess.commit()
+        return domain_name
+
+    @pytest.mark.asyncio
+    async def test_search_includes_domain_not_in_rg(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_with_record: str,
+        domain_not_in_rg: str,
+    ) -> None:
+        """BA-4682: Domain not in any RG should appear in search results with defaults."""
+        scope = DomainFairShareSearchScope(resource_group=scaling_group)
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
+
+        assert result.total_count == 2
+        result_domains = {d.domain_name: d for d in result.items}
+        assert domain_with_record in result_domains
+        assert domain_not_in_rg in result_domains
+        # Domain in RG with record: use_default=False
+        assert result_domains[domain_with_record].data.use_default is False
+        # Domain not in any RG: use_default=True (defaults from queried RG)
+        assert result_domains[domain_not_in_rg].data.use_default is True
 
 
 class TestSearchProjectFairSharesEntityBased:
@@ -875,6 +933,71 @@ class TestSearchProjectFairSharesEntityBased:
         assert len(result.items) == 1
         assert result.items[0].project_id == project_without_record
         assert result.items[0].data.use_default is True
+
+    # ==================== BA-4682: Non-RG-member entity search regression ====================
+
+    @pytest.fixture
+    async def project_not_in_rg(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_name: str,
+    ) -> uuid.UUID:
+        """Create a project NOT associated with any scaling group."""
+        project_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=-1,
+                    max_network_count=10,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                GroupRow(
+                    id=project_id,
+                    name=f"no-rg-project-{project_id.hex[:8]}",
+                    domain_name=domain_name,
+                    description="Project not in any RG",
+                    resource_policy=policy_name,
+                )
+            )
+            await db_sess.commit()
+        return project_id
+
+    @pytest.mark.asyncio
+    async def test_search_includes_project_not_in_rg(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_name: str,
+        project_with_record: uuid.UUID,
+        project_not_in_rg: uuid.UUID,
+    ) -> None:
+        """BA-4682: Project not in any RG should appear in search results with defaults."""
+        scope = ProjectFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+        )
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_project_fair_shares(scope, querier)
+
+        assert result.total_count == 2
+        result_projects = {p.project_id: p for p in result.items}
+        assert project_with_record in result_projects
+        assert project_not_in_rg in result_projects
+        # Project in RG with record: use_default=False
+        assert result_projects[project_with_record].data.use_default is False
+        # Project not in any RG: use_default=True
+        assert result_projects[project_not_in_rg].data.use_default is True
 
 
 class TestSearchUserFairSharesEntityBased:

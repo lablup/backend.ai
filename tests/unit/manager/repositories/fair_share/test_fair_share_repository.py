@@ -723,3 +723,93 @@ class TestFairShareRepository:
         assert result.user_uuid == test_user_uuid
         assert result.project_id == test_project_id
         assert result.data.spec.weight == Decimal("1.8")
+
+    # ==================== Regression: Non-RG-member lookup tests (BA-4682) ====================
+
+    @pytest.fixture
+    async def domain_not_in_rg(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create a domain NOT associated with any scaling group."""
+        domain_name = f"no-rg-domain-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            domain = DomainRow(
+                name=domain_name,
+                description="Domain not in any RG",
+                is_active=True,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+            )
+            db_sess.add(domain)
+            await db_sess.commit()
+
+        return domain_name
+
+    @pytest.fixture
+    async def project_not_in_rg(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_not_in_rg: str,
+    ) -> uuid.UUID:
+        """Create a project NOT associated with any scaling group."""
+        project_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy_name = f"test-project-policy-{uuid.uuid4().hex[:8]}"
+            policy = ProjectResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=-1,
+                max_network_count=10,
+            )
+            db_sess.add(policy)
+            await db_sess.flush()
+
+            group = GroupRow(
+                id=project_id,
+                name=f"no-rg-project-{project_id.hex[:8]}",
+                domain_name=domain_not_in_rg,
+                description="Project not in any RG",
+                resource_policy=policy_name,
+            )
+            db_sess.add(group)
+            await db_sess.commit()
+
+        return project_id
+
+    @pytest.mark.asyncio
+    async def test_get_domain_fair_share_without_rg_membership(
+        self,
+        fair_share_repository: FairShareRepository,
+        test_scaling_group: str,
+        domain_not_in_rg: str,
+    ) -> None:
+        """BA-4682: Domain not in any RG should return default fair share, not raise."""
+        result = await fair_share_repository.get_domain_fair_share(
+            resource_group=test_scaling_group,
+            domain_name=domain_not_in_rg,
+        )
+
+        assert result.domain_name == domain_not_in_rg
+        assert result.resource_group == test_scaling_group
+        assert result.data.use_default is True
+
+    @pytest.mark.asyncio
+    async def test_get_project_fair_share_without_rg_membership(
+        self,
+        fair_share_repository: FairShareRepository,
+        test_scaling_group: str,
+        project_not_in_rg: uuid.UUID,
+    ) -> None:
+        """BA-4682: Project not in any RG should return default fair share, not raise."""
+        result = await fair_share_repository.get_project_fair_share(
+            resource_group=test_scaling_group,
+            project_id=project_not_in_rg,
+        )
+
+        assert result.project_id == project_not_in_rg
+        assert result.resource_group == test_scaling_group
+        assert result.data.use_default is True
