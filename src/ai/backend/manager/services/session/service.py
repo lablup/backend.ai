@@ -752,12 +752,13 @@ class SessionService:
         mark_result = await self._scheduling_controller.mark_sessions_for_termination(
             session_ids,
             reason=reason.value,
+            forced=forced,
         )
 
-        # Build stats for response - prioritize cancelled over terminating
+        # Build stats for response - prioritize cancelled over terminating/force-terminated
         if mark_result.cancelled_sessions:
             last_stat = {"status": "cancelled"}
-        elif mark_result.terminating_sessions:
+        elif mark_result.terminating_sessions or mark_result.force_terminated_sessions:
             last_stat = {"status": "terminated"}
         else:
             last_stat = {}

@@ -488,6 +488,7 @@ class TestDestroySession:
             return_value=MarkTerminatingResult(
                 cancelled_sessions=[sample_session_id],
                 terminating_sessions=[],
+                force_terminated_sessions=[],
                 skipped_sessions=[],
             )
         )
@@ -515,12 +516,48 @@ class TestDestroySession:
         sample_session_id: SessionId,
         sample_access_key: AccessKey,
     ) -> None:
-        """Test successfully destroying session (terminated status)"""
+        """Test successfully destroying session (terminated status via normal termination)"""
         mock_session_repository.get_target_session_ids = AsyncMock(return_value=[sample_session_id])
         mock_scheduling_controller.mark_sessions_for_termination = AsyncMock(
             return_value=MarkTerminatingResult(
                 cancelled_sessions=[],
                 terminating_sessions=[sample_session_id],
+                force_terminated_sessions=[],
+                skipped_sessions=[],
+            )
+        )
+
+        action = DestroySessionAction(
+            user_role=UserRole.USER,
+            session_name="test-session",
+            forced=False,
+            recursive=False,
+            owner_access_key=sample_access_key,
+        )
+        result = await session_service.destroy_session(action)
+
+        assert result.result == {"stats": {"status": "terminated"}}
+        mock_scheduling_controller.mark_sessions_for_termination.assert_called_once_with(
+            [sample_session_id],
+            reason="USER_REQUESTED",
+            forced=False,
+        )
+
+    async def test_force_terminate_directly_terminated(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_scheduling_controller: MagicMock,
+        sample_session_id: SessionId,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test force-terminate skips TERMINATING and goes directly to TERMINATED"""
+        mock_session_repository.get_target_session_ids = AsyncMock(return_value=[sample_session_id])
+        mock_scheduling_controller.mark_sessions_for_termination = AsyncMock(
+            return_value=MarkTerminatingResult(
+                cancelled_sessions=[],
+                terminating_sessions=[],
+                force_terminated_sessions=[sample_session_id],
                 skipped_sessions=[],
             )
         )
@@ -535,6 +572,11 @@ class TestDestroySession:
         result = await session_service.destroy_session(action)
 
         assert result.result == {"stats": {"status": "terminated"}}
+        mock_scheduling_controller.mark_sessions_for_termination.assert_called_once_with(
+            [sample_session_id],
+            reason="FORCE_TERMINATED",
+            forced=True,
+        )
 
     async def test_recursive_destroy(
         self,
@@ -550,6 +592,7 @@ class TestDestroySession:
             return_value=MarkTerminatingResult(
                 cancelled_sessions=session_ids,
                 terminating_sessions=[],
+                force_terminated_sessions=[],
                 skipped_sessions=[],
             )
         )
@@ -581,6 +624,7 @@ class TestDestroySession:
             return_value=MarkTerminatingResult(
                 cancelled_sessions=[],
                 terminating_sessions=[],
+                force_terminated_sessions=[],
                 skipped_sessions=[],
             )
         )

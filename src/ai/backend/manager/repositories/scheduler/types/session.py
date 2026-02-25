@@ -168,14 +168,21 @@ class MarkTerminatingResult:
 
     cancelled_sessions: list[SessionId]  # Sessions that were cancelled (PENDING)
     terminating_sessions: list[SessionId]  # Sessions marked as TERMINATING
+    force_terminated_sessions: list[SessionId]  # Sessions directly set to TERMINATED (forced)
     skipped_sessions: list[
         SessionId
     ]  # Sessions not processed (already terminated, not found, etc.)
 
     def has_processed(self) -> bool:
         """Check if any sessions were actually processed (state changed)."""
-        return bool(self.cancelled_sessions or self.terminating_sessions)
+        return bool(
+            self.cancelled_sessions or self.terminating_sessions or self.force_terminated_sessions
+        )
 
     def processed_count(self) -> int:
         """Get count of sessions that were actually processed."""
-        return len(self.cancelled_sessions) + len(self.terminating_sessions)
+        return (
+            len(self.cancelled_sessions)
+            + len(self.terminating_sessions)
+            + len(self.force_terminated_sessions)
+        )
