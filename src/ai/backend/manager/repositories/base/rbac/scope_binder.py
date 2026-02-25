@@ -9,11 +9,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import RelationType
@@ -27,7 +25,11 @@ from ai.backend.manager.repositories.base.creator import (
     CreatorSpec,
     execute_bulk_creator,
 )
-from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
+from ai.backend.manager.repositories.base.purger import (
+    BatchPurger,
+    BatchPurgerSpec,
+    execute_batch_purger,
+)
 
 # =============================================================================
 # Common
@@ -192,15 +194,8 @@ async def execute_rbac_scope_unbinder[TRow: Base](
         return RBACScopeUnbinderResult(deleted_count=0, association_rows=[])
 
     # 1. Delete business N:N mapping rows via purger_spec
-    base_subquery = unbinder.purger_spec.build_subquery()
-    table = cast(sa.Table, base_subquery.froms[0])
-    pk_columns = list(table.primary_key.columns)
-
-    sub = unbinder.purger_spec.build_subquery().subquery()
-    pk_subquery = sa.select(*[sub.c[pk_col.key] for pk_col in pk_columns])
-    stmt = sa.delete(table).where(sa.tuple_(*pk_columns).in_(pk_subquery))
-    result = await db_sess.execute(stmt)
-    deleted_count = cast(CursorResult[Any], result).rowcount or 0
+    purge_result = await execute_batch_purger(db_sess, BatchPurger(spec=unbinder.purger_spec))
+    deleted_count = purge_result.deleted_count
 
     # 2. Delete RBAC association rows
     assoc_conditions = [
