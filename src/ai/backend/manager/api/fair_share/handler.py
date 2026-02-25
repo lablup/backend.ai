@@ -73,6 +73,7 @@ from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.manager.api.auth import auth_required_for_method
 from ai.backend.manager.api.types import CORSOptions, WebMiddleware
 from ai.backend.manager.dto.context import ProcessorsCtx
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
@@ -133,7 +134,7 @@ class FairShareAPIHandler:
         """Check if the current user is a superadmin."""
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
+            raise NotEnoughPermission("Only superadmin can access fair share data.")
 
     # Domain Fair Share
 
