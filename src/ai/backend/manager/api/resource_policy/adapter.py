@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.dto.manager.resource_policy.request import (
     KeypairResourcePolicyFilter,
     KeypairResourcePolicyOrder,
@@ -112,13 +112,13 @@ class ResourcePolicyAdapter(BaseFilterAdapter):
         idle_timeout: OptionalState[int] = OptionalState.nop()
         allowed_vfolder_hosts: OptionalState[dict[str, Any]] = OptionalState.nop()
 
-        if not isinstance(request.default_for_unspecified, type(SENTINEL)):
+        if not isinstance(request.default_for_unspecified, Sentinel):
             default_for_unspecified = OptionalState.update(request.default_for_unspecified)
-        if not isinstance(request.total_resource_slots, type(SENTINEL)):
+        if not isinstance(request.total_resource_slots, Sentinel):
             total_resource_slots = OptionalState.update(ResourceSlot(request.total_resource_slots))
-        if not isinstance(request.max_session_lifetime, type(SENTINEL)):
+        if not isinstance(request.max_session_lifetime, Sentinel):
             max_session_lifetime = OptionalState.update(request.max_session_lifetime)
-        if not isinstance(request.max_concurrent_sessions, type(SENTINEL)):
+        if not isinstance(request.max_concurrent_sessions, Sentinel):
             max_concurrent_sessions = OptionalState.update(request.max_concurrent_sessions)
         if request.max_pending_session_count is not SENTINEL:
             if request.max_pending_session_count is None:
@@ -132,15 +132,15 @@ class ResourcePolicyAdapter(BaseFilterAdapter):
                 max_pending_session_resource_slots = TriState.update(
                     request.max_pending_session_resource_slots
                 )
-        if not isinstance(request.max_concurrent_sftp_sessions, type(SENTINEL)):
+        if not isinstance(request.max_concurrent_sftp_sessions, Sentinel):
             max_concurrent_sftp_sessions = OptionalState.update(
                 request.max_concurrent_sftp_sessions
             )
-        if not isinstance(request.max_containers_per_session, type(SENTINEL)):
+        if not isinstance(request.max_containers_per_session, Sentinel):
             max_containers_per_session = OptionalState.update(request.max_containers_per_session)
-        if not isinstance(request.idle_timeout, type(SENTINEL)):
+        if not isinstance(request.idle_timeout, Sentinel):
             idle_timeout = OptionalState.update(request.idle_timeout)
-        if not isinstance(request.allowed_vfolder_hosts, type(SENTINEL)):
+        if not isinstance(request.allowed_vfolder_hosts, Sentinel):
             allowed_vfolder_hosts = OptionalState.update(request.allowed_vfolder_hosts)
 
         updater_spec = KeyPairResourcePolicyUpdaterSpec(
@@ -205,15 +205,15 @@ class ResourcePolicyAdapter(BaseFilterAdapter):
         max_session_count_per_model_session: OptionalState[int] = OptionalState.nop()
         max_customized_image_count: OptionalState[int] = OptionalState.nop()
 
-        if not isinstance(request.max_vfolder_count, type(SENTINEL)):
+        if not isinstance(request.max_vfolder_count, Sentinel):
             max_vfolder_count = OptionalState.update(request.max_vfolder_count)
-        if not isinstance(request.max_quota_scope_size, type(SENTINEL)):
+        if not isinstance(request.max_quota_scope_size, Sentinel):
             max_quota_scope_size = OptionalState.update(request.max_quota_scope_size)
-        if not isinstance(request.max_session_count_per_model_session, type(SENTINEL)):
+        if not isinstance(request.max_session_count_per_model_session, Sentinel):
             max_session_count_per_model_session = OptionalState.update(
                 request.max_session_count_per_model_session
             )
-        if not isinstance(request.max_customized_image_count, type(SENTINEL)):
+        if not isinstance(request.max_customized_image_count, Sentinel):
             max_customized_image_count = OptionalState.update(request.max_customized_image_count)
 
         updater_spec = UserResourcePolicyUpdaterSpec(
@@ -270,11 +270,11 @@ class ResourcePolicyAdapter(BaseFilterAdapter):
         max_quota_scope_size: OptionalState[int] = OptionalState.nop()
         max_network_count: OptionalState[int] = OptionalState.nop()
 
-        if not isinstance(request.max_vfolder_count, type(SENTINEL)):
+        if not isinstance(request.max_vfolder_count, Sentinel):
             max_vfolder_count = OptionalState.update(request.max_vfolder_count)
-        if not isinstance(request.max_quota_scope_size, type(SENTINEL)):
+        if not isinstance(request.max_quota_scope_size, Sentinel):
             max_quota_scope_size = OptionalState.update(request.max_quota_scope_size)
-        if not isinstance(request.max_network_count, type(SENTINEL)):
+        if not isinstance(request.max_network_count, Sentinel):
             max_network_count = OptionalState.update(request.max_network_count)
 
         updater_spec = ProjectResourcePolicyUpdaterSpec(
