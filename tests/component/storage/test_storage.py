@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.storage.request import (
 from ai.backend.common.dto.manager.storage.response import (
     ListVFSStorageResponse,
     ObjectStorageAllBucketsResponse,
+    ObjectStorageBucketsResponse,
     ObjectStorageListResponse,
 )
 
@@ -82,19 +83,13 @@ class TestGetAllBuckets:
 
 class TestGetBuckets:
     @pytest.mark.asyncio
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 HMAC signing omits query params; server verifies against"
-            " request.raw_path (including ?param=...). Endpoints with path params"
-            " using random UUIDs cause lookup errors in the service layer."
-        ),
-    )
     async def test_get_buckets_with_nonexistent_storage(
         self,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        await admin_registry.storage.get_buckets(str(uuid.uuid4()))
+        result = await admin_registry.storage.get_buckets(str(uuid.uuid4()))
+        assert isinstance(result, ObjectStorageBucketsResponse)
+        assert result.buckets == []
 
 
 # ── VFS Storage ─────────────────────────────────────────────────────
