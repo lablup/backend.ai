@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import uuid
 
 import pytest
 
@@ -66,14 +65,14 @@ class TestSessionTemplateLifecycle:
         self,
         admin_registry: BackendAIClientRegistry,
         domain_fixture: str,
-        group_fixture: uuid.UUID,
+        group_name_fixture: str,
     ) -> None:
         """Full CRUD lifecycle: create -> get -> update -> get -> delete -> verify gone."""
         # Create
         create_result = await admin_registry.template.create_session_template(
             CreateSessionTemplateRequest(
                 domain=domain_fixture,
-                group=str(group_fixture),
+                group=group_name_fixture,
                 payload=_session_template_payload("lifecycle-st"),
             ),
         )
@@ -92,7 +91,7 @@ class TestSessionTemplateLifecycle:
             template_id,
             UpdateSessionTemplateRequest(
                 domain=domain_fixture,
-                group=str(group_fixture),
+                group=group_name_fixture,
                 payload=_session_template_payload("lifecycle-st-updated"),
             ),
         )
@@ -120,14 +119,14 @@ class TestClusterTemplateLifecycle:
         self,
         admin_registry: BackendAIClientRegistry,
         domain_fixture: str,
-        group_fixture: uuid.UUID,
+        group_name_fixture: str,
     ) -> None:
         """Full CRUD: create session tpl -> create cluster tpl -> get -> update -> delete."""
         # Create prerequisite session template
         st_result = await admin_registry.template.create_session_template(
             CreateSessionTemplateRequest(
                 domain=domain_fixture,
-                group=str(group_fixture),
+                group=group_name_fixture,
                 payload=_session_template_payload("ct-lifecycle-dep"),
             ),
         )
@@ -137,7 +136,7 @@ class TestClusterTemplateLifecycle:
         create_result = await admin_registry.template.create_cluster_template(
             CreateClusterTemplateRequest(
                 domain=domain_fixture,
-                group=str(group_fixture),
+                group=group_name_fixture,
                 payload=_cluster_template_payload("lifecycle-ct", session_tpl_id),
             ),
         )
