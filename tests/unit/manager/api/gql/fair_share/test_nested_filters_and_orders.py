@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.fair_share.types.domain import (
@@ -226,14 +223,12 @@ class TestUserFairShareEntityOrderField:
         assert query_order is not None
 
 
-# postgresql.dialect (PGDialect) has untyped __init__; assign via Any to avoid [no-untyped-call].
-_pg_dialect_cls: Any = postgresql.dialect
-_PG_DIALECT: sa.engine.Dialect = _pg_dialect_cls()
-
-
 def _compile_sql(expr: sa.sql.expression.ColumnElement[bool]) -> str:
-    """Compile a SQLAlchemy expression to a string for assertion."""
-    return str(expr.compile(dialect=_PG_DIALECT, compile_kwargs={"literal_binds": True}))
+    """Compile a SQLAlchemy expression to a string for assertion.
+
+    Uses the default dialect which compiles ilike as lower(...) LIKE lower(...).
+    """
+    return str(expr.compile(compile_kwargs={"literal_binds": True}))
 
 
 class TestDomainFairShareFilterNegatedCaseInsensitive:
@@ -252,7 +247,8 @@ class TestDomainFairShareFilterNegatedCaseInsensitive:
         conditions = f.build_conditions()
         assert len(conditions) == 1
         sql = _compile_sql(conditions[0]())
-        assert "ILIKE" in sql
+        # Default dialect compiles ilike as lower(...) LIKE lower(...)
+        assert "lower" in sql
 
     def test_i_not_contains_filter(self) -> None:
         f = DomainFairShareFilter(resource_group=StringFilter(i_not_contains="a"))
@@ -260,7 +256,8 @@ class TestDomainFairShareFilterNegatedCaseInsensitive:
         assert len(conditions) == 1
         sql = _compile_sql(conditions[0]())
         assert "NOT" in sql
-        assert "ILIKE" in sql
+        # Default dialect compiles ilike as lower(...) LIKE lower(...)
+        assert "lower" in sql
 
 
 class TestProjectFairShareFilterNegatedCaseInsensitive:
@@ -282,7 +279,8 @@ class TestProjectFairShareFilterNegatedCaseInsensitive:
         conditions = nested.build_conditions()
         assert len(conditions) == 1
         sql = _compile_sql(conditions[0]())
-        assert "ILIKE" in sql
+        # Default dialect compiles ilike as lower(...) LIKE lower(...)
+        assert "lower" in sql
 
     def test_resource_group_i_not_contains(self) -> None:
         f = ProjectFairShareFilter(resource_group=StringFilter(i_not_contains="rg"))
@@ -290,7 +288,8 @@ class TestProjectFairShareFilterNegatedCaseInsensitive:
         assert len(conditions) == 1
         sql = _compile_sql(conditions[0]())
         assert "NOT" in sql
-        assert "ILIKE" in sql
+        # Default dialect compiles ilike as lower(...) LIKE lower(...)
+        assert "lower" in sql
 
 
 class TestUserFairShareFilterNegatedCaseInsensitive:
@@ -312,7 +311,8 @@ class TestUserFairShareFilterNegatedCaseInsensitive:
         conditions = nested.build_conditions()
         assert len(conditions) == 1
         sql = _compile_sql(conditions[0]())
-        assert "ILIKE" in sql
+        # Default dialect compiles ilike as lower(...) LIKE lower(...)
+        assert "lower" in sql
 
     def test_domain_name_i_not_contains(self) -> None:
         f = UserFairShareFilter(domain_name=StringFilter(i_not_contains="dom"))
@@ -320,4 +320,5 @@ class TestUserFairShareFilterNegatedCaseInsensitive:
         assert len(conditions) == 1
         sql = _compile_sql(conditions[0]())
         assert "NOT" in sql
-        assert "ILIKE" in sql
+        # Default dialect compiles ilike as lower(...) LIKE lower(...)
+        assert "lower" in sql
