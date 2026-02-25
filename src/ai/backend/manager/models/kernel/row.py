@@ -585,7 +585,7 @@ class KernelRow(Base):  # type: ignore[misc]
     startup_command: Mapped[str | None] = mapped_column("startup_command", sa.Text, nullable=True)
     result: Mapped[SessionResult] = mapped_column(
         "result",
-        EnumType(SessionResult, name="sessionresults"),
+        EnumType(SessionResult),
         default=SessionResult.UNDEFINED,
         server_default=SessionResult.UNDEFINED.name,
         nullable=False,
