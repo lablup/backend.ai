@@ -4654,69 +4654,6 @@
         "title": "UpdateDeploymentRequest",
         "type": "object"
       },
-      "CreateRevisionRequest": {
-        "description": "Request to create a new revision for an existing deployment.",
-        "properties": {
-          "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Revision name",
-            "title": "Name"
-          },
-          "cluster_config": {
-            "$ref": "#/components/schemas/ClusterConfigInput",
-            "description": "Cluster configuration"
-          },
-          "resource_config": {
-            "$ref": "#/components/schemas/ResourceConfigInput",
-            "description": "Resource configuration"
-          },
-          "image": {
-            "$ref": "#/components/schemas/ImageInput",
-            "description": "Container image"
-          },
-          "model_runtime_config": {
-            "$ref": "#/components/schemas/ModelRuntimeConfigInput",
-            "description": "Model runtime configuration"
-          },
-          "model_mount_config": {
-            "$ref": "#/components/schemas/ModelMountConfigInput",
-            "description": "Model mount configuration"
-          },
-          "extra_mounts": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ExtraVFolderMountInput"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Extra vfolder mounts",
-            "title": "Extra Mounts"
-          }
-        },
-        "required": [
-          "cluster_config",
-          "resource_config",
-          "image",
-          "model_runtime_config",
-          "model_mount_config"
-        ],
-        "title": "CreateRevisionRequest",
-        "type": "object"
-      },
       "RevisionFilter": {
         "description": "Filter for revisions.",
         "properties": {
@@ -18923,44 +18860,6 @@
           }
         ],
         "description": "Destroy a deployment.\n\n**Preconditions:**\n* User privilege required.\n"
-      }
-    },
-    "/deployments/{deployment_id}/revisions": {
-      "post": {
-        "operationId": "deployments.create_revision",
-        "tags": [
-          "deployments"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateRevisionRequest"
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "deployment_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "description": "Create a new revision for a deployment.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/deployments/{deployment_id}/revisions/search": {

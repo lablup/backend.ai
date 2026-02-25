@@ -21,7 +21,6 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.dto.manager.deployment import (
     ClusterConfigDTO,
     CreateDeploymentRequest,
-    CreateRevisionRequest,
     DeploymentDTO,
     DeploymentFilter,
     DeploymentOrder,
@@ -32,6 +31,7 @@ from ai.backend.common.dto.manager.deployment import (
     ResourceConfigDTO,
     RevisionDTO,
     RevisionFilter,
+    RevisionInput,
     RevisionOrder,
     RouteDTO,
     RouteFilter,
@@ -89,7 +89,6 @@ from ai.backend.manager.repositories.deployment.options import (
 
 __all__ = (
     "CreateDeploymentAdapter",
-    "CreateRevisionAdapter",
     "DeploymentAdapter",
     "RevisionAdapter",
     "RouteAdapter",
@@ -415,7 +414,7 @@ class CreateDeploymentAdapter:
 
     def _build_revision_creator(
         self,
-        revision_input: Any,  # RevisionInput or CreateRevisionRequest
+        revision_input: RevisionInput,
     ) -> ModelRevisionCreator:
         """Build ModelRevisionCreator from revision input."""
         # Build resource spec
@@ -502,20 +501,3 @@ class CreateDeploymentAdapter:
             strategy_spec=strategy_spec,
             rollback_on_failure=strategy_input.rollback_on_failure,
         )
-
-
-class CreateRevisionAdapter:
-    """Adapter for converting create revision request to creators."""
-
-    def build_creator(self, request: CreateRevisionRequest) -> ModelRevisionCreator:
-        """
-        Convert CreateRevisionRequest to ModelRevisionCreator.
-
-        Args:
-            request: Create revision request DTO
-
-        Returns:
-            ModelRevisionCreator for service layer
-        """
-        deployment_adapter = CreateDeploymentAdapter()
-        return deployment_adapter._build_revision_creator(request)

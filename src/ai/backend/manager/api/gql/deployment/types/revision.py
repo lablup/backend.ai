@@ -369,11 +369,6 @@ class AddRevisionPayload:
     revision: ModelRevision
 
 
-@strawberry.type(description="Added in 25.16.0")
-class CreateRevisionPayload:
-    revision: ModelRevision
-
-
 @strawberry.input(
     name="ActivateRevisionInput",
     description="Added in 25.19.0. Input for activating a revision to be the current revision.",
@@ -496,7 +491,7 @@ class ExtraVFolderMountInput:
 
 
 @strawberry.input(
-    description="Added in 25.19.0. Input for creating a revision without attaching to a deployment."
+    description="Added in 25.19.0. Input for specifying revision configuration within a deployment."
 )
 class CreateRevisionInput:
     name: str | None = None

@@ -50,7 +50,6 @@ from .deployment import (
     create_auto_scaling_rule,
     # Deployment
     create_model_deployment,
-    create_model_revision,
     delete_auto_scaling_rule,
     delete_model_deployment,
     deployment,
@@ -392,7 +391,6 @@ class Mutation:
     delete_model_deployment = delete_model_deployment
     sync_replicas = sync_replicas
     add_model_revision = add_model_revision
-    create_model_revision = create_model_revision
     # Notification - Admin APIs
     admin_create_notification_channel = admin_create_notification_channel
     admin_update_notification_channel = admin_update_notification_channel

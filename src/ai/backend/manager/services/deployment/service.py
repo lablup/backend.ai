@@ -106,10 +106,6 @@ from ai.backend.manager.services.deployment.actions.model_revision.add_model_rev
     AddModelRevisionAction,
     AddModelRevisionActionResult,
 )
-from ai.backend.manager.services.deployment.actions.model_revision.create_model_revision import (
-    CreateModelRevisionAction,
-    CreateModelRevisionActionResult,
-)
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
     GetRevisionByIdActionResult,
@@ -492,17 +488,6 @@ class DeploymentService:
         raise NotImplementedError(
             "add_model_revision requires controller's revision generator for image resolution. "
             "Use create_legacy_deployment for deployment creation with revision."
-        )
-
-    async def create_model_revision(
-        self, action: CreateModelRevisionAction
-    ) -> CreateModelRevisionActionResult:
-        # TODO: Implement full revision creation logic
-        # Note: CreateModelRevisionAction is missing deployment_id field
-        # This requires integration with the controller's revision generator system
-        raise NotImplementedError(
-            "create_model_revision requires controller's revision generator for image resolution "
-            "and is missing deployment_id in action definition."
         )
 
     async def get_revision_by_id(

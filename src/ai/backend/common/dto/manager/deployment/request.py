@@ -34,7 +34,6 @@ __all__ = (
     "SearchRoutesRequest",
     # Create requests
     "CreateDeploymentRequest",
-    "CreateRevisionRequest",
     # Update requests
     "UpdateDeploymentRequest",
     "UpdateRouteTrafficStatusRequest",
@@ -284,17 +283,3 @@ class CreateDeploymentRequest(BaseRequestModel):
     )
     desired_replica_count: int = Field(ge=0, description="Desired number of replicas")
     initial_revision: RevisionInput = Field(description="Initial revision configuration")
-
-
-class CreateRevisionRequest(BaseRequestModel):
-    """Request to create a new revision for an existing deployment."""
-
-    name: str | None = Field(default=None, description="Revision name")
-    cluster_config: ClusterConfigInput = Field(description="Cluster configuration")
-    resource_config: ResourceConfigInput = Field(description="Resource configuration")
-    image: ImageInput = Field(description="Container image")
-    model_runtime_config: ModelRuntimeConfigInput = Field(description="Model runtime configuration")
-    model_mount_config: ModelMountConfigInput = Field(description="Model mount configuration")
-    extra_mounts: list[ExtraVFolderMountInput] | None = Field(
-        default=None, description="Extra vfolder mounts"
-    )

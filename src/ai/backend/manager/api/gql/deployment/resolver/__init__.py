@@ -29,7 +29,6 @@ from .replica import (
 from .revision import (
     activate_deployment_revision,
     add_model_revision,
-    create_model_revision,
     inference_runtime_config,
     inference_runtime_configs,
     revision,
@@ -66,7 +65,6 @@ __all__ = [
     "inference_runtime_config",
     "inference_runtime_configs",
     "add_model_revision",
-    "create_model_revision",
     "activate_deployment_revision",
     # Route
     "routes",

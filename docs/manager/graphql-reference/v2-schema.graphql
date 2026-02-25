@@ -1296,7 +1296,7 @@ type CreateReservoirRegistryPayload {
 }
 
 """
-Added in 25.19.0. Input for creating a revision without attaching to a deployment.
+Added in 25.19.0. Input for specifying revision configuration within a deployment.
 """
 input CreateRevisionInput {
   name: String = null
@@ -1306,11 +1306,6 @@ input CreateRevisionInput {
   modelRuntimeConfig: ModelRuntimeConfigInput!
   modelMountConfig: ModelMountConfigInput!
   extraMounts: [ExtraVFolderMountInput!]
-}
-
-"""Added in 25.16.0"""
-type CreateRevisionPayload {
-  revision: ModelRevision!
 }
 
 """Added in 26.3.0. Input for creating a role"""
@@ -3607,11 +3602,6 @@ type Mutation {
 
   """Added in 25.16.0"""
   addModelRevision(input: AddRevisionInput!): AddRevisionPayload!
-
-  """
-  Added in 25.16.0. Create model revision which is not attached to any deployment.
-  """
-  createModelRevision(input: CreateRevisionInput!): CreateRevisionPayload!
 
   """Create a new notification channel (admin only)"""
   adminCreateNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload!
