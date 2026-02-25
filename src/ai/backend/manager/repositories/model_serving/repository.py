@@ -71,6 +71,10 @@ from ai.backend.manager.repositories.base import (
     execute_creator,
     execute_updater,
 )
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
 from ai.backend.manager.services.model_serving.exceptions import (
@@ -204,13 +208,13 @@ class ModelServingRepository:
 
     @model_serving_repository_resilience.apply()
     async def create_endpoint_validated(
-        self, creator: Creator[EndpointRow], registry: AgentRegistry
+        self, creator: RBACEntityCreator[EndpointRow], registry: AgentRegistry
     ) -> EndpointData:
         """
         Create a new endpoint after validation.
         """
         async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
+            result = await execute_rbac_entity_creator(db_sess, creator)
             endpoint_row = await EndpointRow.get(
                 db_sess,
                 result.row.id,
