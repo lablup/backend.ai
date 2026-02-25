@@ -94,6 +94,10 @@ async def _streaming_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     root_ctx.registry = AsyncMock()
 
+    # stream_app_ctx() accesses root_ctx.event_dispatcher.subscribe() directly
+    # (src/ai/backend/manager/api/stream.py:741), so we must set it on root_ctx.
+    root_ctx.event_dispatcher = MagicMock()
+
     mock_idle_checker = AsyncMock()
     mock_idle_checker.get_idle_check_report = AsyncMock(return_value={})
 
