@@ -117,16 +117,6 @@ Because `next_status()` is `None`, the coordinator's generic success/failure han
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Endpoint Lifecycle State Machine
-
-```
-PENDING → SCALING → READY ⇄ DEPLOYING
-                      ↓
-                  DESTROYING → DESTROYED
-```
-
-`DEPLOYING` is entered when a new revision update is triggered on a deployment in the `READY` state. Which strategy processes it is determined by `DeploymentPolicyData.strategy`.
-
 ### Revision Activation Trigger Branching
 
 Revision switching (`activate_revision`) and general updates (`update_deployment`) take different paths:
