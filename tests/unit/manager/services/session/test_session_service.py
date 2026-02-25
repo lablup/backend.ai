@@ -539,7 +539,7 @@ class TestDestroySession:
         assert result.result == {"stats": {"status": "terminated"}}
         mock_scheduling_controller.mark_sessions_for_termination.assert_called_once_with(
             [sample_session_id],
-            reason="USER_REQUESTED",
+            reason="user-requested",
             forced=False,
         )
 
@@ -574,7 +574,7 @@ class TestDestroySession:
         assert result.result == {"stats": {"status": "terminated"}}
         mock_scheduling_controller.mark_sessions_for_termination.assert_called_once_with(
             [sample_session_id],
-            reason="FORCE_TERMINATED",
+            reason="force-terminated",
             forced=True,
         )
 
