@@ -32,7 +32,7 @@ On promotion, the Manager updates the DB (`Green→ACTIVE`, `Blue→INACTIVE`); 
 
 ## Cycle FSM
 
-The `DeployingDeploymentHandler` periodically evaluates each Blue-Green deployment. Each invocation follows this FSM:
+The `DeploymentStrategyEvaluator` periodically evaluates each Blue-Green deployment. Each invocation follows this FSM:
 
 ```
   ┌──────────────────────────────────────┐
@@ -81,12 +81,12 @@ Each cycle evaluation directly returns one of the shared sub-step variants:
 
 | Sub-Step | Condition | Handler Action |
 |----------|-----------|----------------|
-| **provisioning** | No Green routes → created all as INACTIVE | `successes` → SUCCESS history (DEPLOYING→DEPLOYING), reschedule |
-| **provisioning** | Green routes are PROVISIONING | `successes` → SUCCESS history (DEPLOYING→DEPLOYING), reschedule |
-| **progressing** | Not all Green healthy (mixed state, no PROVISIONING) | `successes` → SUCCESS history (DEPLOYING→DEPLOYING), reschedule |
-| **progressing** | All Green healthy, waiting for promotion trigger (manual or delay) | `successes` → SUCCESS history (DEPLOYING→DEPLOYING), reschedule |
-| **completed** | Promotion executed (Green→ACTIVE, Blue→TERMINATING) | Handler transitions DEPLOYING→READY directly, revision swap |
-| **rolled_back** | All Green failed → terminate Green | Handler transitions DEPLOYING→READY directly, deploying_revision=NULL |
+| **provisioning** | No Green routes → created all as INACTIVE | DeployingInProgressHandler → DEPLOYING→DEPLOYING, reschedule |
+| **provisioning** | Green routes are PROVISIONING | DeployingInProgressHandler → DEPLOYING→DEPLOYING, reschedule |
+| **progressing** | Not all Green healthy (mixed state, no PROVISIONING) | DeployingInProgressHandler → DEPLOYING→DEPLOYING, reschedule |
+| **progressing** | All Green healthy, waiting for promotion trigger (manual or delay) | DeployingInProgressHandler → DEPLOYING→DEPLOYING, reschedule |
+| **completed** | Promotion executed (Green→ACTIVE, Blue→TERMINATING) | DeployingCompletedHandler → DEPLOYING→READY, revision swap |
+| **rolled_back** | All Green failed → terminate Green | DeployingRolledBackHandler → DEPLOYING→READY, deploying_revision=NULL |
 
 ## promote_delay_seconds Handling
 
@@ -210,30 +210,24 @@ With `auto_promote=False`:
 
 ```
   ┌──────────────────────────────────────────────────────────────┐
-  │  DeployingDeploymentHandler                                  │
+  │  DeploymentStrategyEvaluator                                 │
+  │  (evaluator — strategy FSM + route changes)                  │
   │                                                              │
-  │  name()             → "deploying"                            │
-  │  target_statuses()  → [DEPLOYING]                            │
-  │  next_status()      → None  (handler owns transitions)        │
-  │                                                              │
-  │  execute(deployments) → DeploymentExecutionResult            │
-  │    1. Load policy_map                                        │
+  │  evaluate(deployments) → EvaluationResult                    │
+  │    1. Load policy_map, route_map                             │
   │    2. For each deployment:                                   │
   │         policy = policy_map[deployment.id]                   │
   │         strategy = policy.strategy                           │
   │    3. Dispatch by strategy:                                  │
   │         BLUE_GREEN → blue_green_evaluate(...)                │
-  │    4. Classify by sub_step:                                   │
-  │         completed    → handler transitions DEPLOYING→READY   │
-  │         rolled_back  → handler transitions, dep_rev=NULL     │
-  │         in-progress  → successes (SUCCESS history, resched.) │
-  │         errors       → errors                                │
+  │    4. Group by sub_step and return                           │
+  │    5. Apply route changes (scale_out + scale_in)             │
   └──────────────────────────┬───────────────────────────────────┘
                              │
                              ▼
   ┌──────────────────────────────────────────────────────────────┐
-  │  blue_green_evaluate(deployment, routes, policy)             │
-  │  (internal strategy evaluation function)                     │
+  │  blue_green_evaluate(deployment, routes, spec)               │
+  │  (evaluator internal strategy function)                      │
   │                                                              │
   │  Route classification:                                       │
   │  ┌────────────────────────────────────────────────────┐      │
@@ -269,6 +263,20 @@ With `auto_promote=False`:
   │  │    )                                               │      │
   │  └────────────────────────────────────────────────────┘      │
   └──────────────────────────────────────────────────────────────┘
+                             │
+                             ▼
+  ┌──────────────────────────────────────────────────────────────┐
+  │  Per-Sub-Step Handlers (coordinator generic path)            │
+  │                                                              │
+  │  PROVISIONING/PROGRESSING → DeployingInProgressHandler       │
+  │    next_status: DEPLOYING → coordinator records history      │
+  │                                                              │
+  │  COMPLETED → DeployingCompletedHandler                       │
+  │    next_status: READY → revision swap + coordinator transit  │
+  │                                                              │
+  │  ROLLED_BACK → DeployingRolledBackHandler                    │
+  │    next_status: READY → clear dep_rev + coordinator transit  │
+  └──────────────────────────────────────────────────────────────┘
 ```
 
 ## Revision Swap on Completion
@@ -276,17 +284,17 @@ With `auto_promote=False`:
 When all Green routes become ACTIVE and Blue routes are terminated:
 
 ```
-  completed determination
+  completed determination (evaluator)
        │
        ▼
-  RevisionStateUpdaterSpec(
-    current_revision = deploying_revision,
-    deploying_revision = NULL
-  )
+  DeployingCompletedHandler.execute()
+    → complete_deployment_revision_swap(ids)
+      current_revision = deploying_revision
+      deploying_revision = NULL
        │
        ▼
-  Handler records history + transitions DEPLOYING → READY directly
-  (via update_endpoint_lifecycle_bulk_with_history)
+  Coordinator generic path
+    → DEPLOYING → READY history recording + lifecycle transition
 ```
 
 ## Comparison with Rolling Update
