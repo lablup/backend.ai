@@ -3,25 +3,37 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+import aiohttp.web
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.exception import (
+    BackendAIError,
+    ErrorCode,
+    ErrorDetail,
+    ErrorDomain,
+    ErrorOperation,
+)
 from ai.backend.manager.data.permission.types import (
     EntityType,
     RBACElementRef,
     RBACElementType,
     ScopeType,
 )
-from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
+from ai.backend.manager.errors.repository import (
+    UniqueConstraintViolationError,
+    UnsupportedCompositePrimaryKeyError,
+)
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.repositories.base import IntegrityErrorCheck
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACBulkEntityCreator,
@@ -831,3 +843,171 @@ class TestExecuteRBACEntityCreators:
             entity_2_scope_types = {a.scope_type for a in entity_2_assocs}
             assert ScopeType.USER in entity_2_scope_types
             assert ScopeType.PROJECT in entity_2_scope_types
+
+
+# =============================================================================
+# Integrity Error Handling Tests
+# =============================================================================
+
+
+class RBACCreatorUniqueTestRow(Base):  # type: ignore[misc]
+    """ORM model with a unique constraint for integrity error testing."""
+
+    __tablename__ = "test_rbac_creator_unique"
+    __table_args__ = (
+        sa.UniqueConstraint("name", name="uq_test_rbac_creator_unique_name"),
+        {"extend_existing": True},
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
+class _TestRBACDuplicateNameError(BackendAIError, aiohttp.web.HTTPConflict):
+    """Test domain error simulating a duplicate name conflict."""
+
+    error_type = "https://api.backend.ai/probs/test-rbac-duplicate-name"
+    error_title = "Duplicate name."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
+        )
+
+
+class UniqueRBACCreatorSpec(CreatorSpec[RBACCreatorUniqueTestRow]):
+    """Creator spec with integrity_error_checks for unique constraint."""
+
+    def __init__(self, name: str) -> None:
+        self._name = name
+
+    @property
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return (
+            IntegrityErrorCheck(
+                violation_type=UniqueConstraintViolationError,
+                error=_TestRBACDuplicateNameError(extra_msg="name already exists"),
+                constraint_name="uq_test_rbac_creator_unique_name",
+            ),
+        )
+
+    def build_row(self) -> RBACCreatorUniqueTestRow:
+        return RBACCreatorUniqueTestRow(name=self._name)
+
+
+INTEGRITY_TABLES = [
+    RBACCreatorUniqueTestRow,
+    AssociationScopesEntitiesRow,
+]
+
+
+@pytest.fixture
+async def create_unique_tables(
+    database_connection: ExtendedAsyncSAEngine,
+) -> AsyncGenerator[None, None]:
+    """Create RBAC unique constraint test tables."""
+    async with with_tables(database_connection, INTEGRITY_TABLES):  # type: ignore[arg-type]
+        yield
+
+
+@pytest.fixture
+def unique_scope_id() -> str:
+    return str(uuid.uuid4())
+
+
+class TestRBACEntityCreatorIntegrityError:
+    """Tests for integrity error handling in execute_rbac_entity_creator."""
+
+    async def test_matching_check_raises_domain_error(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_unique_tables: None,
+        unique_scope_id: str,
+    ) -> None:
+        """IntegrityError with matching check raises domain error."""
+        async with database_connection.begin_session() as db_sess:
+            creator = RBACEntityCreator(
+                spec=UniqueRBACCreatorSpec(name="duplicate"),
+                element_type=RBACElementType.VFOLDER,
+                scope_ref=RBACElementRef(RBACElementType.USER, unique_scope_id),
+            )
+            await execute_rbac_entity_creator(db_sess, creator)
+
+        async with database_connection.begin_session(commit_on_end=False) as db_sess:
+            creator = RBACEntityCreator(
+                spec=UniqueRBACCreatorSpec(name="duplicate"),
+                element_type=RBACElementType.VFOLDER,
+                scope_ref=RBACElementRef(RBACElementType.USER, unique_scope_id),
+            )
+            with pytest.raises(_TestRBACDuplicateNameError, match="name already exists"):
+                await execute_rbac_entity_creator(db_sess, creator)
+
+
+class TestRBACBulkEntityCreatorIntegrityError:
+    """Tests for integrity error handling in execute_rbac_bulk_entity_creator."""
+
+    async def test_matching_check_raises_domain_error(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_unique_tables: None,
+        unique_scope_id: str,
+    ) -> None:
+        """IntegrityError with matching check raises domain error."""
+        async with database_connection.begin_session() as db_sess:
+            creator = RBACEntityCreator(
+                spec=UniqueRBACCreatorSpec(name="existing"),
+                element_type=RBACElementType.VFOLDER,
+                scope_ref=RBACElementRef(RBACElementType.USER, unique_scope_id),
+            )
+            await execute_rbac_entity_creator(db_sess, creator)
+
+        async with database_connection.begin_session(commit_on_end=False) as db_sess:
+            bulk_creator = RBACBulkEntityCreator(
+                specs=[
+                    UniqueRBACCreatorSpec(name="new-item"),
+                    UniqueRBACCreatorSpec(name="existing"),
+                ],
+                element_type=RBACElementType.VFOLDER,
+                scope_ref=RBACElementRef(RBACElementType.USER, unique_scope_id),
+            )
+            with pytest.raises(_TestRBACDuplicateNameError, match="name already exists"):
+                await execute_rbac_bulk_entity_creator(db_sess, bulk_creator)
+
+
+class TestRBACEntityCreatorsIntegrityError:
+    """Tests for integrity error handling in execute_rbac_entity_creators."""
+
+    async def test_matching_check_raises_domain_error(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_unique_tables: None,
+        unique_scope_id: str,
+    ) -> None:
+        """IntegrityError with matching check raises domain error."""
+        async with database_connection.begin_session() as db_sess:
+            creator = RBACEntityCreator(
+                spec=UniqueRBACCreatorSpec(name="existing"),
+                element_type=RBACElementType.VFOLDER,
+                scope_ref=RBACElementRef(RBACElementType.USER, unique_scope_id),
+            )
+            await execute_rbac_entity_creator(db_sess, creator)
+
+        async with database_connection.begin_session(commit_on_end=False) as db_sess:
+            creators = [
+                RBACEntityCreator(
+                    spec=UniqueRBACCreatorSpec(name="new-item"),
+                    element_type=RBACElementType.VFOLDER,
+                    scope_ref=RBACElementRef(RBACElementType.USER, unique_scope_id),
+                ),
+                RBACEntityCreator(
+                    spec=UniqueRBACCreatorSpec(name="existing"),
+                    element_type=RBACElementType.VFOLDER,
+                    scope_ref=RBACElementRef(RBACElementType.USER, unique_scope_id),
+                ),
+            ]
+            with pytest.raises(_TestRBACDuplicateNameError, match="name already exists"):
+                await execute_rbac_entity_creators(db_sess, creators)

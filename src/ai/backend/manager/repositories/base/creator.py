@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.models.base import Base
 
-from .integrity import _match_integrity_error, parse_integrity_error
+from .integrity import match_integrity_error, parse_integrity_error
 from .types import IntegrityErrorCheck
 
 if TYPE_CHECKING:
@@ -142,7 +142,7 @@ async def execute_creator[TRow: Base](
         await db_sess.flush()
     except sa.exc.IntegrityError as e:
         parsed = parse_integrity_error(e)
-        _match_integrity_error(parsed, creator.spec.integrity_error_checks)
+        match_integrity_error(parsed, creator.spec.integrity_error_checks)
     # Note: refresh() is not needed - SQLAlchemy 2.0 + asyncpg automatically uses RETURNING
     # to populate server_default values (id, created_at, etc.) after flush()
     return CreatorResult(row=row)
@@ -197,7 +197,7 @@ async def execute_bulk_creator[TRow: Base](
         parsed = parse_integrity_error(e)
         # Use first spec's checks (all specs share the same CreatorSpec subclass)
         checks = bulk_creator.specs[0].integrity_error_checks
-        _match_integrity_error(parsed, checks)
+        match_integrity_error(parsed, checks)
     # Note: refresh() loop removed - SQLAlchemy 2.0 + asyncpg automatically uses RETURNING
     # to populate server_default values (id, created_at, etc.) after flush()
     return BulkCreatorResult(rows=rows)
@@ -265,7 +265,7 @@ async def execute_bulk_creator_partial[TRow: Base](
                 checks = spec.integrity_error_checks
                 if checks:
                     try:
-                        _match_integrity_error(parsed, checks)
+                        match_integrity_error(parsed, checks)
                     except Exception as domain_error:
                         errors.append(
                             BulkCreatorError(spec=spec, exception=domain_error, index=index)

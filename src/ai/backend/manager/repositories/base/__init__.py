@@ -27,7 +27,7 @@ from .export import (
     execute_streaming_export,
 )
 from .integrity import (
-    _match_integrity_error,
+    match_integrity_error,
     parse_integrity_error,
 )
 from .pagination import (
@@ -98,7 +98,7 @@ __all__ = [
     "SearchScope",
     # Integrity
     "parse_integrity_error",
-    "_match_integrity_error",
+    "match_integrity_error",
     # Export
     "ExportDataStream",
     "ExportFieldDef",
