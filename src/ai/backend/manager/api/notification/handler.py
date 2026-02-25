@@ -54,6 +54,7 @@ from ai.backend.manager.dto.notification_request import (
     ValidateNotificationChannelPathParam,
     ValidateNotificationRulePathParam,
 )
+from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.notification.creators import (
     NotificationChannelCreatorSpec,
@@ -99,7 +100,7 @@ class NotificationAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can create notification channels.")
+            raise GenericForbidden("Only superadmin can create notification channels.")
 
         # Convert request to creator
         # spec validator in request DTO ensures this is WebhookSpec or EmailSpec
@@ -137,7 +138,7 @@ class NotificationAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can search notification channels.")
+            raise GenericForbidden("Only superadmin can search notification channels.")
 
         # Build querier using adapter
         querier = self.channel_adapter.build_querier(body.parsed)
@@ -169,7 +170,7 @@ class NotificationAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can get notification channels.")
+            raise GenericForbidden("Only superadmin can get notification channels.")
 
         # Call service action
         action_result = await processors.notification.get_channel.wait_for_complete(
@@ -194,7 +195,7 @@ class NotificationAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can update notification channels.")
+            raise GenericForbidden("Only superadmin can update notification channels.")
 
         # Call service action
         channel_id = path.parsed.channel_id
@@ -219,7 +220,7 @@ class NotificationAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can delete notification channels.")
+            raise GenericForbidden("Only superadmin can delete notification channels.")
 
         # Call service action
         action_result = await processors.notification.delete_channel.wait_for_complete(
@@ -242,7 +243,7 @@ class NotificationAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can validate notification channels.")
+            raise GenericForbidden("Only superadmin can validate notification channels.")
 
         # Call service action
         await processors.notification.validate_channel.wait_for_complete(
@@ -270,7 +271,7 @@ class NotificationAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can validate notification rules.")
+            raise GenericForbidden("Only superadmin can validate notification rules.")
 
         # Service layer handles rule fetching and data validation
         action_result = await processors.notification.validate_rule.wait_for_complete(
@@ -294,7 +295,7 @@ class NotificationAPIHandler:
         """List all available notification rule types."""
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can list notification rule types.")
+            raise GenericForbidden("Only superadmin can list notification rule types.")
 
         # Return all available rule types from the enum
         resp = ListNotificationRuleTypesResponse(rule_types=list(NotificationRuleType))
@@ -309,9 +310,7 @@ class NotificationAPIHandler:
         """Get JSON schema for a notification rule type's message format."""
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(
-                reason="Only superadmin can view notification rule type schemas."
-            )
+            raise GenericForbidden("Only superadmin can view notification rule type schemas.")
 
         # Get schema for the requested rule type
         schema = NotifiableMessage.get_message_schema(path.parsed.rule_type)
@@ -335,7 +334,7 @@ class NotificationAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can create notification rules.")
+            raise GenericForbidden("Only superadmin can create notification rules.")
 
         # Convert request to creator
         creator = Creator(
@@ -372,7 +371,7 @@ class NotificationAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can search notification rules.")
+            raise GenericForbidden("Only superadmin can search notification rules.")
 
         # Build querier using adapter
         querier = self.rule_adapter.build_querier(body.parsed)
@@ -404,7 +403,7 @@ class NotificationAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can get notification rules.")
+            raise GenericForbidden("Only superadmin can get notification rules.")
 
         # Call service action
         action_result = await processors.notification.get_rule.wait_for_complete(
@@ -429,7 +428,7 @@ class NotificationAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can update notification rules.")
+            raise GenericForbidden("Only superadmin can update notification rules.")
 
         # Call service action
         rule_id = path.parsed.rule_id
@@ -454,7 +453,7 @@ class NotificationAPIHandler:
         processors = processors_ctx.processors
         me = current_user()
         if me is None or not me.is_superadmin:
-            raise web.HTTPForbidden(reason="Only superadmin can delete notification rules.")
+            raise GenericForbidden("Only superadmin can delete notification rules.")
 
         # Call service action
         action_result = await processors.notification.delete_rule.wait_for_complete(
