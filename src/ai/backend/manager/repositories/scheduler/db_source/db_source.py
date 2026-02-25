@@ -763,10 +763,14 @@ class ScheduleDBSource:
         return dict(dependencies_by_session)
 
     async def mark_sessions_terminating(
-        self, session_ids: list[SessionId], reason: str = "USER_REQUESTED"
+        self,
+        session_ids: list[SessionId],
+        reason: str = "USER_REQUESTED",
+        *,
+        forced: bool = False,
     ) -> MarkTerminatingResult:
         """
-        Mark sessions and their kernels as TERMINATING.
+        Mark sessions and their kernels as TERMINATING (or directly TERMINATED when forced).
         Uses UPDATE ... WHERE ... RETURNING for atomic status transitions.
         Returns categorized session IDs based on their current status.
         """
@@ -777,18 +781,29 @@ class ScheduleDBSource:
                 db_sess, session_ids, reason, now
             )
 
-            # 2. Mark resource-occupying sessions as terminating
-            terminating_sessions = await self._mark_sessions_as_terminating(
-                db_sess, session_ids, reason, now
-            )
+            if forced:
+                # 2a. Force-terminate: set sessions directly to TERMINATED
+                force_terminated_sessions = await self._mark_sessions_as_force_terminated(
+                    db_sess, session_ids, reason, now
+                )
+                terminating_sessions: list[SessionId] = []
+            else:
+                # 2b. Normal: mark sessions as TERMINATING
+                force_terminated_sessions = []
+                terminating_sessions = await self._mark_sessions_as_terminating(
+                    db_sess, session_ids, reason, now
+                )
 
             # 3. Mark unprocessed sessions as skipped
-            processed_ids = set(cancelled_sessions) | set(terminating_sessions)
+            processed_ids = (
+                set(cancelled_sessions) | set(terminating_sessions) | set(force_terminated_sessions)
+            )
             skipped_sessions = [sid for sid in session_ids if sid not in processed_ids]
 
             return MarkTerminatingResult(
                 cancelled_sessions=cancelled_sessions,
                 terminating_sessions=terminating_sessions,
+                force_terminated_sessions=force_terminated_sessions,
                 skipped_sessions=skipped_sessions,
             )
 
@@ -886,6 +901,66 @@ class ScheduleDBSource:
             )
 
         return terminating_sessions
+
+    async def _mark_sessions_as_force_terminated(
+        self, db_sess: SASession, session_ids: list[SessionId], reason: str, now: datetime
+    ) -> list[SessionId]:
+        """Directly mark terminatable sessions and their kernels as TERMINATED (force-terminate)."""
+        now_iso = now.isoformat()
+        # Mark sessions as TERMINATED directly, recording both TERMINATING and TERMINATED timestamps
+        terminated_stmt = (
+            sa.update(SessionRow)
+            .values(
+                status=SessionStatus.TERMINATED,
+                status_info=reason,
+                terminated_at=now,
+                status_history=sql_json_merge(
+                    SessionRow.__table__.c.status_history,
+                    (),
+                    {
+                        SessionStatus.TERMINATING.name: now_iso,
+                        SessionStatus.TERMINATED.name: now_iso,
+                    },
+                ),
+            )
+            .where(
+                sa.and_(
+                    SessionRow.id.in_(session_ids),
+                    SessionRow.status.in_(SessionStatus.terminatable_statuses()),
+                )
+            )
+            .returning(SessionRow.id)
+        )
+        terminated_result = await db_sess.execute(terminated_stmt)
+        force_terminated_sessions = [cast(SessionId, row.id) for row in terminated_result]
+
+        # Mark kernels as TERMINATED directly
+        if force_terminated_sessions:
+            await db_sess.execute(
+                sa.update(KernelRow)
+                .values(
+                    status=KernelStatus.TERMINATED,
+                    status_info=reason,
+                    status_changed=now,
+                    terminated_at=now,
+                    status_history=sql_json_merge(
+                        KernelRow.__table__.c.status_history,
+                        (),
+                        {
+                            KernelStatus.TERMINATING.name: now_iso,
+                            KernelStatus.TERMINATED.name: now_iso,
+                        },
+                    ),
+                )
+                .where(
+                    sa.and_(
+                        KernelRow.session_id.in_(force_terminated_sessions),
+                        KernelRow.status.in_(KernelStatus.terminatable_statuses()),
+                    )
+                )
+            )
+
+        return force_terminated_sessions
 
     async def get_schedulable_scaling_groups(self) -> list[str]:
         """Get list of scaling groups that have schedulable agents."""
