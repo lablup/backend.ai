@@ -207,7 +207,7 @@ class UserUsageBucketSearchResult:
 class DomainUsageBucketSearchScope(SearchScope):
     """Scope for domain usage bucket queries."""
 
-    resource_group: str | None
+    resource_group: str
     domain_name: str
 
     def to_condition(self) -> QueryCondition:
@@ -215,41 +215,34 @@ class DomainUsageBucketSearchScope(SearchScope):
         domain_name = self.domain_name
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            conditions: list[sa.sql.expression.ColumnElement[bool]] = [
+            return sa.and_(
                 DomainUsageBucketRow.domain_name == domain_name,
-            ]
-            if resource_group is not None:
-                conditions.append(DomainUsageBucketRow.resource_group == resource_group)
-            return sa.and_(*conditions)
+                DomainUsageBucketRow.resource_group == resource_group,
+            )
 
         return inner
 
     @property
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        checks: list[ExistenceCheck[Any]] = []
-        if self.resource_group is not None:
-            checks.append(
-                ExistenceCheck(
-                    column=ScalingGroupRow.name,
-                    value=self.resource_group,
-                    error=ScalingGroupNotFound(self.resource_group),
-                ),
-            )
-        checks.append(
+        return [
+            ExistenceCheck(
+                column=ScalingGroupRow.name,
+                value=self.resource_group,
+                error=ScalingGroupNotFound(self.resource_group),
+            ),
             ExistenceCheck(
                 column=DomainRow.name,
                 value=self.domain_name,
                 error=DomainNotFound(self.domain_name),
             ),
-        )
-        return checks
+        ]
 
 
 @dataclass(frozen=True)
 class ProjectUsageBucketSearchScope(SearchScope):
     """Scope for project usage bucket queries."""
 
-    resource_group: str | None
+    resource_group: str
     domain_name: str
     project_id: uuid.UUID
 
@@ -259,28 +252,22 @@ class ProjectUsageBucketSearchScope(SearchScope):
         project_id = self.project_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            conditions: list[sa.sql.expression.ColumnElement[bool]] = [
+            return sa.and_(
                 ProjectUsageBucketRow.domain_name == domain_name,
                 ProjectUsageBucketRow.project_id == project_id,
-            ]
-            if resource_group is not None:
-                conditions.append(ProjectUsageBucketRow.resource_group == resource_group)
-            return sa.and_(*conditions)
+                ProjectUsageBucketRow.resource_group == resource_group,
+            )
 
         return inner
 
     @property
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        checks: list[ExistenceCheck[Any]] = []
-        if self.resource_group is not None:
-            checks.append(
-                ExistenceCheck(
-                    column=ScalingGroupRow.name,
-                    value=self.resource_group,
-                    error=ScalingGroupNotFound(self.resource_group),
-                ),
-            )
-        checks.extend([
+        return [
+            ExistenceCheck(
+                column=ScalingGroupRow.name,
+                value=self.resource_group,
+                error=ScalingGroupNotFound(self.resource_group),
+            ),
             ExistenceCheck(
                 column=DomainRow.name,
                 value=self.domain_name,
@@ -291,15 +278,14 @@ class ProjectUsageBucketSearchScope(SearchScope):
                 value=self.project_id,
                 error=ProjectNotFound(extra_data={"project_id": str(self.project_id)}),
             ),
-        ])
-        return checks
+        ]
 
 
 @dataclass(frozen=True)
 class UserUsageBucketSearchScope(SearchScope):
     """Scope for user usage bucket queries."""
 
-    resource_group: str | None
+    resource_group: str
     domain_name: str
     project_id: uuid.UUID
     user_uuid: uuid.UUID
@@ -311,29 +297,23 @@ class UserUsageBucketSearchScope(SearchScope):
         user_uuid = self.user_uuid
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            conditions: list[sa.sql.expression.ColumnElement[bool]] = [
+            return sa.and_(
                 UserUsageBucketRow.domain_name == domain_name,
                 UserUsageBucketRow.project_id == project_id,
                 UserUsageBucketRow.user_uuid == user_uuid,
-            ]
-            if resource_group is not None:
-                conditions.append(UserUsageBucketRow.resource_group == resource_group)
-            return sa.and_(*conditions)
+                UserUsageBucketRow.resource_group == resource_group,
+            )
 
         return inner
 
     @property
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        checks: list[ExistenceCheck[Any]] = []
-        if self.resource_group is not None:
-            checks.append(
-                ExistenceCheck(
-                    column=ScalingGroupRow.name,
-                    value=self.resource_group,
-                    error=ScalingGroupNotFound(self.resource_group),
-                ),
-            )
-        checks.extend([
+        return [
+            ExistenceCheck(
+                column=ScalingGroupRow.name,
+                value=self.resource_group,
+                error=ScalingGroupNotFound(self.resource_group),
+            ),
             ExistenceCheck(
                 column=DomainRow.name,
                 value=self.domain_name,
@@ -349,5 +329,4 @@ class UserUsageBucketSearchScope(SearchScope):
                 value=self.user_uuid,
                 error=UserNotFound(extra_data={"user_uuid": str(self.user_uuid)}),
             ),
-        ])
-        return checks
+        ]
