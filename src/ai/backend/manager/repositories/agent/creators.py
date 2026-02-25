@@ -30,7 +30,7 @@ class AgentCreatorSpec(CreatorSpec[AgentRow]):
     compute_plugins: dict[str, Any]
     auto_terminate_abusing_kernel: bool
     first_contact: datetime
-    status: AgentStatus = AgentStatus.ALIVE
+    status: AgentStatus
 
     @override
     def build_row(self) -> AgentRow:

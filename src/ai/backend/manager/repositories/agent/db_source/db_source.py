@@ -132,6 +132,7 @@ class AgentDBSource:
                     },
                     auto_terminate_abusing_kernel=upsert_data.metadata.auto_terminate_abusing_kernel,
                     first_contact=upsert_data.heartbeat_received,
+                    status=AgentStatus.ALIVE,
                 )
                 rbac_creator = RBACEntityCreator(
                     spec=creator_spec,
