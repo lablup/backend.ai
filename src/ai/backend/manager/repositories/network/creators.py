@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.manager.models.network.row import NetworkRow
@@ -20,7 +20,7 @@ class NetworkCreatorSpec(CreatorSpec[NetworkRow]):
     driver: str
     domain_name: str
     project_id: uuid.UUID
-    options: Mapping[str, Any] = field(default_factory=dict)
+    options: Mapping[str, Any]
 
     @override
     def build_row(self) -> NetworkRow:
