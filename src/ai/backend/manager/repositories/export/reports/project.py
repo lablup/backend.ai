@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 from typing import Any
 
 from ai.backend.manager.models.association_container_registries_groups import (
@@ -25,11 +26,13 @@ from ai.backend.manager.repositories.base.export import (
 
 
 def _serialize_json(value: Any) -> str:
-    """Serialize value to JSON string, converting sets to lists."""
+    """Serialize value to JSON string, converting sets to lists and Decimals to strings."""
     if not value:
         return ""
 
     def convert(obj: Any) -> Any:
+        if isinstance(obj, Decimal):
+            return str(obj)
         if isinstance(obj, set):
             return sorted(obj)
         if isinstance(obj, dict):
