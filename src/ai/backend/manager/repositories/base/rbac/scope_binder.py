@@ -67,7 +67,6 @@ async def execute_rbac_scope_binder(
         return RBACScopeBinderResult(rows=[])
 
     entity_type = binder.element_type.to_entity_type()
-    table = AssociationScopesEntitiesRow.__table__
 
     values_list = [
         {
@@ -83,10 +82,9 @@ async def execute_rbac_scope_binder(
         pg_insert(AssociationScopesEntitiesRow)
         .values(values_list)
         .on_conflict_do_nothing(constraint="uq_scope_id_entity_id")
-        .returning(*table.columns)
+        .returning(AssociationScopesEntitiesRow)
     )
-    result = await db_sess.execute(stmt)
-    rows = [AssociationScopesEntitiesRow(**dict(row._mapping)) for row in result.fetchall()]
+    rows = list((await db_sess.scalars(stmt)).all())
 
     return RBACScopeBinderResult(rows=rows)
 
@@ -139,7 +137,6 @@ async def execute_rbac_scope_unbinder(
         return RBACScopeUnbinderResult(rows=[])
 
     entity_type = unbinder.element_type.to_entity_type()
-    table = AssociationScopesEntitiesRow.__table__
 
     scope_conditions = [
         sa.and_(
@@ -157,9 +154,8 @@ async def execute_rbac_scope_unbinder(
                 sa.or_(*scope_conditions),
             )
         )
-        .returning(*table.columns)
+        .returning(AssociationScopesEntitiesRow)
     )
-    result = await db_sess.execute(stmt)
-    rows = [AssociationScopesEntitiesRow(**dict(row._mapping)) for row in result.fetchall()]
+    rows = list((await db_sess.scalars(stmt)).all())
 
     return RBACScopeUnbinderResult(rows=rows)
