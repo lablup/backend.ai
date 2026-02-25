@@ -22,10 +22,10 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.repositories.base.creator import CreatorSpec
-from ai.backend.manager.repositories.base.integrity import (
-    match_integrity_error,
-    parse_integrity_error,
+from ai.backend.manager.repositories.base.creator import (
+    BulkCreator,
+    CreatorSpec,
+    execute_bulk_creator,
 )
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 
@@ -110,14 +110,8 @@ async def execute_rbac_scope_binder[TRow: Base](
     # 1. Build and insert business N:N mapping rows
     rows: list[TRow] = []
     if binder.specs:
-        rows = [spec.build_row() for spec in binder.specs]
-        db_sess.add_all(rows)
-        try:
-            await db_sess.flush()
-        except sa.exc.IntegrityError as e:
-            parsed = parse_integrity_error(e)
-            checks = binder.specs[0].integrity_error_checks
-            match_integrity_error(parsed, checks)
+        bulk_result = await execute_bulk_creator(db_sess, BulkCreator(specs=binder.specs))
+        rows = bulk_result.rows
 
     # 2. Insert RBAC association rows
     association_rows: list[AssociationScopesEntitiesRow] = []
