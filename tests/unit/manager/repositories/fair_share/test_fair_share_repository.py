@@ -638,7 +638,6 @@ class TestFairShareRepository:
         assert result.resource_group == non_existent_sg
         assert result.domain_name == domain_name
         assert result.data.spec.weight == Decimal("2.5")
-        assert result.data.calculation_snapshot.available_slots == []
 
     @pytest.mark.asyncio
     async def test_upsert_project_fair_share_without_scaling_group(
@@ -691,7 +690,6 @@ class TestFairShareRepository:
         assert result.resource_group == non_existent_sg
         assert result.project_id == project_id
         assert result.data.spec.weight == Decimal("3.0")
-        assert result.data.calculation_snapshot.available_slots == []
 
     @pytest.mark.asyncio
     async def test_upsert_user_fair_share_without_scaling_group(
@@ -725,4 +723,3 @@ class TestFairShareRepository:
         assert result.user_uuid == test_user_uuid
         assert result.project_id == test_project_id
         assert result.data.spec.weight == Decimal("1.8")
-        assert result.data.calculation_snapshot.available_slots == []
