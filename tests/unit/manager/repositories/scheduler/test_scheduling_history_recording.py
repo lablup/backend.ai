@@ -83,6 +83,7 @@ class TestEnqueueSessionSchedulingHistory:
                 GroupRow,
                 AssociationScopesEntitiesRow,
                 EntityFieldRow,
+                AgentRow,
                 SessionRow,
                 KernelRow,
                 ResourceAllocationRow,
@@ -739,7 +740,7 @@ class TestMarkTerminatingSchedulingHistory:
         )
 
         result = await db_source.mark_sessions_terminating([session_id])
-        assert session_id in result.terminating
+        assert session_id in result.terminating_sessions
 
         # Verify scheduling history record was created
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -796,8 +797,8 @@ class TestMarkTerminatingSchedulingHistory:
             running_session_id,
             scheduled_session_id,
         ])
-        assert running_session_id in result.terminating
-        assert scheduled_session_id in result.terminating
+        assert running_session_id in result.terminating_sessions
+        assert scheduled_session_id in result.terminating_sessions
 
         # Verify each history record has the correct from_status
         async with db_with_cleanup.begin_readonly_session() as db_sess:
