@@ -46,11 +46,7 @@ from ai.backend.manager.models.resource_usage_history import (
     UsageBucketEntryRow,
     UserUsageBucketRow,
 )
-from ai.backend.manager.models.scaling_group import (
-    ScalingGroupForDomainRow,
-    ScalingGroupForProjectRow,
-    ScalingGroupRow,
-)
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import (
@@ -135,25 +131,20 @@ class FairShareDBSource:
         """Get domain fair share data.
 
         Steps:
-        1. Check if (scaling_group, domain) combination exists in scaling_group_for_domain
+        1. Check if domain exists
         2. Query fair share record with (resource_group, domain_name)
         3. If record exists, convert and return
         4. If no record, create default from scaling group spec
 
         Raises:
-            DomainNotFound: If domain is not associated with the scaling group
+            DomainNotFound: If domain does not exist
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # Step 1: Check scaling_group_for_domain association
-            assoc_query = sa.select(ScalingGroupForDomainRow).where(
-                ScalingGroupForDomainRow.scaling_group == resource_group,
-                ScalingGroupForDomainRow.domain == domain_name,
-            )
-            assoc_result = await db_sess.execute(assoc_query)
-            if assoc_result.one_or_none() is None:
-                raise DomainNotFound(
-                    f"Domain {domain_name} not associated with scaling group {resource_group}"
-                )
+            # Step 1: Check domain existence (no RG membership required)
+            domain_query = sa.select(DomainRow.name).where(DomainRow.name == domain_name)
+            domain_result = await db_sess.execute(domain_query)
+            if domain_result.one_or_none() is None:
+                raise DomainNotFound(domain_name)
 
             # Step 2: Query fair share record
             fs_query = sa.select(DomainFairShareRow).where(
@@ -220,8 +211,9 @@ class FairShareDBSource:
     ) -> DomainFairShareEntitySearchResult:
         """Search domain fair shares within a resource group.
 
-        This method returns all domains associated with a resource group,
-        with complete fair share data (either from records or defaults).
+        This method returns all domains with complete fair share data
+        (either from records or defaults). Domains do not need to be
+        registered in the resource group to appear in results.
 
         Args:
             scope: Required scope with resource_group.
@@ -231,20 +223,18 @@ class FairShareDBSource:
             DomainFairShareEntitySearchResult with domain entities and their complete fair share details.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # Build LEFT JOIN query: domains associated with resource_group LEFT JOIN fair_share
+            # Build LEFT JOIN query: all domains LEFT JOIN fair_share (filtered by resource_group)
             query = (
                 sa.select(
-                    ScalingGroupForDomainRow.scaling_group,
-                    ScalingGroupForDomainRow.domain,
+                    DomainRow.name.label("domain_name"),
                     DomainFairShareRow,
                 )
-                .select_from(ScalingGroupForDomainRow)
-                .join(DomainRow, ScalingGroupForDomainRow.domain == DomainRow.name)
+                .select_from(DomainRow)
                 .outerjoin(
                     DomainFairShareRow,
                     sa.and_(
-                        ScalingGroupForDomainRow.scaling_group == DomainFairShareRow.resource_group,
-                        ScalingGroupForDomainRow.domain == DomainFairShareRow.domain_name,
+                        DomainRow.name == DomainFairShareRow.domain_name,
+                        DomainFairShareRow.resource_group == scope.resource_group,
                     ),
                 )
             )
@@ -258,8 +248,8 @@ class FairShareDBSource:
 
             items = [
                 self._build_domain_data(
-                    resource_group=row.scaling_group,
-                    domain_name=row.domain,
+                    resource_group=scope.resource_group,
+                    domain_name=row.domain_name,
                     fair_share_row=row.DomainFairShareRow,
                     spec=spec,
                     available_slots=available_slots,
@@ -344,32 +334,22 @@ class FairShareDBSource:
         """Get project fair share data.
 
         Steps:
-        1. Check if (scaling_group, project) combination exists in scaling_group_for_project
+        1. Check if project exists and get domain_name
         2. Query fair share record with (resource_group, project_id)
         3. If record exists, convert and return
         4. If no record, create default from scaling group spec
 
         Raises:
-            ProjectNotFound: If project is not associated with the scaling group
+            ProjectNotFound: If project does not exist
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # Step 1: Check scaling_group_for_project association and get domain_name
-            assoc_query = (
-                sa.select(GroupRow.domain_name)
-                .select_from(ScalingGroupForProjectRow)
-                .join(GroupRow, ScalingGroupForProjectRow.group == GroupRow.id)
-                .where(
-                    ScalingGroupForProjectRow.scaling_group == resource_group,
-                    ScalingGroupForProjectRow.group == project_id,
-                )
-            )
-            assoc_result = await db_sess.execute(assoc_query)
-            assoc_row = assoc_result.one_or_none()
-            if assoc_row is None:
-                raise ProjectNotFound(
-                    f"Project {project_id} not associated with scaling group {resource_group}"
-                )
-            domain_name = assoc_row[0]
+            # Step 1: Check project existence and get domain_name (no RG membership required)
+            project_query = sa.select(GroupRow.domain_name).where(GroupRow.id == project_id)
+            project_result = await db_sess.execute(project_query)
+            project_row = project_result.one_or_none()
+            if project_row is None:
+                raise ProjectNotFound(str(project_id))
+            domain_name = project_row[0]
 
             # Step 2: Query fair share record
             fs_query = sa.select(ProjectFairShareRow).where(
@@ -436,8 +416,9 @@ class FairShareDBSource:
     ) -> ProjectFairShareEntitySearchResult:
         """Search project fair shares within a resource group.
 
-        This method returns all projects associated with a resource group,
-        with complete fair share data (either from records or defaults).
+        This method returns all projects with complete fair share data
+        (either from records or defaults). Projects do not need to be
+        registered in the resource group to appear in results.
 
         Args:
             scope: Required scope with resource_group.
@@ -447,23 +428,20 @@ class FairShareDBSource:
             ProjectFairShareEntitySearchResult with project entities and their complete fair share details.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # Build LEFT JOIN query: projects associated with resource_group LEFT JOIN fair_share
+            # Build LEFT JOIN query: all projects LEFT JOIN fair_share (filtered by resource_group)
             query = (
                 sa.select(
-                    ScalingGroupForProjectRow.scaling_group,
-                    ScalingGroupForProjectRow.group.label("project_id"),
-                    DomainRow.name.label("domain_name"),
+                    GroupRow.id.label("project_id"),
+                    GroupRow.domain_name.label("domain_name"),
                     ProjectFairShareRow,
                 )
-                .select_from(ScalingGroupForProjectRow)
-                .join(GroupRow, ScalingGroupForProjectRow.group == GroupRow.id)
+                .select_from(GroupRow)
                 .join(DomainRow, GroupRow.domain_name == DomainRow.name)
                 .outerjoin(
                     ProjectFairShareRow,
                     sa.and_(
-                        ScalingGroupForProjectRow.scaling_group
-                        == ProjectFairShareRow.resource_group,
-                        ScalingGroupForProjectRow.group == ProjectFairShareRow.project_id,
+                        GroupRow.id == ProjectFairShareRow.project_id,
+                        ProjectFairShareRow.resource_group == scope.resource_group,
                     ),
                 )
             )
@@ -477,7 +455,7 @@ class FairShareDBSource:
 
             items = [
                 self._build_project_data(
-                    resource_group=row.scaling_group,
+                    resource_group=scope.resource_group,
                     project_id=row.project_id,
                     domain_name=row.domain_name,
                     fair_share_row=row.ProjectFairShareRow,
@@ -790,8 +768,9 @@ class FairShareDBSource:
     ) -> UserFairShareEntitySearchResult:
         """Search user fair shares within a resource group.
 
-        This method returns all users associated with a resource group (via project membership),
-        with complete fair share data (either from records or defaults).
+        This method returns all users (via project membership) with complete
+        fair share data (either from records or defaults). Users do not need
+        to be in a project registered in the resource group to appear in results.
 
         Args:
             scope: Required scope with resource_group.
@@ -802,29 +781,25 @@ class FairShareDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             # Build LEFT JOIN query:
-            # Users in projects associated with resource_group LEFT JOIN fair_share
-            # Path: ScalingGroupForProjectRow -> AssocGroupUserRow -> UserFairShareRow
+            # Users via project membership LEFT JOIN fair_share (filtered by resource_group)
+            # Path: AssocGroupUserRow -> GroupRow -> DomainRow -> UserRow -> LEFT JOIN UserFairShareRow
             query = (
                 sa.select(
-                    ScalingGroupForProjectRow.scaling_group,
                     AssocGroupUserRow.user_id.label("user_uuid"),
                     AssocGroupUserRow.group_id.label("project_id"),
                     DomainRow.name.label("domain_name"),
                     UserFairShareRow,
                 )
-                .select_from(ScalingGroupForProjectRow)
-                .join(
-                    AssocGroupUserRow, ScalingGroupForProjectRow.group == AssocGroupUserRow.group_id
-                )
-                .join(GroupRow, ScalingGroupForProjectRow.group == GroupRow.id)
+                .select_from(AssocGroupUserRow)
+                .join(GroupRow, AssocGroupUserRow.group_id == GroupRow.id)
                 .join(DomainRow, GroupRow.domain_name == DomainRow.name)
                 .join(UserRow, AssocGroupUserRow.user_id == UserRow.uuid)
                 .outerjoin(
                     UserFairShareRow,
                     sa.and_(
-                        ScalingGroupForProjectRow.scaling_group == UserFairShareRow.resource_group,
                         AssocGroupUserRow.user_id == UserFairShareRow.user_uuid,
                         AssocGroupUserRow.group_id == UserFairShareRow.project_id,
+                        UserFairShareRow.resource_group == scope.resource_group,
                     ),
                 )
             )
@@ -838,7 +813,7 @@ class FairShareDBSource:
 
             items = [
                 self._build_user_data(
-                    resource_group=row.scaling_group,
+                    resource_group=scope.resource_group,
                     user_uuid=row.user_uuid,
                     project_id=row.project_id,
                     domain_name=row.domain_name,
