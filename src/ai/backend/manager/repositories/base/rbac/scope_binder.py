@@ -1,14 +1,12 @@
-"""Binder for RBAC scope association bind/unbind operations."""
+"""Binder/Unbinder for RBAC scope association operations."""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
-from typing import Any, cast
+from dataclasses import dataclass
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import RBACElementType, RelationType
@@ -18,29 +16,27 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 
 # =============================================================================
-# Binder Dataclass
+# Binder
 # =============================================================================
 
 
 @dataclass
 class RBACScopeBinder:
-    """Binder for updating scope associations of an existing RBAC entity.
+    """Binds new scope associations to an existing RBAC entity.
 
-    Handles N:N scope mapping changes by inserting new associations (bind)
-    and deleting removed associations (unbind) in a single operation.
+    Inserts AssociationScopesEntitiesRows for each scope reference,
+    using ON CONFLICT DO NOTHING for idempotency.
 
     Attributes:
         element_type: The RBAC element type of the target entity.
         entity_id: The primary key (as string) of the target entity.
-        bind_scope_refs: Scope references to associate with the entity.
-        unbind_scope_refs: Scope references to disassociate from the entity.
-        relation_type: The relation type for newly bound associations. Defaults to AUTO.
+        scope_refs: Scope references to associate with the entity.
+        relation_type: The relation type for the new associations. Defaults to AUTO.
     """
 
     element_type: RBACElementType
     entity_id: str
-    bind_scope_refs: Sequence[RBACElementRef] = field(default_factory=list)
-    unbind_scope_refs: Sequence[RBACElementRef] = field(default_factory=list)
+    scope_refs: Sequence[RBACElementRef]
     relation_type: RelationType = RelationType.AUTO
 
 
@@ -48,79 +44,122 @@ class RBACScopeBinder:
 class RBACScopeBinderResult:
     """Result of executing a scope binder operation."""
 
-    bound_count: int
-    unbound_count: int
-
-
-# =============================================================================
-# Public API
-# =============================================================================
+    rows: list[AssociationScopesEntitiesRow]
 
 
 async def execute_rbac_scope_binder(
     db_sess: SASession,
     binder: RBACScopeBinder,
 ) -> RBACScopeBinderResult:
-    """Execute scope bind/unbind operations for an RBAC entity.
+    """Insert scope associations for an RBAC entity.
 
-    Operations:
-    1. Delete associations for unbind_scope_refs (if any)
-    2. Insert associations for bind_scope_refs (if any), using ON CONFLICT DO NOTHING
+    Uses INSERT ... ON CONFLICT DO NOTHING with RETURNING to retrieve
+    only the newly inserted rows.
 
     Args:
         db_sess: Async SQLAlchemy session (must be writable).
-        binder: Binder instance specifying which scopes to bind/unbind.
+        binder: Binder instance specifying which scopes to bind.
 
     Returns:
-        RBACScopeBinderResult with counts of bound and unbound associations.
+        RBACScopeBinderResult with the newly inserted AssociationScopesEntitiesRows.
     """
+    if not binder.scope_refs:
+        return RBACScopeBinderResult(rows=[])
+
     entity_type = binder.element_type.to_entity_type()
-    unbound_count = 0
-    bound_count = 0
+    table = AssociationScopesEntitiesRow.__table__
 
-    # 1. Unbind: delete associations for removed scopes
-    if binder.unbind_scope_refs:
-        unbind_conditions = [
-            sa.and_(
-                AssociationScopesEntitiesRow.scope_type == ref.element_type.to_scope_type(),
-                AssociationScopesEntitiesRow.scope_id == ref.element_id,
-            )
-            for ref in binder.unbind_scope_refs
-        ]
-        result = await db_sess.execute(
-            sa.delete(AssociationScopesEntitiesRow).where(
-                sa.and_(
-                    AssociationScopesEntitiesRow.entity_type == entity_type,
-                    AssociationScopesEntitiesRow.entity_id == binder.entity_id,
-                    sa.or_(*unbind_conditions),
-                )
-            )
-        )
-        unbound_count = cast(CursorResult[Any], result).rowcount or 0
-
-    # 2. Bind: insert associations for new scopes (ON CONFLICT DO NOTHING)
-    if binder.bind_scope_refs:
-        values_list = [
-            {
-                "scope_type": ref.element_type.to_scope_type(),
-                "scope_id": ref.element_id,
-                "entity_type": entity_type,
-                "entity_id": binder.entity_id,
-                "relation_type": binder.relation_type,
-            }
-            for ref in binder.bind_scope_refs
-        ]
-        stmt = (
-            pg_insert(AssociationScopesEntitiesRow)
-            .values(values_list)
-            .on_conflict_do_nothing(
-                constraint="uq_scope_id_entity_id",
-            )
-        )
-        result = await db_sess.execute(stmt)
-        bound_count = cast(CursorResult[Any], result).rowcount or 0
-
-    return RBACScopeBinderResult(
-        bound_count=bound_count,
-        unbound_count=unbound_count,
+    values_list = [
+        {
+            "scope_type": ref.element_type.to_scope_type(),
+            "scope_id": ref.element_id,
+            "entity_type": entity_type,
+            "entity_id": binder.entity_id,
+            "relation_type": binder.relation_type,
+        }
+        for ref in binder.scope_refs
+    ]
+    stmt = (
+        pg_insert(AssociationScopesEntitiesRow)
+        .values(values_list)
+        .on_conflict_do_nothing(constraint="uq_scope_id_entity_id")
+        .returning(*table.columns)
     )
+    result = await db_sess.execute(stmt)
+    rows = [AssociationScopesEntitiesRow(**dict(row._mapping)) for row in result.fetchall()]
+
+    return RBACScopeBinderResult(rows=rows)
+
+
+# =============================================================================
+# Unbinder
+# =============================================================================
+
+
+@dataclass
+class RBACScopeUnbinder:
+    """Unbinds scope associations from an existing RBAC entity.
+
+    Deletes AssociationScopesEntitiesRows matching the given scope references.
+
+    Attributes:
+        element_type: The RBAC element type of the target entity.
+        entity_id: The primary key (as string) of the target entity.
+        scope_refs: Scope references to disassociate from the entity.
+    """
+
+    element_type: RBACElementType
+    entity_id: str
+    scope_refs: Sequence[RBACElementRef]
+
+
+@dataclass
+class RBACScopeUnbinderResult:
+    """Result of executing a scope unbinder operation."""
+
+    rows: list[AssociationScopesEntitiesRow]
+
+
+async def execute_rbac_scope_unbinder(
+    db_sess: SASession,
+    unbinder: RBACScopeUnbinder,
+) -> RBACScopeUnbinderResult:
+    """Delete scope associations for an RBAC entity.
+
+    Uses DELETE ... RETURNING to retrieve the deleted rows.
+
+    Args:
+        db_sess: Async SQLAlchemy session (must be writable).
+        unbinder: Unbinder instance specifying which scopes to unbind.
+
+    Returns:
+        RBACScopeUnbinderResult with the deleted AssociationScopesEntitiesRows.
+    """
+    if not unbinder.scope_refs:
+        return RBACScopeUnbinderResult(rows=[])
+
+    entity_type = unbinder.element_type.to_entity_type()
+    table = AssociationScopesEntitiesRow.__table__
+
+    scope_conditions = [
+        sa.and_(
+            AssociationScopesEntitiesRow.scope_type == ref.element_type.to_scope_type(),
+            AssociationScopesEntitiesRow.scope_id == ref.element_id,
+        )
+        for ref in unbinder.scope_refs
+    ]
+    stmt = (
+        sa.delete(AssociationScopesEntitiesRow)
+        .where(
+            sa.and_(
+                AssociationScopesEntitiesRow.entity_type == entity_type,
+                AssociationScopesEntitiesRow.entity_id == unbinder.entity_id,
+                sa.or_(*scope_conditions),
+            )
+        )
+        .returning(*table.columns)
+    )
+    result = await db_sess.execute(stmt)
+    rows = [AssociationScopesEntitiesRow(**dict(row._mapping)) for row in result.fetchall()]
+
+    return RBACScopeUnbinderResult(rows=rows)
