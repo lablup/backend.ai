@@ -167,7 +167,7 @@ class TestListSessionTemplates:
         result = await admin_registry.template.list_session_templates(
             ListSessionTemplatesRequest(),
         )
-        assert isinstance(result, list)
+        assert isinstance(result.root, list)
 
 
 class TestUpdateSessionTemplate:
@@ -324,7 +324,7 @@ class TestListClusterTemplates:
         result = await admin_registry.template.list_cluster_templates(
             ListClusterTemplatesRequest(),
         )
-        assert isinstance(result, list)
+        assert isinstance(result.root, list)
 
 
 class TestUpdateClusterTemplate:
