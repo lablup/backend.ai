@@ -2,11 +2,11 @@ import logging
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import AgentNotFound
-from ai.backend.common.types import AgentId, ImageID
+from ai.backend.common.types import AgentId, ImageID, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import (
     AgentData,
@@ -17,16 +17,22 @@ from ai.backend.manager.data.agent.types import (
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
-from ai.backend.manager.models.agent import AgentRow, agents
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.agent.creators import AgentCreatorSpec
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
 from ai.backend.manager.repositories.base import BulkUpserter, execute_bulk_upserter
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -108,12 +114,41 @@ class AgentDBSource:
             agent_data = row.to_heartbeat_update_data() if row is not None else None
             upsert_result = UpsertResult.from_state_comparison(agent_data, upsert_data)
 
-            stmt = pg_insert(agents).values(upsert_data.insert_fields)
-            final_query = stmt.on_conflict_do_update(
-                index_elements=["id"], set_=upsert_data.update_fields
-            )
-
-            await session.execute(final_query)
+            if row is None:
+                # New agent: use RBACEntityCreator for INSERT with scope association
+                creator_spec = AgentCreatorSpec(
+                    id=upsert_data.metadata.id,
+                    region=upsert_data.metadata.region,
+                    scaling_group=upsert_data.metadata.scaling_group,
+                    available_slots=upsert_data.resource_info.available_slots,
+                    occupied_slots=ResourceSlot(),
+                    addr=upsert_data.network_info.addr,
+                    public_host=upsert_data.network_info.public_host,
+                    public_key=upsert_data.network_info.public_key,
+                    version=upsert_data.metadata.version,
+                    architecture=upsert_data.metadata.architecture,
+                    compute_plugins={
+                        str(k): v for k, v in upsert_data.resource_info.compute_plugins.items()
+                    },
+                    auto_terminate_abusing_kernel=upsert_data.metadata.auto_terminate_abusing_kernel,
+                    first_contact=upsert_data.heartbeat_received,
+                )
+                rbac_creator = RBACEntityCreator(
+                    spec=creator_spec,
+                    element_type=RBACElementType.AGENT,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.RESOURCE_GROUP,
+                        element_id=upsert_data.metadata.scaling_group,
+                    ),
+                )
+                await execute_rbac_entity_creator(session, rbac_creator)
+            else:
+                # Existing agent: update fields only
+                update_fields = upsert_data.update_fields
+                for field_name, value in update_fields.items():
+                    if hasattr(row, field_name):
+                        setattr(row, field_name, value)
+                await session.flush()
 
             return upsert_result
 
