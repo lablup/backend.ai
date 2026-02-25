@@ -319,32 +319,38 @@ class SchedulingController:
         self,
         session_ids: list[SessionId],
         reason: str = "USER_REQUESTED",
+        *,
+        forced: bool = False,
     ) -> MarkTerminatingResult:
         """
         Mark multiple sessions and their kernels for termination by updating their status to TERMINATING.
 
-        This method handles the lifecycle management of sessions by marking them
-        for termination, which will be processed by the scheduler's terminate_sessions method.
-        It also automatically requests TERMINATE scheduling if sessions were processed.
+        When forced=True, sessions skip TERMINATING and go directly to TERMINATED so the manager
+        immediately considers the session done and frees resources.
 
         Args:
             session_ids: List of session IDs to terminate
             reason: Reason for termination
+            forced: If True, skip TERMINATING and set directly to TERMINATED
 
         Returns:
             MarkTerminatingResult with categorized session statuses
         """
-        result = await self._repository.mark_sessions_terminating(session_ids, reason)
+        result = await self._repository.mark_sessions_terminating(
+            session_ids, reason, forced=forced
+        )
 
         if result.has_processed():
             log.info(
-                "Marked {} sessions for termination (cancelled: {}, terminating: {})",
+                "Marked {} sessions for termination"
+                " (cancelled: {}, terminating: {}, force_terminated: {})",
                 result.processed_count(),
                 len(result.cancelled_sessions),
                 len(result.terminating_sessions),
+                len(result.force_terminated_sessions),
             )
 
-            # Broadcast status events for cancelled and terminating sessions
+            # Broadcast status events for cancelled, terminating, and force-terminated sessions
             broadcast_events: list[AbstractBroadcastEvent] = [
                 SchedulingBroadcastEvent(
                     session_id=session_id,
@@ -363,6 +369,15 @@ class SchedulingController:
                 )
                 for session_id in result.terminating_sessions
             ])
+            broadcast_events.extend([
+                SchedulingBroadcastEvent(
+                    session_id=session_id,
+                    creation_id="",
+                    status_transition=str(SessionStatus.TERMINATED),
+                    reason=reason,
+                )
+                for session_id in result.force_terminated_sessions
+            ])
             if broadcast_events:
                 await self._event_producer.broadcast_events_batch(broadcast_events)
             # Record metric for termination attempts
@@ -371,6 +386,7 @@ class SchedulingController:
                 count=result.processed_count(),
             )
             # Request termination scheduling for the next cycle
+            # For force-terminated sessions, agents still need cleanup RPCs
             await self.mark_scheduling_needed([ScheduleType.TERMINATE])
 
         return result
