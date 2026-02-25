@@ -23,23 +23,19 @@ class ArtifactCreatorSpec(CreatorSpec[ArtifactRow]):
     source_registry_id: uuid.UUID
     source_registry_type: ArtifactRegistryType | str
     readonly: bool = True
-    id: uuid.UUID | None = None
     description: str | None = None
     extra: Any | None = None
 
     @override
     def build_row(self) -> ArtifactRow:
-        kwargs: dict[str, Any] = {
-            "name": self.name,
-            "type": self.type,
-            "registry_id": self.registry_id,
-            "registry_type": self.registry_type,
-            "source_registry_id": self.source_registry_id,
-            "source_registry_type": self.source_registry_type,
-            "readonly": self.readonly,
-            "description": self.description,
-            "extra": self.extra,
-        }
-        if self.id is not None:
-            kwargs["id"] = self.id
-        return ArtifactRow(**kwargs)
+        return ArtifactRow(
+            name=self.name,
+            type=self.type,
+            registry_id=self.registry_id,
+            registry_type=self.registry_type,
+            source_registry_id=self.source_registry_id,
+            source_registry_type=self.source_registry_type,
+            readonly=self.readonly,
+            description=self.description,
+            extra=self.extra,
+        )

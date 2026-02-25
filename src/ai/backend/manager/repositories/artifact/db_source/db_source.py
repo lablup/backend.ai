@@ -323,7 +323,6 @@ class ArtifactDBSource:
                     # Create new artifact with RBAC scope association
                     rbac_creator = RBACEntityCreator(
                         spec=ArtifactCreatorSpec(
-                            id=artifact_data.id,
                             name=artifact_data.name,
                             type=artifact_data.type,
                             description=artifact_data.description,
