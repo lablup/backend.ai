@@ -52,18 +52,52 @@
 
 ## Test Scenarios
 
+### Fixture: `deployment_factory` (DEFERRED)
+
+> **Status**: DEFERRED — requires EndpointRow direct DB insertion with complex FK relationships
+> (domain, project, user, image, scaling_group, deployment_policy). Tracked in Deferred Items below.
+
+`EndpointRow`를 DB에 직접 삽입해 happy-path 테스트를 가능하게 한다. BA-4590의 `model_deployment_fixture`와 동일 접근법.
+
+- `domain`: "default" (database_fixture 제공)
+- `project`: default group UUID (database_fixture 제공)
+- `created_user` / `session_owner`: default admin UUID (database_fixture 제공)
+- `resource_group`: default scaling group name (database_fixture 제공)
+- `image`: database_fixture에 image row가 있으면 그 UUID 사용; 없으면 conftest에 별도 `image_fixture` 추가
+- `resource_slots`: `{"cpu": "1", "mem": "1073741824"}`
+- `lifecycle_stage`: `EndpointLifecycle.CREATED`
+
 ### Component Tests (`tests/component/deployment/`)
 
 #### TestSearchDeployments
 | Test Method | Scenario | xfail? |
 |-------------|----------|--------|
 | `test_search_deployments_empty` | Search with no data → empty list, pagination total=0 | - |
-| `test_search_deployments_with_filter` | Search with name filter → filtered results | - |
+| `test_search_deployments_with_data` | deployment_factory로 시딩 후 search → 1건 포함된 결과 | - |
+| `test_search_deployments_with_name_filter` | name 필터 일치/불일치 케이스 | - |
 
 #### TestGetDeployment
 | Test Method | Scenario | xfail? |
 |-------------|----------|--------|
 | `test_get_deployment_not_found` | GET non-existent UUID → proper error response | - |
+| `test_admin_gets_deployment` | deployment_factory 시딩 → GET → 필드 검증 | - |
+
+#### TestUpdateDeployment (DEFERRED)
+
+> **Status**: DEFERRED — depends on `deployment_factory` fixture. See Deferred Items.
+
+| Test Method | Scenario | xfail? |
+|-------------|----------|--------|
+| `test_admin_updates_deployment` | deployment_factory 시딩 → PATCH name/desired_replicas → 업데이트 반영 확인 | - |
+| `test_update_nonexistent_deployment` | 존재하지 않는 UUID → error | - |
+
+#### TestDestroyDeployment (DEFERRED)
+
+> **Status**: DEFERRED — depends on `deployment_factory` fixture. See Deferred Items.
+
+| Test Method | Scenario | xfail? |
+|-------------|----------|--------|
+| `test_admin_destroys_deployment` | deployment_factory 시딩 → DELETE → 이후 GET 시 not found | - |
 
 #### TestSearchRevisions
 | Test Method | Scenario | xfail? |
@@ -96,9 +130,10 @@ Integration tests require a full running manager with real infrastructure (agent
 
 | Item | Reason |
 |------|--------|
+| `deployment_factory` fixture | Requires EndpointRow direct DB insertion with complex FK relationships: domain, project, user, image, scaling_group, deployment_policy. Similar to BA-4590 `model_deployment_fixture`. |
 | `create_deployment` component test | Requires extensive fixtures: valid domain, project, user, image, vfolder, scaling_group. Service layer calls deep into infrastructure (agent_registry, deployment_controller). |
-| `update_deployment` component test | Needs existing deployment (depends on create) |
-| `destroy_deployment` component test | Needs existing deployment (depends on create) |
+| `update_deployment` component test | Needs `deployment_factory` fixture (depends on EndpointRow seeding) |
+| `destroy_deployment` component test | Needs `deployment_factory` fixture (depends on EndpointRow seeding) |
 | `create_revision` component test | Needs existing deployment + image + vfolder |
 | `get_revision` component test | Needs existing revision (depends on create_revision) |
 | `activate_revision` component test | Triggers real scheduling via deployment_controller (mocked but complex) |
@@ -112,12 +147,15 @@ Integration tests require a full running manager with real infrastructure (agent
    - `server_subapp_pkgs()` → `[".auth", ".deployment"]`
    - `server_cleanup_contexts()` → same as ACL pattern
    - `_deployment_domain_ctx(root_ctx)` → Repositories + Processors init with mocks
+   - `deployment_factory` fixture → EndpointRow DB 직접 삽입 (image FK 확인 후 image_fixture 필요 시 추가)
 3. Create `tests/component/deployment/test_deployment.py`
-   - `TestSearchDeployments` — search with empty results
-   - `TestGetDeployment` — get non-existent deployment
-   - `TestSearchRevisions` — search revisions empty
+   - `TestSearchDeployments` — empty + 데이터 있을 때 + name 필터
+   - `TestGetDeployment` — not found + happy path (deployment_factory)
+   - `TestUpdateDeployment` — happy path + not found
+   - `TestDestroyDeployment` — happy path (deployment_factory)
+   - `TestSearchRevisions` — empty
    - `TestDeactivateRevision` — stub handler always success
-   - `TestSearchRoutes` — search routes empty
+   - `TestSearchRoutes` — empty
 4. Create `tests/component/deployment/BUILD` → `python_tests()`
 5. Create `tests/integration/deployment/__init__.py`
 6. Create `tests/integration/deployment/conftest.py` — minimal skeleton

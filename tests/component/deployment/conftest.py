@@ -62,6 +62,14 @@ async def _deployment_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             valkey_live_client=root_ctx.valkey_live,
         )
     )
+    # The DeploymentService is initialized with
+    # deployment_controller._deployment_repository (see Processors.create()).
+    # A plain MagicMock would make that attribute another MagicMock, causing
+    # "object MagicMock can't be used in 'await' expression" in every service
+    # method that awaits repository calls.  Wire the real repository so that
+    # DB-backed operations (search, get) work normally.
+    _mock_deployment_controller = MagicMock()
+    _mock_deployment_controller._deployment_repository = root_ctx.repositories.deployment.repository
     root_ctx.processors = Processors.create(
         ProcessorArgs(
             service_args=ServiceArgs(
@@ -85,7 +93,7 @@ async def _deployment_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 event_dispatcher=MagicMock(),
                 hook_plugin_ctx=MagicMock(),
                 scheduling_controller=MagicMock(),
-                deployment_controller=MagicMock(),
+                deployment_controller=_mock_deployment_controller,
                 revision_generator_registry=MagicMock(),
                 agent_cache=MagicMock(),
                 notification_center=MagicMock(),
