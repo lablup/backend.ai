@@ -42,10 +42,11 @@ class ConfigClient(BaseDomainClient):
         )
 
     async def get_user_dotfile(self, request: GetUserDotfileRequest) -> GetDotfileResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "GET",
             "/user-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=GetDotfileResponse,
         )
 
@@ -73,11 +74,11 @@ class ConfigClient(BaseDomainClient):
         )
 
     async def get_bootstrap_script(self) -> GetBootstrapScriptResponse:
-        return await self._client.typed_request(
-            "GET",
-            "/user-config/bootstrap-script",
-            response_model=GetBootstrapScriptResponse,
-        )
+        # The server returns a bare JSON string (not wrapped in an object),
+        # so we cannot use typed_request() which expects a dict response.
+        data = await self._client._request("GET", "/user-config/bootstrap-script")
+        script = data if isinstance(data, str) else ""
+        return GetBootstrapScriptResponse(script=script)
 
     async def update_bootstrap_script(
         self, request: UpdateBootstrapScriptRequest
@@ -102,18 +103,20 @@ class ConfigClient(BaseDomainClient):
         )
 
     async def get_group_dotfile(self, request: GetGroupDotfileRequest) -> GetDotfileResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "GET",
             "/group-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=GetDotfileResponse,
         )
 
     async def list_group_dotfiles(self, request: GetGroupDotfileRequest) -> ListDotfilesResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "GET",
             "/group-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=ListDotfilesResponse,
         )
 
@@ -150,18 +153,20 @@ class ConfigClient(BaseDomainClient):
         )
 
     async def get_domain_dotfile(self, request: GetDomainDotfileRequest) -> GetDotfileResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "GET",
             "/domain-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=GetDotfileResponse,
         )
 
     async def list_domain_dotfiles(self, request: GetDomainDotfileRequest) -> ListDotfilesResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "GET",
             "/domain-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=ListDotfilesResponse,
         )
 
