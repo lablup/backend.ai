@@ -936,6 +936,17 @@ class ScheduleDBSource:
     ) -> list[SessionId]:
         """Directly mark terminatable sessions and their kernels as TERMINATED (force-terminate)."""
         now_iso = now.isoformat()
+        # Capture from_statuses before update
+        status_query = sa.select(SessionRow.id, SessionRow.status).where(
+            sa.and_(
+                SessionRow.id.in_(session_ids),
+                SessionRow.status.in_(SessionStatus.terminatable_statuses()),
+            )
+        )
+        status_result = await db_sess.execute(status_query)
+        from_statuses: dict[SessionId, SessionStatus] = {
+            cast(SessionId, row.id): SessionStatus(row.status) for row in status_result
+        }
         # Mark sessions as TERMINATED directly, recording both TERMINATING and TERMINATED timestamps
         terminated_stmt = (
             sa.update(SessionRow)
@@ -988,6 +999,20 @@ class ScheduleDBSource:
                     )
                 )
             )
+
+            # Record scheduling history for force-terminate transition
+            history_specs = [
+                SessionSchedulingHistoryCreatorSpec(
+                    session_id=sid,
+                    phase="force_terminate",
+                    result=SchedulingResult.SUCCESS,
+                    message="force_terminate success",
+                    from_status=from_statuses.get(sid),
+                    to_status=SessionStatus.TERMINATED,
+                )
+                for sid in force_terminated_sessions
+            ]
+            await self._record_scheduling_history(db_sess, BulkCreator(specs=history_specs))
 
         return force_terminated_sessions
 

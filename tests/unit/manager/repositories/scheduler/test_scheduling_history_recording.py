@@ -46,6 +46,7 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
+from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
@@ -86,6 +87,7 @@ class TestEnqueueSessionSchedulingHistory:
                 AgentRow,
                 SessionRow,
                 KernelRow,
+                ResourceSlotTypeRow,
                 ResourceAllocationRow,
                 SessionDependencyRow,
                 SessionSchedulingHistoryRow,
@@ -297,6 +299,12 @@ class TestEnqueueSessionSchedulingHistory:
         test_access_key: AccessKey,
     ) -> None:
         """Test that enqueue_session() creates a scheduling history record."""
+        # Seed required resource slot types (FK for resource_allocations)
+        async with db_with_cleanup.begin_session() as db_sess:
+            for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
+                db_sess.add(ResourceSlotTypeRow(slot_name=slot_name, slot_type=slot_type))
+            await db_sess.flush()
+
         db_source = ScheduleDBSource(db_with_cleanup)
         now = datetime.now(tzutc())
         session_id = SessionId(uuid.uuid4())
@@ -754,6 +762,47 @@ class TestMarkTerminatingSchedulingHistory:
             assert history_record.from_status == str(SessionStatus.RUNNING)
             assert history_record.to_status == str(SessionStatus.TERMINATING)
             assert history_record.message == "mark_terminating success"
+
+    @pytest.mark.asyncio
+    async def test_force_terminate_creates_scheduling_history(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_agent_id: str,
+    ) -> None:
+        """Test that mark_sessions_terminating(forced=True) creates TERMINATED history records."""
+        db_source = ScheduleDBSource(db_with_cleanup)
+
+        session_id = await self._create_session_with_kernel(
+            db_with_cleanup,
+            session_status=SessionStatus.RUNNING,
+            kernel_status=KernelStatus.RUNNING,
+            domain_name=test_domain_name,
+            scaling_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+            agent_id=test_agent_id,
+        )
+
+        result = await db_source.mark_sessions_terminating([session_id], forced=True)
+        assert session_id in result.force_terminated_sessions
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            history_stmt = sa.select(SessionSchedulingHistoryRow).where(
+                SessionSchedulingHistoryRow.session_id == session_id
+            )
+            history_record = await db_sess.scalar(history_stmt)
+            assert history_record is not None
+            assert history_record.phase == "force_terminate"
+            assert history_record.result == str(SchedulingResult.SUCCESS)
+            assert history_record.from_status == str(SessionStatus.RUNNING)
+            assert history_record.to_status == str(SessionStatus.TERMINATED)
+            assert history_record.message == "force_terminate success"
 
     @pytest.mark.asyncio
     async def test_mark_sessions_as_terminating_captures_correct_from_status(
