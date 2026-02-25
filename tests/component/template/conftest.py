@@ -85,6 +85,8 @@ async def _template_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         [],
     )
     yield
+    async with root_ctx.db.begin() as conn:
+        await conn.execute(sa.delete(session_templates))
 
 
 @pytest.fixture()
@@ -122,11 +124,3 @@ async def group_name_fixture(
         row = result.first()
         assert row is not None
         return str(row[0])
-
-
-@pytest.fixture(autouse=True)
-async def cleanup_session_templates(db_engine: SAEngine) -> AsyncIterator[None]:
-    """Delete all session_templates after each test to avoid FK violations during teardown."""
-    yield
-    async with db_engine.begin() as conn:
-        await conn.execute(sa.delete(session_templates))
