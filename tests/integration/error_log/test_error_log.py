@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 import pytest
 
@@ -20,7 +21,7 @@ def _make_append_request(
     source: str = "integration-test",
     message: str = "integration test error",
     context_lang: str = "python",
-    context_env: dict | None = None,
+    context_env: dict[str, Any] | None = None,
 ) -> AppendErrorLogRequest:
     return AppendErrorLogRequest(
         severity=severity,

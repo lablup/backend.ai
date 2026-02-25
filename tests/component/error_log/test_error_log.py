@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 import pytest
 
@@ -20,7 +21,7 @@ def _make_append_request(
     source: str = "test-source",
     message: str = "test error message",
     context_lang: str = "python",
-    context_env: dict | None = None,
+    context_env: dict[str, Any] | None = None,
     request_url: str | None = None,
     request_status: int | None = None,
     traceback: str | None = None,

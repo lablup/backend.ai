@@ -5,12 +5,14 @@ from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import logs as _logs_api
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
+from ai.backend.manager.models.error_logs import error_logs
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.server import (
@@ -97,6 +99,14 @@ async def _error_log_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         [],
     )
     yield
+
+    # Clean up error_log entries created during tests.
+    # error_logs.user has a FK to users.uuid; if these rows remain when
+    # admin_user_fixture teardown tries to delete users, the cascading
+    # fixture teardown (users → domains, keypairs → resource_policies) will
+    # hit ForeignKeyViolationError.
+    async with root_ctx.db.begin_session() as sess:
+        await sess.execute(sa.delete(error_logs))
 
 
 @pytest.fixture()
