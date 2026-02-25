@@ -44,7 +44,7 @@ class ImageResourceLimitDTO(BaseModel):
 
     key: str = Field(description="Resource slot name")
     min: Decimal = Field(description="Minimum limit")
-    max: Decimal = Field(description="Maximum limit")
+    max: Decimal | None = Field(default=None, description="Maximum limit (None means unlimited)")
 
 
 class ImageDTO(BaseModel):
