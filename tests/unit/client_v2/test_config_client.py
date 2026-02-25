@@ -146,8 +146,11 @@ class TestConfigClientUserDotfiles:
 class TestConfigClientBootstrap:
     @pytest.mark.asyncio
     async def test_get_bootstrap_script(self) -> None:
-        mock_resp = _ok_response({"script": "#!/bin/bash\necho hello"})
-        mock_session = _make_request_session(mock_resp)
+        # The server returns a bare JSON string (not a dict), so we mock accordingly.
+        resp = AsyncMock()
+        resp.status = 200
+        resp.json = AsyncMock(return_value="#!/bin/bash\necho hello")
+        mock_session = _make_request_session(resp)
         client = _make_client(mock_session)
         config_client = ConfigClient(client)
 
