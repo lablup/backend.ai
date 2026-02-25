@@ -159,6 +159,51 @@ class TestRBACScopeBinder:
             )
             assert total == 1
 
+    async def test_bind_mixed_existing_and_new(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+        entity_id: str,
+        project_id_1: str,
+        project_id_2: str,
+        project_id_3: str,
+    ) -> None:
+        """When binding a mix of existing and new scopes, only new ones are returned."""
+        # Pre-bind project 1
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=project_id_1,
+                    entity_type=EntityType.CONTAINER_REGISTRY,
+                    entity_id=entity_id,
+                )
+            )
+            await db_sess.flush()
+
+        # Bind project 1 (existing) + project 2 & 3 (new)
+        binder = RBACScopeBinder(
+            element_type=RBACElementType.CONTAINER_REGISTRY,
+            entity_id=entity_id,
+            scope_refs=[
+                RBACElementRef(RBACElementType.PROJECT, project_id_1),
+                RBACElementRef(RBACElementType.PROJECT, project_id_2),
+                RBACElementRef(RBACElementType.PROJECT, project_id_3),
+            ],
+        )
+
+        async with database_connection.begin_session() as db_sess:
+            result = await execute_rbac_scope_binder(db_sess, binder)
+
+            assert len(result.rows) == 2
+            returned_scope_ids = {row.scope_id for row in result.rows}
+            assert returned_scope_ids == {project_id_2, project_id_3}
+
+            total = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            )
+            assert total == 3
+
     async def test_bind_with_ref_relation_type(
         self,
         database_connection: ExtendedAsyncSAEngine,
