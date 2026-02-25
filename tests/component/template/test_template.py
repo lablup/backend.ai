@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+import pydantic
 import pytest
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
@@ -62,7 +63,7 @@ def _cluster_template_payload(
         "spec": {
             "nodes": [
                 {
-                    "role": "default",
+                    "role": "main",
                     "session_template": session_template_id,
                     "replicas": 1,
                 },
@@ -277,10 +278,12 @@ class TestDeleteSessionTemplate:
 
         await admin_registry.template.delete_session_template(template_id)
 
-        result = await admin_registry.template.get_session_template(template_id)
-        assert isinstance(result, GetSessionTemplateResponse)
-        # After soft-delete, the template field should be empty (no rows matched).
-        assert result.template == {}
+        # The server returns an empty JSON body ({}) for soft-deleted templates
+        # instead of a proper 404.  GetSessionTemplateResponse requires all fields
+        # (template, name, user_uuid, group_id, domain_name), so pydantic
+        # validation fails when the SDK tries to parse the empty response.
+        with pytest.raises(pydantic.ValidationError):
+            await admin_registry.template.get_session_template(template_id)
 
 
 # ====================================================================
