@@ -34,11 +34,15 @@ __all__ = (
     "SearchRoutesRequest",
     # Create requests
     "CreateDeploymentRequest",
+    "CreateRevisionRequest",
+    "CreateDeploymentPolicyRequest",
     # Update requests
     "UpdateDeploymentRequest",
+    "UpdateDeploymentPolicyRequest",
     "UpdateRouteTrafficStatusRequest",
     # Path params
     "DeploymentPathParam",
+    "DeploymentPolicyPathParam",
     "RevisionPathParam",
     "RoutePathParam",
     # Nested input types
@@ -283,3 +287,56 @@ class CreateDeploymentRequest(BaseRequestModel):
     )
     desired_replica_count: int = Field(ge=0, description="Desired number of replicas")
     initial_revision: RevisionInput = Field(description="Initial revision configuration")
+
+
+class CreateRevisionRequest(BaseRequestModel):
+    """Request to create a new revision for an existing deployment."""
+
+    name: str | None = Field(default=None, description="Revision name")
+    cluster_config: ClusterConfigInput = Field(description="Cluster configuration")
+    resource_config: ResourceConfigInput = Field(description="Resource configuration")
+    image: ImageInput = Field(description="Container image")
+    model_runtime_config: ModelRuntimeConfigInput = Field(description="Model runtime configuration")
+    model_mount_config: ModelMountConfigInput = Field(description="Model mount configuration")
+    extra_mounts: list[ExtraVFolderMountInput] | None = Field(
+        default=None, description="Extra vfolder mounts"
+    )
+
+
+# ========== Deployment Policy Requests ==========
+
+
+class CreateDeploymentPolicyRequest(BaseRequestModel):
+    """Request to create a deployment policy."""
+
+    strategy: DeploymentStrategy = Field(description="Deployment strategy type")
+    rollback_on_failure: bool = Field(default=False, description="Rollback on failure")
+    rolling_update: RollingUpdateConfigInput | None = Field(
+        default=None, description="Rolling update configuration"
+    )
+    blue_green: BlueGreenConfigInput | None = Field(
+        default=None, description="Blue-green deployment configuration"
+    )
+
+
+class UpdateDeploymentPolicyRequest(BaseRequestModel):
+    """Request to update a deployment policy."""
+
+    strategy: DeploymentStrategy | None = Field(
+        default=None, description="Updated deployment strategy type"
+    )
+    rollback_on_failure: bool | None = Field(
+        default=None, description="Updated rollback on failure setting"
+    )
+    rolling_update: RollingUpdateConfigInput | None = Field(
+        default=None, description="Updated rolling update configuration"
+    )
+    blue_green: BlueGreenConfigInput | None = Field(
+        default=None, description="Updated blue-green deployment configuration"
+    )
+
+
+class DeploymentPolicyPathParam(BaseRequestModel):
+    """Path parameter for deployment policy endpoints."""
+
+    deployment_id: UUID = Field(description="Deployment ID")

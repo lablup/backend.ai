@@ -23,6 +23,7 @@ from ai.backend.common.types import ClusterMode, RuntimeVariant
 __all__ = (
     # DTOs
     "DeploymentDTO",
+    "DeploymentPolicyDTO",
     "RevisionDTO",
     "RouteDTO",
     "NetworkConfigDTO",
@@ -33,9 +34,12 @@ __all__ = (
     "ReplicaStateDTO",
     # Responses
     "CreateDeploymentResponse",
+    "CreateDeploymentPolicyResponse",
     "GetDeploymentResponse",
+    "GetDeploymentPolicyResponse",
     "ListDeploymentsResponse",
     "UpdateDeploymentResponse",
+    "UpdateDeploymentPolicyResponse",
     "DestroyDeploymentResponse",
     "GetRevisionResponse",
     "ListRevisionsResponse",
@@ -224,3 +228,35 @@ class UpdateRouteTrafficStatusResponse(BaseResponseModel):
     """Response for updating route traffic status."""
 
     route: RouteDTO = Field(description="Updated route")
+
+
+# ========== Deployment Policy DTOs ==========
+
+
+class DeploymentPolicyDTO(BaseModel):
+    """DTO for deployment policy data."""
+
+    id: UUID = Field(description="Deployment policy ID")
+    strategy: DeploymentStrategy = Field(description="Deployment strategy type")
+    strategy_spec: dict[str, Any] = Field(description="Strategy-specific configuration")
+    rollback_on_failure: bool = Field(description="Whether to rollback on failure")
+    created_at: datetime = Field(description="Creation timestamp")
+    updated_at: datetime = Field(description="Last update timestamp")
+
+
+class CreateDeploymentPolicyResponse(BaseResponseModel):
+    """Response for creating a deployment policy."""
+
+    deployment_policy: DeploymentPolicyDTO = Field(description="Created deployment policy")
+
+
+class UpdateDeploymentPolicyResponse(BaseResponseModel):
+    """Response for updating a deployment policy."""
+
+    deployment_policy: DeploymentPolicyDTO = Field(description="Updated deployment policy")
+
+
+class GetDeploymentPolicyResponse(BaseResponseModel):
+    """Response for getting a deployment policy."""
+
+    deployment_policy: DeploymentPolicyDTO = Field(description="Deployment policy data")

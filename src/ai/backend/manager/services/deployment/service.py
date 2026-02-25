@@ -33,6 +33,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.service import RoutingNotFound
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -47,6 +48,9 @@ from ai.backend.manager.repositories.deployment.creators import (
     DeploymentResourceFields,
     EndpointTokenCreatorSpec,
     ModelRevisionFields,
+)
+from ai.backend.manager.repositories.deployment.creators.policy import (
+    DeploymentPolicyCreatorSpec,
 )
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
@@ -85,10 +89,14 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
     CreateLegacyDeploymentActionResult,
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
+    CreateDeploymentPolicyAction,
+    CreateDeploymentPolicyActionResult,
     GetDeploymentPolicyAction,
     GetDeploymentPolicyActionResult,
     SearchDeploymentPoliciesAction,
     SearchDeploymentPoliciesActionResult,
+    UpdateDeploymentPolicyAction,
+    UpdateDeploymentPolicyActionResult,
 )
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
@@ -473,6 +481,45 @@ class DeploymentService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def create_deployment_policy(
+        self, action: CreateDeploymentPolicyAction
+    ) -> CreateDeploymentPolicyActionResult:
+        """Create a new deployment policy for an endpoint.
+
+        Args:
+            action: Action containing the endpoint ID and policy configuration
+
+        Returns:
+            CreateDeploymentPolicyActionResult: Result containing the created policy data
+        """
+        config = action.policy_config
+        spec = DeploymentPolicyCreatorSpec(
+            endpoint_id=action.endpoint_id,
+            strategy=config.strategy,
+            strategy_spec=config.strategy_spec,
+            rollback_on_failure=config.rollback_on_failure,
+        )
+        creator: Creator[DeploymentPolicyRow] = Creator(spec=spec)
+        data = await self._deployment_repository.create_deployment_policy(creator)
+        return CreateDeploymentPolicyActionResult(data=data)
+
+    async def update_deployment_policy(
+        self, action: UpdateDeploymentPolicyAction
+    ) -> UpdateDeploymentPolicyActionResult:
+        """Update a deployment policy.
+
+        Args:
+            action: Action containing the policy ID and updater
+
+        Returns:
+            UpdateDeploymentPolicyActionResult: Result containing the updated policy data
+
+        Raises:
+            DeploymentPolicyNotFound: If the policy does not exist
+        """
+        data = await self._deployment_repository.update_deployment_policy(action.updater)
+        return UpdateDeploymentPolicyActionResult(data=data)
 
     # ========== Revision Operations ==========
 
