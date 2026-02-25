@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 
 import pytest
 
@@ -64,11 +65,17 @@ class TestSessionTemplateLifecycle:
     async def test_create_get_update_delete(
         self,
         admin_registry: BackendAIClientRegistry,
+        domain_fixture: str,
+        group_fixture: uuid.UUID,
     ) -> None:
         """Full CRUD lifecycle: create -> get -> update -> get -> delete -> verify gone."""
         # Create
         create_result = await admin_registry.template.create_session_template(
-            CreateSessionTemplateRequest(payload=_session_template_payload("lifecycle-st")),
+            CreateSessionTemplateRequest(
+                domain=domain_fixture,
+                group=str(group_fixture),
+                payload=_session_template_payload("lifecycle-st"),
+            ),
         )
         assert isinstance(create_result, CreateSessionTemplateResponse)
         template_id = create_result.root[0].id
@@ -84,6 +91,8 @@ class TestSessionTemplateLifecycle:
         update_result = await admin_registry.template.update_session_template(
             template_id,
             UpdateSessionTemplateRequest(
+                domain=domain_fixture,
+                group=str(group_fixture),
                 payload=_session_template_payload("lifecycle-st-updated"),
             ),
         )
@@ -110,17 +119,25 @@ class TestClusterTemplateLifecycle:
     async def test_create_get_update_delete(
         self,
         admin_registry: BackendAIClientRegistry,
+        domain_fixture: str,
+        group_fixture: uuid.UUID,
     ) -> None:
         """Full CRUD: create session tpl -> create cluster tpl -> get -> update -> delete."""
         # Create prerequisite session template
         st_result = await admin_registry.template.create_session_template(
-            CreateSessionTemplateRequest(payload=_session_template_payload("ct-lifecycle-dep")),
+            CreateSessionTemplateRequest(
+                domain=domain_fixture,
+                group=str(group_fixture),
+                payload=_session_template_payload("ct-lifecycle-dep"),
+            ),
         )
         session_tpl_id = st_result.root[0].id
 
         # Create cluster template
         create_result = await admin_registry.template.create_cluster_template(
             CreateClusterTemplateRequest(
+                domain=domain_fixture,
+                group=str(group_fixture),
                 payload=_cluster_template_payload("lifecycle-ct", session_tpl_id),
             ),
         )
