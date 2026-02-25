@@ -38,7 +38,6 @@ A single `evaluate()` call may produce different sub-steps for different deploym
 | **Routing** | Coordinator branches to evaluator path for `DeploymentLifecycleType.DEPLOYING` |
 | **Cycles** | Evaluator runs strategy FSM + applies route changes → handlers process results → coordinator records history |
 
-All handlers use the generic coordinator path, eliminating the need for any `next_status()=None` special-case pattern.
 
 ## Sub-documents
 
