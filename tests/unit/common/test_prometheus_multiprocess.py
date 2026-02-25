@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import Iterator
 from pathlib import Path
@@ -122,3 +123,23 @@ class TestCleanupPrometheusMultiprocDir:
 
         # Should not raise
         cleanup_prometheus_multiprocess_dir()
+
+
+class TestDefaultBaseDirUid:
+    def test_default_base_dir_contains_uid(self) -> None:
+        uid = os.getuid() if hasattr(os, "getuid") else "common"
+        assert f"backendai.{uid}" in str(mp_mod._DEFAULT_BASE_DIR)
+        assert str(mp_mod._DEFAULT_BASE_DIR).endswith("/prometheus")
+
+    def test_setup_raises_on_permission_error(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with (
+            patch.object(mp_mod, "_DEFAULT_BASE_DIR", tmp_path),
+            patch.object(Path, "mkdir", side_effect=PermissionError("mock denied")),
+            caplog.at_level(logging.ERROR),
+        ):
+            with pytest.raises(PermissionError):
+                setup_prometheus_multiprocess_dir("manager")
+
+        assert "permission denied" in caplog.text.lower()
