@@ -99,6 +99,7 @@ class EntityType(enum.StrEnum):
     EXPORT = "export"
     GROUP = "group"
     MODEL_SERVICE = "model_service"
+    NETWORK = "network"
     NOTIFICATION = "notification"
     OBJECT_PERMISSION = "object_permission"
     OBJECT_STORAGE = "object_storage"
