@@ -119,9 +119,9 @@ class FairShareDBSource:
                 upserter,
                 index_elements=["resource_group", "domain_name"],
             )
-            sg_row = await self._fetch_scaling_group_row(db_sess, result.row.resource_group)
-            fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
-            available_slots = await self._fetch_available_slots(db_sess, result.row.resource_group)
+            fair_share_spec, available_slots = await self._try_fetch_scaling_group_context(
+                db_sess, result.row.resource_group
+            )
             return result.row.to_data(
                 default_weight=fair_share_spec.default_weight,
                 available_slots=available_slots,
@@ -328,9 +328,9 @@ class FairShareDBSource:
                 upserter,
                 index_elements=["resource_group", "project_id"],
             )
-            sg_row = await self._fetch_scaling_group_row(db_sess, result.row.resource_group)
-            fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
-            available_slots = await self._fetch_available_slots(db_sess, result.row.resource_group)
+            fair_share_spec, available_slots = await self._try_fetch_scaling_group_context(
+                db_sess, result.row.resource_group
+            )
             return result.row.to_data(
                 default_weight=fair_share_spec.default_weight,
                 available_slots=available_slots,
@@ -549,9 +549,9 @@ class FairShareDBSource:
                 upserter,
                 index_elements=["resource_group", "user_uuid", "project_id"],
             )
-            sg_row = await self._fetch_scaling_group_row(db_sess, result.row.resource_group)
-            fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
-            available_slots = await self._fetch_available_slots(db_sess, result.row.resource_group)
+            fair_share_spec, available_slots = await self._try_fetch_scaling_group_context(
+                db_sess, result.row.resource_group
+            )
             return result.row.to_data(
                 default_weight=fair_share_spec.default_weight,
                 available_slots=available_slots,
@@ -1248,6 +1248,25 @@ class FairShareDBSource:
         if row is None:
             raise ScalingGroupNotFound(resource_group)
         return row
+
+    async def _try_fetch_scaling_group_context(
+        self,
+        db_sess: SASession,
+        resource_group: str,
+    ) -> tuple[FairShareScalingGroupSpec, list[SlotQuantity]]:
+        """Fetch scaling group context for response building, with graceful fallback.
+
+        Returns defaults when scaling group doesn't exist.
+        Used by upsert methods where the scaling group may not exist.
+        """
+        try:
+            sg_row = await self._fetch_scaling_group_row(db_sess, resource_group)
+            fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
+            available_slots = await self._fetch_available_slots(db_sess, resource_group)
+        except ScalingGroupNotFound:
+            fair_share_spec = FairShareScalingGroupSpec()
+            available_slots = []
+        return fair_share_spec, available_slots
 
     async def _fetch_available_slots(
         self,
