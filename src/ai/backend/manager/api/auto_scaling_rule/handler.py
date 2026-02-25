@@ -200,7 +200,7 @@ def create_app(
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     api_handler = AutoScalingRuleAPIHandler()
 
-    cors.add(app.router.add_route("POST", "/", api_handler.create))
+    cors.add(app.router.add_route("POST", "", api_handler.create))
     cors.add(app.router.add_route("GET", "/{rule_id}", api_handler.get))
     cors.add(app.router.add_route("POST", "/search", api_handler.search))
     cors.add(app.router.add_route("PATCH", "/{rule_id}", api_handler.update))
