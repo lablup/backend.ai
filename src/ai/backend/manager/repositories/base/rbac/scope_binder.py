@@ -33,7 +33,7 @@ from ai.backend.manager.repositories.base.purger import (
 )
 
 # =============================================================================
-# Pair Types
+# Binder Pair
 # =============================================================================
 
 
@@ -56,25 +56,6 @@ class RBACScopeBindingPair[TRow: Base]:
     entity_ref: RBACElementRef
     scope_ref: RBACElementRef
     relation_type: RelationType = RelationType.AUTO
-
-
-class RBACScopeUnbindingPair[TRow: Base](ABC):
-    """Abstract base for scope unbinding operations.
-
-    Implementations specify what to delete by providing:
-    - build_purger_spec(): Returns a BatchPurgerSpec for business N:N row deletion.
-    - build_condition(): Returns a WHERE condition for AssociationScopesEntitiesRow deletion.
-    """
-
-    @abstractmethod
-    def build_purger_spec(self) -> BatchPurgerSpec[TRow]:
-        """Build purger spec for business N:N mapping row deletion."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def build_condition(self) -> sa.ColumnElement[bool]:
-        """Build WHERE condition for AssociationScopesEntitiesRow deletion."""
-        raise NotImplementedError
 
 
 # =============================================================================
@@ -161,18 +142,23 @@ async def execute_rbac_scope_binder[TRow: Base](
 # =============================================================================
 
 
-@dataclass
-class RBACScopeUnbinder[TRow: Base]:
-    """Unbinds N:N mapping rows and RBAC scope associations atomically.
+class RBACScopeUnbinder[TRow: Base](ABC):
+    """Abstract base for scope unbinding operations.
 
     Combines business row deletion (e.g., sgroups_for_domains)
     with RBAC association deletion (association_scopes_entities).
 
-    Attributes:
-        pairs: Paired purger specs and RBAC bindings.
+    Implementations specify what to delete by providing:
+    - purger_spec: A BatchPurgerSpec for business N:N row deletion.
+    - build_condition(): A WHERE condition for AssociationScopesEntitiesRow deletion.
     """
 
-    pairs: Sequence[RBACScopeUnbindingPair[TRow]]
+    purger_spec: BatchPurgerSpec[TRow]
+
+    @abstractmethod
+    def build_condition(self) -> sa.ColumnElement[bool]:
+        """Build WHERE condition for AssociationScopesEntitiesRow deletion."""
+        raise NotImplementedError
 
 
 @dataclass
@@ -195,37 +181,28 @@ async def execute_rbac_scope_unbinder[TRow: Base](
     """Delete N:N mapping rows and RBAC scope associations.
 
     Operations:
-    1. Delete business rows via each pair's purger_spec
-    2. Delete RBAC associations matching pairs
+    1. Delete business rows via unbinder.purger_spec
+    2. Delete RBAC associations via unbinder.build_condition()
 
     Args:
         db_sess: Async SQLAlchemy session (must be writable).
-        unbinder: Unbinder instance specifying paired purger specs and bindings.
+        unbinder: Unbinder instance specifying purger spec and association condition.
 
     Returns:
         RBACScopeUnbinderResult with deletion counts and removed associations.
     """
-    if not unbinder.pairs:
-        return RBACScopeUnbinderResult(deleted_count=0, association_rows=[])
+    # 1. Delete business N:N mapping rows
+    purge_result = await execute_batch_purger(db_sess, BatchPurger(spec=unbinder.purger_spec))
 
-    # 1. Delete business N:N mapping rows per pair
-    total_deleted = 0
-    for pair in unbinder.pairs:
-        purge_result = await execute_batch_purger(
-            db_sess, BatchPurger(spec=pair.build_purger_spec())
-        )
-        total_deleted += purge_result.deleted_count
-
-    # 2. Delete RBAC association rows using each pair's condition
-    conditions = [pair.build_condition() for pair in unbinder.pairs]
+    # 2. Delete RBAC association rows
     assoc_stmt = (
         sa.delete(AssociationScopesEntitiesRow)
-        .where(sa.or_(*conditions))
+        .where(unbinder.build_condition())
         .returning(AssociationScopesEntitiesRow)
     )
     association_rows = list((await db_sess.scalars(assoc_stmt)).all())
 
     return RBACScopeUnbinderResult(
-        deleted_count=total_deleted,
+        deleted_count=purge_result.deleted_count,
         association_rows=association_rows,
     )
