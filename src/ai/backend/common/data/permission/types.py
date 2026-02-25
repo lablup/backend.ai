@@ -98,6 +98,7 @@ class EntityType(enum.StrEnum):
     ERROR_LOG = "error_log"
     EXPORT = "export"
     GROUP = "group"
+    KEYPAIR = "keypair"
     MODEL_SERVICE = "model_service"
     NOTIFICATION = "notification"
     OBJECT_PERMISSION = "object_permission"
