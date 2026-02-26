@@ -4,20 +4,33 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import json
 from collections.abc import Awaitable, Callable
-from unittest.mock import MagicMock
+from typing import Self
+from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp_cors
 import pytest
 from aiohttp import web
 
+from ai.backend.common.api_handlers import (
+    APIResponse,
+    BaseRequestModel,
+    BaseResponseModel,
+    BodyParam,
+    MiddlewareParam,
+)
 from ai.backend.manager.api.auth import (
     admin_required,
     auth_middleware,
     auth_required,
     superadmin_required,
 )
-from ai.backend.manager.api.rest.routing import RouteRegistry, _apply_route_middlewares
+from ai.backend.manager.api.rest.routing import (
+    RouteRegistry,
+    _apply_route_middlewares,
+    _wrap_api_handler,
+)
 from ai.backend.manager.api.rest.types import CORSOptions
 
 
@@ -62,12 +75,21 @@ def _make_middleware(
     return middleware
 
 
-async def _dummy_handler(request: web.Request) -> web.Response:
-    return web.json_response({"handler": "dummy"})
+class DummyResponse(BaseResponseModel):
+    handler: str
 
 
-async def _another_handler(request: web.Request) -> web.Response:
-    return web.json_response({"handler": "another"})
+async def _dummy_handler() -> APIResponse:
+    return APIResponse.build(status_code=200, response_model=DummyResponse(handler="dummy"))
+
+
+async def _another_handler() -> APIResponse:
+    return APIResponse.build(status_code=200, response_model=DummyResponse(handler="another"))
+
+
+async def _raw_web_handler(request: web.Request) -> web.Response:
+    """Raw web handler for testing _apply_route_middlewares directly."""
+    return web.json_response({"handler": "raw"})
 
 
 class TestRouteRegistryInit:
@@ -130,12 +152,12 @@ class TestRouteRegistryAdd:
 
     def test_route_without_middleware(self, registry: RouteRegistry) -> None:
         route = registry.add("GET", "/test", _dummy_handler)
-        # The handler should be the original (no wrapping)
-        assert route.handler is _dummy_handler
+        # Handler is always wrapped by _wrap_api_handler
+        assert id(route.handler) != id(_dummy_handler)
 
     def test_route_with_empty_middleware_list(self, registry: RouteRegistry) -> None:
         route = registry.add("GET", "/test", _dummy_handler, middlewares=[])
-        assert route.handler is _dummy_handler
+        assert id(route.handler) != id(_dummy_handler)
 
     def test_registry_middleware_applied_to_all_routes(
         self, app: web.Application, cors_options: CORSOptions
@@ -146,7 +168,7 @@ class TestRouteRegistryAdd:
 
         route = reg.add("GET", "/test", _dummy_handler)
         # Handler should be wrapped by registry-level middleware
-        assert route.handler is not _dummy_handler
+        assert id(route.handler) != id(_dummy_handler)
 
     def test_registry_plus_route_middlewares_combined(
         self, app: web.Application, cors_options: CORSOptions
@@ -159,7 +181,7 @@ class TestRouteRegistryAdd:
         reg.add("GET", "/test", _dummy_handler, middlewares=[route_mw])
 
         # Verify execution order: registry first, then route
-        wrapped = _apply_route_middlewares(_dummy_handler, [reg_mw, route_mw])
+        wrapped = _apply_route_middlewares(_raw_web_handler, [reg_mw, route_mw])
         mock_request = MagicMock(spec=web.Request)
         loop = asyncio.new_event_loop()
         try:
@@ -176,7 +198,7 @@ class TestRouteMiddlewareChaining:
 
         route = registry.add("GET", "/test", _dummy_handler, middlewares=[middleware_a])
         # Handler should be wrapped (not the original)
-        assert route.handler is not _dummy_handler
+        assert id(route.handler) != id(_dummy_handler)
 
     def test_middleware_order_matches_decorator_stacking(self, registry: RouteRegistry) -> None:
         """First middleware in list = outermost wrapper (executed first)."""
@@ -193,7 +215,7 @@ class TestRouteMiddlewareChaining:
 
         # Verify ordering via _apply_route_middlewares directly
         call_order.clear()
-        wrapped = _apply_route_middlewares(_dummy_handler, [mw_first, mw_second])
+        wrapped = _apply_route_middlewares(_raw_web_handler, [mw_first, mw_second])
 
         mock_request = MagicMock(spec=web.Request)
         loop = asyncio.new_event_loop()
@@ -210,7 +232,7 @@ class TestRouteMiddlewareChaining:
         call_order: list[str] = []
 
         wrapped = _apply_route_middlewares(
-            _dummy_handler,
+            _raw_web_handler,
             [
                 _make_middleware("a", call_order),
                 _make_middleware("b", call_order),
@@ -230,8 +252,8 @@ class TestRouteMiddlewareChaining:
 
 class TestApplyRouteMiddlewares:
     def test_empty_middlewares_returns_original(self) -> None:
-        result = _apply_route_middlewares(_dummy_handler, [])
-        assert result is _dummy_handler
+        result = _apply_route_middlewares(_raw_web_handler, [])
+        assert result is _raw_web_handler
 
     def test_preserves_handler_attributes(self) -> None:
         """Middleware using functools.wraps should preserve handler metadata."""
@@ -245,8 +267,8 @@ class TestApplyRouteMiddlewares:
 
             return wrapped
 
-        wrapped = _apply_route_middlewares(_dummy_handler, [attr_setting_middleware])
-        assert wrapped.__name__ == _dummy_handler.__name__
+        wrapped = _apply_route_middlewares(_raw_web_handler, [attr_setting_middleware])
+        assert wrapped.__name__ == _raw_web_handler.__name__
 
 
 class TestAuthMiddlewareImportability:
@@ -259,3 +281,113 @@ class TestAuthMiddlewareImportability:
         assert callable(auth_required)
         assert callable(admin_required)
         assert callable(superadmin_required)
+
+
+class CreateUserRequest(BaseRequestModel):
+    name: str
+    email: str
+
+
+class CreateUserResponse(BaseResponseModel):
+    name: str
+    email: str
+
+
+class MockMiddlewareParam(MiddlewareParam):
+    user_id: str
+
+    @classmethod
+    async def from_request(cls, request: web.Request) -> Self:
+        return cls(user_id="test-user-123")
+
+
+class TestRouteRegistryAutoWrapping:
+    """Verify that RouteRegistry.add() always wraps handlers with _wrap_api_handler."""
+
+    def test_handler_always_wrapped(self, registry: RouteRegistry) -> None:
+        """All handlers registered via add() should be wrapped, not the original."""
+        route = registry.add("GET", "/test", _dummy_handler)
+        assert id(route.handler) != id(_dummy_handler)
+
+    @pytest.mark.asyncio
+    async def test_wrapped_handler_parses_body(self) -> None:
+        """_wrap_api_handler should parse BodyParam from request JSON body."""
+
+        async def create_user(body: BodyParam[CreateUserRequest]) -> APIResponse:
+            return APIResponse.build(
+                status_code=201,
+                response_model=CreateUserResponse(
+                    name=body.parsed.name,
+                    email=body.parsed.email,
+                ),
+            )
+
+        wrapped = _wrap_api_handler(create_user)
+
+        mock_request = AsyncMock(spec=web.Request)
+        mock_request.can_read_body = True
+        mock_request.json = AsyncMock(return_value={"name": "Alice", "email": "alice@example.com"})
+
+        response = await wrapped(mock_request)
+        assert isinstance(response, web.Response)
+        assert response.status == 201
+        assert isinstance(response.body, bytes)
+        body = json.loads(response.body)
+        assert body["name"] == "Alice"
+        assert body["email"] == "alice@example.com"
+
+    @pytest.mark.asyncio
+    async def test_wrapped_handler_converts_api_response(self) -> None:
+        """_wrap_api_handler should convert APIResponse to web.Response with correct status and body."""
+
+        async def health_check() -> APIResponse:
+            return APIResponse.build(
+                status_code=200,
+                response_model=DummyResponse(handler="health"),
+            )
+
+        wrapped = _wrap_api_handler(health_check)
+
+        mock_request = AsyncMock(spec=web.Request)
+        response = await wrapped(mock_request)
+        assert isinstance(response, web.Response)
+        assert response.status == 200
+        assert isinstance(response.body, bytes)
+        body = json.loads(response.body)
+        assert body["handler"] == "health"
+
+    @pytest.mark.asyncio
+    async def test_middleware_param_extracted(self) -> None:
+        """_wrap_api_handler should call from_request() for MiddlewareParam subclasses."""
+
+        async def get_profile(ctx: MockMiddlewareParam) -> APIResponse:
+            return APIResponse.build(
+                status_code=200,
+                response_model=DummyResponse(handler=ctx.user_id),
+            )
+
+        wrapped = _wrap_api_handler(get_profile)
+
+        mock_request = AsyncMock(spec=web.Request)
+        response = await wrapped(mock_request)
+        assert isinstance(response, web.Response)
+        assert response.status == 200
+        assert isinstance(response.body, bytes)
+        body = json.loads(response.body)
+        assert body["handler"] == "test-user-123"
+
+    @pytest.mark.asyncio
+    async def test_no_params_handler_works(self) -> None:
+        """Handlers with no parameters should work correctly."""
+
+        async def no_params() -> APIResponse:
+            return APIResponse.build(
+                status_code=204,
+                response_model=DummyResponse(handler="none"),
+            )
+
+        wrapped = _wrap_api_handler(no_params)
+
+        mock_request = AsyncMock(spec=web.Request)
+        response = await wrapped(mock_request)
+        assert response.status == 204
