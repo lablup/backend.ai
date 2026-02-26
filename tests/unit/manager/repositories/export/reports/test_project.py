@@ -872,7 +872,12 @@ class TestProjectExportExecuteStreamingDB:
         db_engine: ExtendedAsyncSAEngine,
         project_with_sg_and_registry: _ProjectWithSgAndRegistry,
     ) -> None:
-        """SELECT with container_registry_* fields must NOT return empty results."""
+        """SELECT with container_registry_* fields must NOT return empty results.
+
+        This reproduces the reported bug: requesting container_registry_* fields
+        returned an empty list. With correct LEFT OUTER JOINs, the project row
+        must appear even when the join is required.
+        """
         adapter = ExportAdapter()
         query = adapter.build_project_query(
             report=PROJECT_REPORT,
@@ -895,7 +900,11 @@ class TestProjectExportExecuteStreamingDB:
         db_engine: ExtendedAsyncSAEngine,
         project_with_sg_and_registry: _ProjectWithSgAndRegistry,
     ) -> None:
-        """Both scaling_group and container_registry fields selected together must return rows."""
+        """Both scaling_group and container_registry fields selected together must return rows.
+
+        With 1 project, 1 scaling group, 1 container registry, the Cartesian product
+        of the 1:N JOINs produces exactly 1 row (1 x 1 = 1).
+        """
         adapter = ExportAdapter()
         query = adapter.build_project_query(
             report=PROJECT_REPORT,
@@ -935,7 +944,10 @@ class TestProjectExportExecuteStreamingDB:
         db_engine: ExtendedAsyncSAEngine,
         project_with_sg_and_registry: _ProjectWithSgAndRegistry,
     ) -> None:
-        """A project with no registry must still appear (with NULL registry columns)."""
+        """A project with no registry must still appear (with NULL registry columns).
+
+        LEFT OUTER JOIN must not filter out projects without associated registries.
+        """
         policy_name2 = f"test-policy2-{uuid.uuid4().hex[:8]}"
         project_id2 = uuid.uuid4()
 
@@ -1024,7 +1036,6 @@ class TestGlobalContainerRegistryExport:
                     allowed_docker_registries=[],
                 )
             )
-            await db_sess.flush()
             db_sess.add(
                 ProjectResourcePolicyRow(
                     name=policy_name,
@@ -1033,7 +1044,6 @@ class TestGlobalContainerRegistryExport:
                     max_network_count=10,
                 )
             )
-            await db_sess.flush()
             db_sess.add(
                 GroupRow(
                     id=project_id,
@@ -1042,7 +1052,6 @@ class TestGlobalContainerRegistryExport:
                     resource_policy=policy_name,
                 )
             )
-            await db_sess.flush()
             db_sess.add(
                 ContainerRegistryRow(
                     id=global_registry_id,
@@ -1061,7 +1070,6 @@ class TestGlobalContainerRegistryExport:
                     is_global=False,
                 )
             )
-            await db_sess.flush()
             db_sess.add(
                 AssociationContainerRegistriesGroupsRow(
                     id=uuid.uuid4(),
