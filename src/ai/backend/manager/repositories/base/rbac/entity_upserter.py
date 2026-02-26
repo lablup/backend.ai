@@ -74,6 +74,15 @@ async def execute_rbac_entity_upserter[TRow: Base](
     Returns:
         RBACEntityUpserterResult containing the upserted row and whether it was inserted.
     """
+    row_class = rbac_upserter.upserter.spec.row_class
+    mapper = sa.inspect(row_class)
+    pk_columns = mapper.primary_key
+    if len(pk_columns) != 1:
+        raise UnsupportedCompositePrimaryKeyError(
+            f"Entity upserter only supports single-column primary keys"
+            f" (table: {mapper.local_table.name})",
+        )
+
     result: UpserterResult[TRow] = await execute_upserter(
         db_sess,
         rbac_upserter.upserter,
@@ -81,15 +90,6 @@ async def execute_rbac_entity_upserter[TRow: Base](
     )
 
     if result.was_inserted:
-        row_class = rbac_upserter.upserter.spec.row_class
-        mapper = sa.inspect(row_class)
-        pk_columns = mapper.primary_key
-        if len(pk_columns) != 1:
-            raise UnsupportedCompositePrimaryKeyError(
-                f"Entity upserter only supports single-column primary keys"
-                f" (table: {mapper.local_table.name})",
-            )
-
         pk_attr = pk_columns[0].key
         pk_value = getattr(result.row, pk_attr)
         entity_type = rbac_upserter.element_type.to_entity_type()

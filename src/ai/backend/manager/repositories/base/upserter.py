@@ -122,7 +122,10 @@ async def execute_upserter[TRow: Base](
             index_elements=index_elements,
             set_=update_values,
         )
-        .returning(*table.columns, sa.literal_column("xmax"))
+        .returning(
+            *table.columns,
+            sa.literal_column("(xmax = 0)").label("was_inserted"),
+        )
     )
 
     result = await db_sess.execute(stmt)
@@ -132,8 +135,7 @@ async def execute_upserter[TRow: Base](
         raise UpsertEmptyResultError
 
     mapping = dict(row_data._mapping)
-    xmax = mapping.pop("xmax")
-    was_inserted = int(xmax) == 0
+    was_inserted: bool = mapping.pop("was_inserted")
 
     created_row: TRow = row_class(**mapping)
     return UpserterResult(row=created_row, was_inserted=was_inserted)
