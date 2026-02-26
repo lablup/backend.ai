@@ -718,10 +718,10 @@ class TestJoinDefIdentityAndHashing:
 
 
 @dataclass(frozen=True)
-class _ProjectWithSgAndRegistry:
+class _ProjectWithRgAndRegistry:
     project_id: uuid.UUID
     domain_name: str
-    sg_name: str
+    rg_name: str
     registry_id: uuid.UUID
 
 
@@ -756,15 +756,15 @@ class TestProjectExportExecuteStreamingDB:
             yield database_connection
 
     @pytest.fixture
-    async def project_with_sg_and_registry(
+    async def project_with_rg_and_registry(
         self,
         db_engine: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[_ProjectWithSgAndRegistry, None]:
+    ) -> AsyncGenerator[_ProjectWithRgAndRegistry, None]:
         """Create a project associated with a scaling group and a container registry."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
         project_id = uuid.uuid4()
-        sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
+        rg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
         registry_id = uuid.uuid4()
 
         async with db_engine.begin_session() as db_sess:
@@ -802,7 +802,7 @@ class TestProjectExportExecuteStreamingDB:
 
             db_sess.add(
                 ScalingGroupRow(
-                    name=sg_name,
+                    name=rg_name,
                     description="",
                     is_active=True,
                     driver="static",
@@ -814,7 +814,7 @@ class TestProjectExportExecuteStreamingDB:
             )
             await db_sess.flush()
 
-            db_sess.add(ScalingGroupForProjectRow(scaling_group=sg_name, group=project_id))
+            db_sess.add(ScalingGroupForProjectRow(scaling_group=rg_name, group=project_id))
             await db_sess.flush()
 
             db_sess.add(
@@ -837,17 +837,17 @@ class TestProjectExportExecuteStreamingDB:
             )
             await db_sess.commit()
 
-        yield _ProjectWithSgAndRegistry(
+        yield _ProjectWithRgAndRegistry(
             project_id=project_id,
             domain_name=domain_name,
-            sg_name=sg_name,
+            rg_name=rg_name,
             registry_id=registry_id,
         )
 
     async def test_basic_fields_return_project_row(
         self,
         db_engine: ExtendedAsyncSAEngine,
-        project_with_sg_and_registry: _ProjectWithSgAndRegistry,
+        project_with_rg_and_registry: _ProjectWithRgAndRegistry,
     ) -> None:
         """SELECT with basic fields only should return the project row (baseline)."""
         adapter = ExportAdapter()
@@ -865,12 +865,12 @@ class TestProjectExportExecuteStreamingDB:
             rows.extend(partition)
 
         assert len(rows) == 1
-        assert str(rows[0][0]) == str(project_with_sg_and_registry.project_id)
+        assert str(rows[0][0]) == str(project_with_rg_and_registry.project_id)
 
     async def test_container_registry_join_returns_rows_not_empty(
         self,
         db_engine: ExtendedAsyncSAEngine,
-        project_with_sg_and_registry: _ProjectWithSgAndRegistry,
+        project_with_rg_and_registry: _ProjectWithRgAndRegistry,
     ) -> None:
         """SELECT with container_registry_* fields must NOT return empty results.
 
@@ -893,12 +893,12 @@ class TestProjectExportExecuteStreamingDB:
             rows.extend(partition)
 
         assert len(rows) >= 1
-        assert str(rows[0][2]) == str(project_with_sg_and_registry.registry_id)
+        assert str(rows[0][2]) == str(project_with_rg_and_registry.registry_id)
 
     async def test_scaling_group_and_container_registry_combined_returns_rows(
         self,
         db_engine: ExtendedAsyncSAEngine,
-        project_with_sg_and_registry: _ProjectWithSgAndRegistry,
+        project_with_rg_and_registry: _ProjectWithRgAndRegistry,
     ) -> None:
         """Both scaling_group and container_registry fields selected together must return rows.
 
@@ -937,12 +937,12 @@ class TestProjectExportExecuteStreamingDB:
             rows.extend(partition)
 
         assert len(rows) >= 1
-        assert str(rows[0][15]) == str(project_with_sg_and_registry.project_id)
+        assert str(rows[0][15]) == str(project_with_rg_and_registry.project_id)
 
     async def test_project_without_registry_returns_row_with_null_registry_fields(
         self,
         db_engine: ExtendedAsyncSAEngine,
-        project_with_sg_and_registry: _ProjectWithSgAndRegistry,
+        project_with_rg_and_registry: _ProjectWithRgAndRegistry,
     ) -> None:
         """A project with no registry must still appear (with NULL registry columns).
 
@@ -966,7 +966,7 @@ class TestProjectExportExecuteStreamingDB:
                 GroupRow(
                     id=project_id2,
                     name="project-no-registry",
-                    domain_name=project_with_sg_and_registry.domain_name,
+                    domain_name=project_with_rg_and_registry.domain_name,
                     resource_policy=policy_name2,
                 )
             )
