@@ -34,9 +34,8 @@ from ai.backend.manager.models.scaling_group import (
     sgroups_for_keypairs,
 )
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base.creator import BulkCreator
+from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.rbac.scope_binder import (
     RBACScopeBinder,
     RBACScopeBindingPair,
@@ -729,14 +728,7 @@ class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
             scheduler_opts=ScalingGroupOpts.from_json(props.scheduler_opts),
             use_host_network=bool(props.use_host_network),
         )
-        creator = RBACEntityCreator(
-            spec=spec,
-            element_type=RBACElementType.RESOURCE_GROUP,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.DOMAIN,
-                element_id=graph_ctx.user["domain_name"],
-            ),
-        )
+        creator = Creator(spec=spec)
         action = CreateScalingGroupAction(creator=creator)
         result = await graph_ctx.processors.scaling_group.create_scaling_group.wait_for_complete(
             action

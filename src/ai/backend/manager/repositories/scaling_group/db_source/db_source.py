@@ -30,16 +30,17 @@ from ai.backend.manager.models.scaling_group import (
 )
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.creator import BulkCreator, execute_bulk_creator
+from ai.backend.manager.repositories.base.creator import (
+    BulkCreator,
+    Creator,
+    execute_bulk_creator,
+    execute_creator,
+)
 from ai.backend.manager.repositories.base.purger import (
     BatchPurger,
     Purger,
     execute_batch_purger,
     execute_purger,
-)
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-    execute_rbac_entity_creator,
 )
 from ai.backend.manager.repositories.base.rbac.scope_binder import (
     RBACScopeBinder,
@@ -78,14 +79,14 @@ class ScalingGroupDBSource:
 
     async def create_scaling_group(
         self,
-        creator: RBACEntityCreator[ScalingGroupRow],
+        creator: Creator[ScalingGroupRow],
     ) -> ScalingGroupData:
         """Creates a new scaling group.
 
         Raises ScalingGroupConflict if a scaling group with the same name already exists.
         """
         async with self._db.begin_session() as session:
-            result = await execute_rbac_entity_creator(session, creator)
+            result = await execute_creator(session, creator)
             return result.row.to_dataclass()
 
     async def search_scaling_groups(
