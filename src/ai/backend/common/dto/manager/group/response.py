@@ -50,6 +50,9 @@ class GroupDTO(BaseModel):
         default=None, description="Allowed vfolder host permissions"
     )
     resource_policy: str | None = Field(default=None, description="Resource policy name")
+    container_registry_id: UUID | None = Field(
+        default=None, description="Default container registry ID"
+    )
 
 
 class GroupMemberDTO(BaseModel):

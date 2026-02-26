@@ -78,6 +78,7 @@ class TestCreateGroup:
             dotfiles=b"\x90",
             resource_policy="default",
             type=ProjectType.GENERAL,
+            container_registry_id=None,
         )
 
     async def test_create_with_valid_data_returns_group(
@@ -201,6 +202,7 @@ class TestModifyGroup:
             dotfiles=b"\x90",
             resource_policy="default",
             type=ProjectType.GENERAL,
+            container_registry_id=None,
         )
 
     async def test_modify_with_valid_data_returns_updated_group(

@@ -312,7 +312,7 @@ class TestAuthRepository:
                 dotfiles=group.dotfiles,
                 resource_policy=group.resource_policy,
                 type=group.type,
-                container_registry=group.container_registry,
+                container_registry_id=group.container_registry_id,
             )
         yield group_data
 

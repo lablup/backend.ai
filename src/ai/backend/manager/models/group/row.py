@@ -202,6 +202,9 @@ class GroupRow(Base):  # type: ignore[misc]
         nullable=False,
         default=ProjectType.GENERAL,
     )
+    container_registry_id: Mapped[uuid.UUID | None] = mapped_column(
+        "container_registry_id", GUID, nullable=True
+    )
     # Relationships (defined with deferred join conditions to avoid circular imports)
     sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="group")
     domain: Mapped[DomainRow] = relationship("DomainRow", back_populates="groups")
@@ -248,6 +251,7 @@ class GroupRow(Base):  # type: ignore[misc]
             dotfiles=self.dotfiles,
             resource_policy=self.resource_policy,
             type=self.type,
+            container_registry_id=self.container_registry_id,
         )
 
     @classmethod

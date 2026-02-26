@@ -40,8 +40,29 @@ def upgrade() -> None:
 
     op.drop_column("groups", "container_registry")
 
+    # Add a new container_registry_id UUID column (no FK constraint).
+    op.add_column(
+        "groups",
+        sa.Column("container_registry_id", postgresql.UUID(as_uuid=True), nullable=True),
+    )
+
+    # Populate container_registry_id from the association table (pick one per group).
+    conn.execute(
+        sa.text("""
+            UPDATE groups g
+            SET container_registry_id = (
+                SELECT registry_id
+                FROM association_container_registries_groups
+                WHERE group_id = g.id
+                LIMIT 1
+            )
+        """)
+    )
+
 
 def downgrade() -> None:
+    op.drop_column("groups", "container_registry_id")
+
     op.add_column(
         "groups",
         sa.Column("container_registry", postgresql.JSONB(), nullable=True),
