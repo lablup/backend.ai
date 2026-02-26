@@ -32,7 +32,8 @@ from ai.backend.manager.data.deployment.types import (
     RouteInfo,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.errors.service import RoutingNotFound
+from ai.backend.manager.errors.deployment import DeploymentAlreadyInProgress
+from ai.backend.manager.errors.service import DeploymentPolicyNotFound, RoutingNotFound
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -518,31 +519,68 @@ class DeploymentService:
     ) -> ActivateRevisionActionResult:
         """Activate a specific revision to be the current revision.
 
+        If a deployment policy with a strategy (e.g. ROLLING) is configured,
+        the endpoint transitions to DEPLOYING so the strategy handler can
+        drive the rollout.  Otherwise the current_revision is swapped
+        instantly (legacy / instant path).
+
         Args:
             action: Action containing deployment and revision IDs
 
         Returns:
             ActivateRevisionActionResult: Result containing the updated deployment
+
+        Raises:
+            DeploymentAlreadyInProgress: If the endpoint is already DEPLOYING.
         """
         # 1. Validate revision exists (raises exception if not found)
         _revision = await self._deployment_repository.get_revision(action.revision_id)
 
-        # 2. Update endpoint.current_revision and get previous revision
-        previous_revision_id = await self._deployment_repository.update_current_revision(
-            action.deployment_id, action.revision_id
-        )
+        # 2. Guard: reject if already deploying
+        deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
+        if deployment_info.state.lifecycle == EndpointLifecycle.DEPLOYING:
+            raise DeploymentAlreadyInProgress(
+                f"Deployment {action.deployment_id} is already in DEPLOYING state"
+            )
 
-        # 3. Trigger lifecycle check to update routes with new revision
-        await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.CHECK_REPLICA
-        )
+        # 3. Determine deployment path based on policy
+        use_strategy = False
+        try:
+            policy = await self._deployment_repository.get_deployment_policy(action.deployment_id)
+            if policy.strategy in (DeploymentStrategy.ROLLING, DeploymentStrategy.BLUE_GREEN):
+                use_strategy = True
+        except DeploymentPolicyNotFound:
+            pass
 
-        log.info(
-            "Activated revision {} for deployment {} (previous: {})",
-            action.revision_id,
-            action.deployment_id,
-            previous_revision_id,
-        )
+        if use_strategy:
+            # Strategy-based path: set deploying_revision and transition to DEPLOYING
+            await self._deployment_repository.begin_deployment(
+                action.deployment_id, action.revision_id
+            )
+            await self._deployment_controller.mark_lifecycle_needed(
+                DeploymentLifecycleType.DEPLOYING
+            )
+            previous_revision_id = deployment_info.current_revision_id
+            log.info(
+                "Started strategy-based deployment for revision {} on deployment {} (current: {})",
+                action.revision_id,
+                action.deployment_id,
+                previous_revision_id,
+            )
+        else:
+            # Instant path: swap current_revision immediately
+            previous_revision_id = await self._deployment_repository.update_current_revision(
+                action.deployment_id, action.revision_id
+            )
+            await self._deployment_controller.mark_lifecycle_needed(
+                DeploymentLifecycleType.CHECK_REPLICA
+            )
+            log.info(
+                "Activated revision {} for deployment {} (previous: {})",
+                action.revision_id,
+                action.deployment_id,
+                previous_revision_id,
+            )
 
         # 4. Get updated deployment info
         deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)

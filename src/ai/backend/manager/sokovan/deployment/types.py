@@ -5,7 +5,11 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteStatus
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    DeploymentSubStatus,
+    RouteStatus,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.types import DeploymentInfoWithRoutes, RouteInfo
@@ -15,8 +19,21 @@ class DeploymentLifecycleType(StrEnum):
     CHECK_PENDING = "check_pending"
     CHECK_REPLICA = "check_replica"
     SCALING = "scaling"
+    DEPLOYING = "deploying"
     RECONCILE = "reconcile"
     DESTROYING = "destroying"
+
+
+class DeploymentSubStep(DeploymentSubStatus):
+    """Sub-step variants for deployment strategies (BEP-1049).
+
+    Both Blue-Green and Rolling Update strategies use these
+    sub-steps to represent their internal FSM states.
+    """
+
+    PROVISIONING = "provisioning"
+    PROGRESSING = "progressing"
+    ROLLED_BACK = "rolled_back"
 
 
 @dataclass

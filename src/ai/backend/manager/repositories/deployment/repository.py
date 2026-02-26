@@ -1126,6 +1126,31 @@ class DeploymentRepository:
         """
         return await self._db_source.update_current_revision(endpoint_id, revision_id)
 
+    @deployment_repository_resilience.apply()
+    async def begin_deployment(
+        self,
+        endpoint_id: uuid.UUID,
+        deploying_revision_id: uuid.UUID,
+    ) -> None:
+        """Atomically set deploying_revision and transition lifecycle to DEPLOYING."""
+        await self._db_source.begin_deployment(endpoint_id, deploying_revision_id)
+
+    @deployment_repository_resilience.apply()
+    async def complete_deployment_revision_swap(
+        self,
+        endpoint_ids: Sequence[uuid.UUID],
+    ) -> None:
+        """Atomically swap deploying_revision -> current_revision for completed deployments."""
+        await self._db_source.complete_deployment_revision_swap(endpoint_ids)
+
+    @deployment_repository_resilience.apply()
+    async def clear_deploying_revision(
+        self,
+        endpoint_ids: Sequence[uuid.UUID],
+    ) -> None:
+        """Clear deploying_revision for rolled-back deployments."""
+        await self._db_source.clear_deploying_revision(endpoint_ids)
+
     # ========== Deployment Auto-Scaling Policy Operations ==========
 
     @deployment_repository_resilience.apply()
