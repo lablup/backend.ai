@@ -10,7 +10,7 @@ import tempfile
 import textwrap
 import uuid
 from collections.abc import AsyncIterator, Callable, Iterator
-from contextlib import AbstractAsyncContextManager, AsyncExitStack
+from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from functools import partial, update_wrapper
 from pathlib import Path
@@ -28,7 +28,9 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
+from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import LocalLogger, LogLevel
@@ -70,7 +72,6 @@ from ai.backend.manager.models.user import users
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.server import (
     build_root_app,
-    etcd_ctx,
 )
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
@@ -80,6 +81,13 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
 from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger("tests.component.conftest")
+
+
+@asynccontextmanager
+async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncIterator[None]:
+    async with AsyncEtcd.create_from_config(etcd_config) as etcd:
+        root_ctx.etcd = etcd
+        yield
 
 
 @dataclass

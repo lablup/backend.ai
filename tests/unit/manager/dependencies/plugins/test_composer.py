@@ -29,13 +29,9 @@ class TestPluginsComposer:
         mock_network = MagicMock(name="network_ctx")
         mock_hook = MagicMock(name="hook_ctx")
         mock_event = MagicMock(name="event_ctx")
-        mock_error = MagicMock(name="error_ctx")
-        mock_stats = MagicMock(name="stats_ctx")
 
         mock_stack = MagicMock()
-        mock_stack.enter_dependency = AsyncMock(
-            side_effect=[mock_network, mock_hook, mock_event, mock_error, mock_stats]
-        )
+        mock_stack.enter_dependency = AsyncMock(side_effect=[mock_network, mock_hook, mock_event])
 
         composer = PluginsComposer()
 
@@ -44,10 +40,8 @@ class TestPluginsComposer:
             assert resources.network_plugin_ctx is mock_network
             assert resources.hook_plugin_ctx is mock_hook
             assert resources.event_dispatcher_plugin_ctx is mock_event
-            assert resources.error_monitor is mock_error
-            assert resources.stats_monitor is mock_stats
 
-        assert mock_stack.enter_dependency.call_count == 5
+        assert mock_stack.enter_dependency.call_count == 3
 
     @pytest.mark.asyncio
     async def test_compose_preserves_initialization_order(self) -> None:
@@ -71,6 +65,4 @@ class TestPluginsComposer:
             "NetworkPluginDependency",
             "HookPluginDependency",
             "EventDispatcherPluginDependency",
-            "ErrorMonitorDependency",
-            "StatsMonitorDependency",
         ]

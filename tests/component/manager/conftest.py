@@ -36,6 +36,15 @@ from sqlalchemy.ext.asyncio.engine import create_async_engine
 
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError
+from ai.backend.common.configs.loader import (
+    ConfigOverrider,
+    EtcdConfigLoader,
+    EtcdConfigWatcher,
+    LoaderChain,
+    TomlConfigLoader,
+)
+from ai.backend.common.configs.loader.types import AbstractConfigLoader
+from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.lock import FileLock
@@ -52,7 +61,10 @@ from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
 from ai.backend.manager.config.bootstrap import BootstrapConfig
-from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.config.loader.legacy_etcd_loader import (
+    LegacyEtcdLoader,
+    LegacyEtcdVolumesLoader,
+)
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -85,13 +97,72 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, connect_datab
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.server import build_root_app, config_provider_ctx, etcd_ctx
+from ai.backend.manager.server import build_root_app
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
     redis_container,
 )
 from ai.backend.testutils.pants import get_parallel_slot
+
+log = logging.getLogger(__name__)
+
+
+@actxmgr
+async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncIterator[None]:
+    async with AsyncEtcd.create_from_config(etcd_config) as etcd:
+        root_ctx.etcd = etcd
+        yield
+
+
+@actxmgr
+async def config_provider_ctx(
+    root_ctx: RootContext,
+    log_level: LogLevel,
+    config_path: Path | None = None,
+    extra_config: Mapping[str, Any] | None = None,
+) -> AsyncIterator[ManagerConfigProvider]:
+    loaders: list[AbstractConfigLoader] = []
+
+    if config_path:
+        toml_config_loader = TomlConfigLoader(config_path, "manager")
+        loaders.append(toml_config_loader)
+    else:
+        log.warning("No config file path specified. Skipped loading toml config file...")
+
+    legacy_etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
+    loaders.append(legacy_etcd_loader)
+    loaders.append(LegacyEtcdVolumesLoader(root_ctx.etcd))
+    loaders.append(EtcdConfigLoader(root_ctx.etcd, prefix="ai/backend/config/common"))
+    loaders.append(EtcdConfigLoader(root_ctx.etcd, prefix="ai/backend/config/manager"))
+
+    overrides: list[tuple[tuple[str, ...], Any]] = [
+        (("debug", "enabled"), log_level == LogLevel.DEBUG),
+    ]
+    if log_level != LogLevel.NOTSET:
+        overrides += [
+            (("logging", "level"), log_level),
+            (("logging", "pkg-ns", "ai.backend"), log_level),
+        ]
+
+    loaders.append(ConfigOverrider(overrides))
+
+    unified_config_loader = LoaderChain(loaders, base_config=extra_config)
+    etcd_watcher = EtcdConfigWatcher(root_ctx.etcd)
+
+    config_provider: ManagerConfigProvider | None = None
+    config_provider = await ManagerConfigProvider.create(
+        unified_config_loader,
+        etcd_watcher,
+        legacy_etcd_loader,
+    )
+    root_ctx.config_provider = config_provider
+
+    try:
+        yield root_ctx.config_provider
+    finally:
+        if config_provider:
+            await config_provider.terminate()
 
 
 def create_test_password_info(password: str = "test_password") -> PasswordInfo:

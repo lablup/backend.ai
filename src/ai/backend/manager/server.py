@@ -26,7 +26,6 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from pprint import pformat
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -70,15 +69,6 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import Valke
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import find_config_file
-from ai.backend.common.configs.loader import (
-    ConfigOverrider,
-    EtcdConfigLoader,
-    EtcdConfigWatcher,
-    LoaderChain,
-    TomlConfigLoader,
-)
-from ai.backend.common.configs.loader.types import AbstractConfigLoader
-from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
     REDIS_CONTAINER_LOG,
@@ -89,7 +79,7 @@ from ai.backend.common.defs import (
     REDIS_STREAM_LOCK,
     RedisRole,
 )
-from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.dependencies import DependencyBuilderStack
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
     DoScanReservoirRegistryEvent,
@@ -105,7 +95,6 @@ from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.json import dump_json_str
-from ai.backend.common.jwt.validator import JWTValidator
 from ai.backend.common.leader import ValkeyLeaderElection, ValkeyLeaderElectionConfig
 from ai.backend.common.leader.tasks import EventProducerTask, LeaderCron, PeriodicTask
 from ai.backend.common.leader.tasks.event_task import EventTaskSpec
@@ -151,7 +140,6 @@ from ai.backend.logging.otel import (
     instrument_aiohttp_client,
     instrument_aiohttp_server,
 )
-from ai.backend.manager.server_gql_ctx import gql_adapters_ctx
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import (
@@ -169,12 +157,8 @@ from .api.context import RootContext
 from .clients.agent import AgentClientPool, AgentPoolSpec
 from .clients.appproxy.client import AppProxyClientPool
 from .config.bootstrap import BootstrapConfig
-from .config.loader.legacy_etcd_loader import (
-    LegacyEtcdLoader,
-    LegacyEtcdVolumesLoader,
-)
-from .config.provider import ManagerConfigProvider
 from .config.unified import EventLoopType
+from .dependencies import DependencyInput, DependencyResources, ManagerDependencyComposer
 from .errors.api import InvalidAPIParameters
 from .errors.common import (
     GenericBadRequest,
@@ -202,7 +186,6 @@ from .reporters.smtp import SMTPReporter, SMTPSenderArgs
 from .repositories.container_registry_quota.repository import PerProjectRegistryQuotaRepository
 from .repositories.repositories import Repositories
 from .repositories.types import RepositoryArgs
-from .server_bgtask_ctx import manager_bgtask_registry_ctx
 from .service.base import ServicesContext
 from .service.container_registry.harbor import (
     PerProjectContainerRegistryQuotaClientPool,
@@ -527,64 +510,89 @@ async def exception_middleware(
         return resp
 
 
-@asynccontextmanager
-async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncIterator[None]:
-    async with AsyncEtcd.create_from_config(etcd_config) as etcd:
-        root_ctx.etcd = etcd
-        yield
-
-
-@asynccontextmanager
-async def config_provider_ctx(
+def _bridge_resources_to_root_ctx(
     root_ctx: RootContext,
-    log_level: LogLevel,
-    config_path: Path | None = None,
-    extra_config: Mapping[str, Any] | None = None,
-) -> AsyncIterator[ManagerConfigProvider]:
-    loaders: list[AbstractConfigLoader] = []
+    resources: DependencyResources,
+) -> None:
+    """Bridge DependencyResources to RootContext for backward compatibility.
 
-    if config_path:
-        toml_config_loader = TomlConfigLoader(config_path, "manager")
-        loaders.append(toml_config_loader)
-    else:
-        log.warning("No config file path specified. Skipped loading toml config file...")
+    Maps all Composer outputs to the corresponding RootContext attributes
+    so that existing code referencing root_ctx.xxx continues to work.
+    """
+    # Bootstrap
+    root_ctx.etcd = resources.bootstrap.etcd
+    root_ctx.config_provider = resources.bootstrap.config_provider
 
-    legacy_etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
-    loaders.append(legacy_etcd_loader)
-    loaders.append(LegacyEtcdVolumesLoader(root_ctx.etcd))
-    loaders.append(EtcdConfigLoader(root_ctx.etcd, prefix="ai/backend/config/common"))
-    loaders.append(EtcdConfigLoader(root_ctx.etcd, prefix="ai/backend/config/manager"))
-
-    overrides: list[tuple[tuple[str, ...], Any]] = [
-        (("debug", "enabled"), log_level == LogLevel.DEBUG),
-    ]
-    if log_level != LogLevel.NOTSET:
-        overrides += [
-            (("logging", "level"), log_level),
-            (("logging", "pkg-ns", "ai.backend"), log_level),
-        ]
-
-    loaders.append(ConfigOverrider(overrides))
-
-    unified_config_loader = LoaderChain(loaders, base_config=extra_config)
-    etcd_watcher = EtcdConfigWatcher(root_ctx.etcd)
-
-    config_provider: ManagerConfigProvider | None = None
-    config_provider = await ManagerConfigProvider.create(
-        unified_config_loader,
-        etcd_watcher,
-        legacy_etcd_loader,
+    # Infrastructure
+    root_ctx.db = resources.infrastructure.db
+    root_ctx.valkey_artifact = resources.infrastructure.valkey.artifact
+    root_ctx.valkey_container_log = resources.infrastructure.valkey.container_log
+    root_ctx.valkey_live = resources.infrastructure.valkey.live
+    root_ctx.valkey_stat = resources.infrastructure.valkey.stat
+    root_ctx.valkey_image = resources.infrastructure.valkey.image
+    root_ctx.valkey_stream = resources.infrastructure.valkey.stream
+    root_ctx.valkey_schedule = resources.infrastructure.valkey.schedule
+    root_ctx.valkey_bgtask = resources.infrastructure.valkey.bgtask
+    valkey_profile_target = (
+        resources.bootstrap.config_provider.config.redis.to_valkey_profile_target()
     )
-    root_ctx.config_provider = config_provider
+    root_ctx.valkey_profile_target = valkey_profile_target
 
-    if config_provider.config.debug.enabled and root_ctx.pidx == 0:
-        print("== Manager configuration ==", file=sys.stderr)
-        print(pformat(config_provider.config), file=sys.stderr)
-    try:
-        yield root_ctx.config_provider
-    finally:
-        if config_provider:
-            await config_provider.terminate()
+    # Components
+    root_ctx.storage_manager = resources.components.storage_manager
+    root_ctx.agent_cache = resources.components.agent_cache
+
+    # Plugins
+    root_ctx.hook_plugin_ctx = resources.plugins.hook_plugin_ctx
+    root_ctx.network_plugin_ctx = resources.plugins.network_plugin_ctx
+    root_ctx.event_dispatcher_plugin_ctx = resources.plugins.event_dispatcher_plugin_ctx
+
+    # Monitoring (initialized after Domain — requires error_log_repository)
+    if resources.monitoring.error_monitor is not None:
+        root_ctx.error_monitor = resources.monitoring.error_monitor
+    if resources.monitoring.stats_monitor is not None:
+        root_ctx.stats_monitor = resources.monitoring.stats_monitor
+
+    # Messaging
+    root_ctx.event_hub = resources.messaging.event_hub
+    root_ctx.message_queue = resources.messaging.message_queue
+    root_ctx.event_producer = resources.messaging.event_producer
+    root_ctx.event_fetcher = resources.messaging.event_fetcher
+
+    # Domain
+    root_ctx.notification_center = resources.domain.notification_center
+    root_ctx.distributed_lock_factory = resources.domain.distributed_lock_factory
+    root_ctx.repositories = resources.domain.repositories
+    root_ctx.services_ctx = resources.domain.services_ctx
+
+    # System
+    root_ctx.cors_options = resources.system.cors_options
+    root_ctx.metrics = resources.system.metrics
+    root_ctx.gql_adapter = resources.system.gql_adapter
+    root_ctx.jwt_validator = resources.system.jwt_validator
+    root_ctx.prometheus_client = resources.system.prometheus_client
+    root_ctx.service_discovery = resources.system.service_discovery
+    root_ctx.sd_loop = resources.system.sd_loop
+    root_ctx.background_task_manager = resources.system.background_task_manager
+    root_ctx.health_probe = resources.system.health_probe
+
+    # Agents
+    root_ctx.scheduling_controller = resources.agents.scheduling_controller
+    root_ctx.revision_generator_registry = resources.agents.revision_generator_registry
+    root_ctx.deployment_controller = resources.agents.deployment_controller
+    root_ctx.route_controller = resources.agents.route_controller
+    root_ctx.agent_client_pool = resources.agents.agent_client_pool
+    root_ctx.appproxy_client_pool = resources.agents.appproxy_client_pool
+    root_ctx.registry = resources.agents.registry
+
+    # Orchestration
+    root_ctx.idle_checker_host = resources.orchestration.idle_checker_host
+    root_ctx.sokovan_orchestrator = resources.orchestration.sokovan_orchestrator
+    root_ctx.leader_election = resources.orchestration.leader_election
+
+    # Processing
+    root_ctx.event_dispatcher = resources.processing.event_dispatcher
+    root_ctx.processors = resources.processing.processors
 
 
 @asynccontextmanager
@@ -1576,34 +1584,11 @@ def build_root_app(
     app.on_response_prepare.append(on_prepare)
 
     if cleanup_contexts is None:
+        # All dependency initialization is now handled by ManagerDependencyComposer
+        # in server_main(). Only manager_status_ctx remains as a cleanup context
+        # because it performs a one-time etcd status check during startup.
         cleanup_contexts = [
-            event_hub_ctx,
             manager_status_ctx,
-            redis_ctx,
-            database_ctx,
-            services_ctx,
-            distributed_lock_ctx,
-            message_queue_ctx,
-            event_producer_ctx,
-            storage_manager_ctx,
-            repositories_ctx,
-            notification_center_ctx,
-            hook_plugin_ctx,
-            monitoring_ctx,
-            network_plugin_ctx,
-            event_dispatcher_plugin_ctx,
-            idle_checker_ctx,
-            agent_registry_ctx,
-            service_discovery_ctx,
-            sokovan_orchestrator_ctx,
-            leader_election_ctx,
-            event_dispatcher_ctx,
-            background_task_ctx,
-            prometheus_client_ctx,
-            processors_ctx,
-            manager_bgtask_registry_ctx,
-            gql_adapters_ctx,
-            health_probe_ctx,
         ]
     shutdown_context_instances = []
 
@@ -1832,16 +1817,22 @@ async def server_main(
         root_ctx: RootContext = root_app["_root.context"]
 
         await manager_init_stack.enter_async_context(aiomonitor_ctx())
-        await manager_init_stack.enter_async_context(
-            etcd_ctx(root_ctx, boostrap_config.etcd.to_dataclass())
+
+        # Initialize all dependencies via the Composer (replaces individual cleanup contexts)
+        dep_stack = DependencyBuilderStack()
+        await manager_init_stack.enter_async_context(dep_stack)
+        dep_input = DependencyInput(
+            config_path=args.bootstrap_cfg_path,
+            pidx=pidx,
+            log_level=args.log_level,
         )
-        await manager_init_stack.enter_async_context(
-            config_provider_ctx(root_ctx, args.log_level, args.bootstrap_cfg_path)
+        dep_resources = await dep_stack.enter_composer(
+            ManagerDependencyComposer(),
+            dep_input,
         )
 
-        # Initialize JWT validator after config is loaded
-        jwt_config = root_ctx.config_provider.config.jwt.to_jwt_config()
-        root_ctx.jwt_validator = JWTValidator(jwt_config)
+        # Bridge all Composer outputs to RootContext for backward compatibility
+        _bridge_resources_to_root_ctx(root_ctx, dep_resources)
 
         # TODO: Remove manual middleware injection once the manager startup is
         # decoupled from the aiohttp Application lifecycle. Currently root_app is

@@ -2,18 +2,16 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.plugin.hook import HookPluginContext
-from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
 from ai.backend.manager.plugin.network import NetworkPluginContext
 
 from .base import PluginsInput
 from .event_dispatcher import EventDispatcherPluginDependency
 from .hook import HookPluginDependency
-from .monitoring import ErrorMonitorDependency, StatsMonitorDependency
 from .network import NetworkPluginDependency
 
 
@@ -24,20 +22,19 @@ class PluginsResources:
     hook_plugin_ctx: HookPluginContext
     network_plugin_ctx: NetworkPluginContext
     event_dispatcher_plugin_ctx: EventDispatcherPluginContext
-    error_monitor: ManagerErrorPluginContext | None = field(default=None)
-    stats_monitor: ManagerStatsPluginContext | None = field(default=None)
 
 
 class PluginsComposer(DependencyComposer[PluginsInput, PluginsResources]):
-    """Composes all plugin context dependencies.
+    """Composes plugin context dependencies (network, hook, event dispatcher).
 
-    Initializes plugin contexts in the following order
-    (preserving the current server.py initialization order):
+    Monitoring plugins (error_monitor, stats_monitor) are initialized separately
+    in MonitoringComposer (after DomainComposer) because they require
+    error_log_repository which is only available post-Domain stage.
+
+    Initializes plugin contexts in the following order:
     1. NetworkPluginContext
     2. HookPluginContext (dispatches ACTIVATE_MANAGER)
     3. EventDispatcherPluginContext
-    4. ErrorMonitorDependency (tolerates init failures)
-    5. StatsMonitorDependency (tolerates init failures)
     """
 
     @property
@@ -74,20 +71,8 @@ class PluginsComposer(DependencyComposer[PluginsInput, PluginsResources]):
             setup_input,
         )
 
-        error_monitor = await stack.enter_dependency(
-            ErrorMonitorDependency(),
-            setup_input,
-        )
-
-        stats_monitor = await stack.enter_dependency(
-            StatsMonitorDependency(),
-            setup_input,
-        )
-
         yield PluginsResources(
             hook_plugin_ctx=hook_plugin_ctx,
             network_plugin_ctx=network_plugin_ctx,
             event_dispatcher_plugin_ctx=event_dispatcher_plugin_ctx,
-            error_monitor=error_monitor,
-            stats_monitor=stats_monitor,
         )

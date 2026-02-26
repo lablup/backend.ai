@@ -1,23 +1,48 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
+from ai.backend.common.dependencies import NonMonitorableDependencyProvider, ResourceT
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
 
-from .base import PluginDependency, PluginsInput
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.error_log import ErrorLogRepository
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class ErrorMonitorDependency(PluginDependency[ManagerErrorPluginContext | None]):
+@dataclass
+class MonitoringInput:
+    """Input required for monitoring plugin setup.
+
+    Separated from PluginsInput because monitoring plugins require
+    error_log_repository which is only available after DomainComposer (Stage 6).
+    """
+
+    etcd: AsyncEtcd
+    local_config: Mapping[str, Any]
+    allowed_plugins: set[str] | None
+    disabled_plugins: set[str] | None
+    error_log_repository: ErrorLogRepository
+
+
+class MonitoringDependency(NonMonitorableDependencyProvider[MonitoringInput, ResourceT]):
+    """Base class for monitoring plugin dependencies."""
+
+    pass
+
+
+class ErrorMonitorDependency(MonitoringDependency[ManagerErrorPluginContext | None]):
     """Provides ManagerErrorPluginContext lifecycle management.
 
     Tolerates initialization failures — yields None if init fails.
-    Passes ``{"_root.context": init_context}`` as the context parameter,
-    matching the current server.py behavior.
+    Injects error_log_repository directly, bypassing root_ctx lookup.
     """
 
     @property
@@ -26,20 +51,12 @@ class ErrorMonitorDependency(PluginDependency[ManagerErrorPluginContext | None])
 
     @asynccontextmanager
     async def provide(
-        self, setup_input: PluginsInput
+        self, setup_input: MonitoringInput
     ) -> AsyncIterator[ManagerErrorPluginContext | None]:
-        """Initialize and provide a ManagerErrorPluginContext.
-
-        Args:
-            setup_input: Plugins input containing etcd and config
-
-        Yields:
-            Initialized ManagerErrorPluginContext, or None if init fails
-        """
         ctx = ManagerErrorPluginContext(setup_input.etcd, setup_input.local_config)
         try:
             await ctx.init(
-                context={"_root.context": setup_input.init_context},
+                context={"error_log_repository": setup_input.error_log_repository},
                 allowlist=setup_input.allowed_plugins,
             )
         except Exception:
@@ -56,11 +73,11 @@ class ErrorMonitorDependency(PluginDependency[ManagerErrorPluginContext | None])
             await ctx.cleanup()
 
 
-class StatsMonitorDependency(PluginDependency[ManagerStatsPluginContext | None]):
+class StatsMonitorDependency(MonitoringDependency[ManagerStatsPluginContext | None]):
     """Provides ManagerStatsPluginContext lifecycle management.
 
     Tolerates initialization failures — yields None if init fails.
-    Does not pass any context to init, matching current server.py behavior.
+    Does not use error_log_repository.
     """
 
     @property
@@ -69,16 +86,8 @@ class StatsMonitorDependency(PluginDependency[ManagerStatsPluginContext | None])
 
     @asynccontextmanager
     async def provide(
-        self, setup_input: PluginsInput
+        self, setup_input: MonitoringInput
     ) -> AsyncIterator[ManagerStatsPluginContext | None]:
-        """Initialize and provide a ManagerStatsPluginContext.
-
-        Args:
-            setup_input: Plugins input containing etcd and config
-
-        Yields:
-            Initialized ManagerStatsPluginContext, or None if init fails
-        """
         ctx = ManagerStatsPluginContext(setup_input.etcd, setup_input.local_config)
         try:
             await ctx.init(

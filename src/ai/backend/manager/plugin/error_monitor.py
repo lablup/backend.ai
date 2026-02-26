@@ -35,8 +35,7 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
             self.enabled = False
             return
         self.enabled = True
-        root_ctx: RootContext = context["_root.context"]
-        self._error_log_repository = root_ctx.repositories.error_log.repository
+        self._error_log_repository = context["error_log_repository"]
 
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         pass

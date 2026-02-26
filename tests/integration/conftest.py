@@ -9,7 +9,7 @@ import tempfile
 import textwrap
 import uuid
 from collections.abc import AsyncIterator, Iterator
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,7 +27,9 @@ from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.loader import EtcdConfigWatcher, LoaderChain
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
+from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.jwt.validator import JWTValidator
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
@@ -70,11 +72,18 @@ from ai.backend.manager.models.user import users
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.server import (
     build_root_app,
-    etcd_ctx,
     global_subapp_pkgs,
     webapp_plugin_ctx,
 )
 from ai.backend.testutils.pants import get_parallel_slot
+
+
+@asynccontextmanager
+async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncIterator[None]:
+    async with AsyncEtcd.create_from_config(etcd_config) as etcd:
+        root_ctx.etcd = etcd
+        yield
+
 
 # Import testcontainer fixtures (etcd_container, redis_container, postgres_container)
 # via pytest_plugins so they are registered as fixtures without triggering
