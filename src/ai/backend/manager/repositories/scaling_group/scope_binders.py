@@ -11,13 +11,8 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupForProjectRow,
 )
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
-from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
-    RBACEntityUnbinder,
-    RBACScopeUnbinder,
-)
+from ai.backend.manager.repositories.base.rbac.scope_unbinder import RBACEntityUnbinder
 from ai.backend.manager.repositories.scaling_group.purgers import (
-    AllScalingGroupsForDomainPurgerSpec,
-    AllScalingGroupsForProjectPurgerSpec,
     ScalingGroupForDomainPurgerSpec,
     ScalingGroupForProjectPurgerSpec,
 )
@@ -75,50 +70,3 @@ class SGProjectEntityUnbinder(RBACEntityUnbinder[ScalingGroupForProjectRow]):
     @override
     def scope_ref(self) -> RBACElementRef:
         return RBACElementRef(RBACElementType.PROJECT, str(self.project))
-
-
-# =============================================================================
-# Scope Unbinders ("All" cases: entity_ref=None)
-# =============================================================================
-
-
-@dataclass
-class AllSGsFromDomainScopeUnbinder(RBACScopeUnbinder[ScalingGroupForDomainRow]):
-    """Unbind all scaling groups from a domain."""
-
-    domain: str
-
-    @override
-    def build_purger_spec(self) -> BatchPurgerSpec[ScalingGroupForDomainRow]:
-        return AllScalingGroupsForDomainPurgerSpec(domain=self.domain)
-
-    @property
-    @override
-    def scope_ref(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.DOMAIN, self.domain)
-
-    @property
-    @override
-    def entity_ref(self) -> RBACElementRef | None:
-        return None
-
-
-@dataclass
-class AllSGsFromProjectScopeUnbinder(RBACScopeUnbinder[ScalingGroupForProjectRow]):
-    """Unbind all scaling groups from a project."""
-
-    project: UUID
-
-    @override
-    def build_purger_spec(self) -> BatchPurgerSpec[ScalingGroupForProjectRow]:
-        return AllScalingGroupsForProjectPurgerSpec(project=self.project)
-
-    @property
-    @override
-    def scope_ref(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.PROJECT, str(self.project))
-
-    @property
-    @override
-    def entity_ref(self) -> RBACElementRef | None:
-        return None

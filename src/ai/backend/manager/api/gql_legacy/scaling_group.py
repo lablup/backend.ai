@@ -52,8 +52,6 @@ from ai.backend.manager.repositories.scaling_group.purgers import (
     create_scaling_group_for_keypairs_purger,
 )
 from ai.backend.manager.repositories.scaling_group.scope_binders import (
-    AllSGsFromDomainScopeUnbinder,
-    AllSGsFromProjectScopeUnbinder,
     SGDomainEntityUnbinder,
     SGProjectEntityUnbinder,
 )
@@ -980,8 +978,19 @@ class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):  # type: ignore
         domain: str,
     ) -> DisassociateAllScalingGroupsWithDomain:
         graph_ctx: GraphQueryContext = info.context
+        # Query all scaling groups associated with this domain
+        async with graph_ctx.db.begin_readonly_session() as session:
+            query = sa.select(ScalingGroupForDomainRow.scaling_group).where(
+                ScalingGroupForDomainRow.domain == domain
+            )
+            result = await session.execute(query)
+            scaling_groups = result.scalars().all()
+
+        # Create EntityUnbinders for each scaling group
         action = DisassociateScalingGroupWithDomainsAction(
-            unbinders=AllSGsFromDomainScopeUnbinder(domain=domain),
+            unbinders=[
+                SGDomainEntityUnbinder(scaling_group=sg, domain=domain) for sg in scaling_groups
+            ]
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_domains.wait_for_complete(
             action
@@ -1156,8 +1165,21 @@ class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):  # type: ignore[
         user_group: uuid.UUID,
     ) -> DisassociateAllScalingGroupsWithGroup:
         graph_ctx: GraphQueryContext = info.context
+
+        # Query all scaling groups associated with this user group
+        async with graph_ctx.db.begin_readonly_session() as session:
+            query = sa.select(ScalingGroupForProjectRow.scaling_group).where(
+                ScalingGroupForProjectRow.group == user_group
+            )
+            result = await session.execute(query)
+            scaling_groups = result.scalars().all()
+
+        # Create EntityUnbinders for each scaling group
         action = DisassociateScalingGroupWithUserGroupsAction(
-            unbinders=AllSGsFromProjectScopeUnbinder(project=user_group),
+            unbinders=[
+                SGProjectEntityUnbinder(scaling_group=sg, project=user_group)
+                for sg in scaling_groups
+            ],
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_user_groups.wait_for_complete(
             action

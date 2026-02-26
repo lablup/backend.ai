@@ -47,9 +47,7 @@ from ai.backend.manager.repositories.base.rbac.scope_binder import (
 )
 from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
     RBACEntityUnbinder,
-    RBACScopeUnbinder,
     execute_rbac_entity_unbinder,
-    execute_rbac_scope_unbinder,
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.resource_slot.types import subtract_quantities
@@ -210,16 +208,12 @@ class ScalingGroupDBSource:
 
     async def disassociate_scaling_group_with_domains(
         self,
-        unbinders: Sequence[RBACEntityUnbinder[ScalingGroupForDomainRow]]
-        | RBACScopeUnbinder[ScalingGroupForDomainRow],
+        unbinders: Sequence[RBACEntityUnbinder[ScalingGroupForDomainRow]],
     ) -> None:
         """Disassociates a scaling group from multiple domains."""
         async with self._db.begin_session() as session:
-            if isinstance(unbinders, RBACScopeUnbinder):
-                await execute_rbac_scope_unbinder(session, unbinders)
-            else:
-                for unbinder in unbinders:
-                    await execute_rbac_entity_unbinder(session, unbinder)
+            for unbinder in unbinders:
+                await execute_rbac_entity_unbinder(session, unbinder)
 
     async def check_scaling_group_domain_association_exists(
         self,
@@ -285,16 +279,12 @@ class ScalingGroupDBSource:
 
     async def disassociate_scaling_group_with_user_groups(
         self,
-        unbinders: Sequence[RBACEntityUnbinder[ScalingGroupForProjectRow]]
-        | RBACScopeUnbinder[ScalingGroupForProjectRow],
+        unbinders: Sequence[RBACEntityUnbinder[ScalingGroupForProjectRow]],
     ) -> None:
         """Disassociates a single scaling group from a user group (project)."""
         async with self._db.begin_session() as session:
-            if isinstance(unbinders, RBACScopeUnbinder):
-                await execute_rbac_scope_unbinder(session, unbinders)
-            else:
-                for unbinder in unbinders:
-                    await execute_rbac_entity_unbinder(session, unbinder)
+            for unbinder in unbinders:
+                await execute_rbac_entity_unbinder(session, unbinder)
 
     async def check_scaling_group_user_group_association_exists(
         self,
