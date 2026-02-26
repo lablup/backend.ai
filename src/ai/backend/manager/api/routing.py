@@ -5,25 +5,41 @@ from collections.abc import Sequence
 import aiohttp_cors
 from aiohttp import web
 
-from .types import CORSOptions, RouteMiddleware, WebRequestHandler
+from .types import CORSOptions, RouteMiddleware, WebMiddleware, WebRequestHandler
 
 
 class RouteRegistry:
-    """Registry for API routes with per-route middleware support.
+    """Registry for API routes with three-tier middleware support.
 
-    Replaces the per-module create_app() + sub-app pattern by providing
-    a unified way to register routes with optional route-level middleware
-    on a single application.
+    Middleware tiers (outermost → innermost):
 
-    Global middleware (request_id, exception, auth, etc.) is applied via
-    web.Application's middleware stack. Route-level middleware (auth_required,
-    admin_required, rate limiting, etc.) is applied per-route through this
-    registry's add() method.
+    1. **Global middleware** — added to ``web.Application.middlewares``,
+       processed by aiohttp for every request (e.g. request_id, exception,
+       auth, rate-limit).
+    2. **Registry-level middleware** — applied to every route registered
+       through this registry instance (e.g. auth_required for an entire
+       module).
+    3. **Route-level middleware** — applied to individual routes via the
+       ``add()`` method (e.g. admin_required on a specific endpoint).
+
+    When both registry-level and route-level middlewares are present,
+    they are concatenated (registry first, then route) and applied as a
+    single chain in declaration order.
     """
 
-    def __init__(self, app: web.Application, cors_options: CORSOptions) -> None:
+    def __init__(
+        self,
+        app: web.Application,
+        cors_options: CORSOptions,
+        *,
+        global_middlewares: Sequence[WebMiddleware] | None = None,
+        middlewares: Sequence[RouteMiddleware] | None = None,
+    ) -> None:
         self._app = app
         self._cors = aiohttp_cors.setup(app, defaults=cors_options)
+        self._middlewares: list[RouteMiddleware] = list(middlewares or [])
+        if global_middlewares:
+            app.middlewares.extend(global_middlewares)
 
     @property
     def app(self) -> web.Application:
@@ -32,6 +48,10 @@ class RouteRegistry:
     @property
     def cors(self) -> aiohttp_cors.CorsConfig:
         return self._cors
+
+    @property
+    def middlewares(self) -> list[RouteMiddleware]:
+        return self._middlewares
 
     def add(
         self,
@@ -42,26 +62,29 @@ class RouteRegistry:
     ) -> web.AbstractRoute:
         """Register a route with optional per-route middleware.
 
-        Middlewares are applied in declaration order — the first middleware
-        in the list becomes the outermost wrapper (executed first on request,
-        last on response), matching the conventional decorator stacking order.
+        Registry-level middlewares are prepended to the per-route list,
+        so they wrap the handler outermost. Within each tier, the first
+        middleware in the list becomes the outermost wrapper (executed
+        first on request, last on response), matching the conventional
+        decorator stacking order.
 
         Example::
 
-            registry.add("GET", "/users", get_users, middlewares=[
-                auth_required,        # checked first
-                admin_required,       # checked second
+            registry = RouteRegistry(app, cors, middlewares=[auth_required])
+            registry.add("GET", "/admin/users", list_users, middlewares=[
+                admin_required,
             ])
 
         is equivalent to::
 
-            @auth_required
-            @admin_required
-            async def get_users(request): ...
+            @auth_required      # registry-level (outermost)
+            @admin_required     # route-level
+            async def list_users(request): ...
         """
+        combined = self._middlewares + list(middlewares or [])
         final_handler: WebRequestHandler = handler
-        if middlewares:
-            final_handler = _apply_route_middlewares(handler, middlewares)
+        if combined:
+            final_handler = _apply_route_middlewares(handler, combined)
         route = self._app.router.add_route(method, path, final_handler)
         self._cors.add(route)
         return route
