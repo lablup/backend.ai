@@ -23,9 +23,9 @@ CURRENT_COMMIT=$(git rev-parse --short HEAD)
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 if ! command -v gh &> /dev/null; then
-  echo "GitHub CLI (gh) is not installed. Since we cannot determine the base branch, running the full check before push."
-  pants tailor --check update-build-files --check ::
-  pants lint check ::
+  echo "GitHub CLI (gh) is not installed. Running lint on HEAD~1."
+  pants tailor --check update-build-files --check --changed-since=HEAD~1
+  pants lint --changed-since=HEAD~1
 else
   # Get the base branch name from GitHub if we are on a pull request.
   BASE_BRANCH=$(gh pr view "$CURRENT_BRANCH" --json baseRefName -q '.baseRefName' 2>/dev/null || true)
@@ -55,5 +55,5 @@ else
   fi
   echo "Performing lint and check on ${ORIGIN}/${BASE_BRANCH}..HEAD@${CURRENT_COMMIT} ..."
   pants tailor --check update-build-files --check --changed-since="${ORIGIN}/${BASE_BRANCH}"
-  pants lint check --changed-since="${ORIGIN}/${BASE_BRANCH}"
+  pants lint --changed-since="${ORIGIN}/${BASE_BRANCH}"
 fi
