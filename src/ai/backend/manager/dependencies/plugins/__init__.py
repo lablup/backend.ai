@@ -2,13 +2,14 @@ from .base import PluginDependency, PluginsInput
 from .composer import PluginsComposer, PluginsResources
 from .event_dispatcher import EventDispatcherPluginDependency
 from .hook import HookPluginDependency
-from .monitoring import ErrorMonitorDependency, StatsMonitorDependency
+from .monitoring import ErrorMonitorDependency, MonitoringInput, StatsMonitorDependency
 from .network import NetworkPluginDependency
 
 __all__ = [
-    "EventDispatcherPluginDependency",
     "ErrorMonitorDependency",
+    "EventDispatcherPluginDependency",
     "HookPluginDependency",
+    "MonitoringInput",
     "NetworkPluginDependency",
     "PluginDependency",
     "PluginsComposer",

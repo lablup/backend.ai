@@ -546,10 +546,12 @@ def _bridge_resources_to_root_ctx(
     root_ctx.hook_plugin_ctx = resources.plugins.hook_plugin_ctx
     root_ctx.network_plugin_ctx = resources.plugins.network_plugin_ctx
     root_ctx.event_dispatcher_plugin_ctx = resources.plugins.event_dispatcher_plugin_ctx
-    if resources.plugins.error_monitor is not None:
-        root_ctx.error_monitor = resources.plugins.error_monitor
-    if resources.plugins.stats_monitor is not None:
-        root_ctx.stats_monitor = resources.plugins.stats_monitor
+
+    # Monitoring (initialized after Domain — requires error_log_repository)
+    if resources.monitoring.error_monitor is not None:
+        root_ctx.error_monitor = resources.monitoring.error_monitor
+    if resources.monitoring.stats_monitor is not None:
+        root_ctx.stats_monitor = resources.monitoring.stats_monitor
 
     # Messaging
     root_ctx.event_hub = resources.messaging.event_hub

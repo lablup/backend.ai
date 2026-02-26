@@ -7,6 +7,7 @@ from pathlib import Path
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.logging.types import LogLevel
+from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
 
 from .agents import AgentsComposer, AgentsInput, AgentsResources
 from .bootstrap import BootstrapComposer, BootstrapInput, BootstrapResources
@@ -22,6 +23,7 @@ from .messaging import MessagingComposer, MessagingInput, MessagingResources
 from .orchestration import OrchestrationComposer, OrchestrationInput, OrchestrationResources
 from .plugins import PluginsComposer, PluginsResources
 from .plugins.base import PluginsInput
+from .plugins.monitoring import ErrorMonitorDependency, MonitoringInput, StatsMonitorDependency
 from .processing import ProcessingComposer, ProcessingInput, ProcessingResources
 from .system import SystemComposer, SystemInput, SystemResources
 
@@ -40,6 +42,17 @@ class DependencyInput:
 
 
 @dataclass
+class MonitoringResources:
+    """Container for monitoring plugin resources.
+
+    Initialized after DomainComposer so that error_log_repository is available.
+    """
+
+    error_monitor: ManagerErrorPluginContext | None
+    stats_monitor: ManagerStatsPluginContext | None
+
+
+@dataclass
 class DependencyResources:
     """Container for all initialized dependency resources.
 
@@ -50,10 +63,11 @@ class DependencyResources:
     3. Plugins stage: hook, network, event dispatcher plugin contexts
     4. Messaging stage: event hub, message queue, event producer, event fetcher
     5. Domain stage: notification center, distributed lock, repositories, services
-    6. System stage: CORS, metrics, GQL adapter, JWT, prometheus, service discovery
-    7. Agents stage: controllers, client pools, agent registry
-    8. Orchestration stage: idle checker, sokovan, leader election
-    9. Processing stage: event dispatcher, processors
+    6. Monitoring stage: error_monitor, stats_monitor (requires Domain repositories)
+    7. System stage: CORS, metrics, GQL adapter, JWT, prometheus, service discovery
+    8. Agents stage: controllers, client pools, agent registry
+    9. Orchestration stage: idle checker, sokovan, leader election
+    10. Processing stage: event dispatcher, processors
     """
 
     bootstrap: BootstrapResources
@@ -62,6 +76,7 @@ class DependencyResources:
     plugins: PluginsResources
     messaging: MessagingResources
     domain: DomainResources
+    monitoring: MonitoringResources
     system: SystemResources
     agents: AgentsResources
     orchestration: OrchestrationResources
@@ -164,6 +179,28 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
             ),
         )
 
+        # Stage 6.5: Monitoring (error_monitor, stats_monitor)
+        # Must run after Domain so that error_log_repository is available.
+        monitoring_input = MonitoringInput(
+            etcd=bootstrap.etcd,
+            local_config=config.model_dump(by_alias=True),
+            allowed_plugins=config.manager.allowed_plugins,
+            disabled_plugins=config.manager.disabled_plugins,
+            error_log_repository=domain.repositories.error_log.repository,
+        )
+        error_monitor = await stack.enter_dependency(
+            ErrorMonitorDependency(),
+            monitoring_input,
+        )
+        stats_monitor = await stack.enter_dependency(
+            StatsMonitorDependency(),
+            monitoring_input,
+        )
+        monitoring = MonitoringResources(
+            error_monitor=error_monitor,
+            stats_monitor=stats_monitor,
+        )
+
         # Stage 7: System (CORS, metrics, GQL, JWT, prometheus, service discovery, bgtask mgr)
         system = await stack.enter_composer(
             SystemComposer(),
@@ -224,7 +261,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
         # Stage 10: Processing (event dispatcher, processors, bgtask registry)
         # error_monitor is required by ProcessingInput; raise if not initialized
         # since the processing stage cannot function without it.
-        if plugins.error_monitor is None:
+        if monitoring.error_monitor is None:
             raise DependencyInitializationError("error_monitor plugin failed to initialize")
         processing = await stack.enter_composer(
             ProcessingComposer(),
@@ -257,7 +294,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 valkey_artifact_client=infrastructure.valkey.artifact,
                 event_fetcher=messaging.event_fetcher,
                 background_task_manager=system.background_task_manager,
-                error_monitor=plugins.error_monitor,
+                error_monitor=monitoring.error_monitor,
                 hook_plugin_ctx=plugins.hook_plugin_ctx,
                 deployment_controller=agents.deployment_controller,
                 revision_generator_registry=agents.revision_generator_registry,
@@ -277,6 +314,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
             plugins=plugins,
             messaging=messaging,
             domain=domain,
+            monitoring=monitoring,
             system=system,
             agents=agents,
             orchestration=orchestration,
