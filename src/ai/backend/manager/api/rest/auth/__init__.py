@@ -25,11 +25,11 @@ def register_routes(
     """
     handler = AuthHandler(processors=processors)
 
-    # /auth root — test endpoint (registered on both GET and POST, and /test path)
-    registry.add("GET", "/auth", handler.test, middlewares=[auth_required])
-    registry.add("POST", "/auth", handler.test, middlewares=[auth_required])
-    registry.add("GET", "/auth/test", handler.test, middlewares=[auth_required])
-    registry.add("POST", "/auth/test", handler.test, middlewares=[auth_required])
+    # /auth root — test endpoint (GET and POST split into separate handlers)
+    registry.add("GET", "/auth", handler.test_get, middlewares=[auth_required])
+    registry.add("POST", "/auth", handler.test_post, middlewares=[auth_required])
+    registry.add("GET", "/auth/test", handler.test_get, middlewares=[auth_required])
+    registry.add("POST", "/auth/test", handler.test_post, middlewares=[auth_required])
 
     # Public endpoints (no auth_required)
     registry.add("POST", "/auth/authorize", handler.authorize)

@@ -74,6 +74,8 @@ class UserContext(MiddlewareParam):
     user_email: str
     user_domain: str
     access_key: str
+    is_admin: bool
+    is_superadmin: bool
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -85,6 +87,8 @@ class UserContext(MiddlewareParam):
             user_email=request["user"]["email"],
             user_domain=request["user"]["domain_name"],
             access_key=request["keypair"]["access_key"],
+            is_admin=request["is_admin"],
+            is_superadmin=request["is_superadmin"],
         )
 
 

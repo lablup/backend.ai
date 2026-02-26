@@ -1,25 +1,20 @@
 """Auth handler class using constructor dependency injection.
 
-All 11 unique handlers from the legacy ``api/auth.py`` are migrated here
-as methods of ``AuthHandler``, using Pydantic DTOs for request validation
-and ``APIResponse.build()`` for response serialization.
-
-Handlers are registered as standard aiohttp request handlers (accepting
-``web.Request``) so that they retain access to per-request auth state
-(``request["user"]``, ``request["keypair"]``, etc.) set by
-``auth_middleware``.
+All handlers use the new ApiHandler pattern: typed parameters
+(``BodyParam``, ``QueryParam``, ``UserContext``, ``RequestCtx``) are
+automatically extracted by ``_wrap_api_handler`` and responses are
+returned as ``APIResponse`` objects.
 """
 
 from __future__ import annotations
 
-import json
 import logging
 from http import HTTPStatus
-from typing import Any, Final
+from typing import Final
 
 from aiohttp import web
 
-from ai.backend.common.api_handlers import APIResponse, BaseRequestModel, BodyParam, QueryParam
+from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
     GetRoleRequest,
@@ -49,7 +44,7 @@ from ai.backend.common.dto.manager.auth.types import (
     AuthTokenType,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
@@ -68,22 +63,6 @@ from ai.backend.manager.services.processors import Processors
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def _parse_body[T: BaseRequestModel](request_body: dict[str, Any], model: type[T]) -> BodyParam[T]:
-    """Parse a JSON body into a BodyParam with the given Pydantic model."""
-    bp: BodyParam[T] = BodyParam(model)
-    bp.from_body(request_body)
-    return bp
-
-
-async def _read_json_body(request: web.Request) -> dict[str, Any]:
-    """Read and parse JSON body from the request."""
-    try:
-        result: dict[str, Any] = await request.json()
-        return result
-    except json.JSONDecodeError as e:
-        raise InvalidAPIParameters("Malformed request body") from e
-
-
 class AuthHandler:
     """Auth API handler with constructor-injected dependencies."""
 
@@ -91,38 +70,41 @@ class AuthHandler:
         self._processors = processors
 
     # ------------------------------------------------------------------
-    # test (GET/POST /auth, /auth/test)
+    # test_get (GET /auth, /auth/test)
     # ------------------------------------------------------------------
 
-    async def test(self, request: web.Request) -> web.Response:
-        log.info("AUTH.TEST(ak:{})", request["keypair"]["access_key"])
-        body = await _read_json_body(request)
-        params = _parse_body(body, VerifyAuthRequest).parsed
+    async def test_get(self, ctx: UserContext) -> APIResponse:
+        log.info("AUTH.TEST(ak:{})", ctx.access_key)
+        resp = VerifyAuthResponse(authorized="yes", echo="")
+        return APIResponse.build(HTTPStatus.OK, resp)
+
+    # ------------------------------------------------------------------
+    # test_post (POST /auth, /auth/test)
+    # ------------------------------------------------------------------
+
+    async def test_post(self, body: BodyParam[VerifyAuthRequest], ctx: UserContext) -> APIResponse:
+        log.info("AUTH.TEST(ak:{})", ctx.access_key)
+        params = body.parsed
         resp = VerifyAuthResponse(authorized="yes", echo=params.echo)
-        return web.json_response(
-            APIResponse.build(HTTPStatus.OK, resp).to_json,
-            status=HTTPStatus.OK,
-        )
+        return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
     # get_role (GET /auth/role)
     # ------------------------------------------------------------------
 
-    async def get_role(self, request: web.Request) -> web.Response:
-        qp = QueryParam(GetRoleRequest)
-        qp.from_query(request.query)
-        params = qp.parsed
+    async def get_role(self, query: QueryParam[GetRoleRequest], ctx: UserContext) -> APIResponse:
+        params = query.parsed
         log.info(
             "AUTH.ROLES(ak:{}, d:{}, g:{})",
-            request["keypair"]["access_key"],
-            request["user"]["domain_name"],
+            ctx.access_key,
+            ctx.user_domain,
             params.group,
         )
         action = GetRoleAction(
-            user_id=request["user"]["uuid"],
+            user_id=ctx.user_uuid,
             group_id=params.group,
-            is_superadmin=request["is_superadmin"],
-            is_admin=request["is_admin"],
+            is_superadmin=ctx.is_superadmin,
+            is_admin=ctx.is_admin,
         )
         result = await self._processors.auth.get_role.wait_for_complete(action)
         resp = GetRoleResponse(
@@ -130,18 +112,16 @@ class AuthHandler:
             domain_role=result.domain_role,
             group_role=result.group_role,
         )
-        return web.json_response(
-            APIResponse.build(HTTPStatus.OK, resp).to_json,
-            status=HTTPStatus.OK,
-        )
+        return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
     # authorize (POST /auth/authorize)
     # ------------------------------------------------------------------
 
-    async def authorize(self, request: web.Request) -> web.StreamResponse:
-        body = await _read_json_body(request)
-        params = _parse_body(body, AuthorizeRequest).parsed
+    async def authorize(
+        self, body: BodyParam[AuthorizeRequest], ctx: RequestCtx
+    ) -> APIResponse | web.StreamResponse:
+        params = body.parsed
         log.info(
             "AUTH.AUTHORIZE(d:{}, u:{}, passwd:****, type:{})",
             params.domain,
@@ -149,7 +129,7 @@ class AuthHandler:
             params.type,
         )
         action = AuthorizeAction(
-            request=request,
+            request=ctx.request,
             type=AuthTokenType(params.type),
             domain_name=params.domain,
             email=params.username,
@@ -172,21 +152,17 @@ class AuthHandler:
             status=auth_result.status,
         )
         resp = AuthorizeResponse(data=data)
-        return web.json_response(
-            APIResponse.build(HTTPStatus.OK, resp).to_json,
-            status=HTTPStatus.OK,
-        )
+        return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
     # signup (POST /auth/signup)
     # ------------------------------------------------------------------
 
-    async def signup(self, request: web.Request) -> web.Response:
-        body = await _read_json_body(request)
-        params = _parse_body(body, SignupRequest).parsed
+    async def signup(self, body: BodyParam[SignupRequest], ctx: RequestCtx) -> APIResponse:
+        params = body.parsed
         log.info("AUTH.SIGNUP(d:{}, email:{}, passwd:****)", params.domain, params.email)
         action = SignupAction(
-            request=request,
+            request=ctx.request,
             domain_name=params.domain,
             email=params.email,
             password=params.password,
@@ -199,72 +175,62 @@ class AuthHandler:
             access_key=result.access_key,
             secret_key=result.secret_key,
         )
-        return web.json_response(
-            APIResponse.build(HTTPStatus.CREATED, resp).to_json,
-            status=HTTPStatus.CREATED,
-        )
+        return APIResponse.build(HTTPStatus.CREATED, resp)
 
     # ------------------------------------------------------------------
     # signout (POST /auth/signout)
     # ------------------------------------------------------------------
 
-    async def signout(self, request: web.Request) -> web.Response:
-        body = await _read_json_body(request)
-        params = _parse_body(body, SignoutRequest).parsed
-        domain_name = request["user"]["domain_name"]
-        log.info("AUTH.SIGNOUT(d:{}, email:{})", domain_name, params.email)
+    async def signout(self, body: BodyParam[SignoutRequest], ctx: UserContext) -> APIResponse:
+        params = body.parsed
+        log.info("AUTH.SIGNOUT(d:{}, email:{})", ctx.user_domain, params.email)
         await self._processors.auth.signout.wait_for_complete(
             SignoutAction(
-                user_id=request["user"]["uuid"],
-                domain_name=domain_name,
-                requester_email=request["user"]["email"],
+                user_id=ctx.user_uuid,
+                domain_name=ctx.user_domain,
+                requester_email=ctx.user_email,
                 email=params.email,
                 password=params.password,
             )
         )
-        return web.json_response(
-            APIResponse.build(HTTPStatus.OK, SignoutResponse()).to_json,
-            status=HTTPStatus.OK,
-        )
+        return APIResponse.build(HTTPStatus.OK, SignoutResponse())
 
     # ------------------------------------------------------------------
     # update_full_name (POST /auth/update-full-name)
     # ------------------------------------------------------------------
 
-    async def update_full_name(self, request: web.Request) -> web.Response:
-        body = await _read_json_body(request)
-        params = _parse_body(body, UpdateFullNameRequest).parsed
-        domain_name = request["user"]["domain_name"]
-        email = request["user"]["email"]
-        log.info("AUTH.UPDATE_FULL_NAME(d:{}, email:{})", domain_name, email)
+    async def update_full_name(
+        self, body: BodyParam[UpdateFullNameRequest], ctx: UserContext
+    ) -> APIResponse:
+        params = body.parsed
+        log.info("AUTH.UPDATE_FULL_NAME(d:{}, email:{})", ctx.user_domain, ctx.user_email)
         await self._processors.auth.update_full_name.wait_for_complete(
             UpdateFullNameAction(
-                user_id=request["user"]["uuid"],
+                user_id=str(ctx.user_uuid),
                 full_name=params.full_name,
-                domain_name=domain_name,
-                email=email,
+                domain_name=ctx.user_domain,
+                email=ctx.user_email,
             )
         )
-        return web.json_response(
-            APIResponse.build(HTTPStatus.OK, UpdateFullNameResponse()).to_json,
-            status=HTTPStatus.OK,
-        )
+        return APIResponse.build(HTTPStatus.OK, UpdateFullNameResponse())
 
     # ------------------------------------------------------------------
     # update_password (POST /auth/update-password)
     # ------------------------------------------------------------------
 
-    async def update_password(self, request: web.Request) -> web.Response:
-        body = await _read_json_body(request)
-        params = _parse_body(body, UpdatePasswordRequest).parsed
-        domain_name = request["user"]["domain_name"]
-        email = request["user"]["email"]
-        log.info("AUTH.UPDATE_PASSWORD(d:{}, email:{})", domain_name, email)
+    async def update_password(
+        self,
+        body: BodyParam[UpdatePasswordRequest],
+        ctx: UserContext,
+        req: RequestCtx,
+    ) -> APIResponse:
+        params = body.parsed
+        log.info("AUTH.UPDATE_PASSWORD(d:{}, email:{})", ctx.user_domain, ctx.user_email)
         action = UpdatePasswordAction(
-            request=request,
-            user_id=request["user"]["uuid"],
-            domain_name=domain_name,
-            email=email,
+            request=req.request,
+            user_id=ctx.user_uuid,
+            domain_name=ctx.user_domain,
+            email=ctx.user_email,
             old_password=params.old_password,
             new_password=params.new_password,
             new_password_confirm=params.new_password2,
@@ -272,29 +238,24 @@ class AuthHandler:
         result = await self._processors.auth.update_password.wait_for_complete(action)
         if not result.success:
             resp = UpdatePasswordResponse(error_msg="new password mismatch")
-            return web.json_response(
-                APIResponse.build(HTTPStatus.BAD_REQUEST, resp).to_json,
-                status=HTTPStatus.BAD_REQUEST,
-            )
-        return web.json_response(
-            APIResponse.build(HTTPStatus.OK, UpdatePasswordResponse()).to_json,
-            status=HTTPStatus.OK,
-        )
+            return APIResponse.build(HTTPStatus.BAD_REQUEST, resp)
+        return APIResponse.build(HTTPStatus.OK, UpdatePasswordResponse())
 
     # ------------------------------------------------------------------
     # update_password_no_auth (POST /auth/update-password-no-auth)
     # ------------------------------------------------------------------
 
-    async def update_password_no_auth(self, request: web.Request) -> web.Response:
-        body = await _read_json_body(request)
-        params = _parse_body(body, UpdatePasswordNoAuthRequest).parsed
+    async def update_password_no_auth(
+        self, body: BodyParam[UpdatePasswordNoAuthRequest], ctx: RequestCtx
+    ) -> APIResponse:
+        params = body.parsed
         log.info(
             "AUTH.UPDATE_PASSWORD_NO_AUTH(d:{}, u:{}, passwd:****)",
             params.domain,
             params.username,
         )
         action = UpdatePasswordNoAuthAction(
-            request=request,
+            request=ctx.request,
             domain_name=params.domain,
             email=params.username,
             current_password=params.current_password,
@@ -304,79 +265,62 @@ class AuthHandler:
         resp = UpdatePasswordNoAuthResponse(
             password_changed_at=result.password_changed_at.isoformat(),
         )
-        return web.json_response(
-            APIResponse.build(HTTPStatus.CREATED, resp).to_json,
-            status=HTTPStatus.CREATED,
-        )
+        return APIResponse.build(HTTPStatus.CREATED, resp)
 
     # ------------------------------------------------------------------
     # get_ssh_keypair (GET /auth/ssh-keypair)
     # ------------------------------------------------------------------
 
-    async def get_ssh_keypair(self, request: web.Request) -> web.Response:
-        domain_name = request["user"]["domain_name"]
-        access_key = request["keypair"]["access_key"]
-        log.info("AUTH.GET_SSH_KEYPAIR(d:{}, ak:{})", domain_name, access_key)
+    async def get_ssh_keypair(self, ctx: UserContext) -> APIResponse:
+        log.info("AUTH.GET_SSH_KEYPAIR(d:{}, ak:{})", ctx.user_domain, ctx.access_key)
         result = await self._processors.auth.get_ssh_keypair.wait_for_complete(
             GetSSHKeypairAction(
-                user_id=request["user"]["uuid"],
-                access_key=access_key,
+                user_id=ctx.user_uuid,
+                access_key=ctx.access_key,
             )
         )
         resp = GetSSHKeypairResponse(ssh_public_key=result.public_key)
-        return web.json_response(
-            APIResponse.build(HTTPStatus.OK, resp).to_json,
-            status=HTTPStatus.OK,
-        )
+        return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
     # generate_ssh_keypair (PATCH /auth/ssh-keypair)
     # ------------------------------------------------------------------
 
-    async def generate_ssh_keypair(self, request: web.Request) -> web.Response:
-        domain_name = request["user"]["domain_name"]
-        access_key = request["keypair"]["access_key"]
-        log.info("AUTH.REFRESH_SSH_KEYPAIR(d:{}, ak:{})", domain_name, access_key)
+    async def generate_ssh_keypair(self, ctx: UserContext) -> APIResponse:
+        log.info("AUTH.REFRESH_SSH_KEYPAIR(d:{}, ak:{})", ctx.user_domain, ctx.access_key)
         result = await self._processors.auth.generate_ssh_keypair.wait_for_complete(
             GenerateSSHKeypairAction(
-                user_id=request["user"]["uuid"],
-                access_key=access_key,
+                user_id=ctx.user_uuid,
+                access_key=ctx.access_key,
             )
         )
         resp = SSHKeypairResponse(
             ssh_public_key=result.ssh_keypair.ssh_public_key,
             ssh_private_key=result.ssh_keypair.ssh_private_key,
         )
-        return web.json_response(
-            APIResponse.build(HTTPStatus.OK, resp).to_json,
-            status=HTTPStatus.OK,
-        )
+        return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
     # upload_ssh_keypair (POST /auth/ssh-keypair)
     # ------------------------------------------------------------------
 
-    async def upload_ssh_keypair(self, request: web.Request) -> web.Response:
-        body = await _read_json_body(request)
-        params = _parse_body(body, UploadSSHKeypairRequest).parsed
-        domain_name = request["user"]["domain_name"]
-        access_key = request["keypair"]["access_key"]
+    async def upload_ssh_keypair(
+        self, body: BodyParam[UploadSSHKeypairRequest], ctx: UserContext
+    ) -> APIResponse:
+        params = body.parsed
         pubkey = f"{params.pubkey.rstrip()}\n"
         privkey = f"{params.privkey.rstrip()}\n"
-        log.info("AUTH.SAVE_SSH_KEYPAIR(d:{}, ak:{})", domain_name, access_key)
+        log.info("AUTH.SAVE_SSH_KEYPAIR(d:{}, ak:{})", ctx.user_domain, ctx.access_key)
         result = await self._processors.auth.upload_ssh_keypair.wait_for_complete(
             UploadSSHKeypairAction(
-                user_id=request["user"]["uuid"],
+                user_id=ctx.user_uuid,
                 public_key=pubkey,
                 private_key=privkey,
-                access_key=access_key,
+                access_key=ctx.access_key,
             )
         )
         resp = SSHKeypairResponse(
             ssh_public_key=result.ssh_keypair.ssh_public_key,
             ssh_private_key=result.ssh_keypair.ssh_private_key,
         )
-        return web.json_response(
-            APIResponse.build(HTTPStatus.OK, resp).to_json,
-            status=HTTPStatus.OK,
-        )
+        return APIResponse.build(HTTPStatus.OK, resp)

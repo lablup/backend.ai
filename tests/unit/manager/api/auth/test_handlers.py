@@ -2,9 +2,9 @@
 Tests for AuthHandler methods (new-style auth module).
 
 Each test verifies that the AuthHandler method correctly:
-- Parses request parameters (JSON body via request.json() or query params)
+- Accepts typed parameters (BodyParam, QueryParam, UserContext, RequestCtx)
 - Calls the appropriate processor action with correct arguments
-- Returns the correct HTTP response with proper status codes
+- Returns the correct APIResponse with proper status codes
 
 Note: Auth decorator tests (auth_required, admin_required, etc.) belong
 in middleware tests, not here — AuthHandler methods assume the request
@@ -13,18 +13,29 @@ has already passed through auth_middleware.
 
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import UTC, datetime
 from http import HTTPStatus
-from typing import Any, cast
-from unittest.mock import AsyncMock, MagicMock, PropertyMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiohttp import web
 
+from ai.backend.common.api_handlers import BodyParam, QueryParam
+from ai.backend.common.dto.manager.auth.request import (
+    AuthorizeRequest,
+    GetRoleRequest,
+    SignoutRequest,
+    SignupRequest,
+    UpdateFullNameRequest,
+    UpdatePasswordNoAuthRequest,
+    UpdatePasswordRequest,
+    UploadSSHKeypairRequest,
+    VerifyAuthRequest,
+)
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
+from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeActionResult
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
@@ -59,31 +70,68 @@ def handler(mock_processors: MagicMock) -> AuthHandler:
 
 
 @pytest.fixture
-def authorized_request() -> MagicMock:
-    """Mock request for authorized user with POST body support."""
-    req = MagicMock(spec=web.Request)
-    type(req).can_read_body = PropertyMock(return_value=True)
-    req.method = "POST"
-    req.content_type = "application/json"
-    storage: dict[str, Any] = {}
-    req.__getitem__ = lambda _, key: storage[key]
-    req.__setitem__ = lambda _, key, value: storage.__setitem__(key, value)
-    return req
+def user_context() -> UserContext:
+    """UserContext for authenticated endpoints."""
+    return UserContext(
+        user_uuid=uuid.uuid4(),
+        user_email="test@example.com",
+        user_domain="default",
+        access_key="AKTEST",
+        is_admin=False,
+        is_superadmin=False,
+    )
 
 
 @pytest.fixture
-def public_request() -> MagicMock:
-    """Mock request for public endpoints (no auth required)."""
-    req = MagicMock(spec=web.Request)
-    type(req).can_read_body = PropertyMock(return_value=True)
-    req.method = "POST"
-    req.content_type = "application/json"
-    return req
+def request_ctx() -> RequestCtx:
+    """RequestCtx for endpoints needing raw request access."""
+    return RequestCtx(request=MagicMock(spec=web.Request))
 
 
 # ---------------------------------------------------------------------------
 # Test Classes
 # ---------------------------------------------------------------------------
+
+
+class TestTestGet:
+    """Tests for test_get handler (GET /auth)."""
+
+    @pytest.mark.asyncio
+    async def test_returns_authorized_yes(
+        self,
+        handler: AuthHandler,
+        user_context: UserContext,
+    ) -> None:
+        """Verify test_get returns authorized=yes with empty echo."""
+        response = await handler.test_get(user_context)
+
+        assert response.status_code == HTTPStatus.OK
+        data = response.to_json
+        assert data is not None
+        assert data["authorized"] == "yes"
+        assert data["echo"] == ""
+
+
+class TestTestPost:
+    """Tests for test_post handler (POST /auth)."""
+
+    @pytest.mark.asyncio
+    async def test_returns_echo(
+        self,
+        handler: AuthHandler,
+        user_context: UserContext,
+    ) -> None:
+        """Verify test_post returns echo from body."""
+        body: BodyParam[VerifyAuthRequest] = BodyParam(VerifyAuthRequest)
+        body.from_body({"echo": "hello"})
+
+        response = await handler.test_post(body, user_context)
+
+        assert response.status_code == HTTPStatus.OK
+        data = response.to_json
+        assert data is not None
+        assert data["authorized"] == "yes"
+        assert data["echo"] == "hello"
 
 
 class TestAuthorize:
@@ -106,40 +154,36 @@ class TestAuthorize:
     async def test_calls_processor_and_returns_result(
         self,
         handler: AuthHandler,
-        public_request: MagicMock,
+        request_ctx: RequestCtx,
         mock_processors: MagicMock,
         authorize_result: AuthorizeActionResult,
     ) -> None:
         """Verify processor is called and authorization result is returned."""
-        public_request.json = AsyncMock(
-            return_value={
-                "type": "keypair",
-                "domain": "default",
-                "username": "test@example.com",
-                "password": "password123",
-            }
-        )
+        body: BodyParam[AuthorizeRequest] = BodyParam(AuthorizeRequest)
+        body.from_body({
+            "type": "keypair",
+            "domain": "default",
+            "username": "test@example.com",
+            "password": "password123",
+        })
         mock_processors.auth.authorize.wait_for_complete = AsyncMock(return_value=authorize_result)
 
-        response = await handler.authorize(public_request)
+        response = await handler.authorize(body, request_ctx)
 
         mock_processors.auth.authorize.wait_for_complete.assert_called_once()
-        assert response.status == HTTPStatus.OK
-        json_response = cast(web.Response, response)
-        response_body = json.loads(cast(bytes, json_response.body))
+        assert not isinstance(response, web.StreamResponse)
+        assert response.status_code == HTTPStatus.OK
         assert authorize_result.authorization_result is not None
-        assert (
-            response_body["data"]["access_key"] == authorize_result.authorization_result.access_key
-        )
-        assert (
-            response_body["data"]["secret_key"] == authorize_result.authorization_result.secret_key
-        )
+        data = response.to_json
+        assert data is not None
+        assert data["data"]["access_key"] == authorize_result.authorization_result.access_key
+        assert data["data"]["secret_key"] == authorize_result.authorization_result.secret_key
 
     @pytest.mark.asyncio
     async def test_passes_params_to_action(
         self,
         handler: AuthHandler,
-        public_request: MagicMock,
+        request_ctx: RequestCtx,
         mock_processors: MagicMock,
         authorize_result: AuthorizeActionResult,
     ) -> None:
@@ -148,24 +192,49 @@ class TestAuthorize:
         email = "user@example.com"
         password = "jwtpass"
         stoken = "session-token"
-        public_request.json = AsyncMock(
-            return_value={
-                "type": "jwt",
-                "domain": domain,
-                "username": email,
-                "password": password,
-                "stoken": stoken,
-            }
-        )
+        body: BodyParam[AuthorizeRequest] = BodyParam(AuthorizeRequest)
+        body.from_body({
+            "type": "jwt",
+            "domain": domain,
+            "username": email,
+            "password": password,
+            "stoken": stoken,
+        })
         mock_processors.auth.authorize.wait_for_complete = AsyncMock(return_value=authorize_result)
 
-        await handler.authorize(public_request)
+        await handler.authorize(body, request_ctx)
 
         action = mock_processors.auth.authorize.wait_for_complete.call_args[0][0]
         assert action.domain_name == domain
         assert action.email == email
         assert action.password == password
         assert action.stoken == stoken
+
+    @pytest.mark.asyncio
+    async def test_stream_response_passthrough(
+        self,
+        handler: AuthHandler,
+        request_ctx: RequestCtx,
+        mock_processors: MagicMock,
+    ) -> None:
+        """Verify StreamResponse from hook is passed through."""
+        stream_resp = MagicMock(spec=web.StreamResponse)
+        result = AuthorizeActionResult(
+            stream_response=stream_resp,
+            authorization_result=None,
+        )
+        body: BodyParam[AuthorizeRequest] = BodyParam(AuthorizeRequest)
+        body.from_body({
+            "type": "keypair",
+            "domain": "default",
+            "username": "test@example.com",
+            "password": "pass",
+        })
+        mock_processors.auth.authorize.wait_for_complete = AsyncMock(return_value=result)
+
+        response = await handler.authorize(body, request_ctx)
+
+        assert response is stream_resp
 
 
 class TestSignup:
@@ -183,33 +252,33 @@ class TestSignup:
     async def test_calls_processor_and_returns_created(
         self,
         handler: AuthHandler,
-        public_request: MagicMock,
+        request_ctx: RequestCtx,
         mock_processors: MagicMock,
         signup_result: SignupActionResult,
     ) -> None:
         """Verify processor is called and HTTP 201 CREATED is returned."""
-        public_request.json = AsyncMock(
-            return_value={
-                "domain": "default",
-                "email": "newuser@example.com",
-                "password": "securepassword",
-            }
-        )
+        body: BodyParam[SignupRequest] = BodyParam(SignupRequest)
+        body.from_body({
+            "domain": "default",
+            "email": "newuser@example.com",
+            "password": "securepassword",
+        })
         mock_processors.auth.signup.wait_for_complete = AsyncMock(return_value=signup_result)
 
-        response = await handler.signup(public_request)
+        response = await handler.signup(body, request_ctx)
 
         mock_processors.auth.signup.wait_for_complete.assert_called_once()
-        assert response.status == HTTPStatus.CREATED
-        response_body = json.loads(cast(bytes, response.body))
-        assert response_body["access_key"] == signup_result.access_key
-        assert response_body["secret_key"] == signup_result.secret_key
+        assert response.status_code == HTTPStatus.CREATED
+        data = response.to_json
+        assert data is not None
+        assert data["access_key"] == signup_result.access_key
+        assert data["secret_key"] == signup_result.secret_key
 
     @pytest.mark.asyncio
     async def test_passes_optional_params_to_action(
         self,
         handler: AuthHandler,
-        public_request: MagicMock,
+        request_ctx: RequestCtx,
         mock_processors: MagicMock,
         signup_result: SignupActionResult,
     ) -> None:
@@ -218,19 +287,18 @@ class TestSignup:
         email = "fulluser@example.com"
         username = "fulluser"
         full_name = "Full Name"
-        public_request.json = AsyncMock(
-            return_value={
-                "domain": domain,
-                "email": email,
-                "password": "password",
-                "username": username,
-                "full_name": full_name,
-                "description": "Description",
-            }
-        )
+        body: BodyParam[SignupRequest] = BodyParam(SignupRequest)
+        body.from_body({
+            "domain": domain,
+            "email": email,
+            "password": "password",
+            "username": username,
+            "full_name": full_name,
+            "description": "Description",
+        })
         mock_processors.auth.signup.wait_for_complete = AsyncMock(return_value=signup_result)
 
-        await handler.signup(public_request)
+        await handler.signup(body, request_ctx)
 
         action = mock_processors.auth.signup.wait_for_complete.call_args[0][0]
         assert action.domain_name == domain
@@ -246,30 +314,24 @@ class TestSignout:
     async def test_calls_processor(
         self,
         handler: AuthHandler,
-        authorized_request: MagicMock,
+        user_context: UserContext,
         mock_processors: MagicMock,
     ) -> None:
         """Verify processor is called and empty response is returned."""
-        user_uuid = uuid.uuid4()
         email = "test@example.com"
-        authorized_request.json = AsyncMock(return_value={"email": email, "password": "pass"})
-        authorized_request["user"] = {
-            "uuid": user_uuid,
-            "email": email,
-            "domain_name": "default",
-        }
-        authorized_request["keypair"] = {"access_key": "AKTEST"}
+        body: BodyParam[SignoutRequest] = BodyParam(SignoutRequest)
+        body.from_body({"email": email, "password": "pass"})
         mock_processors.auth.signout.wait_for_complete = AsyncMock(
             return_value=SignoutActionResult(success=True)
         )
 
-        response = await handler.signout(authorized_request)
+        response = await handler.signout(body, user_context)
 
         mock_processors.auth.signout.wait_for_complete.assert_called_once()
         action = mock_processors.auth.signout.wait_for_complete.call_args[0][0]
-        assert action.user_id == user_uuid
+        assert action.user_id == user_context.user_uuid
         assert action.email == email
-        assert response.status == HTTPStatus.OK
+        assert response.status_code == HTTPStatus.OK
 
 
 class TestGetRole:
@@ -279,20 +341,14 @@ class TestGetRole:
     async def test_calls_processor_and_returns_roles(
         self,
         handler: AuthHandler,
-        authorized_request: MagicMock,
+        user_context: UserContext,
         mock_processors: MagicMock,
     ) -> None:
         """Verify processor is called and roles are returned."""
-        user_uuid = uuid.uuid4()
         global_role = "user"
         domain_role = "user"
-        type(authorized_request).can_read_body = PropertyMock(return_value=False)
-        authorized_request.method = "GET"
-        authorized_request.query = {}
-        authorized_request["user"] = {"uuid": user_uuid, "domain_name": "default"}
-        authorized_request["keypair"] = {"access_key": "AKTEST"}
-        authorized_request["is_superadmin"] = False
-        authorized_request["is_admin"] = False
+        query: QueryParam[GetRoleRequest] = QueryParam(GetRoleRequest)
+        query.from_query({})
         mock_processors.auth.get_role.wait_for_complete = AsyncMock(
             return_value=GetRoleActionResult(
                 global_role=global_role,
@@ -301,32 +357,27 @@ class TestGetRole:
             )
         )
 
-        response = await handler.get_role(authorized_request)
+        response = await handler.get_role(query, user_context)
 
         mock_processors.auth.get_role.wait_for_complete.assert_called_once()
-        assert response.status == HTTPStatus.OK
-        response_body = json.loads(cast(bytes, response.body))
-        assert response_body["global_role"] == global_role
-        assert response_body["domain_role"] == domain_role
-        assert response_body["group_role"] is None
+        assert response.status_code == HTTPStatus.OK
+        data = response.to_json
+        assert data is not None
+        assert data["global_role"] == global_role
+        assert data["domain_role"] == domain_role
+        assert data["group_role"] is None
 
     @pytest.mark.asyncio
     async def test_passes_group_to_action(
         self,
         handler: AuthHandler,
-        authorized_request: MagicMock,
+        user_context: UserContext,
         mock_processors: MagicMock,
     ) -> None:
         """Verify group parameter is passed to Action."""
-        user_uuid = uuid.uuid4()
         group_uuid = uuid.uuid4()
-        type(authorized_request).can_read_body = PropertyMock(return_value=False)
-        authorized_request.method = "GET"
-        authorized_request.query = {"group": str(group_uuid)}
-        authorized_request["user"] = {"uuid": user_uuid, "domain_name": "default"}
-        authorized_request["keypair"] = {"access_key": "AKTEST"}
-        authorized_request["is_superadmin"] = False
-        authorized_request["is_admin"] = False
+        query: QueryParam[GetRoleRequest] = QueryParam(GetRoleRequest)
+        query.from_query({"group": str(group_uuid)})
         mock_processors.auth.get_role.wait_for_complete = AsyncMock(
             return_value=GetRoleActionResult(
                 global_role="user",
@@ -335,10 +386,41 @@ class TestGetRole:
             )
         )
 
-        await handler.get_role(authorized_request)
+        await handler.get_role(query, user_context)
 
         action = mock_processors.auth.get_role.wait_for_complete.call_args[0][0]
         assert action.group_id == group_uuid
+
+    @pytest.mark.asyncio
+    async def test_uses_admin_flags_from_context(
+        self,
+        handler: AuthHandler,
+        mock_processors: MagicMock,
+    ) -> None:
+        """Verify is_admin and is_superadmin are passed from UserContext."""
+        admin_ctx = UserContext(
+            user_uuid=uuid.uuid4(),
+            user_email="admin@example.com",
+            user_domain="default",
+            access_key="AKADMIN",
+            is_admin=True,
+            is_superadmin=True,
+        )
+        query: QueryParam[GetRoleRequest] = QueryParam(GetRoleRequest)
+        query.from_query({})
+        mock_processors.auth.get_role.wait_for_complete = AsyncMock(
+            return_value=GetRoleActionResult(
+                global_role="superadmin",
+                domain_role="admin",
+                group_role=None,
+            )
+        )
+
+        await handler.get_role(query, admin_ctx)
+
+        action = mock_processors.auth.get_role.wait_for_complete.call_args[0][0]
+        assert action.is_admin is True
+        assert action.is_superadmin is True
 
 
 class TestUpdatePassword:
@@ -348,62 +430,48 @@ class TestUpdatePassword:
     async def test_calls_processor_on_success(
         self,
         handler: AuthHandler,
-        authorized_request: MagicMock,
+        user_context: UserContext,
+        request_ctx: RequestCtx,
         mock_processors: MagicMock,
     ) -> None:
         """Verify processor is called and OK is returned on success."""
-        user_uuid = uuid.uuid4()
-        authorized_request.json = AsyncMock(
-            return_value={
-                "old_password": "oldpass",
-                "new_password": "newpass",
-                "new_password2": "newpass",
-            }
-        )
-        authorized_request["user"] = {
-            "uuid": user_uuid,
-            "email": "test@example.com",
-            "domain_name": "default",
-        }
-        authorized_request["keypair"] = {"access_key": "AKTEST"}
+        body: BodyParam[UpdatePasswordRequest] = BodyParam(UpdatePasswordRequest)
+        body.from_body({
+            "old_password": "oldpass",
+            "new_password": "newpass",
+            "new_password2": "newpass",
+        })
         mock_processors.auth.update_password.wait_for_complete = AsyncMock(
             return_value=UpdatePasswordActionResult(success=True, message="OK")
         )
 
-        response = await handler.update_password(authorized_request)
+        response = await handler.update_password(body, user_context, request_ctx)
 
         mock_processors.auth.update_password.wait_for_complete.assert_called_once()
-        assert response.status == HTTPStatus.OK
+        assert response.status_code == HTTPStatus.OK
 
     @pytest.mark.asyncio
     async def test_returns_bad_request_on_failure(
         self,
         handler: AuthHandler,
-        authorized_request: MagicMock,
+        user_context: UserContext,
+        request_ctx: RequestCtx,
         mock_processors: MagicMock,
     ) -> None:
         """Verify BAD_REQUEST is returned when password update fails."""
-        user_uuid = uuid.uuid4()
-        authorized_request.json = AsyncMock(
-            return_value={
-                "old_password": "oldpass",
-                "new_password": "newpass",
-                "new_password2": "differentpass",
-            }
-        )
-        authorized_request["user"] = {
-            "uuid": user_uuid,
-            "email": "test@example.com",
-            "domain_name": "default",
-        }
-        authorized_request["keypair"] = {"access_key": "AKTEST"}
+        body: BodyParam[UpdatePasswordRequest] = BodyParam(UpdatePasswordRequest)
+        body.from_body({
+            "old_password": "oldpass",
+            "new_password": "newpass",
+            "new_password2": "differentpass",
+        })
         mock_processors.auth.update_password.wait_for_complete = AsyncMock(
             return_value=UpdatePasswordActionResult(success=False, message="mismatch")
         )
 
-        response = await handler.update_password(authorized_request)
+        response = await handler.update_password(body, user_context, request_ctx)
 
-        assert response.status == HTTPStatus.BAD_REQUEST
+        assert response.status_code == HTTPStatus.BAD_REQUEST
 
 
 class TestUpdatePasswordNoAuth:
@@ -413,19 +481,18 @@ class TestUpdatePasswordNoAuth:
     async def test_calls_processor_and_returns_created(
         self,
         handler: AuthHandler,
-        public_request: MagicMock,
+        request_ctx: RequestCtx,
         mock_processors: MagicMock,
     ) -> None:
         """Verify processor is called and HTTP 201 CREATED is returned."""
         password_changed_at = datetime.now(tz=UTC)
-        public_request.json = AsyncMock(
-            return_value={
-                "domain": "default",
-                "username": "user@example.com",
-                "current_password": "current",
-                "new_password": "newpass",
-            }
-        )
+        body: BodyParam[UpdatePasswordNoAuthRequest] = BodyParam(UpdatePasswordNoAuthRequest)
+        body.from_body({
+            "domain": "default",
+            "username": "user@example.com",
+            "current_password": "current",
+            "new_password": "newpass",
+        })
         mock_processors.auth.update_password_no_auth.wait_for_complete = AsyncMock(
             return_value=UpdatePasswordNoAuthActionResult(
                 user_id=uuid.uuid4(),
@@ -433,12 +500,13 @@ class TestUpdatePasswordNoAuth:
             )
         )
 
-        response = await handler.update_password_no_auth(public_request)
+        response = await handler.update_password_no_auth(body, request_ctx)
 
         mock_processors.auth.update_password_no_auth.wait_for_complete.assert_called_once()
-        assert response.status == HTTPStatus.CREATED
-        response_body = json.loads(cast(bytes, response.body))
-        assert "password_changed_at" in response_body
+        assert response.status_code == HTTPStatus.CREATED
+        data = response.to_json
+        assert data is not None
+        assert "password_changed_at" in data
 
 
 class TestUpdateFullName:
@@ -448,30 +516,23 @@ class TestUpdateFullName:
     async def test_calls_processor(
         self,
         handler: AuthHandler,
-        authorized_request: MagicMock,
+        user_context: UserContext,
         mock_processors: MagicMock,
     ) -> None:
         """Verify processor is called with correct params."""
-        user_uuid = uuid.uuid4()
-        email = "user@example.com"
         full_name = "New Name"
-        authorized_request.json = AsyncMock(return_value={"email": email, "full_name": full_name})
-        authorized_request["user"] = {
-            "uuid": user_uuid,
-            "email": email,
-            "domain_name": "default",
-        }
-        authorized_request["keypair"] = {"access_key": "AKTEST"}
+        body: BodyParam[UpdateFullNameRequest] = BodyParam(UpdateFullNameRequest)
+        body.from_body({"email": "user@example.com", "full_name": full_name})
         mock_processors.auth.update_full_name.wait_for_complete = AsyncMock(
             return_value=UpdateFullNameActionResult(success=True)
         )
 
-        response = await handler.update_full_name(authorized_request)
+        response = await handler.update_full_name(body, user_context)
 
         mock_processors.auth.update_full_name.wait_for_complete.assert_called_once()
         action = mock_processors.auth.update_full_name.wait_for_complete.call_args[0][0]
         assert action.full_name == full_name
-        assert response.status == HTTPStatus.OK
+        assert response.status_code == HTTPStatus.OK
 
 
 class TestGetSSHKeypair:
@@ -481,24 +542,22 @@ class TestGetSSHKeypair:
     async def test_calls_processor_and_returns_public_key(
         self,
         handler: AuthHandler,
-        authorized_request: MagicMock,
+        user_context: UserContext,
         mock_processors: MagicMock,
     ) -> None:
         """Verify processor is called and public key is returned."""
-        user_uuid = uuid.uuid4()
         public_key = "ssh-rsa AAAAB3...\n"
-        authorized_request["user"] = {"uuid": user_uuid, "domain_name": "default"}
-        authorized_request["keypair"] = {"access_key": "AKTEST"}
         mock_processors.auth.get_ssh_keypair.wait_for_complete = AsyncMock(
             return_value=GetSSHKeypairActionResult(public_key=public_key)
         )
 
-        response = await handler.get_ssh_keypair(authorized_request)
+        response = await handler.get_ssh_keypair(user_context)
 
         mock_processors.auth.get_ssh_keypair.wait_for_complete.assert_called_once()
-        assert response.status == HTTPStatus.OK
-        response_body = json.loads(cast(bytes, response.body))
-        assert response_body["ssh_public_key"] == public_key
+        assert response.status_code == HTTPStatus.OK
+        data = response.to_json
+        assert data is not None
+        assert data["ssh_public_key"] == public_key
 
 
 class TestGenerateSSHKeypair:
@@ -508,15 +567,12 @@ class TestGenerateSSHKeypair:
     async def test_calls_processor_and_returns_keypair(
         self,
         handler: AuthHandler,
-        authorized_request: MagicMock,
+        user_context: UserContext,
         mock_processors: MagicMock,
     ) -> None:
         """Verify processor is called and keypair is returned."""
-        user_uuid = uuid.uuid4()
         ssh_public_key = "ssh-rsa NEWPUB...\n"
         ssh_private_key = "-----BEGIN RSA PRIVATE KEY-----\n...\n"
-        authorized_request["user"] = {"uuid": user_uuid, "domain_name": "default"}
-        authorized_request["keypair"] = {"access_key": "AKTEST"}
         mock_processors.auth.generate_ssh_keypair.wait_for_complete = AsyncMock(
             return_value=GenerateSSHKeypairActionResult(
                 ssh_keypair=SSHKeypair(
@@ -526,13 +582,14 @@ class TestGenerateSSHKeypair:
             )
         )
 
-        response = await handler.generate_ssh_keypair(authorized_request)
+        response = await handler.generate_ssh_keypair(user_context)
 
         mock_processors.auth.generate_ssh_keypair.wait_for_complete.assert_called_once()
-        assert response.status == HTTPStatus.OK
-        response_body = json.loads(cast(bytes, response.body))
-        assert response_body["ssh_public_key"] == ssh_public_key
-        assert response_body["ssh_private_key"] == ssh_private_key
+        assert response.status_code == HTTPStatus.OK
+        data = response.to_json
+        assert data is not None
+        assert data["ssh_public_key"] == ssh_public_key
+        assert data["ssh_private_key"] == ssh_private_key
 
 
 class TestUploadSSHKeypair:
@@ -542,19 +599,15 @@ class TestUploadSSHKeypair:
     async def test_calls_processor_and_returns_keypair(
         self,
         handler: AuthHandler,
-        authorized_request: MagicMock,
+        user_context: UserContext,
         mock_processors: MagicMock,
     ) -> None:
         """Verify processor is called and keypair is returned."""
-        user_uuid = uuid.uuid4()
-        authorized_request.json = AsyncMock(
-            return_value={
-                "pubkey": "ssh-rsa AAAAB3...",
-                "privkey": "-----BEGIN RSA PRIVATE KEY-----\n...",
-            }
-        )
-        authorized_request["user"] = {"uuid": user_uuid, "domain_name": "default"}
-        authorized_request["keypair"] = {"access_key": "AKTEST"}
+        body: BodyParam[UploadSSHKeypairRequest] = BodyParam(UploadSSHKeypairRequest)
+        body.from_body({
+            "pubkey": "ssh-rsa AAAAB3...",
+            "privkey": "-----BEGIN RSA PRIVATE KEY-----\n...",
+        })
         mock_processors.auth.upload_ssh_keypair.wait_for_complete = AsyncMock(
             return_value=UploadSSHKeypairActionResult(
                 ssh_keypair=SSHKeypair(
@@ -564,10 +617,11 @@ class TestUploadSSHKeypair:
             )
         )
 
-        response = await handler.upload_ssh_keypair(authorized_request)
+        response = await handler.upload_ssh_keypair(body, user_context)
 
         mock_processors.auth.upload_ssh_keypair.wait_for_complete.assert_called_once()
-        assert response.status == HTTPStatus.OK
-        response_body = json.loads(cast(bytes, response.body))
-        assert "ssh_public_key" in response_body
-        assert "ssh_private_key" in response_body
+        assert response.status_code == HTTPStatus.OK
+        data = response.to_json
+        assert data is not None
+        assert "ssh_public_key" in data
+        assert "ssh_private_key" in data
