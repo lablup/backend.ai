@@ -26,6 +26,9 @@ from ai.backend.manager.models.scaling_group import (
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.purger import BatchPurger, Purger
+from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
+    RBACScopeWideEntityUnbinder,
+)
 from ai.backend.manager.repositories.base.updater import Updater
 
 from .db_source import ScalingGroupDBSource
@@ -131,10 +134,10 @@ class ScalingGroupRepository:
 
     async def disassociate_scaling_group_with_domains(
         self,
-        purger: BatchPurger[ScalingGroupForDomainRow],
+        unbinder: RBACScopeWideEntityUnbinder[ScalingGroupForDomainRow],
     ) -> None:
         """Disassociates a scaling group from multiple domains."""
-        await self._db_source.disassociate_scaling_group_with_domains(purger)
+        await self._db_source.disassociate_scaling_group_with_domains(unbinder)
 
     async def check_scaling_group_domain_association_exists(
         self,
@@ -180,10 +183,10 @@ class ScalingGroupRepository:
 
     async def disassociate_scaling_group_with_user_groups(
         self,
-        purger: BatchPurger[ScalingGroupForProjectRow],
+        unbinder: RBACScopeWideEntityUnbinder[ScalingGroupForProjectRow],
     ) -> None:
         """Disassociates a single scaling group from a user group (project)."""
-        await self._db_source.disassociate_scaling_group_with_user_groups(purger)
+        await self._db_source.disassociate_scaling_group_with_user_groups(unbinder)
 
     async def check_scaling_group_user_group_association_exists(
         self,

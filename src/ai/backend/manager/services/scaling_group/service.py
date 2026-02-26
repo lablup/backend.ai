@@ -120,7 +120,7 @@ class ScalingGroupService:
         self, action: DisassociateScalingGroupWithDomainsAction
     ) -> DisassociateScalingGroupWithDomainsActionResult:
         """Disassociates a scaling group from multiple domains."""
-        await self._repository.disassociate_scaling_group_with_domains(action.purger)
+        await self._repository.disassociate_scaling_group_with_domains(action.unbinder)
         return DisassociateScalingGroupWithDomainsActionResult()
 
     async def associate_scaling_group_with_keypairs(
@@ -148,7 +148,7 @@ class ScalingGroupService:
         self, action: DisassociateScalingGroupWithUserGroupsAction
     ) -> DisassociateScalingGroupWithUserGroupsActionResult:
         """Disassociates a single scaling group from a user group (project)."""
-        await self._repository.disassociate_scaling_group_with_user_groups(action.purger)
+        await self._repository.disassociate_scaling_group_with_user_groups(action.unbinder)
         return DisassociateScalingGroupWithUserGroupsActionResult()
 
     async def get_resource_info(self, action: GetResourceInfoAction) -> GetResourceInfoActionResult:

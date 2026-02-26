@@ -40,6 +40,10 @@ from ai.backend.manager.repositories.base.purger import (
     execute_batch_purger,
     execute_purger,
 )
+from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
+    RBACScopeWideEntityUnbinder,
+    execute_rbac_scope_wide_entity_unbinder,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.resource_slot.types import subtract_quantities
 
@@ -199,11 +203,11 @@ class ScalingGroupDBSource:
 
     async def disassociate_scaling_group_with_domains(
         self,
-        purger: BatchPurger[ScalingGroupForDomainRow],
+        unbinder: RBACScopeWideEntityUnbinder[ScalingGroupForDomainRow],
     ) -> None:
         """Disassociates a scaling group from multiple domains."""
         async with self._db.begin_session() as session:
-            await execute_batch_purger(session, purger)
+            await execute_rbac_scope_wide_entity_unbinder(session, unbinder)
 
     async def check_scaling_group_domain_association_exists(
         self,
@@ -269,11 +273,11 @@ class ScalingGroupDBSource:
 
     async def disassociate_scaling_group_with_user_groups(
         self,
-        purger: BatchPurger[ScalingGroupForProjectRow],
+        unbinder: RBACScopeWideEntityUnbinder[ScalingGroupForProjectRow],
     ) -> None:
         """Disassociates a single scaling group from a user group (project)."""
         async with self._db.begin_session() as session:
-            await execute_batch_purger(session, purger)
+            await execute_rbac_scope_wide_entity_unbinder(session, unbinder)
 
     async def check_scaling_group_user_group_association_exists(
         self,

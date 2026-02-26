@@ -42,14 +42,14 @@ from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupForProjectCreatorSpec,
 )
 from ai.backend.manager.repositories.scaling_group.purgers import (
-    AllScalingGroupsForDomainPurgerSpec,
-    AllScalingGroupsForProjectPurgerSpec,
-    ScalingGroupForDomainPurgerSpec,
     ScalingGroupForKeypairsPurgerSpec,
-    ScalingGroupForProjectPurgerSpec,
-    ScalingGroupsForDomainPurgerSpec,
     ScalingGroupsForKeypairsPurgerSpec,
-    ScalingGroupsForProjectPurgerSpec,
+)
+from ai.backend.manager.repositories.scaling_group.scope_binders import (
+    AllSGsFromDomainUnbinder,
+    AllSGsFromProjectUnbinder,
+    SGDomainEntityUnbinder,
+    SGProjectEntityUnbinder,
 )
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupDriverConfigUpdaterSpec,
@@ -893,12 +893,10 @@ class DisassociateScalingGroupWithDomain(graphene.Mutation):  # type: ignore[mis
     ) -> DisassociateScalingGroupWithDomain:
         graph_ctx: GraphQueryContext = info.context
         action = DisassociateScalingGroupWithDomainsAction(
-            purger=BatchPurger(
-                spec=ScalingGroupForDomainPurgerSpec(
-                    scaling_group=scaling_group,
-                    domain=domain,
-                ),
-            )
+            unbinder=SGDomainEntityUnbinder(
+                scaling_groups=[scaling_group],
+                domain=domain,
+            ),
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_domains.wait_for_complete(
             action
@@ -928,12 +926,10 @@ class DisassociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[mi
     ) -> DisassociateScalingGroupsWithDomain:
         graph_ctx: GraphQueryContext = info.context
         action = DisassociateScalingGroupWithDomainsAction(
-            purger=BatchPurger(
-                spec=ScalingGroupsForDomainPurgerSpec(
-                    scaling_groups=list(scaling_groups),
-                    domain=domain,
-                ),
-            )
+            unbinder=SGDomainEntityUnbinder(
+                scaling_groups=list(scaling_groups),
+                domain=domain,
+            ),
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_domains.wait_for_complete(
             action
@@ -959,11 +955,9 @@ class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):  # type: ignore
     ) -> DisassociateAllScalingGroupsWithDomain:
         graph_ctx: GraphQueryContext = info.context
         action = DisassociateScalingGroupWithDomainsAction(
-            purger=BatchPurger(
-                spec=AllScalingGroupsForDomainPurgerSpec(
-                    domain=domain,
-                ),
-            )
+            unbinder=AllSGsFromDomainUnbinder(
+                domain=domain,
+            ),
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_domains.wait_for_complete(
             action
@@ -1064,12 +1058,10 @@ class DisassociateScalingGroupWithUserGroup(graphene.Mutation):  # type: ignore[
     ) -> DisassociateScalingGroupWithUserGroup:
         graph_ctx: GraphQueryContext = info.context
         action = DisassociateScalingGroupWithUserGroupsAction(
-            purger=BatchPurger(
-                spec=ScalingGroupForProjectPurgerSpec(
-                    scaling_group=scaling_group,
-                    project=user_group,
-                ),
-            )
+            unbinder=SGProjectEntityUnbinder(
+                scaling_groups=[scaling_group],
+                project=user_group,
+            ),
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_user_groups.wait_for_complete(
             action
@@ -1099,12 +1091,10 @@ class DisassociateScalingGroupsWithUserGroup(graphene.Mutation):  # type: ignore
     ) -> DisassociateScalingGroupsWithUserGroup:
         graph_ctx: GraphQueryContext = info.context
         action = DisassociateScalingGroupWithUserGroupsAction(
-            purger=BatchPurger(
-                spec=ScalingGroupsForProjectPurgerSpec(
-                    scaling_groups=list(scaling_groups),
-                    project=user_group,
-                ),
-            )
+            unbinder=SGProjectEntityUnbinder(
+                scaling_groups=list(scaling_groups),
+                project=user_group,
+            ),
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_user_groups.wait_for_complete(
             action
@@ -1130,11 +1120,9 @@ class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):  # type: ignore[
     ) -> DisassociateAllScalingGroupsWithGroup:
         graph_ctx: GraphQueryContext = info.context
         action = DisassociateScalingGroupWithUserGroupsAction(
-            purger=BatchPurger(
-                spec=AllScalingGroupsForProjectPurgerSpec(
-                    project=user_group,
-                ),
-            )
+            unbinder=AllSGsFromProjectUnbinder(
+                project=user_group,
+            ),
         )
         await graph_ctx.processors.scaling_group.disassociate_scaling_group_with_user_groups.wait_for_complete(
             action
