@@ -109,8 +109,9 @@ Core idea: A **strategy evaluator** evaluates DEPLOYING-state deployments and gr
                             │  Per-Sub-Step Handlers (composite)   │
                             │                                      │
                             │  (DEPLOYING, PROVISIONING)           │
+                            │    → DeployingProvisioningHandler    │
                             │  (DEPLOYING, PROGRESSING)            │
-                            │    → DeployingInProgressHandler      │
+                            │    → DeployingProgressingHandler     │
                             │      next_status: DEPLOYING          │
                             │      post_process: revision swap     │
                             │        for completed deployments     │
@@ -163,8 +164,8 @@ Both Blue-Green and Rolling Update cycle FSMs share a common set of **sub-step v
 
 | Sub-Step | Description | Handler | Transition |
 |----------|-------------|---------|------------|
-| **provisioning** | New routes being created or still in PROVISIONING state | DeployingInProgressHandler | DEPLOYING → DEPLOYING |
-| **progressing** | Strategy making active progress — health checks pending, promotion waiting, or routes being replaced | DeployingInProgressHandler | DEPLOYING → DEPLOYING |
+| **provisioning** | New routes being created or still in PROVISIONING state | DeployingProvisioningHandler | DEPLOYING → DEPLOYING |
+| **progressing** | Strategy making active progress — health checks pending, promotion waiting, or routes being replaced | DeployingProgressingHandler | DEPLOYING → DEPLOYING |
 | **rolled_back** | Strategy failed — rolled back to previous revision | DeployingRolledBackHandler | DEPLOYING → READY |
 
 Completion is not a sub-step but a signal on `CycleEvaluationResult.completed`. When the strategy FSM detects that all new routes are healthy and no old routes remain, it returns `CycleEvaluationResult(sub_step=PROGRESSING, completed=True)`. The evaluator collects these into `EvaluationResult.completed`, and the coordinator passes them to the PROGRESSING handler's `post_process` for revision swap, then transitions to READY.
@@ -231,24 +232,33 @@ DeploymentStrategyEvaluator.evaluate(deployments)
 
 Each handler is registered with a `(DeploymentLifecycleType, DeploymentSubStep)` composite key in the coordinator.
 
-#### DeployingInProgressHandler (PROVISIONING / PROGRESSING)
+#### State Transition Type: `DeploymentLifecycleStatus`
+
+Handlers' `next_status()` and `failure_status()` return `DeploymentLifecycleStatus`. This type bundles `EndpointLifecycle` with an optional `DeploymentSubStatus`, conveying which sub-step triggered the transition to the coordinator's generic path:
+
+```python
+@dataclass(frozen=True)
+class DeploymentLifecycleStatus:
+    lifecycle: EndpointLifecycle
+    sub_status: DeploymentSubStatus | None = None
+```
+
+The coordinator's `_handle_status_transitions()` extracts `.lifecycle` for DB updates and history recording.
+
+#### DeployingInProgressHandler (base) → Provisioning / Progressing
+
+PROVISIONING and PROGRESSING share the same logic (evaluator already applied route changes; handler returns success + reschedules), so `DeployingInProgressHandler` base class defines common behavior, and subclasses hard-code their sub-step-specific `next_status()` and `status_transitions()`:
 
 ```python
 class DeployingInProgressHandler(DeploymentHandler):
-    @classmethod
-    def name(cls) -> str:
-        return "deploying_in_progress"
+    """PROVISIONING / PROGRESSING common base."""
 
     @classmethod
     def target_statuses(cls) -> list[EndpointLifecycle]:
         return [EndpointLifecycle.DEPLOYING]
 
     @classmethod
-    def next_status(cls) -> EndpointLifecycle | None:
-        return EndpointLifecycle.DEPLOYING  # DEPLOYING -> DEPLOYING
-
-    @classmethod
-    def failure_status(cls) -> EndpointLifecycle | None:
+    def failure_status(cls) -> DeploymentLifecycleStatus | None:
         return None
 
     async def execute(self, deployments):
@@ -263,7 +273,6 @@ class DeployingInProgressHandler(DeploymentHandler):
         await self._route_controller.mark_lifecycle_needed(
             RouteLifecycleType.PROVISIONING              # trigger new route provisioning
         )
-
         # Revision swap for completed deployments
         # (coordinator attaches eval_result.completed to result.completed)
         if result.completed:
@@ -271,11 +280,29 @@ class DeployingInProgressHandler(DeploymentHandler):
                         if d.deploying_revision_id is not None]
             if swap_ids:
                 await repo.complete_deployment_revision_swap(swap_ids)
+
+
+class DeployingProvisioningHandler(DeployingInProgressHandler):
+    @classmethod
+    def next_status(cls) -> DeploymentLifecycleStatus | None:
+        return DeploymentLifecycleStatus(
+            lifecycle=EndpointLifecycle.DEPLOYING,
+            sub_status=DeploymentSubStep.PROVISIONING,
+        )
+
+
+class DeployingProgressingHandler(DeployingInProgressHandler):
+    @classmethod
+    def next_status(cls) -> DeploymentLifecycleStatus | None:
+        return DeploymentLifecycleStatus(
+            lifecycle=EndpointLifecycle.DEPLOYING,
+            sub_status=DeploymentSubStep.PROGRESSING,
+        )
 ```
 
-`next_status()=DEPLOYING` so the coordinator records DEPLOYING→DEPLOYING SUCCESS history for in-progress deployments. The deployment stays in DEPLOYING state and is re-evaluated next cycle.
+`next_status().lifecycle == DEPLOYING` so the coordinator records DEPLOYING→DEPLOYING SUCCESS history for in-progress deployments. The deployment stays in DEPLOYING state and is re-evaluated next cycle.
 
-For completed deployments, the coordinator passes `EvaluationResult.completed` to this handler's `post_process` via `result.completed`. The handler performs the revision swap, then the coordinator transitions the deployment to READY with history recording.
+For completed deployments, the coordinator passes `EvaluationResult.completed` to the PROGRESSING handler's `post_process` via `result.completed`. The handler performs the revision swap, then the coordinator transitions the deployment to READY with history recording.
 
 #### DeployingRolledBackHandler (ROLLED_BACK)
 
@@ -283,11 +310,14 @@ For completed deployments, the coordinator passes `EvaluationResult.completed` t
 class DeployingRolledBackHandler(DeploymentHandler):
     @classmethod
     def name(cls) -> str:
-        return "deploying_rolled_back"
+        return "deploying-rolled-back"
 
     @classmethod
-    def next_status(cls) -> EndpointLifecycle | None:
-        return EndpointLifecycle.READY  # DEPLOYING -> READY
+    def next_status(cls) -> DeploymentLifecycleStatus | None:
+        return DeploymentLifecycleStatus(
+            lifecycle=EndpointLifecycle.READY,
+            sub_status=DeploymentSubStep.ROLLED_BACK,
+        )
 
     async def execute(self, deployments):
         # deploying_revision = NULL (current_revision preserved)
