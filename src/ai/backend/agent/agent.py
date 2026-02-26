@@ -804,8 +804,11 @@ def _observe_stat_task(
             except OSError as e:
                 if e.errno == errno.EMFILE:
                     log.warning("skipping {} due to FD exhaustion", func.__name__)
-                else:
-                    log.exception("unhandled exception in {}", func.__name__)
+                    stat_task_observer.observe_stat_task_failure(
+                        agent_id=self.id, stat_scope=stat_scope, exception=e
+                    )
+                    return
+                log.exception("unhandled exception in {}", func.__name__)
                 await self.produce_error_event()
                 stat_task_observer.observe_stat_task_failure(
                     agent_id=self.id, stat_scope=stat_scope, exception=e

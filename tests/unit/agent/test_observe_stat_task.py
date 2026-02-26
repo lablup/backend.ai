@@ -64,7 +64,7 @@ class TestObserveStatTaskDecorator:
 
         mock_log.warning.assert_called_once()
         mock_log.exception.assert_not_called()
-        mock_agent.produce_error_event.assert_awaited_once()
+        mock_agent.produce_error_event.assert_not_called()
         mock_stat_task_observer.observe_stat_task_failure.assert_called_once()
         mock_stat_task_observer.observe_stat_task_success.assert_not_called()
 
