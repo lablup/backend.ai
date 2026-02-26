@@ -4,6 +4,7 @@ import asyncio
 import enum
 import hashlib
 import hmac
+import importlib
 import json
 import logging
 import os
@@ -56,6 +57,8 @@ from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest import auth as _auth_rest_module
+from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
@@ -97,13 +100,16 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, connect_datab
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.server import build_root_app
+from ai.backend.manager.server import build_root_app, global_newstyle_pkgs
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
     redis_container,
 )
 from ai.backend.testutils.pants import get_parallel_slot
+
+# Statically imported so that Pants includes new-style route modules in the test PEX.
+_NEWSTYLE_ROUTE_MODULES = (_auth_rest_module,)
 
 log = logging.getLogger(__name__)
 
@@ -821,7 +827,13 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
 
         if scheduler_opts is None:
             scheduler_opts = {}
-        _cleanup_ctxs = []
+
+        # Separate legacy subapp packages from new-style route packages.
+        newstyle_set = set(global_newstyle_pkgs)
+        legacy_pkgs = [p for p in (subapp_pkgs or []) if p not in newstyle_set]
+        newstyle_pkgs = [p for p in (subapp_pkgs or []) if p in newstyle_set]
+
+        _cleanup_ctxs: list[Callable[[RootContext], AbstractAsyncContextManager[None]]] = []
         _outer_ctx_classes: list[type[AbstractAsyncContextManager[Any, Any]]] = []
         if cleanup_contexts is not None:
             for ctx in cleanup_contexts:
@@ -830,11 +842,15 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
                     _outer_ctx_classes.append(ctx)  # type: ignore
                 else:
                     _cleanup_ctxs.append(ctx)
+
+        # Build app with only legacy subapps and NO cleanup contexts.
+        # Cleanup contexts are managed manually so that new-style routes
+        # can be registered between "processors ready" and "router frozen".
         app = build_root_app(
             0,
             bootstrap_config,
-            cleanup_contexts=_cleanup_ctxs,
-            subapp_pkgs=subapp_pkgs,
+            cleanup_contexts=[],
+            subapp_pkgs=legacy_pkgs,
             scheduler_opts={
                 "close_timeout": 10,
                 **scheduler_opts,
@@ -845,6 +861,30 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
             octx = octx_cls(root_ctx)  # type: ignore
             _outer_ctxs.append(octx)
             await octx.__aenter__()
+
+        # Run cleanup contexts manually (before router freeze).
+        for cctx in _cleanup_ctxs:
+            octx = cctx(root_ctx)
+            _outer_ctxs.append(octx)
+            await octx.__aenter__()
+
+        # Register new-style route modules.  If cleanup contexts already
+        # set root_ctx.processors, use it; otherwise fall back to a mock
+        # (sufficient for endpoints that don't invoke service actions, such
+        # as /auth/test).
+        # Insert middlewares at the pre-subapp position so that auth_middleware
+        # runs before any legacy-subapp middlewares (e.g. rlim_middleware).
+        if newstyle_pkgs:
+            processors = getattr(root_ctx, "processors", None) or MagicMock()
+            insert_pos: int = app.get("_pre_subapp_middleware_count", len(app.middlewares))
+            registry = RouteRegistry(app, root_ctx.cors_options)
+            for pkg_name in newstyle_pkgs:
+                mod = importlib.import_module(pkg_name, "ai.backend.manager.api.rest")
+                global_mws = mod.register_routes(registry, processors)
+                for mw in global_mws:
+                    app.middlewares.insert(insert_pos, mw)
+                    insert_pos += 1
+
         runner = web.AppRunner(app, handle_signals=False)
         await runner.setup()
         site = web.TCPSite(

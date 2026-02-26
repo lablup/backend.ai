@@ -1390,15 +1390,24 @@ def _register_newstyle_routes(
     Must be called **after** the Composer has run (so that
     ``dep_resources.processing.processors`` is available) but **before**
     ``runner.setup()`` freezes the application router.
+
+    Global middlewares returned by each module are inserted *before* any
+    legacy-subapp middlewares (using the position recorded by
+    ``build_root_app()``).  This preserves the original middleware ordering
+    where ``auth_middleware`` runs before subapp middlewares such as
+    ``rlim_middleware``.
     """
     root_ctx: RootContext = root_app["_root.context"]
+    insert_pos: int = root_app.get("_pre_subapp_middleware_count", len(root_app.middlewares))
     registry = RouteRegistry(root_app, root_ctx.cors_options)
     for pkg_name in newstyle_pkgs:
         if pidx == 0:
             log.info("Loading new-style module: {0}", pkg_name[1:])
         mod = importlib.import_module(pkg_name, "ai.backend.manager.api.rest")
         global_mws = mod.register_routes(registry, dep_resources.processing.processors)
-        root_app.middlewares.extend(global_mws)
+        for mw in global_mws:
+            root_app.middlewares.insert(insert_pos, mw)
+            insert_pos += 1
 
 
 def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
@@ -1548,6 +1557,11 @@ def build_root_app(
     cors.add(app.router.add_route("GET", r"/", hello))
 
     # --- Legacy subapp modules (create_app pattern) ---
+    # Track the middleware count before subapps are loaded so that
+    # _register_newstyle_routes() can insert its middlewares at the
+    # correct position (before any subapp middleware, but after the
+    # framework-level middlewares like exception_middleware).
+    app["_pre_subapp_middleware_count"] = len(app.middlewares)
     if subapp_pkgs is None:
         subapp_pkgs = []
     for pkg_name in subapp_pkgs:
