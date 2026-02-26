@@ -31,9 +31,7 @@ class TestPluginsComposer:
         mock_event = MagicMock(name="event_ctx")
 
         mock_stack = MagicMock()
-        mock_stack.enter_dependency = AsyncMock(
-            side_effect=[mock_network, mock_hook, mock_event]
-        )
+        mock_stack.enter_dependency = AsyncMock(side_effect=[mock_network, mock_hook, mock_event])
 
         composer = PluginsComposer()
 

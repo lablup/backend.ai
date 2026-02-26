@@ -40,7 +40,9 @@ class TestErrorMonitorDependency:
 
         async with dep.provide(monitoring_input) as ctx:
             assert ctx is mock_ctx
-            mock_ctx_class.assert_called_once_with(monitoring_input.etcd, monitoring_input.local_config)
+            mock_ctx_class.assert_called_once_with(
+                monitoring_input.etcd, monitoring_input.local_config
+            )
             mock_ctx.init.assert_called_once_with(
                 context={"error_log_repository": monitoring_input.error_log_repository},
                 allowlist=monitoring_input.allowed_plugins,
@@ -103,7 +105,9 @@ class TestStatsMonitorDependency:
 
         async with dep.provide(monitoring_input) as ctx:
             assert ctx is mock_ctx
-            mock_ctx_class.assert_called_once_with(monitoring_input.etcd, monitoring_input.local_config)
+            mock_ctx_class.assert_called_once_with(
+                monitoring_input.etcd, monitoring_input.local_config
+            )
             mock_ctx.init.assert_called_once_with(
                 allowlist=monitoring_input.allowed_plugins,
             )
