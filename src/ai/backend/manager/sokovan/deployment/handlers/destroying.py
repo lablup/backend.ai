@@ -4,7 +4,11 @@ import logging
 from collections.abc import Sequence
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentStatusTransitions
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    DeploymentLifecycleStatus,
+    DeploymentStatusTransitions,
+)
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -47,14 +51,14 @@ class DestroyingDeploymentHandler(DeploymentHandler):
         return [EndpointLifecycle.DESTROYING]
 
     @classmethod
-    def next_status(cls) -> EndpointLifecycle | None:
+    def next_status(cls) -> DeploymentLifecycleStatus | None:
         """Get the next deployment status after destroying."""
-        return EndpointLifecycle.DESTROYED
+        return DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED)
 
     @classmethod
-    def failure_status(cls) -> EndpointLifecycle | None:
+    def failure_status(cls) -> DeploymentLifecycleStatus | None:
         # No failure status for destroying deployments
-        return EndpointLifecycle.DESTROYED
+        return DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED)
 
     @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
@@ -64,8 +68,8 @@ class DestroyingDeploymentHandler(DeploymentHandler):
         - failure: Deployment → DESTROYED (always proceed to destroyed)
         """
         return DeploymentStatusTransitions(
-            success=EndpointLifecycle.DESTROYED,
-            failure=EndpointLifecycle.DESTROYED,
+            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
+            failure=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
         )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:

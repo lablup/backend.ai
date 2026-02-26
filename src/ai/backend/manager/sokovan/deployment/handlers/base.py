@@ -1,7 +1,11 @@
 from abc import abstractmethod
 from collections.abc import Sequence
 
-from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentStatusTransitions
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    DeploymentLifecycleStatus,
+    DeploymentStatusTransitions,
+)
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.types import DeploymentExecutionResult
@@ -38,21 +42,21 @@ class DeploymentHandler:
 
     @classmethod
     @abstractmethod
-    def next_status(cls) -> EndpointLifecycle | None:
+    def next_status(cls) -> DeploymentLifecycleStatus | None:
         """Get the next deployment status after this handler's operation.
 
         Returns:
-            The next deployment status
+            The target lifecycle status, or None if no transition needed
         """
         raise NotImplementedError("Subclasses must implement next_status()")
 
     @classmethod
     @abstractmethod
-    def failure_status(cls) -> EndpointLifecycle | None:
+    def failure_status(cls) -> DeploymentLifecycleStatus | None:
         """Get the failure deployment status if applicable.
 
         Returns:
-            The failure deployment status, or None if not applicable
+            The failure lifecycle status, or None if not applicable
         """
         raise NotImplementedError("Subclasses must implement failure_status()")
 

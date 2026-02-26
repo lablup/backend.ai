@@ -148,6 +148,33 @@ class RouteTrafficStatus(enum.StrEnum):
 # ========== Status Transition Types (BEP-1030) ==========
 
 
+class DeploymentSubStatus(enum.StrEnum):
+    """Base class for deployment lifecycle sub-statuses.
+
+    Each lifecycle type can define its own sub-status enum by
+    inheriting from this class.  For example, DEPLOYING handlers
+    use ``DeploymentSubStep`` (provisioning, progressing, …).
+    """
+
+
+@dataclass(frozen=True)
+class DeploymentLifecycleStatus:
+    """Target lifecycle state for a deployment status transition.
+
+    Pairs an EndpointLifecycle with an optional sub-status to provide
+    context about which sub-step led to this transition.
+
+    Attributes:
+        lifecycle: The target endpoint lifecycle state
+        sub_status: Optional sub-status indicating what determined this
+            transition. Concrete values come from DeploymentSubStatus
+            subclasses (e.g. DeploymentSubStep for DEPLOYING handlers).
+    """
+
+    lifecycle: EndpointLifecycle
+    sub_status: DeploymentSubStatus | None = None
+
+
 @dataclass(frozen=True)
 class DeploymentStatusTransitions:
     """Status transitions for deployment handlers.
@@ -159,8 +186,8 @@ class DeploymentStatusTransitions:
         failure: Target lifecycle when handler fails, None means no change
     """
 
-    success: EndpointLifecycle | None = None
-    failure: EndpointLifecycle | None = None
+    success: DeploymentLifecycleStatus | None = None
+    failure: DeploymentLifecycleStatus | None = None
 
 
 @dataclass(frozen=True)
