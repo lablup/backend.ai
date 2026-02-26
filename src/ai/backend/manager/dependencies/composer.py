@@ -12,6 +12,7 @@ from .agents import AgentsComposer, AgentsInput, AgentsResources
 from .bootstrap import BootstrapComposer, BootstrapInput, BootstrapResources
 from .components import ComponentsComposer, ComponentsInput, ComponentsResources
 from .domain import DomainComposer, DomainInput, DomainResources
+from .errors import DependencyInitializationError
 from .infrastructure import (
     InfrastructureComposer,
     InfrastructureInput,
@@ -224,7 +225,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
         # error_monitor is required by ProcessingInput; raise if not initialized
         # since the processing stage cannot function without it.
         if plugins.error_monitor is None:
-            raise RuntimeError("error_monitor plugin failed to initialize")
+            raise DependencyInitializationError("error_monitor plugin failed to initialize")
         processing = await stack.enter_composer(
             ProcessingComposer(),
             ProcessingInput(
