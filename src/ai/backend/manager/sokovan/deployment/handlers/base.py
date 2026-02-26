@@ -40,8 +40,9 @@ class DeploymentHandler:
         """
         raise NotImplementedError("Subclasses must implement target_statuses()")
 
+    @classmethod
     @abstractmethod
-    def next_status(self) -> DeploymentLifecycleStatus | None:
+    def next_status(cls) -> DeploymentLifecycleStatus | None:
         """Get the next deployment status after this handler's operation.
 
         Returns:
@@ -49,8 +50,9 @@ class DeploymentHandler:
         """
         raise NotImplementedError("Subclasses must implement next_status()")
 
+    @classmethod
     @abstractmethod
-    def failure_status(self) -> DeploymentLifecycleStatus | None:
+    def failure_status(cls) -> DeploymentLifecycleStatus | None:
         """Get the failure deployment status if applicable.
 
         Returns:
@@ -58,8 +60,9 @@ class DeploymentHandler:
         """
         raise NotImplementedError("Subclasses must implement failure_status()")
 
+    @classmethod
     @abstractmethod
-    def status_transitions(self) -> DeploymentStatusTransitions:
+    def status_transitions(cls) -> DeploymentStatusTransitions:
         """Define state transitions for different handler outcomes (BEP-1030).
 
         Returns:
