@@ -86,7 +86,6 @@ CONTAINER_REGISTRY_JOIN = JoinDef(
         .exists(),
     ),
 )
-CONTAINER_REGISTRY_JOINS = (CONTAINER_REGISTRY_JOIN,)
 
 # Field definitions for project export
 PROJECT_FIELDS: list[ExportFieldDef] = [
@@ -273,7 +272,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         description="Container registry UUID",
         field_type=ExportFieldType.UUID,
         column=ContainerRegistryRow.id,
-        joins=CONTAINER_REGISTRY_JOINS,
+        joins=(CONTAINER_REGISTRY_JOIN,),
     ),
     ExportFieldDef(
         key="container_registry_url",
@@ -281,7 +280,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         description="Container registry URL",
         field_type=ExportFieldType.STRING,
         column=ContainerRegistryRow.url,
-        joins=CONTAINER_REGISTRY_JOINS,
+        joins=(CONTAINER_REGISTRY_JOIN,),
     ),
     ExportFieldDef(
         key="container_registry_name",
@@ -289,7 +288,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         description="Container registry name",
         field_type=ExportFieldType.STRING,
         column=ContainerRegistryRow.registry_name,
-        joins=CONTAINER_REGISTRY_JOINS,
+        joins=(CONTAINER_REGISTRY_JOIN,),
     ),
     ExportFieldDef(
         key="container_registry_type",
@@ -298,7 +297,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         field_type=ExportFieldType.ENUM,
         column=ContainerRegistryRow.type,
         formatter=lambda v: str(v) if v else "",
-        joins=CONTAINER_REGISTRY_JOINS,
+        joins=(CONTAINER_REGISTRY_JOIN,),
     ),
     ExportFieldDef(
         key="container_registry_project",
@@ -306,7 +305,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         description="Container registry project",
         field_type=ExportFieldType.STRING,
         column=ContainerRegistryRow.project,
-        joins=CONTAINER_REGISTRY_JOINS,
+        joins=(CONTAINER_REGISTRY_JOIN,),
     ),
     ExportFieldDef(
         key="container_registry_is_global",
@@ -314,7 +313,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         description="Container registry global status",
         field_type=ExportFieldType.BOOLEAN,
         column=ContainerRegistryRow.is_global,
-        joins=CONTAINER_REGISTRY_JOINS,
+        joins=(CONTAINER_REGISTRY_JOIN,),
     ),
 ]
 

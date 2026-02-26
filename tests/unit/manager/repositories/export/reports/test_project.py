@@ -35,7 +35,6 @@ from ai.backend.manager.repositories.base.export import (
 )
 from ai.backend.manager.repositories.export.reports.project import (
     CONTAINER_REGISTRY_JOIN,
-    CONTAINER_REGISTRY_JOINS,
     PROJECT_FIELDS,
     PROJECT_REPORT,
     RESOURCE_POLICY_JOIN,
@@ -45,6 +44,21 @@ from ai.backend.manager.repositories.export.reports.project import (
     _serialize_json,
 )
 from ai.backend.testutils.db import with_tables
+
+
+@dataclass(frozen=True)
+class _ProjectWithRgAndRegistry:
+    project_id: uuid.UUID
+    domain_name: str
+    rg_name: str
+    registry_id: uuid.UUID
+
+
+@dataclass(frozen=True)
+class _ProjectWithMixedRegistries:
+    project_id: uuid.UUID
+    global_registry_id: uuid.UUID
+    scoped_registry_id: uuid.UUID
 
 
 class TestProjectReportDefinition:
@@ -151,11 +165,6 @@ class TestJoinDefinitions:
         """ScalingGroup JOIN should use correct table."""
         assert SCALING_GROUP_JOIN.table is ScalingGroupRow.__table__
 
-    def test_container_registry_joins_count(self) -> None:
-        """Container registry should have 1 JOIN (with EXISTS subquery for associations)."""
-        assert len(CONTAINER_REGISTRY_JOINS) == 1
-        assert CONTAINER_REGISTRY_JOIN in CONTAINER_REGISTRY_JOINS
-
     def test_container_registry_join_table(self) -> None:
         """Container registry JOIN should use correct table."""
         assert CONTAINER_REGISTRY_JOIN.table is ContainerRegistryRow.__table__
@@ -221,7 +230,7 @@ class TestFieldJoinAssignments:
     def test_container_registry_fields_have_joins(
         self, fields_by_key: dict[str, ExportFieldDef]
     ) -> None:
-        """Container registry fields should have CONTAINER_REGISTRY_JOINS."""
+        """Container registry fields should have CONTAINER_REGISTRY_JOIN."""
         cr_keys = [
             "container_registry_id",
             "container_registry_url",
@@ -233,7 +242,7 @@ class TestFieldJoinAssignments:
         for key in cr_keys:
             field = fields_by_key[key]
             assert field.joins is not None
-            assert field.joins == CONTAINER_REGISTRY_JOINS
+            assert CONTAINER_REGISTRY_JOIN in field.joins
             assert len(field.joins) == 1
 
 
@@ -576,7 +585,7 @@ class TestProjectQuerySQLGenerationForBugReproduction:
     ) -> None:
         """Selecting multiple container_registry_* fields must not multiply the JOIN count.
 
-        6 container_registry_* fields all share the same CONTAINER_REGISTRY_JOINS tuple.
+        6 container_registry_* fields all share the same CONTAINER_REGISTRY_JOIN.
         Selecting all 6 should still result in exactly 1 JOIN (deduplicated), not 6.
         """
         query = adapter.build_project_query(
@@ -715,21 +724,6 @@ class TestJoinDefIdentityAndHashing:
             f"(1 resource_policy + 2 scaling_group + 1 container_registry), "
             f"got {len(joins)}: {joins}"
         )
-
-
-@dataclass(frozen=True)
-class _ProjectWithRgAndRegistry:
-    project_id: uuid.UUID
-    domain_name: str
-    rg_name: str
-    registry_id: uuid.UUID
-
-
-@dataclass(frozen=True)
-class _ProjectWithMixedRegistries:
-    project_id: uuid.UUID
-    global_registry_id: uuid.UUID
-    scoped_registry_id: uuid.UUID
 
 
 class TestProjectExportExecuteStreamingDB:
@@ -892,7 +886,10 @@ class TestProjectExportExecuteStreamingDB:
         async for partition in execute_streaming_export(db_engine, query):
             rows.extend(partition)
 
-        assert len(rows) >= 1
+        assert len(rows) >= 1, (
+            "Expected at least 1 row with container_registry fields, got 0. "
+            "This indicates the LEFT OUTER JOIN is not working correctly."
+        )
         assert str(rows[0][2]) == str(project_with_rg_and_registry.registry_id)
 
     async def test_scaling_group_and_container_registry_combined_returns_rows(
@@ -936,7 +933,11 @@ class TestProjectExportExecuteStreamingDB:
         async for partition in execute_streaming_export(db_engine, query):
             rows.extend(partition)
 
-        assert len(rows) >= 1
+        assert len(rows) >= 1, (
+            "Expected at least 1 row when selecting all fields including "
+            "scaling_group_name and container_registry_*, got 0. "
+            "This is the exact bug reproduction scenario."
+        )
         assert str(rows[0][15]) == str(project_with_rg_and_registry.project_id)
 
     async def test_project_without_registry_returns_row_with_null_registry_fields(
@@ -986,7 +987,10 @@ class TestProjectExportExecuteStreamingDB:
         async for partition in execute_streaming_export(db_engine, query):
             rows.extend(partition)
 
-        assert len(rows) == 2
+        assert len(rows) == 2, (
+            f"Expected 2 rows (1 with registry, 1 without), got {len(rows)}. "
+            "The project without registry must still appear with NULL registry_id."
+        )
         row_ids = {str(r[0]) for r in rows}
         assert str(project_id2) in row_ids
 
