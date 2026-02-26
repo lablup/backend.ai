@@ -150,7 +150,8 @@ class RBACScopeUnbinder[TRow: Base](ABC):
 
     Implementations specify what to delete by providing:
     - build_purger_spec(): Returns a BatchPurgerSpec for business N:N row deletion.
-    - build_condition(): Returns a WHERE condition for AssociationScopesEntitiesRow deletion.
+    - entity_ref: RBAC element ref for the entity to unbind (always required).
+    - scope_ref: RBAC element ref for the scope to unbind from (None = all scopes).
     """
 
     @abstractmethod
@@ -158,9 +159,16 @@ class RBACScopeUnbinder[TRow: Base](ABC):
         """Build purger spec for business N:N mapping row deletion."""
         raise NotImplementedError
 
+    @property
     @abstractmethod
-    def build_condition(self) -> sa.ColumnElement[bool]:
-        """Build WHERE condition for AssociationScopesEntitiesRow deletion."""
+    def entity_ref(self) -> RBACElementRef:
+        """RBAC element ref for the entity to unbind."""
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def scope_ref(self) -> RBACElementRef | None:
+        """RBAC element ref for the scope to unbind from. None means all scopes."""
         raise NotImplementedError
 
 
@@ -184,12 +192,12 @@ async def execute_rbac_scope_unbinder[TRow: Base](
     """Delete N:N mapping rows and RBAC scope associations.
 
     Operations:
-    1. Delete business rows via unbinder.purger_spec
-    2. Delete RBAC associations via unbinder.build_condition()
+    1. Delete business rows via unbinder.build_purger_spec()
+    2. Delete RBAC associations matching unbinder.entity_ref/scope_ref
 
     Args:
         db_sess: Async SQLAlchemy session (must be writable).
-        unbinder: Unbinder instance specifying purger spec and association condition.
+        unbinder: Unbinder instance specifying purger spec and RBAC element refs.
 
     Returns:
         RBACScopeUnbinderResult with deletion counts and removed associations.
@@ -200,9 +208,21 @@ async def execute_rbac_scope_unbinder[TRow: Base](
     )
 
     # 2. Delete RBAC association rows
+    entity_ref = unbinder.entity_ref
+    scope_ref = unbinder.scope_ref
+    conditions: list[sa.ColumnElement[bool]] = [
+        AssociationScopesEntitiesRow.entity_type == entity_ref.element_type.to_entity_type(),
+        AssociationScopesEntitiesRow.entity_id == entity_ref.element_id,
+    ]
+    if scope_ref is not None:
+        conditions.append(
+            AssociationScopesEntitiesRow.scope_type == scope_ref.element_type.to_scope_type(),
+        )
+        conditions.append(AssociationScopesEntitiesRow.scope_id == scope_ref.element_id)
+
     assoc_stmt = (
         sa.delete(AssociationScopesEntitiesRow)
-        .where(unbinder.build_condition())
+        .where(*conditions)
         .returning(AssociationScopesEntitiesRow)
     )
     association_rows = list((await db_sess.scalars(assoc_stmt)).all())
