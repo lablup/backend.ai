@@ -4,7 +4,11 @@ import logging
 from collections.abc import Sequence
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentStatusTransitions
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    DeploymentLifecycleStatus,
+    DeploymentStatusTransitions,
+)
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -48,17 +52,14 @@ class ReconcileDeploymentHandler(DeploymentHandler):
         """Get the target deployment statuses for this handler."""
         return [EndpointLifecycle.READY]
 
-    @classmethod
-    def next_status(cls) -> EndpointLifecycle | None:
+    def next_status(self) -> DeploymentLifecycleStatus | None:
         """Get the next deployment status after this handler's operation."""
         return None
 
-    @classmethod
-    def failure_status(cls) -> EndpointLifecycle | None:
-        return EndpointLifecycle.SCALING
+    def failure_status(self) -> DeploymentLifecycleStatus | None:
+        return DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING)
 
-    @classmethod
-    def status_transitions(cls) -> DeploymentStatusTransitions:
+    def status_transitions(self) -> DeploymentStatusTransitions:
         """Define state transitions for reconcile deployment handler (BEP-1030).
 
         - success: None (stays READY)
@@ -66,7 +67,7 @@ class ReconcileDeploymentHandler(DeploymentHandler):
         """
         return DeploymentStatusTransitions(
             success=None,
-            failure=EndpointLifecycle.SCALING,
+            failure=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
         )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:

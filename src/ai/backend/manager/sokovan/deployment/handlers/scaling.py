@@ -4,7 +4,11 @@ import logging
 from collections.abc import Sequence
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentStatusTransitions
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    DeploymentLifecycleStatus,
+    DeploymentStatusTransitions,
+)
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -46,24 +50,21 @@ class ScalingDeploymentHandler(DeploymentHandler):
         """Get the target deployment statuses for this handler."""
         return [EndpointLifecycle.SCALING]
 
-    @classmethod
-    def next_status(cls) -> EndpointLifecycle | None:
+    def next_status(self) -> DeploymentLifecycleStatus | None:
         """Get the next deployment status after this handler's operation."""
-        return EndpointLifecycle.READY
+        return DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY)
 
-    @classmethod
-    def failure_status(cls) -> EndpointLifecycle | None:
+    def failure_status(self) -> DeploymentLifecycleStatus | None:
         return None
 
-    @classmethod
-    def status_transitions(cls) -> DeploymentStatusTransitions:
+    def status_transitions(self) -> DeploymentStatusTransitions:
         """Define state transitions for scaling deployment handler (BEP-1030).
 
         - success: Deployment → READY
         - failure: None (stays in current state)
         """
         return DeploymentStatusTransitions(
-            success=EndpointLifecycle.READY,
+            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
             failure=None,
         )
 

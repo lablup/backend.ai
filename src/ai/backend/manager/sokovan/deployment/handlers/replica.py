@@ -4,7 +4,11 @@ import logging
 from collections.abc import Sequence
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentStatusTransitions
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    DeploymentLifecycleStatus,
+    DeploymentStatusTransitions,
+)
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -45,24 +49,21 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         """Get the target deployment statuses for this handler."""
         return [EndpointLifecycle.READY]
 
-    @classmethod
-    def next_status(cls) -> EndpointLifecycle | None:
+    def next_status(self) -> DeploymentLifecycleStatus | None:
         """Get the next deployment status after this handler's operation."""
-        return EndpointLifecycle.SCALING
+        return DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING)
 
-    @classmethod
-    def failure_status(cls) -> EndpointLifecycle | None:
+    def failure_status(self) -> DeploymentLifecycleStatus | None:
         return None
 
-    @classmethod
-    def status_transitions(cls) -> DeploymentStatusTransitions:
+    def status_transitions(self) -> DeploymentStatusTransitions:
         """Define state transitions for check replica deployment handler (BEP-1030).
 
         - success: Deployment → SCALING
         - failure: None (stays in current state)
         """
         return DeploymentStatusTransitions(
-            success=EndpointLifecycle.SCALING,
+            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
             failure=None,
         )
 

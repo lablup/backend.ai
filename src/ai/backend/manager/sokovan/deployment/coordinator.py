@@ -224,8 +224,9 @@ class DeploymentCoordinator:
         timestamp_now = datetime.now(UTC).isoformat()
 
         # Handle success transitions
-        next_status = handler.next_status()
-        if next_status is not None and result.successes:
+        next_lifecycle_status = handler.next_status()
+        if next_lifecycle_status is not None and result.successes:
+            next_lifecycle = next_lifecycle_status.lifecycle
             endpoint_ids = [d.id for d in result.successes]
             success_history_specs = [
                 DeploymentHistoryCreatorSpec(
@@ -234,14 +235,14 @@ class DeploymentCoordinator:
                     result=SchedulingResult.SUCCESS,
                     message=f"{handler_name} completed successfully",
                     from_status=from_status,
-                    to_status=next_status,
+                    to_status=next_lifecycle,
                     sub_steps=extract_sub_steps_for_entity(d.id, records),
                 )
                 for d in result.successes
             ]
             batch_updaters.append(
                 BatchUpdater(
-                    spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=next_status),
+                    spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=next_lifecycle),
                     conditions=[
                         DeploymentConditions.by_ids(endpoint_ids),
                         DeploymentConditions.by_lifecycle_stages(target_statuses),
@@ -253,7 +254,7 @@ class DeploymentCoordinator:
                 self._build_lifecycle_notification_event(
                     deployment=d,
                     from_status=from_status,
-                    to_status=next_status,
+                    to_status=next_lifecycle,
                     transition_result="success",
                     timestamp=timestamp_now,
                 )
@@ -261,8 +262,9 @@ class DeploymentCoordinator:
             ])
 
         # Handle failure transitions
-        failure_status = handler.failure_status()
-        if failure_status is not None and result.errors:
+        failure_lifecycle_status = handler.failure_status()
+        if failure_lifecycle_status is not None and result.errors:
+            failure_lifecycle = failure_lifecycle_status.lifecycle
             endpoint_ids = [e.deployment_info.id for e in result.errors]
             failure_history_specs = [
                 DeploymentHistoryCreatorSpec(
@@ -271,7 +273,7 @@ class DeploymentCoordinator:
                     result=SchedulingResult.FAILURE,
                     message=e.reason,
                     from_status=from_status,
-                    to_status=failure_status,
+                    to_status=failure_lifecycle,
                     error_code=e.error_code,
                     sub_steps=extract_sub_steps_for_entity(e.deployment_info.id, records),
                 )
@@ -279,7 +281,7 @@ class DeploymentCoordinator:
             ]
             batch_updaters.append(
                 BatchUpdater(
-                    spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=failure_status),
+                    spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=failure_lifecycle),
                     conditions=[
                         DeploymentConditions.by_ids(endpoint_ids),
                         DeploymentConditions.by_lifecycle_stages(target_statuses),
@@ -291,7 +293,7 @@ class DeploymentCoordinator:
                 self._build_lifecycle_notification_event(
                     deployment=e.deployment_info,
                     from_status=from_status,
-                    to_status=failure_status,
+                    to_status=failure_lifecycle,
                     transition_result="failure",
                     timestamp=timestamp_now,
                 )
