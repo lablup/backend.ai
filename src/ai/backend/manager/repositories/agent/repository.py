@@ -32,6 +32,7 @@ from ai.backend.manager.repositories.agent.stateful_source.stateful_source impor
 )
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
 from ai.backend.manager.repositories.base import BulkUpserter
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base.updater import Updater
@@ -87,6 +88,11 @@ class AgentRepository:
     @agent_repository_resilience.apply()
     async def get_by_id(self, agent_id: AgentId) -> AgentData:
         return await self._db_source.get_by_id(agent_id)
+
+    @agent_repository_resilience.apply()
+    async def create(self, creator: Creator[AgentRow]) -> AgentData:
+        result = await self._db_source.create(creator)
+        return result.row.to_data()
 
     @agent_repository_resilience.apply()
     async def sync_installed_images(self, agent_id: AgentId) -> None:

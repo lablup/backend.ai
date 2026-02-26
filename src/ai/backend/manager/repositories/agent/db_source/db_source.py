@@ -26,6 +26,7 @@ from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
 from ai.backend.manager.repositories.base import BulkUpserter, execute_bulk_upserter
+from ai.backend.manager.repositories.base.creator import Creator, CreatorResult, execute_creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
@@ -86,6 +87,10 @@ class AgentDBSource:
                 log.error("Agent with id {} not found", agent_id)
                 raise AgentNotFound(f"Agent with id {agent_id} not found")
             return agent_row.to_data()
+
+    async def create(self, creator: Creator[AgentRow]) -> CreatorResult[AgentRow]:
+        async with self._db.begin_session() as session:
+            return await execute_creator(session, creator)
 
     async def _check_scaling_group_exists(
         self, session: "AsyncSession", scaling_group_name: str

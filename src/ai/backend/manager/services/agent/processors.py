@@ -3,6 +3,10 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.services.agent.actions.create_agent import (
+    CreateAgentAction,
+    CreateAgentActionResult,
+)
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -63,6 +67,7 @@ from ai.backend.manager.services.agent.service import AgentService
 
 
 class AgentProcessors(AbstractProcessorPackage):
+    create_agent: ActionProcessor[CreateAgentAction, CreateAgentActionResult]
     sync_agent_registry: ActionProcessor[SyncAgentRegistryAction, SyncAgentRegistryActionResult]
     get_watcher_status: ActionProcessor[GetWatcherStatusAction, GetWatcherStatusActionResult]
     watcher_agent_start: ActionProcessor[WatcherAgentStartAction, WatcherAgentStartActionResult]
@@ -87,6 +92,7 @@ class AgentProcessors(AbstractProcessorPackage):
     ]
 
     def __init__(self, service: AgentService, action_monitors: list[ActionMonitor]) -> None:
+        self.create_agent = ActionProcessor(service.create_agent, action_monitors)
         self.sync_agent_registry = ActionProcessor(service.sync_agent_registry, action_monitors)
         self.get_watcher_status = ActionProcessor(service.get_watcher_status, action_monitors)
         self.watcher_agent_start = ActionProcessor(service.watcher_agent_start, action_monitors)
@@ -109,6 +115,7 @@ class AgentProcessors(AbstractProcessorPackage):
     @override
     def supported_actions(self) -> list[ActionSpec]:
         return [
+            CreateAgentAction.spec(),
             SyncAgentRegistryAction.spec(),
             GetWatcherStatusAction.spec(),
             WatcherAgentStartAction.spec(),

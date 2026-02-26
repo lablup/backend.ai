@@ -32,6 +32,10 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.services.agent.actions.create_agent import (
+    CreateAgentAction,
+    CreateAgentActionResult,
+)
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -122,6 +126,10 @@ class AgentService:
         self._hook_plugin_ctx = hook_plugin_ctx
         self._event_producer = event_producer
         self._agent_cache = agent_cache
+
+    async def create_agent(self, action: CreateAgentAction) -> CreateAgentActionResult:
+        agent_data = await self._agent_repository.create(action.creator)
+        return CreateAgentActionResult(data=agent_data)
 
     async def _get_watcher_info(self, agent_id: AgentId) -> dict[str, Any]:
         """
