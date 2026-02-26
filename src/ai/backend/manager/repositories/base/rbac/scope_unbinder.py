@@ -110,31 +110,6 @@ class RBACUnbinderResult:
 # =============================================================================
 
 
-async def _delete_rbac_associations(
-    db_sess: SASession,
-    entity_refs: Sequence[RBACElementRef],
-    scope_refs: Sequence[RBACElementRef],
-) -> list[AssociationScopesEntitiesRow]:
-    """Delete RBAC association rows matching the given entity/scope refs.
-
-    Both entity_refs and scope_refs must be non-empty.
-    All refs in each list must share the same element_type.
-    """
-    conditions: list[sa.ColumnElement[bool]] = [
-        AssociationScopesEntitiesRow.entity_type == entity_refs[0].element_type.to_entity_type(),
-        AssociationScopesEntitiesRow.entity_id.in_([ref.element_id for ref in entity_refs]),
-        AssociationScopesEntitiesRow.scope_type == scope_refs[0].element_type.to_scope_type(),
-        AssociationScopesEntitiesRow.scope_id.in_([ref.element_id for ref in scope_refs]),
-    ]
-
-    assoc_stmt = (
-        sa.delete(AssociationScopesEntitiesRow)
-        .where(*conditions)
-        .returning(AssociationScopesEntitiesRow)
-    )
-    return list((await db_sess.scalars(assoc_stmt)).all())
-
-
 async def execute_rbac_entity_unbinder[TRow: Base](
     db_sess: SASession,
     unbinder: RBACEntityUnbinder[TRow],
@@ -154,9 +129,23 @@ async def execute_rbac_entity_unbinder[TRow: Base](
     purge_result = await execute_batch_purger(
         db_sess, BatchPurger(spec=unbinder.build_purger_spec())
     )
-    association_rows = await _delete_rbac_associations(
-        db_sess, entity_refs=unbinder.entity_refs, scope_refs=[unbinder.scope_ref]
+    entity_refs = unbinder.entity_refs
+    if not entity_refs:
+        return RBACUnbinderResult(deleted_count=purge_result.deleted_count, association_rows=[])
+
+    scope_ref = unbinder.scope_ref
+    assoc_stmt = (
+        sa.delete(AssociationScopesEntitiesRow)
+        .where(
+            AssociationScopesEntitiesRow.entity_type
+            == entity_refs[0].element_type.to_entity_type(),
+            AssociationScopesEntitiesRow.entity_id.in_([ref.element_id for ref in entity_refs]),
+            AssociationScopesEntitiesRow.scope_type == scope_ref.element_type.to_scope_type(),
+            AssociationScopesEntitiesRow.scope_id == scope_ref.element_id,
+        )
+        .returning(AssociationScopesEntitiesRow)
     )
+    association_rows = list((await db_sess.scalars(assoc_stmt)).all())
     return RBACUnbinderResult(
         deleted_count=purge_result.deleted_count,
         association_rows=association_rows,
@@ -182,9 +171,22 @@ async def execute_rbac_scope_unbinder[TRow: Base](
     purge_result = await execute_batch_purger(
         db_sess, BatchPurger(spec=unbinder.build_purger_spec())
     )
-    association_rows = await _delete_rbac_associations(
-        db_sess, entity_refs=[unbinder.entity_ref], scope_refs=unbinder.scope_refs
+    scope_refs = unbinder.scope_refs
+    if not scope_refs:
+        return RBACUnbinderResult(deleted_count=purge_result.deleted_count, association_rows=[])
+
+    entity_ref = unbinder.entity_ref
+    assoc_stmt = (
+        sa.delete(AssociationScopesEntitiesRow)
+        .where(
+            AssociationScopesEntitiesRow.entity_type == entity_ref.element_type.to_entity_type(),
+            AssociationScopesEntitiesRow.entity_id == entity_ref.element_id,
+            AssociationScopesEntitiesRow.scope_type == scope_refs[0].element_type.to_scope_type(),
+            AssociationScopesEntitiesRow.scope_id.in_([ref.element_id for ref in scope_refs]),
+        )
+        .returning(AssociationScopesEntitiesRow)
     )
+    association_rows = list((await db_sess.scalars(assoc_stmt)).all())
     return RBACUnbinderResult(
         deleted_count=purge_result.deleted_count,
         association_rows=association_rows,

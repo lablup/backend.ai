@@ -401,3 +401,10 @@ class TestRBACScopeUnbinder:
             entity1_remaining = [r for r in remaining if r.entity_id == ctx.entity_id_1]
             assert len(entity1_remaining) == 1
             assert entity1_remaining[0].scope_id == ctx.scope_id_b
+
+            entity2_remaining = [r for r in remaining if r.entity_id == ctx.entity_id_2]
+            assert len(entity2_remaining) == 2
+            assert {r.scope_id for r in entity2_remaining} == {
+                ctx.scope_id_a,
+                ctx.scope_id_b,
+            }
