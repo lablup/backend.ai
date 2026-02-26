@@ -75,15 +75,12 @@ jobs:
     - name: Calculate base ref
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
-          echo "BASE_REF=origin/${BASE_REF_SHORT}" >> $GITHUB_ENV
-          git remote set-branches origin "$BASE_REF_SHORT"
-          BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
-          BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
-          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
+          git fetch --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+          BASE_REF="${{ github.event.pull_request.base.sha }}"
         else
-          echo "BASE_REF=HEAD~1" >> $GITHUB_ENV
+          BASE_REF="HEAD~1"
         fi
+        echo "BASE_REF=$BASE_REF" >> $GITHUB_ENV
     - name: Check BUILD files
       run: |
         if [ "$GITHUB_EVENT_NAME" == "push" ] && [[ "$GITHUB_REF" == refs/tags/* ]]; then
@@ -256,12 +253,8 @@ jobs:
           pants test :: -- -v
         else
           if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-            [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
-            BASE_REF="origin/${BASE_REF_SHORT}"
-            git remote set-branches origin "$BASE_REF_SHORT"
-            BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
-            BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
-            git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
+            git fetch --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+            BASE_REF="${{ github.event.pull_request.base.sha }}"
           else
             BASE_REF="HEAD~1"
           fi
