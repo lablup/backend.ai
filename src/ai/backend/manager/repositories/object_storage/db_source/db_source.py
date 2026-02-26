@@ -5,20 +5,16 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.types import ConcreteArtifactStorageId
-from ai.backend.manager.data.artifact_storages.types import ArtifactStorageCreatorSpec
 from ai.backend.manager.data.object_storage.types import ObjectStorageData, ObjectStorageListResult
-from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.object_storage import (
     ObjectStorageNotFoundError,
 )
-from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.base.updater import Updater
 
 
 class ObjectStorageDBSource:
@@ -34,37 +30,21 @@ class ObjectStorageDBSource:
         Get an existing object storage configuration from the database.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            query = (
-                sa.select(ArtifactStorageRow)
-                .where(ArtifactStorageRow.name == storage_name)
-                .options(
-                    selectinload(ArtifactStorageRow.object_storages).selectinload(
-                        ObjectStorageRow.meta
-                    )
-                )
-            )
+            query = sa.select(ObjectStorageRow).where(ObjectStorageRow.name == storage_name)
             result = await db_session.execute(query)
             row = result.scalar_one_or_none()
             if row is None:
                 raise ObjectStorageNotFoundError(
                     f"Object storage with name {storage_name} not found."
                 )
-            if row.object_storages is None:
-                raise ObjectStorageNotFoundError(
-                    f"Object storage not found for name {storage_name}"
-                )
-            return row.object_storages.to_dataclass()
+            return row.to_dataclass()
 
     async def get_by_id(self, storage_id: uuid.UUID) -> ObjectStorageData:
         """
         Get an existing object storage configuration from the database by ID.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            query = (
-                sa.select(ObjectStorageRow)
-                .where(ObjectStorageRow.id == storage_id)
-                .options(selectinload(ObjectStorageRow.meta))
-            )
+            query = sa.select(ObjectStorageRow).where(ObjectStorageRow.id == storage_id)
             result = await db_session.execute(query)
             row = result.scalar_one_or_none()
             if row is None:
@@ -73,17 +53,13 @@ class ObjectStorageDBSource:
 
     async def get_by_namespace_id(self, storage_namespace_id: uuid.UUID) -> ObjectStorageData:
         """
-        Get an existing object storage configuration from the database by ID.
+        Get an existing object storage configuration from the database by namespace ID.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             query = (
                 sa.select(StorageNamespaceRow)
                 .where(StorageNamespaceRow.id == storage_namespace_id)
-                .options(
-                    selectinload(StorageNamespaceRow.object_storage_row).selectinload(
-                        ObjectStorageRow.meta
-                    )
-                )
+                .options(selectinload(StorageNamespaceRow.object_storage_row))
             )
             result = await db_session.execute(query)
             row = result.scalar_one_or_none()
@@ -97,32 +73,14 @@ class ObjectStorageDBSource:
                 )
             return row.object_storage_row.to_dataclass()
 
-    async def create(
-        self, creator: Creator[ObjectStorageRow], meta_creator: Creator[ArtifactStorageRow]
-    ) -> ObjectStorageData:
+    async def create(self, creator: Creator[ObjectStorageRow]) -> ObjectStorageData:
         """
         Create a new object storage configuration in the database.
+        JTI handles inserting into both artifact_storages and object_storages.
         """
         async with self._db.begin_session() as db_session:
             creator_result = await execute_creator(db_session, creator)
-            new_row = creator_result.row
-
-            # Set the storage_id on the meta creator spec and create ArtifactStorageRow
-            meta_spec = meta_creator.spec
-            if not isinstance(meta_spec, ArtifactStorageCreatorSpec):
-                raise InternalServerError("meta_creator.spec must be ArtifactStorageCreatorSpec")
-            meta_spec.set_storage_id(ConcreteArtifactStorageId(new_row.id))
-            await execute_creator(db_session, meta_creator)
-
-            # Re-query to load the meta relationship
-            query = (
-                sa.select(ObjectStorageRow)
-                .where(ObjectStorageRow.id == new_row.id)
-                .options(selectinload(ObjectStorageRow.meta))
-            )
-            row_result = await db_session.execute(query)
-            row = row_result.scalar_one()
-            return row.to_dataclass()
+            return creator_result.row.to_dataclass()
 
     async def update(
         self,
@@ -130,18 +88,19 @@ class ObjectStorageDBSource:
     ) -> ObjectStorageData:
         """
         Update an existing object storage configuration in the database.
+        Uses plain UPDATE + SELECT instead of execute_updater's RETURNING+from_statement,
+        which is incompatible with JTI (RETURNING only includes child table columns).
         """
         async with self._db.begin_session() as db_session:
-            # Execute update (may return None if no values to update, which is fine)
-            await execute_updater(db_session, updater)
-
             storage_id = uuid.UUID(str(updater.pk_value))
-            # Re-query to load the meta relationship
-            query = (
-                sa.select(ObjectStorageRow)
-                .where(ObjectStorageRow.id == storage_id)
-                .options(selectinload(ObjectStorageRow.meta))
-            )
+            values = updater.spec.build_values()
+            if values:
+                table = ObjectStorageRow.__table__
+                pk_col = list(table.primary_key.columns)[0]
+                update_stmt = sa.update(table).values(values).where(pk_col == storage_id)
+                await db_session.execute(update_stmt)
+
+            query = sa.select(ObjectStorageRow).where(ObjectStorageRow.id == storage_id)
             row_result = await db_session.execute(query)
             row = row_result.scalar_one_or_none()
             if row is None:
@@ -151,6 +110,7 @@ class ObjectStorageDBSource:
     async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:
         """
         Delete an existing object storage configuration from the database.
+        FK cascade handles deleting the ArtifactStorageRow.
         """
         async with self._db.begin_session() as db_session:
             delete_query = (
@@ -162,12 +122,6 @@ class ObjectStorageDBSource:
             deleted_id = result.scalar()
             if deleted_id is None:
                 raise ObjectStorageNotFoundError(f"Object storage with ID {storage_id} not found.")
-
-            # Delete the ArtifactStorageRow
-            delete_meta_query = sa.delete(ArtifactStorageRow).where(
-                ArtifactStorageRow.storage_id == storage_id
-            )
-            await db_session.execute(delete_meta_query)
             return deleted_id
 
     async def list_object_storages(self) -> list[ObjectStorageData]:
@@ -175,7 +129,7 @@ class ObjectStorageDBSource:
         List all object storage configurations from the database.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            query = sa.select(ObjectStorageRow).options(selectinload(ObjectStorageRow.meta))
+            query = sa.select(ObjectStorageRow)
             result = await db_session.execute(query)
             rows = result.scalars().all()
             return [row.to_dataclass() for row in rows]
@@ -186,7 +140,7 @@ class ObjectStorageDBSource:
     ) -> ObjectStorageListResult:
         """Searches Object storages with total count."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ObjectStorageRow).options(selectinload(ObjectStorageRow.meta))
+            query = sa.select(ObjectStorageRow)
 
             result = await execute_batch_querier(
                 db_sess,

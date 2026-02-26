@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict
 
 from ai.backend.common.type_adapters import VFolderIDField
-from ai.backend.common.types import ArtifactStorageId, ConcreteArtifactStorageId
+from ai.backend.common.types import ArtifactStorageId
 
 
 class VFolderStorageTarget(BaseModel):
@@ -39,7 +39,6 @@ class ArtifactStorageData:
 
     id: ArtifactStorageId
     name: str
-    storage_id: ConcreteArtifactStorageId
     type: ArtifactStorageType
 
 

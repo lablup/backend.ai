@@ -48,10 +48,6 @@ class ArtifactStorageRepository:
         return await self._db_source.get_by_id(storage_id)
 
     @artifact_storage_repository_resilience.apply()
-    async def get_by_storage_id(self, storage_id: uuid.UUID) -> ArtifactStorageData:
-        return await self._db_source.get_by_storage_id(storage_id)
-
-    @artifact_storage_repository_resilience.apply()
     async def update(
         self,
         updater: Updater[ArtifactStorageRow],

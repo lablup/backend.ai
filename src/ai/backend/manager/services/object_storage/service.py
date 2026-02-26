@@ -77,9 +77,7 @@ class ObjectStorageService:
         Create a new object storage.
         """
         log.info("Creating object storage with data: {}", action.creator)
-        storage_data = await self._object_storage_repository.create(
-            action.creator, action.meta_creator
-        )
+        storage_data = await self._object_storage_repository.create(action.creator)
         return CreateObjectStorageActionResult(result=storage_data)
 
     async def update(self, action: UpdateObjectStorageAction) -> UpdateObjectStorageActionResult:

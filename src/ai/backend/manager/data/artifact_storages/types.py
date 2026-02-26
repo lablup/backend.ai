@@ -3,35 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.common.data.storage.types import ArtifactStorageType
-from ai.backend.common.types import ConcreteArtifactStorageId
-from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
-from ai.backend.manager.repositories.base.creator import CreatorSpec
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState
-
-
-class ArtifactStorageCreatorSpec(CreatorSpec[ArtifactStorageRow]):
-    """CreatorSpec for ArtifactStorageRow with deferred storage_id."""
-
-    def __init__(self, name: str, storage_type: ArtifactStorageType) -> None:
-        self._name = name
-        self._storage_type = storage_type
-        self._storage_id: ConcreteArtifactStorageId | None = None
-
-    def set_storage_id(self, storage_id: ConcreteArtifactStorageId) -> None:
-        self._storage_id = storage_id
-
-    @override
-    def build_row(self) -> ArtifactStorageRow:
-        if self._storage_id is None:
-            raise InternalServerError("storage_id must be set before building row")
-        return ArtifactStorageRow(
-            name=self._name,
-            storage_id=self._storage_id,
-            type=self._storage_type,
-        )
 
 
 @dataclass

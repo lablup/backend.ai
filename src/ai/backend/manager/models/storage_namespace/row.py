@@ -49,6 +49,7 @@ class StorageNamespaceRow(Base):  # type: ignore[misc]
         "ObjectStorageRow",
         back_populates="namespace_rows",
         primaryjoin=_get_storage_namespace_join_cond,
+        viewonly=True,
     )
 
     def to_dataclass(self) -> StorageNamespaceData:

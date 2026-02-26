@@ -7,16 +7,16 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
-from ai.backend.common.exception import RelationNotLoadedError
+from ai.backend.common.data.storage.types import ArtifactStorageType
+from ai.backend.common.types import ArtifactStorageId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 from ai.backend.manager.models.base import (
     GUID,
-    Base,
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
     from ai.backend.manager.models.association_artifacts_storages import (
         AssociationArtifactsStorageRow,
     )
@@ -41,23 +41,18 @@ def _get_object_storage_namespace_join_cond() -> sa.ColumnElement[bool]:
     return foreign(StorageNamespaceRow.storage_id) == ObjectStorageRow.id
 
 
-def _get_object_storage_meta_join_cond() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
-
-    return ObjectStorageRow.id == foreign(ArtifactStorageRow.storage_id)
-
-
-class ObjectStorageRow(Base):  # type: ignore[misc]
+class ObjectStorageRow(ArtifactStorageRow):
     """
     Represents an object storage configuration.
     This model is used to store the details of object storage services
     such as access keys, endpoints.
+    Uses SQLAlchemy Joined Table Inheritance (child of ArtifactStorageRow).
     """
 
     __tablename__ = "object_storages"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, sa.ForeignKey("artifact_storages.id", ondelete="CASCADE"), primary_key=True
     )
     host: Mapped[str] = mapped_column("host", sa.String, index=True, nullable=False)
     access_key: Mapped[str] = mapped_column(
@@ -87,20 +82,19 @@ class ObjectStorageRow(Base):  # type: ignore[misc]
             back_populates="object_storage_row",
             primaryjoin=_get_object_storage_association_artifact_join_cond,
             overlaps="vfs_storage_row",
+            viewonly=True,
         )
     )
     namespace_rows: Mapped[list[StorageNamespaceRow]] = relationship(
         "StorageNamespaceRow",
         back_populates="object_storage_row",
         primaryjoin=_get_object_storage_namespace_join_cond,
-    )
-    meta: Mapped[ArtifactStorageRow | None] = relationship(
-        "ArtifactStorageRow",
-        back_populates="object_storages",
-        primaryjoin=_get_object_storage_meta_join_cond,
-        uselist=False,
         viewonly=True,
     )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "object_storage",
+    }
 
     def __str__(self) -> str:
         return (
@@ -117,11 +111,10 @@ class ObjectStorageRow(Base):  # type: ignore[misc]
         return self.__str__()
 
     def to_dataclass(self) -> ObjectStorageData:
-        if self.meta is None:
-            raise RelationNotLoadedError()
         return ObjectStorageData(
-            id=self.id,
-            name=self.meta.name,
+            id=ArtifactStorageId(self.id),
+            name=self.name,
+            type=ArtifactStorageType(self.type),
             host=self.host,
             access_key=self.access_key,
             secret_key=self.secret_key,

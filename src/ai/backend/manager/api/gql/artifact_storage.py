@@ -63,9 +63,6 @@ class ArtifactStorageTypeGQL(StrEnum):
 class ArtifactStorageGQL:
     id: ID = strawberry.field(description="The ID of the artifact storage")
     name: str = strawberry.field(description="The name of the artifact storage")
-    storage_id: ID = strawberry.field(
-        description="The ID of the underlying storage (ObjectStorage or VFSStorage)"
-    )
     type: ArtifactStorageTypeGQL = strawberry.field(description="The type of the artifact storage")
 
     @classmethod
@@ -73,7 +70,6 @@ class ArtifactStorageGQL:
         return cls(
             id=ID(str(data.id)),
             name=data.name,
-            storage_id=ID(str(data.storage_id)),
             type=ArtifactStorageTypeGQL.from_internal(data.type),
         )
 

@@ -3,15 +3,13 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Self
+from typing import Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.api.gql.base import encode_cursor
-from ai.backend.manager.data.artifact_storages.types import ArtifactStorageCreatorSpec
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.repositories.base.creator import Creator
@@ -36,9 +34,6 @@ from ai.backend.manager.types import OptionalState
 
 from .storage_namespace import StorageNamespace, StorageNamespaceConnection, StorageNamespaceEdge
 from .types import StrawberryGQLContext
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 
 
 @strawberry.type(description="Added in 25.14.0")
@@ -170,19 +165,12 @@ class CreateObjectStorageInput:
     def to_creator(self) -> Creator[ObjectStorageRow]:
         return Creator(
             spec=ObjectStorageCreatorSpec(
+                name=self.name,
                 host=self.host,
                 access_key=self.access_key,
                 secret_key=self.secret_key,
                 endpoint=self.endpoint,
                 region=self.region,
-            )
-        )
-
-    def to_meta_creator(self) -> Creator[ArtifactStorageRow]:
-        return Creator(
-            spec=ArtifactStorageCreatorSpec(
-                name=self.name,
-                storage_type=ArtifactStorageType.OBJECT_STORAGE,
             )
         )
 
@@ -260,7 +248,6 @@ async def create_object_storage(
     action_result = await processors.object_storage.create.wait_for_complete(
         CreateObjectStorageAction(
             creator=input.to_creator(),
-            meta_creator=input.to_meta_creator(),
         )
     )
 

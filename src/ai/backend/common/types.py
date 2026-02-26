@@ -308,8 +308,6 @@ SessionId = NewType("SessionId", UUID)
 KernelId = NewType("KernelId", UUID)
 # ID of the `artifact_storages` common table (storage metadata).
 ArtifactStorageId = NewType("ArtifactStorageId", UUID)
-# ID of the concrete storage table (`object_storages`, `vfs_storages`, etc.).
-ConcreteArtifactStorageId = NewType("ConcreteArtifactStorageId", UUID)
 ImageAlias = NewType("ImageAlias", str)
 ArchName = NewType("ArchName", str)
 

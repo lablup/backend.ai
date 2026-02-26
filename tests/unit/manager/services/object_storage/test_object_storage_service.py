@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.data.object_storage.types import (
     ObjectStorageData,
     ObjectStorageListResult,
@@ -76,6 +77,7 @@ class TestObjectStorageService:
         return ObjectStorageData(
             id=uuid4(),
             name="test-object-storage",
+            type=ArtifactStorageType.OBJECT_STORAGE,
             host="storage-proxy-1",
             access_key="test-access-key",
             secret_key="test-secret-key",
