@@ -33,7 +33,6 @@ from ai.backend.manager.repositories.base.export import (
     execute_streaming_export,
 )
 from ai.backend.manager.repositories.export.reports.project import (
-    CONTAINER_REGISTRY_ASSOC_JOIN,
     CONTAINER_REGISTRY_JOIN,
     CONTAINER_REGISTRY_JOINS,
     PROJECT_FIELDS,
@@ -152,16 +151,9 @@ class TestJoinDefinitions:
         assert SCALING_GROUP_JOIN.table is ScalingGroupRow.__table__
 
     def test_container_registry_joins_count(self) -> None:
-        """Container registry should have 2 JOINs."""
-        assert len(CONTAINER_REGISTRY_JOINS) == 2
-        assert CONTAINER_REGISTRY_ASSOC_JOIN in CONTAINER_REGISTRY_JOINS
+        """Container registry should have 1 JOIN (with EXISTS subquery for associations)."""
+        assert len(CONTAINER_REGISTRY_JOINS) == 1
         assert CONTAINER_REGISTRY_JOIN in CONTAINER_REGISTRY_JOINS
-
-    def test_container_registry_assoc_join_table(self) -> None:
-        """Container registry association JOIN should use correct table."""
-        assert (
-            CONTAINER_REGISTRY_ASSOC_JOIN.table is AssociationContainerRegistriesGroupsRow.__table__
-        )
 
     def test_container_registry_join_table(self) -> None:
         """Container registry JOIN should use correct table."""
@@ -241,7 +233,7 @@ class TestFieldJoinAssignments:
             field = fields_by_key[key]
             assert field.joins is not None
             assert field.joins == CONTAINER_REGISTRY_JOINS
-            assert len(field.joins) == 2
+            assert len(field.joins) == 1
 
 
 class TestBuildProjectQueryWithRealReport:
@@ -298,8 +290,8 @@ class TestBuildProjectQueryWithRealReport:
         assert "sgroups_for_groups" in compiled
         assert "scaling_groups" in compiled
 
-    def test_container_registry_fields_add_two_joins(self, adapter: ExportAdapter) -> None:
-        """Selecting container registry fields should add 2 JOINs."""
+    def test_container_registry_fields_add_one_join(self, adapter: ExportAdapter) -> None:
+        """Selecting container registry fields should add 1 JOIN (with EXISTS subquery)."""
         query = adapter.build_project_query(
             report=PROJECT_REPORT,
             fields=["id", "name", "container_registry_url"],
@@ -310,11 +302,12 @@ class TestBuildProjectQueryWithRealReport:
         )
 
         compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
-        assert "association_container_registries_groups" in compiled
         assert "container_registries" in compiled
+        # Association table is referenced in EXISTS subquery, not as a direct JOIN
+        assert compiled.count("LEFT OUTER JOIN") == 1
 
     def test_all_join_fields_add_all_joins(self, adapter: ExportAdapter) -> None:
-        """Selecting all join fields should add all JOINs (5 total)."""
+        """Selecting all join fields should add all JOINs (4 total)."""
         query = adapter.build_project_query(
             report=PROJECT_REPORT,
             fields=[
@@ -331,11 +324,10 @@ class TestBuildProjectQueryWithRealReport:
         )
 
         compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
-        # All 5 join tables should be present
+        # 4 LEFT OUTER JOINs: 1 (resource_policy) + 2 (scaling_group) + 1 (container_registry)
         assert "project_resource_policies" in compiled
         assert "sgroups_for_groups" in compiled
         assert "scaling_groups" in compiled
-        assert "association_container_registries_groups" in compiled
         assert "container_registries" in compiled
 
     def test_all_fields_selected_when_none_specified(self, adapter: ExportAdapter) -> None:
@@ -391,11 +383,9 @@ class TestProjectQuerySQLGenerationForBugReproduction:
     def test_scaling_group_and_container_registry_combined_join_count(
         self, adapter: ExportAdapter
     ) -> None:
-        """Combining scaling_group and container_registry fields must produce exactly 4 JOINs.
+        """Combining scaling_group and container_registry fields must produce exactly 3 JOINs.
 
-        BUG: When both field groups are selected, the total should be 4 LEFT OUTER JOINs
-        (2 for scaling group + 2 for container registry). If JOINs are duplicated,
-        the count would be higher and the SQL would be invalid.
+        2 JOINs for scaling group + 1 JOIN for container registry (with EXISTS subquery).
         """
         query = adapter.build_project_query(
             report=PROJECT_REPORT,
@@ -408,13 +398,13 @@ class TestProjectQuerySQLGenerationForBugReproduction:
 
         compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
         # 2 JOINs for scaling group (sgroups_for_groups + scaling_groups)
-        # 2 JOINs for container registry (association_container_registries_groups + container_registries)
-        assert compiled.count("LEFT OUTER JOIN") == 4
+        # 1 JOIN for container registry (with EXISTS subquery for associations)
+        assert compiled.count("LEFT OUTER JOIN") == 3
 
     def test_full_field_combination_that_triggers_bug_join_count(
         self, adapter: ExportAdapter
     ) -> None:
-        """The exact field combination reported to cause empty results must produce exactly 5 JOINs.
+        """The exact field combination reported to cause empty results must produce exactly 4 JOINs.
 
         Fields: name, domain_name, description, created_at, is_active, total_resource_slots,
                 resource_policy_name, allowed_vfolder_hosts, scaling_group_name,
@@ -424,8 +414,7 @@ class TestProjectQuerySQLGenerationForBugReproduction:
           1. project_resource_policies (N:1 for resource_policy_name)
           2. sgroups_for_groups (1:N step 1 for scaling_group_name)
           3. scaling_groups (1:N step 2 for scaling_group_name)
-          4. association_container_registries_groups (1:N step 1 for container_registry_*)
-          5. container_registries (1:N step 2 for container_registry_*)
+          4. container_registries (1:N with EXISTS subquery for container_registry_*)
         """
         bug_reproduction_fields = [
             "name",
@@ -455,8 +444,8 @@ class TestProjectQuerySQLGenerationForBugReproduction:
         )
 
         compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
-        # Exactly 5 JOINs: 1 (resource_policy) + 2 (scaling_group) + 2 (container_registry)
-        assert compiled.count("LEFT OUTER JOIN") == 5
+        # Exactly 4 JOINs: 1 (resource_policy) + 2 (scaling_group) + 1 (container_registry)
+        assert compiled.count("LEFT OUTER JOIN") == 4
 
     def test_all_joins_are_left_outer_not_inner(self, adapter: ExportAdapter) -> None:
         """All generated JOINs must be LEFT OUTER JOINs, never INNER JOINs.
@@ -511,12 +500,9 @@ class TestProjectQuerySQLGenerationForBugReproduction:
 
         compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
         # Each joined table must appear exactly once as a LEFT OUTER JOIN target.
-        # Note: we check "LEFT OUTER JOIN <table_name>" — not raw occurrences of the
-        # table name (which would also match substrings in column references).
         for table_name in [
             "sgroups_for_groups",
             "scaling_groups",
-            "association_container_registries_groups",
             "container_registries",
         ]:
             join_occurrences = compiled.count(f"LEFT OUTER JOIN {table_name}")
@@ -575,7 +561,6 @@ class TestProjectQuerySQLGenerationForBugReproduction:
         for table_name in [
             "sgroups_for_groups",
             "scaling_groups",
-            "association_container_registries_groups",
             "container_registries",
         ]:
             join_occurrences = compiled.count(f"LEFT OUTER JOIN {table_name}")
@@ -591,7 +576,7 @@ class TestProjectQuerySQLGenerationForBugReproduction:
         """Selecting multiple container_registry_* fields must not multiply the JOIN count.
 
         6 container_registry_* fields all share the same CONTAINER_REGISTRY_JOINS tuple.
-        Selecting all 6 should still result in exactly 2 JOINs (deduplicated), not 12.
+        Selecting all 6 should still result in exactly 1 JOIN (deduplicated), not 6.
         """
         query = adapter.build_project_query(
             report=PROJECT_REPORT,
@@ -611,8 +596,8 @@ class TestProjectQuerySQLGenerationForBugReproduction:
         )
 
         compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
-        # Exactly 2 JOINs regardless of how many container_registry_* fields are selected
-        assert compiled.count("LEFT OUTER JOIN") == 2
+        # Exactly 1 JOIN regardless of how many container_registry_* fields are selected
+        assert compiled.count("LEFT OUTER JOIN") == 1
 
     def test_join_order_maintains_dependency_for_scaling_group(
         self, adapter: ExportAdapter
@@ -639,13 +624,13 @@ class TestProjectQuerySQLGenerationForBugReproduction:
             f"but got: sgroups_for_groups at {sg_for_project_pos}, scaling_groups at {sg_pos}"
         )
 
-    def test_join_order_maintains_dependency_for_container_registry(
+    def test_container_registry_join_includes_global_condition(
         self, adapter: ExportAdapter
     ) -> None:
-        """association_container_registries_groups must appear before container_registries.
+        """Container registry JOIN must include is_global condition for global registries.
 
-        CONTAINER_REGISTRY_JOIN depends on association_container_registries_groups being joined,
-        because its condition references AssociationContainerRegistriesGroupsRow.registry_id.
+        The JOIN condition uses OR: is_global=true OR EXISTS(assoc subquery).
+        This ensures global registries appear for all projects without explicit association.
         """
         query = adapter.build_project_query(
             report=PROJECT_REPORT,
@@ -657,12 +642,9 @@ class TestProjectQuerySQLGenerationForBugReproduction:
         )
 
         compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
-        assoc_pos = compiled.index("association_container_registries_groups")
-        cr_pos = compiled.index("container_registries")
-        assert assoc_pos < cr_pos, (
-            "association_container_registries_groups must be joined before container_registries, "
-            f"but got: assoc at {assoc_pos}, container_registries at {cr_pos}"
-        )
+        assert "container_registries.is_global" in compiled
+        assert "EXISTS" in compiled.upper()
+        assert "association_container_registries_groups" in compiled
 
 
 class TestJoinDefIdentityAndHashing:
@@ -713,9 +695,9 @@ class TestJoinDefIdentityAndHashing:
         assert SCALING_GROUP_FOR_PROJECT_JOIN in joins
         assert SCALING_GROUP_JOIN in joins
 
-    def test_all_five_joins_collected_for_full_field_combination(self) -> None:
+    def test_all_four_joins_collected_for_full_field_combination(self) -> None:
         """When resource_policy + scaling_group + container_registry fields are all selected,
-        exactly 5 unique JoinDef objects must be collected.
+        exactly 4 unique JoinDef objects must be collected.
         """
         adapter = ExportAdapter()
         fields_map = {f.key: f for f in PROJECT_REPORT.fields}
@@ -727,9 +709,9 @@ class TestJoinDefIdentityAndHashing:
         ]
 
         joins = adapter._collect_joins(selected_fields)
-        assert len(joins) == 5, (
-            f"Expected 5 unique joins "
-            f"(1 resource_policy + 2 scaling_group + 2 container_registry), "
+        assert len(joins) == 4, (
+            f"Expected 4 unique joins "
+            f"(1 resource_policy + 2 scaling_group + 1 container_registry), "
             f"got {len(joins)}: {joins}"
         )
 
@@ -1016,6 +998,290 @@ class TestProjectExportExecuteStreamingDB:
         # The project without registry has NULL for container_registry_id
         row_ids = {str(r[0]) for r in rows}
         assert str(project_id2) in row_ids
+
+
+class TestGlobalContainerRegistryExport:
+    """Tests for global container registries appearing in project export.
+
+    Verifies that global registries (is_global=true) appear for all projects
+    without requiring explicit association records (BA-4708).
+    """
+
+    @pytest.fixture
+    async def db_engine(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Engine with all required tables created."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ProjectResourcePolicyRow,
+                GroupRow,
+                ScalingGroupRow,
+                ScalingGroupForProjectRow,
+                ContainerRegistryRow,
+                AssociationContainerRegistriesGroupsRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def projects_with_global_registry(
+        self,
+        db_engine: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Create two projects and one global registry (no explicit associations)."""
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+        project_id_a = uuid.uuid4()
+        project_id_b = uuid.uuid4()
+        global_registry_id = uuid.uuid4()
+
+        async with db_engine.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    name=domain_name,
+                    description="",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=-1,
+                    max_network_count=10,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                GroupRow(
+                    id=project_id_a,
+                    name="project-a",
+                    domain_name=domain_name,
+                    resource_policy=policy_name,
+                )
+            )
+            db_sess.add(
+                GroupRow(
+                    id=project_id_b,
+                    name="project-b",
+                    domain_name=domain_name,
+                    resource_policy=policy_name,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                ContainerRegistryRow(
+                    id=global_registry_id,
+                    url="https://global-registry.example.com",
+                    registry_name="global-registry",
+                    type=ContainerRegistryType.DOCKER,
+                    is_global=True,
+                )
+            )
+            await db_sess.commit()
+
+        yield {
+            "project_id_a": project_id_a,
+            "project_id_b": project_id_b,
+            "global_registry_id": global_registry_id,
+            "domain_name": domain_name,
+        }
+
+    async def test_global_registry_appears_for_all_projects(
+        self,
+        db_engine: ExtendedAsyncSAEngine,
+        projects_with_global_registry: dict[str, Any],
+    ) -> None:
+        """A global registry must appear in export rows for every project.
+
+        This is the core BA-4708 fix: global registries have no association records,
+        but must still appear for all projects via the is_global=true JOIN condition.
+        """
+        adapter = ExportAdapter()
+        query = adapter.build_project_query(
+            report=PROJECT_REPORT,
+            fields=["id", "name", "container_registry_id", "container_registry_is_global"],
+            filter=None,
+            order=None,
+            max_rows=1000,
+            statement_timeout_sec=60,
+        )
+
+        rows: list[Any] = []
+        async for partition in execute_streaming_export(db_engine, query):
+            rows.extend(partition)
+
+        global_reg_id = str(projects_with_global_registry["global_registry_id"])
+        # Both projects must have a row with the global registry
+        assert len(rows) == 2, (
+            f"Expected 2 rows (1 per project, each with global registry), got {len(rows)}."
+        )
+        for row in rows:
+            assert str(row[2]) == global_reg_id
+            assert row[3] is True  # is_global
+
+    @pytest.fixture
+    async def projects_with_mixed_registries(
+        self,
+        db_engine: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Create projects with both global and non-global registries."""
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+        project_id = uuid.uuid4()
+        global_registry_id = uuid.uuid4()
+        scoped_registry_id = uuid.uuid4()
+
+        async with db_engine.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    name=domain_name,
+                    description="",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=-1,
+                    max_network_count=10,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                GroupRow(
+                    id=project_id,
+                    name="test-project",
+                    domain_name=domain_name,
+                    resource_policy=policy_name,
+                )
+            )
+            await db_sess.flush()
+
+            # Global registry (no association needed)
+            db_sess.add(
+                ContainerRegistryRow(
+                    id=global_registry_id,
+                    url="https://global-registry.example.com",
+                    registry_name="global-registry",
+                    type=ContainerRegistryType.DOCKER,
+                    is_global=True,
+                )
+            )
+            # Scoped registry (with explicit association)
+            db_sess.add(
+                ContainerRegistryRow(
+                    id=scoped_registry_id,
+                    url="https://scoped-registry.example.com",
+                    registry_name="scoped-registry",
+                    type=ContainerRegistryType.DOCKER,
+                    is_global=False,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                AssociationContainerRegistriesGroupsRow(
+                    id=uuid.uuid4(),
+                    registry_id=scoped_registry_id,
+                    group_id=project_id,
+                )
+            )
+            await db_sess.commit()
+
+        yield {
+            "project_id": project_id,
+            "global_registry_id": global_registry_id,
+            "scoped_registry_id": scoped_registry_id,
+        }
+
+    async def test_both_global_and_scoped_registries_appear(
+        self,
+        db_engine: ExtendedAsyncSAEngine,
+        projects_with_mixed_registries: dict[str, Any],
+    ) -> None:
+        """A project with both global and explicitly associated registries must show both."""
+        adapter = ExportAdapter()
+        query = adapter.build_project_query(
+            report=PROJECT_REPORT,
+            fields=["id", "name", "container_registry_id", "container_registry_is_global"],
+            filter=None,
+            order=None,
+            max_rows=1000,
+            statement_timeout_sec=60,
+        )
+
+        rows: list[Any] = []
+        async for partition in execute_streaming_export(db_engine, query):
+            rows.extend(partition)
+
+        data = projects_with_mixed_registries
+        registry_ids = {str(row[2]) for row in rows}
+        assert str(data["global_registry_id"]) in registry_ids
+        assert str(data["scoped_registry_id"]) in registry_ids
+        assert len(rows) == 2
+
+    async def test_global_registry_not_duplicated_when_also_associated(
+        self,
+        db_engine: ExtendedAsyncSAEngine,
+        projects_with_global_registry: dict[str, Any],
+    ) -> None:
+        """A global registry that also has an explicit association must not appear twice.
+
+        If someone explicitly associates a global registry with a project,
+        the OR condition must not produce duplicate rows.
+        """
+        data = projects_with_global_registry
+        # Add an explicit association for the global registry with project_a
+        async with db_engine.begin_session() as db_sess:
+            db_sess.add(
+                AssociationContainerRegistriesGroupsRow(
+                    id=uuid.uuid4(),
+                    registry_id=data["global_registry_id"],
+                    group_id=data["project_id_a"],
+                )
+            )
+            await db_sess.commit()
+
+        adapter = ExportAdapter()
+        query = adapter.build_project_query(
+            report=PROJECT_REPORT,
+            fields=["id", "name", "container_registry_id"],
+            filter=None,
+            order=None,
+            max_rows=1000,
+            statement_timeout_sec=60,
+        )
+
+        rows: list[Any] = []
+        async for partition in execute_streaming_export(db_engine, query):
+            rows.extend(partition)
+
+        # project_a: 1 row (global registry, even though also associated)
+        # project_b: 1 row (global registry)
+        # Total: 2 rows, not 3
+        assert len(rows) == 2, (
+            f"Expected 2 rows (1 per project), got {len(rows)}. "
+            "A global registry with explicit association must not produce duplicates."
+        )
 
 
 class TestSerializeJson:
