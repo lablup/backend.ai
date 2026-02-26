@@ -315,6 +315,7 @@ class ScopeType(enum.StrEnum):
     ARTIFACT = "artifact"
     ARTIFACT_REVISION = "artifact_revision"
     ROLE = "role"
+    NOTIFICATION_CHANNEL = "notification_channel"
 
     def to_element(self) -> RBACElementType:
         from ai.backend.common.exception import RBACTypeConversionError

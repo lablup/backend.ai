@@ -18,6 +18,7 @@ from ai.backend.common.data.notification import (
     SessionTerminatedMessage,
     WebhookSpec,
 )
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
@@ -25,13 +26,15 @@ from ai.backend.manager.data.notification import (
     NotificationRuleData,
     NotificationRuleListResult,
 )
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
     NotificationRuleNotFound,
     NotificationTemplateRenderingFailure,
 )
 from ai.backend.manager.notification.notification_center import NotificationCenter
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.notification import NotificationRepository
 from ai.backend.manager.repositories.notification.creators import (
@@ -454,7 +457,7 @@ class TestNotificationService:
         """Test creating a notification channel"""
         # TODO: Remove isinstance check when Email channel is implemented
         assert isinstance(sample_webhook_channel.spec, WebhookSpec)
-        creator = Creator(
+        creator = RBACEntityCreator(
             spec=NotificationChannelCreatorSpec(
                 name=sample_webhook_channel.name,
                 description=sample_webhook_channel.description,
@@ -462,7 +465,9 @@ class TestNotificationService:
                 spec=sample_webhook_channel.spec,
                 enabled=sample_webhook_channel.enabled,
                 created_by=sample_webhook_channel.created_by,
-            )
+            ),
+            element_type=RBACElementType.NOTIFICATION_CHANNEL,
+            scope_ref=RBACElementRef(RBACElementType.USER, str(sample_webhook_channel.created_by)),
         )
         mock_repository.create_channel = AsyncMock(return_value=sample_webhook_channel)
 
@@ -480,7 +485,7 @@ class TestNotificationService:
         sample_rule: NotificationRuleData,
     ) -> None:
         """Test creating a notification rule"""
-        creator = Creator(
+        creator = RBACEntityCreator(
             spec=NotificationRuleCreatorSpec(
                 name=sample_rule.name,
                 description=sample_rule.description,
@@ -489,7 +494,11 @@ class TestNotificationService:
                 message_template=sample_rule.message_template,
                 enabled=sample_rule.enabled,
                 created_by=sample_rule.created_by,
-            )
+            ),
+            element_type=RBACElementType.NOTIFICATION_RULE,
+            scope_ref=RBACElementRef(
+                RBACElementType.NOTIFICATION_CHANNEL, str(sample_rule.channel.id)
+            ),
         )
         mock_repository.create_rule = AsyncMock(return_value=sample_rule)
 

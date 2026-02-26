@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, cast, override
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.notification import NotificationRuleData
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.notification.creators import NotificationRuleCreatorSpec
 
 from .base import NotificationAction
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class CreateRuleAction(NotificationAction):
     """Action to create a notification rule."""
 
-    creator: Creator[NotificationRuleRow]
+    creator: RBACEntityCreator[NotificationRuleRow]
 
     @override
     @classmethod

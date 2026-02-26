@@ -23,6 +23,7 @@ from ai.backend.common.data.notification.types import (
     SMTPAuth,
     SMTPConnection,
 )
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import InvalidNotificationChannelSpec
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
@@ -30,14 +31,15 @@ from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationRuleData,
 )
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.repositories.base import (
-    Creator,
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.notification.creators import (
     NotificationChannelCreatorSpec,
@@ -561,8 +563,8 @@ class CreateNotificationChannelInput:
     spec: NotificationChannelSpecInput
     enabled: bool = True
 
-    def to_creator(self, created_by: uuid.UUID) -> Creator[NotificationChannelRow]:
-        return Creator(
+    def to_creator(self, created_by: uuid.UUID) -> RBACEntityCreator[NotificationChannelRow]:
+        return RBACEntityCreator(
             spec=NotificationChannelCreatorSpec(
                 name=self.name,
                 description=self.description,
@@ -570,7 +572,9 @@ class CreateNotificationChannelInput:
                 spec=self.spec.to_dataclass(),
                 enabled=self.enabled,
                 created_by=created_by,
-            )
+            ),
+            element_type=RBACElementType.NOTIFICATION_CHANNEL,
+            scope_ref=RBACElementRef(RBACElementType.USER, str(created_by)),
         )
 
 
@@ -613,8 +617,8 @@ class CreateNotificationRuleInput:
     message_template: str
     enabled: bool = True
 
-    def to_creator(self, created_by: uuid.UUID) -> Creator[NotificationRuleRow]:
-        return Creator(
+    def to_creator(self, created_by: uuid.UUID) -> RBACEntityCreator[NotificationRuleRow]:
+        return RBACEntityCreator(
             spec=NotificationRuleCreatorSpec(
                 name=self.name,
                 description=self.description,
@@ -623,7 +627,9 @@ class CreateNotificationRuleInput:
                 message_template=self.message_template,
                 enabled=self.enabled,
                 created_by=created_by,
-            )
+            ),
+            element_type=RBACElementType.NOTIFICATION_RULE,
+            scope_ref=RBACElementRef(RBACElementType.NOTIFICATION_CHANNEL, str(self.channel_id)),
         )
 
 

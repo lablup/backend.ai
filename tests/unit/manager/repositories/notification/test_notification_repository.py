@@ -16,7 +16,9 @@ from ai.backend.common.data.notification import (
     NotificationRuleType,
     WebhookSpec,
 )
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import BinarySize, ResourceSlot
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
     NotificationRuleNotFound,
@@ -36,6 +38,9 @@ from ai.backend.manager.models.notification import (
     NotificationRuleRow,
 )
 from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -54,7 +59,8 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.notification import NotificationRepository
 from ai.backend.manager.repositories.notification.creators import (
@@ -107,6 +113,8 @@ class TestNotificationRepository:
                 KernelRow,
                 RoutingRow,
                 ResourcePresetRow,
+                # RBAC association
+                AssociationScopesEntitiesRow,
                 # Test-specific rows
                 NotificationChannelRow,
                 NotificationRuleRow,
@@ -386,7 +394,7 @@ class TestNotificationRepository:
             success_status_codes=[200, 201, 202],
         )
 
-        creator = Creator(
+        creator = RBACEntityCreator(
             spec=NotificationChannelCreatorSpec(
                 name="Test Webhook",
                 channel_type=NotificationChannelType.WEBHOOK,
@@ -394,7 +402,9 @@ class TestNotificationRepository:
                 created_by=test_user,
                 description="Test webhook channel",
                 enabled=True,
-            )
+            ),
+            element_type=RBACElementType.NOTIFICATION_CHANNEL,
+            scope_ref=RBACElementRef(RBACElementType.USER, str(test_user)),
         )
 
         channel = await notification_repository.create_channel(creator)
@@ -527,18 +537,20 @@ class TestNotificationRepository:
         """Test creating notification rule"""
         config = WebhookSpec(url="https://example.com/webhook")
 
-        channel_creator = Creator(
+        channel_creator = RBACEntityCreator(
             spec=NotificationChannelCreatorSpec(
                 name="Test Channel",
                 channel_type=NotificationChannelType.WEBHOOK,
                 spec=config,
                 created_by=test_user,
-            )
+            ),
+            element_type=RBACElementType.NOTIFICATION_CHANNEL,
+            scope_ref=RBACElementRef(RBACElementType.USER, str(test_user)),
         )
 
         channel = await notification_repository.create_channel(channel_creator)
 
-        rule_creator = Creator(
+        rule_creator = RBACEntityCreator(
             spec=NotificationRuleCreatorSpec(
                 name="Session Started Rule",
                 rule_type=NotificationRuleType.SESSION_STARTED,
@@ -547,7 +559,9 @@ class TestNotificationRepository:
                 created_by=test_user,
                 description="Notify when session starts",
                 enabled=True,
-            )
+            ),
+            element_type=RBACElementType.NOTIFICATION_RULE,
+            scope_ref=RBACElementRef(RBACElementType.NOTIFICATION_CHANNEL, str(channel.id)),
         )
 
         rule = await notification_repository.create_rule(rule_creator)
