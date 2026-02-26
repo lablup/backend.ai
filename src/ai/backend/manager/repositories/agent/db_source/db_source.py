@@ -142,6 +142,13 @@ class AgentDBSource:
         async with self._db.begin_session() as session:
             await execute_updater(session, updater)
 
+    async def update(self, updater: Updater[AgentRow]) -> AgentData:
+        async with self._db.begin_session() as session:
+            result = await execute_updater(session, updater)
+            if result is None:
+                raise AgentNotFound(f"Agent with id {updater.pk_value} not found")
+            return result.row.to_data()
+
     async def search_agents(
         self,
         querier: BatchQuerier,

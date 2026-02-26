@@ -32,3 +32,23 @@ class AgentStatusUpdaterSpec(UpdaterSpec[AgentRow]):
         }
         self.lost_at.update_dict(to_update, "lost_at")
         return to_update
+
+
+@dataclass
+class AgentUpdaterSpec(UpdaterSpec[AgentRow]):
+    """UpdaterSpec for general agent property updates."""
+
+    schedulable: OptionalState[bool] = field(default_factory=OptionalState.nop)
+    scaling_group: OptionalState[str] = field(default_factory=OptionalState.nop)
+
+    @property
+    @override
+    def row_class(self) -> type[AgentRow]:
+        return AgentRow
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.schedulable.update_dict(to_update, "schedulable")
+        self.scaling_group.update_dict(to_update, "scaling_group")
+        return to_update

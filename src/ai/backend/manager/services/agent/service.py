@@ -76,6 +76,10 @@ from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
     SyncAgentRegistryActionResult,
 )
+from ai.backend.manager.services.agent.actions.update_agent import (
+    UpdateAgentAction,
+    UpdateAgentActionResult,
+)
 from ai.backend.manager.services.agent.actions.watcher_agent_restart import (
     WatcherAgentRestartAction,
     WatcherAgentRestartActionResult,
@@ -335,3 +339,10 @@ class AgentService:
             agent_ids=action.agent_ids
         )
         return LoadContainerCountsActionResult(container_counts=container_counts)
+
+    async def update_agent(self, action: UpdateAgentAction) -> UpdateAgentActionResult:
+        agent_data = await self._agent_repository.update(
+            agent_id=action.agent_id,
+            updater=action.updater,
+        )
+        return UpdateAgentActionResult(data=agent_data)

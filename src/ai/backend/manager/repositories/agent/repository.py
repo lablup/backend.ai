@@ -215,6 +215,10 @@ class AgentRepository:
             await self._cache_source.update_gpu_alloc_map(agent_id, alloc_map)
 
     @agent_repository_resilience.apply()
+    async def update(self, agent_id: AgentId, updater: Updater[AgentRow]) -> AgentData:
+        return await self._db_source.update(updater)
+
+    @agent_repository_resilience.apply()
     async def search_agents(
         self,
         querier: BatchQuerier,
