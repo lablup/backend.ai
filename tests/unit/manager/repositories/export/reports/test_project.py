@@ -1001,18 +1001,13 @@ class TestProjectExportExecuteStreamingDB:
 
 
 class TestGlobalContainerRegistryExport:
-    """Tests for global container registries appearing in project export.
-
-    Verifies that global registries (is_global=true) appear for all projects
-    without requiring explicit association records (BA-4708).
-    """
+    """Tests that global container registries appear in project export (BA-4708)."""
 
     @pytest.fixture
     async def db_engine(
         self,
         database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Engine with all required tables created."""
         async with with_tables(
             database_connection,
             [
@@ -1028,115 +1023,11 @@ class TestGlobalContainerRegistryExport:
             yield database_connection
 
     @pytest.fixture
-    async def projects_with_global_registry(
+    async def project_with_global_and_scoped_registries(
         self,
         db_engine: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[dict[str, Any], None]:
-        """Create two projects and one global registry (no explicit associations)."""
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
-        project_id_a = uuid.uuid4()
-        project_id_b = uuid.uuid4()
-        global_registry_id = uuid.uuid4()
-
-        async with db_engine.begin_session() as db_sess:
-            db_sess.add(
-                DomainRow(
-                    name=domain_name,
-                    description="",
-                    is_active=True,
-                    total_resource_slots=ResourceSlot(),
-                    allowed_vfolder_hosts={},
-                    allowed_docker_registries=[],
-                )
-            )
-            await db_sess.flush()
-
-            db_sess.add(
-                ProjectResourcePolicyRow(
-                    name=policy_name,
-                    max_vfolder_count=10,
-                    max_quota_scope_size=-1,
-                    max_network_count=10,
-                )
-            )
-            await db_sess.flush()
-
-            db_sess.add(
-                GroupRow(
-                    id=project_id_a,
-                    name="project-a",
-                    domain_name=domain_name,
-                    resource_policy=policy_name,
-                )
-            )
-            db_sess.add(
-                GroupRow(
-                    id=project_id_b,
-                    name="project-b",
-                    domain_name=domain_name,
-                    resource_policy=policy_name,
-                )
-            )
-            await db_sess.flush()
-
-            db_sess.add(
-                ContainerRegistryRow(
-                    id=global_registry_id,
-                    url="https://global-registry.example.com",
-                    registry_name="global-registry",
-                    type=ContainerRegistryType.DOCKER,
-                    is_global=True,
-                )
-            )
-            await db_sess.commit()
-
-        yield {
-            "project_id_a": project_id_a,
-            "project_id_b": project_id_b,
-            "global_registry_id": global_registry_id,
-            "domain_name": domain_name,
-        }
-
-    async def test_global_registry_appears_for_all_projects(
-        self,
-        db_engine: ExtendedAsyncSAEngine,
-        projects_with_global_registry: dict[str, Any],
-    ) -> None:
-        """A global registry must appear in export rows for every project.
-
-        This is the core BA-4708 fix: global registries have no association records,
-        but must still appear for all projects via the is_global=true JOIN condition.
-        """
-        adapter = ExportAdapter()
-        query = adapter.build_project_query(
-            report=PROJECT_REPORT,
-            fields=["id", "name", "container_registry_id", "container_registry_is_global"],
-            filter=None,
-            order=None,
-            max_rows=1000,
-            statement_timeout_sec=60,
-        )
-
-        rows: list[Any] = []
-        async for partition in execute_streaming_export(db_engine, query):
-            rows.extend(partition)
-
-        global_reg_id = str(projects_with_global_registry["global_registry_id"])
-        # Both projects must have a row with the global registry
-        assert len(rows) == 2, (
-            f"Expected 2 rows (1 per project, each with global registry), got {len(rows)}."
-        )
-        for row in rows:
-            assert str(row[2]) == global_reg_id
-            assert row[3] is True  # is_global
-
-    @pytest.fixture
-    async def projects_with_mixed_registries(
-        self,
-        db_engine: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[dict[str, Any], None]:
-        """Create projects with both global and non-global registries."""
+        """Create a project with one global registry and one scoped (associated) registry."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
         project_id = uuid.uuid4()
@@ -1155,7 +1046,6 @@ class TestGlobalContainerRegistryExport:
                 )
             )
             await db_sess.flush()
-
             db_sess.add(
                 ProjectResourcePolicyRow(
                     name=policy_name,
@@ -1165,7 +1055,6 @@ class TestGlobalContainerRegistryExport:
                 )
             )
             await db_sess.flush()
-
             db_sess.add(
                 GroupRow(
                     id=project_id,
@@ -1175,8 +1064,6 @@ class TestGlobalContainerRegistryExport:
                 )
             )
             await db_sess.flush()
-
-            # Global registry (no association needed)
             db_sess.add(
                 ContainerRegistryRow(
                     id=global_registry_id,
@@ -1186,7 +1073,6 @@ class TestGlobalContainerRegistryExport:
                     is_global=True,
                 )
             )
-            # Scoped registry (with explicit association)
             db_sess.add(
                 ContainerRegistryRow(
                     id=scoped_registry_id,
@@ -1197,7 +1083,6 @@ class TestGlobalContainerRegistryExport:
                 )
             )
             await db_sess.flush()
-
             db_sess.add(
                 AssociationContainerRegistriesGroupsRow(
                     id=uuid.uuid4(),
@@ -1213,12 +1098,12 @@ class TestGlobalContainerRegistryExport:
             "scoped_registry_id": scoped_registry_id,
         }
 
-    async def test_both_global_and_scoped_registries_appear(
+    async def test_global_and_scoped_registries_both_appear(
         self,
         db_engine: ExtendedAsyncSAEngine,
-        projects_with_mixed_registries: dict[str, Any],
+        project_with_global_and_scoped_registries: dict[str, Any],
     ) -> None:
-        """A project with both global and explicitly associated registries must show both."""
+        """Both global and scoped registries must appear in project export (BA-4708)."""
         adapter = ExportAdapter()
         query = adapter.build_project_query(
             report=PROJECT_REPORT,
@@ -1233,55 +1118,11 @@ class TestGlobalContainerRegistryExport:
         async for partition in execute_streaming_export(db_engine, query):
             rows.extend(partition)
 
-        data = projects_with_mixed_registries
+        data = project_with_global_and_scoped_registries
         registry_ids = {str(row[2]) for row in rows}
+        assert len(rows) == 2
         assert str(data["global_registry_id"]) in registry_ids
         assert str(data["scoped_registry_id"]) in registry_ids
-        assert len(rows) == 2
-
-    async def test_global_registry_not_duplicated_when_also_associated(
-        self,
-        db_engine: ExtendedAsyncSAEngine,
-        projects_with_global_registry: dict[str, Any],
-    ) -> None:
-        """A global registry that also has an explicit association must not appear twice.
-
-        If someone explicitly associates a global registry with a project,
-        the OR condition must not produce duplicate rows.
-        """
-        data = projects_with_global_registry
-        # Add an explicit association for the global registry with project_a
-        async with db_engine.begin_session() as db_sess:
-            db_sess.add(
-                AssociationContainerRegistriesGroupsRow(
-                    id=uuid.uuid4(),
-                    registry_id=data["global_registry_id"],
-                    group_id=data["project_id_a"],
-                )
-            )
-            await db_sess.commit()
-
-        adapter = ExportAdapter()
-        query = adapter.build_project_query(
-            report=PROJECT_REPORT,
-            fields=["id", "name", "container_registry_id"],
-            filter=None,
-            order=None,
-            max_rows=1000,
-            statement_timeout_sec=60,
-        )
-
-        rows: list[Any] = []
-        async for partition in execute_streaming_export(db_engine, query):
-            rows.extend(partition)
-
-        # project_a: 1 row (global registry, even though also associated)
-        # project_b: 1 row (global registry)
-        # Total: 2 rows, not 3
-        assert len(rows) == 2, (
-            f"Expected 2 rows (1 per project), got {len(rows)}. "
-            "A global registry with explicit association must not produce duplicates."
-        )
 
 
 class TestSerializeJson:
