@@ -106,7 +106,9 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
     allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
     resource_policy = graphene.String()
-    container_registry_id = graphene.UUID(description="Added in 25.4.0.")
+    container_registry_id = graphene.UUID(
+        description="Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified."
+    )
     type = graphene.String(description=f"Added in 24.03.7. One of {[t.name for t in ProjectType]}.")
     scaling_groups = graphene.List(
         lambda: graphene.String,
@@ -354,7 +356,9 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
     allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
     resource_policy = graphene.String()
-    container_registry_id = graphene.UUID(description="Added in 25.4.0.")
+    container_registry_id = graphene.UUID(
+        description="Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified."
+    )
     type = graphene.String(description="Added in 24.03.0.")
 
     scaling_groups = graphene.List(lambda: graphene.String)
@@ -555,7 +559,10 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
     allowed_vfolder_hosts = graphene.JSONString(required=False, default_value={})
     integration_id = graphene.String(required=False, default_value="")
     resource_policy = graphene.String(required=False, default_value="default")
-    container_registry_id = graphene.UUID(required=False, description="Added in 25.4.0.")
+    container_registry_id = graphene.UUID(
+        required=False,
+        description="Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.",
+    )
 
     def to_action(self, name: str) -> CreateGroupAction:
         def value_or_none(value: Any) -> Any:
@@ -607,7 +614,10 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
     resource_policy = graphene.String(required=False)
-    container_registry_id = graphene.UUID(required=False, description="Added in 25.4.0.")
+    container_registry_id = graphene.UUID(
+        required=False,
+        description="Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.",
+    )
 
     def to_action(self, group_id: uuid.UUID) -> ModifyGroupAction:
         spec = GroupUpdaterSpec(

@@ -23,10 +23,7 @@ FIXTURES_FOR_HARBOR_CRUD_TEST = [
                 "resource_policy": "default",
                 "total_resource_slots": {},
                 "allowed_vfolder_hosts": {},
-                "container_registry": {
-                    "registry": "mock_registry",
-                    "project": "mock_project",
-                },
+                "container_registry_id": "00000000-0000-0000-0000-000000000000",
                 "type": "general",
             }
         ],

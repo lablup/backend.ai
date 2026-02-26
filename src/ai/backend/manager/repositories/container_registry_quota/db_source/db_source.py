@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -28,31 +27,20 @@ class PerProjectRegistryQuotaDBSource:
     ) -> PerProjectContainerRegistryInfo:
         async with self._db.begin_readonly_session() as db_sess:
             project_id = scope_id.project_id
-            project_row = await self._fetch_project_row(db_sess, project_id)
-
-            if project_row is None:
-                raise ContainerRegistryNotFound(
-                    f"Container registry info does not exist or is invalid in the project. (project: {project_id})"
-                )
-            container_registry: dict[str, Any] | None = project_row.container_registry
-            if (
-                not container_registry
-                or "registry" not in container_registry
-                or "project" not in container_registry
-            ):
-                raise ContainerRegistryNotFound(
-                    f"Container registry info does not exist or is invalid in the project. (project: {project_id})"
-                )
-            registry_name, project = (
-                container_registry["registry"],
-                container_registry["project"],
+            container_registry_id = await self._fetch_project_container_registry_id(
+                db_sess, project_id
             )
 
-            registry_row = await self._fetch_registry_row(db_sess, registry_name, project)
+            if container_registry_id is None:
+                raise ContainerRegistryNotFound(
+                    f"Container registry info does not exist or is invalid in the project. (project: {project_id})"
+                )
+
+            registry_row = await self._fetch_registry_row_by_id(db_sess, container_registry_id)
 
             if registry_row is None:
                 raise ContainerRegistryNotFound(
-                    f"Container registry row not found. (registry: {registry_name}, project: {project})"
+                    f"Container registry row not found. (id: {container_registry_id})"
                 )
 
             return PerProjectContainerRegistryInfo(
@@ -68,28 +56,29 @@ class PerProjectRegistryQuotaDBSource:
                 extra=registry_row.extra or {},
             )
 
-    async def _fetch_project_row(
+    async def _fetch_project_container_registry_id(
         self,
         db_sess: SASession,
         project_id: UUID,
-    ) -> GroupRow | None:
+    ) -> UUID | None:
         project_query = (
             sa.select(GroupRow)
             .where(GroupRow.id == project_id)
-            .options(load_only(GroupRow.container_registry))
+            .options(load_only(GroupRow.container_registry_id))
         )
         result = await db_sess.execute(project_query)
-        return result.scalar_one_or_none()
+        project_row = result.scalar_one_or_none()
+        if project_row is None:
+            return None
+        return project_row.container_registry_id
 
-    async def _fetch_registry_row(
+    async def _fetch_registry_row_by_id(
         self,
         db_sess: SASession,
-        registry_name: str,
-        project: str,
+        registry_id: UUID,
     ) -> ContainerRegistryRow | None:
         registry_query = sa.select(ContainerRegistryRow).where(
-            (ContainerRegistryRow.registry_name == registry_name)
-            & (ContainerRegistryRow.project == project)
+            ContainerRegistryRow.id == registry_id
         )
         result = await db_sess.execute(registry_query)
         return result.scalars().one_or_none()

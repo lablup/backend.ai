@@ -51,7 +51,11 @@ class GroupDTO(BaseModel):
     )
     resource_policy: str | None = Field(default=None, description="Resource policy name")
     container_registry_id: UUID | None = Field(
-        default=None, description="Default container registry ID"
+        default=None,
+        description=(
+            "The default container registry used as the target for session commits"
+            " when no container registry is explicitly specified."
+        ),
     )
 
 
