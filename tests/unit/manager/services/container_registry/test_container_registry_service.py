@@ -14,7 +14,10 @@ import pytest
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.types import ImageCanonical, ImageID
 from ai.backend.manager.container_registry import get_container_registry_cls
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.container_registry.types import (
+    ContainerRegistryData,
+    ContainerRegistrySearchResult,
+)
 from ai.backend.manager.data.image.types import (
     ImageData,
     ImageLabelsData,
@@ -25,6 +28,7 @@ from ai.backend.manager.data.image.types import (
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -40,6 +44,12 @@ from ai.backend.manager.services.container_registry.actions.load_container_regis
 )
 from ai.backend.manager.services.container_registry.actions.rescan_images import (
     RescanImagesAction,
+)
+from ai.backend.manager.services.container_registry.actions.search_container_registries import (
+    SearchContainerRegistriesAction,
+)
+from ai.backend.manager.services.container_registry.processors import (
+    ContainerRegistryProcessors,
 )
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 
@@ -699,3 +709,133 @@ class TestRescanImages:
             mock_scanner_cls.assert_called_once_with(
                 mock_db_engine, "registry.example.com", sample_registry_row
             )
+
+
+# ==================== SearchContainerRegistries Tests ====================
+
+
+class TestSearchContainerRegistries:
+    """Test cases for ContainerRegistryService.search_container_registries"""
+
+    async def test_success(
+        self,
+        container_registry_service: ContainerRegistryService,
+        mock_container_registry_repository: MagicMock,
+        sample_registry_data: ContainerRegistryData,
+    ) -> None:
+        """Search container registries should return matching results."""
+        mock_container_registry_repository.search_container_registries = AsyncMock(
+            return_value=ContainerRegistrySearchResult(
+                items=[sample_registry_data],
+                total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchContainerRegistriesAction(querier=querier)
+
+        result = await container_registry_service.search_container_registries(action)
+
+        assert result.data == [sample_registry_data]
+        assert result.total_count == 1
+        assert result.has_next_page is False
+        assert result.has_previous_page is False
+        mock_container_registry_repository.search_container_registries.assert_called_once_with(
+            querier
+        )
+
+    async def test_empty_result(
+        self,
+        container_registry_service: ContainerRegistryService,
+        mock_container_registry_repository: MagicMock,
+    ) -> None:
+        """Search container registries should return empty list when no results found."""
+        mock_container_registry_repository.search_container_registries = AsyncMock(
+            return_value=ContainerRegistrySearchResult(
+                items=[],
+                total_count=0,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchContainerRegistriesAction(querier=querier)
+
+        result = await container_registry_service.search_container_registries(action)
+
+        assert result.data == []
+        assert result.total_count == 0
+
+    async def test_with_pagination(
+        self,
+        container_registry_service: ContainerRegistryService,
+        mock_container_registry_repository: MagicMock,
+        sample_registry_data: ContainerRegistryData,
+    ) -> None:
+        """Search container registries should handle pagination correctly."""
+        mock_container_registry_repository.search_container_registries = AsyncMock(
+            return_value=ContainerRegistrySearchResult(
+                items=[sample_registry_data],
+                total_count=25,
+                has_next_page=True,
+                has_previous_page=True,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=10),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchContainerRegistriesAction(querier=querier)
+
+        result = await container_registry_service.search_container_registries(action)
+
+        assert result.total_count == 25
+        assert result.has_next_page is True
+        assert result.has_previous_page is True
+
+    async def test_via_processor(
+        self,
+        mock_db_engine: MagicMock,
+        mock_container_registry_repository: MagicMock,
+        sample_registry_data: ContainerRegistryData,
+    ) -> None:
+        """Search container registries should work through the processor."""
+        service = ContainerRegistryService(
+            db=mock_db_engine,
+            container_registry_repository=mock_container_registry_repository,
+        )
+        processors = ContainerRegistryProcessors(service, [])
+
+        mock_container_registry_repository.search_container_registries = AsyncMock(
+            return_value=ContainerRegistrySearchResult(
+                items=[sample_registry_data],
+                total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchContainerRegistriesAction(querier=querier)
+
+        result = await processors.search_container_registries.wait_for_complete(action)
+
+        assert result.data == [sample_registry_data]
+        assert result.total_count == 1

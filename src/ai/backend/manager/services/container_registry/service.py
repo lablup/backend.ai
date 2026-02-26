@@ -39,6 +39,10 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
     RescanImagesAction,
     RescanImagesActionResult,
 )
+from ai.backend.manager.services.container_registry.actions.search_container_registries import (
+    SearchContainerRegistriesAction,
+    SearchContainerRegistriesActionResult,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -125,6 +129,20 @@ class ContainerRegistryService:
     ) -> LoadAllContainerRegistriesActionResult:
         registries = await self._container_registry_repository.get_all()
         return LoadAllContainerRegistriesActionResult(registries=registries)
+
+    async def search_container_registries(
+        self, action: SearchContainerRegistriesAction
+    ) -> SearchContainerRegistriesActionResult:
+        """Search container registries with pagination and ordering."""
+        result = await self._container_registry_repository.search_container_registries(
+            action.querier
+        )
+        return SearchContainerRegistriesActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def get_container_registries(
         self, _action: GetContainerRegistriesAction

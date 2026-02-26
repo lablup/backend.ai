@@ -12,7 +12,10 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.container_registry.types import (
+    ContainerRegistryData,
+    ContainerRegistrySearchResult,
+)
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry import (
@@ -24,6 +27,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.purger import Purger, execute_purger
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.container_registry.creators import ContainerRegistryCreatorSpec
 from ai.backend.manager.repositories.container_registry.updaters import (
@@ -221,6 +225,35 @@ class ContainerRegistryRepository:
             if not row:
                 raise ContainerRegistryNotFound()
             return row
+
+    @container_registry_repository_resilience.apply()
+    async def search_container_registries(
+        self,
+        querier: BatchQuerier,
+    ) -> ContainerRegistrySearchResult:
+        """Search container registries with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            ContainerRegistrySearchResult with items, total_count, and pagination info.
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(ContainerRegistryRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            return ContainerRegistrySearchResult(
+                items=[row.ContainerRegistryRow.to_dataclass() for row in result.rows],
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     async def _get_by_registry_and_project(
         self,

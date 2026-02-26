@@ -47,6 +47,7 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
@@ -1274,3 +1275,208 @@ class TestContainerRegistryRepository:
         assert result.password == "test-pass"
         assert result.ssl_verify is False
         assert result.is_global is False
+
+
+class TestSearchContainerRegistries:
+    """Integration tests for search_container_registries repository method."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables created."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+                ContainerRegistryRow,
+                AssociationContainerRegistriesGroupsRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:
+        return ContainerRegistryRepository(db=db_with_cleanup)
+
+    @pytest.fixture
+    async def sample_registries(
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> list[ContainerRegistryData]:
+        """Create 4 container registries with different types for testing."""
+        registries: list[ContainerRegistryData] = []
+        configs = [
+            (ContainerRegistryType.DOCKER, "docker-reg", "project-a"),
+            (ContainerRegistryType.DOCKER, "docker-reg-2", "project-b"),
+            (ContainerRegistryType.HARBOR2, "harbor-reg", "harbor-project"),
+            (ContainerRegistryType.GITHUB, "ghcr-reg", "ghcr-project"),
+        ]
+        async with db_with_cleanup.begin_session() as session:
+            for reg_type, reg_name, project in configs:
+                row = ContainerRegistryRow(
+                    id=uuid.uuid4(),
+                    url=f"https://{reg_name}.example.com",
+                    registry_name=reg_name,
+                    type=reg_type,
+                    project=project,
+                )
+                session.add(row)
+                await session.flush()
+                registries.append(row.to_dataclass())
+            await session.commit()
+        return registries
+
+    # =========================================================================
+    # Tests - Search with pagination
+    # =========================================================================
+
+    async def test_search_first_page(
+        self,
+        repository: ContainerRegistryRepository,
+        sample_registries: list[ContainerRegistryData],
+    ) -> None:
+        """Test first page of search results."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=2, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        result = await repository.search_container_registries(querier)
+
+        assert len(result.items) == 2
+        assert result.total_count == 4
+
+    async def test_search_second_page(
+        self,
+        repository: ContainerRegistryRepository,
+        sample_registries: list[ContainerRegistryData],
+    ) -> None:
+        """Test second page of search results."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=2, offset=2),
+            conditions=[],
+            orders=[],
+        )
+        result = await repository.search_container_registries(querier)
+
+        assert len(result.items) == 2
+        assert result.total_count == 4
+
+    # =========================================================================
+    # Tests - Search with filtering
+    # =========================================================================
+
+    async def test_search_filter_by_type(
+        self,
+        repository: ContainerRegistryRepository,
+        sample_registries: list[ContainerRegistryData],
+    ) -> None:
+        """Test filtering container registries by type."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                lambda: ContainerRegistryRow.type == ContainerRegistryType.DOCKER,
+            ],
+            orders=[],
+        )
+        result = await repository.search_container_registries(querier)
+
+        assert len(result.items) == 2
+        assert all(item.type == ContainerRegistryType.DOCKER for item in result.items)
+
+    async def test_search_filter_by_registry_name(
+        self,
+        repository: ContainerRegistryRepository,
+        sample_registries: list[ContainerRegistryData],
+    ) -> None:
+        """Test filtering container registries by registry name."""
+        target_name = sample_registries[0].registry_name
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                lambda: ContainerRegistryRow.registry_name == target_name,
+            ],
+            orders=[],
+        )
+        result = await repository.search_container_registries(querier)
+
+        assert len(result.items) == 1
+        assert result.items[0].registry_name == target_name
+
+    # =========================================================================
+    # Tests - Search with ordering
+    # =========================================================================
+
+    async def test_search_order_by_registry_name_ascending(
+        self,
+        repository: ContainerRegistryRepository,
+        sample_registries: list[ContainerRegistryData],
+    ) -> None:
+        """Test ordering container registries by registry_name ascending."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[ContainerRegistryRow.registry_name.asc()],
+        )
+        result = await repository.search_container_registries(querier)
+
+        names = [item.registry_name for item in result.items]
+        assert names == sorted(names)
+
+    async def test_search_order_by_registry_name_descending(
+        self,
+        repository: ContainerRegistryRepository,
+        sample_registries: list[ContainerRegistryData],
+    ) -> None:
+        """Test ordering container registries by registry_name descending."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[ContainerRegistryRow.registry_name.desc()],
+        )
+        result = await repository.search_container_registries(querier)
+
+        names = [item.registry_name for item in result.items]
+        assert names == sorted(names, reverse=True)
+
+    # =========================================================================
+    # Tests - Empty results
+    # =========================================================================
+
+    async def test_search_no_results(
+        self,
+        repository: ContainerRegistryRepository,
+        sample_registries: list[ContainerRegistryData],
+    ) -> None:
+        """Test search with no matching results."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                lambda: ContainerRegistryRow.registry_name == "non-existent-registry",
+            ],
+            orders=[],
+        )
+        result = await repository.search_container_registries(querier)
+
+        assert len(result.items) == 0
+        assert result.total_count == 0
