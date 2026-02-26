@@ -941,6 +941,11 @@ type GroupNode implements Node @key(fields: "id") {
   integration_id: String
   resource_policy: String
 
+  """
+  Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.
+  """
+  container_registry_id: UUID
+
   """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE']."""
   type: String
   scaling_groups: [String]
@@ -1064,6 +1069,11 @@ type Group {
   allowed_vfolder_hosts: JSONString
   integration_id: String
   resource_policy: String
+
+  """
+  Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.
+  """
+  container_registry_id: UUID
 
   """Added in 24.03.0."""
   type: String
@@ -2702,6 +2712,11 @@ input GroupInput {
   allowed_vfolder_hosts: JSONString = "{}"
   integration_id: String = ""
   resource_policy: String = "default"
+
+  """
+  Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.
+  """
+  container_registry_id: UUID
 }
 
 type ModifyGroup {
@@ -2721,6 +2736,11 @@ input ModifyGroupInput {
   allowed_vfolder_hosts: JSONString
   integration_id: String
   resource_policy: String
+
+  """
+  Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.
+  """
+  container_registry_id: UUID
 }
 
 """Instead of deleting the group, just mark it as inactive."""

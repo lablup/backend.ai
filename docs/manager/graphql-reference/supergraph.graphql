@@ -4607,6 +4607,11 @@ type Group
   integration_id: String
   resource_policy: String
 
+  """
+  Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.
+  """
+  container_registry_id: UUID
+
   """Added in 24.03.0."""
   type: String
   scaling_groups: [String]
@@ -4649,6 +4654,11 @@ input GroupInput
   allowed_vfolder_hosts: JSONString = "{}"
   integration_id: String = ""
   resource_policy: String = "default"
+
+  """
+  Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.
+  """
+  container_registry_id: UUID
 }
 
 type GroupNode implements Node
@@ -4671,6 +4681,11 @@ type GroupNode implements Node
   allowed_vfolder_hosts: JSONString @join__field(graph: GRAPHENE)
   integration_id: String @join__field(graph: GRAPHENE)
   resource_policy: String @join__field(graph: GRAPHENE)
+
+  """
+  Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.
+  """
+  container_registry_id: UUID @join__field(graph: GRAPHENE)
 
   """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE']."""
   type: String @join__field(graph: GRAPHENE)
@@ -6411,6 +6426,11 @@ input ModifyGroupInput
   allowed_vfolder_hosts: JSONString
   integration_id: String
   resource_policy: String
+
+  """
+  Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.
+  """
+  container_registry_id: UUID
 }
 
 type ModifyImage
