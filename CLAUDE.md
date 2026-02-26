@@ -37,18 +37,17 @@ Skills are in `.claude/skills/{name}/SKILL.md`. See `.claude/skills/README.md` f
 
 ## Before Committing
 
-Always run these commands and fix all errors:
+Before committing, run these commands and fix all errors:
 
 ```bash
-pants fmt ::
-pants fix ::
+pants fmt --changed-since=HEAD~1
+pants fix --changed-since=HEAD~1
 pants lint --changed-since=HEAD~1
+pants check --changed-since=HEAD~1
+pants test --changed-since=HEAD~1
 ```
 
-The pre-commit hook runs `pants fmt` and `pants lint` automatically.
-Type checking (`pants check`) and tests (`pants test`) are enforced by CI only — do **not** run them locally.
-
-**Fix all lint errors - never suppress or skip.**
+**Fix all lint, type, and test errors — never suppress or skip.**
 
 ## Development Guidelines
 
