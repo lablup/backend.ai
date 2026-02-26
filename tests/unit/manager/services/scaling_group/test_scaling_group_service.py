@@ -39,9 +39,8 @@ from ai.backend.manager.models.scaling_group import (
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.registry import check_scaling_group
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.base.creator import BulkCreator
+from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.purger import BatchPurger
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.rbac.scope_binder import (
     RBACScopeBinder,
     RBACScopeBindingPair,
@@ -157,7 +156,7 @@ class TestScalingGroupService:
         )
 
     @pytest.fixture
-    def scaling_group_creator_full(self) -> RBACEntityCreator[ScalingGroupRow]:
+    def scaling_group_creator_full(self) -> Creator[ScalingGroupRow]:
         """Creator with full configuration for testing create_scaling_group success"""
         scheduler_opts = ScalingGroupOpts(
             allowed_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
@@ -178,14 +177,7 @@ class TestScalingGroupService:
             scheduler_opts=scheduler_opts,
             use_host_network=True,
         )
-        return RBACEntityCreator(
-            spec=spec,
-            element_type=RBACElementType.RESOURCE_GROUP,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.DOMAIN,
-                element_id="default",
-            ),
-        )
+        return Creator(spec=spec)
 
     async def test_search_scaling_groups_with_default_querier(
         self,
@@ -351,7 +343,7 @@ class TestScalingGroupService:
         scaling_group_service: ScalingGroupService,
         mock_repository: MagicMock,
         sample_scaling_group: ScalingGroupData,
-        scaling_group_creator_full: RBACEntityCreator[ScalingGroupRow],
+        scaling_group_creator_full: Creator[ScalingGroupRow],
     ) -> None:
         """Test creating a scaling group successfully"""
         mock_repository.create_scaling_group = AsyncMock(return_value=sample_scaling_group)
@@ -366,7 +358,7 @@ class TestScalingGroupService:
         self,
         scaling_group_service: ScalingGroupService,
         mock_repository: MagicMock,
-        scaling_group_creator_full: RBACEntityCreator[ScalingGroupRow],
+        scaling_group_creator_full: Creator[ScalingGroupRow],
     ) -> None:
         """Test that ScalingGroupConflict propagates through the service"""
         mock_repository.create_scaling_group = AsyncMock(
@@ -463,17 +455,15 @@ class TestScalingGroupService:
         """Test disassociating a scaling group from domains"""
         mock_repository.disassociate_scaling_group_with_domains = AsyncMock(return_value=None)
 
-        unbinders = [
-            SGDomainEntityUnbinder(
-                scaling_group="test-sgroup",
-                domain="test-domain",
-            )
-        ]
-        action = DisassociateScalingGroupWithDomainsAction(unbinders=unbinders)
+        unbinder = SGDomainEntityUnbinder(
+            scaling_groups=["test-sgroup"],
+            domain="test-domain",
+        )
+        action = DisassociateScalingGroupWithDomainsAction(unbinder=unbinder)
         result = await scaling_group_service.disassociate_scaling_group_with_domains(action)
 
         assert result is not None
-        mock_repository.disassociate_scaling_group_with_domains.assert_called_once_with(unbinders)
+        mock_repository.disassociate_scaling_group_with_domains.assert_called_once_with(unbinder)
 
     # Associate/Disassociate with Keypair Tests
 
@@ -565,18 +555,16 @@ class TestScalingGroupService:
         scaling_group_name = "test-scaling-group"
         project_id = uuid.uuid4()
 
-        unbinders = [
-            SGProjectEntityUnbinder(
-                scaling_group=scaling_group_name,
-                project=project_id,
-            )
-        ]
-        action = DisassociateScalingGroupWithUserGroupsAction(unbinders=unbinders)
+        unbinder = SGProjectEntityUnbinder(
+            scaling_groups=[scaling_group_name],
+            project=project_id,
+        )
+        action = DisassociateScalingGroupWithUserGroupsAction(unbinder=unbinder)
         result = await scaling_group_service.disassociate_scaling_group_with_user_groups(action)
 
         assert result is not None
         mock_repository.disassociate_scaling_group_with_user_groups.assert_called_once_with(
-            unbinders
+            unbinder
         )
 
 

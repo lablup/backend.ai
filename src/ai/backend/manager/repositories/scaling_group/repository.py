@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -134,10 +133,10 @@ class ScalingGroupRepository:
 
     async def disassociate_scaling_group_with_domains(
         self,
-        unbinders: Sequence[RBACEntityUnbinder[ScalingGroupForDomainRow]],
+        unbinder: RBACEntityUnbinder[ScalingGroupForDomainRow],
     ) -> None:
-        """Disassociates a scaling group from multiple domains."""
-        await self._db_source.disassociate_scaling_group_with_domains(unbinders)
+        """Disassociates scaling groups from a domain."""
+        await self._db_source.disassociate_scaling_group_with_domains(unbinder)
 
     async def check_scaling_group_domain_association_exists(
         self,
@@ -183,10 +182,10 @@ class ScalingGroupRepository:
 
     async def disassociate_scaling_group_with_user_groups(
         self,
-        unbinders: Sequence[RBACEntityUnbinder[ScalingGroupForProjectRow]],
+        unbinder: RBACEntityUnbinder[ScalingGroupForProjectRow],
     ) -> None:
-        """Disassociates a single scaling group from a user group (project)."""
-        await self._db_source.disassociate_scaling_group_with_user_groups(unbinders)
+        """Disassociates scaling groups from a project."""
+        await self._db_source.disassociate_scaling_group_with_user_groups(unbinder)
 
     async def check_scaling_group_user_group_association_exists(
         self,

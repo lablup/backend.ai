@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
@@ -14,9 +13,9 @@ from .domain_base import ScalingGroupDomainAction
 
 @dataclass
 class DisassociateScalingGroupWithDomainsAction(ScalingGroupDomainAction):
-    """Action to disassociate a scaling group from multiple domains."""
+    """Action to disassociate scaling groups from a domain."""
 
-    unbinders: Sequence[RBACEntityUnbinder[ScalingGroupForDomainRow]]
+    unbinder: RBACEntityUnbinder[ScalingGroupForDomainRow]
 
     @override
     @classmethod

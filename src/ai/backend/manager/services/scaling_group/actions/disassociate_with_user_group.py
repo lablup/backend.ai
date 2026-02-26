@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
@@ -14,9 +13,9 @@ from .user_group_base import ScalingGroupUserGroupAction
 
 @dataclass
 class DisassociateScalingGroupWithUserGroupsAction(ScalingGroupUserGroupAction):
-    """Action to disassociate a single scaling group from a user group (project)."""
+    """Action to disassociate scaling groups from a project."""
 
-    unbinders: Sequence[RBACEntityUnbinder[ScalingGroupForProjectRow]]
+    unbinder: RBACEntityUnbinder[ScalingGroupForProjectRow]
 
     @override
     @classmethod

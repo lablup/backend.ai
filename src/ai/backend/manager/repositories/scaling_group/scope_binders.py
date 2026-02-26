@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 from uuid import UUID
@@ -13,33 +14,33 @@ from ai.backend.manager.models.scaling_group import (
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 from ai.backend.manager.repositories.base.rbac.scope_unbinder import RBACEntityUnbinder
 from ai.backend.manager.repositories.scaling_group.purgers import (
-    ScalingGroupForDomainPurgerSpec,
-    ScalingGroupForProjectPurgerSpec,
+    ScalingGroupsForDomainPurgerSpec,
+    ScalingGroupsForProjectPurgerSpec,
 )
 
 # =============================================================================
-# Entity Unbinders (single SG + single scope)
+# Entity Unbinders (batch SGs + single scope)
 # =============================================================================
 
 
 @dataclass
 class SGDomainEntityUnbinder(RBACEntityUnbinder[ScalingGroupForDomainRow]):
-    """Unbind a single scaling group from a single domain."""
+    """Unbind scaling groups from a domain."""
 
-    scaling_group: str
+    scaling_groups: Sequence[str]
     domain: str
 
     @override
     def build_purger_spec(self) -> BatchPurgerSpec[ScalingGroupForDomainRow]:
-        return ScalingGroupForDomainPurgerSpec(
-            scaling_group=self.scaling_group,
+        return ScalingGroupsForDomainPurgerSpec(
+            scaling_groups=list(self.scaling_groups),
             domain=self.domain,
         )
 
     @property
     @override
-    def entity_ref(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.RESOURCE_GROUP, self.scaling_group)
+    def entity_refs(self) -> Sequence[RBACElementRef]:
+        return [RBACElementRef(RBACElementType.RESOURCE_GROUP, sg) for sg in self.scaling_groups]
 
     @property
     @override
@@ -49,22 +50,22 @@ class SGDomainEntityUnbinder(RBACEntityUnbinder[ScalingGroupForDomainRow]):
 
 @dataclass
 class SGProjectEntityUnbinder(RBACEntityUnbinder[ScalingGroupForProjectRow]):
-    """Unbind a single scaling group from a single project."""
+    """Unbind scaling groups from a project."""
 
-    scaling_group: str
+    scaling_groups: Sequence[str]
     project: UUID
 
     @override
     def build_purger_spec(self) -> BatchPurgerSpec[ScalingGroupForProjectRow]:
-        return ScalingGroupForProjectPurgerSpec(
-            scaling_group=self.scaling_group,
+        return ScalingGroupsForProjectPurgerSpec(
+            scaling_groups=list(self.scaling_groups),
             project=self.project,
         )
 
     @property
     @override
-    def entity_ref(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.RESOURCE_GROUP, self.scaling_group)
+    def entity_refs(self) -> Sequence[RBACElementRef]:
+        return [RBACElementRef(RBACElementType.RESOURCE_GROUP, sg) for sg in self.scaling_groups]
 
     @property
     @override

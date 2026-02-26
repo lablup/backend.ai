@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -209,12 +208,11 @@ class ScalingGroupDBSource:
 
     async def disassociate_scaling_group_with_domains(
         self,
-        unbinders: Sequence[RBACEntityUnbinder[ScalingGroupForDomainRow]],
+        unbinder: RBACEntityUnbinder[ScalingGroupForDomainRow],
     ) -> None:
-        """Disassociates a scaling group from multiple domains."""
+        """Disassociates scaling groups from a domain."""
         async with self._db.begin_session() as session:
-            for unbinder in unbinders:
-                await execute_rbac_entity_unbinder(session, unbinder)
+            await execute_rbac_entity_unbinder(session, unbinder)
 
     async def check_scaling_group_domain_association_exists(
         self,
@@ -280,12 +278,11 @@ class ScalingGroupDBSource:
 
     async def disassociate_scaling_group_with_user_groups(
         self,
-        unbinders: Sequence[RBACEntityUnbinder[ScalingGroupForProjectRow]],
+        unbinder: RBACEntityUnbinder[ScalingGroupForProjectRow],
     ) -> None:
-        """Disassociates a single scaling group from a user group (project)."""
+        """Disassociates scaling groups from a project."""
         async with self._db.begin_session() as session:
-            for unbinder in unbinders:
-                await execute_rbac_entity_unbinder(session, unbinder)
+            await execute_rbac_entity_unbinder(session, unbinder)
 
     async def check_scaling_group_user_group_association_exists(
         self,
