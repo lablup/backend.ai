@@ -4609,9 +4609,6 @@ type Group
 
   """Added in 24.03.0."""
   type: String
-
-  """Added in 24.03.0."""
-  container_registry: JSONString
   scaling_groups: [String]
 }
 
@@ -4652,9 +4649,6 @@ input GroupInput
   allowed_vfolder_hosts: JSONString = "{}"
   integration_id: String = ""
   resource_policy: String = "default"
-
-  """Added in 24.03.0"""
-  container_registry: JSONString = "{}"
 }
 
 type GroupNode implements Node
@@ -4680,9 +4674,6 @@ type GroupNode implements Node
 
   """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE']."""
   type: String @join__field(graph: GRAPHENE)
-
-  """Added in 24.03.7."""
-  container_registry: JSONString @join__field(graph: GRAPHENE)
   scaling_groups: [String] @join__field(graph: GRAPHENE)
 
   """Added in 25.3.0."""
@@ -6420,9 +6411,6 @@ input ModifyGroupInput
   allowed_vfolder_hosts: JSONString
   integration_id: String
   resource_policy: String
-
-  """Added in 24.03.0"""
-  container_registry: JSONString = "{}"
 }
 
 type ModifyImage
