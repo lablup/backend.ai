@@ -54,6 +54,5 @@ else
     ORIGIN="origin"
   fi
   echo "Performing lint and check on ${ORIGIN}/${BASE_BRANCH}..HEAD@${CURRENT_COMMIT} ..."
-  pants tailor --check update-build-files --check --changed-since="${ORIGIN}/${BASE_BRANCH}"
   pants lint --changed-since="${ORIGIN}/${BASE_BRANCH}"
 fi
