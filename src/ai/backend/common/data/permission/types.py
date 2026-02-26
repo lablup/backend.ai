@@ -325,6 +325,7 @@ class ScopeType(enum.StrEnum):
         except ValueError as e:
             raise RBACTypeConversionError(f"{self!r} has no corresponding RBACElementType") from e
 
+
 GLOBAL_SCOPE_ID = "global"
 
 
