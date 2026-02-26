@@ -1006,9 +1006,6 @@ type ArtifactStorage
   """The name of the artifact storage"""
   name: String!
 
-  """The ID of the underlying storage (ObjectStorage or VFSStorage)"""
-  storageId: ID!
-
   """The type of the artifact storage"""
   type: ArtifactStorageType!
 }
