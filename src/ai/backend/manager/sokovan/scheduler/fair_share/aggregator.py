@@ -101,19 +101,19 @@ class KernelUsagePreparationResult:
 
 @dataclass
 class BucketDelta:
-    """Separated resource amount and duration for a usage bucket.
+    """Pre-computed resource-seconds for a usage bucket.
 
-    Stores raw resource amounts and duration separately instead of
-    pre-multiplied resource-seconds.  The product ``amount * duration_seconds``
-    is computed at SQL query time where PostgreSQL auto-extends NUMERIC precision,
-    eliminating overflow risk for large memory values.
+    Stores the sum of per-slice ``raw_slots * segment_seconds`` so that
+    multiple kernels sharing the same bucket key are accumulated correctly.
+    Previously, raw slots and duration were stored separately and multiplied
+    later, which produced an N-times inflation when N kernels overlapped.
 
     Attributes:
-        slots: Raw resource amounts (e.g., {"cpu": 2, "mem": 4096000000})
-        duration_seconds: Total usage duration in seconds
+        resource_seconds: Accumulated resource-seconds (e.g., {"cpu": 600})
+        duration_seconds: Total observation duration in seconds (informational)
     """
 
-    slots: ResourceSlot = field(default_factory=ResourceSlot)
+    resource_seconds: ResourceSlot = field(default_factory=ResourceSlot)
     duration_seconds: int = 0
 
 
@@ -291,10 +291,10 @@ class FairShareAggregator:
     ) -> None:
         """Add resource usage to bucket deltas for a day.
 
-        Accumulates raw resource amounts and duration separately.
-        Slots are accumulated additively (sum of ``raw_slots`` across all
-        slices within the same bucket key) while ``duration_seconds`` tracks
-        total observation time.
+        Computes resource-seconds for this slice (``raw_slots * segment_seconds``)
+        and accumulates the result.  This avoids the N-times inflation that
+        occurred when raw slots and duration were stored separately and
+        multiplied later.
 
         Args:
             spec: Original spec (for entity identifiers)
@@ -305,6 +305,9 @@ class FairShareAggregator:
             project_deltas: Project deltas to update (mutated)
             domain_deltas: Domain deltas to update (mutated)
         """
+        # Pre-compute resource-seconds for this slice
+        slice_resource_seconds = self._calculate_resource_seconds(raw_slots, segment_seconds)
+
         # User bucket key
         user_key = UserUsageBucketKey(
             user_uuid=spec.user_uuid,
@@ -315,7 +318,7 @@ class FairShareAggregator:
         )
         ud = user_deltas[user_key]
         user_deltas[user_key] = BucketDelta(
-            slots=ud.slots + raw_slots,
+            resource_seconds=ud.resource_seconds + slice_resource_seconds,
             duration_seconds=ud.duration_seconds + segment_seconds,
         )
 
@@ -328,7 +331,7 @@ class FairShareAggregator:
         )
         pd = project_deltas[project_key]
         project_deltas[project_key] = BucketDelta(
-            slots=pd.slots + raw_slots,
+            resource_seconds=pd.resource_seconds + slice_resource_seconds,
             duration_seconds=pd.duration_seconds + segment_seconds,
         )
 
@@ -340,7 +343,7 @@ class FairShareAggregator:
         )
         dd = domain_deltas[domain_key]
         domain_deltas[domain_key] = BucketDelta(
-            slots=dd.slots + raw_slots,
+            resource_seconds=dd.resource_seconds + slice_resource_seconds,
             duration_seconds=dd.duration_seconds + segment_seconds,
         )
 

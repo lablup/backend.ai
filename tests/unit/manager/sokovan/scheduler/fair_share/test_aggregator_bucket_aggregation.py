@@ -3,7 +3,7 @@
 Verifies that kernel usage specs are correctly split by day boundaries
 and aggregated into user/project/domain buckets.
 
-Phase 3 (BA-4308): BucketDelta stores raw amount and duration separately.
+Phase 3 (BA-4308): BucketDelta stores pre-computed resource-seconds per slice.
 """
 
 from __future__ import annotations
@@ -158,7 +158,7 @@ class TestSplitSpecByDay:
 class TestAggregateKernelUsageToBuckets:
     """Tests for aggregate_kernel_usage_to_buckets method.
 
-    BucketDelta stores raw slots and duration_seconds separately.
+    BucketDelta stores pre-computed resource-seconds per slice.
     """
 
     def test_single_spec_single_day(self, aggregator: FairShareAggregator) -> None:
@@ -193,7 +193,8 @@ class TestAggregateKernelUsageToBuckets:
         )
         assert user_key in result.user_usage_deltas
         delta = result.user_usage_deltas[user_key]
-        assert delta.slots["cpu"] == Decimal("2")
+        # resource-seconds: 2 CPU * 300s = 600
+        assert delta.resource_seconds["cpu"] == Decimal("600")
         assert delta.duration_seconds == 300
 
         # Project bucket
@@ -205,7 +206,7 @@ class TestAggregateKernelUsageToBuckets:
             period_date=date(2024, 1, 15),
         )
         assert project_key in result.project_usage_deltas
-        assert result.project_usage_deltas[project_key].slots["cpu"] == Decimal("2")
+        assert result.project_usage_deltas[project_key].resource_seconds["cpu"] == Decimal("600")
 
         # Domain bucket
         assert len(result.domain_usage_deltas) == 1
@@ -215,7 +216,7 @@ class TestAggregateKernelUsageToBuckets:
             period_date=date(2024, 1, 15),
         )
         assert domain_key in result.domain_usage_deltas
-        assert result.domain_usage_deltas[domain_key].slots["cpu"] == Decimal("2")
+        assert result.domain_usage_deltas[domain_key].resource_seconds["cpu"] == Decimal("600")
 
     def test_multiple_specs_same_user_same_day_aggregated(
         self, aggregator: FairShareAggregator
@@ -246,12 +247,12 @@ class TestAggregateKernelUsageToBuckets:
 
         result = aggregator.aggregate_kernel_usage_to_buckets(specs)
 
-        # Should have only one user bucket with summed raw slots and duration
+        # Should have only one user bucket with summed resource-seconds
         assert len(result.user_usage_deltas) == 1
         user_key = list(result.user_usage_deltas.keys())[0]
         delta = result.user_usage_deltas[user_key]
-        # Raw slots accumulate: 2 + 2 = 4
-        assert delta.slots["cpu"] == Decimal("4")
+        # resource-seconds: (2*300) + (2*300) = 1200
+        assert delta.resource_seconds["cpu"] == Decimal("1200")
         # Durations accumulate: 300 + 300 = 600
         assert delta.duration_seconds == 600
 
@@ -297,11 +298,11 @@ class TestAggregateKernelUsageToBuckets:
 
         assert day1_key in result.user_usage_deltas
         assert day2_key in result.user_usage_deltas
-        # Day 1: 3 minutes = 180s, raw slots = 2 CPU
-        assert result.user_usage_deltas[day1_key].slots["cpu"] == Decimal("2")
+        # Day 1: 3 minutes = 180s, resource-seconds = 2 * 180 = 360
+        assert result.user_usage_deltas[day1_key].resource_seconds["cpu"] == Decimal("360")
         assert result.user_usage_deltas[day1_key].duration_seconds == 180
-        # Day 2: 3 minutes = 180s, raw slots = 2 CPU
-        assert result.user_usage_deltas[day2_key].slots["cpu"] == Decimal("2")
+        # Day 2: 3 minutes = 180s, resource-seconds = 2 * 180 = 360
+        assert result.user_usage_deltas[day2_key].resource_seconds["cpu"] == Decimal("360")
         assert result.user_usage_deltas[day2_key].duration_seconds == 180
 
 
@@ -423,16 +424,16 @@ class TestBackloggedUsageScenario:
             period_date=date(2024, 1, 16),
         )
 
-        # Day 1: 5 specs, raw_slots=2 each, accumulated = 2*5 = 10
+        # Day 1: 5 specs, resource-seconds = 2*240 + 2*300*4 = 480+2400 = 2880
         # duration: 240 + 300 + 300 + 300 + 300 = 1440 seconds
         d1 = result.user_usage_deltas[day1_key]
-        assert d1.slots["cpu"] == Decimal("10")
+        assert d1.resource_seconds["cpu"] == Decimal("2880")
         assert d1.duration_seconds == 1440
 
-        # Day 2: 3 specs, raw_slots=2 each, accumulated = 2*3 = 6
+        # Day 2: 3 specs, resource-seconds = 2*300 + 2*300 + 2*180 = 1560
         # duration: 300 + 300 + 180 = 780 seconds
         d2 = result.user_usage_deltas[day2_key]
-        assert d2.slots["cpu"] == Decimal("6")
+        assert d2.resource_seconds["cpu"] == Decimal("1560")
         assert d2.duration_seconds == 780
 
     def test_backlogged_usage_with_midnight_crossing_spec(
@@ -525,17 +526,16 @@ class TestBackloggedUsageScenario:
             period_date=date(2024, 1, 16),
         )
 
-        # Day 1: specs contribute raw_slots=2 each
-        # 4 complete specs + crossing spec day1 part = 5 contributions = 2*5 = 10
+        # Day 1: resource-seconds = 2*240 + 2*300 + 2*300 + 2*300 + 2*300 = 2880
         # duration: 240 + 300 + 300 + 300 + 300(crossing) = 1440s
         d1 = result.user_usage_deltas[day1_key]
-        assert d1.slots["cpu"] == Decimal("10")
+        assert d1.resource_seconds["cpu"] == Decimal("2880")
         assert d1.duration_seconds == 1440
 
-        # Day 2: crossing spec day2 part + 2 specs = 3 contributions = 2*3 = 6
+        # Day 2: resource-seconds = 2*300 + 2*300 + 2*180 = 1560
         # duration: 300(crossing) + 300 + 180 = 780s
         d2 = result.user_usage_deltas[day2_key]
-        assert d2.slots["cpu"] == Decimal("6")
+        assert d2.resource_seconds["cpu"] == Decimal("1560")
         assert d2.duration_seconds == 780
 
     def test_backlogged_multiple_users(self, aggregator: FairShareAggregator) -> None:
@@ -581,10 +581,9 @@ class TestBackloggedUsageScenario:
             resource_group="default",
             period_date=date(2024, 1, 15),
         )
-        # User1: raw=2 for 300s, User2: raw=2 for 300s (day1 part)
-        # Accumulated slots: 2 + 2 = 4
+        # User1: 2*300=600, User2: 2*300=600 → total 1200
         pd1 = result.project_usage_deltas[project_day1_key]
-        assert pd1.slots["cpu"] == Decimal("4")
+        assert pd1.resource_seconds["cpu"] == Decimal("1200")
         assert pd1.duration_seconds == 600  # 300 + 300
 
         project_day2_key = ProjectUsageBucketKey(
@@ -593,9 +592,9 @@ class TestBackloggedUsageScenario:
             resource_group="default",
             period_date=date(2024, 1, 16),
         )
-        # User2 only: raw=2 for 300s (day2 part)
+        # User2 only: 2*300 = 600
         pd2 = result.project_usage_deltas[project_day2_key]
-        assert pd2.slots["cpu"] == Decimal("2")
+        assert pd2.resource_seconds["cpu"] == Decimal("600")
         assert pd2.duration_seconds == 300
 
 
@@ -632,7 +631,7 @@ class TestEdgeCases:
         user_key = list(result.user_usage_deltas.keys())[0]
         assert user_key.period_date == date(2024, 1, 15)
         delta = result.user_usage_deltas[user_key]
-        assert delta.slots["cpu"] == Decimal("2")
+        assert delta.resource_seconds["cpu"] == Decimal("600")
         assert delta.duration_seconds == 300
 
     def test_spec_starting_exactly_at_midnight(self, aggregator: FairShareAggregator) -> None:
@@ -679,8 +678,8 @@ class TestEdgeCases:
         assert len(result.user_usage_deltas) == 2
 
         for _key, delta in result.user_usage_deltas.items():
-            # Each day gets raw slots + 120 seconds
-            assert delta.slots["cpu"] == Decimal("2")
-            assert delta.slots["mem"] == Decimal("4096")
-            assert delta.slots["cuda.shares"] == Decimal("1")
+            # Each day: resource-seconds = slots * 120s
+            assert delta.resource_seconds["cpu"] == Decimal("240")
+            assert delta.resource_seconds["mem"] == Decimal("491520")
+            assert delta.resource_seconds["cuda.shares"] == Decimal("120")
             assert delta.duration_seconds == 120

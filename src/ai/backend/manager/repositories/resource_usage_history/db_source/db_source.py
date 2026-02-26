@@ -581,11 +581,8 @@ class ResourceUsageHistoryDBSource:
         for key, bucket_delta in deltas.items():
             lookup_key = (key.user_uuid, key.project_id, key.resource_group, key.period_date)
             existing_usage = existing.get(lookup_key, ResourceSlot())
-            # JSONB stores resource-seconds (amount * seconds) for legacy compatibility
-            resource_seconds = self._calculate_resource_seconds(
-                bucket_delta.slots, bucket_delta.duration_seconds
-            )
-            new_usage = existing_usage + resource_seconds
+            # BucketDelta already carries pre-computed resource-seconds
+            new_usage = existing_usage + bucket_delta.resource_seconds
 
             # Upsert with merged usage (JSONB)
             stmt = (
@@ -609,7 +606,7 @@ class ResourceUsageHistoryDBSource:
             result = await db_sess.execute(stmt)
             bucket_id = result.scalar_one()
 
-            # Write normalized entries with separated amount/duration
+            # Write normalized entries with pre-computed resource-seconds
             await self._upsert_bucket_entries(
                 db_sess,
                 bucket_id,
@@ -673,10 +670,7 @@ class ResourceUsageHistoryDBSource:
         for key, bucket_delta in deltas.items():
             lookup_key = (key.project_id, key.resource_group, key.period_date)
             existing_usage = existing.get(lookup_key, ResourceSlot())
-            resource_seconds = self._calculate_resource_seconds(
-                bucket_delta.slots, bucket_delta.duration_seconds
-            )
-            new_usage = existing_usage + resource_seconds
+            new_usage = existing_usage + bucket_delta.resource_seconds
 
             # Upsert with merged usage (JSONB)
             stmt = (
@@ -699,7 +693,7 @@ class ResourceUsageHistoryDBSource:
             result = await db_sess.execute(stmt)
             bucket_id = result.scalar_one()
 
-            # Write normalized entries with separated amount/duration
+            # Write normalized entries with pre-computed resource-seconds
             await self._upsert_bucket_entries(
                 db_sess,
                 bucket_id,
@@ -755,10 +749,7 @@ class ResourceUsageHistoryDBSource:
         for key, bucket_delta in deltas.items():
             lookup_key = (key.domain_name, key.resource_group, key.period_date)
             existing_usage = existing.get(lookup_key, ResourceSlot())
-            resource_seconds = self._calculate_resource_seconds(
-                bucket_delta.slots, bucket_delta.duration_seconds
-            )
-            new_usage = existing_usage + resource_seconds
+            new_usage = existing_usage + bucket_delta.resource_seconds
 
             # Upsert with merged usage (JSONB)
             stmt = (
@@ -780,7 +771,7 @@ class ResourceUsageHistoryDBSource:
             result = await db_sess.execute(stmt)
             bucket_id = result.scalar_one()
 
-            # Write normalized entries with separated amount/duration
+            # Write normalized entries with pre-computed resource-seconds
             await self._upsert_bucket_entries(
                 db_sess,
                 bucket_id,
@@ -831,17 +822,15 @@ class ResourceUsageHistoryDBSource:
         """Upsert normalized usage_bucket_entries for a bucket.
 
         For each slot in the delta, insert or update an entry row.
-        ``amount`` stores the raw resource amount (not pre-multiplied)
-        and ``duration_seconds`` stores the actual observation duration.
-        The product ``amount * duration_seconds`` is computed at SQL query
-        time where PostgreSQL auto-extends NUMERIC precision, eliminating
-        overflow risk for large memory values.
+        ``amount`` stores pre-computed resource-seconds (sum of per-slice
+        ``raw_slots * segment_seconds``).  ``duration_seconds`` stores the
+        total observation duration for informational purposes.
 
         ``capacity`` is set to 0 here; it is updated separately during
         fair share factor calculation when the cluster capacity is known.
         """
         entry_table = UsageBucketEntryRow.__table__
-        for slot_name, value in bucket_delta.slots.items():
+        for slot_name, value in bucket_delta.resource_seconds.items():
             stmt = (
                 pg_insert(entry_table)
                 .values(
@@ -909,15 +898,3 @@ class ResourceUsageHistoryDBSource:
                         .values(capacity=capacity)
                     )
                     await db_sess.execute(stmt)
-
-    @staticmethod
-    def _calculate_resource_seconds(
-        slots: ResourceSlot,
-        seconds: int,
-    ) -> ResourceSlot:
-        """Convert resource slots to resource-seconds for legacy JSONB storage.
-
-        Multiplies each resource value by the number of seconds to get
-        the total resource-seconds consumed during the period.
-        """
-        return ResourceSlot({key: value * Decimal(str(seconds)) for key, value in slots.items()})
