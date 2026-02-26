@@ -1,7 +1,7 @@
-"""Add artifact_storages common table
+"""Add artifact_storages common table with JTI
 
 Revision ID: 35dfab3b0662
-Revises: 03ff6767b2e4
+Revises: ffcf0ed13a26
 Create Date: 2025-12-02 09:24:21.050932
 
 """
@@ -13,7 +13,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "35dfab3b0662"
-down_revision = "03ff6767b2e4"
+down_revision = "ffcf0ed13a26"
 branch_labels = None
 depends_on = None
 
@@ -21,22 +21,15 @@ depends_on = None
 def _migrate_object_storages_to_artifact_storages(
     conn: sa.engine.Connection,
 ) -> None:
-    """Migrate existing object_storages records to artifact_storages."""
-    result = conn.execute(
+    """Migrate existing object_storages records to artifact_storages (JTI: id = child id)."""
+    conn.execute(
         sa.text("""
-        SELECT id, name FROM object_storages
+        INSERT INTO artifact_storages (id, name, type)
+        SELECT id, name, 'object_storage'
+        FROM object_storages
         WHERE name IS NOT NULL
     """)
     )
-
-    for row in result:
-        conn.execute(
-            sa.text("""
-            INSERT INTO artifact_storages (name, storage_id, type)
-            VALUES (:name, :storage_id, :type)
-        """),
-            {"name": row.name, "storage_id": row.id, "type": "object_storage"},
-        )
 
     # Drop the name column and constraint
     op.drop_index("ix_object_storages_name", table_name="object_storages")
@@ -46,22 +39,15 @@ def _migrate_object_storages_to_artifact_storages(
 def _migrate_vfs_storages_to_artifact_storages(
     conn: sa.engine.Connection,
 ) -> None:
-    """Migrate existing vfs_storages records to artifact_storages."""
-    result = conn.execute(
+    """Migrate existing vfs_storages records to artifact_storages (JTI: id = child id)."""
+    conn.execute(
         sa.text("""
-        SELECT id, name FROM vfs_storages
+        INSERT INTO artifact_storages (id, name, type)
+        SELECT id, name, 'vfs_storage'
+        FROM vfs_storages
         WHERE name IS NOT NULL
     """)
     )
-
-    for row in result:
-        conn.execute(
-            sa.text("""
-            INSERT INTO artifact_storages (name, storage_id, type)
-            VALUES (:name, :storage_id, :type)
-        """),
-            {"name": row.name, "storage_id": row.id, "type": "vfs_storage"},
-        )
 
     # Drop the name column and constraint
     op.drop_index("ix_vfs_storages_name", table_name="vfs_storages")
@@ -72,44 +58,28 @@ def _migrate_artifact_storages_to_object_storages(
     conn: sa.engine.Connection,
 ) -> None:
     """Migrate data back from artifact_storages to object_storages."""
-    result = conn.execute(
+    conn.execute(
         sa.text("""
-        SELECT name, storage_id FROM artifact_storages
-        WHERE type = 'object_storage'
+        UPDATE object_storages o
+        SET name = a.name
+        FROM artifact_storages a
+        WHERE o.id = a.id AND a.type = 'object_storage'
     """)
     )
-
-    for row in result:
-        conn.execute(
-            sa.text("""
-            UPDATE object_storages
-            SET name = :name
-            WHERE id = :storage_id
-        """),
-            {"name": row.name, "storage_id": row.storage_id},
-        )
 
 
 def _migrate_artifact_storages_to_vfs_storages(
     conn: sa.engine.Connection,
 ) -> None:
     """Migrate data back from artifact_storages to vfs_storages."""
-    result = conn.execute(
+    conn.execute(
         sa.text("""
-        SELECT name, storage_id FROM artifact_storages
-        WHERE type = 'vfs_storage'
+        UPDATE vfs_storages v
+        SET name = a.name
+        FROM artifact_storages a
+        WHERE v.id = a.id AND a.type = 'vfs_storage'
     """)
     )
-
-    for row in result:
-        conn.execute(
-            sa.text("""
-            UPDATE vfs_storages
-            SET name = :name
-            WHERE id = :storage_id
-        """),
-            {"name": row.name, "storage_id": row.storage_id},
-        )
 
 
 def upgrade() -> None:
@@ -117,11 +87,9 @@ def upgrade() -> None:
         "artifact_storages",
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
         sa.Column("name", sa.String(), nullable=False),
-        sa.Column("storage_id", GUID(), nullable=False),
         sa.Column("type", sa.String(), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_artifact_storages")),
         sa.UniqueConstraint("name", name=op.f("uq_artifact_storages_name")),
-        sa.UniqueConstraint("storage_id", name=op.f("uq_artifact_storages_storage_id")),
     )
 
     conn = op.get_bind()
@@ -129,9 +97,33 @@ def upgrade() -> None:
     _migrate_object_storages_to_artifact_storages(conn)
     _migrate_vfs_storages_to_artifact_storages(conn)
 
+    # Add FK constraints: child.id → artifact_storages.id (JTI)
+    op.create_foreign_key(
+        "fk_object_storages_id_artifact_storages",
+        "object_storages",
+        "artifact_storages",
+        ["id"],
+        ["id"],
+        ondelete="CASCADE",
+    )
+    op.create_foreign_key(
+        "fk_vfs_storages_id_artifact_storages",
+        "vfs_storages",
+        "artifact_storages",
+        ["id"],
+        ["id"],
+        ondelete="CASCADE",
+    )
+
 
 def downgrade() -> None:
     conn = op.get_bind()
+
+    # Drop FK constraints
+    op.drop_constraint(
+        "fk_object_storages_id_artifact_storages", "object_storages", type_="foreignkey"
+    )
+    op.drop_constraint("fk_vfs_storages_id_artifact_storages", "vfs_storages", type_="foreignkey")
 
     # Add name column back to object_storages
     op.add_column(
