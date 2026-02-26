@@ -35,6 +35,10 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
     RescanImagesAction,
     RescanImagesActionResult,
 )
+from ai.backend.manager.services.container_registry.actions.search_container_registries import (
+    SearchContainerRegistriesAction,
+    SearchContainerRegistriesActionResult,
+)
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 
 
@@ -58,6 +62,9 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
     ]
     delete_container_registry: ActionProcessor[
         DeleteContainerRegistryAction, DeleteContainerRegistryActionResult
+    ]
+    search_container_registries: ActionProcessor[
+        SearchContainerRegistriesAction, SearchContainerRegistriesActionResult
     ]
 
     def __init__(
@@ -83,6 +90,9 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
         self.delete_container_registry = ActionProcessor(
             service.delete_container_registry, action_monitors
         )
+        self.search_container_registries = ActionProcessor(
+            service.search_container_registries, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -95,4 +105,5 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
             CreateContainerRegistryAction.spec(),
             ModifyContainerRegistryAction.spec(),
             DeleteContainerRegistryAction.spec(),
+            SearchContainerRegistriesAction.spec(),
         ]
