@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import json
 import logging
 import os
@@ -37,6 +38,8 @@ from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest import auth as _auth_rest_module
+from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
@@ -72,6 +75,7 @@ from ai.backend.manager.models.user import users
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.server import (
     build_root_app,
+    global_newstyle_pkgs,
 )
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
@@ -79,6 +83,10 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
     redis_container,
 )
 from ai.backend.testutils.pants import get_parallel_slot
+
+# Statically imported so that Pants includes new-style route modules in the test
+# PEX.  importlib.import_module() in the server fixture cannot be traced by Pants.
+_NEWSTYLE_ROUTE_MODULES = (_auth_rest_module,)
 
 log = logging.getLogger("tests.component.conftest")
 
@@ -876,12 +884,27 @@ async def server(
     This is the only fixture that depends on server internals
     (build_root_app, cleanup_contexts). When Handler-based migration
     happens, only this fixture's implementation changes.
+
+    New-style modules (those in ``global_newstyle_pkgs``) are automatically
+    separated from ``server_subapp_pkgs``.  Their routes are registered
+    *after* cleanup contexts have initialised ``root_ctx.processors`` but
+    *before* ``runner.setup()`` freezes the router.
     """
+    # Separate legacy subapp packages from new-style route packages.
+    # Domain conftest files can keep returning [".auth", ".acl", ...] and
+    # the split is handled here transparently.
+    newstyle_set = set(global_newstyle_pkgs)
+    legacy_pkgs = [p for p in server_subapp_pkgs if p not in newstyle_set]
+    newstyle_pkgs = [p for p in server_subapp_pkgs if p in newstyle_set]
+
+    # Build the app with only legacy subapps and NO cleanup contexts.
+    # Cleanup contexts are managed manually below so that we can register
+    # new-style routes between "processors ready" and "router frozen".
     app = build_root_app(
         0,
         bootstrap_config,
-        cleanup_contexts=server_cleanup_contexts,
-        subapp_pkgs=server_subapp_pkgs,
+        cleanup_contexts=[],
+        subapp_pkgs=legacy_pkgs,
     )
     root_ctx: RootContext = app["_root.context"]
 
@@ -905,6 +928,20 @@ async def server(
         "redis": {"addr": {"host": redis_addr.host, "port": redis_addr.port}},
     })
     root_ctx.config_provider = _TestConfigProvider(unified_config)
+
+    # Run cleanup contexts manually so that root_ctx.processors (and other
+    # dependencies) are available before the router is frozen.
+    for cctx in server_cleanup_contexts:
+        await exit_stack.enter_async_context(cctx(root_ctx))
+
+    # Register new-style route modules.  At this point processors are ready
+    # (set by cleanup contexts above) and the router is not yet frozen.
+    if newstyle_pkgs:
+        registry = RouteRegistry(app, root_ctx.cors_options)
+        for pkg_name in newstyle_pkgs:
+            mod = importlib.import_module(pkg_name, "ai.backend.manager.api.rest")
+            global_mws = mod.register_routes(registry, root_ctx.processors)
+            app.middlewares.extend(global_mws)
 
     runner = web.AppRunner(app, handle_signals=False)
     await runner.setup()
