@@ -61,12 +61,12 @@ class TestScopeWideEntityUnbinder(RBACScopeWideEntityUnbinder[ScopeUnbinderMappi
 
     def __init__(
         self,
-        _entity_ids: Sequence[str] | None,
+        entity_ids: Sequence[str] | None,
         entity_element_type: RBACElementType,
         scope_id: str,
         scope_element_type: RBACElementType,
     ) -> None:
-        self._entity_ids_value = _entity_ids
+        self._entity_ids_value = entity_ids
         self._entity_element_type = entity_element_type
         self._scope_id = scope_id
         self._scope_element_type = scope_element_type
@@ -186,7 +186,7 @@ class TestRBACScopeWideEntityUnbinder:
 
         async with database_connection.begin_session_read_committed() as db_sess:
             unbinder = TestScopeWideEntityUnbinder(
-                _entity_ids=[ctx.entity_id_1],
+                entity_ids=[ctx.entity_id_1],
                 entity_element_type=RBACElementType.RESOURCE_GROUP,
                 scope_id=ctx.scope_id_a,
                 scope_element_type=RBACElementType.DOMAIN,
@@ -218,7 +218,7 @@ class TestRBACScopeWideEntityUnbinder:
 
         async with database_connection.begin_session_read_committed() as db_sess:
             unbinder = TestScopeWideEntityUnbinder(
-                _entity_ids=[ctx.entity_id_1, ctx.entity_id_2],
+                entity_ids=[ctx.entity_id_1, ctx.entity_id_2],
                 entity_element_type=RBACElementType.RESOURCE_GROUP,
                 scope_id=ctx.scope_id_a,
                 scope_element_type=RBACElementType.DOMAIN,
@@ -249,7 +249,7 @@ class TestRBACScopeWideEntityUnbinder:
 
         async with database_connection.begin_session_read_committed() as db_sess:
             unbinder = TestScopeWideEntityUnbinder(
-                _entity_ids=None,
+                entity_ids=None,
                 entity_element_type=RBACElementType.RESOURCE_GROUP,
                 scope_id=ctx.scope_id_a,
                 scope_element_type=RBACElementType.DOMAIN,
@@ -279,7 +279,7 @@ class TestRBACScopeWideEntityUnbinder:
         """Unbinding a non-existent entity returns zero counts."""
         async with database_connection.begin_session_read_committed() as db_sess:
             unbinder = TestScopeWideEntityUnbinder(
-                _entity_ids=[str(uuid.uuid4())],
+                entity_ids=[str(uuid.uuid4())],
                 entity_element_type=RBACElementType.RESOURCE_GROUP,
                 scope_id=str(uuid.uuid4()),
                 scope_element_type=RBACElementType.DOMAIN,
@@ -297,7 +297,7 @@ class TestRBACScopeWideEntityUnbinder:
         """Unbinding all entities from a non-existent scope returns zero counts."""
         async with database_connection.begin_session_read_committed() as db_sess:
             unbinder = TestScopeWideEntityUnbinder(
-                _entity_ids=None,
+                entity_ids=None,
                 entity_element_type=RBACElementType.RESOURCE_GROUP,
                 scope_id=str(uuid.uuid4()),
                 scope_element_type=RBACElementType.DOMAIN,
@@ -317,7 +317,7 @@ class TestRBACScopeWideEntityUnbinder:
 
         async with database_connection.begin_session_read_committed() as db_sess:
             unbinder = TestScopeWideEntityUnbinder(
-                _entity_ids=None,
+                entity_ids=None,
                 entity_element_type=RBACElementType.RESOURCE_GROUP,
                 scope_id=ctx.scope_id_a,
                 scope_element_type=RBACElementType.DOMAIN,
@@ -340,7 +340,7 @@ class TestRBACScopeWideEntityUnbinder:
 
         async with database_connection.begin_session_read_committed() as db_sess:
             unbinder = TestScopeWideEntityUnbinder(
-                _entity_ids=[ctx.entity_id_1],
+                entity_ids=[ctx.entity_id_1],
                 entity_element_type=RBACElementType.RESOURCE_GROUP,
                 scope_id=ctx.scope_id_a,
                 scope_element_type=RBACElementType.DOMAIN,

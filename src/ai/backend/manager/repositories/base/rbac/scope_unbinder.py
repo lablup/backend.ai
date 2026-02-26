@@ -117,6 +117,11 @@ async def execute_rbac_scope_wide_entity_unbinder[TRow: Base](
     ]
     entity_ids = unbinder.entity_ids
     if entity_ids is not None:
+        if not entity_ids:
+            return RBACUnbinderResult(
+                deleted_count=purge_result.deleted_count,
+                association_rows=[],
+            )
         where_clauses.append(AssociationScopesEntitiesRow.entity_id.in_(entity_ids))
     assoc_stmt = (
         sa.delete(AssociationScopesEntitiesRow)
