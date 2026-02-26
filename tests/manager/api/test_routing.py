@@ -17,8 +17,8 @@ from ai.backend.manager.api.auth import (
     auth_required,
     superadmin_required,
 )
-from ai.backend.manager.api.routing import RouteRegistry, _apply_route_middlewares
-from ai.backend.manager.api.types import CORSOptions
+from ai.backend.manager.api.rest.routing import RouteRegistry, _apply_route_middlewares
+from ai.backend.manager.api.rest.types import CORSOptions
 
 
 @pytest.fixture
