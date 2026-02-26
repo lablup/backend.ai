@@ -224,7 +224,7 @@ type _ParserType = (
 )
 
 
-async def _extract_param_value(request: web.Request, input_param_type: Any) -> _ParamType:
+async def extract_param_value(request: web.Request, input_param_type: Any) -> _ParamType:
     try:
         # MiddlewareParam Type
         if get_origin(input_param_type) is None and issubclass(input_param_type, MiddlewareParam):
@@ -305,7 +305,7 @@ async def _parse_and_execute_handler(
                 f"Type hint or Annotated must be added in API handler signature: {param.name}"
             )
 
-        value = await _extract_param_value(request=request, input_param_type=param.annotation)
+        value = await extract_param_value(request=request, input_param_type=param.annotation)
 
         if not value:
             raise InvalidAPIParameters(
@@ -393,7 +393,7 @@ async def _serialize_parameter(
     return param_instance
 
 
-def _parse_response(response: APIResponse) -> web.Response:
+def parse_response(response: APIResponse) -> web.Response:
     return web.json_response(
         data=response.to_json,
         status=response.status_code,
@@ -488,7 +488,7 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
             param_instance = await _serialize_parameter(request, param_instance_or_class)
             kwargs[name] = param_instance
         response = await handler(first_arg, **kwargs)
-        return _parse_response(response)
+        return parse_response(response)
 
     return wrapped
 

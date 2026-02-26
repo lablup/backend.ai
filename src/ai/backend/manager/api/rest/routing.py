@@ -1,11 +1,31 @@
 from __future__ import annotations
 
+import functools
+import inspect
 from collections.abc import Sequence
+from typing import Any
 
 import aiohttp_cors
 from aiohttp import web
 
-from .types import CORSOptions, RouteMiddleware, WebMiddleware, WebRequestHandler
+from ai.backend.common.api_handlers import extract_param_value, parse_response
+
+from .types import ApiHandler, CORSOptions, RouteMiddleware, WebMiddleware, WebRequestHandler
+
+
+def _wrap_api_handler(handler: ApiHandler) -> WebRequestHandler:
+    """Wrap a typed API handler: extract params from web.Request, convert APIResponse → web.Response."""
+    sig = inspect.signature(handler, eval_str=True)
+
+    @functools.wraps(handler)
+    async def wrapped(request: web.Request) -> web.Response:
+        kwargs: dict[str, Any] = {}
+        for name, param in sig.parameters.items():
+            kwargs[name] = await extract_param_value(request, param.annotation)
+        response = await handler(**kwargs)
+        return parse_response(response)
+
+    return wrapped
 
 
 class RouteRegistry:
@@ -57,10 +77,15 @@ class RouteRegistry:
         self,
         method: str,
         path: str,
-        handler: WebRequestHandler,
+        handler: ApiHandler,
         middlewares: Sequence[RouteMiddleware] | None = None,
     ) -> web.AbstractRoute:
         """Register a route with optional per-route middleware.
+
+        The handler is always wrapped by ``_wrap_api_handler`` so that
+        typed parameters (``BodyParam``, ``QueryParam``, ``MiddlewareParam``,
+        etc.) are automatically extracted from the ``web.Request`` and the
+        returned ``APIResponse`` is converted to a ``web.Response``.
 
         Registry-level middlewares are prepended to the per-route list,
         so they wrap the handler outermost. Within each tier, the first
@@ -81,10 +106,11 @@ class RouteRegistry:
             @admin_required     # route-level
             async def list_users(request): ...
         """
+        effective_handler: WebRequestHandler = _wrap_api_handler(handler)
         combined = self._middlewares + list(middlewares or [])
-        final_handler: WebRequestHandler = handler
+        final_handler: WebRequestHandler = effective_handler
         if combined:
-            final_handler = _apply_route_middlewares(handler, combined)
+            final_handler = _apply_route_middlewares(effective_handler, combined)
         route = self._app.router.add_route(method, path, final_handler)
         self._cors.add(route)
         return route
