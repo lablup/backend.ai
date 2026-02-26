@@ -11,7 +11,6 @@ on:
       - '[0-9][0-9].[0-9][0-9].*'
   pull_request:
     types: [opened, synchronize, reopened]
-  merge_group:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -33,33 +32,6 @@ jobs:
       release: ${{ steps.release.outputs.IS_RELEASE }}
       alembic: ${{ steps.alembic.outputs.ALEMBIC }}
     steps:
-      - name: Debug action trigger
-        run: |
-          echo "github.action: ${{ github.action }}"
-          echo "github.run_id: ${{ github.run_id }}"
-          echo "github.actor: ${{ github.actor }}"
-          echo "github.job: ${{ github.job }}"
-          echo "github.head_ref: ${{ github.head_ref }}"
-          echo "github.ref: ${{ github.ref }}"
-          echo "github.ref_name: ${{ github.ref_name }}"
-          echo "github.ref_type: ${{ github.ref_type }}"
-          echo "github.event_name: ${{ github.event_name }}"
-          echo "github.event_path: ${{ github.event_path }}"
-          echo "github.event.action: ${{ github.event.action }}"
-          echo "merge_group:"
-          echo "  github.event.merge_group.head_ref: ${{ github.event.merge_group.head_ref }}"
-          echo "  github.event.merge_group.base_ref: ${{ github.event.merge_group.base_ref }}"
-          echo "pull_request:"
-          echo "  github.event.number: ${{ github.event.number }}"
-          echo "  github.event.pull_request.head.ref: ${{ github.event.pull_request.head.ref }}"
-          echo "  github.event.pull_request.base.ref: ${{ github.event.pull_request.base.ref }}"
-          echo "push:"
-          echo "  github.event.after: ${{ github.event.after }}"
-          echo "  github.event.before: ${{ github.event.before }}"
-          echo "  github.event.base_ref: ${{ github.event.base_ref }}"
-          echo "  github.event.ref: ${{ github.event.ref }}"
-          echo "---"
-          echo "concurrency-group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
       - name: labeler
         id: labeler
         if: github.event_name == 'pull_request'
@@ -76,18 +48,14 @@ jobs:
         run: echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
       - name: Alembic
         id: alembic
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" == "merge_group" ]; then
+          changed=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files \
+            --paginate --jq '.[].filename')
+          if echo "$changed" | grep -qE '^src/ai/backend/manager/models/'; then
             echo "ALEMBIC=true" >> $GITHUB_OUTPUT
-          else
-            changed=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files \
-              --paginate --jq '.[].filename')
-            if echo "$changed" | grep -qE '^src/ai/backend/manager/models/'; then
-              echo "ALEMBIC=true" >> $GITHUB_OUTPUT
-            fi
           fi
 
 
@@ -317,12 +285,7 @@ jobs:
           else
             BASE_REF="HEAD~1"
           fi
-          # Use --changed-dependents=transitive only for merge_group to run broader tests
-          DEPENDENTS_OPT=""
-          if [ "$GITHUB_EVENT_NAME" == "merge_group" ]; then
-            DEPENDENTS_OPT="--changed-dependents=transitive"
-          fi
-          pants test --changed-since=$BASE_REF $DEPENDENTS_OPT -- -v
+          pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -v
         fi
     - name: Upload pants log
       uses: actions/upload-artifact@v5
