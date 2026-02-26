@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -60,84 +60,76 @@ class ScopeUnbinderMappingRow(Base):  # type: ignore[misc]
 
 
 class TestEntityUnbinder(RBACEntityUnbinder[ScopeUnbinderMappingRow]):
-    """Entity unbinder: delete by entity, optionally filtered by scope."""
+    """Entity unbinder: delete entities from a scope."""
 
     def __init__(
         self,
-        entity_id: str,
+        entity_ids: Sequence[str],
         entity_element_type: RBACElementType,
-        scope_id: str | None = None,
-        scope_element_type: RBACElementType | None = None,
-    ) -> None:
-        self._entity_id = entity_id
-        self._entity_element_type = entity_element_type
-        self._scope_id = scope_id
-        self._scope_element_type = scope_element_type
-
-    def build_purger_spec(self) -> BatchPurgerSpec[ScopeUnbinderMappingRow]:
-        entity_id = self._entity_id
-        scope_id = self._scope_id
-
-        class _Spec(BatchPurgerSpec[ScopeUnbinderMappingRow]):
-            def build_subquery(self) -> sa.sql.Select[tuple[ScopeUnbinderMappingRow]]:
-                stmt = sa.select(ScopeUnbinderMappingRow).where(
-                    ScopeUnbinderMappingRow.entity_id == entity_id,
-                )
-                if scope_id is not None:
-                    stmt = stmt.where(ScopeUnbinderMappingRow.scope_id == scope_id)
-                return stmt
-
-        return _Spec()
-
-    @property
-    def entity_ref(self) -> RBACElementRef:
-        return RBACElementRef(self._entity_element_type, self._entity_id)
-
-    @property
-    def scope_ref(self) -> RBACElementRef | None:
-        if self._scope_id is None or self._scope_element_type is None:
-            return None
-        return RBACElementRef(self._scope_element_type, self._scope_id)
-
-
-class TestScopeUnbinder(RBACScopeUnbinder[ScopeUnbinderMappingRow]):
-    """Scope unbinder: delete by scope, optionally filtered by entity."""
-
-    def __init__(
-        self,
         scope_id: str,
         scope_element_type: RBACElementType,
-        entity_id: str | None = None,
-        entity_element_type: RBACElementType | None = None,
     ) -> None:
+        self._entity_ids = entity_ids
+        self._entity_element_type = entity_element_type
         self._scope_id = scope_id
         self._scope_element_type = scope_element_type
-        self._entity_id = entity_id
-        self._entity_element_type = entity_element_type
 
     def build_purger_spec(self) -> BatchPurgerSpec[ScopeUnbinderMappingRow]:
+        entity_ids = self._entity_ids
         scope_id = self._scope_id
-        entity_id = self._entity_id
 
         class _Spec(BatchPurgerSpec[ScopeUnbinderMappingRow]):
             def build_subquery(self) -> sa.sql.Select[tuple[ScopeUnbinderMappingRow]]:
-                stmt = sa.select(ScopeUnbinderMappingRow).where(
+                return sa.select(ScopeUnbinderMappingRow).where(
+                    ScopeUnbinderMappingRow.entity_id.in_(entity_ids),
                     ScopeUnbinderMappingRow.scope_id == scope_id,
                 )
-                if entity_id is not None:
-                    stmt = stmt.where(ScopeUnbinderMappingRow.entity_id == entity_id)
-                return stmt
 
         return _Spec()
+
+    @property
+    def entity_refs(self) -> Sequence[RBACElementRef]:
+        return [RBACElementRef(self._entity_element_type, eid) for eid in self._entity_ids]
 
     @property
     def scope_ref(self) -> RBACElementRef:
         return RBACElementRef(self._scope_element_type, self._scope_id)
 
+
+class TestScopeUnbinder(RBACScopeUnbinder[ScopeUnbinderMappingRow]):
+    """Scope unbinder: delete scopes from an entity."""
+
+    def __init__(
+        self,
+        scope_ids: Sequence[str],
+        scope_element_type: RBACElementType,
+        entity_id: str,
+        entity_element_type: RBACElementType,
+    ) -> None:
+        self._scope_ids = scope_ids
+        self._scope_element_type = scope_element_type
+        self._entity_id = entity_id
+        self._entity_element_type = entity_element_type
+
+    def build_purger_spec(self) -> BatchPurgerSpec[ScopeUnbinderMappingRow]:
+        scope_ids = self._scope_ids
+        entity_id = self._entity_id
+
+        class _Spec(BatchPurgerSpec[ScopeUnbinderMappingRow]):
+            def build_subquery(self) -> sa.sql.Select[tuple[ScopeUnbinderMappingRow]]:
+                return sa.select(ScopeUnbinderMappingRow).where(
+                    ScopeUnbinderMappingRow.scope_id.in_(scope_ids),
+                    ScopeUnbinderMappingRow.entity_id == entity_id,
+                )
+
+        return _Spec()
+
     @property
-    def entity_ref(self) -> RBACElementRef | None:
-        if self._entity_id is None or self._entity_element_type is None:
-            return None
+    def scope_refs(self) -> Sequence[RBACElementRef]:
+        return [RBACElementRef(self._scope_element_type, sid) for sid in self._scope_ids]
+
+    @property
+    def entity_ref(self) -> RBACElementRef:
         return RBACElementRef(self._entity_element_type, self._entity_id)
 
 
@@ -216,58 +208,28 @@ async def seed_data(
 class TestRBACEntityUnbinder:
     """Tests for entity-centric unbinding (RBACEntityUnbinder)."""
 
-    async def test_unbind_entity_from_all_scopes(
+    async def test_unbind_single_entity_from_scope(
         self,
         database_connection: ExtendedAsyncSAEngine,
         seed_data: UnbinderSeedContext,
     ) -> None:
-        """Unbinding entity_1 with scope_ref=None removes all its mappings/associations."""
+        """Unbinding one entity from scope_a removes that pair."""
         ctx = seed_data
 
         async with database_connection.begin_session_read_committed() as db_sess:
             unbinder = TestEntityUnbinder(
-                entity_id=ctx.entity_id_1,
-                entity_element_type=RBACElementType.RESOURCE_GROUP,
-            )
-            result = await execute_rbac_entity_unbinder(db_sess, unbinder)
-
-            assert isinstance(result, RBACUnbinderResult)
-            assert result.deleted_count == 2  # 2 mapping rows for entity_1
-            assert len(result.association_rows) == 2  # 2 assoc rows for entity_1
-
-            # entity_2 mappings remain
-            mapping_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(ScopeUnbinderMappingRow)
-            )
-            assert mapping_count == 2
-
-            # entity_2 associations remain
-            assoc_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
-            )
-            assert assoc_count == 2
-
-    async def test_unbind_entity_from_specific_scope(
-        self,
-        database_connection: ExtendedAsyncSAEngine,
-        seed_data: UnbinderSeedContext,
-    ) -> None:
-        """Unbinding entity_1 from scope_a removes only that pair."""
-        ctx = seed_data
-
-        async with database_connection.begin_session_read_committed() as db_sess:
-            unbinder = TestEntityUnbinder(
-                entity_id=ctx.entity_id_1,
+                entity_ids=[ctx.entity_id_1],
                 entity_element_type=RBACElementType.RESOURCE_GROUP,
                 scope_id=ctx.scope_id_a,
                 scope_element_type=RBACElementType.DOMAIN,
             )
             result = await execute_rbac_entity_unbinder(db_sess, unbinder)
 
+            assert isinstance(result, RBACUnbinderResult)
             assert result.deleted_count == 1
             assert len(result.association_rows) == 1
 
-            # 3 mapping rows remain (entity_1×scope_b, entity_2×scope_a, entity_2×scope_b)
+            # 3 mapping rows remain
             mapping_count = await db_sess.scalar(
                 sa.select(sa.func.count()).select_from(ScopeUnbinderMappingRow)
             )
@@ -278,6 +240,37 @@ class TestRBACEntityUnbinder:
             )
             assert assoc_count == 3
 
+    async def test_unbind_multiple_entities_from_scope(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        seed_data: UnbinderSeedContext,
+    ) -> None:
+        """Unbinding both entities from scope_a removes both pairs in one call."""
+        ctx = seed_data
+
+        async with database_connection.begin_session_read_committed() as db_sess:
+            unbinder = TestEntityUnbinder(
+                entity_ids=[ctx.entity_id_1, ctx.entity_id_2],
+                entity_element_type=RBACElementType.RESOURCE_GROUP,
+                scope_id=ctx.scope_id_a,
+                scope_element_type=RBACElementType.DOMAIN,
+            )
+            result = await execute_rbac_entity_unbinder(db_sess, unbinder)
+
+            assert result.deleted_count == 2
+            assert len(result.association_rows) == 2
+
+            # 2 mapping rows remain (both entities × scope_b)
+            mapping_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(ScopeUnbinderMappingRow)
+            )
+            assert mapping_count == 2
+
+            assoc_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            )
+            assert assoc_count == 2
+
     async def test_unbind_entity_no_rows(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -286,8 +279,10 @@ class TestRBACEntityUnbinder:
         """Unbinding a non-existent entity returns zero counts."""
         async with database_connection.begin_session_read_committed() as db_sess:
             unbinder = TestEntityUnbinder(
-                entity_id=str(uuid.uuid4()),
+                entity_ids=[str(uuid.uuid4())],
                 entity_element_type=RBACElementType.RESOURCE_GROUP,
+                scope_id=str(uuid.uuid4()),
+                scope_element_type=RBACElementType.DOMAIN,
             )
             result = await execute_rbac_entity_unbinder(db_sess, unbinder)
 
@@ -303,53 +298,24 @@ class TestRBACEntityUnbinder:
 class TestRBACScopeUnbinder:
     """Tests for scope-centric unbinding (RBACScopeUnbinder)."""
 
-    async def test_unbind_scope_from_all_entities(
+    async def test_unbind_single_scope_from_entity(
         self,
         database_connection: ExtendedAsyncSAEngine,
         seed_data: UnbinderSeedContext,
     ) -> None:
-        """Unbinding scope_a with entity_ref=None removes all its mappings/associations."""
+        """Unbinding scope_a from entity_1 removes that pair."""
         ctx = seed_data
 
         async with database_connection.begin_session_read_committed() as db_sess:
             unbinder = TestScopeUnbinder(
-                scope_id=ctx.scope_id_a,
-                scope_element_type=RBACElementType.DOMAIN,
-            )
-            result = await execute_rbac_scope_unbinder(db_sess, unbinder)
-
-            assert isinstance(result, RBACUnbinderResult)
-            assert result.deleted_count == 2  # 2 mapping rows for scope_a
-            assert len(result.association_rows) == 2  # 2 assoc rows for scope_a
-
-            # scope_b mappings remain
-            mapping_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(ScopeUnbinderMappingRow)
-            )
-            assert mapping_count == 2
-
-            assoc_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
-            )
-            assert assoc_count == 2
-
-    async def test_unbind_scope_from_specific_entity(
-        self,
-        database_connection: ExtendedAsyncSAEngine,
-        seed_data: UnbinderSeedContext,
-    ) -> None:
-        """Unbinding scope_a from entity_1 removes only that pair."""
-        ctx = seed_data
-
-        async with database_connection.begin_session_read_committed() as db_sess:
-            unbinder = TestScopeUnbinder(
-                scope_id=ctx.scope_id_a,
+                scope_ids=[ctx.scope_id_a],
                 scope_element_type=RBACElementType.DOMAIN,
                 entity_id=ctx.entity_id_1,
                 entity_element_type=RBACElementType.RESOURCE_GROUP,
             )
             result = await execute_rbac_scope_unbinder(db_sess, unbinder)
 
+            assert isinstance(result, RBACUnbinderResult)
             assert result.deleted_count == 1
             assert len(result.association_rows) == 1
 
@@ -363,6 +329,37 @@ class TestRBACScopeUnbinder:
             )
             assert assoc_count == 3
 
+    async def test_unbind_multiple_scopes_from_entity(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        seed_data: UnbinderSeedContext,
+    ) -> None:
+        """Unbinding both scopes from entity_1 removes both pairs in one call."""
+        ctx = seed_data
+
+        async with database_connection.begin_session_read_committed() as db_sess:
+            unbinder = TestScopeUnbinder(
+                scope_ids=[ctx.scope_id_a, ctx.scope_id_b],
+                scope_element_type=RBACElementType.DOMAIN,
+                entity_id=ctx.entity_id_1,
+                entity_element_type=RBACElementType.RESOURCE_GROUP,
+            )
+            result = await execute_rbac_scope_unbinder(db_sess, unbinder)
+
+            assert result.deleted_count == 2
+            assert len(result.association_rows) == 2
+
+            # 2 mapping rows remain (entity_2 × both scopes)
+            mapping_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(ScopeUnbinderMappingRow)
+            )
+            assert mapping_count == 2
+
+            assoc_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            )
+            assert assoc_count == 2
+
     async def test_unbind_scope_no_rows(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -371,8 +368,10 @@ class TestRBACScopeUnbinder:
         """Unbinding a non-existent scope returns zero counts."""
         async with database_connection.begin_session_read_committed() as db_sess:
             unbinder = TestScopeUnbinder(
-                scope_id=str(uuid.uuid4()),
+                scope_ids=[str(uuid.uuid4())],
                 scope_element_type=RBACElementType.DOMAIN,
+                entity_id=str(uuid.uuid4()),
+                entity_element_type=RBACElementType.RESOURCE_GROUP,
             )
             result = await execute_rbac_scope_unbinder(db_sess, unbinder)
 
@@ -384,16 +383,28 @@ class TestRBACScopeUnbinder:
         database_connection: ExtendedAsyncSAEngine,
         seed_data: UnbinderSeedContext,
     ) -> None:
-        """After unbinding scope_a, scope_b associations are intact."""
+        """After unbinding scope_a from entity_1, scope_b associations are intact."""
         ctx = seed_data
 
         async with database_connection.begin_session_read_committed() as db_sess:
             unbinder = TestScopeUnbinder(
-                scope_id=ctx.scope_id_a,
+                scope_ids=[ctx.scope_id_a],
                 scope_element_type=RBACElementType.DOMAIN,
+                entity_id=ctx.entity_id_1,
+                entity_element_type=RBACElementType.RESOURCE_GROUP,
             )
             await execute_rbac_scope_unbinder(db_sess, unbinder)
 
             remaining = (await db_sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
-            assert all(row.scope_id == ctx.scope_id_b for row in remaining)
-            assert len(remaining) == 2
+            assert len(remaining) == 3
+            # entity_1 × scope_b, entity_2 × scope_a, entity_2 × scope_b remain
+            entity1_remaining = [r for r in remaining if r.entity_id == ctx.entity_id_1]
+            assert len(entity1_remaining) == 1
+            assert entity1_remaining[0].scope_id == ctx.scope_id_b
+
+            entity2_remaining = [r for r in remaining if r.entity_id == ctx.entity_id_2]
+            assert len(entity2_remaining) == 2
+            assert {r.scope_id for r in entity2_remaining} == {
+                ctx.scope_id_a,
+                ctx.scope_id_b,
+            }
