@@ -12,7 +12,9 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupForProjectRow,
 )
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
-from ai.backend.manager.repositories.base.rbac.scope_unbinder import RBACEntityUnbinder
+from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
+    RBACScopeWideEntityUnbinder,
+)
 from ai.backend.manager.repositories.scaling_group.purgers import (
     ScalingGroupsForDomainPurgerSpec,
     ScalingGroupsForProjectPurgerSpec,
@@ -24,8 +26,8 @@ from ai.backend.manager.repositories.scaling_group.purgers import (
 
 
 @dataclass
-class SGDomainEntityUnbinder(RBACEntityUnbinder[ScalingGroupForDomainRow]):
-    """Unbind scaling groups from a domain."""
+class SGDomainEntityUnbinder(RBACScopeWideEntityUnbinder[ScalingGroupForDomainRow]):
+    """Unbind specific scaling groups from a domain."""
 
     scaling_groups: Sequence[str]
     domain: str
@@ -39,18 +41,23 @@ class SGDomainEntityUnbinder(RBACEntityUnbinder[ScalingGroupForDomainRow]):
 
     @property
     @override
-    def entity_refs(self) -> Sequence[RBACElementRef]:
-        return [RBACElementRef(RBACElementType.RESOURCE_GROUP, sg) for sg in self.scaling_groups]
+    def entity_type(self) -> RBACElementType:
+        return RBACElementType.RESOURCE_GROUP
 
     @property
     @override
     def scope_ref(self) -> RBACElementRef:
         return RBACElementRef(RBACElementType.DOMAIN, self.domain)
 
+    @property
+    @override
+    def entity_ids(self) -> Sequence[str]:
+        return list(self.scaling_groups)
+
 
 @dataclass
-class SGProjectEntityUnbinder(RBACEntityUnbinder[ScalingGroupForProjectRow]):
-    """Unbind scaling groups from a project."""
+class SGProjectEntityUnbinder(RBACScopeWideEntityUnbinder[ScalingGroupForProjectRow]):
+    """Unbind specific scaling groups from a project."""
 
     scaling_groups: Sequence[str]
     project: UUID
@@ -64,10 +71,15 @@ class SGProjectEntityUnbinder(RBACEntityUnbinder[ScalingGroupForProjectRow]):
 
     @property
     @override
-    def entity_refs(self) -> Sequence[RBACElementRef]:
-        return [RBACElementRef(RBACElementType.RESOURCE_GROUP, sg) for sg in self.scaling_groups]
+    def entity_type(self) -> RBACElementType:
+        return RBACElementType.RESOURCE_GROUP
 
     @property
     @override
     def scope_ref(self) -> RBACElementRef:
         return RBACElementRef(RBACElementType.PROJECT, str(self.project))
+
+    @property
+    @override
+    def entity_ids(self) -> Sequence[str]:
+        return list(self.scaling_groups)

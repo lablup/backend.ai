@@ -6,7 +6,9 @@ from typing import override
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
-from ai.backend.manager.repositories.base.rbac.scope_unbinder import RBACEntityUnbinder
+from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
+    RBACScopeWideEntityUnbinder,
+)
 
 from .user_group_base import ScalingGroupUserGroupAction
 
@@ -15,7 +17,7 @@ from .user_group_base import ScalingGroupUserGroupAction
 class DisassociateScalingGroupWithUserGroupsAction(ScalingGroupUserGroupAction):
     """Action to disassociate scaling groups from a project."""
 
-    unbinder: RBACEntityUnbinder[ScalingGroupForProjectRow]
+    unbinder: RBACScopeWideEntityUnbinder[ScalingGroupForProjectRow]
 
     @override
     @classmethod

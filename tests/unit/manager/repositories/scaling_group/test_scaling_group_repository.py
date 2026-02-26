@@ -1226,7 +1226,7 @@ class TestScalingGroupRepositoryDB:
 
         # When: Disassociate (even though no association exists)
         unbinder = SGProjectEntityUnbinder(scaling_groups=[sgroup_name], project=project_id)
-        # Then: Should not raise any error (RBACEntityUnbinder deletes 0 rows silently)
+        # Then: Should not raise any error (unbinder deletes 0 rows silently)
         await scaling_group_repository.disassociate_scaling_group_with_user_groups(unbinder)
 
     @pytest.fixture
