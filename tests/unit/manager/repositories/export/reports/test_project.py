@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
@@ -716,17 +717,23 @@ class TestJoinDefIdentityAndHashing:
         )
 
 
+@dataclass(frozen=True)
+class _ProjectWithSgAndRegistry:
+    project_id: uuid.UUID
+    domain_name: str
+    sg_name: str
+    registry_id: uuid.UUID
+
+
+@dataclass(frozen=True)
+class _ProjectWithMixedRegistries:
+    project_id: uuid.UUID
+    global_registry_id: uuid.UUID
+    scoped_registry_id: uuid.UUID
+
+
 class TestProjectExportExecuteStreamingDB:
-    """DB-level integration tests for execute_streaming_export with project data.
-
-    These tests use a real PostgreSQL database to verify that the export query
-    actually returns rows when project, scaling group, and container registry
-    data exist. This directly reproduces the reported bug where container_registry_*
-    fields caused empty results.
-
-    Run with: pants test tests/unit/manager/repositories/export/reports/test_project.py
-    (Requires Docker for postgres_container fixture)
-    """
+    """DB-level integration tests for execute_streaming_export with project data."""
 
     @pytest.fixture
     async def db_engine(
@@ -752,7 +759,7 @@ class TestProjectExportExecuteStreamingDB:
     async def project_with_sg_and_registry(
         self,
         db_engine: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[dict[str, Any], None]:
+    ) -> AsyncGenerator[_ProjectWithSgAndRegistry, None]:
         """Create a project associated with a scaling group and a container registry."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
@@ -830,17 +837,17 @@ class TestProjectExportExecuteStreamingDB:
             )
             await db_sess.commit()
 
-        yield {
-            "project_id": project_id,
-            "domain_name": domain_name,
-            "sg_name": sg_name,
-            "registry_id": registry_id,
-        }
+        yield _ProjectWithSgAndRegistry(
+            project_id=project_id,
+            domain_name=domain_name,
+            sg_name=sg_name,
+            registry_id=registry_id,
+        )
 
     async def test_basic_fields_return_project_row(
         self,
         db_engine: ExtendedAsyncSAEngine,
-        project_with_sg_and_registry: dict[str, Any],
+        project_with_sg_and_registry: _ProjectWithSgAndRegistry,
     ) -> None:
         """SELECT with basic fields only should return the project row (baseline)."""
         adapter = ExportAdapter()
@@ -858,20 +865,14 @@ class TestProjectExportExecuteStreamingDB:
             rows.extend(partition)
 
         assert len(rows) == 1
-        project_id = project_with_sg_and_registry["project_id"]
-        assert str(rows[0][0]) == str(project_id)
+        assert str(rows[0][0]) == str(project_with_sg_and_registry.project_id)
 
     async def test_container_registry_join_returns_rows_not_empty(
         self,
         db_engine: ExtendedAsyncSAEngine,
-        project_with_sg_and_registry: dict[str, Any],
+        project_with_sg_and_registry: _ProjectWithSgAndRegistry,
     ) -> None:
-        """SELECT with container_registry_* fields must NOT return empty results.
-
-        This reproduces the reported bug: requesting container_registry_* fields
-        returned an empty list. With correct LEFT OUTER JOINs, the project row
-        must appear even when the join is required.
-        """
+        """SELECT with container_registry_* fields must NOT return empty results."""
         adapter = ExportAdapter()
         query = adapter.build_project_query(
             report=PROJECT_REPORT,
@@ -886,23 +887,15 @@ class TestProjectExportExecuteStreamingDB:
         async for partition in execute_streaming_export(db_engine, query):
             rows.extend(partition)
 
-        assert len(rows) >= 1, (
-            "Expected at least 1 row with container_registry fields, got 0. "
-            "This indicates the LEFT OUTER JOIN is not working correctly."
-        )
-        registry_id = project_with_sg_and_registry["registry_id"]
-        assert str(rows[0][2]) == str(registry_id)
+        assert len(rows) >= 1
+        assert str(rows[0][2]) == str(project_with_sg_and_registry.registry_id)
 
     async def test_scaling_group_and_container_registry_combined_returns_rows(
         self,
         db_engine: ExtendedAsyncSAEngine,
-        project_with_sg_and_registry: dict[str, Any],
+        project_with_sg_and_registry: _ProjectWithSgAndRegistry,
     ) -> None:
-        """The exact bug reproduction: both scaling_group and container_registry fields.
-
-        With 1 project, 1 scaling group, 1 container registry, the Cartesian product
-        of the 1:N JOINs produces exactly 1 row (1 x 1 = 1).
-        """
+        """Both scaling_group and container_registry fields selected together must return rows."""
         adapter = ExportAdapter()
         query = adapter.build_project_query(
             report=PROJECT_REPORT,
@@ -934,24 +927,15 @@ class TestProjectExportExecuteStreamingDB:
         async for partition in execute_streaming_export(db_engine, query):
             rows.extend(partition)
 
-        assert len(rows) >= 1, (
-            "Expected at least 1 row when selecting all fields including "
-            "scaling_group_name and container_registry_*, got 0. "
-            "This is the exact bug reproduction scenario."
-        )
+        assert len(rows) >= 1
+        assert str(rows[0][15]) == str(project_with_sg_and_registry.project_id)
 
     async def test_project_without_registry_returns_row_with_null_registry_fields(
         self,
         db_engine: ExtendedAsyncSAEngine,
-        project_with_sg_and_registry: dict[str, Any],
+        project_with_sg_and_registry: _ProjectWithSgAndRegistry,
     ) -> None:
-        """A second project with no registry must still appear (with NULL registry columns).
-
-        LEFT OUTER JOIN must not filter out projects without associated registries.
-        This confirms the JOIN type is truly LEFT OUTER (not INNER).
-        """
-        # Create a second project with NO container registry
-        domain_name = project_with_sg_and_registry["domain_name"]
+        """A project with no registry must still appear (with NULL registry columns)."""
         policy_name2 = f"test-policy2-{uuid.uuid4().hex[:8]}"
         project_id2 = uuid.uuid4()
 
@@ -970,7 +954,7 @@ class TestProjectExportExecuteStreamingDB:
                 GroupRow(
                     id=project_id2,
                     name="project-no-registry",
-                    domain_name=domain_name,
+                    domain_name=project_with_sg_and_registry.domain_name,
                     resource_policy=policy_name2,
                 )
             )
@@ -990,12 +974,7 @@ class TestProjectExportExecuteStreamingDB:
         async for partition in execute_streaming_export(db_engine, query):
             rows.extend(partition)
 
-        # Both projects must appear
-        assert len(rows) == 2, (
-            f"Expected 2 rows (1 with registry, 1 without), got {len(rows)}. "
-            "The project without registry must still appear with NULL registry_id."
-        )
-        # The project without registry has NULL for container_registry_id
+        assert len(rows) == 2
         row_ids = {str(r[0]) for r in rows}
         assert str(project_id2) in row_ids
 
@@ -1023,10 +1002,10 @@ class TestGlobalContainerRegistryExport:
             yield database_connection
 
     @pytest.fixture
-    async def project_with_global_and_scoped_registries(
+    async def project_with_mixed_registries(
         self,
         db_engine: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[dict[str, Any], None]:
+    ) -> AsyncGenerator[_ProjectWithMixedRegistries, None]:
         """Create a project with one global registry and one scoped (associated) registry."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
@@ -1092,16 +1071,16 @@ class TestGlobalContainerRegistryExport:
             )
             await db_sess.commit()
 
-        yield {
-            "project_id": project_id,
-            "global_registry_id": global_registry_id,
-            "scoped_registry_id": scoped_registry_id,
-        }
+        yield _ProjectWithMixedRegistries(
+            project_id=project_id,
+            global_registry_id=global_registry_id,
+            scoped_registry_id=scoped_registry_id,
+        )
 
     async def test_global_and_scoped_registries_both_appear(
         self,
         db_engine: ExtendedAsyncSAEngine,
-        project_with_global_and_scoped_registries: dict[str, Any],
+        project_with_mixed_registries: _ProjectWithMixedRegistries,
     ) -> None:
         """Both global and scoped registries must appear in project export (BA-4708)."""
         adapter = ExportAdapter()
@@ -1118,11 +1097,11 @@ class TestGlobalContainerRegistryExport:
         async for partition in execute_streaming_export(db_engine, query):
             rows.extend(partition)
 
-        data = project_with_global_and_scoped_registries
+        data = project_with_mixed_registries
         registry_ids = {str(row[2]) for row in rows}
         assert len(rows) == 2
-        assert str(data["global_registry_id"]) in registry_ids
-        assert str(data["scoped_registry_id"]) in registry_ids
+        assert str(data.global_registry_id) in registry_ids
+        assert str(data.scoped_registry_id) in registry_ids
 
 
 class TestSerializeJson:
