@@ -68,9 +68,11 @@ def downgrade() -> None:
     op.drop_index(
         op.f("ix_prometheus_query_presets_metric_name"),
         table_name="prometheus_query_presets",
+        if_exists=True,
     )
     op.drop_index(
         op.f("ix_prometheus_query_presets_name"),
         table_name="prometheus_query_presets",
+        if_exists=True,
     )
     op.drop_table("prometheus_query_presets")
