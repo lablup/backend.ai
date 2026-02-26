@@ -23,7 +23,6 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
     allowed_vfolder_hosts: VFolderHostPermissionMap | None = None
     integration_id: str | None = None
     resource_policy: str | None = None
-    container_registry: dict[str, str] | None = None
     dotfiles: bytes | None = None
 
     @override
@@ -39,5 +38,4 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
             integration_id=self.integration_id,
             resource_policy=self.resource_policy,
             dotfiles=self.dotfiles,
-            container_registry=self.container_registry,
         )

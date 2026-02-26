@@ -52,7 +52,6 @@ class GroupData:
     dotfiles: bytes
     resource_policy: str
     type: ProjectType
-    container_registry: dict[str, str] | None
 
     def scope_id(self) -> ScopeId:
         return ScopeId(
@@ -88,9 +87,6 @@ class GroupModifier(PartialModifier):
     )
     integration_id: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     resource_policy: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    container_registry: TriState[dict[str, str]] = field(
-        default_factory=TriState[dict[str, str]].nop
-    )
 
     @override
     def fields_to_update(self) -> dict[str, Any]:
@@ -103,5 +99,4 @@ class GroupModifier(PartialModifier):
         self.allowed_vfolder_hosts.update_dict(to_update, "allowed_vfolder_hosts")
         self.integration_id.update_dict(to_update, "integration_id")
         self.resource_policy.update_dict(to_update, "resource_policy")
-        self.container_registry.update_dict(to_update, "container_registry")
         return to_update

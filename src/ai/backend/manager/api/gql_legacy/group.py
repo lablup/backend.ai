@@ -107,7 +107,6 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
     integration_id = graphene.String()
     resource_policy = graphene.String()
     type = graphene.String(description=f"Added in 24.03.7. One of {[t.name for t in ProjectType]}.")
-    container_registry = graphene.JSONString(description="Added in 24.03.7.")
     scaling_groups = graphene.List(
         lambda: graphene.String,
     )
@@ -158,7 +157,6 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             integration_id=row.integration_id,
             resource_policy=row.resource_policy,
             type=row.type.name,
-            container_registry=row.container_registry,
         )
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
@@ -355,7 +353,6 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
     integration_id = graphene.String()
     resource_policy = graphene.String()
     type = graphene.String(description="Added in 24.03.0.")
-    container_registry = graphene.JSONString(description="Added in 24.03.0.")
 
     scaling_groups = graphene.List(lambda: graphene.String)
 
@@ -378,7 +375,6 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             integration_id=row.integration_id,
             resource_policy=row.resource_policy,
             type=row.type.name,
-            container_registry=row.container_registry,
         )
 
     @classmethod
@@ -400,7 +396,6 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             integration_id=dto.integration_id,
             resource_policy=dto.resource_policy,
             type=dto.type.name,
-            container_registry=dto.container_registry,
         )
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
@@ -555,9 +550,6 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
     allowed_vfolder_hosts = graphene.JSONString(required=False, default_value={})
     integration_id = graphene.String(required=False, default_value="")
     resource_policy = graphene.String(required=False, default_value="default")
-    container_registry = graphene.JSONString(
-        required=False, default_value={}, description="Added in 24.03.0"
-    )
 
     def to_action(self, name: str) -> CreateGroupAction:
         def value_or_none(value: Any) -> Any:
@@ -578,7 +570,6 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
         )
         integration_id_val = value_or_none(self.integration_id)
         resource_policy_val = value_or_none(self.resource_policy)
-        container_registry_val = value_or_none(self.container_registry)
 
         return CreateGroupAction(
             creator=Creator(
@@ -592,7 +583,6 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
                     allowed_vfolder_hosts=allowed_vfolder_hosts_val,
                     integration_id=integration_id_val,
                     resource_policy=resource_policy_val,
-                    container_registry=container_registry_val,
                 )
             ),
         )
@@ -609,9 +599,6 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
     resource_policy = graphene.String(required=False)
-    container_registry = graphene.JSONString(
-        required=False, default_value={}, description="Added in 24.03.0"
-    )
 
     def to_action(self, group_id: uuid.UUID) -> ModifyGroupAction:
         spec = GroupUpdaterSpec(
@@ -640,9 +627,6 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             ),
             resource_policy=OptionalState[str].from_graphql(
                 self.resource_policy,
-            ),
-            container_registry=TriState[dict[str, str]].from_graphql(
-                self.container_registry,
             ),
         )
         return ModifyGroupAction(
