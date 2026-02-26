@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
-from ai.backend.manager.repositories.base.purger import BatchPurger
+from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
+    RBACEntityUnbinder,
+    RBACScopeUnbinder,
+)
 
 from .domain_base import ScalingGroupDomainAction
 
@@ -15,7 +19,10 @@ from .domain_base import ScalingGroupDomainAction
 class DisassociateScalingGroupWithDomainsAction(ScalingGroupDomainAction):
     """Action to disassociate a scaling group from multiple domains."""
 
-    purger: BatchPurger[ScalingGroupForDomainRow]
+    unbinders: (
+        Sequence[RBACEntityUnbinder[ScalingGroupForDomainRow]]
+        | RBACScopeUnbinder[ScalingGroupForDomainRow]
+    )
 
     @override
     @classmethod

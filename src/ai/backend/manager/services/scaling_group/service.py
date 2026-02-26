@@ -171,14 +171,14 @@ class ScalingGroupService:
         self, action: AssociateScalingGroupWithDomainsAction
     ) -> AssociateScalingGroupWithDomainsActionResult:
         """Associates a scaling group with multiple domains."""
-        await self._repository.associate_scaling_group_with_domains(action.bulk_creator)
+        await self._repository.associate_scaling_group_with_domains(action.binder)
         return AssociateScalingGroupWithDomainsActionResult()
 
     async def disassociate_scaling_group_with_domains(
         self, action: DisassociateScalingGroupWithDomainsAction
     ) -> DisassociateScalingGroupWithDomainsActionResult:
         """Disassociates a scaling group from multiple domains."""
-        await self._repository.disassociate_scaling_group_with_domains(action.purger)
+        await self._repository.disassociate_scaling_group_with_domains(action.unbinders)
         return DisassociateScalingGroupWithDomainsActionResult()
 
     async def associate_scaling_group_with_keypairs(
@@ -199,14 +199,14 @@ class ScalingGroupService:
         self, action: AssociateScalingGroupWithUserGroupsAction
     ) -> AssociateScalingGroupWithUserGroupsActionResult:
         """Associates a scaling group with multiple user groups (projects)."""
-        await self._repository.associate_scaling_group_with_user_groups(action.bulk_creator)
+        await self._repository.associate_scaling_group_with_user_groups(action.binder)
         return AssociateScalingGroupWithUserGroupsActionResult()
 
     async def disassociate_scaling_group_with_user_groups(
         self, action: DisassociateScalingGroupWithUserGroupsAction
     ) -> DisassociateScalingGroupWithUserGroupsActionResult:
         """Disassociates a single scaling group from a user group (project)."""
-        await self._repository.disassociate_scaling_group_with_user_groups(action.purger)
+        await self._repository.disassociate_scaling_group_with_user_groups(action.unbinders)
         return DisassociateScalingGroupWithUserGroupsActionResult()
 
     async def get_resource_info(self, action: GetResourceInfoAction) -> GetResourceInfoActionResult:

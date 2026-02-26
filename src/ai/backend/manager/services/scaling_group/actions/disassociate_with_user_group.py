@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
-from ai.backend.manager.repositories.base.purger import BatchPurger
+from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
+    RBACEntityUnbinder,
+    RBACScopeUnbinder,
+)
 
 from .user_group_base import ScalingGroupUserGroupAction
 
@@ -15,7 +19,10 @@ from .user_group_base import ScalingGroupUserGroupAction
 class DisassociateScalingGroupWithUserGroupsAction(ScalingGroupUserGroupAction):
     """Action to disassociate a single scaling group from a user group (project)."""
 
-    purger: BatchPurger[ScalingGroupForProjectRow]
+    unbinders: (
+        Sequence[RBACEntityUnbinder[ScalingGroupForProjectRow]]
+        | RBACScopeUnbinder[ScalingGroupForProjectRow]
+    )
 
     @override
     @classmethod
