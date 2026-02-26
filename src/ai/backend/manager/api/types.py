@@ -26,4 +26,9 @@ type AppCreator = Callable[
     tuple[web.Application, Iterable[WebMiddleware]],
 ]
 
+type RouteMiddleware = Callable[
+    [WebRequestHandler],
+    WebRequestHandler,
+]
+
 type CleanupContext = Callable[["RootContext"], AbstractAsyncContextManager[None]]
