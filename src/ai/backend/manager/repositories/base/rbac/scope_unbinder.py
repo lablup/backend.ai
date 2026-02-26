@@ -8,6 +8,7 @@ and RBAC association rows atomically.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import sqlalchemy as sa
@@ -30,11 +31,11 @@ from ai.backend.manager.repositories.base.purger import (
 
 
 class RBACEntityUnbinder[TRow: Base](ABC):
-    """Unbind a specific entity from scope associations.
+    """Unbind entities from a scope.
 
-    Use when deleting an entity and its scope bindings.
-    - entity_ref: The entity to unbind (required).
-    - scope_ref: Specific scope to unbind from (None = all scopes).
+    Use when removing entity-scope associations from the entity side.
+    - entity_refs: Entities to unbind (batch support).
+    - scope_ref: The scope to unbind from.
     """
 
     @abstractmethod
@@ -44,14 +45,14 @@ class RBACEntityUnbinder[TRow: Base](ABC):
 
     @property
     @abstractmethod
-    def entity_ref(self) -> RBACElementRef:
-        """RBAC element ref for the entity to unbind."""
+    def entity_refs(self) -> Sequence[RBACElementRef]:
+        """RBAC element refs for the entities to unbind."""
         raise NotImplementedError
 
     @property
     @abstractmethod
-    def scope_ref(self) -> RBACElementRef | None:
-        """RBAC element ref for the scope to unbind from. None means all scopes."""
+    def scope_ref(self) -> RBACElementRef:
+        """RBAC element ref for the scope to unbind from."""
         raise NotImplementedError
 
 
@@ -61,11 +62,11 @@ class RBACEntityUnbinder[TRow: Base](ABC):
 
 
 class RBACScopeUnbinder[TRow: Base](ABC):
-    """Unbind entities from a specific scope.
+    """Unbind scopes from an entity.
 
-    Use when deleting a scope and its entity bindings.
-    - scope_ref: The scope to unbind from (required).
-    - entity_ref: Specific entity to unbind (None = all entities).
+    Use when removing entity-scope associations from the scope side.
+    - scope_refs: Scopes to unbind (batch support).
+    - entity_ref: The entity to unbind from.
     """
 
     @abstractmethod
@@ -75,14 +76,14 @@ class RBACScopeUnbinder[TRow: Base](ABC):
 
     @property
     @abstractmethod
-    def scope_ref(self) -> RBACElementRef:
-        """RBAC element ref for the scope to unbind from."""
+    def scope_refs(self) -> Sequence[RBACElementRef]:
+        """RBAC element refs for the scopes to unbind from."""
         raise NotImplementedError
 
     @property
     @abstractmethod
-    def entity_ref(self) -> RBACElementRef | None:
-        """RBAC element ref for the entity to unbind. None means all entities."""
+    def entity_ref(self) -> RBACElementRef:
+        """RBAC element ref for the entity to unbind."""
         raise NotImplementedError
 
 
@@ -111,24 +112,21 @@ class RBACUnbinderResult:
 
 async def _delete_rbac_associations(
     db_sess: SASession,
-    entity_ref: RBACElementRef | None,
-    scope_ref: RBACElementRef | None,
+    entity_refs: Sequence[RBACElementRef],
+    scope_refs: Sequence[RBACElementRef],
 ) -> list[AssociationScopesEntitiesRow]:
     """Delete RBAC association rows matching the given entity/scope refs.
 
-    At least one of entity_ref or scope_ref must be provided.
+    Both entity_refs and scope_refs must be non-empty.
+    All refs in each list must share the same element_type.
     """
-    conditions: list[sa.ColumnElement[bool]] = []
-    if entity_ref is not None:
-        conditions.append(
-            AssociationScopesEntitiesRow.entity_type == entity_ref.element_type.to_entity_type(),
-        )
-        conditions.append(AssociationScopesEntitiesRow.entity_id == entity_ref.element_id)
-    if scope_ref is not None:
-        conditions.append(
-            AssociationScopesEntitiesRow.scope_type == scope_ref.element_type.to_scope_type(),
-        )
-        conditions.append(AssociationScopesEntitiesRow.scope_id == scope_ref.element_id)
+    conditions: list[sa.ColumnElement[bool]] = [
+        AssociationScopesEntitiesRow.entity_type == entity_refs[0].element_type.to_entity_type(),
+        AssociationScopesEntitiesRow.entity_id.in_([ref.element_id for ref in entity_refs]),
+        AssociationScopesEntitiesRow.scope_type == scope_refs[0].element_type.to_scope_type(),
+        AssociationScopesEntitiesRow.scope_id.in_([ref.element_id for ref in scope_refs]),
+    ]
+
     assoc_stmt = (
         sa.delete(AssociationScopesEntitiesRow)
         .where(*conditions)
@@ -141,10 +139,10 @@ async def execute_rbac_entity_unbinder[TRow: Base](
     db_sess: SASession,
     unbinder: RBACEntityUnbinder[TRow],
 ) -> RBACUnbinderResult:
-    """Delete N:N mapping rows and RBAC associations for an entity.
+    """Delete N:N mapping rows and RBAC associations for entities.
 
-    Use when deleting an entity: removes the business rows and
-    the RBAC association rows tied to that entity.
+    Removes the business rows and the RBAC association rows
+    tied to the given entities and scope.
 
     Args:
         db_sess: Async SQLAlchemy session (must be writable).
@@ -157,7 +155,7 @@ async def execute_rbac_entity_unbinder[TRow: Base](
         db_sess, BatchPurger(spec=unbinder.build_purger_spec())
     )
     association_rows = await _delete_rbac_associations(
-        db_sess, entity_ref=unbinder.entity_ref, scope_ref=unbinder.scope_ref
+        db_sess, entity_refs=unbinder.entity_refs, scope_refs=[unbinder.scope_ref]
     )
     return RBACUnbinderResult(
         deleted_count=purge_result.deleted_count,
@@ -169,10 +167,10 @@ async def execute_rbac_scope_unbinder[TRow: Base](
     db_sess: SASession,
     unbinder: RBACScopeUnbinder[TRow],
 ) -> RBACUnbinderResult:
-    """Delete N:N mapping rows and RBAC associations for a scope.
+    """Delete N:N mapping rows and RBAC associations for scopes.
 
-    Use when deleting a scope: removes the business rows and
-    the RBAC association rows tied to that scope.
+    Removes the business rows and the RBAC association rows
+    tied to the given scopes and entity.
 
     Args:
         db_sess: Async SQLAlchemy session (must be writable).
@@ -185,7 +183,7 @@ async def execute_rbac_scope_unbinder[TRow: Base](
         db_sess, BatchPurger(spec=unbinder.build_purger_spec())
     )
     association_rows = await _delete_rbac_associations(
-        db_sess, entity_ref=unbinder.entity_ref, scope_ref=unbinder.scope_ref
+        db_sess, entity_refs=[unbinder.entity_ref], scope_refs=unbinder.scope_refs
     )
     return RBACUnbinderResult(
         deleted_count=purge_result.deleted_count,
