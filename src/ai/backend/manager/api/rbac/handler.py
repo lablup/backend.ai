@@ -11,6 +11,7 @@ module can be removed.
 
 from __future__ import annotations
 
+import importlib
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
@@ -19,11 +20,11 @@ from aiohttp import web
 
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.rest.middleware.auth import auth_required
-from ai.backend.manager.api.rest.rbac.handler import RBACHandler
 from ai.backend.manager.api.rest.routing import _wrap_api_handler
 from ai.backend.manager.api.types import CORSOptions, WebMiddleware
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.rest.rbac.handler import RBACHandler
     from ai.backend.manager.api.rest.types import WebRequestHandler
 
 __all__ = ("create_app",)
@@ -40,8 +41,9 @@ def _make_route_handler(method_name: str) -> WebRequestHandler:
 
     async def dispatch(request: web.Request) -> web.StreamResponse:
         if _handler[0] is None:
+            _mod = importlib.import_module("ai.backend.manager.api.rest.rbac.handler")
             root_ctx: RootContext = request.app["_root.context"]
-            _handler[0] = RBACHandler(processors=root_ctx.processors)
+            _handler[0] = _mod.RBACHandler(processors=root_ctx.processors)
         if (wrapped := _wrapped[0]) is None:
             _wrapped[0] = wrapped = _wrap_api_handler(getattr(_handler[0], method_name))
         return await wrapped(request)
