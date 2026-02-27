@@ -5908,6 +5908,9 @@ type Role implements Node {
   createdAt: DateTime!
   updatedAt: DateTime!
   deletedAt: DateTime
+
+  """Permissions associated with this role."""
+  permissions(filter: PermissionFilter = null, orderBy: PermissionOrderBy = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection!
 }
 
 """Added in 26.3.0. RBAC role assignment (user-role association)"""
