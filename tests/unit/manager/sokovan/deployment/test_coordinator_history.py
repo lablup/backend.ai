@@ -15,6 +15,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
     DeploymentState,
+    DeploymentStatusTransitions,
     ReplicaSpec,
 )
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -164,10 +165,12 @@ def mock_handler_with_success(
     mock.name = MagicMock(return_value="check_pending")
     mock.lock_id = None
     mock.target_statuses = MagicMock(return_value=[EndpointLifecycle.PENDING])
-    mock.next_status = MagicMock(
-        return_value=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.CREATED)
+    mock.status_transitions = MagicMock(
+        return_value=DeploymentStatusTransitions(
+            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.CREATED),
+            failure=None,
+        )
     )
-    mock.failure_status = MagicMock(return_value=None)
     mock.execute = AsyncMock(
         return_value=DeploymentExecutionResult(
             successes=[sample_deployment_info],
@@ -187,11 +190,11 @@ def mock_handler_with_failure(
     mock.name = MagicMock(return_value="check_pending")
     mock.lock_id = None
     mock.target_statuses = MagicMock(return_value=[EndpointLifecycle.PENDING])
-    mock.next_status = MagicMock(
-        return_value=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.CREATED)
-    )
-    mock.failure_status = MagicMock(
-        return_value=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED)
+    mock.status_transitions = MagicMock(
+        return_value=DeploymentStatusTransitions(
+            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.CREATED),
+            failure=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
+        )
     )
     mock.execute = AsyncMock(
         return_value=DeploymentExecutionResult(
@@ -210,10 +213,12 @@ def mock_handler_with_empty_result() -> MagicMock:
     mock.name = MagicMock(return_value="check_pending")
     mock.lock_id = None
     mock.target_statuses = MagicMock(return_value=[EndpointLifecycle.PENDING])
-    mock.next_status = MagicMock(
-        return_value=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.CREATED)
+    mock.status_transitions = MagicMock(
+        return_value=DeploymentStatusTransitions(
+            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.CREATED),
+            failure=None,
+        )
     )
-    mock.failure_status = MagicMock(return_value=None)
     mock.execute = AsyncMock(return_value=DeploymentExecutionResult())
     mock.post_process = AsyncMock()
     return mock

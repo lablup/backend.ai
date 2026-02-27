@@ -51,16 +51,6 @@ class DestroyingDeploymentHandler(DeploymentHandler):
         return [EndpointLifecycle.DESTROYING]
 
     @classmethod
-    def next_status(cls) -> DeploymentLifecycleStatus | None:
-        """Get the next deployment status after destroying."""
-        return DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED)
-
-    @classmethod
-    def failure_status(cls) -> DeploymentLifecycleStatus | None:
-        # No failure status for destroying deployments
-        return DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED)
-
-    @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
         """Define state transitions for destroying deployment handler (BEP-1030).
 

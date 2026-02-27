@@ -50,15 +50,6 @@ class CheckPendingDeploymentHandler(DeploymentHandler):
         return [EndpointLifecycle.PENDING, EndpointLifecycle.CREATED]
 
     @classmethod
-    def next_status(cls) -> DeploymentLifecycleStatus | None:
-        """Get the next deployment status after this handler's operation."""
-        return DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING)
-
-    @classmethod
-    def failure_status(cls) -> DeploymentLifecycleStatus | None:
-        return None
-
-    @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
         """Define state transitions for check pending deployment handler (BEP-1030).
 
