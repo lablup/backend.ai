@@ -104,7 +104,7 @@ class Auth(BaseFunction):
             "current_password": current_password,
             "new_password": new_password,
         }
-        _put_secure_body(rqst, body)
+        rqst.set_json(body)
         async with rqst.fetch(anonymous=True) as resp:
             result: dict[str, Any] = await resp.json()
 
