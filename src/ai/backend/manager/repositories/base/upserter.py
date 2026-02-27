@@ -7,7 +7,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
-import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 
@@ -71,7 +70,6 @@ class UpserterResult[TRow: Base]:
     """Result of executing an upsert operation."""
 
     row: TRow
-    was_inserted: bool
 
 
 async def execute_upserter[TRow: Base](
@@ -122,10 +120,7 @@ async def execute_upserter[TRow: Base](
             index_elements=index_elements,
             set_=update_values,
         )
-        .returning(
-            *table.columns,
-            sa.literal_column("(xmax = 0)").label("was_inserted"),
-        )
+        .returning(*table.columns)
     )
 
     result = await db_sess.execute(stmt)
@@ -134,11 +129,8 @@ async def execute_upserter[TRow: Base](
     if row_data is None:
         raise UpsertEmptyResultError
 
-    mapping = dict(row_data._mapping)
-    was_inserted: bool = mapping.pop("was_inserted")
-
-    created_row: TRow = row_class(**mapping)
-    return UpserterResult(row=created_row, was_inserted=was_inserted)
+    created_row: TRow = row_class(**dict(row_data._mapping))
+    return UpserterResult(row=created_row)
 
 
 @dataclass
