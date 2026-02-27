@@ -195,133 +195,6 @@
         "title": "PatchContainerRegistryRequestModel",
         "type": "object"
       },
-      "PatchContainerRegistryResponseModel": {
-        "properties": {
-          "id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Id"
-          },
-          "url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Url"
-          },
-          "registry_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Registry Name"
-          },
-          "type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ContainerRegistryType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "project": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Project"
-          },
-          "username": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Username"
-          },
-          "password": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Password"
-          },
-          "ssl_verify": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Ssl Verify"
-          },
-          "is_global": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Is Global"
-          },
-          "extra": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Extra"
-          }
-        },
-        "title": "PatchContainerRegistryResponseModel",
-        "type": "object"
-      },
       "EventData": {
         "properties": {
           "resources": {
@@ -1321,6 +1194,68 @@
           "models"
         ],
         "title": "ScanArtifactModelsReq",
+        "type": "object"
+      },
+      "GetConfigRequest": {
+        "description": "Request body for ``POST /config/get``.",
+        "properties": {
+          "key": {
+            "description": "etcd key to read.",
+            "title": "Key",
+            "type": "string"
+          },
+          "prefix": {
+            "default": false,
+            "description": "If true, read all keys sharing the given prefix.",
+            "title": "Prefix",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "GetConfigRequest",
+        "type": "object"
+      },
+      "SetConfigRequest": {
+        "description": "Request body for ``POST /config/set``.",
+        "properties": {
+          "key": {
+            "description": "etcd key to write.",
+            "title": "Key",
+            "type": "string"
+          },
+          "value": {
+            "description": "Value to store (scalar or nested mapping).",
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "title": "SetConfigRequest",
+        "type": "object"
+      },
+      "DeleteConfigRequest": {
+        "description": "Request body for ``POST /config/delete``.",
+        "properties": {
+          "key": {
+            "description": "etcd key to delete.",
+            "title": "Key",
+            "type": "string"
+          },
+          "prefix": {
+            "default": false,
+            "description": "If true, delete all keys sharing the given prefix.",
+            "title": "Prefix",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "DeleteConfigRequest",
         "type": "object"
       },
       "VFolderMountPermission": {
@@ -9987,20 +9922,13 @@
     },
     "/container-registries/{registry_id}": {
       "patch": {
-        "operationId": "container-registries.patch_container_registry",
+        "operationId": "container-registries.patch",
         "tags": [
           "container-registries"
         ],
         "responses": {
           "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PatchContainerRegistryResponseModel"
-                }
-              }
-            }
+            "description": "Successful response"
           }
         },
         "security": [
@@ -10032,7 +9960,7 @@
     },
     "/container-registries/webhook/harbor": {
       "post": {
-        "operationId": "container-registries.harbor_webhook_handler",
+        "operationId": "container-registries.harbor_webhook",
         "tags": [
           "container-registries"
         ],
@@ -10545,8 +10473,13 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "parameters": [],
-        "description": ""
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/config/resource-slots/details": {
@@ -10560,17 +10493,32 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "sgroup",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Scaling group name to filter resource metadata by.",
+              "title": "Sgroup"
+            }
           }
         ],
-        "description": ""
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/config/vfolder-types": {
@@ -10584,8 +10532,13 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "parameters": [],
-        "description": ""
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/config/docker-registries": {
@@ -10605,7 +10558,7 @@
           }
         ],
         "parameters": [],
-        "description": "\nReturns the list of all registered docker registries.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/config/get": {
@@ -10628,26 +10581,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "key": {
-                    "type": "string"
-                  },
-                  "prefix": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "key",
-                  "prefix"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/GetConfigRequest"
+              }
             }
           }
         },
         "parameters": [],
-        "description": "\nA raw access API to read key-value pairs from the etcd.\n\n.. warning::\n\n   When reading the keys with ``prefix=True``, it uses a simple string-prefix\n   matching over the flattened keys (with the delimiter \"/\").  Thus, it may\n   return additional keys that you may not want.\n\n   For example, reading \"some/key1\" will fetch all of the following keys:\n\n   .. code-block:: text\n\n       some/key1\n       some/key1/field1\n       some/key1/field2\n       some/key12\n       some/key12/field1\n       some/key12/field2\n\n   **To avoid this issue, developers must use dedicated CRUD APIs\n   instead of relying on the etcd raw access APIs whenever possible.**\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Raw etcd key-value read.\n\n.. warning::\n\n   When reading with ``prefix=True``, simple string-prefix matching\n   is used.  Prefer dedicated CRUD APIs when possible.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/config/set": {
@@ -10670,26 +10610,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "key": {
-                    "type": "string"
-                  },
-                  "value": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "key",
-                  "value"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/SetConfigRequest"
+              }
             }
           }
         },
         "parameters": [],
-        "description": "\nA raw access API to write key-value pairs into the etcd.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Raw etcd key-value write.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/config/delete": {
@@ -10712,26 +10639,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "key": {
-                    "type": "string"
-                  },
-                  "prefix": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "key",
-                  "prefix"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/DeleteConfigRequest"
+              }
             }
           }
         },
         "parameters": [],
-        "description": "\nA raw access API to delete key-value pairs from the etcd.\n\n.. warning::\n\n   When deleting the keys with ``prefix=True``, it uses a simple string-prefix\n   matching over the flattened keys (with the delimiter \"/\"). This may result in\n   unexpected deletion of sibling keys.\n\n   For example, deleting \"some/key1\" will DELETE all of the following keys:\n\n   .. code-block:: text\n\n       some/key1\n       some/key1/field1\n       some/key1/field2\n       some/key12\n       some/key12/field1\n       some/key12/field2\n\n   **To avoid this issue, developers must use dedicated CRUD APIs\n   instead of relying on the etcd raw access APIs whenever possible.**\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Raw etcd key-value delete.\n\n.. warning::\n\n   When deleting with ``prefix=True``, simple string-prefix matching\n   is used.  This may delete sibling keys unexpectedly.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/events/background-task": {
