@@ -1,8 +1,9 @@
 import logging
 import uuid
-from typing import cast
+from typing import Any, cast
 
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
@@ -17,7 +18,13 @@ from ai.backend.manager.data.container_registry.types import (
     ContainerRegistrySearchResult,
 )
 from ai.backend.manager.data.image.types import ImageStatus
-from ai.backend.manager.errors.image import ContainerRegistryNotFound
+from ai.backend.manager.errors.image import (
+    ContainerRegistryGroupsAssociationNotFound,
+    ContainerRegistryNotFound,
+)
+from ai.backend.manager.models.association_container_registries_groups import (
+    AssociationContainerRegistriesGroupsRow,
+)
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
     ContainerRegistryValidator,
@@ -25,15 +32,21 @@ from ai.backend.manager.models.container_registry import (
 )
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.creator import (
+    BulkCreator,
+    Creator,
+    execute_bulk_creator,
+    execute_creator,
+)
 from ai.backend.manager.repositories.base.purger import Purger, execute_purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
-from ai.backend.manager.repositories.container_registry.creators import ContainerRegistryCreatorSpec
+from ai.backend.manager.repositories.container_registry.creators import (
+    ContainerRegistryCreatorSpec,
+    ContainerRegistryGroupCreatorSpec,
+)
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
-    clear_all_allowed_groups,
-    handle_allowed_groups_update,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -72,7 +85,7 @@ class ContainerRegistryRepository:
 
             if spec.has_allowed_groups:
                 allowed_groups = cast(AllowedGroupsModel, spec.allowed_groups)
-                await handle_allowed_groups_update(
+                await self._handle_allowed_groups_update(
                     session, container_registry_row.id, allowed_groups
                 )
 
@@ -94,13 +107,13 @@ class ContainerRegistryRepository:
                 raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
 
             if updater.spec.has_allowed_groups_update is True:
-                await handle_allowed_groups_update(
+                await self._handle_allowed_groups_update(
                     session, registry_id, updater.spec.allowed_groups.value()
                 )
 
             is_global_value = updater.spec.is_global.optional_value()
             if is_global_value is True:
-                await clear_all_allowed_groups(session, registry_id)
+                await self._clear_all_allowed_groups(session, registry_id)
 
             to_update = updater.spec.build_values()
             if to_update == {}:  # means no fields to update or only allowed_groups updated
@@ -275,6 +288,61 @@ class ContainerRegistryRepository:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    async def _handle_allowed_groups_update(
+        self,
+        session: SASession,
+        registry_id: uuid.UUID,
+        allowed_group_updates: AllowedGroupsModel,
+    ) -> None:
+        """
+        Handle adding/removing group associations for a container registry.
+
+        Args:
+            session: Database session
+            registry_id: Container registry UUID
+            allowed_group_updates: Groups to add or remove
+
+        Raises:
+            ContainerRegistryGroupsAlreadyAssociated: If groups are already associated
+            ContainerRegistryGroupsAssociationNotFound: If trying to remove non-existing associations
+        """
+        if allowed_group_updates.add:
+            specs = [
+                ContainerRegistryGroupCreatorSpec(
+                    registry_id=registry_id,
+                    group_id=uuid.UUID(group_id),
+                )
+                for group_id in allowed_group_updates.add
+            ]
+            bulk_creator = BulkCreator(specs=specs)
+            await execute_bulk_creator(session, bulk_creator)
+
+        if allowed_group_updates.remove:
+            delete_query = (
+                sa.delete(AssociationContainerRegistriesGroupsRow)
+                .where(AssociationContainerRegistriesGroupsRow.registry_id == registry_id)
+                .where(
+                    AssociationContainerRegistriesGroupsRow.group_id.in_(
+                        allowed_group_updates.remove
+                    )
+                )
+            )
+            result = await session.execute(delete_query)
+            if cast(CursorResult[Any], result).rowcount == 0:
+                raise ContainerRegistryGroupsAssociationNotFound(
+                    f"Tried to remove non-existing associations for registry_id: {registry_id}, group_ids: {allowed_group_updates.remove}"
+                )
+
+    async def _clear_all_allowed_groups(
+        self,
+        session: SASession,
+        registry_id: uuid.UUID,
+    ) -> None:
+        delete_query = sa.delete(AssociationContainerRegistriesGroupsRow).where(
+            AssociationContainerRegistriesGroupsRow.registry_id == registry_id
+        )
+        await session.execute(delete_query)
 
     async def _get_by_registry_and_project(
         self,
