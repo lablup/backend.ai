@@ -942,9 +942,9 @@ type GroupNode implements Node @key(fields: "id") {
   resource_policy: String
 
   """
-  Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.
+  Added in 24.03.0. The default container registry resolved from container_registry_id. Kept for backward compatibility.
   """
-  container_registry_id: UUID
+  container_registry: JSONString
 
   """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE']."""
   type: String
@@ -1071,9 +1071,9 @@ type Group {
   resource_policy: String
 
   """
-  Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.
+  Added in 24.03.0. The default container registry resolved from container_registry_id. Kept for backward compatibility.
   """
-  container_registry_id: UUID
+  container_registry: JSONString
 
   """Added in 24.03.0."""
   type: String
