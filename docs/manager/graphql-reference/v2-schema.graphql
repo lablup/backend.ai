@@ -1296,7 +1296,7 @@ type CreateReservoirRegistryPayload {
 }
 
 """
-Added in 25.19.0. Input for specifying revision configuration within a deployment.
+Added in 25.19.0. Input for creating a revision without attaching to a deployment.
 """
 input CreateRevisionInput {
   name: String = null
