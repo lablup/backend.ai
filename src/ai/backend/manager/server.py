@@ -147,6 +147,7 @@ from .actions.monitors.reporter import ReporterMonitor
 from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
 from .api.context import RootContext
+from .api.rest.auth import register_routes as register_auth_routes
 from .api.rest.middleware import (
     build_api_metric_middleware,
     exception_middleware,
@@ -346,12 +347,6 @@ global_subapp_pkgs: Final[list[str]] = [
     ".domain",
     ".quota_scope",
     ".user",
-]
-
-# Modules that have been migrated to the new-style register_routes() pattern.
-# Each entry is a dotted path relative to ``ai.backend.manager.api.rest``.
-global_newstyle_pkgs: Final[list[str]] = [
-    ".auth",
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
@@ -1382,7 +1377,6 @@ def init_subapp(pkg_name: str, root_app: web.Application, create_subapp: AppCrea
 def _register_newstyle_routes(
     root_app: web.Application,
     dep_resources: DependencyResources,
-    newstyle_pkgs: Sequence[str],
     pidx: int,
 ) -> None:
     """Register new-style modules that use the ``register_routes()`` pattern.
@@ -1400,14 +1394,14 @@ def _register_newstyle_routes(
     root_ctx: RootContext = root_app["_root.context"]
     insert_pos: int = root_app.get("_pre_subapp_middleware_count", len(root_app.middlewares))
     registry = RouteRegistry(root_app, root_ctx.cors_options)
-    for pkg_name in newstyle_pkgs:
-        if pidx == 0:
-            log.info("Loading new-style module: {0}", pkg_name[1:])
-        mod = importlib.import_module(pkg_name, "ai.backend.manager.api.rest")
-        global_mws = mod.register_routes(registry, dep_resources.processing.processors)
-        for mw in global_mws:
-            root_app.middlewares.insert(insert_pos, mw)
-            insert_pos += 1
+    processors = dep_resources.processing.processors
+
+    if pidx == 0:
+        log.info("Loading new-style module: auth")
+    global_mws = register_auth_routes(registry, processors)
+    for mw in global_mws:
+        root_app.middlewares.insert(insert_pos, mw)
+        insert_pos += 1
 
 
 def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
@@ -1776,7 +1770,7 @@ async def server_main(
         # Register new-style modules that use register_routes() pattern.
         # Must happen after bridging (cors_options must be set) and before
         # runner.setup() which freezes the application router.
-        _register_newstyle_routes(root_app, dep_resources, global_newstyle_pkgs, pidx)
+        _register_newstyle_routes(root_app, dep_resources, pidx)
 
         # TODO: Remove manual middleware injection once the manager startup is
         # decoupled from the aiohttp Application lifecycle. Currently root_app is
