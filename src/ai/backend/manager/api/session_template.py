@@ -1,348 +1,43 @@
-import json
-import logging
-import uuid
-from collections.abc import Iterable, Mapping
-from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+"""Backward-compatible create_app() shim for the session template module.
 
-import aiohttp_cors
-import sqlalchemy as sa
-import trafaret as t
-import yaml
+All session template handler logic has been migrated to:
+
+* ``api.rest.session_template.handler`` — SessionTemplateHandler class
+* ``api.rest.session_template`` — register_routes()
+
+This module keeps the ``create_app()`` entry-point so that
+``server.py`` continues to mount the sub-application without modification.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterable
+
 from aiohttp import web
 
-from ai.backend.common import validators as tx
-from ai.backend.common.json import dump_json, load_json
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.resource import DBOperationFailed, TaskTemplateNotFound
-from ai.backend.manager.models.group import groups
-from ai.backend.manager.models.session_template import (
-    TemplateType,
-    check_task_template,
-    session_templates,
-)
-from ai.backend.manager.models.user import users
+from ai.backend.manager.api.manager import READ_ALLOWED, server_status_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.session_template.handler import SessionTemplateHandler
 
-from .auth import auth_required
-from .manager import READ_ALLOWED, server_status_required
-from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params, get_access_key_scopes
-
-if TYPE_CHECKING:
-    from .context import RootContext
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-@server_status_required(READ_ALLOWED)
-@auth_required
-@check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
-            tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
-            t.Key("owner_access_key", default=None): t.Null | t.String,
-            t.Key("payload"): t.String,
-        },
-    )
-)
-async def create(request: web.Request, params: Any) -> web.Response:
-    if params["domain"] is None:
-        params["domain"] = request["user"]["domain_name"]
-    requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
-    log.info(
-        "SESSION_TEMPLATE.CREATE (ak:{0}/{1})",
-        requester_access_key,
-        owner_access_key if owner_access_key != requester_access_key else "*",
-    )
-    root_ctx: RootContext = request.app["_root.context"]
-    resp = []
-    async with root_ctx.db.begin() as conn:
-        user_uuid, group_id, _ = await query_userinfo(request, params, conn)
-        log.debug("Params: {0}", params)
-        try:
-            body = load_json(params["payload"])
-        except json.JSONDecodeError:
-            try:
-                body = yaml.safe_load_all(params["payload"])
-            except (yaml.YAMLError, yaml.MarkedYAMLError) as e:
-                raise InvalidAPIParameters("Malformed payload") from e
-        for st in body:
-            template_data = check_task_template(st["template"])
-            template_id = uuid.uuid4().hex
-            name = st["name"] if "name" in st else template_data["metadata"]["name"]
-            if "group_id" in st:
-                group_id = st["group_id"]
-            if "user_uuid" in st:
-                user_uuid = st["user_uuid"]
-            query = session_templates.insert().values({
-                "id": template_id,
-                "created_at": datetime.now(UTC),
-                "domain_name": params["domain"],
-                "group_id": group_id,
-                "user_uuid": user_uuid,
-                "name": name,
-                "template": template_data,
-                "type": TemplateType.TASK,
-            })
-            result = await conn.execute(query)
-            resp.append({
-                "id": template_id,
-                "user": str(user_uuid),
-            })
-            if result.rowcount != 1:
-                raise DBOperationFailed(f"Failed to create session template: {template_id}")
-    return web.json_response(resp)
-
-
-@auth_required
-@server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("all", default=False): t.ToBool,
-        tx.AliasedKey(["group_id", "groupId"], default=None): tx.UUID | t.String | t.Null,
-    }),
-)
-async def list_template(request: web.Request, _params: Any) -> web.Response:
-    resp = []
-    access_key = request["keypair"]["access_key"]
-    domain_name = request["user"]["domain_name"]
-    user_uuid = request["user"]["uuid"]
-    log.info("SESSION_TEMPLATE.LIST (ak:{})", access_key)
-    root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin() as conn:
-        entries: list[Mapping[str, Any]]
-        j = session_templates.join(
-            users, session_templates.c.user_uuid == users.c.uuid, isouter=True
-        ).join(groups, session_templates.c.group_id == groups.c.id, isouter=True)
-        query = (
-            sa.select(session_templates, users.c.email, groups.c.name)
-            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
-            .select_from(j)
-            .where(
-                (session_templates.c.is_active) & (session_templates.c.type == TemplateType.TASK),
-            )
-        )
-        result = await conn.execute(query)
-        entries = []
-        for row in result.fetchall():
-            is_owner = row.session_templates_user_uuid == user_uuid
-            entries.append({
-                "name": row.session_templates_name,
-                "id": row.session_templates_id,
-                "created_at": row.session_templates_created_at,
-                "is_owner": is_owner,
-                "user": (
-                    str(row.session_templates_user_uuid)
-                    if row.session_templates_user_uuid
-                    else None
-                ),
-                "group": (
-                    str(row.session_templates_group_id) if row.session_templates_group_id else None
-                ),
-                "user_email": row.users_email,
-                "group_name": row.groups_name,
-                "domain_name": domain_name,
-                "type": row.session_templates_type,
-                "template": row.session_templates_template,
-            })
-        for entry in entries:
-            resp.append({
-                "name": entry["name"],
-                "id": entry["id"].hex,
-                "created_at": str(entry["created_at"]),
-                "is_owner": entry["is_owner"],
-                "user": str(entry["user"]),
-                "group": str(entry["group"]),
-                "user_email": entry["user_email"],
-                "group_name": entry["group_name"],
-                "domain_name": domain_name,
-                "type": entry["type"],
-                "template": entry["template"],
-            })
-        return web.json_response(resp)
-
-
-@auth_required
-@server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("format", default="json"): t.Null | t.Enum("yaml", "json"),
-        t.Key("owner_access_key", default=None): t.Null | t.String,
-    }),
-)
-async def get(request: web.Request, params: Any) -> web.Response:
-    if params["format"] not in ["yaml", "json"]:
-        raise InvalidAPIParameters('format should be "yaml" or "json"')
-    resp: dict[str, Any] = {}
-    domain_name = request["user"]["domain_name"]
-    requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
-    log.info(
-        "SESSION_TEMPLATE.GET (ak:{0}/{1})",
-        requester_access_key,
-        owner_access_key if owner_access_key != requester_access_key else "*",
-    )
-    template_id = request.match_info["template_id"]
-    root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin() as conn:
-        query = (
-            sa.select(
-                session_templates.c.template,
-                session_templates.c.name,
-                session_templates.c.user_uuid,
-                session_templates.c.group_id,
-            )
-            .select_from(session_templates)
-            .where(
-                (session_templates.c.id == template_id)
-                & (session_templates.c.is_active)
-                & (session_templates.c.type == TemplateType.TASK),
-            )
-        )
-        result = await conn.execute(query)
-        for row in result.fetchall():
-            resp.update({
-                "template": row.template,
-                "name": row.name,
-                "user_uuid": str(row.user_uuid),
-                "group_id": str(row.group_id),
-                "domain_name": domain_name,
-            })
-        resp = load_json(dump_json(resp))
-        return web.json_response(resp)
-
-
-@auth_required
-@server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict({
-        tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
-        tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
-        t.Key("payload"): t.String,
-        t.Key("owner_access_key", default=None): t.Null | t.String,
-    }),
-)
-async def put(request: web.Request, params: Any) -> web.Response:
-    if params["domain"] is None:
-        params["domain"] = request["user"]["domain_name"]
-    template_id = request.match_info["template_id"]
-
-    requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
-    log.info(
-        "SESSION_TEMPLATE.PUT (ak:{0}/{1})",
-        requester_access_key,
-        owner_access_key if owner_access_key != requester_access_key else "*",
-    )
-    root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin() as conn:
-        user_uuid, group_id, _ = await query_userinfo(request, params, conn)
-        select_query = (
-            sa.select(session_templates.c.id)
-            .select_from(session_templates)
-            .where(
-                (session_templates.c.id == template_id)
-                & (session_templates.c.is_active)
-                & (session_templates.c.type == TemplateType.TASK),
-            )
-        )
-        result = await conn.scalar(select_query)
-        if not result:
-            raise TaskTemplateNotFound
-        try:
-            body = load_json(params["payload"])
-        except json.JSONDecodeError:
-            try:
-                body = yaml.safe_load(params["payload"])
-            except (yaml.YAMLError, yaml.MarkedYAMLError) as e:
-                raise InvalidAPIParameters("Malformed payload") from e
-        for st in body:
-            template_data = check_task_template(st["template"])
-            name = st["name"] if "name" in st else template_data["metadata"]["name"]
-            if "group_id" in st:
-                group_id = st["group_id"]
-            if "user_uuid" in st:
-                user_uuid = st["user_uuid"]
-            update_query = (
-                sa.update(session_templates)
-                .values({
-                    "group_id": group_id,
-                    "user_uuid": user_uuid,
-                    "name": name,
-                    "template": template_data,
-                })
-                .where(session_templates.c.id == template_id)
-            )
-            result = await conn.execute(update_query)
-            if result.rowcount != 1:
-                raise DBOperationFailed(f"Failed to update session template: {template_id}")
-        return web.json_response({"success": True})
-
-
-@auth_required
-@server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("owner_access_key", default=None): t.Null | t.String,
-    }),
-)
-async def delete(request: web.Request, params: Any) -> web.Response:
-    template_id = request.match_info["template_id"]
-    requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
-    log.info(
-        "SESSION_TEMPLATE.DELETE (ak:{0}/{1})",
-        requester_access_key,
-        owner_access_key if owner_access_key != requester_access_key else "*",
-    )
-    root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin() as conn:
-        select_query = (
-            sa.select(session_templates.c.id)
-            .select_from(session_templates)
-            .where(
-                (session_templates.c.id == template_id)
-                & (session_templates.c.is_active)
-                & (session_templates.c.type == TemplateType.TASK),
-            )
-        )
-        result = await conn.scalar(select_query)
-        if not result:
-            raise TaskTemplateNotFound
-        update_query = (
-            sa.update(session_templates)
-            .values(is_active=False)
-            .where(session_templates.c.id == template_id)
-        )
-        result = await conn.execute(update_query)
-        if result.rowcount != 1:
-            raise DBOperationFailed(f"Failed to delete session template: {template_id}")
-
-        return web.json_response({"success": True})
-
-
-async def init(app: web.Application) -> None:
-    pass
-
-
-async def shutdown(app: web.Application) -> None:
-    pass
 
 
 def create_app(
     default_cors_options: CORSOptions,
 ) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
-    app.on_startup.append(init)
-    app.on_shutdown.append(shutdown)
     app["api_versions"] = (4, 5)
     app["prefix"] = "template/session"
-    cors = aiohttp_cors.setup(app, defaults=default_cors_options)
-    cors.add(app.router.add_route("POST", "", create))
-    cors.add(app.router.add_route("GET", "", list_template))
-    template_resource = cors.add(app.router.add_resource(r"/{template_id}"))
-    cors.add(template_resource.add_route("GET", get))
-    cors.add(template_resource.add_route("PUT", put))
-    cors.add(template_resource.add_route("DELETE", delete))
+
+    handler = SessionTemplateHandler()
+    registry = RouteRegistry(app, default_cors_options)
+    _middlewares = [server_status_required(READ_ALLOWED), auth_required]
+
+    registry.add("POST", "", handler.create, middlewares=_middlewares)
+    registry.add("GET", "", handler.list_templates, middlewares=_middlewares)
+    registry.add("GET", "/{template_id}", handler.get, middlewares=_middlewares)
+    registry.add("PUT", "/{template_id}", handler.update, middlewares=_middlewares)
+    registry.add("DELETE", "/{template_id}", handler.delete, middlewares=_middlewares)
 
     return app, []
