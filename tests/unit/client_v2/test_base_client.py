@@ -66,17 +66,17 @@ class TestBackendAIClient:
         client = _make_client(config=config)
         assert client._build_url("/folders") == "https://api.example.com/folders"
 
-    def test_build_headers_returns_required_headers(self) -> None:
+    def test_sign_returns_required_headers(self) -> None:
         client = _make_client()
-        headers = client._build_headers("GET", "/folders", "application/json")
+        headers = client._sign("GET", "/folders", "application/json")
         assert "Authorization" in headers
         assert "Date" in headers
         assert "Content-Type" in headers
         assert "X-BackendAI-Version" in headers
         assert headers["Content-Type"] == "application/json"
 
-    def test_docstring_mentions_hmac(self) -> None:
-        assert "HMAC" in (BackendAIAuthClient.__doc__ or "")
+    def test_docstring_mentions_pydantic(self) -> None:
+        assert "Pydantic" in (BackendAIAuthClient.__doc__ or "")
 
     @pytest.mark.asyncio
     async def test_create_factory(self) -> None:

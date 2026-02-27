@@ -50,19 +50,19 @@ class TestAnonymousClientBuildHeaders:
         assert headers["X-BackendAI-Version"] == config.api_version
 
 
-class TestAuthClientBuildHeaders:
+class TestAuthClientSign:
     def test_contains_authorization_header(self, config: ClientConfig) -> None:
         session = MagicMock(spec=aiohttp.ClientSession)
         auth = FakeAuth()
         client = BackendAIAuthClient(config, auth, session)
-        headers = client._build_headers("GET", "/api/resource", "application/json")
+        headers = client._sign("GET", "/api/resource", "application/json")
         assert "Authorization" in headers
 
     def test_contains_required_headers(self, config: ClientConfig) -> None:
         session = MagicMock(spec=aiohttp.ClientSession)
         auth = FakeAuth()
         client = BackendAIAuthClient(config, auth, session)
-        headers = client._build_headers("GET", "/api/resource", "application/json")
+        headers = client._sign("GET", "/api/resource", "application/json")
         assert "Date" in headers
         assert headers["Content-Type"] == "application/json"
         assert headers["X-BackendAI-Version"] == config.api_version

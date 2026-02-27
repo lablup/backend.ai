@@ -46,7 +46,7 @@ def _create_aiohttp_session(config: ClientConfig) -> aiohttp.ClientSession:
 
 
 class BackendAIAuthClient:
-    """Authenticated HTTP client for Backend.AI REST API using HMAC signing.
+    """Async HTTP client for Backend.AI REST API.
 
     All public request methods accept and return Pydantic models only.
     Use ``typed_request()`` as the sole public interface for making API calls.
@@ -86,7 +86,7 @@ class BackendAIAuthClient:
         path = path.lstrip("/")
         return f"{base}/{path}"
 
-    def _build_headers(self, method: str, rel_url: str, content_type: str) -> Mapping[str, str]:
+    def _sign(self, method: str, rel_url: str, content_type: str) -> Mapping[str, str]:
         now = datetime.now(UTC)
         headers = self._auth.sign(
             method=method,
@@ -111,11 +111,12 @@ class BackendAIAuthClient:
         json: Any | None = None,
         params: dict[str, str] | None = None,
     ) -> dict[str, Any] | list[Any] | None:
+        session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
-        headers = self._build_headers(method, rel_url, content_type)
+        headers = self._sign(method, rel_url, content_type)
         url = self._build_url(path)
-        async with self._session.request(
+        async with session.request(
             method,
             url,
             headers=headers,
@@ -180,7 +181,7 @@ class BackendAIAuthClient:
         """Send a multipart file upload and return the parsed JSON response."""
         session = self._session
         rel_url = "/" + path.lstrip("/")
-        headers = dict(self._build_headers("POST", rel_url, "multipart/form-data"))
+        headers = dict(self._sign("POST", rel_url, "multipart/form-data"))
         # Let aiohttp set the actual Content-Type with the multipart boundary.
         del headers["Content-Type"]
         url = self._build_url(path)
@@ -214,7 +215,7 @@ class BackendAIAuthClient:
         session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
-        headers = dict(self._build_headers(method, rel_url, content_type))
+        headers = dict(self._sign(method, rel_url, content_type))
         url = self._build_url(path)
         async with session.request(
             method,
@@ -250,7 +251,7 @@ class BackendAIAuthClient:
                     print(msg.data)
         """
         rel_url = "/" + path.lstrip("/")
-        headers = self._build_headers("GET", rel_url, "application/octet-stream")
+        headers = self._sign("GET", rel_url, "application/octet-stream")
         url = self._build_url(path)
         ws: aiohttp.ClientWebSocketResponse | None = None
         try:
@@ -288,7 +289,7 @@ class BackendAIAuthClient:
                     print(event.event, event.data)
         """
         rel_url = "/" + path.lstrip("/")
-        headers = dict(self._build_headers("GET", rel_url, "text/event-stream"))
+        headers = dict(self._sign("GET", rel_url, "text/event-stream"))
         headers["Accept"] = "text/event-stream"
         url = self._build_url(path)
         timeout = aiohttp.ClientTimeout(total=None, sock_read=None)
