@@ -22,7 +22,7 @@ from ai.backend.manager.models.deployment_policy import (
     DeploymentPolicyRow,
     RollingUpdateSpec,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators.policy import (
@@ -239,7 +239,8 @@ class TestCreateDeploymentPolicy(DeploymentServiceBaseFixtures):
             return_value=deployment_policy_data
         )
 
-        action = CreateDeploymentPolicyAction(creator_spec=rolling_creator_spec)
+        creator = Creator[DeploymentPolicyRow](spec=rolling_creator_spec)
+        action = CreateDeploymentPolicyAction(creator=creator)
 
         result = await processors.create_deployment_policy.wait_for_complete(action)
 
@@ -263,7 +264,8 @@ class TestCreateDeploymentPolicy(DeploymentServiceBaseFixtures):
             return_value=blue_green_policy_data
         )
 
-        action = CreateDeploymentPolicyAction(creator_spec=blue_green_creator_spec)
+        creator = Creator[DeploymentPolicyRow](spec=blue_green_creator_spec)
+        action = CreateDeploymentPolicyAction(creator=creator)
 
         result = await processors.create_deployment_policy.wait_for_complete(action)
 

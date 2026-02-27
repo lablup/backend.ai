@@ -49,6 +49,7 @@ from ai.backend.manager.data.deployment.types import RouteTrafficStatus as Manag
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentMetadataUpdaterSpec,
@@ -421,9 +422,10 @@ class DeploymentAPIHandler:
         creator_spec = self._policy_adapter.build_creator_spec(
             body.parsed, endpoint_id=path.parsed.deployment_id
         )
+        creator = Creator[DeploymentPolicyRow](spec=creator_spec)
 
         action_result = await deployment_processors.create_deployment_policy.wait_for_complete(
-            CreateDeploymentPolicyAction(creator_spec=creator_spec)
+            CreateDeploymentPolicyAction(creator=creator)
         )
 
         resp = CreateDeploymentPolicyResponse(

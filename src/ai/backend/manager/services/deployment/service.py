@@ -33,7 +33,6 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.service import RoutingNotFound
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -485,13 +484,12 @@ class DeploymentService:
         """Create a new deployment policy for an endpoint.
 
         Args:
-            action: Action containing the creator spec for the policy
+            action: Action containing the creator for the policy
 
         Returns:
             CreateDeploymentPolicyActionResult: Result containing the created policy data
         """
-        creator: Creator[DeploymentPolicyRow] = Creator(spec=action.creator_spec)
-        data = await self._deployment_repository.create_deployment_policy(creator)
+        data = await self._deployment_repository.create_deployment_policy(action.creator)
         return CreateDeploymentPolicyActionResult(data=data)
 
     async def update_deployment_policy(
