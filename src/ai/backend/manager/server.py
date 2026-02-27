@@ -153,6 +153,7 @@ from .api.rest.middleware import (
     exception_middleware,
     request_id_middleware,
 )
+from .api.rest.middleware.auth import auth_middleware
 from .api.rest.routing import RouteRegistry
 from .clients.agent import AgentClientPool, AgentPoolSpec
 from .clients.appproxy.client import AppProxyClientPool
@@ -1385,23 +1386,15 @@ def _register_newstyle_routes(
     ``dep_resources.processing.processors`` is available) but **before**
     ``runner.setup()`` freezes the application router.
 
-    Global middlewares returned by each module are inserted *before* any
-    legacy-subapp middlewares (using the position recorded by
-    ``build_root_app()``).  This preserves the original middleware ordering
-    where ``auth_middleware`` runs before subapp middlewares such as
-    ``rlim_middleware``.
+    Global middlewares (e.g. ``auth_middleware``) are registered separately
+    in ``build_root_app()`` — route modules only register their routes here.
     """
     root_ctx: RootContext = root_app["_root.context"]
-    insert_pos: int = root_app.get("_pre_subapp_middleware_count", len(root_app.middlewares))
     registry = RouteRegistry(root_app, root_ctx.cors_options)
-    processors = dep_resources.processing.processors
 
     if pidx == 0:
         log.info("Loading new-style module: auth")
-    global_mws = register_auth_routes(registry, processors)
-    for mw in global_mws:
-        root_app.middlewares.insert(insert_pos, mw)
-        insert_pos += 1
+    register_auth_routes(registry, dep_resources.processing.processors)
 
 
 def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
@@ -1475,6 +1468,7 @@ def build_root_app(
         middlewares=[
             request_id_middleware,
             exception_middleware,
+            auth_middleware,
             api_middleware,
             build_api_metric_middleware(root_ctx.metrics.api),
         ]
@@ -1551,11 +1545,6 @@ def build_root_app(
     cors.add(app.router.add_route("GET", r"/", hello))
 
     # --- Legacy subapp modules (create_app pattern) ---
-    # Track the middleware count before subapps are loaded so that
-    # _register_newstyle_routes() can insert its middlewares at the
-    # correct position (before any subapp middleware, but after the
-    # framework-level middlewares like exception_middleware).
-    app["_pre_subapp_middleware_count"] = len(app.middlewares)
     if subapp_pkgs is None:
         subapp_pkgs = []
     for pkg_name in subapp_pkgs:

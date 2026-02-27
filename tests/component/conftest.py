@@ -931,15 +931,10 @@ async def server(
 
     # Register new-style route modules.  At this point processors are ready
     # (set by cleanup contexts above) and the router is not yet frozen.
-    # Insert middlewares at the pre-subapp position so that auth_middleware
-    # runs before any legacy-subapp middlewares (e.g. rlim_middleware).
+    # auth_middleware is already in app.middlewares (added by build_root_app).
     if has_auth:
-        insert_pos: int = app.get("_pre_subapp_middleware_count", len(app.middlewares))
         registry = RouteRegistry(app, root_ctx.cors_options)
-        global_mws = register_auth_routes(registry, root_ctx.processors)
-        for mw in global_mws:
-            app.middlewares.insert(insert_pos, mw)
-            insert_pos += 1
+        register_auth_routes(registry, root_ctx.processors)
 
     runner = web.AppRunner(app, handle_signals=False)
     await runner.setup()

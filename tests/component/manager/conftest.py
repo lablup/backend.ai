@@ -871,16 +871,11 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
         # set root_ctx.processors, use it; otherwise fall back to a mock
         # (sufficient for endpoints that don't invoke service actions, such
         # as /auth/test).
-        # Insert middlewares at the pre-subapp position so that auth_middleware
-        # runs before any legacy-subapp middlewares (e.g. rlim_middleware).
+        # auth_middleware is already in app.middlewares (added by build_root_app).
         if has_auth:
             processors = getattr(root_ctx, "processors", None) or MagicMock()
-            insert_pos: int = app.get("_pre_subapp_middleware_count", len(app.middlewares))
             registry = RouteRegistry(app, root_ctx.cors_options)
-            global_mws = register_auth_routes(registry, processors)
-            for mw in global_mws:
-                app.middlewares.insert(insert_pos, mw)
-                insert_pos += 1
+            register_auth_routes(registry, processors)
 
         runner = web.AppRunner(app, handle_signals=False)
         await runner.setup()
