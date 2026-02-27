@@ -68,6 +68,16 @@ async def handle_allowed_groups_update(
             )
 
 
+async def clear_all_allowed_groups(
+    session: SASession,
+    registry_id: uuid.UUID,
+) -> None:
+    delete_query = sa.delete(AssociationContainerRegistriesGroupsRow).where(
+        AssociationContainerRegistriesGroupsRow.registry_id == registry_id
+    )
+    await session.execute(delete_query)
+
+
 @dataclass
 class ContainerRegistryUpdaterSpec(UpdaterSpec[ContainerRegistryRow]):
     """UpdaterSpec for container registry updates."""

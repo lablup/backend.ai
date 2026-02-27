@@ -32,6 +32,7 @@ from ai.backend.manager.repositories.base.updater import Updater, execute_update
 from ai.backend.manager.repositories.container_registry.creators import ContainerRegistryCreatorSpec
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
+    clear_all_allowed_groups,
     handle_allowed_groups_update,
 )
 
@@ -96,6 +97,10 @@ class ContainerRegistryRepository:
                 await handle_allowed_groups_update(
                     session, registry_id, updater.spec.allowed_groups.value()
                 )
+
+            is_global_value = updater.spec.is_global.optional_value()
+            if is_global_value is True:
+                await clear_all_allowed_groups(session, registry_id)
 
             to_update = updater.spec.build_values()
             if to_update == {}:  # means no fields to update or only allowed_groups updated
