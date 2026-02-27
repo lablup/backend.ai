@@ -11,7 +11,7 @@ from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.deployment.options import DeploymentConditions
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.service import ServiceFilterModel
+    from ai.backend.common.dto.manager.model_serving.request import ServiceFilterModel
 
 
 class ServiceSearchAdapter(BaseFilterAdapter):

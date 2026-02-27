@@ -24,6 +24,9 @@ from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.types import RuntimeVariant
 
 __all__ = (
+    # Path param models
+    "ServiceIdPathParam",
+    "ServiceRouteIdPathParam",
     # Request models
     "ListServeRequestModel",
     "ServiceFilterModel",
@@ -34,6 +37,15 @@ __all__ = (
     "UpdateRouteRequestModel",
     "TokenRequestModel",
 )
+
+
+class ServiceIdPathParam(BaseRequestModel):
+    service_id: uuid.UUID
+
+
+class ServiceRouteIdPathParam(BaseRequestModel):
+    service_id: uuid.UUID
+    route_id: uuid.UUID
 
 
 class ListServeRequestModel(BaseRequestModel):
