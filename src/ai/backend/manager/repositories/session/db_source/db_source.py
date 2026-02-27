@@ -27,6 +27,7 @@ from ai.backend.manager.models.session import (
     KernelLoadingStrategy,
     SessionDependencyRow,
     SessionRow,
+    batch_populate_session_occupied_slots,
 )
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import UserRole, UserRow
@@ -512,7 +513,9 @@ class SessionDBSource:
                 querier,
             )
 
-            items = [row.SessionRow.to_dataclass() for row in result.rows]
+            session_rows = [row.SessionRow for row in result.rows]
+            await batch_populate_session_occupied_slots(db_sess, session_rows)
+            items = [row.to_dataclass() for row in session_rows]
 
             return SessionListResult(
                 items=items,
