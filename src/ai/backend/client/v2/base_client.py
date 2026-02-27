@@ -45,42 +45,6 @@ def _create_aiohttp_session(config: ClientConfig) -> aiohttp.ClientSession:
     )
 
 
-def _build_url(config: ClientConfig, path: str) -> str:
-    base = str(config.endpoint).rstrip("/")
-    path = path.lstrip("/")
-    return f"{base}/{path}"
-
-
-async def _do_request(
-    session: aiohttp.ClientSession,
-    config: ClientConfig,
-    method: str,
-    path: str,
-    *,
-    headers: Mapping[str, str],
-    json: Any | None = None,
-    params: dict[str, str] | None = None,
-) -> dict[str, Any] | list[Any] | None:
-    url = _build_url(config, path)
-    async with session.request(
-        method,
-        url,
-        headers=headers,
-        json=json,
-        params=params,
-    ) as resp:
-        if resp.status >= 400:
-            try:
-                data = await resp.json()
-            except Exception:
-                data = await resp.text()
-            raise map_status_to_exception(resp.status, resp.reason or "", data)
-        if resp.status == 204:
-            return None
-        result: dict[str, Any] | list[Any] = await resp.json()
-        return result
-
-
 class BackendAIAuthClient:
     """Authenticated HTTP client for Backend.AI REST API using HMAC signing.
 
@@ -118,7 +82,9 @@ class BackendAIAuthClient:
         await self._session.close()
 
     def _build_url(self, path: str) -> str:
-        return _build_url(self._config, path)
+        base = str(self._config.endpoint).rstrip("/")
+        path = path.lstrip("/")
+        return f"{base}/{path}"
 
     def _build_headers(self, method: str, rel_url: str, content_type: str) -> Mapping[str, str]:
         now = datetime.now(UTC)
@@ -148,9 +114,24 @@ class BackendAIAuthClient:
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
         headers = self._build_headers(method, rel_url, content_type)
-        return await _do_request(
-            self._session, self._config, method, path, headers=headers, json=json, params=params
-        )
+        url = self._build_url(path)
+        async with self._session.request(
+            method,
+            url,
+            headers=headers,
+            json=json,
+            params=params,
+        ) as resp:
+            if resp.status >= 400:
+                try:
+                    data = await resp.json()
+                except Exception:
+                    data = await resp.text()
+                raise map_status_to_exception(resp.status, resp.reason or "", data)
+            if resp.status == 204:
+                return None
+            result: dict[str, Any] | list[Any] = await resp.json()
+            return result
 
     async def typed_request(
         self,
@@ -368,6 +349,11 @@ class BackendAIAnonymousClient:
     async def close(self) -> None:
         await self._session.close()
 
+    def _build_url(self, path: str) -> str:
+        base = str(self._config.endpoint).rstrip("/")
+        path = path.lstrip("/")
+        return f"{base}/{path}"
+
     def _build_headers(self, method: str, rel_url: str, content_type: str) -> Mapping[str, str]:
         return {
             "Date": datetime.now(UTC).isoformat(),
@@ -386,9 +372,24 @@ class BackendAIAnonymousClient:
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
         headers = self._build_headers(method, rel_url, content_type)
-        return await _do_request(
-            self._session, self._config, method, path, headers=headers, json=json, params=params
-        )
+        url = self._build_url(path)
+        async with self._session.request(
+            method,
+            url,
+            headers=headers,
+            json=json,
+            params=params,
+        ) as resp:
+            if resp.status >= 400:
+                try:
+                    data = await resp.json()
+                except Exception:
+                    data = await resp.text()
+                raise map_status_to_exception(resp.status, resp.reason or "", data)
+            if resp.status == 204:
+                return None
+            result: dict[str, Any] | list[Any] = await resp.json()
+            return result
 
     async def _typed_request(
         self,
