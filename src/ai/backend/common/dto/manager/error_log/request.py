@@ -5,9 +5,10 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
+import json as _json
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 
@@ -26,6 +27,20 @@ class AppendErrorLogRequest(BaseRequestModel):
     message: str = Field(description="Error message")
     context_lang: str = Field(description="Language context")
     context_env: dict[str, Any] = Field(description="Environment context as JSON object")
+
+    @field_validator("context_env", mode="before")
+    @classmethod
+    def _parse_context_env(cls, v: object) -> object:
+        if isinstance(v, str):
+            try:
+                parsed = _json.loads(v)
+            except (ValueError, _json.JSONDecodeError) as e:
+                raise ValueError(f"Invalid JSON in context_env: {v}") from e
+            if not isinstance(parsed, dict):
+                raise ValueError(f"context_env must be a JSON object, got {type(parsed).__name__}")
+            return parsed
+        return v
+
     request_url: str | None = Field(
         default=None, description="URL of the request that caused the error"
     )
