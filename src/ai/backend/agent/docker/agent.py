@@ -732,6 +732,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     raise FileNotFoundError(
                         f"dropbearmulti binary not found at {dropbearmulti_path}"
                     )
+                # If the host key already exists, we assume it's valid and skip generation.
                 if not host_key_path.is_file():
                     try:
                         subprocess_run(
@@ -761,6 +762,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     host_key_path.chmod(0o600)
                 paths_to_chown.append(host_key_path)
 
+                # Write provided SSH keypair for cluster access if exists
                 if sshkey is not None:
                     cluster_priv_key_path = ssh_dir / "id_cluster"
                     cluster_pub_key_path = ssh_dir / "id_cluster.pub"
