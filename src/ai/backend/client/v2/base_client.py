@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ssl
 from collections.abc import AsyncIterator, Iterable, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -34,7 +33,7 @@ ResponseT = TypeVar("ResponseT", bound=BaseResponseModel | BaseRootResponseModel
 
 
 def _create_aiohttp_session(config: ClientConfig) -> aiohttp.ClientSession:
-    ssl_context: ssl.SSLContext | bool = not config.skip_ssl_verification
+    ssl_context: bool = not config.skip_ssl_verification
     connector = aiohttp.TCPConnector(ssl=ssl_context)
     timeout = aiohttp.ClientTimeout(
         sock_connect=config.connection_timeout or None,
@@ -391,7 +390,7 @@ class BackendAIAnonymousClient:
             self._session, self._config, method, path, headers=headers, json=json, params=params
         )
 
-    async def typed_request(
+    async def _typed_request(
         self,
         method: str,
         path: str,
@@ -416,7 +415,7 @@ class BackendAIAnonymousClient:
         return cast(ResponseT, response_model.model_validate(data))
 
     async def authorize(self, request: AuthorizeRequest) -> AuthorizeResponse:
-        return await self.typed_request(
+        return await self._typed_request(
             "POST",
             "/auth/authorize",
             request=request,
@@ -424,7 +423,7 @@ class BackendAIAnonymousClient:
         )
 
     async def signup(self, request: SignupRequest) -> SignupResponse:
-        return await self.typed_request(
+        return await self._typed_request(
             "POST",
             "/auth/signup",
             request=request,
@@ -434,7 +433,7 @@ class BackendAIAnonymousClient:
     async def update_password_no_auth(
         self, request: UpdatePasswordNoAuthRequest
     ) -> UpdatePasswordNoAuthResponse:
-        return await self.typed_request(
+        return await self._typed_request(
             "POST",
             "/auth/update-password-no-auth",
             request=request,
