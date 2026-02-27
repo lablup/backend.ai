@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections import defaultdict
 from collections.abc import Sequence
 
 from ai.backend.manager.data.permission.association_scopes_entities import (
@@ -140,8 +141,6 @@ async def load_assignments_by_role_ids(
     )
 
     # Group assignments by role_id
-    from collections import defaultdict
-
     assignment_map: dict[uuid.UUID, list[AssignedUserData]] = defaultdict(list)
     for assignment in action_result.result.items:
         assignment_map[assignment.role_id].append(assignment)
