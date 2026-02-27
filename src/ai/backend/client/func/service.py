@@ -103,6 +103,7 @@ class Service(BaseFunction):
         extra_mounts: Sequence[str] | None = None,
         extra_mount_map: Mapping[str, str] | None = None,
         extra_mount_options: Mapping[str, Mapping[str, str]] | None = None,
+        extra_mount_subpaths: Mapping[str, str] | None = None,
         service_name: str | None = None,
         model_version: str | None = None,
         _dependencies: Sequence[str] | None = None,
@@ -154,6 +155,7 @@ class Service(BaseFunction):
         extra_mounts = extra_mounts or []
         extra_mount_map = extra_mount_map or {}
         extra_mount_options = extra_mount_options or {}
+        extra_mount_subpaths = extra_mount_subpaths or {}
 
         if service_name is None:
             faker = Faker()
@@ -185,6 +187,8 @@ class Service(BaseFunction):
                 }
                 if mount_type := extra_mount_options.get(mount, {}).get("type"):
                     extra_mount_body[str(vfolder_id)]["type"] = mount_type
+                if subpath := extra_mount_subpaths.get(mount):
+                    extra_mount_body[str(vfolder_id)]["subpath"] = subpath
         model_config = {
             "model": model_id_or_name,
             "model_mount_destination": model_mount_destination,
