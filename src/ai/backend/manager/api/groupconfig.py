@@ -18,7 +18,10 @@ from ai.backend.manager.api.rest.groupconfig.handler import GroupConfigHandler
 from ai.backend.manager.api.rest.middleware.auth import admin_required, auth_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
+from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
+
+_status_readable = server_status_required(READ_ALLOWED)
 
 
 def create_app(
@@ -29,8 +32,16 @@ def create_app(
     app["prefix"] = "group-config"
     handler = GroupConfigHandler()
     registry = RouteRegistry(app, default_cors_options)
-    registry.add("POST", "/dotfiles", handler.create, middlewares=[admin_required])
-    registry.add("GET", "/dotfiles", handler.list_or_get, middlewares=[auth_required])
-    registry.add("PATCH", "/dotfiles", handler.update, middlewares=[admin_required])
-    registry.add("DELETE", "/dotfiles", handler.delete, middlewares=[admin_required])
+    registry.add(
+        "POST", "/dotfiles", handler.create, middlewares=[_status_readable, admin_required]
+    )
+    registry.add(
+        "GET", "/dotfiles", handler.list_or_get, middlewares=[_status_readable, auth_required]
+    )
+    registry.add(
+        "PATCH", "/dotfiles", handler.update, middlewares=[_status_readable, admin_required]
+    )
+    registry.add(
+        "DELETE", "/dotfiles", handler.delete, middlewares=[_status_readable, admin_required]
+    )
     return app, []

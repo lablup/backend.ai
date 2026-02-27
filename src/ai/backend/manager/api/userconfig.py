@@ -18,7 +18,10 @@ from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.userconfig.handler import UserConfigHandler
 
+from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
+
+_status_readable = server_status_required(READ_ALLOWED)
 
 
 def create_app(
@@ -29,14 +32,26 @@ def create_app(
     app["prefix"] = "user-config"
     handler = UserConfigHandler()
     registry = RouteRegistry(app, default_cors_options)
-    registry.add("POST", "/dotfiles", handler.create, middlewares=[auth_required])
-    registry.add("GET", "/dotfiles", handler.list_or_get, middlewares=[auth_required])
-    registry.add("PATCH", "/dotfiles", handler.update, middlewares=[auth_required])
-    registry.add("DELETE", "/dotfiles", handler.delete, middlewares=[auth_required])
+    registry.add("POST", "/dotfiles", handler.create, middlewares=[_status_readable, auth_required])
     registry.add(
-        "POST", "/bootstrap-script", handler.update_bootstrap_script, middlewares=[auth_required]
+        "GET", "/dotfiles", handler.list_or_get, middlewares=[_status_readable, auth_required]
     )
     registry.add(
-        "GET", "/bootstrap-script", handler.get_bootstrap_script, middlewares=[auth_required]
+        "PATCH", "/dotfiles", handler.update, middlewares=[_status_readable, auth_required]
+    )
+    registry.add(
+        "DELETE", "/dotfiles", handler.delete, middlewares=[_status_readable, auth_required]
+    )
+    registry.add(
+        "POST",
+        "/bootstrap-script",
+        handler.update_bootstrap_script,
+        middlewares=[_status_readable, auth_required],
+    )
+    registry.add(
+        "GET",
+        "/bootstrap-script",
+        handler.get_bootstrap_script,
+        middlewares=[_status_readable, auth_required],
     )
     return app, []

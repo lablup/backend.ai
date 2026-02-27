@@ -63,22 +63,38 @@ async def _resolve_group_id_and_domain(
     conn: sa.ext.asyncio.engine.AsyncConnection,
     group_id_or_name: UUID | str,
     domain: str | None,
+    *,
+    user_domain: str | None = None,
 ) -> tuple[UUID | None, str | None]:
-    """Resolve group identifier to (group_id, domain) pair."""
+    """Resolve group identifier to (group_id, domain) pair.
+
+    When *group_id_or_name* is a string that looks like a UUID, it is
+    treated as a UUID (backward-compat with Trafaret's ``tx.UUID | t.String``).
+    When it is a plain group name and *domain* is ``None``, *user_domain*
+    is used as a fallback so that callers need not always supply a domain.
+    """
     if isinstance(group_id_or_name, str):
-        if domain is None:
-            raise InvalidAPIParameters("Missing parameter 'domain'")
-        query = (
-            sa.select(groups.c.id)
-            .select_from(groups)
-            .where(groups.c.domain_name == domain)
-            .where(groups.c.name == group_id_or_name)
-        )
-        group_id = await conn.scalar(query)
-        return group_id, domain
-    group_id = group_id_or_name
-    resolved_domain = await query_group_domain(conn, group_id)
-    return group_id, resolved_domain
+        # Pydantic smart-union may parse a UUID-shaped string as str.
+        try:
+            group_id_or_name = UUID(group_id_or_name)
+        except ValueError:
+            pass
+    if isinstance(group_id_or_name, UUID):
+        resolved_domain = await query_group_domain(conn, group_id_or_name)
+        return group_id_or_name, resolved_domain
+    # group_id_or_name is a group name (non-UUID string)
+    if domain is None:
+        domain = user_domain
+    if domain is None:
+        raise InvalidAPIParameters("Missing parameter 'domain'")
+    query = (
+        sa.select(groups.c.id)
+        .select_from(groups)
+        .where(groups.c.domain_name == domain)
+        .where(groups.c.name == group_id_or_name)
+    )
+    group_id = await conn.scalar(query)
+    return group_id, domain
 
 
 class GroupConfigHandler:
@@ -101,6 +117,7 @@ class GroupConfigHandler:
                 conn,
                 params.group,
                 params.domain,
+                user_domain=ctx.user_domain,
             )
             if group_id is None or domain is None:
                 raise ProjectNotFound
@@ -146,6 +163,7 @@ class GroupConfigHandler:
                 conn,
                 params.group,
                 params.domain,
+                user_domain=ctx.user_domain,
             )
             if group_id is None or domain is None:
                 raise ProjectNotFound
@@ -207,6 +225,7 @@ class GroupConfigHandler:
                 conn,
                 params.group,
                 params.domain,
+                user_domain=ctx.user_domain,
             )
             if group_id is None or domain is None:
                 raise ProjectNotFound
@@ -245,6 +264,7 @@ class GroupConfigHandler:
                 conn,
                 params.group,
                 params.domain,
+                user_domain=ctx.user_domain,
             )
             if group_id is None or domain is None:
                 raise ProjectNotFound
@@ -253,7 +273,7 @@ class GroupConfigHandler:
 
             dotfiles, _ = await query_group_dotfiles(conn, group_id)
             if dotfiles is None:
-                raise DotfileNotFound
+                raise ProjectNotFound
             new_dotfiles = [x for x in dotfiles if x["path"] != params.path]
             if len(new_dotfiles) == len(dotfiles):
                 raise DotfileNotFound
