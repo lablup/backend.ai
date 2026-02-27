@@ -96,7 +96,6 @@ from ai.backend.manager.types import OptionalState
 
 __all__ = (
     "CreateDeploymentAdapter",
-    "CreateRevisionAdapter",
     "DeploymentAdapter",
     "DeploymentPolicyAdapter",
     "RevisionAdapter",
@@ -510,23 +509,6 @@ class CreateDeploymentAdapter:
             strategy_spec=strategy_spec,
             rollback_on_failure=strategy_input.rollback_on_failure,
         )
-
-
-class CreateRevisionAdapter:
-    """Adapter for converting create revision request to creators."""
-
-    def build_creator(self, revision_input: RevisionInput) -> ModelRevisionCreator:
-        """
-        Convert RevisionInput to ModelRevisionCreator.
-
-        Args:
-            revision_input: Revision input DTO
-
-        Returns:
-            ModelRevisionCreator for service layer
-        """
-        deployment_adapter = CreateDeploymentAdapter()
-        return deployment_adapter._build_revision_creator(revision_input)
 
 
 class DeploymentPolicyAdapter:
