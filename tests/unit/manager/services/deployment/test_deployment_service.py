@@ -87,15 +87,40 @@ class DeploymentServiceBaseFixtures:
             updated_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
         )
 
+    @pytest.fixture
+    def endpoint_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def policy_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
 
 class TestSearchDeploymentPolicies(DeploymentServiceBaseFixtures):
     """Tests for DeploymentService.search_deployment_policies"""
+
+    @pytest.fixture
+    def default_querier(self) -> BatchQuerier:
+        return BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+    @pytest.fixture
+    def paginated_querier(self) -> BatchQuerier:
+        return BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=10),
+            conditions=[],
+            orders=[],
+        )
 
     async def test_search_deployment_policies_success(
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
         deployment_policy_data: DeploymentPolicyData,
+        default_querier: BatchQuerier,
     ) -> None:
         """Search deployment policies should return matching results."""
         mock_deployment_repository.search_deployment_policies = AsyncMock(
@@ -107,12 +132,7 @@ class TestSearchDeploymentPolicies(DeploymentServiceBaseFixtures):
             )
         )
 
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchDeploymentPoliciesAction(querier=querier)
+        action = SearchDeploymentPoliciesAction(querier=default_querier)
 
         result = await processors.search_deployment_policies.wait_for_complete(action)
 
@@ -120,12 +140,15 @@ class TestSearchDeploymentPolicies(DeploymentServiceBaseFixtures):
         assert result.total_count == 1
         assert result.has_next_page is False
         assert result.has_previous_page is False
-        mock_deployment_repository.search_deployment_policies.assert_called_once_with(querier)
+        mock_deployment_repository.search_deployment_policies.assert_called_once_with(
+            default_querier
+        )
 
     async def test_search_deployment_policies_empty_result(
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
+        default_querier: BatchQuerier,
     ) -> None:
         """Search deployment policies should return empty list when no results found."""
         mock_deployment_repository.search_deployment_policies = AsyncMock(
@@ -137,12 +160,7 @@ class TestSearchDeploymentPolicies(DeploymentServiceBaseFixtures):
             )
         )
 
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchDeploymentPoliciesAction(querier=querier)
+        action = SearchDeploymentPoliciesAction(querier=default_querier)
 
         result = await processors.search_deployment_policies.wait_for_complete(action)
 
@@ -154,6 +172,7 @@ class TestSearchDeploymentPolicies(DeploymentServiceBaseFixtures):
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
         deployment_policy_data: DeploymentPolicyData,
+        paginated_querier: BatchQuerier,
     ) -> None:
         """Search deployment policies should handle pagination correctly."""
         mock_deployment_repository.search_deployment_policies = AsyncMock(
@@ -165,12 +184,7 @@ class TestSearchDeploymentPolicies(DeploymentServiceBaseFixtures):
             )
         )
 
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=10),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchDeploymentPoliciesAction(querier=querier)
+        action = SearchDeploymentPoliciesAction(querier=paginated_querier)
 
         result = await processors.search_deployment_policies.wait_for_complete(action)
 
@@ -182,26 +196,50 @@ class TestSearchDeploymentPolicies(DeploymentServiceBaseFixtures):
 class TestCreateDeploymentPolicy(DeploymentServiceBaseFixtures):
     """Tests for DeploymentService.create_deployment_policy"""
 
+    @pytest.fixture
+    def rolling_policy_config(self) -> DeploymentPolicyConfig:
+        return DeploymentPolicyConfig(
+            strategy=DeploymentStrategy.ROLLING,
+            strategy_spec=RollingUpdateSpec(max_surge=2, max_unavailable=1),
+            rollback_on_failure=True,
+        )
+
+    @pytest.fixture
+    def blue_green_policy_config(self) -> DeploymentPolicyConfig:
+        return DeploymentPolicyConfig(
+            strategy=DeploymentStrategy.BLUE_GREEN,
+            strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
+            rollback_on_failure=False,
+        )
+
+    @pytest.fixture
+    def blue_green_policy_data(self) -> DeploymentPolicyData:
+        return DeploymentPolicyData(
+            id=uuid.uuid4(),
+            endpoint=uuid.uuid4(),
+            strategy=DeploymentStrategy.BLUE_GREEN,
+            strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
+            rollback_on_failure=False,
+            created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
+            updated_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
+        )
+
     async def test_create_deployment_policy_rolling(
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
         deployment_policy_data: DeploymentPolicyData,
+        endpoint_id: uuid.UUID,
+        rolling_policy_config: DeploymentPolicyConfig,
     ) -> None:
         """Create deployment policy with ROLLING strategy should succeed."""
         mock_deployment_repository.create_deployment_policy = AsyncMock(
             return_value=deployment_policy_data
         )
 
-        endpoint_id = uuid.uuid4()
-        policy_config = DeploymentPolicyConfig(
-            strategy=DeploymentStrategy.ROLLING,
-            strategy_spec=RollingUpdateSpec(max_surge=2, max_unavailable=1),
-            rollback_on_failure=True,
-        )
         action = CreateDeploymentPolicyAction(
             endpoint_id=endpoint_id,
-            policy_config=policy_config,
+            policy_config=rolling_policy_config,
         )
 
         result = await processors.create_deployment_policy.wait_for_complete(action)
@@ -218,51 +256,31 @@ class TestCreateDeploymentPolicy(DeploymentServiceBaseFixtures):
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
+        endpoint_id: uuid.UUID,
+        blue_green_policy_config: DeploymentPolicyConfig,
+        blue_green_policy_data: DeploymentPolicyData,
     ) -> None:
         """Create deployment policy with BLUE_GREEN strategy should succeed."""
-        policy_data = DeploymentPolicyData(
-            id=uuid.uuid4(),
-            endpoint=uuid.uuid4(),
-            strategy=DeploymentStrategy.BLUE_GREEN,
-            strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
-            rollback_on_failure=False,
-            created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
-            updated_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
+        mock_deployment_repository.create_deployment_policy = AsyncMock(
+            return_value=blue_green_policy_data
         )
-        mock_deployment_repository.create_deployment_policy = AsyncMock(return_value=policy_data)
 
-        endpoint_id = uuid.uuid4()
-        policy_config = DeploymentPolicyConfig(
-            strategy=DeploymentStrategy.BLUE_GREEN,
-            strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
-            rollback_on_failure=False,
-        )
         action = CreateDeploymentPolicyAction(
             endpoint_id=endpoint_id,
-            policy_config=policy_config,
+            policy_config=blue_green_policy_config,
         )
 
         result = await processors.create_deployment_policy.wait_for_complete(action)
 
-        assert result.data == policy_data
+        assert result.data == blue_green_policy_data
         assert result.data.strategy == DeploymentStrategy.BLUE_GREEN
 
 
 class TestUpdateDeploymentPolicy(DeploymentServiceBaseFixtures):
     """Tests for DeploymentService.update_deployment_policy"""
 
-    async def test_update_deployment_policy_success(
-        self,
-        processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
-        deployment_policy_data: DeploymentPolicyData,
-    ) -> None:
-        """Update deployment policy should succeed."""
-        mock_deployment_repository.update_deployment_policy = AsyncMock(
-            return_value=deployment_policy_data
-        )
-
-        policy_id = uuid.uuid4()
+    @pytest.fixture
+    def full_update_action(self, policy_id: uuid.UUID) -> UpdateDeploymentPolicyAction:
         updater_spec = DeploymentPolicyUpdaterSpec(
             strategy=OptionalState.update(DeploymentStrategy.ROLLING),
             rollback_on_failure=OptionalState.update(True),
@@ -271,28 +289,13 @@ class TestUpdateDeploymentPolicy(DeploymentServiceBaseFixtures):
             spec=updater_spec,
             pk_value=policy_id,
         )
-        action = UpdateDeploymentPolicyAction(
+        return UpdateDeploymentPolicyAction(
             policy_id=policy_id,
             updater=updater,
         )
 
-        result = await processors.update_deployment_policy.wait_for_complete(action)
-
-        assert result.data == deployment_policy_data
-        mock_deployment_repository.update_deployment_policy.assert_called_once_with(updater)
-
-    async def test_update_deployment_policy_partial_update(
-        self,
-        processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
-        deployment_policy_data: DeploymentPolicyData,
-    ) -> None:
-        """Update deployment policy with partial fields should succeed."""
-        mock_deployment_repository.update_deployment_policy = AsyncMock(
-            return_value=deployment_policy_data
-        )
-
-        policy_id = uuid.uuid4()
+    @pytest.fixture
+    def partial_update_action(self, policy_id: uuid.UUID) -> UpdateDeploymentPolicyAction:
         updater_spec = DeploymentPolicyUpdaterSpec(
             rollback_on_failure=OptionalState.update(False),
         )
@@ -300,12 +303,43 @@ class TestUpdateDeploymentPolicy(DeploymentServiceBaseFixtures):
             spec=updater_spec,
             pk_value=policy_id,
         )
-        action = UpdateDeploymentPolicyAction(
+        return UpdateDeploymentPolicyAction(
             policy_id=policy_id,
             updater=updater,
         )
 
-        result = await processors.update_deployment_policy.wait_for_complete(action)
+    async def test_update_deployment_policy_success(
+        self,
+        processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
+        deployment_policy_data: DeploymentPolicyData,
+        full_update_action: UpdateDeploymentPolicyAction,
+    ) -> None:
+        """Update deployment policy should succeed."""
+        mock_deployment_repository.update_deployment_policy = AsyncMock(
+            return_value=deployment_policy_data
+        )
+
+        result = await processors.update_deployment_policy.wait_for_complete(full_update_action)
+
+        assert result.data == deployment_policy_data
+        mock_deployment_repository.update_deployment_policy.assert_called_once_with(
+            full_update_action.updater
+        )
+
+    async def test_update_deployment_policy_partial_update(
+        self,
+        processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
+        deployment_policy_data: DeploymentPolicyData,
+        partial_update_action: UpdateDeploymentPolicyAction,
+    ) -> None:
+        """Update deployment policy with partial fields should succeed."""
+        mock_deployment_repository.update_deployment_policy = AsyncMock(
+            return_value=deployment_policy_data
+        )
+
+        result = await processors.update_deployment_policy.wait_for_complete(partial_update_action)
 
         assert result.data == deployment_policy_data
         mock_deployment_repository.update_deployment_policy.assert_called_once()
