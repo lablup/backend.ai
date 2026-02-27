@@ -53,15 +53,6 @@ class ReconcileDeploymentHandler(DeploymentHandler):
         return [EndpointLifecycle.READY]
 
     @classmethod
-    def next_status(cls) -> DeploymentLifecycleStatus | None:
-        """Get the next deployment status after this handler's operation."""
-        return None
-
-    @classmethod
-    def failure_status(cls) -> DeploymentLifecycleStatus | None:
-        return DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING)
-
-    @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
         """Define state transitions for reconcile deployment handler (BEP-1030).
 

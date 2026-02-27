@@ -224,7 +224,8 @@ class DeploymentCoordinator:
         timestamp_now = datetime.now(UTC).isoformat()
 
         # Handle success transitions
-        next_lifecycle_status = handler.next_status()
+        transitions = handler.status_transitions()
+        next_lifecycle_status = transitions.success
         if next_lifecycle_status is not None and result.successes:
             next_lifecycle = next_lifecycle_status.lifecycle
             endpoint_ids = [d.id for d in result.successes]
@@ -262,7 +263,7 @@ class DeploymentCoordinator:
             ])
 
         # Handle failure transitions
-        failure_lifecycle_status = handler.failure_status()
+        failure_lifecycle_status = transitions.failure
         if failure_lifecycle_status is not None and result.errors:
             failure_lifecycle = failure_lifecycle_status.lifecycle
             endpoint_ids = [e.deployment_info.id for e in result.errors]

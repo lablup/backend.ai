@@ -51,15 +51,6 @@ class ScalingDeploymentHandler(DeploymentHandler):
         return [EndpointLifecycle.SCALING]
 
     @classmethod
-    def next_status(cls) -> DeploymentLifecycleStatus | None:
-        """Get the next deployment status after this handler's operation."""
-        return DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY)
-
-    @classmethod
-    def failure_status(cls) -> DeploymentLifecycleStatus | None:
-        return None
-
-    @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
         """Define state transitions for scaling deployment handler (BEP-1030).
 
