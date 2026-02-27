@@ -18,11 +18,13 @@ def _wrap_api_handler(handler: ApiHandler) -> WebRequestHandler:
     sig = inspect.signature(handler, eval_str=True)
 
     @functools.wraps(handler)
-    async def wrapped(request: web.Request) -> web.Response:
+    async def wrapped(request: web.Request) -> web.StreamResponse:
         kwargs: dict[str, Any] = {}
         for name, param in sig.parameters.items():
             kwargs[name] = await extract_param_value(request, param.annotation)
         response = await handler(**kwargs)
+        if isinstance(response, web.StreamResponse):
+            return response
         return parse_response(response)
 
     return wrapped

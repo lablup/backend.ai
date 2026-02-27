@@ -25,4 +25,4 @@ type RouteMiddleware = Callable[
     WebRequestHandler,
 ]
 
-type ApiHandler = Callable[..., Awaitable[APIResponse]]
+type ApiHandler = Callable[..., Awaitable[APIResponse | web.StreamResponse]]

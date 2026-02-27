@@ -30,7 +30,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Final,
-    cast,
 )
 
 import aiohttp_cors
@@ -89,7 +88,6 @@ from ai.backend.common.events.event_types.service_discovery.anycast import (
 )
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
@@ -102,18 +100,13 @@ from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.metrics.http import (
-    build_api_metric_middleware,
-    build_prometheus_metrics_handler,
-)
+from ai.backend.common.metrics.http import build_prometheus_metrics_handler
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.multiprocess import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
-from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
-from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
     ETCDServiceDiscovery,
     ETCDServiceDiscoveryArgs,
@@ -154,22 +147,26 @@ from .actions.monitors.reporter import ReporterMonitor
 from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
 from .api.context import RootContext
+from .api.rest.auth import register_routes as register_auth_routes
+from .api.rest.middleware import (
+    build_api_metric_middleware,
+    exception_middleware,
+    request_id_middleware,
+)
+from .api.rest.middleware.auth import auth_middleware
+from .api.rest.routing import RouteRegistry
 from .clients.agent import AgentClientPool, AgentPoolSpec
 from .clients.appproxy.client import AppProxyClientPool
 from .config.bootstrap import BootstrapConfig
 from .config.unified import EventLoopType
 from .dependencies import DependencyInput, DependencyResources, ManagerDependencyComposer
-from .errors.api import InvalidAPIParameters
 from .errors.common import (
     GenericBadRequest,
     InternalServerError,
-    MethodNotAllowed,
     ServerMisconfiguredError,
-    URLNotFound,
 )
 from .errors.resource import ConfigurationLoadFailed
 from .event_dispatcher.dispatch import DispatcherArgs, Dispatchers
-from .exceptions import InvalidArgument
 from .health.database import DatabaseHealthChecker
 from .idle import init_idle_checkers
 from .models.storage import StorageSessionManager
@@ -318,7 +315,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".artifact_registry",
     ".etcd",
     ".events",
-    ".auth",
+    # ".auth" — migrated to new-style (api/rest/auth)
     ".ratelimit",
     ".vfolder",
     ".admin",
@@ -405,109 +402,9 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
     return await _handler(request)
 
 
-def _debug_error_response(
-    e: Exception,
-) -> web.StreamResponse:
-    error_type = ""
-    error_title = ""
-    error_message = "Internal server error"
-    status_code = 500
-    error_code = ErrorCode.default()
-    if isinstance(e, BackendAIError):
-        error_type = e.error_type
-        error_title = e.error_title
-        if e.extra_msg:
-            error_message = e.extra_msg
-        status_code = e.status_code
-        error_code = e.error_code()
-
-    return web.json_response(
-        {
-            "type": error_type,
-            "title": error_title,
-            "error_code": str(error_code),
-            "msg": error_message,
-            "traceback": traceback.format_exc(),
-        },
-        status=status_code,
-        dumps=dump_json_str,
-    )
-
-
-@web.middleware
-async def exception_middleware(
-    request: web.Request, handler: WebRequestHandler
-) -> web.StreamResponse:
-    root_ctx: RootContext = request.app["_root.context"]
-    error_monitor = root_ctx.error_monitor
-    stats_monitor = root_ctx.stats_monitor
-    method = request.method
-    endpoint = getattr(request.match_info.route.resource, "canonical", request.path)
-    try:
-        await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.requests")
-        resp = await handler(request)
-    # NOTE: pydantic.ValidationError is handled in utils.pydantic_params_api_handler()
-    except InvalidArgument as ex:
-        if len(ex.args) > 1:
-            raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}") from ex
-        if len(ex.args) == 1:
-            raise InvalidAPIParameters(ex.args[0]) from ex
-        raise InvalidAPIParameters() from ex
-    except BackendAIError as ex:
-        if ex.status_code // 100 == 4:
-            log.warning(
-                "client error raised inside handlers: ({} {}): {}", method, endpoint, repr(ex)
-            )
-        elif ex.status_code // 100 == 5:
-            log.exception(
-                "Internal server error raised inside handlers: ({} {}): {}",
-                method,
-                endpoint,
-                repr(ex),
-            )
-        await error_monitor.capture_exception()
-        await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.failures")
-        await stats_monitor.report_metric(
-            INCREMENT, f"ai.backend.manager.api.status.{ex.status_code}"
-        )
-        if root_ctx.config_provider.config.debug.enabled:
-            return _debug_error_response(ex)
-        raise
-    except web.HTTPException as ex:
-        await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.failures")
-        await stats_monitor.report_metric(
-            INCREMENT, f"ai.backend.manager.api.status.{ex.status_code}"
-        )
-        if ex.status_code // 100 == 4:
-            log.warning("client error raised inside handlers: ({} {}): {}", method, endpoint, ex)
-        elif ex.status_code // 100 == 5:
-            log.exception(
-                "Internal server error raised inside handlers: ({} {}): {}", method, endpoint, ex
-            )
-        if ex.status_code == 404:
-            raise URLNotFound(extra_data=request.path) from ex
-        if ex.status_code == 405:
-            concrete_ex = cast(web.HTTPMethodNotAllowed, ex)
-            raise MethodNotAllowed(
-                method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
-            ) from ex
-        raise GenericBadRequest from ex
-    except asyncio.CancelledError as e:
-        # The server is closing or the client has disconnected in the middle of
-        # request.  Atomic requests are still executed to their ends.
-        log.debug("Request cancelled ({0} {1})", request.method, request.rel_url)
-        raise e
-    except Exception as e:
-        await error_monitor.capture_exception()
-        log.exception(
-            "Uncaught exception in HTTP request handlers ({} {}): {}", method, endpoint, e
-        )
-        if root_ctx.config_provider.config.debug.enabled:
-            return _debug_error_response(e)
-        raise InternalServerError() from e
-    else:
-        await stats_monitor.report_metric(INCREMENT, f"ai.backend.manager.api.status.{resp.status}")
-        return resp
+# exception_middleware and _debug_error_response have been extracted to
+# ai.backend.manager.api.rest.middleware.exception and are re-exported
+# from ai.backend.manager.api.rest.middleware.__init__.
 
 
 def _bridge_resources_to_root_ctx(
@@ -1478,6 +1375,28 @@ def init_subapp(pkg_name: str, root_app: web.Application, create_subapp: AppCrea
     _init_subapp(pkg_name, root_app, subapp, global_middlewares)
 
 
+def _register_newstyle_routes(
+    root_app: web.Application,
+    dep_resources: DependencyResources,
+    pidx: int,
+) -> None:
+    """Register new-style modules that use the ``register_routes()`` pattern.
+
+    Must be called **after** the Composer has run (so that
+    ``dep_resources.processing.processors`` is available) but **before**
+    ``runner.setup()`` freezes the application router.
+
+    Global middlewares (e.g. ``auth_middleware``) are registered separately
+    in ``build_root_app()`` — route modules only register their routes here.
+    """
+    root_ctx: RootContext = root_app["_root.context"]
+    registry = RouteRegistry(root_app, root_ctx.cors_options)
+
+    if pidx == 0:
+        log.info("Loading new-style module: auth")
+    register_auth_routes(registry, dep_resources.processing.processors)
+
+
 def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
     ipc_base_path = root_ctx.config_provider.config.manager.ipc_base_path
     manager_id = root_ctx.config_provider.config.manager.id
@@ -1549,6 +1468,7 @@ def build_root_app(
         middlewares=[
             request_id_middleware,
             exception_middleware,
+            auth_middleware,
             api_middleware,
             build_api_metric_middleware(root_ctx.metrics.api),
         ]
@@ -1623,6 +1543,8 @@ def build_root_app(
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
+
+    # --- Legacy subapp modules (create_app pattern) ---
     if subapp_pkgs is None:
         subapp_pkgs = []
     for pkg_name in subapp_pkgs:
@@ -1833,6 +1755,11 @@ async def server_main(
 
         # Bridge all Composer outputs to RootContext for backward compatibility
         _bridge_resources_to_root_ctx(root_ctx, dep_resources)
+
+        # Register new-style modules that use register_routes() pattern.
+        # Must happen after bridging (cors_options must be set) and before
+        # runner.setup() which freezes the application router.
+        _register_newstyle_routes(root_app, dep_resources, pidx)
 
         # TODO: Remove manual middleware injection once the manager startup is
         # decoupled from the aiohttp Application lifecycle. Currently root_app is

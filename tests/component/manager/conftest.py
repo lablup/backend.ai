@@ -56,6 +56,8 @@ from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest.auth import register_routes as register_auth_routes
+from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
@@ -106,6 +108,9 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
 from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger(__name__)
+
+# New-style subapp package names (those using register_routes() instead of create_app()).
+_NEWSTYLE_SUBAPP_PKGS: frozenset[str] = frozenset({".auth"})
 
 
 @actxmgr
@@ -821,7 +826,13 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
 
         if scheduler_opts is None:
             scheduler_opts = {}
-        _cleanup_ctxs = []
+
+        # Separate legacy subapp packages from new-style route packages.
+        all_pkgs = list(subapp_pkgs or [])
+        legacy_pkgs = [p for p in all_pkgs if p not in _NEWSTYLE_SUBAPP_PKGS]
+        has_auth = ".auth" in all_pkgs
+
+        _cleanup_ctxs: list[Callable[[RootContext], AbstractAsyncContextManager[None]]] = []
         _outer_ctx_classes: list[type[AbstractAsyncContextManager[Any, Any]]] = []
         if cleanup_contexts is not None:
             for ctx in cleanup_contexts:
@@ -830,11 +841,15 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
                     _outer_ctx_classes.append(ctx)  # type: ignore
                 else:
                     _cleanup_ctxs.append(ctx)
+
+        # Build app with only legacy subapps and NO cleanup contexts.
+        # Cleanup contexts are managed manually so that new-style routes
+        # can be registered between "processors ready" and "router frozen".
         app = build_root_app(
             0,
             bootstrap_config,
-            cleanup_contexts=_cleanup_ctxs,
-            subapp_pkgs=subapp_pkgs,
+            cleanup_contexts=[],
+            subapp_pkgs=legacy_pkgs,
             scheduler_opts={
                 "close_timeout": 10,
                 **scheduler_opts,
@@ -845,6 +860,23 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
             octx = octx_cls(root_ctx)  # type: ignore
             _outer_ctxs.append(octx)
             await octx.__aenter__()
+
+        # Run cleanup contexts manually (before router freeze).
+        for cctx in _cleanup_ctxs:
+            octx = cctx(root_ctx)
+            _outer_ctxs.append(octx)
+            await octx.__aenter__()
+
+        # Register new-style route modules.  If cleanup contexts already
+        # set root_ctx.processors, use it; otherwise fall back to a mock
+        # (sufficient for endpoints that don't invoke service actions, such
+        # as /auth/test).
+        # auth_middleware is already in app.middlewares (added by build_root_app).
+        if has_auth:
+            processors = getattr(root_ctx, "processors", None) or MagicMock()
+            registry = RouteRegistry(app, root_ctx.cors_options)
+            register_auth_routes(registry, processors)
+
         runner = web.AppRunner(app, handle_signals=False)
         await runner.setup()
         site = web.TCPSite(
