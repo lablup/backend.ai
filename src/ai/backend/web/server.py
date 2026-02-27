@@ -39,7 +39,6 @@ from setproctitle import setproctitle
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
-from ai.backend.client.request import Request
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config
 from ai.backend.common.clients.http_client.client_pool import ClientPool
@@ -69,7 +68,7 @@ from ai.backend.web.config.unified import EventLoopType, ServiceMode, WebServerU
 from ai.backend.web.security import SecurityPolicy, security_policy_middleware
 
 from . import __version__, user_agent
-from .auth import fill_forwarding_hdrs_to_api_session, get_anonymous_session, get_client_ip
+from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
 from .errors import InvalidAPIConfigurationError
 from .proxy import (
     decrypt_payload,
@@ -204,12 +203,9 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
 async def update_password_no_auth(request: web.Request) -> web.Response:
     config = cast(WebServerUnifiedConfig, request.app["config"])
     client_ip = get_client_ip(request)
-    request_headers = extra_config_headers.check(request.headers)
-    secure_context = request_headers.get("X-BackendAI-Encoded", None)
-    if not secure_context:
-        request["payload"] = await request.text()
     try:
-        creds = json.loads(request["payload"])
+        text = await request.text()
+        creds = json.loads(text)
     except json.JSONDecodeError as e:
         log.error("Login: JSON decoding error: {}", e)
         creds = {}
@@ -235,24 +231,33 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
     }
 
     try:
-        api_session = await get_anonymous_session(request)
-        async with api_session:
+        anon_api_config = APIConfig(
+            domain=config.api.domain,
+            endpoint=str(config.api.endpoint[0]),
+            access_key="",
+            secret_key="",  # anonymous session
+            user_agent=user_agent,
+            skip_sslcert_validation=not config.api.ssl_verify,
+        )
+        if not anon_api_config.is_anonymous:
+            raise InvalidAPIConfigurationError(
+                "Anonymous API configuration is not properly initialized."
+            )
+        async with APISession(config=anon_api_config) as api_session:
             fill_forwarding_hdrs_to_api_session(request, api_session)
-            rqst = Request("POST", "/auth/update-password-no-auth")
-            rqst.set_json({
-                "domain": config.api.domain,
-                "username": creds["username"],
-                "current_password": creds["current_password"],
-                "new_password": creds["new_password"],
-            })
-            async with rqst.fetch() as resp:
-                result = await resp.json()
+            result = await api_session.Auth.update_password_no_auth(
+                config.api.domain,
+                creds["username"],
+                creds["current_password"],
+                creds["new_password"],
+            )
             log.info(
                 "UPDATE_PASSWORD_NO_AUTH: Authorization succeeded for (email:{}, ip:{})",
                 creds["username"],
                 client_ip,
             )
     except BackendClientError as e:
+        # This is error, not failed login, so we should not update login history.
         return web.HTTPBadGateway(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/bad-gateway",
@@ -263,7 +268,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         )
     except BackendAPIError as e:
         log.info(
-            "UPDATE_PASSWORD_NO_AUTH: Failed (email:{}, ip:{}) - {}",
+            "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
             creds["username"],
             client_ip,
             e,
