@@ -20,6 +20,26 @@ services:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
+  backend-ai-storage-proxy:
+    image: backend.ai/storage-proxy:26.1.0rc1
+    container_name: backend-ai-storage-proxy
+    networks:
+      - half
+    ports:
+      - "6021:6021"
+      - "6022:6022"
+      - "16023:16023"
+    volumes:
+      - ./storage-proxy.toml:/etc/backend.ai/storage-proxy.toml:ro
+      - ./configs/storage-proxy/ssl:/etc/backend.ai/ssl:ro
+      - ./vfolder:/vfolder
+      - /tmp/backend.ai/ipc:/tmp/backend.ai/ipc
+    environment:
+      - PYTHONUNBUFFERED=1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
   backend-ai-webserver:
     image: backend.ai/webserver:26.1.0rc1
     container_name: backend-ai-webserver

@@ -1,7 +1,7 @@
 Install from Docker Containers
 ==============================
 
-This guide explains how to run Backend.AI components (manager, webserver) using Docker containers built from the monorepo.
+This guide explains how to run Backend.AI components (manager, webserver, storage-proxy) using Docker containers built from the monorepo.
 
 Prerequisites
 -------------
@@ -27,7 +27,7 @@ Prerequisites
 Building Docker Images
 ----------------------
 
-Build the manager and webserver Docker images:
+Build the Docker images:
 
 .. code-block:: bash
 
@@ -44,6 +44,13 @@ Build the manager and webserver Docker images:
    # Build manager image
    docker build -f docker/backend.ai-manager.Dockerfile \
      -t backend.ai/manager:${PKGVER} \
+     --build-arg PYTHON_VERSION=3.13 \
+     --build-arg PKGVER=${PKGVER} \
+     .
+
+   # Build storage-proxy image
+   docker build -f docker/backend.ai-storage-proxy.dockerfile \
+     -t backend.ai/storage-proxy:${PKGVER} \
      --build-arg PYTHON_VERSION=3.13 \
      --build-arg PKGVER=${PKGVER} \
      .
@@ -209,6 +216,75 @@ Create ``webserver.conf`` with the following content:
    enabled = true
    endpoint = "http://host.docker.internal:4000"
 
+Storage Proxy Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Create ``storage-proxy.toml`` with the following content:
+
+.. code-block:: toml
+
+   # Backend.AI Storage Proxy configuration for Docker containers
+
+   [etcd]
+   namespace = "local"
+   addr = { host = "host.docker.internal", port = 8121 }
+   user = ""
+   password = ""
+
+   [storage-proxy]
+   node-id = "i-storage-proxy-local"
+   num-proc = 1
+   event-loop = "asyncio"
+   scandir-limit = 1000
+   max-upload-size = "100g"
+   secret = "some-secret-private-for-storage-proxy"
+   session-expire = "1d"
+
+   [api.client]
+   service-addr = { host = "0.0.0.0", port = 6021 }
+   ssl-enabled = false
+
+   [api.manager]
+   service-addr = { host = "0.0.0.0", port = 6022 }
+   internal-addr = { host = "0.0.0.0", port = 16023 }
+   ssl-enabled = true
+   ssl-cert = "/etc/backend.ai/ssl/manager-api-selfsigned.cert.pem"
+   ssl-privkey = "/etc/backend.ai/ssl/manager-api-selfsigned.key.pem"
+   secret = "some-secret-shared-with-manager"
+
+   [volume.local]
+   backend = "vfs"
+   path = "/vfolder"
+
+   [logging]
+   level = "INFO"
+   drivers = ["console"]
+
+   [logging.console]
+   colored = true
+   format = "verbose"
+
+   [logging.pkg-ns]
+   "" = "WARNING"
+   "aiotools" = "INFO"
+   "aiohttp" = "INFO"
+   "ai.backend" = "INFO"
+
+   [debug]
+   enabled = false
+
+   [otel]
+   enabled = true
+   log-level = "INFO"
+   endpoint = "http://host.docker.internal:4317"
+
+The self-signed SSL certificates are provided at ``configs/storage-proxy/ssl/`` in the repository.
+Create a ``vfolder/`` directory for the VFS storage backend:
+
+.. code-block:: bash
+
+   mkdir -p vfolder
+
 Key configuration points for Docker containers:
 
 - Use ``host.docker.internal`` to access services on the host machine (etcd, PostgreSQL, OTEL)
@@ -220,51 +296,8 @@ Running with Docker Compose
 
 The easiest way to run the components is using docker-compose.
 
-The ``docker-compose.monorepo.yml`` file includes both manager and webserver:
-
-.. code-block:: yaml
-
-   version: "3.8"
-
-   services:
-     backend-ai-manager:
-       image: backend.ai/manager:26.1.0rc1
-       container_name: backend-ai-manager
-       networks:
-         - half
-       ports:
-         - "8091:8091"
-       volumes:
-         - ./fixtures:/app/fixtures:ro
-         - ./manager.toml:/etc/backend.ai/manager.toml:ro
-         - ./logs:/var/log/backend.ai
-         - /tmp/backend.ai/ipc:/tmp/backend.ai/ipc
-         - /var/run/docker.sock:/var/run/docker.sock
-       environment:
-         - PYTHONUNBUFFERED=1
-       extra_hosts:
-         - "host.docker.internal:host-gateway"
-       restart: unless-stopped
-
-     backend-ai-webserver:
-       image: backend.ai/webserver:26.1.0rc1
-       container_name: backend-ai-webserver
-       networks:
-         - half
-       ports:
-         - "8090:8090"
-       volumes:
-         - ./webserver.conf:/etc/backend.ai/webserver.conf:ro
-       extra_hosts:
-         - "host.docker.internal:host-gateway"
-       restart: unless-stopped
-       depends_on:
-         - backend-ai-manager
-
-   networks:
-     half:
-       external: true
-       name: backendai_half
+The ``docker-compose.monorepo.yml`` file includes manager, storage-proxy, and webserver.
+Refer to the file in the repository for the latest configuration.
 
 Start the services:
 
@@ -294,6 +327,23 @@ Alternatively, you can run the containers manually:
      -e PYTHONUNBUFFERED=1 \
      --restart unless-stopped \
      backend.ai/manager:26.1.0rc1
+
+**Storage Proxy:**
+
+.. code-block:: bash
+
+   docker run -d \
+     --name backend-ai-storage-proxy \
+     --network backendai_half \
+     --add-host host.docker.internal:host-gateway \
+     -p 6021:6021 -p 6022:6022 -p 16023:16023 \
+     -v $(pwd)/storage-proxy.toml:/etc/backend.ai/storage-proxy.toml:ro \
+     -v $(pwd)/configs/storage-proxy/ssl:/etc/backend.ai/ssl:ro \
+     -v $(pwd)/vfolder:/vfolder \
+     -v /tmp/backend.ai/ipc:/tmp/backend.ai/ipc \
+     -e PYTHONUNBUFFERED=1 \
+     --restart unless-stopped \
+     backend.ai/storage-proxy:26.1.0rc1
 
 **Webserver:**
 
@@ -328,6 +378,7 @@ Check logs:
 .. code-block:: bash
 
    docker logs backend-ai-manager
+   docker logs backend-ai-storage-proxy
    docker logs backend-ai-webserver
 
 Connection issues
@@ -364,5 +415,5 @@ Or manually:
 
 .. code-block:: bash
 
-   docker stop backend-ai-manager backend-ai-webserver
-   docker rm backend-ai-manager backend-ai-webserver
+   docker stop backend-ai-manager backend-ai-storage-proxy backend-ai-webserver
+   docker rm backend-ai-manager backend-ai-storage-proxy backend-ai-webserver
