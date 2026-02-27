@@ -108,6 +108,7 @@ class TestTestGet:
         assert response.status_code == HTTPStatus.OK
         data = response.to_json
         assert data is not None
+        assert isinstance(data, dict)
         assert data["authorized"] == "yes"
         assert data["echo"] == ""
 
@@ -130,6 +131,7 @@ class TestTestPost:
         assert response.status_code == HTTPStatus.OK
         data = response.to_json
         assert data is not None
+        assert isinstance(data, dict)
         assert data["authorized"] == "yes"
         assert data["echo"] == "hello"
 
@@ -176,6 +178,7 @@ class TestAuthorize:
         assert authorize_result.authorization_result is not None
         data = response.to_json
         assert data is not None
+        assert isinstance(data, dict)
         assert data["data"]["access_key"] == authorize_result.authorization_result.access_key
         assert data["data"]["secret_key"] == authorize_result.authorization_result.secret_key
 
@@ -271,6 +274,7 @@ class TestSignup:
         assert response.status_code == HTTPStatus.CREATED
         data = response.to_json
         assert data is not None
+        assert isinstance(data, dict)
         assert data["access_key"] == signup_result.access_key
         assert data["secret_key"] == signup_result.secret_key
 
@@ -363,6 +367,7 @@ class TestGetRole:
         assert response.status_code == HTTPStatus.OK
         data = response.to_json
         assert data is not None
+        assert isinstance(data, dict)
         assert data["global_role"] == global_role
         assert data["domain_role"] == domain_role
         assert data["group_role"] is None
@@ -557,6 +562,7 @@ class TestGetSSHKeypair:
         assert response.status_code == HTTPStatus.OK
         data = response.to_json
         assert data is not None
+        assert isinstance(data, dict)
         assert data["ssh_public_key"] == public_key
 
 
@@ -588,6 +594,7 @@ class TestGenerateSSHKeypair:
         assert response.status_code == HTTPStatus.OK
         data = response.to_json
         assert data is not None
+        assert isinstance(data, dict)
         assert data["ssh_public_key"] == ssh_public_key
         assert data["ssh_private_key"] == ssh_private_key
 

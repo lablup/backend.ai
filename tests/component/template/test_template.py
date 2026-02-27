@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 
-import pydantic
 import pytest
 
+from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.template import (
     CreateClusterTemplateRequest,
@@ -278,11 +278,8 @@ class TestDeleteSessionTemplate:
 
         await admin_registry.template.delete_session_template(template_id)
 
-        # The server returns an empty JSON body ({}) for soft-deleted templates
-        # instead of a proper 404.  GetSessionTemplateResponse requires all fields
-        # (template, name, user_uuid, group_id, domain_name), so pydantic
-        # validation fails when the SDK tries to parse the empty response.
-        with pytest.raises(pydantic.ValidationError):
+        # The server returns 404 for soft-deleted templates.
+        with pytest.raises(NotFoundError):
             await admin_registry.template.get_session_template(template_id)
 
 

@@ -243,12 +243,7 @@ class SessionTemplateHandler:
             result = await conn.execute(q)
             row = result.first()
             if row is None:
-                return APIResponse.build(
-                    HTTPStatus.OK,
-                    GetSessionTemplateResponse(
-                        template={}, name="", user_uuid="", group_id="", domain_name=""
-                    ),
-                )
+                raise TaskTemplateNotFound
             return APIResponse.build(
                 HTTPStatus.OK,
                 GetSessionTemplateResponse(
