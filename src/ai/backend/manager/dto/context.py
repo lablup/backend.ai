@@ -13,6 +13,7 @@ from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.config.unified import AuthConfig, ExportConfig
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.export import ExportRepository
+from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.processors import Processors
 
 
@@ -38,6 +39,18 @@ class ProcessorsCtx(MiddlewareParam):
     async def from_request(cls, request: web.Request) -> Self:
         root_ctx: RootContext = request.app["_root.context"]
         return cls(processors=root_ctx.processors)
+
+
+class ServicesCtx(MiddlewareParam):
+    services_ctx: ServicesContext
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @override
+    @classmethod
+    async def from_request(cls, request: web.Request) -> Self:
+        root_ctx: RootContext = request.app["_root.context"]
+        return cls(services_ctx=root_ctx.services_ctx)
 
 
 class RequestCtx(MiddlewareParam):

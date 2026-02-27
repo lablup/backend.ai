@@ -1,3 +1,14 @@
+"""Backward-compatible shim for the spec module.
+
+Documentation-serving handler logic has been migrated to:
+
+* ``api.rest.spec.handler`` — SpecHandler class
+* ``api.rest.spec`` — register_routes()
+
+This module keeps ``create_app()`` so that the existing server bootstrap
+(which iterates ``global_subapp_pkgs``) continues to work.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -9,6 +20,11 @@ import aiohttp_cors
 from aiohttp import web
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.rest.spec.handler import (
+    GRAPHIQL_HTML,
+    GRAPHIQL_V2_HTML,
+    OPENAPI_HTML,
+)
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.openapi import generate_openapi
 
@@ -19,90 +35,6 @@ if TYPE_CHECKING:
     from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-OPENAPI_HTML = """
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Backend.AI REST API Reference</title>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-      body {
-        margin: 0;
-        padding: 0;
-      }
-    </style>
-  </head>
-  <body>
-    <redoc spec-url="openapi/spec.json"></redoc>
-    <script src="../static/vendor/spec-viewer.js"></script>
-  </body>
-</html>
-"""
-
-
-GRAPHIQL_HTML = """
-<html>
-  <head>
-    <title>Backend.AI GraphQL API Reference</title>
-	<meta charset="UTF-8">
-    <link href="../static/vendor/graphiql.min.css" rel="stylesheet" />
-  </head>
-  <body style="margin: 0;">
-    <div id="graphiql" style="height: 100vh;"></div>
-
-    <script src="../static/vendor/react.production.min.js"
-    ></script>
-    <script src="../static/vendor/react-dom.production.min.js"
-    ></script>
-    <script src="../static/vendor/graphiql.min.js"
-    ></script>
-
-    <script>
-      const fetcher = GraphiQL.createFetcher({ url: '../admin/gql' });
-
-      ReactDOM.render(
-        React.createElement(GraphiQL, { fetcher: fetcher }),
-        document.getElementById('graphiql'),
-      );
-    </script>
-  </body>
-</html>
-"""
-
-
-GRAPHIQL_V2_HTML = """
-<html>
-  <head>
-    <title>Backend.AI GraphQL V2 API Reference</title>
-	<meta charset="UTF-8">
-    <link href="../../static/vendor/graphiql.min.css" rel="stylesheet" />
-  </head>
-  <body style="margin: 0;">
-    <div id="graphiql" style="height: 100vh;"></div>
-
-    <script src="../../static/vendor/react.production.min.js"
-    ></script>
-    <script src="../../static/vendor/react-dom.production.min.js"
-    ></script>
-    <script src="../../static/vendor/graphiql.min.js"
-    ></script>
-
-    <script>
-      const fetcher = GraphiQL.createFetcher({
-        url: '/func/admin/gql',
-        subscriptionUrl: '/func/admin/gql'
-      });
-
-      ReactDOM.render(
-        React.createElement(GraphiQL, { fetcher: fetcher }),
-        document.getElementById('graphiql'),
-      );
-    </script>
-  </body>
-</html>
-"""
 
 
 @auth_required
