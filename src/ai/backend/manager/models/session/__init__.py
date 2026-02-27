@@ -29,6 +29,9 @@ from .row import (
     _build_session_fetch_query as _build_session_fetch_query,
 )
 from .row import (
+    batch_populate_session_occupied_slots as batch_populate_session_occupied_slots,
+)
+from .row import (
     get_permission_ctx as get_permission_ctx,
 )
 
