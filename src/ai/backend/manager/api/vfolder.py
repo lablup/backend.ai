@@ -20,7 +20,6 @@ from typing import (
 )
 
 import aiohttp
-import aiohttp_cors
 import aiotools
 import attrs
 import sqlalchemy as sa
@@ -2872,73 +2871,19 @@ async def shutdown(app: web.Application) -> None:
 
 
 def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list[Any]]:
+    # Lazy imports to avoid circular references at module load time.
+    # These modules depend on this module's utility functions (check_vfolder_status,
+    # resolve_vfolder_rows, etc.), so importing them at the top level would create
+    # a circular import chain.
+    from ai.backend.manager.api.rest.routing import RouteRegistry  # PLC0415: intentional
+    from ai.backend.manager.api.rest.vfolder import register_routes  # PLC0415: intentional
+
     app = web.Application()
     app["prefix"] = "folders"
     app["api_versions"] = (2, 3, 4)
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     app["folders.context"] = PrivateContext()
-    cors = aiohttp_cors.setup(app, defaults=default_cors_options)
-    add_route = app.router.add_route
-
-    root_resource = cors.add(app.router.add_resource(r""))
-    cors.add(root_resource.add_route("POST", create))
-    cors.add(root_resource.add_route("GET", list_folders))
-    cors.add(root_resource.add_route("DELETE", delete_by_id))
-    vfolder_resource = cors.add(app.router.add_resource(r"/{name}"))
-    cors.add(vfolder_resource.add_route("GET", get_info))
-    cors.add(vfolder_resource.add_route("DELETE", delete_by_name))
-    cors.add(add_route("GET", r"/_/id", get_vfolder_id))
-    cors.add(add_route("GET", r"/_/hosts", list_hosts))
-    cors.add(add_route("GET", r"/_/all-hosts", list_all_hosts))
-    cors.add(add_route("GET", r"/_/allowed-types", list_allowed_types))
-    cors.add(add_route("GET", r"/_/all_hosts", list_all_hosts))  # legacy underbar
-    cors.add(add_route("GET", r"/_/allowed_types", list_allowed_types))  # legacy underbar
-    cors.add(add_route("GET", r"/_/perf-metric", get_volume_perf_metric))
-    cors.add(add_route("POST", r"/{name}/rename", rename_vfolder))
-    cors.add(add_route("POST", r"/{name}/update-options", update_vfolder_options))
-    cors.add(add_route("POST", r"/{name}/mkdir", mkdir))
-    cors.add(add_route("POST", r"/{name}/request-upload", create_upload_session))
-    cors.add(add_route("POST", r"/{name}/request-download", create_download_session))
-    cors.add(
-        add_route("POST", r"/{name}/request-download-archive", create_archive_download_session)
-    )
-    cors.add(add_route("POST", r"/{name}/move-file", move_file))
-    cors.add(add_route("POST", r"/{name}/rename-file", rename_file))
-    cors.add(add_route("POST", r"/{name}/delete-files", delete_files))
-    cors.add(add_route("DELETE", r"/{name}/delete-files", delete_files))
-    cors.add(add_route("POST", r"/{name}/delete-files-async", delete_files_async))
-    cors.add(add_route("POST", r"/{name}/rename_file", rename_file))  # legacy underbar
-    cors.add(add_route("DELETE", r"/{name}/delete_files", delete_files))  # legacy underbar
-    cors.add(add_route("GET", r"/{name}/files", list_files))
-    cors.add(add_route("POST", r"/{name}/invite", invite))
-    cors.add(add_route("POST", r"/{name}/leave", leave))
-    cors.add(add_route("POST", r"/{name}/share", share))
-    cors.add(add_route("POST", r"/{name}/unshare", unshare))
-    cors.add(add_route("DELETE", r"/{name}/unshare", unshare))
-    cors.add(add_route("POST", r"/{name}/clone", clone))
-    cors.add(add_route("POST", r"/purge", purge))
-    cors.add(add_route("POST", r"/restore-from-trash-bin", restore))
-    cors.add(add_route("POST", r"/delete-from-trash-bin", delete_from_trash_bin))
-    cors.add(add_route("DELETE", r"/{folder_id}/force", force_delete))
-    cors.add(add_route("GET", r"/invitations/list-sent", list_sent_invitations))
-    cors.add(add_route("GET", r"/invitations/list_sent", list_sent_invitations))  # legacy underbar
-    cors.add(add_route("POST", r"/invitations/update/{inv_id}", update_invitation))
-    cors.add(add_route("GET", r"/invitations/list", invitations))
-    cors.add(add_route("POST", r"/invitations/accept", accept_invitation))
-    cors.add(add_route("POST", r"/invitations/delete", delete_invitation))
-    cors.add(add_route("DELETE", r"/invitations/delete", delete_invitation))
-    cors.add(add_route("GET", r"/_/shared", list_shared_vfolders))
-    cors.add(add_route("POST", r"/_/shared", update_shared_vfolder))
-    cors.add(add_route("POST", r"/_/sharing", update_vfolder_sharing_status))
-    cors.add(add_route("GET", r"/_/fstab", get_fstab_contents))
-    cors.add(add_route("GET", r"/_/mounts", list_mounts))
-    cors.add(add_route("POST", r"/_/mounts", mount_host))
-    cors.add(add_route("POST", r"/_/umounts", umount_host))
-    cors.add(add_route("DELETE", r"/_/mounts", umount_host))
-    cors.add(add_route("POST", r"/_/change-ownership", change_vfolder_ownership))
-    cors.add(add_route("GET", r"/_/quota", get_quota))
-    cors.add(add_route("POST", r"/_/quota", update_quota))
-    cors.add(add_route("GET", r"/_/usage", get_usage))
-    cors.add(add_route("GET", r"/_/used-bytes", get_used_bytes))
+    registry = RouteRegistry(app, default_cors_options)
+    register_routes(registry)
     return app, []

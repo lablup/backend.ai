@@ -213,6 +213,8 @@ split-on-trailing-comma = true
 "src/ai/backend/client/utils.py" = ["PLC0415"]
 # - Client v2 registry uses lazy imports to avoid circular dependencies with domain clients
 "src/ai/backend/client/v2/registry.py" = ["PLC0415"]
+# - vfolder shim uses lazy imports to avoid circular dependency with api/rest/vfolder
+"src/ai/backend/manager/api/vfolder.py" = ["PLC0415"]
 # - Client func vfolder has progress printing
 "src/ai/backend/client/func/vfolder.py" = ["T20"]
 # - Alembic migrations may print progress and have standard signatures
