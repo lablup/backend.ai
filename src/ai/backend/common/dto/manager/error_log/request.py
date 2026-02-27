@@ -14,6 +14,7 @@ from ai.backend.common.api_handlers import BaseRequestModel
 __all__ = (
     "AppendErrorLogRequest",
     "ListErrorLogsRequest",
+    "MarkClearedPathParam",
 )
 
 
@@ -40,3 +41,9 @@ class ListErrorLogsRequest(BaseRequestModel):
     mark_read: bool = Field(default=False, description="Mark listed logs as read")
     page_size: int = Field(default=20, ge=1, le=100, description="Number of logs per page")
     page_no: int = Field(default=1, ge=1, description="Page number")
+
+
+class MarkClearedPathParam(BaseRequestModel):
+    """Path parameters for marking an error log as cleared."""
+
+    log_id: str = Field(description="Error log ID")

@@ -1,46 +1,25 @@
+"""Backward-compatibility shim for the ACL module.
+
+All ACL handler logic has been migrated to:
+
+* ``api.rest.acl`` — AclHandler + register_routes()
+
+This module keeps ``create_app()`` so that the existing server bootstrap
+(which iterates ``global_subapp_pkgs``) continues to work.
+"""
+
 from __future__ import annotations
 
-import logging
-from http import HTTPStatus
+from collections.abc import Iterable
 from typing import Any
 
-import aiohttp_cors
 from aiohttp import web
 
-from ai.backend.logging import BraceStyleAdapter
-
-from .auth import auth_required
-from .gql_legacy.acl import get_all_permissions
-from .manager import ALL_ALLOWED, server_status_required
 from .types import CORSOptions
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-
-@auth_required
-@server_status_required(ALL_ALLOWED)
-async def get_permission(request: web.Request) -> web.Response:
-    access_key = request["keypair"]["access_key"]
-    log.info("GET_PERMISSION (ak:{})", access_key)
-
-    return web.json_response(get_all_permissions(), status=HTTPStatus.OK)
-
-
-async def init(app: web.Application) -> None:
-    pass
-
-
-async def shutdown(app: web.Application) -> None:
-    pass
-
-
-def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list[Any]]:
+def create_app(_default_cors_options: CORSOptions) -> tuple[web.Application, Iterable[Any]]:
     app = web.Application()
     app["prefix"] = "acl"
     app["api_versions"] = (4,)
-    app.on_startup.append(init)
-    app.on_shutdown.append(shutdown)
-    cors = aiohttp_cors.setup(app, defaults=default_cors_options)
-    root_resource = cors.add(app.router.add_resource(r""))
-    cors.add(root_resource.add_route("GET", get_permission))
     return app, []

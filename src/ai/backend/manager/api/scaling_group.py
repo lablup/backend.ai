@@ -1,118 +1,27 @@
-import logging
-from collections.abc import Iterable
-from dataclasses import dataclass, field
-from http import HTTPStatus
-from typing import TYPE_CHECKING, Any
+"""Backward-compatibility shim for the scaling_group module.
 
-import aiohttp_cors
-import trafaret as t
+All scaling group handler logic has been migrated to:
+
+* ``api.rest.scaling_group`` — ScalingGroupHandler + register_routes()
+
+This module keeps ``create_app()`` so that the existing server bootstrap
+(which iterates ``global_subapp_pkgs``) continues to work.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterable
+from typing import Any
+
 from aiohttp import web
 
-from ai.backend.common import validators as tx
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.common import ObjectNotFound
-from ai.backend.manager.models.scaling_group import query_allowed_sgroups
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-
-from .auth import auth_required
-from .manager import READ_ALLOWED, server_status_required
-from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params
-
-if TYPE_CHECKING:
-    from .context import RootContext
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-@dataclass(unsafe_hash=True)
-class WSProxyVersionQueryParams:
-    db_ctx: ExtendedAsyncSAEngine = field(hash=False)
-
-
-@auth_required
-@server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict({
-        tx.AliasedKey(["group", "group_id", "group_name"]): tx.UUID | t.String,
-    }),
-)
-async def list_available_sgroups(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
-    access_key = request["keypair"]["access_key"]
-    domain_name = request["user"]["domain_name"]
-    is_admin = request["is_admin"]
-    group_id_or_name = params["group"]
-    log.info("SGROUPS.LIST(ak:{}, g:{}, d:{})", access_key, group_id_or_name, domain_name)
-    async with root_ctx.db.begin() as conn:
-        sgroups = await query_allowed_sgroups(conn, domain_name, group_id_or_name, access_key)
-        if not is_admin:
-            sgroups = [sgroup for sgroup in sgroups if sgroup.is_public]
-        return web.json_response(
-            {
-                "scaling_groups": [{"name": sgroup.name} for sgroup in sgroups],
-            },
-            status=HTTPStatus.OK,
-        )
-
-
-@auth_required
-@server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict({
-        tx.AliasedKey(["group", "group_id", "group_name"], default=None): (
-            t.Null | tx.UUID | t.String
-        ),
-    })
-)
-async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
-    scaling_group_name = request.match_info["scaling_group"]
-    access_key = request["keypair"]["access_key"]
-    domain_name = request["user"]["domain_name"]
-    group_id_or_name = params["group"]
-    log.info("SGROUPS.LIST(ak:{}, g:{}, d:{})", access_key, group_id_or_name, domain_name)
-    # remove appproxy client pool from root_ctx when db query migrated to service layer.
-    async with root_ctx.db.begin_readonly() as conn:
-        sgroups = await query_allowed_sgroups(conn, domain_name, group_id_or_name or "", access_key)
-        sgroup_filtered = [sg for sg in sgroups if sg.name == scaling_group_name]
-        if not sgroup_filtered:
-            raise ObjectNotFound(object_name="scaling group")
-        sgroup = sgroup_filtered[0]
-
-        if not sgroup.wsproxy_addr:
-            # if wsproxy_addr is not set, raise not found error(migrating from v1 behavior)
-            # It should be either 404 or 500 before wsproxy_addr is mandatory field.
-            raise ObjectNotFound(object_name="AppProxy address")
-        client = root_ctx.appproxy_client_pool.load_client(
-            sgroup.wsproxy_addr, sgroup.wsproxy_api_token or ""
-        )
-        status = await client.fetch_status()
-        wsproxy_version = status.api_version
-
-        return web.json_response({
-            "wsproxy_version": wsproxy_version,
-        })
-
-
-async def init(app: web.Application) -> None:
-    pass
-
-
-async def shutdown(app: web.Application) -> None:
-    pass
+from .types import CORSOptions
 
 
 def create_app(
-    default_cors_options: CORSOptions,
-) -> tuple[web.Application, Iterable[WebMiddleware]]:
+    _default_cors_options: CORSOptions,
+) -> tuple[web.Application, Iterable[Any]]:
     app = web.Application()
     app["prefix"] = "scaling-groups"
     app["api_versions"] = (2, 3, 4)
-    app.on_startup.append(init)
-    app.on_shutdown.append(shutdown)
-    cors = aiohttp_cors.setup(app, defaults=default_cors_options)
-    root_resource = cors.add(app.router.add_resource(r""))
-    cors.add(root_resource.add_route("GET", list_available_sgroups))
-    cors.add(app.router.add_route("GET", "/{scaling_group}/wsproxy-version", get_wsproxy_version))
     return app, []
