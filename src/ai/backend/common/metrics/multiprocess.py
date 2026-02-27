@@ -18,7 +18,6 @@ from __future__ import annotations
 import logging
 import os
 import shutil
-import tempfile
 from pathlib import Path
 
 from prometheus_client import CollectorRegistry, generate_latest
@@ -29,12 +28,12 @@ log = logging.getLogger(__spec__.name)
 
 _multiprocess_dir: Path | None = None
 
-_uid = os.getuid() if hasattr(os, "getuid") else "common"
-_DEFAULT_BASE_DIR = Path(tempfile.gettempdir()) / f"backendai.{_uid}" / "prometheus"
+_DEFAULT_BASE_DIR = Path("/tmp/backend.ai/prometheus")
 
 
 def setup_prometheus_multiprocess_dir(
     component: str = "manager",
+    base_dir: Path | None = None,
 ) -> Path:
     """
     Set up the prometheus multiprocess directory and environment variable.
@@ -44,8 +43,15 @@ def setup_prometheus_multiprocess_dir(
     Creates a directory for prometheus multiprocess files and sets
     the PROMETHEUS_MULTIPROC_DIR environment variable.
 
+    The base directory is resolved in the following priority order:
+    1. ``base_dir`` argument (if provided)
+    2. ``BACKENDAI_PROMETHEUS_DIR`` environment variable (if set)
+    3. Default: ``/tmp/backend.ai/prometheus/``
+
     Args:
         component: Component name for directory naming (e.g., 'manager', 'agent')
+        base_dir: Optional override for the base directory. Takes precedence over
+            the ``BACKENDAI_PROMETHEUS_DIR`` environment variable.
 
     Returns:
         Path to the created multiprocess directory
@@ -55,15 +61,21 @@ def setup_prometheus_multiprocess_dir(
     if _multiprocess_dir is not None:
         return _multiprocess_dir
 
-    multiprocess_dir = _DEFAULT_BASE_DIR / component
+    if base_dir is not None:
+        resolved_base = base_dir
+    elif env_base := os.environ.get("BACKENDAI_PROMETHEUS_DIR"):
+        resolved_base = Path(env_base)
+    else:
+        resolved_base = _DEFAULT_BASE_DIR
+
+    multiprocess_dir = resolved_base / component
     try:
         multiprocess_dir.mkdir(parents=True, exist_ok=True)
     except PermissionError:
         log.error(
             "Cannot create prometheus multiprocess dir %s — permission denied. "
-            "Ensure the directory is writable by the current user (uid=%s).",
+            "Ensure the directory is writable by the current user.",
             multiprocess_dir,
-            _uid,
         )
         raise
 

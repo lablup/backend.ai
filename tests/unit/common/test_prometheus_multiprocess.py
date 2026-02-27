@@ -67,6 +67,30 @@ class TestSetupPrometheusMultiprocDir:
 
         assert first == second  # idempotent, returns first result
 
+    def test_base_dir_parameter_overrides_default(self, tmp_path: Path) -> None:
+        custom_base = tmp_path / "custom_base"
+        result = setup_prometheus_multiprocess_dir("manager", base_dir=custom_base)
+
+        assert result == custom_base / "manager"
+        assert result.is_dir()
+        assert os.environ["PROMETHEUS_MULTIPROC_DIR"] == str(result)
+
+    def test_backendai_prometheus_dir_env_var_overrides_default(self, tmp_path: Path) -> None:
+        env_base = tmp_path / "env_base"
+        with patch.dict(os.environ, {"BACKENDAI_PROMETHEUS_DIR": str(env_base)}):
+            result = setup_prometheus_multiprocess_dir("agent")
+            assert result == env_base / "agent"
+            assert result.is_dir()
+            assert os.environ["PROMETHEUS_MULTIPROC_DIR"] == str(result)
+
+    def test_base_dir_parameter_takes_priority_over_env_var(self, tmp_path: Path) -> None:
+        custom_base = tmp_path / "custom_base"
+        env_base = tmp_path / "env_base"
+        with patch.dict(os.environ, {"BACKENDAI_PROMETHEUS_DIR": str(env_base)}):
+            result = setup_prometheus_multiprocess_dir("manager", base_dir=custom_base)
+            assert result == custom_base / "manager"
+            assert result.is_dir()
+
 
 class TestGenerateLatestMultiprocess:
     def test_returns_bytes_normally(self, tmp_path: Path) -> None:
@@ -126,10 +150,8 @@ class TestCleanupPrometheusMultiprocDir:
 
 
 class TestDefaultBaseDirUid:
-    def test_default_base_dir_contains_uid(self) -> None:
-        uid = os.getuid() if hasattr(os, "getuid") else "common"
-        assert f"backendai.{uid}" in str(mp_mod._DEFAULT_BASE_DIR)
-        assert str(mp_mod._DEFAULT_BASE_DIR).endswith("/prometheus")
+    def test_default_base_dir_is_hardcoded(self) -> None:
+        assert Path("/tmp/backend.ai/prometheus") == mp_mod._DEFAULT_BASE_DIR
 
     def test_setup_raises_on_permission_error(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
