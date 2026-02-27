@@ -96,6 +96,7 @@ from ai.backend.manager.repositories.deployment.options import (
 from ai.backend.manager.types import OptionalState
 
 __all__ = (
+    "AddRevisionAdapter",
     "CreateDeploymentAdapter",
     "CreateRevisionAdapter",
     "DeploymentAdapter",
@@ -362,6 +363,62 @@ class RouteAdapter(BaseFilterAdapter):
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
         """Build pagination from limit and offset."""
         return OffsetPagination(limit=limit, offset=offset)
+
+
+class AddRevisionAdapter:
+    """Adapter for converting add revision request to ModelRevisionCreator."""
+
+    @staticmethod
+    def build_revision_creator(revision_input: RevisionInput) -> ModelRevisionCreator:
+        """Build ModelRevisionCreator from revision input."""
+        resource_spec = ResourceSpec(
+            cluster_mode=ClusterMode(revision_input.cluster_config.mode),
+            cluster_size=revision_input.cluster_config.size,
+            resource_slots=dict(revision_input.resource_config.resource_slots),
+            resource_opts=(
+                dict(revision_input.resource_config.resource_opts)
+                if revision_input.resource_config.resource_opts
+                else None
+            ),
+        )
+
+        extra_mounts: list[MountInfo] = []
+        if revision_input.extra_mounts:
+            extra_mounts = [
+                MountInfo(
+                    vfolder_id=mount.vfolder_id,
+                    kernel_path=PurePosixPath(mount.mount_destination or ""),
+                )
+                for mount in revision_input.extra_mounts
+            ]
+
+        mounts = VFolderMountsCreator(
+            model_vfolder_id=revision_input.model_mount_config.vfolder_id,
+            model_definition_path=revision_input.model_mount_config.definition_path,
+            model_mount_destination=revision_input.model_mount_config.mount_destination,
+            extra_mounts=extra_mounts,
+        )
+
+        execution = ExecutionSpec(
+            runtime_variant=RuntimeVariant(revision_input.model_runtime_config.runtime_variant),
+            inference_runtime_config=(
+                dict(revision_input.model_runtime_config.inference_runtime_config)
+                if revision_input.model_runtime_config.inference_runtime_config
+                else None
+            ),
+            environ=(
+                dict(revision_input.model_runtime_config.environ)
+                if revision_input.model_runtime_config.environ
+                else None
+            ),
+        )
+
+        return ModelRevisionCreator(
+            image_id=revision_input.image.id,
+            resource_spec=resource_spec,
+            mounts=mounts,
+            execution=execution,
+        )
 
 
 class CreateDeploymentAdapter:

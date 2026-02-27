@@ -42,6 +42,7 @@ __all__ = (
     "UpdateDeploymentPolicyResponse",
     "DestroyDeploymentResponse",
     "GetRevisionResponse",
+    "AddRevisionResponse",
     "ListRevisionsResponse",
     "ActivateRevisionResponse",
     "DeactivateRevisionResponse",
@@ -174,6 +175,12 @@ class GetRevisionResponse(BaseResponseModel):
     """Response for getting a revision."""
 
     revision: RevisionDTO = Field(description="Revision data")
+
+
+class AddRevisionResponse(BaseResponseModel):
+    """Response for adding a new revision to a deployment."""
+
+    revision: RevisionDTO = Field(description="Created revision")
 
 
 class ListRevisionsResponse(BaseResponseModel):

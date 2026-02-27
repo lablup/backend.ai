@@ -34,6 +34,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base import Creator, Updater
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -46,6 +47,7 @@ from ai.backend.manager.repositories.deployment.creators import (
     DeploymentNetworkFields,
     DeploymentReplicaFields,
     DeploymentResourceFields,
+    DeploymentRevisionCreatorSpec,
     EndpointTokenCreatorSpec,
     ModelRevisionFields,
 )
@@ -542,16 +544,57 @@ class DeploymentService:
     async def add_model_revision(
         self, action: AddModelRevisionAction
     ) -> AddModelRevisionActionResult:
-        # TODO: Implement full revision creation logic
-        # This requires integration with the controller's revision generator system:
-        # 1. Get default architecture from scaling group
-        # 2. Use revision generator to resolve image and build ModelRevisionSpec
-        # 3. Get latest revision number via get_latest_revision_number()
-        # 4. Build DeploymentRevisionCreatorSpec and create revision
-        raise NotImplementedError(
-            "add_model_revision requires controller's revision generator for image resolution. "
-            "Use create_legacy_deployment for deployment creation with revision."
+        """Add a new model revision to an existing deployment.
+
+        Args:
+            action: Action containing deployment ID and revision creator spec
+
+        Returns:
+            AddModelRevisionActionResult: Result containing the created revision data
+        """
+        log.info("Adding model revision to deployment {}", action.model_deployment_id)
+
+        # 1. Get endpoint info for resource_group
+        endpoint_info = await self._deployment_repository.get_endpoint_info(
+            action.model_deployment_id
         )
+
+        # 2. Get latest revision number to determine next number
+        latest_revision_number = await self._deployment_repository.get_latest_revision_number(
+            action.model_deployment_id
+        )
+        next_revision_number = (latest_revision_number or 0) + 1
+
+        # 3. Build DeploymentRevisionCreatorSpec
+        adder = action.adder
+        spec = DeploymentRevisionCreatorSpec(
+            endpoint_id=action.model_deployment_id,
+            revision_number=next_revision_number,
+            image_id=adder.image_id,
+            resource_group=endpoint_info.metadata.resource_group,
+            resource_slots=ResourceSlot(adder.resource_spec.resource_slots),
+            resource_opts=adder.resource_spec.resource_opts or {},
+            cluster_mode=adder.resource_spec.cluster_mode.value,
+            cluster_size=adder.resource_spec.cluster_size,
+            model_id=adder.mounts.model_vfolder_id,
+            model_mount_destination=adder.mounts.model_mount_destination,
+            model_definition_path=adder.mounts.model_definition_path,
+            model_definition=None,
+            startup_command=adder.execution.startup_command,
+            bootstrap_script=adder.execution.bootstrap_script,
+            environ=adder.execution.environ or {},
+            callback_url=str(adder.execution.callback_url)
+            if adder.execution.callback_url
+            else None,
+            runtime_variant=adder.execution.runtime_variant,
+            extra_mounts=(),
+        )
+        creator: Creator[DeploymentRevisionRow] = Creator(spec=spec)
+
+        # 4. Create revision via repository
+        revision_data = await self._deployment_repository.create_revision(creator)
+
+        return AddModelRevisionActionResult(revision=revision_data)
 
     async def get_revision_by_id(
         self, action: GetRevisionByIdAction
