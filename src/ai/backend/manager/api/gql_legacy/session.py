@@ -53,6 +53,7 @@ from ai.backend.manager.models.session import (
     SessionDependencyRow,
     SessionRow,
     SessionTypes,
+    batch_populate_session_occupied_slots,
     by_domain_name,
     by_raw_filter,
     by_resource_group_name,
@@ -84,8 +85,6 @@ from .base import (
     OrderExprArg,
     PaginatedConnectionField,
     PaginatedList,
-    batch_multiresult_in_session,
-    batch_result_in_session,
     generate_sql_info_for_gql_connection,
 )
 from .gql_relay import (
@@ -297,7 +296,10 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
                 .options(selectinload(SessionRow.kernels), joinedload(SessionRow.user))
             )
             query_result = await db_session.scalar(stmt)
-            return cls.from_row(graphene_ctx, query_result) if query_result is not None else None
+            if query_result is None:
+                return None
+            await batch_populate_session_occupied_slots(db_session, [query_result])
+            return cls.from_row(graphene_ctx, query_result)
 
     @classmethod
     def _add_basic_options_to_query(
@@ -583,7 +585,8 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
                     selectinload(SessionRow.user),
                 )
             )
-            session_rows = (await db_sess.execute(query)).scalars().all()
+            session_rows = list((await db_sess.execute(query)).scalars().all())
+            await batch_populate_session_occupied_slots(db_sess, session_rows)
 
         # Convert into GraphQL node objects
         sessions = [type(self).from_row(ctx, r) for r in session_rows]
@@ -617,14 +620,12 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
                 .select_from(j)
                 .where(SessionDependencyRow.session_id.in_(session_ids))
             )
-            return await batch_multiresult_in_session(
-                ctx,
-                db_sess,
-                query,
-                cls,
-                session_ids,
-                lambda row: row.id,
-            )
+            rows = (await db_sess.execute(query)).scalars().all()
+            await batch_populate_session_occupied_slots(db_sess, list(rows))
+            objs_per_key: dict[SessionId, list[Self]] = {sid: [] for sid in session_ids}
+            for row in rows:
+                objs_per_key[row.id].append(cls.from_row(ctx, row))
+            return [*objs_per_key.values()]
 
     @classmethod
     async def batch_load_by_dependent_id(
@@ -641,14 +642,12 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
                 .select_from(j)
                 .where(SessionDependencyRow.depends_on.in_(session_ids))
             )
-            return await batch_multiresult_in_session(
-                ctx,
-                db_sess,
-                query,
-                cls,
-                session_ids,
-                lambda row: row.id,
-            )
+            rows = (await db_sess.execute(query)).scalars().all()
+            await batch_populate_session_occupied_slots(db_sess, list(rows))
+            objs_per_key: dict[SessionId, list[Self]] = {sid: [] for sid in session_ids}
+            for row in rows:
+                objs_per_key[row.id].append(cls.from_row(ctx, row))
+            return [*objs_per_key.values()]
 
     @classmethod
     async def get_accessible_node(
@@ -671,6 +670,8 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             query = cls._add_basic_options_to_query(query)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_row = await db_session.scalar(query)
+                if session_row is not None:
+                    await batch_populate_session_occupied_slots(db_session, [session_row])
         if session_row is None:
             return None
         return cls.from_row(
@@ -735,8 +736,9 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             query = cls._add_basic_options_to_query(query.where(cond))
             cnt_query = cls._add_basic_options_to_query(cnt_query.where(cond), is_count=True)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
-                session_rows = (await db_session.scalars(query)).all()
+                session_rows = list((await db_session.scalars(query)).all())
                 total_cnt = await db_session.scalar(cnt_query)
+                await batch_populate_session_occupied_slots(db_session, session_rows)
         result: list[Self] = [
             cls.from_row(
                 graph_ctx,
@@ -792,6 +794,8 @@ class TotalResourceSlot(graphene.ObjectType):  # type: ignore[misc]
         session_rows = await SessionRow.list_session_by_condition(
             query_conditions, query_options, db=ctx.db
         )
+        async with ctx.db.begin_readonly_session() as db_sess:
+            await batch_populate_session_occupied_slots(db_sess, session_rows)
         occupied_slots = ResourceSlot()
         requested_slots = ResourceSlot()
         for row in session_rows:
@@ -1291,7 +1295,10 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         else:
             query = query.order_by(*DEFAULT_SESSION_ORDERING)
         async with ctx.db.begin_readonly_session() as db_sess:
-            return [cls.from_row(ctx, r) async for r in (await db_sess.stream(query))]
+            rows = (await db_sess.execute(query)).all()
+            session_rows = [r.SessionRow for r in rows]
+            await batch_populate_session_occupied_slots(db_sess, session_rows)
+            return [cls.from_row(ctx, r) for r in rows]
 
     @classmethod
     async def batch_load_detail(
@@ -1321,14 +1328,13 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         if access_key is not None:
             query = query.where(SessionRow.access_key == access_key)
         async with ctx.db.begin_readonly_session() as db_sess:
-            return await batch_result_in_session(
-                ctx,
-                db_sess,
-                query,
-                cls,
-                session_ids,
-                lambda row: row.SessionRow.id,
-            )
+            rows = (await db_sess.execute(query)).all()
+            sr_list = [r.SessionRow for r in rows]
+            await batch_populate_session_occupied_slots(db_sess, sr_list)
+            objs_per_key: dict[SessionId, ComputeSession | None] = dict.fromkeys(session_ids)
+            for row in rows:
+                objs_per_key[row.SessionRow.id] = cls.from_row(ctx, row)
+            return [*objs_per_key.values()]
 
     @classmethod
     async def batch_load_by_dependency(
@@ -1348,14 +1354,15 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
             .options(selectinload(SessionRow.kernels))
         )
         async with ctx.db.begin_readonly_session() as db_sess:
-            return await batch_multiresult_in_session(
-                ctx,
-                db_sess,
-                query,
-                cls,
-                session_ids,
-                lambda row: row.SessionRow.id,
-            )
+            rows = (await db_sess.execute(query)).all()
+            sr_list = [r.SessionRow for r in rows]
+            await batch_populate_session_occupied_slots(db_sess, sr_list)
+            objs_per_key: dict[SessionId, list[ComputeSession]] = {sid: [] for sid in session_ids}
+            for row in rows:
+                obj = cls.from_row(ctx, row)
+                if obj is not None:
+                    objs_per_key[row.SessionRow.id].append(obj)
+            return [*objs_per_key.values()]
 
     @classmethod
     async def batch_load_commit_statuses(

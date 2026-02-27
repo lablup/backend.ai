@@ -2220,3 +2220,49 @@ async def get_permission_ctx(
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = ComputeSessionPermissionContextBuilder(db_session)
         return await builder.build(ctx, target_scope, requested_permission)
+
+
+async def batch_populate_session_occupied_slots(
+    db_session: SASession,
+    session_rows: Sequence[SessionRow],
+) -> None:
+    """Batch-compute occupied slots from the normalized resource_allocations table
+    and populate each SessionRow's occupying_slots attribute in-place.
+
+    This replaces the deprecated JSONB column read with a live computation
+    from the resource_allocations table (Phase 3, BA-4308).
+    """
+    if not session_rows:
+        return
+    session_ids = [row.id for row in session_rows]
+    ra = ResourceAllocationRow.__table__
+    kernels = KernelRow.__table__
+    effective = sa.func.coalesce(ra.c.used, ra.c.requested)
+    stmt = (
+        sa.select(
+            kernels.c.session_id,
+            ra.c.slot_name,
+            sa.func.sum(effective).label("total"),
+        )
+        .select_from(ra.join(kernels, ra.c.kernel_id == kernels.c.id))
+        .where(
+            kernels.c.session_id.in_(session_ids),
+            ra.c.free_at.is_(None),
+        )
+        .group_by(kernels.c.session_id, ra.c.slot_name)
+    )
+    rows = (await db_session.execute(stmt)).all()
+    slots_map: dict[SessionId, ResourceSlot] = {}
+    for r in rows:
+        sid = SessionId(r.session_id)
+        if sid not in slots_map:
+            slots_map[sid] = ResourceSlot()
+        slots_map[sid][r.slot_name] = r.total
+    for session_row in session_rows:
+        # Use set_committed_value to avoid marking the attribute as dirty
+        # in readonly sessions.
+        sa.orm.attributes.set_committed_value(
+            session_row,
+            "occupying_slots",
+            slots_map.get(SessionId(session_row.id), ResourceSlot()),
+        )
