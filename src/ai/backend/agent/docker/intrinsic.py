@@ -272,33 +272,36 @@ class CPUPlugin(AbstractComputePlugin):
                 return None
             return cpu_used
 
-        async def api_impl(container_id: str) -> float | None:
-            async with closing_async(Docker()) as docker:
-                container = DockerContainer(docker, id=container_id)
-                try:
-                    async with async_timeout.timeout(2.0):
-                        ret = await fetch_api_stats(container)
-                except TimeoutError:
-                    return None
-                if ret is None:
-                    return None
-                cpu_usage = cast(float, nmget(ret, "cpu_stats.cpu_usage.total_usage", 0))
-                return cpu_usage / 1e6
-
         if ctx.mode == StatModes.CGROUP:
-            impl = sysfs_impl
+            tasks = []
+            for cid in container_ids:
+                tasks.append(asyncio.create_task(sysfs_impl(cid)))
+            results = await asyncio.gather(*tasks)
         elif ctx.mode == StatModes.DOCKER:
-            impl = api_impl
+            async with closing_async(Docker()) as docker:
+
+                async def api_impl(container_id: str) -> float | None:
+                    container = DockerContainer(docker, id=container_id)
+                    try:
+                        async with async_timeout.timeout(2.0):
+                            ret = await fetch_api_stats(container)
+                    except TimeoutError:
+                        return None
+                    if ret is None:
+                        return None
+                    cpu_usage = cast(float, nmget(ret, "cpu_stats.cpu_usage.total_usage", 0))
+                    return cpu_usage / 1e6
+
+                tasks = []
+                for cid in container_ids:
+                    tasks.append(asyncio.create_task(api_impl(cid)))
+                results = await asyncio.gather(*tasks)
         else:
             raise RuntimeError("should not reach here")
 
         q = Decimal("0.000")
         per_container_cpu_used = {}
         per_container_cpu_util = {}
-        tasks = []
-        for cid in container_ids:
-            tasks.append(asyncio.create_task(impl(cid)))
-        results = await asyncio.gather(*tasks)
         for cid, cpu_used in zip(container_ids, results, strict=True):
             if cpu_used is None:
                 continue
@@ -700,10 +703,9 @@ class MemoryPlugin(AbstractComputePlugin):
                     e,
                 )
                 return None
-            async with closing_async(Docker()) as docker:
-                container = DockerContainer(docker, id=container_id)
-                data = await container.show()
-                sandbox_key = data["NetworkSettings"]["SandboxKey"]
+            container = DockerContainer(docker, id=container_id)
+            data = await container.show()
+            sandbox_key = data["NetworkSettings"]["SandboxKey"]
             net_rx_bytes = 0
             net_tx_bytes = 0
             nstat = await netstat_ns(sandbox_key)
@@ -724,41 +726,42 @@ class MemoryPlugin(AbstractComputePlugin):
                 scratch_sz,
             )
 
-        async def api_impl(container_id: str) -> tuple[int, int, int, int, int, int, int] | None:
-            async with closing_async(Docker()) as docker:
-                container = DockerContainer(docker, id=container_id)
-                try:
-                    async with async_timeout.timeout(2.0):
-                        ret = await fetch_api_stats(container)
-                except TimeoutError:
-                    return None
-                if ret is None:
-                    return None
-                mem_cur_bytes = nmget(ret, "memory_stats.usage", 0)
-                mem_total_bytes = nmget(ret, "memory_stats.limit", 0)
-                io_read_bytes = 0
-                io_write_bytes = 0
-                for item in nmget(ret, "blkio_stats.io_service_bytes_recursive", []):
-                    if item["op"] == "Read":
-                        io_read_bytes += item["value"]
-                    elif item["op"] == "Write":
-                        io_write_bytes += item["value"]
-                net_rx_bytes = 0
-                net_tx_bytes = 0
-                for name, stat in ret["networks"].items():
-                    net_rx_bytes += stat["rx_bytes"]
-                    net_tx_bytes += stat["tx_bytes"]
-                loop = current_loop()
-                scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
-                return (
-                    mem_cur_bytes,
-                    mem_total_bytes,
-                    io_read_bytes,
-                    io_write_bytes,
-                    net_rx_bytes,
-                    net_tx_bytes,
-                    scratch_sz,
-                )
+        async def api_impl(
+            container_id: str,
+        ) -> tuple[int, int, int, int, int, int, int] | None:
+            container = DockerContainer(docker, id=container_id)
+            try:
+                async with async_timeout.timeout(2.0):
+                    ret = await fetch_api_stats(container)
+            except TimeoutError:
+                return None
+            if ret is None:
+                return None
+            mem_cur_bytes = nmget(ret, "memory_stats.usage", 0)
+            mem_total_bytes = nmget(ret, "memory_stats.limit", 0)
+            io_read_bytes = 0
+            io_write_bytes = 0
+            for item in nmget(ret, "blkio_stats.io_service_bytes_recursive", []):
+                if item["op"] == "Read":
+                    io_read_bytes += item["value"]
+                elif item["op"] == "Write":
+                    io_write_bytes += item["value"]
+            net_rx_bytes = 0
+            net_tx_bytes = 0
+            for name, stat in ret["networks"].items():
+                net_rx_bytes += stat["rx_bytes"]
+                net_tx_bytes += stat["tx_bytes"]
+            loop = current_loop()
+            scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
+            return (
+                mem_cur_bytes,
+                mem_total_bytes,
+                io_read_bytes,
+                io_write_bytes,
+                net_rx_bytes,
+                net_tx_bytes,
+                scratch_sz,
+            )
 
         if ctx.mode == StatModes.CGROUP:
             impl = sysfs_impl
@@ -773,10 +776,11 @@ class MemoryPlugin(AbstractComputePlugin):
         per_container_net_rx_bytes = {}
         per_container_net_tx_bytes = {}
         per_container_io_scratch_size = {}
-        tasks = []
-        for cid in container_ids:
-            tasks.append(asyncio.create_task(impl(cid)))
-        results = await asyncio.gather(*tasks)
+        async with closing_async(Docker()) as docker:
+            tasks = []
+            for cid in container_ids:
+                tasks.append(asyncio.create_task(impl(cid)))
+            results = await asyncio.gather(*tasks)
         for cid, result in zip(container_ids, results, strict=True):
             if result is None:
                 continue
