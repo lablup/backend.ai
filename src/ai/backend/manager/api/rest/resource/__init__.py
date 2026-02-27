@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.manager import READ_ALLOWED, server_status_required
 from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
@@ -21,79 +20,73 @@ def register_routes(
     """Register resource routes on the given RouteRegistry."""
     handler = ResourceHandler(processors=processors)
 
-    # Resource presets
+    # Public preset listing (auth required)
     registry.add("GET", "/resource/presets", handler.list_presets, middlewares=[auth_required])
+
+    # Container registries (superadmin)
     registry.add(
-        "POST",
-        "/resource/check-presets",
-        handler.check_presets,
-        middlewares=[server_status_required(READ_ALLOWED), auth_required],
+        "GET",
+        "/resource/container-registries",
+        handler.get_container_registries,
+        middlewares=[superadmin_required],
     )
 
-    # Resource usage
+    # Check presets (auth required)
+    registry.add(
+        "POST", "/resource/check-presets", handler.check_presets, middlewares=[auth_required]
+    )
+
+    # Recalculate usage (superadmin)
     registry.add(
         "POST",
         "/resource/recalculate-usage",
         handler.recalculate_usage,
-        middlewares=[server_status_required(READ_ALLOWED), superadmin_required],
+        middlewares=[superadmin_required],
     )
+
+    # Usage statistics (superadmin)
     registry.add(
-        "GET",
-        "/resource/usage/month",
-        handler.usage_per_month,
-        middlewares=[server_status_required(READ_ALLOWED), superadmin_required],
+        "GET", "/resource/usage/month", handler.usage_per_month, middlewares=[superadmin_required]
     )
     registry.add(
         "GET",
         "/resource/usage/period",
         handler.usage_per_period,
-        middlewares=[server_status_required(READ_ALLOWED), superadmin_required],
+        middlewares=[superadmin_required],
     )
 
-    # Stats
+    # User stats (auth required)
     registry.add(
-        "GET",
-        "/resource/stats/user/month",
-        handler.user_month_stats,
-        middlewares=[server_status_required(READ_ALLOWED), auth_required],
+        "GET", "/resource/stats/user/month", handler.user_month_stats, middlewares=[auth_required]
     )
+
+    # Admin stats (superadmin)
     registry.add(
         "GET",
         "/resource/stats/admin/month",
         handler.admin_month_stats,
-        middlewares=[server_status_required(READ_ALLOWED), superadmin_required],
+        middlewares=[superadmin_required],
     )
 
-    # Watcher
+    # Watcher endpoints (superadmin)
     registry.add(
-        "GET",
-        "/resource/watcher",
-        handler.get_watcher_status,
-        middlewares=[server_status_required(READ_ALLOWED), superadmin_required],
+        "GET", "/resource/watcher", handler.get_watcher_status, middlewares=[superadmin_required]
     )
     registry.add(
         "POST",
         "/resource/watcher/agent/start",
         handler.watcher_agent_start,
-        middlewares=[server_status_required(READ_ALLOWED), superadmin_required],
+        middlewares=[superadmin_required],
     )
     registry.add(
         "POST",
         "/resource/watcher/agent/stop",
         handler.watcher_agent_stop,
-        middlewares=[server_status_required(READ_ALLOWED), superadmin_required],
+        middlewares=[superadmin_required],
     )
     registry.add(
         "POST",
         "/resource/watcher/agent/restart",
         handler.watcher_agent_restart,
-        middlewares=[server_status_required(READ_ALLOWED), superadmin_required],
-    )
-
-    # Container registries
-    registry.add(
-        "GET",
-        "/resource/container-registries",
-        handler.get_container_registries,
         middlewares=[superadmin_required],
     )
