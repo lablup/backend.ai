@@ -74,7 +74,12 @@ def authorized_request(mock_root_ctx: MagicMock) -> MagicMock:
         "is_superadmin": False,
     }.get(k, default)
     # Enable dict-like access for request["keypair"], request["user"]
-    storage: dict[str, Any] = {}
+    storage: dict[str, Any] = {
+        "user": {"uuid": uuid.uuid4(), "email": "test@example.com", "domain_name": "default"},
+        "keypair": {"access_key": "AKTEST"},
+        "is_admin": False,
+        "is_superadmin": False,
+    }
     req.__getitem__ = lambda _, key: storage[key]
     req.__setitem__ = lambda _, key, value: storage.__setitem__(key, value)
     return req
@@ -85,6 +90,14 @@ def superadmin_request(mock_root_ctx: MagicMock) -> MagicMock:
     """Mock request for superadmin user."""
     req = MagicMock(spec=web.Request)
     req.app = {"_root.context": mock_root_ctx}
+    storage: dict[str, Any] = {
+        "user": {"uuid": uuid.uuid4(), "email": "admin@example.com", "domain_name": "default"},
+        "keypair": {"access_key": "AKTEST"},
+        "is_admin": True,
+        "is_superadmin": True,
+    }
+    req.__getitem__ = lambda _, key: storage[key]
+    req.__setitem__ = lambda _, key, value: storage.__setitem__(key, value)
     req.get = lambda k, default=None: {
         "is_authorized": True,
         "is_superadmin": True,
@@ -275,7 +288,11 @@ class TestUserMonthStats:
         """Verify user_id is passed to Action and stats are returned."""
         user_uuid = uuid.uuid4()
         authorized_request["keypair"] = {"access_key": "AKTEST"}
-        authorized_request["user"] = {"uuid": user_uuid}
+        authorized_request["user"] = {
+            "uuid": user_uuid,
+            "email": "test@example.com",
+            "domain_name": "default",
+        }
         expected_stats = [{"date": "2024-01-15", "usage": 100}]
         mock_result = MagicMock()
         mock_result.stats = expected_stats
@@ -311,6 +328,14 @@ class TestGetWatcherStatus:
         """Mock GET request for superadmin user."""
         req = MagicMock(spec=web.Request)
         req.app = {"_root.context": mock_root_ctx}
+        storage: dict[str, Any] = {
+            "user": {"uuid": uuid.uuid4(), "email": "admin@example.com", "domain_name": "default"},
+            "keypair": {"access_key": "AKTEST"},
+            "is_admin": True,
+            "is_superadmin": True,
+        }
+        req.__getitem__ = lambda _, key: storage[key]
+        req.__setitem__ = lambda _, key, value: storage.__setitem__(key, value)
         req.get = lambda k, default=None: {
             "is_authorized": True,
             "is_superadmin": True,
@@ -362,6 +387,14 @@ class TestWatcherAgentStart:
         """Mock POST request for superadmin user."""
         req = MagicMock(spec=web.Request)
         req.app = {"_root.context": mock_root_ctx}
+        storage: dict[str, Any] = {
+            "user": {"uuid": uuid.uuid4(), "email": "admin@example.com", "domain_name": "default"},
+            "keypair": {"access_key": "AKTEST"},
+            "is_admin": True,
+            "is_superadmin": True,
+        }
+        req.__getitem__ = lambda _, key: storage[key]
+        req.__setitem__ = lambda _, key, value: storage.__setitem__(key, value)
         req.get = lambda k, default=None: {
             "is_authorized": True,
             "is_superadmin": True,
@@ -415,6 +448,14 @@ class TestWatcherAgentStop:
         """Mock POST request for superadmin user."""
         req = MagicMock(spec=web.Request)
         req.app = {"_root.context": mock_root_ctx}
+        storage: dict[str, Any] = {
+            "user": {"uuid": uuid.uuid4(), "email": "admin@example.com", "domain_name": "default"},
+            "keypair": {"access_key": "AKTEST"},
+            "is_admin": True,
+            "is_superadmin": True,
+        }
+        req.__getitem__ = lambda _, key: storage[key]
+        req.__setitem__ = lambda _, key, value: storage.__setitem__(key, value)
         req.get = lambda k, default=None: {
             "is_authorized": True,
             "is_superadmin": True,
@@ -468,6 +509,14 @@ class TestWatcherAgentRestart:
         """Mock POST request for superadmin user."""
         req = MagicMock(spec=web.Request)
         req.app = {"_root.context": mock_root_ctx}
+        storage: dict[str, Any] = {
+            "user": {"uuid": uuid.uuid4(), "email": "admin@example.com", "domain_name": "default"},
+            "keypair": {"access_key": "AKTEST"},
+            "is_admin": True,
+            "is_superadmin": True,
+        }
+        req.__getitem__ = lambda _, key: storage[key]
+        req.__setitem__ = lambda _, key, value: storage.__setitem__(key, value)
         req.get = lambda k, default=None: {
             "is_authorized": True,
             "is_superadmin": True,
@@ -521,6 +570,14 @@ class TestUsagePerMonth:
         """Mock GET request for superadmin user."""
         req = MagicMock(spec=web.Request)
         req.app = {"_root.context": mock_root_ctx}
+        storage: dict[str, Any] = {
+            "user": {"uuid": uuid.uuid4(), "email": "admin@example.com", "domain_name": "default"},
+            "keypair": {"access_key": "AKTEST"},
+            "is_admin": True,
+            "is_superadmin": True,
+        }
+        req.__getitem__ = lambda _, key: storage[key]
+        req.__setitem__ = lambda _, key, value: storage.__setitem__(key, value)
         req.get = lambda k, default=None: {
             "is_authorized": True,
             "is_superadmin": True,
@@ -575,6 +632,14 @@ class TestUsagePerPeriod:
         """Mock GET request for superadmin user."""
         req = MagicMock(spec=web.Request)
         req.app = {"_root.context": mock_root_ctx}
+        storage: dict[str, Any] = {
+            "user": {"uuid": uuid.uuid4(), "email": "admin@example.com", "domain_name": "default"},
+            "keypair": {"access_key": "AKTEST"},
+            "is_admin": True,
+            "is_superadmin": True,
+        }
+        req.__getitem__ = lambda _, key: storage[key]
+        req.__setitem__ = lambda _, key, value: storage.__setitem__(key, value)
         req.get = lambda k, default=None: {
             "is_authorized": True,
             "is_superadmin": True,
@@ -664,7 +729,12 @@ class TestCheckPresets:
         req.method = "POST"
         req.content_type = "application/json"
         # Enable dict-like access for request["keypair"], request["user"]
-        storage: dict[str, Any] = {}
+        storage: dict[str, Any] = {
+            "user": {"uuid": uuid.uuid4(), "email": "test@example.com", "domain_name": "default"},
+            "keypair": {"access_key": "AKTEST", "resource_policy": "default"},
+            "is_admin": False,
+            "is_superadmin": False,
+        }
         req.__getitem__ = lambda _, key: storage[key]
         req.__setitem__ = lambda _, key, value: storage.__setitem__(key, value)
         return req
@@ -704,7 +774,11 @@ class TestCheckPresets:
             return_value=json.dumps({"scaling_group": "sg-test", "group": "test-group"})
         )
         mock_request["keypair"] = {"access_key": "AKTEST", "resource_policy": "default"}
-        mock_request["user"] = {"uuid": user_uuid, "domain_name": "default"}
+        mock_request["user"] = {
+            "uuid": user_uuid,
+            "email": "test@example.com",
+            "domain_name": "default",
+        }
         mock_result, _ = self._create_mock_result()
         mock_root_ctx.processors.resource_preset.check_presets.wait_for_complete = AsyncMock(
             return_value=mock_result
@@ -749,7 +823,11 @@ class TestCheckPresets:
             return_value=json.dumps({"scaling_group": "sg-test", "group": "default"})
         )
         mock_request["keypair"] = {"access_key": "AKTEST", "resource_policy": "default"}
-        mock_request["user"] = {"uuid": user_uuid, "domain_name": "default"}
+        mock_request["user"] = {
+            "uuid": user_uuid,
+            "email": "test@example.com",
+            "domain_name": "default",
+        }
         mock_result, _ = self._create_mock_result()
         mock_root_ctx.processors.resource_preset.check_presets.wait_for_complete = AsyncMock(
             return_value=mock_result
