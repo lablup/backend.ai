@@ -16218,7 +16218,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "get": {
         "operationId": "user-config.list_or_get",
@@ -16273,7 +16273,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "patch": {
         "operationId": "user-config.update",
@@ -16300,7 +16300,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "delete": {
         "operationId": "user-config.delete",
@@ -16327,7 +16327,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/user-config/bootstrap-script": {
@@ -16356,7 +16356,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "get": {
         "operationId": "user-config.get_bootstrap_script",
@@ -16374,7 +16374,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/domain-config/dotfiles": {
@@ -16403,7 +16403,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* Admin privilege required.\n"
+        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "get": {
         "operationId": "domain-config.list_or_get",
@@ -16450,7 +16450,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "patch": {
         "operationId": "domain-config.update",
@@ -16477,7 +16477,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* Admin privilege required.\n"
+        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "delete": {
         "operationId": "domain-config.delete",
@@ -16504,7 +16504,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* Admin privilege required.\n"
+        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/group/registry-quota": {
@@ -16607,7 +16607,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* Admin privilege required.\n"
+        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "get": {
         "operationId": "group-config.list_or_get",
@@ -16680,7 +16680,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "patch": {
         "operationId": "group-config.update",
@@ -16707,7 +16707,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* Admin privilege required.\n"
+        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "delete": {
         "operationId": "group-config.delete",
@@ -16734,7 +16734,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* Admin privilege required.\n"
+        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/logs/error": {
