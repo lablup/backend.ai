@@ -1212,16 +1212,7 @@ class TestContainerRegistryRepository:
         result = await repository.modify_registry(
             Updater(
                 spec=ContainerRegistryUpdaterSpec(
-                    url=OptionalState.nop(),
-                    type=OptionalState.nop(),
-                    registry_name=OptionalState.nop(),
-                    project=TriState.nop(),
-                    username=TriState.nop(),
-                    password=TriState.nop(),
-                    ssl_verify=TriState.nop(),
                     is_global=TriState.update(True),
-                    extra=TriState.nop(),
-                    allowed_groups=TriState.nop(),
                 ),
                 pk_value=registry_id,
             )
