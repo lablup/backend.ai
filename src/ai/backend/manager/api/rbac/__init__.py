@@ -1,5 +1,7 @@
-"""
-RBAC API module.
+"""Backward-compatibility shim for the RBAC module.
+
+Handler logic has been migrated to ``api.rest.rbac``.  This package
+re-exports public names so that existing imports continue to work.
 """
 
 from .assigned_user_adapter import AssignedUserAdapter

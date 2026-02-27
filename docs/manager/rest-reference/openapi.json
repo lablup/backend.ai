@@ -4576,596 +4576,6 @@
         "title": "DeleteAutoScalingRuleRequest",
         "type": "object"
       },
-      "RoleSource": {
-        "description": "Definition source of the role.",
-        "enum": [
-          "system",
-          "custom"
-        ],
-        "title": "RoleSource",
-        "type": "string"
-      },
-      "RoleStatus": {
-        "description": "Status of a role.",
-        "enum": [
-          "active",
-          "inactive",
-          "deleted"
-        ],
-        "title": "RoleStatus",
-        "type": "string"
-      },
-      "CreateRoleRequest": {
-        "description": "Request to create a role.",
-        "properties": {
-          "name": {
-            "description": "Role name",
-            "title": "Name",
-            "type": "string"
-          },
-          "source": {
-            "$ref": "#/components/schemas/RoleSource",
-            "default": "custom",
-            "description": "Role source"
-          },
-          "status": {
-            "$ref": "#/components/schemas/RoleStatus",
-            "default": "active",
-            "description": "Role status"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Role description",
-            "title": "Description"
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "title": "CreateRoleRequest",
-        "type": "object"
-      },
-      "RoleFilter": {
-        "description": "Filter for roles.",
-        "properties": {
-          "name": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by name"
-          },
-          "sources": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RoleSource"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by role sources",
-            "title": "Sources"
-          },
-          "statuses": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RoleStatus"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by role statuses",
-            "title": "Statuses"
-          }
-        },
-        "title": "RoleFilter",
-        "type": "object"
-      },
-      "RoleOrder": {
-        "description": "Order specification for roles.",
-        "properties": {
-          "field": {
-            "$ref": "#/components/schemas/RoleOrderField",
-            "description": "Field to order by"
-          },
-          "direction": {
-            "$ref": "#/components/schemas/OrderDirection",
-            "default": "asc",
-            "description": "Order direction"
-          }
-        },
-        "required": [
-          "field"
-        ],
-        "title": "RoleOrder",
-        "type": "object"
-      },
-      "RoleOrderField": {
-        "description": "Fields available for ordering roles.",
-        "enum": [
-          "name",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "RoleOrderField",
-        "type": "string"
-      },
-      "SearchRolesRequest": {
-        "description": "Request body for searching roles with filters, orders, and pagination.",
-        "properties": {
-          "filter": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RoleFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter conditions"
-          },
-          "order": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RoleOrder"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Order specifications",
-            "title": "Order"
-          },
-          "limit": {
-            "default": 50,
-            "description": "Maximum items to return",
-            "maximum": 1000,
-            "minimum": 1,
-            "title": "Limit",
-            "type": "integer"
-          },
-          "offset": {
-            "default": 0,
-            "description": "Number of items to skip",
-            "minimum": 0,
-            "title": "Offset",
-            "type": "integer"
-          }
-        },
-        "title": "SearchRolesRequest",
-        "type": "object"
-      },
-      "Sentinel": {
-        "description": "A sentinel value to represent an unset value.",
-        "enum": [
-          1
-        ],
-        "title": "Sentinel",
-        "type": "integer"
-      },
-      "UpdateRoleRequest": {
-        "description": "Request to update a role.",
-        "properties": {
-          "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Updated role name",
-            "title": "Name"
-          },
-          "source": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RoleSource"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Updated role source"
-          },
-          "status": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RoleStatus"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Updated role status"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": 1,
-            "description": "Updated role description",
-            "title": "Description"
-          }
-        },
-        "title": "UpdateRoleRequest",
-        "type": "object"
-      },
-      "DeleteRoleRequest": {
-        "description": "Request to delete a role.",
-        "properties": {
-          "role_id": {
-            "description": "Role ID to delete",
-            "format": "uuid",
-            "title": "Role Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "role_id"
-        ],
-        "title": "DeleteRoleRequest",
-        "type": "object"
-      },
-      "PurgeRoleRequest": {
-        "description": "Request to purge a role.",
-        "properties": {
-          "role_id": {
-            "description": "Role ID to purge",
-            "format": "uuid",
-            "title": "Role Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "role_id"
-        ],
-        "title": "PurgeRoleRequest",
-        "type": "object"
-      },
-      "AssignRoleRequest": {
-        "description": "Request to assign a role to a user.",
-        "properties": {
-          "user_id": {
-            "description": "User ID to assign the role to",
-            "format": "uuid",
-            "title": "User Id",
-            "type": "string"
-          },
-          "role_id": {
-            "description": "Role ID to assign",
-            "format": "uuid",
-            "title": "Role Id",
-            "type": "string"
-          },
-          "granted_by": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "User ID who granted this role assignment",
-            "title": "Granted By"
-          }
-        },
-        "required": [
-          "user_id",
-          "role_id"
-        ],
-        "title": "AssignRoleRequest",
-        "type": "object"
-      },
-      "RevokeRoleRequest": {
-        "description": "Request to revoke a role from a user.",
-        "properties": {
-          "user_id": {
-            "description": "User ID to revoke the role from",
-            "format": "uuid",
-            "title": "User Id",
-            "type": "string"
-          },
-          "role_id": {
-            "description": "Role ID to revoke",
-            "format": "uuid",
-            "title": "Role Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "user_id",
-          "role_id"
-        ],
-        "title": "RevokeRoleRequest",
-        "type": "object"
-      },
-      "AssignedUserFilter": {
-        "description": "Filter for assigned users.",
-        "properties": {
-          "username": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by username"
-          },
-          "email": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by email"
-          },
-          "granted_by": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by 'granted_by' user ID",
-            "title": "Granted By"
-          }
-        },
-        "title": "AssignedUserFilter",
-        "type": "object"
-      },
-      "AssignedUserOrder": {
-        "description": "Order specification for assigned users.",
-        "properties": {
-          "field": {
-            "$ref": "#/components/schemas/AssignedUserOrderField",
-            "description": "Field to order by"
-          },
-          "direction": {
-            "$ref": "#/components/schemas/OrderDirection",
-            "default": "asc",
-            "description": "Order direction"
-          }
-        },
-        "required": [
-          "field"
-        ],
-        "title": "AssignedUserOrder",
-        "type": "object"
-      },
-      "AssignedUserOrderField": {
-        "description": "Fields available for ordering assigned users.",
-        "enum": [
-          "username",
-          "email",
-          "granted_at"
-        ],
-        "title": "AssignedUserOrderField",
-        "type": "string"
-      },
-      "SearchUsersAssignedToRoleRequest": {
-        "description": "Request body for searching users assigned to a specific role.",
-        "properties": {
-          "filter": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AssignedUserFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter conditions"
-          },
-          "order": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/AssignedUserOrder"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Order specifications",
-            "title": "Order"
-          },
-          "limit": {
-            "default": 50,
-            "description": "Maximum items to return",
-            "maximum": 1000,
-            "minimum": 1,
-            "title": "Limit",
-            "type": "integer"
-          },
-          "offset": {
-            "default": 0,
-            "description": "Number of items to skip",
-            "minimum": 0,
-            "title": "Offset",
-            "type": "integer"
-          }
-        },
-        "title": "SearchUsersAssignedToRoleRequest",
-        "type": "object"
-      },
-      "ScopeFilter": {
-        "description": "Filter for scopes.",
-        "properties": {
-          "name": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StringFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by name"
-          }
-        },
-        "title": "ScopeFilter",
-        "type": "object"
-      },
-      "ScopeOrder": {
-        "description": "Order specification for scopes.",
-        "properties": {
-          "field": {
-            "$ref": "#/components/schemas/ScopeOrderField",
-            "description": "Field to order by"
-          },
-          "direction": {
-            "$ref": "#/components/schemas/OrderDirection",
-            "default": "asc",
-            "description": "Order direction"
-          }
-        },
-        "required": [
-          "field"
-        ],
-        "title": "ScopeOrder",
-        "type": "object"
-      },
-      "ScopeOrderField": {
-        "description": "Fields available for ordering scope IDs.",
-        "enum": [
-          "name",
-          "created_at"
-        ],
-        "title": "ScopeOrderField",
-        "type": "string"
-      },
-      "SearchScopesRequest": {
-        "description": "Request body for searching scopes with filters and pagination.",
-        "properties": {
-          "filter": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ScopeFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter conditions"
-          },
-          "order": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ScopeOrder"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Order specifications",
-            "title": "Order"
-          },
-          "limit": {
-            "default": 50,
-            "description": "Maximum items to return",
-            "maximum": 1000,
-            "minimum": 1,
-            "title": "Limit",
-            "type": "integer"
-          },
-          "offset": {
-            "default": 0,
-            "description": "Number of items to skip",
-            "minimum": 0,
-            "title": "Offset",
-            "type": "integer"
-          }
-        },
-        "title": "SearchScopesRequest",
-        "type": "object"
-      },
-      "SearchEntitiesRequest": {
-        "description": "Request body for searching entities within a scope.",
-        "properties": {
-          "limit": {
-            "default": 50,
-            "description": "Maximum items to return",
-            "maximum": 1000,
-            "minimum": 1,
-            "title": "Limit",
-            "type": "integer"
-          },
-          "offset": {
-            "default": 0,
-            "description": "Number of items to skip",
-            "minimum": 0,
-            "title": "Offset",
-            "type": "integer"
-          }
-        },
-        "title": "SearchEntitiesRequest",
-        "type": "object"
-      },
       "SchedulingResultType": {
         "enum": [
           "SUCCESS",
@@ -18012,7 +17422,7 @@
     },
     "/admin/rbac/roles": {
       "post": {
-        "operationId": "admin/rbac.create_role",
+        "operationId": "admin/rbac.dispatch",
         "tags": [
           "admin/rbac"
         ],
@@ -18026,22 +17436,13 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateRoleRequest"
-              }
-            }
-          }
-        },
         "parameters": [],
-        "description": "Create a new role.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/admin/rbac/roles/search": {
       "post": {
-        "operationId": "admin/rbac.search_roles",
+        "operationId": "admin/rbac.dispatch.2",
         "tags": [
           "admin/rbac"
         ],
@@ -18055,22 +17456,13 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SearchRolesRequest"
-              }
-            }
-          }
-        },
         "parameters": [],
-        "description": "Search roles with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/admin/rbac/roles/{role_id}": {
       "get": {
-        "operationId": "admin/rbac.get_role",
+        "operationId": "admin/rbac.dispatch.3",
         "tags": [
           "admin/rbac"
         ],
@@ -18094,10 +17486,10 @@
             }
           }
         ],
-        "description": "Get a specific role with details.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       },
       "patch": {
-        "operationId": "admin/rbac.update_role",
+        "operationId": "admin/rbac.dispatch.4",
         "tags": [
           "admin/rbac"
         ],
@@ -18111,15 +17503,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateRoleRequest"
-              }
-            }
-          }
-        },
         "parameters": [
           {
             "name": "role_id",
@@ -18130,12 +17513,12 @@
             }
           }
         ],
-        "description": "Update an existing role.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/admin/rbac/roles/delete": {
       "post": {
-        "operationId": "admin/rbac.delete_role",
+        "operationId": "admin/rbac.dispatch.5",
         "tags": [
           "admin/rbac"
         ],
@@ -18149,22 +17532,13 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeleteRoleRequest"
-              }
-            }
-          }
-        },
         "parameters": [],
-        "description": "Delete a role (soft delete).\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/admin/rbac/roles/purge": {
       "post": {
-        "operationId": "admin/rbac.purge_role",
+        "operationId": "admin/rbac.dispatch.6",
         "tags": [
           "admin/rbac"
         ],
@@ -18178,22 +17552,13 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PurgeRoleRequest"
-              }
-            }
-          }
-        },
         "parameters": [],
-        "description": "Delete a role (soft delete).\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/admin/rbac/roles/assign": {
       "post": {
-        "operationId": "admin/rbac.assign_role",
+        "operationId": "admin/rbac.dispatch.7",
         "tags": [
           "admin/rbac"
         ],
@@ -18207,22 +17572,13 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AssignRoleRequest"
-              }
-            }
-          }
-        },
         "parameters": [],
-        "description": "Assign a role to a user.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/admin/rbac/roles/revoke": {
       "post": {
-        "operationId": "admin/rbac.revoke_role",
+        "operationId": "admin/rbac.dispatch.8",
         "tags": [
           "admin/rbac"
         ],
@@ -18236,22 +17592,13 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RevokeRoleRequest"
-              }
-            }
-          }
-        },
         "parameters": [],
-        "description": "Revoke a role from a user.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/admin/rbac/roles/{role_id}/assigned-users/search": {
       "post": {
-        "operationId": "admin/rbac.search_assigned_users",
+        "operationId": "admin/rbac.dispatch.9",
         "tags": [
           "admin/rbac"
         ],
@@ -18265,15 +17612,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SearchUsersAssignedToRoleRequest"
-              }
-            }
-          }
-        },
         "parameters": [
           {
             "name": "role_id",
@@ -18284,12 +17622,12 @@
             }
           }
         ],
-        "description": "Search users assigned to a specific role with filters and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/admin/rbac/scope-types": {
       "get": {
-        "operationId": "admin/rbac.get_scope_types",
+        "operationId": "admin/rbac.dispatch.10",
         "tags": [
           "admin/rbac"
         ],
@@ -18304,12 +17642,12 @@
           }
         ],
         "parameters": [],
-        "description": "Get available scope types for role configuration.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/admin/rbac/scopes/{scope_type}/search": {
       "post": {
-        "operationId": "admin/rbac.search_scopes",
+        "operationId": "admin/rbac.dispatch.11",
         "tags": [
           "admin/rbac"
         ],
@@ -18323,15 +17661,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SearchScopesRequest"
-              }
-            }
-          }
-        },
         "parameters": [
           {
             "name": "scope_type",
@@ -18342,12 +17671,12 @@
             }
           }
         ],
-        "description": "Search scopes for a specific scope type with filters and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/admin/rbac/entity-types": {
       "get": {
-        "operationId": "admin/rbac.get_entity_types",
+        "operationId": "admin/rbac.dispatch.12",
         "tags": [
           "admin/rbac"
         ],
@@ -18362,12 +17691,12 @@
           }
         ],
         "parameters": [],
-        "description": "Get available entity types for role configuration.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/admin/rbac/scopes/{scope_type}/{scope_id}/entities/{entity_type}/search": {
       "post": {
-        "operationId": "admin/rbac.search_entities",
+        "operationId": "admin/rbac.dispatch.13",
         "tags": [
           "admin/rbac"
         ],
@@ -18381,15 +17710,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SearchEntitiesRequest"
-              }
-            }
-          }
-        },
         "parameters": [
           {
             "name": "scope_type",
@@ -18416,7 +17736,7 @@
             }
           }
         ],
-        "description": "Search entities within a scope by entity type with filters and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/scheduling-history/sessions/search": {
