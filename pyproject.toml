@@ -271,6 +271,8 @@ split-on-trailing-comma = true
 "src/ai/backend/*/api/gql_legacy/**/*.py" = ["PLC0415"]
 # - Container registry factory uses lazy imports to avoid circular dependencies with models
 "src/ai/backend/manager/container_registry/factory.py" = ["PLC0415"]
+# - Session API shim uses lazy import to break circular dependency with rest/session
+"src/ai/backend/manager/api/session.py" = ["PLC0415"]
 
 [tool.ruff.format]
 preview = true  # enable the black's preview style

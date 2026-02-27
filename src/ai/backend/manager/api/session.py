@@ -45,7 +45,6 @@ from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 
 from .auth import auth_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
-from .rest.session import _make_lazy_handler
 from .types import CORSOptions, WebMiddleware
 from .utils import catch_unexpected, deprecated_stub, undefined
 
@@ -300,6 +299,10 @@ def create_app(
     deprecated_get_stub = deprecated_stub(
         "Use the HTTP POST method to invoke this API with parameters in the request body."
     )
+
+    # Lazy import to break circular dependency:
+    # api/session.py → rest/session/ → handler.py → dto → services → repositories → api/session.py
+    from .rest.session import _make_lazy_handler
 
     # Helper: compose middleware decorators around a lazy handler.
     def _h(method_name: str, *, status: Any = ALL_ALLOWED, auth: bool = True) -> Any:
