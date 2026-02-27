@@ -36,13 +36,14 @@ from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import AccessKey, AgentId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     kernels,
 )
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
-from ai.backend.manager.utils import query_userinfo as query_userinfo
+from ai.backend.manager.utils import query_userinfo as _query_userinfo
 
 from .auth import auth_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
@@ -50,6 +51,7 @@ from .types import CORSOptions, WebMiddleware
 from .utils import catch_unexpected, deprecated_stub, undefined
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
     from .context import RootContext
@@ -70,6 +72,30 @@ class UndefChecker(t.Trafaret):
             return value
         self._failure("Invalid Undef format", value=value)
         raise AssertionError("unreachable")  # _failure always raises
+
+
+async def query_userinfo(
+    request: web.Request,
+    params: Any,
+    conn: SAConnection,
+) -> tuple[UUID, UUID, dict[str, Any]]:
+    """Backward-compatible wrapper around utils.query_userinfo."""
+    try:
+        return await _query_userinfo(
+            conn,
+            request["user"]["uuid"],
+            request["keypair"]["access_key"],
+            request["user"]["role"],
+            request["user"]["domain_name"],
+            request["keypair"]["resource_policy"],
+            params["domain"] or request["user"]["domain_name"],
+            params["group"],
+            query_on_behalf_of=(
+                None if params["owner_access_key"] is undefined else params["owner_access_key"]
+            ),
+        )
+    except ValueError as e:
+        raise InvalidAPIParameters(str(e)) from e
 
 
 # ---------------------------------------------------------------------------
