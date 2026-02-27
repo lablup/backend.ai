@@ -15,9 +15,9 @@ from ai.backend.manager.services.deployment.actions.deployment_policy.base impor
 
 @dataclass
 class CreateDeploymentPolicyAction(DeploymentPolicyBaseAction):
-    """Action to create a deployment policy for an endpoint."""
+    """Action to create a deployment policy for a deployment."""
 
-    endpoint_id: UUID
+    deployment_id: UUID
     policy_config: DeploymentPolicyConfig
 
     @override

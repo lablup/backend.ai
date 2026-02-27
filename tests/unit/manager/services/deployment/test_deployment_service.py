@@ -238,7 +238,7 @@ class TestCreateDeploymentPolicy(DeploymentServiceBaseFixtures):
         )
 
         action = CreateDeploymentPolicyAction(
-            endpoint_id=endpoint_id,
+            deployment_id=endpoint_id,
             policy_config=rolling_policy_config,
         )
 
@@ -266,7 +266,7 @@ class TestCreateDeploymentPolicy(DeploymentServiceBaseFixtures):
         )
 
         action = CreateDeploymentPolicyAction(
-            endpoint_id=endpoint_id,
+            deployment_id=endpoint_id,
             policy_config=blue_green_policy_config,
         )
 

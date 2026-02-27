@@ -495,7 +495,7 @@ class DeploymentService:
         """
         config = action.policy_config
         spec = DeploymentPolicyCreatorSpec(
-            endpoint_id=action.endpoint_id,
+            endpoint_id=action.deployment_id,
             strategy=config.strategy,
             strategy_spec=config.strategy_spec,
             rollback_on_failure=config.rollback_on_failure,
