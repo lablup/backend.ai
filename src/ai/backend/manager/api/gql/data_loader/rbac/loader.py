@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections import defaultdict
 from collections.abc import Sequence
 
 from ai.backend.manager.data.permission.association_scopes_entities import (
@@ -100,8 +101,6 @@ async def load_permissions_by_role_ids(
     )
 
     # Group permissions by role_id
-    from collections import defaultdict
-
     permission_map: dict[uuid.UUID, list[PermissionData]] = defaultdict(list)
     for permission in action_result.result.items:
         permission_map[permission.role_id].append(permission)
