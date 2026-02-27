@@ -1,3 +1,16 @@
+"""Backward-compatibility shim for the group module.
+
+Handler logic has been migrated to:
+
+* ``api.rest.group.handler`` — GroupHandler with constructor DI
+* ``api.rest.group`` — register_routes()
+
+This module retains ``create_app()`` so that the existing server
+bootstrap (which calls ``create_app()``) continues to work.
+The handler functions below delegate business logic to
+:class:`~ai.backend.manager.api.rest.group.handler.GroupHandler`.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -11,7 +24,7 @@ from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.api.rest.group.handler import GroupHandler
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -24,6 +37,13 @@ from .utils import check_api_params
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+def _get_handler(request: web.Request) -> GroupHandler:
+    root_ctx: RootContext = request.app["_root.context"]
+    return GroupHandler(
+        quota_service=root_ctx.services_ctx.per_project_container_registries_quota,
+    )
+
+
 @server_status_required(READ_ALLOWED)
 @superadmin_required
 @check_api_params(
@@ -34,12 +54,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 )
 async def update_registry_quota(request: web.Request, params: Any) -> web.Response:
     log.info("UPDATE_REGISTRY_QUOTA (group:{})", params["group_id"])
-    root_ctx: RootContext = request.app["_root.context"]
-    group_id = params["group_id"]
-    scope_id = ProjectScope(project_id=group_id, domain_name=None)
-    quota = int(params["quota"])
-
-    await root_ctx.services_ctx.per_project_container_registries_quota.update_quota(scope_id, quota)
+    handler = _get_handler(request)
+    await handler.update_quota(params["group_id"], int(params["quota"]))
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -52,11 +68,8 @@ async def update_registry_quota(request: web.Request, params: Any) -> web.Respon
 )
 async def delete_registry_quota(request: web.Request, params: Any) -> web.Response:
     log.info("DELETE_REGISTRY_QUOTA (group:{})", params["group_id"])
-    root_ctx: RootContext = request.app["_root.context"]
-    group_id = params["group_id"]
-    scope_id = ProjectScope(project_id=group_id, domain_name=None)
-
-    await root_ctx.services_ctx.per_project_container_registries_quota.delete_quota(scope_id)
+    handler = _get_handler(request)
+    await handler.delete_quota(params["group_id"])
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -70,12 +83,8 @@ async def delete_registry_quota(request: web.Request, params: Any) -> web.Respon
 )
 async def create_registry_quota(request: web.Request, params: Any) -> web.Response:
     log.info("CREATE_REGISTRY_QUOTA (group:{})", params["group_id"])
-    root_ctx: RootContext = request.app["_root.context"]
-    group_id = params["group_id"]
-    scope_id = ProjectScope(project_id=group_id, domain_name=None)
-    quota = int(params["quota"])
-
-    await root_ctx.services_ctx.per_project_container_registries_quota.create_quota(scope_id, quota)
+    handler = _get_handler(request)
+    await handler.create_quota(params["group_id"], int(params["quota"]))
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -88,14 +97,8 @@ async def create_registry_quota(request: web.Request, params: Any) -> web.Respon
 )
 async def read_registry_quota(request: web.Request, params: Any) -> web.Response:
     log.info("READ_REGISTRY_QUOTA (group:{})", params["group_id"])
-    root_ctx: RootContext = request.app["_root.context"]
-    group_id = params["group_id"]
-    scope_id = ProjectScope(project_id=group_id, domain_name=None)
-
-    quota = await root_ctx.services_ctx.per_project_container_registries_quota.read_quota(
-        scope_id,
-    )
-
+    handler = _get_handler(request)
+    quota = await handler.read_quota(params["group_id"])
     return web.json_response({"result": quota})
 
 
