@@ -307,36 +307,59 @@ class CreateRevisionRequest(BaseRequestModel):
 
 
 class CreateDeploymentPolicyRequest(BaseRequestModel):
-    """Request to create a deployment policy."""
+    """Request to create a deployment policy that governs how new revisions are rolled out.
 
-    strategy: DeploymentStrategy = Field(description="Deployment strategy type")
-    rollback_on_failure: bool = Field(default=False, description="Rollback on failure")
+    Exactly one of rolling_update or blue_green must be provided depending on the chosen strategy.
+    """
+
+    strategy: DeploymentStrategy = Field(
+        description="Rollout strategy: ROLLING replaces replicas gradually with configurable concurrency limits; BLUE_GREEN runs two parallel environments and switches traffic atomically"
+    )
+    rollback_on_failure: bool = Field(
+        default=False,
+        description="When true, the system automatically reverts to the previous stable revision if health checks fail during rollout",
+    )
     rolling_update: RollingUpdateConfigInput | None = Field(
-        default=None, description="Rolling update configuration"
+        default=None,
+        description="Concurrency limits for rolling updates (max_surge, max_unavailable); required when strategy is ROLLING, ignored otherwise",
     )
     blue_green: BlueGreenConfigInput | None = Field(
-        default=None, description="Blue-green deployment configuration"
+        default=None,
+        description="Promotion settings for blue-green rollouts (auto_promote, promote_delay_seconds); required when strategy is BLUE_GREEN, ignored otherwise",
     )
 
 
 class UpdateDeploymentPolicyRequest(BaseRequestModel):
-    """Request to update a deployment policy."""
+    """Request to partially update a deployment policy.
+
+    All fields are optional; only provided (non-null) fields are updated.
+    Omitted fields retain their current values.
+    """
 
     strategy: DeploymentStrategy | None = Field(
-        default=None, description="Updated deployment strategy type"
+        default=None,
+        description="New rollout strategy type; changing strategy resets any strategy-specific configuration stored internally",
     )
     rollback_on_failure: bool | None = Field(
-        default=None, description="Updated rollback on failure setting"
+        default=None,
+        description="New value for the automatic rollback flag; null to leave the current setting unchanged",
     )
     rolling_update: RollingUpdateConfigInput | None = Field(
-        default=None, description="Updated rolling update configuration"
+        default=None,
+        description="New rolling update parameters (max_surge, max_unavailable); null to clear existing rolling update configuration",
     )
     blue_green: BlueGreenConfigInput | None = Field(
-        default=None, description="Updated blue-green deployment configuration"
+        default=None,
+        description="New blue-green deployment parameters (auto_promote, promote_delay_seconds); null to clear existing blue-green configuration",
     )
 
 
 class DeploymentPolicyPathParam(BaseRequestModel):
-    """Path parameter for deployment policy endpoints."""
+    """Path parameters for deployment policy endpoints.
 
-    deployment_id: UUID = Field(description="Deployment ID")
+    Identifies the deployment whose rollout policy is being managed.
+    """
+
+    deployment_id: UUID = Field(
+        description="UUID of the deployment whose policy is being read or modified"
+    )

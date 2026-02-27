@@ -234,26 +234,42 @@ class UpdateRouteTrafficStatusResponse(BaseResponseModel):
 
 
 class DeploymentPolicyDTO(BaseModel):
-    """DTO for deployment policy data."""
+    """DTO representing the rollout policy for a deployment.
 
-    id: UUID = Field(description="Deployment policy ID")
-    strategy: DeploymentStrategy = Field(description="Deployment strategy type")
-    strategy_spec: dict[str, Any] = Field(description="Strategy-specific configuration")
-    rollback_on_failure: bool = Field(description="Whether to rollback on failure")
-    created_at: datetime = Field(description="Creation timestamp")
-    updated_at: datetime = Field(description="Last update timestamp")
+    Controls how new revisions are promoted to production traffic,
+    including the update strategy and automatic rollback behavior.
+    """
+
+    id: UUID = Field(description="Unique identifier of this deployment policy")
+    strategy: DeploymentStrategy = Field(
+        description="Configured rollout strategy type (ROLLING for gradual replacement, BLUE_GREEN for parallel environment switching)"
+    )
+    strategy_spec: dict[str, Any] = Field(
+        description="Raw strategy-specific parameters stored as a dictionary; contains rolling update or blue-green fields depending on the active strategy"
+    )
+    rollback_on_failure: bool = Field(
+        description="Whether the system automatically reverts to the previous stable revision when health checks fail during rollout"
+    )
+    created_at: datetime = Field(
+        description="UTC timestamp when this deployment policy was created"
+    )
+    updated_at: datetime = Field(
+        description="UTC timestamp of the last modification to this deployment policy"
+    )
 
 
 class CreateDeploymentPolicyResponse(BaseResponseModel):
     """Response for creating a deployment policy."""
 
-    deployment_policy: DeploymentPolicyDTO = Field(description="Created deployment policy")
+    deployment_policy: DeploymentPolicyDTO = Field(description="Newly created deployment policy")
 
 
 class UpdateDeploymentPolicyResponse(BaseResponseModel):
     """Response for updating a deployment policy."""
 
-    deployment_policy: DeploymentPolicyDTO = Field(description="Updated deployment policy")
+    deployment_policy: DeploymentPolicyDTO = Field(
+        description="Deployment policy after applying the requested updates"
+    )
 
 
 class GetDeploymentPolicyResponse(BaseResponseModel):
