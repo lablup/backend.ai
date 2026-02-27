@@ -2,12 +2,13 @@
 
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
+from ai.backend.manager.repositories.deployment.creators.policy import (
+    DeploymentPolicyCreatorSpec,
+)
 from ai.backend.manager.services.deployment.actions.deployment_policy.base import (
     DeploymentPolicyBaseAction,
 )
@@ -17,8 +18,7 @@ from ai.backend.manager.services.deployment.actions.deployment_policy.base impor
 class CreateDeploymentPolicyAction(DeploymentPolicyBaseAction):
     """Action to create a deployment policy for a deployment."""
 
-    deployment_id: UUID
-    policy_config: DeploymentPolicyConfig
+    creator_spec: DeploymentPolicyCreatorSpec
 
     @override
     def entity_id(self) -> str | None:

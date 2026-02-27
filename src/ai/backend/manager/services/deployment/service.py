@@ -49,9 +49,6 @@ from ai.backend.manager.repositories.deployment.creators import (
     EndpointTokenCreatorSpec,
     ModelRevisionFields,
 )
-from ai.backend.manager.repositories.deployment.creators.policy import (
-    DeploymentPolicyCreatorSpec,
-)
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
@@ -488,19 +485,12 @@ class DeploymentService:
         """Create a new deployment policy for an endpoint.
 
         Args:
-            action: Action containing the endpoint ID and policy configuration
+            action: Action containing the creator spec for the policy
 
         Returns:
             CreateDeploymentPolicyActionResult: Result containing the created policy data
         """
-        config = action.policy_config
-        spec = DeploymentPolicyCreatorSpec(
-            endpoint_id=action.deployment_id,
-            strategy=config.strategy,
-            strategy_spec=config.strategy_spec,
-            rollback_on_failure=config.rollback_on_failure,
-        )
-        creator: Creator[DeploymentPolicyRow] = Creator(spec=spec)
+        creator: Creator[DeploymentPolicyRow] = Creator(spec=action.creator_spec)
         data = await self._deployment_repository.create_deployment_policy(creator)
         return CreateDeploymentPolicyActionResult(data=data)
 

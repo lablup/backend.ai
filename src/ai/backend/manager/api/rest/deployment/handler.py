@@ -418,13 +418,12 @@ class DeploymentAPIHandler:
         """Create a deployment policy for a deployment."""
         deployment_processors = self._get_deployment_processors()
 
-        policy_config = self._policy_adapter.build_policy_config(body.parsed)
+        creator_spec = self._policy_adapter.build_creator_spec(
+            body.parsed, endpoint_id=path.parsed.deployment_id
+        )
 
         action_result = await deployment_processors.create_deployment_policy.wait_for_complete(
-            CreateDeploymentPolicyAction(
-                endpoint_id=path.parsed.deployment_id,
-                policy_config=policy_config,
-            )
+            CreateDeploymentPolicyAction(creator_spec=creator_spec)
         )
 
         resp = CreateDeploymentPolicyResponse(

@@ -11,6 +11,8 @@ from pathlib import PurePosixPath
 from typing import Any
 from uuid import UUID, uuid4
 
+
+
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.model_deployment.types import (
     RouteStatus as CommonRouteStatus,
@@ -83,6 +85,9 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     QueryCondition,
     QueryOrder,
+)
+from ai.backend.manager.repositories.deployment.creators.policy import (
+    DeploymentPolicyCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment.options import (
     DeploymentConditions,
@@ -544,8 +549,10 @@ class DeploymentPolicyAdapter:
             updated_at=data.updated_at,
         )
 
-    def build_policy_config(self, request: CreateDeploymentPolicyRequest) -> DeploymentPolicyConfig:
-        """Build DeploymentPolicyConfig from create request."""
+    def build_creator_spec(
+        self, request: CreateDeploymentPolicyRequest, endpoint_id: UUID
+    ) -> DeploymentPolicyCreatorSpec:
+        """Build DeploymentPolicyCreatorSpec from create request."""
         strategy = request.strategy
 
         strategy_spec: RollingUpdateSpec | BlueGreenSpec
@@ -569,7 +576,8 @@ class DeploymentPolicyAdapter:
             case _:
                 raise InvalidAPIParameters(f"Unsupported deployment strategy: {strategy}")
 
-        return DeploymentPolicyConfig(
+        return DeploymentPolicyCreatorSpec(
+            endpoint_id=endpoint_id,
             strategy=strategy,
             strategy_spec=strategy_spec,
             rollback_on_failure=request.rollback_on_failure,

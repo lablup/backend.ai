@@ -13,9 +13,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.manager.data.deployment.creator import (
-    DeploymentPolicyConfig,
-)
 from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
@@ -28,6 +25,9 @@ from ai.backend.manager.models.deployment_policy import (
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.creators.policy import (
+    DeploymentPolicyCreatorSpec,
+)
 from ai.backend.manager.repositories.deployment.updaters import DeploymentPolicyUpdaterSpec
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
     SearchDeploymentPoliciesAction,
@@ -197,16 +197,18 @@ class TestCreateDeploymentPolicy(DeploymentServiceBaseFixtures):
     """Tests for DeploymentService.create_deployment_policy"""
 
     @pytest.fixture
-    def rolling_policy_config(self) -> DeploymentPolicyConfig:
-        return DeploymentPolicyConfig(
+    def rolling_creator_spec(self, endpoint_id: uuid.UUID) -> DeploymentPolicyCreatorSpec:
+        return DeploymentPolicyCreatorSpec(
+            endpoint_id=endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(max_surge=2, max_unavailable=1),
             rollback_on_failure=True,
         )
 
     @pytest.fixture
-    def blue_green_policy_config(self) -> DeploymentPolicyConfig:
-        return DeploymentPolicyConfig(
+    def blue_green_creator_spec(self, endpoint_id: uuid.UUID) -> DeploymentPolicyCreatorSpec:
+        return DeploymentPolicyCreatorSpec(
+            endpoint_id=endpoint_id,
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
             rollback_on_failure=False,
@@ -230,17 +232,14 @@ class TestCreateDeploymentPolicy(DeploymentServiceBaseFixtures):
         mock_deployment_repository: MagicMock,
         deployment_policy_data: DeploymentPolicyData,
         endpoint_id: uuid.UUID,
-        rolling_policy_config: DeploymentPolicyConfig,
+        rolling_creator_spec: DeploymentPolicyCreatorSpec,
     ) -> None:
         """Create deployment policy with ROLLING strategy should succeed."""
         mock_deployment_repository.create_deployment_policy = AsyncMock(
             return_value=deployment_policy_data
         )
 
-        action = CreateDeploymentPolicyAction(
-            deployment_id=endpoint_id,
-            policy_config=rolling_policy_config,
-        )
+        action = CreateDeploymentPolicyAction(creator_spec=rolling_creator_spec)
 
         result = await processors.create_deployment_policy.wait_for_complete(action)
 
@@ -256,8 +255,7 @@ class TestCreateDeploymentPolicy(DeploymentServiceBaseFixtures):
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
-        endpoint_id: uuid.UUID,
-        blue_green_policy_config: DeploymentPolicyConfig,
+        blue_green_creator_spec: DeploymentPolicyCreatorSpec,
         blue_green_policy_data: DeploymentPolicyData,
     ) -> None:
         """Create deployment policy with BLUE_GREEN strategy should succeed."""
@@ -265,10 +263,7 @@ class TestCreateDeploymentPolicy(DeploymentServiceBaseFixtures):
             return_value=blue_green_policy_data
         )
 
-        action = CreateDeploymentPolicyAction(
-            deployment_id=endpoint_id,
-            policy_config=blue_green_policy_config,
-        )
+        action = CreateDeploymentPolicyAction(creator_spec=blue_green_creator_spec)
 
         result = await processors.create_deployment_policy.wait_for_complete(action)
 
