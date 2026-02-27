@@ -10734,36 +10734,6 @@
         "description": "\nA raw access API to delete key-value pairs from the etcd.\n\n.. warning::\n\n   When deleting the keys with ``prefix=True``, it uses a simple string-prefix\n   matching over the flattened keys (with the delimiter \"/\"). This may result in\n   unexpected deletion of sibling keys.\n\n   For example, deleting \"some/key1\" will DELETE all of the following keys:\n\n   .. code-block:: text\n\n       some/key1\n       some/key1/field1\n       some/key1/field2\n       some/key12\n       some/key12/field1\n       some/key12/field2\n\n   **To avoid this issue, developers must use dedicated CRUD APIs\n   instead of relying on the etcd raw access APIs whenever possible.**\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
-    "/events/background-task": {
-      "get": {
-        "operationId": "events.push_background_task_events",
-        "tags": [
-          "events"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "task_id",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "in": "query"
-          }
-        ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
-      }
-    },
     "/events/session": {
       "get": {
         "operationId": "events.push_session_events",
@@ -10782,48 +10752,100 @@
         ],
         "parameters": [
           {
-            "name": "name",
+            "name": "sessionName",
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": "string",
-              "default": "*"
-            },
-            "required": true,
-            "in": "query"
+              "default": "*",
+              "title": "Sessionname",
+              "type": "string"
+            }
           },
           {
             "name": "ownerAccessKey",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Owneraccesskey"
+            }
           },
           {
             "name": "sessionId",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sessionid"
+            }
           },
           {
-            "name": "group",
+            "name": "groupName",
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": "string",
-              "default": "*"
-            },
-            "required": true,
-            "in": "query"
+              "default": "*",
+              "title": "Groupname",
+              "type": "string"
+            }
           },
           {
             "name": "scope",
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": "string",
-              "default": "*"
-            },
+              "default": "*",
+              "title": "Scope",
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+      }
+    },
+    "/events/background-task": {
+      "get": {
+        "operationId": "events.push_background_task_events",
+        "tags": [
+          "events"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "query",
             "required": true,
-            "in": "query"
+            "schema": {
+              "format": "uuid",
+              "title": "Taskid",
+              "type": "string"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
@@ -15469,7 +15491,7 @@
             }
           }
         ],
-        "description": "\nWebSocket-version of gateway.kernel.execute().\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "WebSocket-version of gateway.kernel.execute().\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/stream/session/{session_name}/apps": {
@@ -15528,37 +15550,65 @@
           },
           {
             "name": "app",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": true,
-            "in": "query"
+            "schema": {
+              "title": "App",
+              "type": "string"
+            }
           },
           {
             "name": "port",
-            "schema": {
-              "type": "integer",
-              "minimum": 1024,
-              "maximum": 65535
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 65535,
+                  "minimum": 1024,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Port"
+            }
           },
           {
             "name": "envs",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Envs"
+            }
           },
           {
             "name": "arguments",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Arguments"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
@@ -15591,37 +15641,65 @@
           },
           {
             "name": "app",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": true,
-            "in": "query"
+            "schema": {
+              "title": "App",
+              "type": "string"
+            }
           },
           {
             "name": "port",
-            "schema": {
-              "type": "integer",
-              "minimum": 1024,
-              "maximum": 65535
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 65535,
+                  "minimum": 1024,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Port"
+            }
           },
           {
             "name": "envs",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Envs"
+            }
           },
           {
             "name": "arguments",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Arguments"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
