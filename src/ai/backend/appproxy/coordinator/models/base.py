@@ -75,6 +75,19 @@ def zero_if_none(val: int | None) -> int:
 
 class EnumType(TypeDecorator[enum.Enum], SchemaType):
     """
+    .. deprecated::
+        Use :class:`StrEnumType` instead.
+
+        ``EnumType`` maps a Python enum to a **PostgreSQL native ENUM** column (stored by enum name).
+        Native ENUM types are difficult to alter (adding values requires DDL) and offer no
+        portability advantage over VARCHAR.
+
+        Migration guide:
+          - Replace ``EnumType(MyEnum)`` with ``StrEnumType(MyEnum, use_name=True)``
+          - The stored values remain identical (enum member names), but the column type changes
+            from native ENUM to VARCHAR(64) which is easier to evolve.
+          - A schema migration (alembic) is required to change the column type.
+
     A stripped-down version of Spoqa's sqlalchemy-enum34.
     It also handles postgres-specific enum type creation.
 
