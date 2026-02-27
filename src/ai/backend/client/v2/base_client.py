@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ssl
-from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Iterable, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -34,34 +33,110 @@ from .streaming_types import SSEConnection, WebSocketSession
 ResponseT = TypeVar("ResponseT", bound=BaseResponseModel | BaseRootResponseModel[Any])
 
 
-class BackendAIClient(ABC):
-    """Abstract base for Backend.AI HTTP clients.
+def _create_aiohttp_session(config: ClientConfig) -> aiohttp.ClientSession:
+    ssl_context: ssl.SSLContext | bool = not config.skip_ssl_verification
+    connector = aiohttp.TCPConnector(ssl=ssl_context)
+    timeout = aiohttp.ClientTimeout(
+        sock_connect=config.connection_timeout or None,
+        sock_read=config.read_timeout or None,
+    )
+    return aiohttp.ClientSession(
+        connector=connector,
+        timeout=timeout,
+    )
 
-    Concrete subclasses must implement ``_build_headers`` to supply
-    per-request headers (with or without authentication).
+
+def _build_url(config: ClientConfig, path: str) -> str:
+    base = str(config.endpoint).rstrip("/")
+    path = path.lstrip("/")
+    return f"{base}/{path}"
+
+
+async def _do_request(
+    session: aiohttp.ClientSession,
+    config: ClientConfig,
+    method: str,
+    path: str,
+    *,
+    headers: Mapping[str, str],
+    json: Any | None = None,
+    params: dict[str, str] | None = None,
+) -> dict[str, Any] | list[Any] | None:
+    url = _build_url(config, path)
+    async with session.request(
+        method,
+        url,
+        headers=headers,
+        json=json,
+        params=params,
+    ) as resp:
+        if resp.status >= 400:
+            try:
+                data = await resp.json()
+            except Exception:
+                data = await resp.text()
+            raise map_status_to_exception(resp.status, resp.reason or "", data)
+        if resp.status == 204:
+            return None
+        result: dict[str, Any] | list[Any] = await resp.json()
+        return result
+
+
+class BackendAIAuthClient:
+    """Authenticated HTTP client for Backend.AI REST API using HMAC signing.
+
+    All public request methods accept and return Pydantic models only.
+    Use ``typed_request()`` as the sole public interface for making API calls.
+
+    Prefer ``create()`` for production use; ``__init__`` accepts a pre-built
+    session so tests can inject a mock directly.
     """
 
     _config: ClientConfig
+    _auth: AuthStrategy
     _session: aiohttp.ClientSession
 
     def __init__(
         self,
         config: ClientConfig,
+        auth: AuthStrategy,
         session: aiohttp.ClientSession,
     ) -> None:
         self._config = config
+        self._auth = auth
         self._session = session
+
+    @classmethod
+    async def create(
+        cls,
+        config: ClientConfig,
+        auth: AuthStrategy,
+    ) -> BackendAIAuthClient:
+        session = _create_aiohttp_session(config)
+        return cls(config, auth, session)
 
     async def close(self) -> None:
         await self._session.close()
 
     def _build_url(self, path: str) -> str:
-        base = str(self._config.endpoint).rstrip("/")
-        path = path.lstrip("/")
-        return f"{base}/{path}"
+        return _build_url(self._config, path)
 
-    @abstractmethod
-    def _build_headers(self, method: str, rel_url: str, content_type: str) -> Mapping[str, str]: ...
+    def _build_headers(self, method: str, rel_url: str, content_type: str) -> Mapping[str, str]:
+        now = datetime.now(UTC)
+        headers = self._auth.sign(
+            method=method,
+            version=self._config.api_version,
+            endpoint=self._config.endpoint,
+            date=now,
+            rel_url=rel_url,
+            content_type=content_type,
+        )
+        return {
+            "Date": now.isoformat(),
+            "Content-Type": content_type,
+            "X-BackendAI-Version": self._config.api_version,
+            **headers,
+        }
 
     async def _request(
         self,
@@ -71,28 +146,12 @@ class BackendAIClient(ABC):
         json: Any | None = None,
         params: dict[str, str] | None = None,
     ) -> dict[str, Any] | list[Any] | None:
-        session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
         headers = self._build_headers(method, rel_url, content_type)
-        url = self._build_url(path)
-        async with session.request(
-            method,
-            url,
-            headers=headers,
-            json=json,
-            params=params,
-        ) as resp:
-            if resp.status >= 400:
-                try:
-                    data = await resp.json()
-                except Exception:
-                    data = await resp.text()
-                raise map_status_to_exception(resp.status, resp.reason or "", data)
-            if resp.status == 204:
-                return None
-            result: dict[str, Any] | list[Any] = await resp.json()
-            return result
+        return await _do_request(
+            self._session, self._config, method, path, headers=headers, json=json, params=params
+        )
 
     async def typed_request(
         self,
@@ -130,65 +189,6 @@ class BackendAIClient(ABC):
             request.model_dump(mode="json", exclude_none=True) if request is not None else None
         )
         await self._request(method, path, json=json_body, params=params)
-
-    @classmethod
-    async def _create_session(cls, config: ClientConfig) -> aiohttp.ClientSession:
-        ssl_context: ssl.SSLContext | bool = not config.skip_ssl_verification
-        connector = aiohttp.TCPConnector(ssl=ssl_context)
-        timeout = aiohttp.ClientTimeout(
-            sock_connect=config.connection_timeout or None,
-            sock_read=config.read_timeout or None,
-        )
-        return aiohttp.ClientSession(
-            connector=connector,
-            timeout=timeout,
-        )
-
-
-class BackendAIAuthClient(BackendAIClient):
-    """Authenticated HTTP client using HMAC signing.
-
-    Use this for all endpoints that require ``Authorization`` headers.
-    Provides additional helpers for file upload, download, WebSocket,
-    and SSE connections.
-    """
-
-    _auth: AuthStrategy
-
-    def __init__(
-        self,
-        config: ClientConfig,
-        auth: AuthStrategy,
-        session: aiohttp.ClientSession,
-    ) -> None:
-        super().__init__(config, session)
-        self._auth = auth
-
-    @classmethod
-    async def create(
-        cls,
-        config: ClientConfig,
-        auth: AuthStrategy,
-    ) -> BackendAIAuthClient:
-        session = await cls._create_session(config)
-        return cls(config, auth, session)
-
-    def _build_headers(self, method: str, rel_url: str, content_type: str) -> Mapping[str, str]:
-        now = datetime.now(UTC)
-        headers = self._auth.sign(
-            method=method,
-            version=self._config.api_version,
-            endpoint=self._config.endpoint,
-            date=now,
-            rel_url=rel_url,
-            content_type=content_type,
-        )
-        return {
-            "Date": now.isoformat(),
-            "Content-Type": content_type,
-            "X-BackendAI-Version": self._config.api_version,
-            **headers,
-        }
 
     async def upload(
         self,
@@ -336,8 +336,8 @@ class BackendAIAuthClient(BackendAIClient):
                 resp.close()
 
 
-class BackendAIAnonymousClient(BackendAIClient):
-    """Unauthenticated HTTP client for anonymous endpoints.
+class BackendAIAnonymousClient:
+    """Unauthenticated HTTP client for anonymous Backend.AI endpoints.
 
     Sends only ``Date``, ``Content-Type``, and ``X-BackendAI-Version``
     headers — no ``Authorization`` header is attached.
@@ -347,13 +347,27 @@ class BackendAIAnonymousClient(BackendAIClient):
     ``update_password_no_auth``.
     """
 
+    _config: ClientConfig
+    _session: aiohttp.ClientSession
+
+    def __init__(
+        self,
+        config: ClientConfig,
+        session: aiohttp.ClientSession,
+    ) -> None:
+        self._config = config
+        self._session = session
+
     @classmethod
     async def create(
         cls,
         config: ClientConfig,
     ) -> BackendAIAnonymousClient:
-        session = await cls._create_session(config)
+        session = _create_aiohttp_session(config)
         return cls(config, session)
+
+    async def close(self) -> None:
+        await self._session.close()
 
     def _build_headers(self, method: str, rel_url: str, content_type: str) -> Mapping[str, str]:
         return {
@@ -361,6 +375,45 @@ class BackendAIAnonymousClient(BackendAIClient):
             "Content-Type": content_type,
             "X-BackendAI-Version": self._config.api_version,
         }
+
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        json: Any | None = None,
+        params: dict[str, str] | None = None,
+    ) -> dict[str, Any] | list[Any] | None:
+        content_type = "application/json"
+        rel_url = "/" + path.lstrip("/")
+        headers = self._build_headers(method, rel_url, content_type)
+        return await _do_request(
+            self._session, self._config, method, path, headers=headers, json=json, params=params
+        )
+
+    async def typed_request(
+        self,
+        method: str,
+        path: str,
+        *,
+        request: BaseRequestModel | None = None,
+        response_model: type[ResponseT],
+        params: dict[str, str] | None = None,
+    ) -> ResponseT:
+        json_body = (
+            request.model_dump(mode="json", exclude_none=True) if request is not None else None
+        )
+        data = await self._request(method, path, json=json_body, params=params)
+        if data is None:
+            raise BackendAPIError(
+                204,
+                "No Content",
+                {
+                    "type": "https://api.backend.ai/probs/unexpected-no-content",
+                    "title": f"Expected a JSON response from {method} {path}, but got 204 No Content",
+                },
+            )
+        return cast(ResponseT, response_model.model_validate(data))
 
     async def authorize(self, request: AuthorizeRequest) -> AuthorizeResponse:
         return await self.typed_request(
