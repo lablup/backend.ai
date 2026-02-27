@@ -42,6 +42,7 @@ from ai.backend.manager.models.kernel import (
 )
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+from ai.backend.manager.utils import query_userinfo as query_userinfo
 
 from .auth import auth_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
