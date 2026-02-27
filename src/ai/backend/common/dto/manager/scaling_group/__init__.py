@@ -12,10 +12,14 @@ from .response import (
     WsproxyVersionResponse,
 )
 
+# Backward-compatible alias: client SDK uses GetWsproxyVersionResponse
+GetWsproxyVersionResponse = WsproxyVersionResponse
+
 __all__ = (
     "ListScalingGroupsRequest",
     "WsproxyVersionPathParam",
     "WsproxyVersionQueryParam",
     "ListScalingGroupsResponse",
     "WsproxyVersionResponse",
+    "GetWsproxyVersionResponse",
 )

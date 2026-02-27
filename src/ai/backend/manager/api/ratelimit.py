@@ -24,8 +24,15 @@ from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.logging import BraceStyleAdapter
 
 from .context import RootContext
-from .rest.ratelimit.handler import rlim_middleware
+from .rest.ratelimit.handler import _rlim_window, rlim_middleware
 from .types import CORSOptions, WebMiddleware
+
+__all__ = (
+    "PrivateContext",
+    "_rlim_window",
+    "rlim_middleware",
+    "create_app",
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

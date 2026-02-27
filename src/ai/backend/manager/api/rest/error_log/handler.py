@@ -107,7 +107,7 @@ class ErrorLogHandler:
                 )
                 result = await conn.execute(usr_query)
                 usrs = result.fetchall()
-                user_ids = [g.id for g in usrs]
+                user_ids = [g.user_id for g in usrs]
                 where = error_logs.c.user.in_(user_ids)
                 select_query = select_query.where(where)
                 count_query = count_query.where(where)
@@ -178,7 +178,7 @@ class ErrorLogHandler:
                 )
                 result = await conn.execute(usr_query)
                 usrs = result.fetchall()
-                user_ids = [g.id for g in usrs]
+                user_ids = [g.user_id for g in usrs]
                 update_query = update_query.where(
                     (error_logs.c.user.in_(user_ids)) & (error_logs.c.id == log_id),
                 )
