@@ -79,6 +79,32 @@ class TestPrometheusQueryPresetRepository:
             await db_sess.flush()
         return preset_id
 
+    @pytest.fixture
+    async def sample_preset_ids(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> list[uuid.UUID]:
+        """Create 5 sample presets directly in DB and return their IDs."""
+        preset_ids: list[uuid.UUID] = []
+        now = datetime.now(tz=UTC)
+        async with db_with_cleanup.begin_session() as db_sess:
+            for i in range(5):
+                preset_id = uuid.uuid4()
+                preset_ids.append(preset_id)
+                row = PrometheusQueryPresetRow(
+                    id=preset_id,
+                    name=f"preset_{i}",
+                    metric_name="backendai_metric",
+                    query_template="template",
+                    time_window=None,
+                    options=PresetOptions(filter_labels=[], group_labels=[]),
+                    created_at=now,
+                    updated_at=now,
+                )
+                db_sess.add(row)
+            await db_sess.flush()
+        return preset_ids
+
     @pytest.mark.asyncio
     async def test_create(
         self,
@@ -142,33 +168,18 @@ class TestPrometheusQueryPresetRepository:
     async def test_search(
         self,
         preset_repository: PrometheusQueryPresetRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_preset_ids: list[uuid.UUID],
     ) -> None:
-        now = datetime.now(tz=UTC)
-        async with db_with_cleanup.begin_session() as db_sess:
-            for i in range(5):
-                row = PrometheusQueryPresetRow(
-                    id=uuid.uuid4(),
-                    name=f"preset_{i}",
-                    metric_name="backendai_metric",
-                    query_template="template",
-                    time_window=None,
-                    options=PresetOptions(filter_labels=[], group_labels=[]),
-                    created_at=now,
-                    updated_at=now,
-                )
-                db_sess.add(row)
-            await db_sess.flush()
-
+        limit = 3
         querier = BatchQuerier(
-            pagination=OffsetPagination(limit=3, offset=0),
+            pagination=OffsetPagination(limit=limit, offset=0),
             conditions=[],
             orders=[],
         )
         result = await preset_repository.search(querier=querier)
 
-        assert len(result.items) == 3
-        assert result.total_count == 5
+        assert len(result.items) == limit
+        assert result.total_count == len(sample_preset_ids)
 
     @pytest.mark.asyncio
     async def test_update(
