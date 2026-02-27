@@ -1,5 +1,18 @@
-"""
-Resource preset APIs.
+"""Backward-compatibility shim for the resource module.
+
+All handler logic has been migrated to the constructor DI pattern:
+
+* ``api.rest.resource.handler`` — ResourceHandler class
+* ``api.rest.resource`` — register_routes()
+
+This module keeps the old-style handler functions and ``create_app()``
+for backward compatibility with ``server.py`` (which still uses the
+legacy subapp pattern) and with existing tests.  ``get_watcher_info()``
+is also kept here for consumers such as ``vfolder.py``.
+
+Once ``server.py`` switches to ``register_routes()``, the handler
+functions below can be removed and this module can be reduced to a
+thin re-export shim (similar to ``api/auth.py``).
 """
 
 from __future__ import annotations
@@ -60,6 +73,13 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _json_loads = functools.partial(json.loads, parse_float=Decimal)
 
 
+# ---------------------------------------------------------------------------
+# Legacy handler functions (kept for create_app() and test backward compat).
+# The canonical DI-based implementation lives in
+# ``ai.backend.manager.api.rest.resource.handler.ResourceHandler``.
+# ---------------------------------------------------------------------------
+
+
 @auth_required
 async def list_presets(request: web.Request) -> web.Response:
     """
@@ -97,9 +117,6 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         access_key = request["keypair"]["access_key"]
         resource_policy = request["keypair"]["resource_policy"]
         domain_name = request["user"]["domain_name"]
-        # TODO: uncomment when we implement scaling group.
-        # scaling_group = request.query.get('scaling_group')
-        # assert scaling_group is not None, 'scaling_group parameter is missing.'
     except (json.decoder.JSONDecodeError, AssertionError) as e:
         raise InvalidAPIParameters(extra_msg=str(e.args[0])) from e
 
