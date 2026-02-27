@@ -23,9 +23,9 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
-    RBACScopeWideEntityUnbinder,
+    RBACScopeEntityUnbinder,
     RBACUnbinderResult,
-    execute_rbac_scope_wide_entity_unbinder,
+    execute_rbac_scope_entity_unbinder,
 )
 from ai.backend.testutils.db import with_tables
 
@@ -56,7 +56,7 @@ class ScopeUnbinderMappingRow(Base):  # type: ignore[misc]
 # =============================================================================
 
 
-class TestScopeWideEntityUnbinder(RBACScopeWideEntityUnbinder[ScopeUnbinderMappingRow]):
+class TestScopeEntityUnbinder(RBACScopeEntityUnbinder[ScopeUnbinderMappingRow]):
     """Scope-wide entity unbinder for testing: delete entities from a scope."""
 
     def __init__(
@@ -173,8 +173,8 @@ async def seed_data(
 # =============================================================================
 
 
-class TestRBACScopeWideEntityUnbinder:
-    """Tests for scope-wide entity unbinding (RBACScopeWideEntityUnbinder)."""
+class TestRBACScopeEntityUnbinder:
+    """Tests for scope entity unbinding (RBACScopeEntityUnbinder)."""
 
     async def test_unbind_single_entity_from_scope(
         self,
@@ -185,13 +185,13 @@ class TestRBACScopeWideEntityUnbinder:
         ctx = seed_data
 
         async with database_connection.begin_session_read_committed() as db_sess:
-            unbinder = TestScopeWideEntityUnbinder(
+            unbinder = TestScopeEntityUnbinder(
                 entity_ids=[ctx.entity_id_1],
                 entity_element_type=RBACElementType.RESOURCE_GROUP,
                 scope_id=ctx.scope_id_a,
                 scope_element_type=RBACElementType.DOMAIN,
             )
-            result = await execute_rbac_scope_wide_entity_unbinder(db_sess, unbinder)
+            result = await execute_rbac_scope_entity_unbinder(db_sess, unbinder)
 
             assert isinstance(result, RBACUnbinderResult)
             assert result.deleted_count == 1
@@ -217,13 +217,13 @@ class TestRBACScopeWideEntityUnbinder:
         ctx = seed_data
 
         async with database_connection.begin_session_read_committed() as db_sess:
-            unbinder = TestScopeWideEntityUnbinder(
+            unbinder = TestScopeEntityUnbinder(
                 entity_ids=[ctx.entity_id_1, ctx.entity_id_2],
                 entity_element_type=RBACElementType.RESOURCE_GROUP,
                 scope_id=ctx.scope_id_a,
                 scope_element_type=RBACElementType.DOMAIN,
             )
-            result = await execute_rbac_scope_wide_entity_unbinder(db_sess, unbinder)
+            result = await execute_rbac_scope_entity_unbinder(db_sess, unbinder)
 
             assert result.deleted_count == 2
             assert len(result.association_rows) == 2
@@ -248,13 +248,13 @@ class TestRBACScopeWideEntityUnbinder:
         ctx = seed_data
 
         async with database_connection.begin_session_read_committed() as db_sess:
-            unbinder = TestScopeWideEntityUnbinder(
+            unbinder = TestScopeEntityUnbinder(
                 entity_ids=None,
                 entity_element_type=RBACElementType.RESOURCE_GROUP,
                 scope_id=ctx.scope_id_a,
                 scope_element_type=RBACElementType.DOMAIN,
             )
-            result = await execute_rbac_scope_wide_entity_unbinder(db_sess, unbinder)
+            result = await execute_rbac_scope_entity_unbinder(db_sess, unbinder)
 
             # Both entities in scope_a deleted
             assert result.deleted_count == 2
@@ -278,13 +278,13 @@ class TestRBACScopeWideEntityUnbinder:
     ) -> None:
         """Unbinding a non-existent entity returns zero counts."""
         async with database_connection.begin_session_read_committed() as db_sess:
-            unbinder = TestScopeWideEntityUnbinder(
+            unbinder = TestScopeEntityUnbinder(
                 entity_ids=[str(uuid.uuid4())],
                 entity_element_type=RBACElementType.RESOURCE_GROUP,
                 scope_id=str(uuid.uuid4()),
                 scope_element_type=RBACElementType.DOMAIN,
             )
-            result = await execute_rbac_scope_wide_entity_unbinder(db_sess, unbinder)
+            result = await execute_rbac_scope_entity_unbinder(db_sess, unbinder)
 
             assert result.deleted_count == 0
             assert len(result.association_rows) == 0
@@ -296,13 +296,13 @@ class TestRBACScopeWideEntityUnbinder:
     ) -> None:
         """Unbinding all entities from a non-existent scope returns zero counts."""
         async with database_connection.begin_session_read_committed() as db_sess:
-            unbinder = TestScopeWideEntityUnbinder(
+            unbinder = TestScopeEntityUnbinder(
                 entity_ids=None,
                 entity_element_type=RBACElementType.RESOURCE_GROUP,
                 scope_id=str(uuid.uuid4()),
                 scope_element_type=RBACElementType.DOMAIN,
             )
-            result = await execute_rbac_scope_wide_entity_unbinder(db_sess, unbinder)
+            result = await execute_rbac_scope_entity_unbinder(db_sess, unbinder)
 
             assert result.deleted_count == 0
             assert len(result.association_rows) == 0
@@ -316,13 +316,13 @@ class TestRBACScopeWideEntityUnbinder:
         ctx = seed_data
 
         async with database_connection.begin_session_read_committed() as db_sess:
-            unbinder = TestScopeWideEntityUnbinder(
+            unbinder = TestScopeEntityUnbinder(
                 entity_ids=None,
                 entity_element_type=RBACElementType.RESOURCE_GROUP,
                 scope_id=ctx.scope_id_a,
                 scope_element_type=RBACElementType.DOMAIN,
             )
-            await execute_rbac_scope_wide_entity_unbinder(db_sess, unbinder)
+            await execute_rbac_scope_entity_unbinder(db_sess, unbinder)
 
             remaining = (await db_sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
             assert len(remaining) == 2
@@ -339,13 +339,13 @@ class TestRBACScopeWideEntityUnbinder:
         ctx = seed_data
 
         async with database_connection.begin_session_read_committed() as db_sess:
-            unbinder = TestScopeWideEntityUnbinder(
+            unbinder = TestScopeEntityUnbinder(
                 entity_ids=[ctx.entity_id_1],
                 entity_element_type=RBACElementType.RESOURCE_GROUP,
                 scope_id=ctx.scope_id_a,
                 scope_element_type=RBACElementType.DOMAIN,
             )
-            await execute_rbac_scope_wide_entity_unbinder(db_sess, unbinder)
+            await execute_rbac_scope_entity_unbinder(db_sess, unbinder)
 
             remaining = (await db_sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
             assert len(remaining) == 3

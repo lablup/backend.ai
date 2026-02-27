@@ -26,11 +26,11 @@ from ai.backend.manager.repositories.base.purger import (
 )
 
 # =============================================================================
-# Scope-Wide Entity Unbinder
+# Scope Entity Unbinder
 # =============================================================================
 
 
-class RBACScopeWideEntityUnbinder[TRow: Base](ABC):
+class RBACScopeEntityUnbinder[TRow: Base](ABC):
     """Unbind entities of a given type from a scope.
 
     Use when removing entity-scope associations for a specific
@@ -87,9 +87,9 @@ class RBACUnbinderResult:
 # =============================================================================
 
 
-async def execute_rbac_scope_wide_entity_unbinder[TRow: Base](
+async def execute_rbac_scope_entity_unbinder[TRow: Base](
     db_sess: SASession,
-    unbinder: RBACScopeWideEntityUnbinder[TRow],
+    unbinder: RBACScopeEntityUnbinder[TRow],
 ) -> RBACUnbinderResult:
     """Delete N:N mapping rows and RBAC associations for an entity type in a scope.
 
