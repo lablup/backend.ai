@@ -1509,142 +1509,6 @@
         "title": "UpdateSharedRequestModel",
         "type": "object"
       },
-      "TransitSessionStatusRequestModel": {
-        "properties": {
-          "session_ids": {
-            "description": "ID array of sessions to check and transit status.",
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "title": "Session Ids",
-            "type": "array"
-          }
-        },
-        "required": [
-          "session_ids"
-        ],
-        "title": "TransitSessionStatusRequestModel",
-        "type": "object"
-      },
-      "SessionStatusResponseModel": {
-        "properties": {
-          "status": {
-            "default": 200,
-            "exclusiveMaximum": 600,
-            "minimum": 100,
-            "title": "Status",
-            "type": "integer"
-          },
-          "session_status_map": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "propertyNames": {
-              "format": "uuid"
-            },
-            "title": "Session Status Map",
-            "type": "object"
-          }
-        },
-        "required": [
-          "session_status_map"
-        ],
-        "title": "SessionStatusResponseModel",
-        "type": "object"
-      },
-      "ContainerLogRequestModel": {
-        "properties": {
-          "ownerAccessKey": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Owneraccesskey"
-          },
-          "kernelId": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Target kernel to get container logs.",
-            "title": "Kernelid"
-          }
-        },
-        "title": "ContainerLogRequestModel",
-        "type": "object"
-      },
-      "CustomizedImageVisibilityScope": {
-        "enum": [
-          "user",
-          "project"
-        ],
-        "title": "CustomizedImageVisibilityScope",
-        "type": "string"
-      },
-      "ConvertSessionToImageRequesteModel": {
-        "properties": {
-          "image_name": {
-            "description": "Name of the image to be created.",
-            "pattern": "[a-zA-Z0-9\\.\\-_]+",
-            "title": "Image Name",
-            "type": "string"
-          },
-          "login_session_token": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Login Session Token"
-          },
-          "image_visibility": {
-            "$ref": "#/components/schemas/CustomizedImageVisibilityScope",
-            "default": "user",
-            "description": "Visibility scope of newly created image. currently only supports `USER` scope. Setting this to value other than `USER` will raise error."
-          }
-        },
-        "required": [
-          "image_name"
-        ],
-        "title": "ConvertSessionToImageRequesteModel",
-        "type": "object"
-      },
-      "ConvertSessionToImageResponseModel": {
-        "properties": {
-          "status": {
-            "default": 200,
-            "exclusiveMaximum": 600,
-            "minimum": 100,
-            "title": "Status",
-            "type": "integer"
-          },
-          "task_id": {
-            "title": "Task Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "task_id"
-        ],
-        "title": "ConvertSessionToImageResponseModel",
-        "type": "object"
-      },
       "ImageFilter": {
         "description": "Filter for images.",
         "properties": {
@@ -12294,7 +12158,7 @@
     },
     "/session": {
       "post": {
-        "operationId": "session.create_from_params",
+        "operationId": "session._handler",
         "tags": [
           "session"
         ],
@@ -12308,156 +12172,13 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "pattern": "^(?=.{4,64}$)\\w[\\w.-]*\\w$"
-                  },
-                  "priority": {
-                    "type": "integer",
-                    "maximum": 100,
-                    "default": 10
-                  },
-                  "image": {
-                    "type": "string"
-                  },
-                  "arch": {
-                    "type": "string"
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "interactive",
-                      "batch",
-                      "inference",
-                      "system"
-                    ],
-                    "default": "interactive"
-                  },
-                  "group": {
-                    "type": "string",
-                    "default": "default"
-                  },
-                  "domain": {
-                    "type": "string",
-                    "default": "default"
-                  },
-                  "cluster_size": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "default": 1
-                  },
-                  "cluster_mode": {
-                    "type": "string",
-                    "enum": [
-                      "single-node",
-                      "multi-node"
-                    ],
-                    "default": "SINGLE_NODE"
-                  },
-                  "config": {
-                    "type": "object",
-                    "description": "Mapping(String => Any)",
-                    "additionalProperties": true,
-                    "default": {}
-                  },
-                  "tag": {
-                    "type": "string"
-                  },
-                  "enqueueOnly": {
-                    "type": "boolean"
-                  },
-                  "maxWaitSeconds": {
-                    "type": "integer"
-                  },
-                  "starts_at": {
-                    "type": "string"
-                  },
-                  "batch_timeout": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "description": "Human-readable time duration representation (e.g. 2y, 3d, 4m, 5h, 6s, ...)"
-                      },
-                      {
-                        "type": "int",
-                        "minimum": 0,
-                        "description": "Number of seconds"
-                      },
-                      {
-                        "type": "float",
-                        "minimum": 0,
-                        "description": "Number of seconds"
-                      }
-                    ]
-                  },
-                  "reuseIfExists": {
-                    "type": "boolean",
-                    "default": true
-                  },
-                  "startupCommand": {
-                    "type": "string"
-                  },
-                  "bootstrap_script": {
-                    "type": "string"
-                  },
-                  "dependencies": {
-                    "anyOf": [
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "format": "uuid"
-                        }
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      }
-                    ]
-                  },
-                  "callback_url": {
-                    "type": "string",
-                    "format": "uri"
-                  },
-                  "owner_access_key": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "name",
-                  "priority",
-                  "image",
-                  "type",
-                  "group",
-                  "domain",
-                  "cluster_size",
-                  "cluster_mode",
-                  "config",
-                  "enqueueOnly",
-                  "maxWaitSeconds",
-                  "reuseIfExists",
-                  "dependencies"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/_/create": {
       "post": {
-        "operationId": "session.create_from_params.2",
+        "operationId": "session._handler.2",
         "tags": [
           "session"
         ],
@@ -12471,156 +12192,13 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "pattern": "^(?=.{4,64}$)\\w[\\w.-]*\\w$"
-                  },
-                  "priority": {
-                    "type": "integer",
-                    "maximum": 100,
-                    "default": 10
-                  },
-                  "image": {
-                    "type": "string"
-                  },
-                  "arch": {
-                    "type": "string"
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "interactive",
-                      "batch",
-                      "inference",
-                      "system"
-                    ],
-                    "default": "interactive"
-                  },
-                  "group": {
-                    "type": "string",
-                    "default": "default"
-                  },
-                  "domain": {
-                    "type": "string",
-                    "default": "default"
-                  },
-                  "cluster_size": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "default": 1
-                  },
-                  "cluster_mode": {
-                    "type": "string",
-                    "enum": [
-                      "single-node",
-                      "multi-node"
-                    ],
-                    "default": "SINGLE_NODE"
-                  },
-                  "config": {
-                    "type": "object",
-                    "description": "Mapping(String => Any)",
-                    "additionalProperties": true,
-                    "default": {}
-                  },
-                  "tag": {
-                    "type": "string"
-                  },
-                  "enqueueOnly": {
-                    "type": "boolean"
-                  },
-                  "maxWaitSeconds": {
-                    "type": "integer"
-                  },
-                  "starts_at": {
-                    "type": "string"
-                  },
-                  "batch_timeout": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "description": "Human-readable time duration representation (e.g. 2y, 3d, 4m, 5h, 6s, ...)"
-                      },
-                      {
-                        "type": "int",
-                        "minimum": 0,
-                        "description": "Number of seconds"
-                      },
-                      {
-                        "type": "float",
-                        "minimum": 0,
-                        "description": "Number of seconds"
-                      }
-                    ]
-                  },
-                  "reuseIfExists": {
-                    "type": "boolean",
-                    "default": true
-                  },
-                  "startupCommand": {
-                    "type": "string"
-                  },
-                  "bootstrap_script": {
-                    "type": "string"
-                  },
-                  "dependencies": {
-                    "anyOf": [
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "format": "uuid"
-                        }
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      }
-                    ]
-                  },
-                  "callback_url": {
-                    "type": "string",
-                    "format": "uri"
-                  },
-                  "owner_access_key": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "name",
-                  "priority",
-                  "image",
-                  "type",
-                  "group",
-                  "domain",
-                  "cluster_size",
-                  "cluster_mode",
-                  "config",
-                  "enqueueOnly",
-                  "maxWaitSeconds",
-                  "reuseIfExists",
-                  "dependencies"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/_/create-from-template": {
       "post": {
-        "operationId": "session.create_from_template",
+        "operationId": "session._handler.3",
         "tags": [
           "session"
         ],
@@ -12634,169 +12212,13 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "template_id": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "name": {
-                    "type": "string",
-                    "pattern": "^(?=.{4,64}$)\\w[\\w.-]*\\w$",
-                    "default": null
-                  },
-                  "priority": {
-                    "type": "integer",
-                    "maximum": 100,
-                    "default": 10
-                  },
-                  "image": {
-                    "type": "string",
-                    "default": null
-                  },
-                  "arch": {
-                    "type": "string",
-                    "default": null
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "interactive",
-                      "batch",
-                      "inference",
-                      "system"
-                    ],
-                    "default": null
-                  },
-                  "group": {
-                    "type": "string",
-                    "default": null
-                  },
-                  "domain": {
-                    "type": "string",
-                    "default": null
-                  },
-                  "cluster_size": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "default": 1
-                  },
-                  "cluster_mode": {
-                    "type": "string",
-                    "enum": [
-                      "single-node",
-                      "multi-node"
-                    ],
-                    "default": "SINGLE_NODE"
-                  },
-                  "config": {
-                    "type": "object",
-                    "description": "Mapping(String => Any)",
-                    "additionalProperties": true,
-                    "default": {}
-                  },
-                  "tag": {
-                    "type": "string",
-                    "default": null
-                  },
-                  "enqueueOnly": {
-                    "type": "boolean"
-                  },
-                  "maxWaitSeconds": {
-                    "type": "integer"
-                  },
-                  "starts_at": {
-                    "type": "string"
-                  },
-                  "batch_timeout": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "description": "Human-readable time duration representation (e.g. 2y, 3d, 4m, 5h, 6s, ...)"
-                      },
-                      {
-                        "type": "int",
-                        "minimum": 0,
-                        "description": "Number of seconds"
-                      },
-                      {
-                        "type": "float",
-                        "minimum": 0,
-                        "description": "Number of seconds"
-                      }
-                    ]
-                  },
-                  "reuseIfExists": {
-                    "type": "boolean",
-                    "default": true
-                  },
-                  "startupCommand": {
-                    "type": "string"
-                  },
-                  "bootstrap_script": {
-                    "type": "string",
-                    "default": null
-                  },
-                  "dependencies": {
-                    "anyOf": [
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "format": "uuid"
-                        }
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      }
-                    ]
-                  },
-                  "callback_url": {
-                    "type": "string",
-                    "format": "uri"
-                  },
-                  "owner_access_key": {
-                    "type": "string",
-                    "default": null
-                  }
-                },
-                "required": [
-                  "priority",
-                  "image",
-                  "group",
-                  "domain",
-                  "cluster_size",
-                  "cluster_mode",
-                  "config",
-                  "tag",
-                  "enqueueOnly",
-                  "maxWaitSeconds",
-                  "reuseIfExists",
-                  "startupCommand",
-                  "bootstrap_script",
-                  "dependencies",
-                  "callback_url",
-                  "owner_access_key"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/_/create-cluster": {
       "post": {
-        "operationId": "session.create_cluster",
+        "operationId": "session._handler.4",
         "tags": [
           "session"
         ],
@@ -12810,74 +12232,13 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "clientSessionToken": {
-                    "type": "string",
-                    "pattern": "^(?=.{4,64}$)\\w[\\w.-]*\\w$"
-                  },
-                  "template_id": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "interactive",
-                      "batch",
-                      "inference",
-                      "system"
-                    ],
-                    "default": "interactive"
-                  },
-                  "group": {
-                    "type": "string",
-                    "default": "default"
-                  },
-                  "domain": {
-                    "type": "string",
-                    "default": "default"
-                  },
-                  "scaling_group": {
-                    "type": "string"
-                  },
-                  "tag": {
-                    "type": "string"
-                  },
-                  "enqueueOnly": {
-                    "type": "boolean"
-                  },
-                  "maxWaitSeconds": {
-                    "type": "integer"
-                  },
-                  "owner_access_key": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "clientSessionToken",
-                  "type",
-                  "group",
-                  "domain",
-                  "enqueueOnly",
-                  "maxWaitSeconds"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/_/match": {
       "get": {
-        "operationId": "session.match_sessions",
+        "operationId": "session._handler.5",
         "tags": [
           "session"
         ],
@@ -12891,22 +12252,13 @@
             "TokenAuth": []
           }
         ],
-        "parameters": [
-          {
-            "name": "id",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "in": "query"
-          }
-        ],
-        "description": "\nA quick session-ID matcher API for use with auto-completion in CLI.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/session/_/sync-agent-registry": {
       "post": {
-        "operationId": "session.sync_agent_registry",
+        "operationId": "session._handler.6",
         "tags": [
           "session"
         ],
@@ -12920,44 +12272,19 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "agent": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "agent"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/_/transit-status": {
       "post": {
-        "operationId": "session.check_and_transit_status",
+        "operationId": "session._handler.7",
         "tags": [
           "session"
         ],
         "responses": {
           "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionStatusResponseModel"
-                }
-              }
-            }
+            "description": "Successful response"
           }
         },
         "security": [
@@ -12965,22 +12292,13 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TransitSessionStatusRequestModel"
-              }
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/{session_name}": {
       "get": {
-        "operationId": "session.get_info",
+        "operationId": "session._handler.8",
         "tags": [
           "session"
         ],
@@ -13007,7 +12325,7 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "patch": {
-        "operationId": "session.restart",
+        "operationId": "session._handler.9",
         "tags": [
           "session"
         ],
@@ -13021,22 +12339,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "owner_access_key": {
-                    "type": "string"
-                  }
-                },
-                "required": []
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [
           {
             "name": "session_name",
@@ -13050,7 +12352,7 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "delete": {
-        "operationId": "session.destroy",
+        "operationId": "session._handler.10",
         "tags": [
           "session"
         ],
@@ -13072,38 +12374,12 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "forced",
-            "schema": {
-              "type": "boolean",
-              "default": "false"
-            },
-            "required": true,
-            "in": "query"
-          },
-          {
-            "name": "recursive",
-            "schema": {
-              "type": "boolean",
-              "default": "false"
-            },
-            "required": true,
-            "in": "query"
-          },
-          {
-            "name": "owner_access_key",
-            "schema": {
-              "type": "string"
-            },
-            "required": false,
-            "in": "query"
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "post": {
-        "operationId": "session.execute",
+        "operationId": "session._handler.11",
         "tags": [
           "session"
         ],
@@ -13132,7 +12408,7 @@
     },
     "/session/_/logs": {
       "head": {
-        "operationId": "session.get_task_logs",
+        "operationId": "session._handler.12",
         "tags": [
           "session"
         ],
@@ -13146,30 +12422,11 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "session_name": {
-                    "type": "string",
-                    "format": "uuid"
-                  }
-                },
-                "required": [
-                  "session_name"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "get": {
-        "operationId": "session.get_task_logs.2",
+        "operationId": "session._handler.13",
         "tags": [
           "session"
         ],
@@ -13183,23 +12440,13 @@
             "TokenAuth": []
           }
         ],
-        "parameters": [
-          {
-            "name": "session_name",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "in": "query"
-          }
-        ],
+        "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/session/{session_name}/direct-access-info": {
       "get": {
-        "operationId": "session.get_direct_access_info",
+        "operationId": "session._handler.14",
         "tags": [
           "session"
         ],
@@ -13228,7 +12475,7 @@
     },
     "/session/{session_name}/logs": {
       "get": {
-        "operationId": "session.get_container_logs",
+        "operationId": "session._handler.15",
         "tags": [
           "session"
         ],
@@ -13242,15 +12489,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ContainerLogRequestModel"
-              }
-            }
-          }
-        },
         "parameters": [
           {
             "name": "session_name",
@@ -13266,7 +12504,7 @@
     },
     "/session/{session_name}/rename": {
       "post": {
-        "operationId": "session.rename_session",
+        "operationId": "session._handler.16",
         "tags": [
           "session"
         ],
@@ -13280,25 +12518,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "pattern": "^(?=.{4,64}$)\\w[\\w.-]*\\w$"
-                  }
-                },
-                "required": [
-                  "name"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [
           {
             "name": "session_name",
@@ -13314,7 +12533,7 @@
     },
     "/session/{session_name}/interrupt": {
       "post": {
-        "operationId": "session.interrupt",
+        "operationId": "session._handler.17",
         "tags": [
           "session"
         ],
@@ -13343,7 +12562,7 @@
     },
     "/session/{session_name}/complete": {
       "post": {
-        "operationId": "session.complete",
+        "operationId": "session._handler.18",
         "tags": [
           "session"
         ],
@@ -13372,7 +12591,7 @@
     },
     "/session/{session_name}/shutdown-service": {
       "post": {
-        "operationId": "session.shutdown_service",
+        "operationId": "session._handler.19",
         "tags": [
           "session"
         ],
@@ -13386,24 +12605,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "service_name": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "service_name"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [
           {
             "name": "session_name",
@@ -13419,7 +12620,7 @@
     },
     "/session/{session_name}/upload": {
       "post": {
-        "operationId": "session.upload_files",
+        "operationId": "session._handler.20",
         "tags": [
           "session"
         ],
@@ -13470,7 +12671,7 @@
         "description": ""
       },
       "post": {
-        "operationId": "session.download_files",
+        "operationId": "session._handler.21",
         "tags": [
           "session"
         ],
@@ -13484,27 +12685,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "files": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "required": [
-                  "files"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [
           {
             "name": "session_name",
@@ -13542,7 +12722,7 @@
         "description": ""
       },
       "post": {
-        "operationId": "session.download_single",
+        "operationId": "session._handler.22",
         "tags": [
           "session"
         ],
@@ -13556,24 +12736,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "file": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "file"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [
           {
             "name": "session_name",
@@ -13584,12 +12746,12 @@
             }
           }
         ],
-        "description": "\nDownload a single file from the scratch root. Only for small files.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/session/{session_name}/files": {
       "get": {
-        "operationId": "session.list_files",
+        "operationId": "session._handler.23",
         "tags": [
           "session"
         ],
@@ -13618,7 +12780,7 @@
     },
     "/session/{session_name}/start-service": {
       "post": {
-        "operationId": "session.start_service",
+        "operationId": "session._handler.24",
         "tags": [
           "session"
         ],
@@ -13632,38 +12794,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "login_session_token": {
-                    "type": "string"
-                  },
-                  "app": {
-                    "type": "string"
-                  },
-                  "port": {
-                    "type": "integer",
-                    "minimum": 1024,
-                    "maximum": 65535
-                  },
-                  "envs": {
-                    "type": "string"
-                  },
-                  "arguments": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "app"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [
           {
             "name": "session_name",
@@ -13679,7 +12809,7 @@
     },
     "/session/{session_name}/commit": {
       "post": {
-        "operationId": "session.commit_session",
+        "operationId": "session._handler.25",
         "tags": [
           "session"
         ],
@@ -13693,25 +12823,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "login_session_token": {
-                    "type": "string"
-                  },
-                  "filename": {
-                    "type": "string"
-                  }
-                },
-                "required": []
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [
           {
             "name": "session_name",
@@ -13725,7 +12836,7 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "get": {
-        "operationId": "session.get_commit_status",
+        "operationId": "session._handler.27",
         "tags": [
           "session"
         ],
@@ -13747,14 +12858,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "login_session_token",
-            "schema": {
-              "type": "string"
-            },
-            "required": false,
-            "in": "query"
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
@@ -13762,20 +12865,13 @@
     },
     "/session/{session_name}/imagify": {
       "post": {
-        "operationId": "session.convert_session_to_image",
+        "operationId": "session._handler.26",
         "tags": [
           "session"
         ],
         "responses": {
           "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConvertSessionToImageResponseModel"
-                }
-              }
-            }
+            "description": "Successful response"
           }
         },
         "security": [
@@ -13783,15 +12879,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ConvertSessionToImageRequesteModel"
-              }
-            }
-          }
-        },
         "parameters": [
           {
             "name": "session_name",
@@ -13807,7 +12894,7 @@
     },
     "/session/{session_name}/status-history": {
       "get": {
-        "operationId": "session.get_status_history",
+        "operationId": "session._handler.28",
         "tags": [
           "session"
         ],
@@ -13829,14 +12916,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "owner_access_key",
-            "schema": {
-              "type": "string"
-            },
-            "required": false,
-            "in": "query"
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
@@ -13844,7 +12923,7 @@
     },
     "/session/{session_name}/abusing-report": {
       "get": {
-        "operationId": "session.get_abusing_report",
+        "operationId": "session._handler.29",
         "tags": [
           "session"
         ],
@@ -13866,14 +12945,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "login_session_token",
-            "schema": {
-              "type": "string"
-            },
-            "required": false,
-            "in": "query"
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
@@ -13881,7 +12952,7 @@
     },
     "/session/{session_name}/dependency-graph": {
       "get": {
-        "operationId": "session.get_dependency_graph",
+        "operationId": "session._handler.30",
         "tags": [
           "session"
         ],
