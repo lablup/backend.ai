@@ -2,13 +2,26 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 import click
 
+from ai.backend.cli.types import ExitCode
+from ai.backend.client.session import Session
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.dto.manager.deployment import (
+    BlueGreenConfigInput,
+    CreateDeploymentPolicyRequest,
+    RollingUpdateConfigInput,
+    UpdateDeploymentPolicyRequest,
+)
+
 from .extensions import pass_ctx_obj
+from .pretty import print_done
 from .types import CLIContext
 
 if TYPE_CHECKING:
@@ -17,7 +30,7 @@ if TYPE_CHECKING:
 
 @click.group()
 def deployment() -> None:
-    """Set of deployment operations (deployments, revisions, routes)"""
+    """Set of deployment operations (deployments, revisions, routes, policies)"""
 
 
 # Deployment commands
@@ -422,6 +435,174 @@ def update_route_traffic_cmd(
             )
             print_done(f"Route traffic status updated: {route_id}")
             print(json.dumps(result.route.model_dump(mode="json"), indent=2, default=str))
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+# Policy commands
+
+
+@deployment.group()
+def policy() -> None:
+    """Manage deployment policies"""
+
+
+@policy.command("info")
+@pass_ctx_obj
+@click.argument("deployment_id", type=str)
+def info_policy_cmd(ctx: CLIContext, deployment_id: str) -> None:
+    """Display the deployment policy."""
+    with Session() as session:
+        try:
+            result = session.Deployment.get_policy(UUID(deployment_id))
+            print(
+                json.dumps(result.deployment_policy.model_dump(mode="json"), indent=2, default=str)
+            )
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@policy.command("create")
+@pass_ctx_obj
+@click.argument("deployment_id", type=str)
+@click.option(
+    "--strategy",
+    type=click.Choice(["ROLLING", "BLUE_GREEN"], case_sensitive=False),
+    required=True,
+    help="Deployment strategy type",
+)
+@click.option(
+    "--rollback-on-failure",
+    is_flag=True,
+    default=False,
+    help="Automatically rollback on failure",
+)
+@click.option("--max-surge", type=int, default=None, help="Max surge for rolling update")
+@click.option(
+    "--max-unavailable", type=int, default=None, help="Max unavailable for rolling update"
+)
+@click.option("--auto-promote", is_flag=True, default=False, help="Auto promote for blue-green")
+@click.option(
+    "--promote-delay", type=int, default=None, help="Promote delay seconds for blue-green"
+)
+def create_policy_cmd(
+    ctx: CLIContext,
+    deployment_id: str,
+    strategy: str,
+    rollback_on_failure: bool,
+    max_surge: int | None,
+    max_unavailable: int | None,
+    auto_promote: bool,
+    promote_delay: int | None,
+) -> None:
+    """Create a deployment policy."""
+    rolling_update = None
+    blue_green = None
+    strategy_enum = DeploymentStrategy(strategy)
+
+    if strategy_enum == DeploymentStrategy.ROLLING:
+        rolling_kwargs: dict[str, int] = {}
+        if max_surge is not None:
+            rolling_kwargs["max_surge"] = max_surge
+        if max_unavailable is not None:
+            rolling_kwargs["max_unavailable"] = max_unavailable
+        if rolling_kwargs:
+            rolling_update = RollingUpdateConfigInput(**rolling_kwargs)
+    elif strategy_enum == DeploymentStrategy.BLUE_GREEN:
+        bg_kwargs: dict[str, int | bool] = {}
+        if auto_promote:
+            bg_kwargs["auto_promote"] = auto_promote
+        if promote_delay is not None:
+            bg_kwargs["promote_delay_seconds"] = promote_delay
+        if bg_kwargs:
+            blue_green = BlueGreenConfigInput(**bg_kwargs)
+
+    with Session() as session:
+        try:
+            request = CreateDeploymentPolicyRequest(
+                strategy=strategy_enum,
+                rollback_on_failure=rollback_on_failure,
+                rolling_update=rolling_update,
+                blue_green=blue_green,
+            )
+            result = session.Deployment.create_policy(UUID(deployment_id), request)
+            print_done(f"Deployment policy created for: {deployment_id}")
+            print(
+                json.dumps(result.deployment_policy.model_dump(mode="json"), indent=2, default=str)
+            )
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@policy.command("update")
+@pass_ctx_obj
+@click.argument("deployment_id", type=str)
+@click.option(
+    "--strategy",
+    type=click.Choice(["ROLLING", "BLUE_GREEN"], case_sensitive=False),
+    default=None,
+    help="Deployment strategy type",
+)
+@click.option(
+    "--rollback-on-failure/--no-rollback-on-failure",
+    is_flag=True,
+    default=None,
+    help="Automatically rollback on failure",
+)
+@click.option("--max-surge", type=int, default=None, help="Max surge for rolling update")
+@click.option(
+    "--max-unavailable", type=int, default=None, help="Max unavailable for rolling update"
+)
+@click.option("--auto-promote", is_flag=True, default=False, help="Auto promote for blue-green")
+@click.option(
+    "--promote-delay", type=int, default=None, help="Promote delay seconds for blue-green"
+)
+def update_policy_cmd(
+    ctx: CLIContext,
+    deployment_id: str,
+    strategy: str | None,
+    rollback_on_failure: bool | None,
+    max_surge: int | None,
+    max_unavailable: int | None,
+    auto_promote: bool,
+    promote_delay: int | None,
+) -> None:
+    """Update a deployment policy. Only provided fields are updated."""
+    strategy_enum = DeploymentStrategy(strategy) if strategy else None
+
+    rolling_update = None
+    blue_green = None
+    if max_surge is not None or max_unavailable is not None:
+        rolling_kwargs: dict[str, int] = {}
+        if max_surge is not None:
+            rolling_kwargs["max_surge"] = max_surge
+        if max_unavailable is not None:
+            rolling_kwargs["max_unavailable"] = max_unavailable
+        rolling_update = RollingUpdateConfigInput(**rolling_kwargs)
+    if auto_promote or promote_delay is not None:
+        bg_kwargs: dict[str, int | bool] = {}
+        if auto_promote:
+            bg_kwargs["auto_promote"] = auto_promote
+        if promote_delay is not None:
+            bg_kwargs["promote_delay_seconds"] = promote_delay
+        blue_green = BlueGreenConfigInput(**bg_kwargs)
+
+    with Session() as session:
+        try:
+            request = UpdateDeploymentPolicyRequest(
+                strategy=strategy_enum,
+                rollback_on_failure=rollback_on_failure,
+                rolling_update=rolling_update,
+                blue_green=blue_green,
+            )
+            result = session.Deployment.update_policy(UUID(deployment_id), request)
+            print_done(f"Deployment policy updated for: {deployment_id}")
+            print(
+                json.dumps(result.deployment_policy.model_dump(mode="json"), indent=2, default=str)
+            )
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
