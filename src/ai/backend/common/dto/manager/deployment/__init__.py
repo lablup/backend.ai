@@ -9,7 +9,6 @@ from .request import (
     ClusterConfigInput,
     CreateDeploymentPolicyRequest,
     CreateDeploymentRequest,
-    CreateRevisionRequest,
     DeploymentFilter,
     DeploymentMetadataInput,
     DeploymentPathParam,
@@ -110,7 +109,6 @@ __all__ = (
     # Request DTOs - Create/Update requests
     "CreateDeploymentRequest",
     "CreateDeploymentPolicyRequest",
-    "CreateRevisionRequest",
     "UpdateDeploymentRequest",
     "UpdateDeploymentPolicyRequest",
     "UpdateRouteTrafficStatusRequest",

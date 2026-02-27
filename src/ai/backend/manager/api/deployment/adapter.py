@@ -22,7 +22,6 @@ from ai.backend.common.dto.manager.deployment import (
     ClusterConfigDTO,
     CreateDeploymentPolicyRequest,
     CreateDeploymentRequest,
-    CreateRevisionRequest,
     DeploymentDTO,
     DeploymentFilter,
     DeploymentOrder,
@@ -516,18 +515,18 @@ class CreateDeploymentAdapter:
 class CreateRevisionAdapter:
     """Adapter for converting create revision request to creators."""
 
-    def build_creator(self, request: CreateRevisionRequest) -> ModelRevisionCreator:
+    def build_creator(self, revision_input: RevisionInput) -> ModelRevisionCreator:
         """
-        Convert CreateRevisionRequest to ModelRevisionCreator.
+        Convert RevisionInput to ModelRevisionCreator.
 
         Args:
-            request: Create revision request DTO
+            revision_input: Revision input DTO
 
         Returns:
             ModelRevisionCreator for service layer
         """
         deployment_adapter = CreateDeploymentAdapter()
-        return deployment_adapter._build_revision_creator(request)
+        return deployment_adapter._build_revision_creator(revision_input)
 
 
 class DeploymentPolicyAdapter:
