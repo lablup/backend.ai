@@ -17,7 +17,6 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.data.permission.types import EntityType, FieldType
 from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
@@ -117,10 +116,6 @@ from ai.backend.manager.repositories.base.purger import (
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
-)
-from ai.backend.manager.repositories.base.rbac.field_creator import (
-    RBACFieldCreator,
-    execute_rbac_field_creator,
 )
 from ai.backend.manager.repositories.base.updater import (
     BatchUpdater,
@@ -1952,14 +1947,10 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             spec = cast(DeploymentRevisionCreatorSpec, creator.spec)
 
-            rbac_creator: RBACFieldCreator[DeploymentRevisionRow] = RBACFieldCreator(
-                spec=spec,
-                entity_type=EntityType.MODEL_DEPLOYMENT,
-                entity_id=str(spec.endpoint_id),
-                field_type=FieldType.MODEL_REVISION,
-            )
-            rbac_result = await execute_rbac_field_creator(db_sess, rbac_creator)
-            return rbac_result.row.to_data()
+            row = spec.build_row()
+            db_sess.add(row)
+            await db_sess.flush()
+            return row.to_data()
 
     async def get_revision(
         self,
