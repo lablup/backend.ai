@@ -5,7 +5,13 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteStatus
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    DeploymentSubStatus,
+    RouteStatus,
+)
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.repositories.base import Creator
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.types import DeploymentInfoWithRoutes, RouteInfo
@@ -15,8 +21,59 @@ class DeploymentLifecycleType(StrEnum):
     CHECK_PENDING = "check_pending"
     CHECK_REPLICA = "check_replica"
     SCALING = "scaling"
+    DEPLOYING = "deploying"
     RECONCILE = "reconcile"
     DESTROYING = "destroying"
+
+
+class DeploymentSubStep(DeploymentSubStatus):
+    """Sub-step variants shared by all deployment strategies (BEP-1049).
+
+    Both Blue-Green and Rolling Update cycle FSMs directly return
+    one of these variants. No strategy-specific statuses exist.
+    """
+
+    PROVISIONING = "provisioning"
+    PROGRESSING = "progressing"
+    ROLLED_BACK = "rolled_back"
+
+
+@dataclass
+class CycleEvaluationResult:
+    """Result of evaluating one cycle of a deployment strategy.
+
+    Returned by strategy evaluation functions (rolling_update_evaluate,
+    blue_green_evaluate). Bundles the sub-step with any route changes
+    that should be applied.
+
+    When ``completed`` is True the strategy has finished and the coordinator
+    should transition the deployment to READY after the handler performs
+    the revision swap in its post_process.
+    """
+
+    sub_step: DeploymentSubStep
+    completed: bool = False
+    scale_out: list[Creator[RoutingRow]] = field(default_factory=list)
+    scale_in_route_ids: list[UUID] = field(default_factory=list)
+
+
+@dataclass
+class EvaluationResult:
+    """Result of strategy evaluation grouping deployments by sub-step.
+
+    Attributes:
+        groups: Deployments grouped by in-progress sub-step for handler dispatch.
+        completed: Deployments whose strategy completed. The coordinator passes
+            these to the PROGRESSING handler's post_process for revision swap,
+            then transitions them to READY.
+        skipped: Deployments skipped (no policy / unsupported strategy).
+        errors: Deployments that failed evaluation.
+    """
+
+    groups: dict[DeploymentSubStep, list[DeploymentInfo]]
+    completed: list[DeploymentInfo] = field(default_factory=list)
+    skipped: list[DeploymentInfo] = field(default_factory=list)
+    errors: list[DeploymentExecutionError] = field(default_factory=list)
 
 
 @dataclass
@@ -34,6 +91,7 @@ class DeploymentExecutionResult:
     successes: list[DeploymentInfo] = field(default_factory=list)
     errors: list[DeploymentExecutionError] = field(default_factory=list)
     skipped: list[DeploymentInfo] = field(default_factory=list)
+    completed: list[DeploymentInfo] = field(default_factory=list)
 
 
 @dataclass

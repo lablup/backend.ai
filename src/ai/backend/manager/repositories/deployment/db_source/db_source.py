@@ -631,7 +631,7 @@ class DeploymentDBSource:
         Returns:
             Total number of rows updated
         """
-        if not batch_updaters:
+        if not batch_updaters and not bulk_creator.specs:
             return 0
 
         async with self._begin_session_read_committed() as db_sess:
@@ -2119,6 +2119,64 @@ class DeploymentDBSource:
 
             return previous_revision_id
 
+    async def begin_deployment(
+        self,
+        endpoint_id: uuid.UUID,
+        deploying_revision_id: uuid.UUID,
+    ) -> None:
+        """Atomically set deploying_revision and transition lifecycle to DEPLOYING."""
+        async with self._begin_session_read_committed() as db_sess:
+            update_query = (
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == endpoint_id)
+                .values(
+                    deploying_revision=deploying_revision_id,
+                    lifecycle_stage=EndpointLifecycle.DEPLOYING,
+                )
+            )
+            await db_sess.execute(update_query)
+
+    async def complete_deployment_revision_swap(
+        self,
+        endpoint_ids: Sequence[uuid.UUID],
+    ) -> None:
+        """Atomically swap deploying_revision → current_revision for completed deployments.
+
+        Sets current_revision = deploying_revision and deploying_revision = NULL
+        for all specified endpoints in a single query.
+        """
+        if not endpoint_ids:
+            return
+        async with self._begin_session_read_committed() as db_sess:
+            update_query = (
+                sa.update(EndpointRow)
+                .where(EndpointRow.id.in_(endpoint_ids))
+                .values(
+                    current_revision=EndpointRow.deploying_revision,
+                    deploying_revision=None,
+                )
+            )
+            await db_sess.execute(update_query)
+
+    async def clear_deploying_revision(
+        self,
+        endpoint_ids: Sequence[uuid.UUID],
+    ) -> None:
+        """Clear deploying_revision for rolled-back deployments.
+
+        Sets deploying_revision = NULL without changing current_revision.
+        Used when a deployment strategy is rolled back.
+        """
+        if not endpoint_ids:
+            return
+        async with self._begin_session_read_committed() as db_sess:
+            update_query = (
+                sa.update(EndpointRow)
+                .where(EndpointRow.id.in_(endpoint_ids))
+                .values(deploying_revision=None)
+            )
+            await db_sess.execute(update_query)
+
     # -------------------------------------------------------------------------
     # Auto-Scaling Policy Methods (DeploymentAutoScalingPolicyRow)
     # -------------------------------------------------------------------------
@@ -2299,9 +2357,7 @@ class DeploymentDBSource:
             )
 
             return AutoScalingRuleSearchResult(
-                items=[
-                    row.EndpointAutoScalingRuleRow.to_model_deployment_data() for row in result.rows
-                ],
+                items=[row.to_model_deployment_data() for row in result.rows],
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,

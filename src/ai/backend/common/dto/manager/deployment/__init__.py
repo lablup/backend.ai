@@ -8,6 +8,7 @@ from .request import (
     BlueGreenConfigInput,
     ClusterConfigInput,
     CreateDeploymentRequest,
+    CreateRevisionRequest,
     DeploymentFilter,
     DeploymentMetadataInput,
     DeploymentPathParam,
@@ -34,6 +35,7 @@ from .response import (
     ActivateRevisionResponse,
     ClusterConfigDTO,
     CreateDeploymentResponse,
+    CreateRevisionResponse,
     CursorPaginationInfo,
     DeactivateRevisionResponse,
     DeploymentDTO,
@@ -100,6 +102,7 @@ __all__ = (
     "RevisionInput",
     # Request DTOs - Create/Update requests
     "CreateDeploymentRequest",
+    "CreateRevisionRequest",
     "UpdateDeploymentRequest",
     "UpdateRouteTrafficStatusRequest",
     # Response DTOs - Data
@@ -114,6 +117,7 @@ __all__ = (
     "ReplicaStateDTO",
     # Response DTOs - Create responses
     "CreateDeploymentResponse",
+    "CreateRevisionResponse",
     # Response DTOs - Get/List responses
     "GetDeploymentResponse",
     "ListDeploymentsResponse",

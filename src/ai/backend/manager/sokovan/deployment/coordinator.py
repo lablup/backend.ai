@@ -51,14 +51,24 @@ from .executor import DeploymentExecutor
 from .handlers import (
     CheckPendingDeploymentHandler,
     CheckReplicaDeploymentHandler,
+    DeployingProgressingHandler,
+    DeployingProvisioningHandler,
+    DeployingRolledBackHandler,
     DeploymentHandler,
+    DeploymentStrategyEvaluator,
     DestroyingDeploymentHandler,
     ReconcileDeploymentHandler,
     ScalingDeploymentHandler,
 )
-from .types import DeploymentExecutionResult, DeploymentLifecycleType
+from .types import (
+    DeploymentExecutionResult,
+    DeploymentLifecycleType,
+    DeploymentSubStep,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
+
+HandlerKey = DeploymentLifecycleType | tuple[DeploymentLifecycleType, DeploymentSubStep]
 
 
 @dataclass
@@ -95,7 +105,8 @@ class DeploymentCoordinator:
     _valkey_schedule: ValkeyScheduleClient
     _deployment_controller: DeploymentController
     _deployment_repository: DeploymentRepository
-    _deployment_handlers: Mapping[DeploymentLifecycleType, DeploymentHandler]
+    _deployment_handlers: Mapping[HandlerKey, DeploymentHandler]
+    _deployment_evaluators: Mapping[DeploymentLifecycleType, DeploymentStrategyEvaluator]
     _lock_factory: DistributedLockFactory
     _config_provider: ManagerConfigProvider
     _event_producer: EventProducer
@@ -131,30 +142,59 @@ class DeploymentCoordinator:
             valkey_stat=valkey_stat,
         )
         self._deployment_handlers = self._init_handlers(executor)
+        self._deployment_evaluators = self._init_evaluators(executor)
 
-    def _init_handlers(
-        self, executor: DeploymentExecutor
-    ) -> Mapping[DeploymentLifecycleType, DeploymentHandler]:
+    def _init_handlers(self, executor: DeploymentExecutor) -> dict[HandlerKey, DeploymentHandler]:
         """Initialize and return the mapping of deployment lifecycle types to their handlers."""
+        DLT = DeploymentLifecycleType
+        DSS = DeploymentSubStep
+
         return {
-            DeploymentLifecycleType.CHECK_PENDING: CheckPendingDeploymentHandler(
+            DLT.CHECK_PENDING: CheckPendingDeploymentHandler(
                 deployment_executor=executor,
                 deployment_controller=self._deployment_controller,
             ),
-            DeploymentLifecycleType.CHECK_REPLICA: CheckReplicaDeploymentHandler(
+            DLT.CHECK_REPLICA: CheckReplicaDeploymentHandler(
                 deployment_executor=executor,
                 deployment_controller=self._deployment_controller,
             ),
-            DeploymentLifecycleType.SCALING: ScalingDeploymentHandler(
+            DLT.SCALING: ScalingDeploymentHandler(
                 deployment_executor=executor,
                 deployment_controller=self._deployment_controller,
                 route_controller=self._route_controller,
             ),
-            DeploymentLifecycleType.RECONCILE: ReconcileDeploymentHandler(
+            # DEPLOYING sub-step handlers (composite keys)
+            (DLT.DEPLOYING, DSS.PROVISIONING): DeployingProvisioningHandler(
+                deployment_executor=executor,
+                deployment_controller=self._deployment_controller,
+                route_controller=self._route_controller,
+            ),
+            (DLT.DEPLOYING, DSS.PROGRESSING): DeployingProgressingHandler(
+                deployment_executor=executor,
+                deployment_controller=self._deployment_controller,
+                route_controller=self._route_controller,
+            ),
+            (DLT.DEPLOYING, DSS.ROLLED_BACK): DeployingRolledBackHandler(
                 deployment_executor=executor,
                 deployment_controller=self._deployment_controller,
             ),
-            DeploymentLifecycleType.DESTROYING: DestroyingDeploymentHandler(
+            DLT.RECONCILE: ReconcileDeploymentHandler(
+                deployment_executor=executor,
+                deployment_controller=self._deployment_controller,
+            ),
+            DLT.DESTROYING: DestroyingDeploymentHandler(
+                deployment_executor=executor,
+                deployment_controller=self._deployment_controller,
+                route_controller=self._route_controller,
+            ),
+        }
+
+    def _init_evaluators(
+        self, executor: DeploymentExecutor
+    ) -> dict[DeploymentLifecycleType, DeploymentStrategyEvaluator]:
+        """Initialize evaluators for lifecycle types that need pre-evaluation."""
+        return {
+            DeploymentLifecycleType.DEPLOYING: DeploymentStrategyEvaluator(
                 deployment_executor=executor,
                 deployment_controller=self._deployment_controller,
                 route_controller=self._route_controller,
@@ -165,6 +205,12 @@ class DeploymentCoordinator:
         self,
         lifecycle_type: DeploymentLifecycleType,
     ) -> None:
+        evaluator = self._deployment_evaluators.get(lifecycle_type)
+        if evaluator is not None:
+            await self._process_with_evaluator(lifecycle_type, evaluator)
+            return
+
+        # Existing single-handler path
         handler = self._deployment_handlers.get(lifecycle_type)
         if not handler:
             log.warning("No handler for deployment lifecycle type: {}", lifecycle_type.value)
@@ -197,6 +243,90 @@ class DeploymentCoordinator:
             except Exception as e:
                 log.error("Error during post-processing: {}", e)
 
+    async def _process_with_evaluator(
+        self,
+        lifecycle_type: DeploymentLifecycleType,
+        evaluator: DeploymentStrategyEvaluator,
+    ) -> None:
+        """Process a lifecycle type that uses an evaluator + per-sub-step handlers."""
+        async with AsyncExitStack() as stack:
+            if evaluator.lock_id is not None:
+                lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
+                await stack.enter_async_context(
+                    self._lock_factory(evaluator.lock_id, lock_lifetime)
+                )
+
+            deployments = await self._deployment_repository.get_endpoints_by_statuses(
+                evaluator.target_statuses()
+            )
+            if not deployments:
+                return
+
+            deployment_ids = [d.id for d in deployments]
+            log.info(
+                "evaluator: {} - processing {} deployments",
+                lifecycle_type.value,
+                len(deployments),
+            )
+
+            handler_results: dict[
+                DeploymentSubStep, tuple[DeploymentHandler, DeploymentExecutionResult]
+            ] = {}
+
+            with DeploymentRecorderContext.scope(
+                lifecycle_type.value, entity_ids=deployment_ids
+            ) as pool:
+                eval_result = await evaluator.evaluate(deployments)
+
+                # Execute per-sub-step handlers
+                for sub_step, group in eval_result.groups.items():
+                    handler = self._deployment_handlers.get((lifecycle_type, sub_step))
+                    if not handler:
+                        log.warning(
+                            "No handler for ({}, {}), skipping {} deployments",
+                            lifecycle_type.value,
+                            sub_step.value,
+                            len(group),
+                        )
+                        continue
+                    result = await handler.execute(group)
+                    handler_results[sub_step] = (handler, result)
+
+                all_records = pool.build_all_records()
+
+                # Use coordinator generic transition logic for each sub-step
+                for sub_step, (handler, result) in handler_results.items():
+                    await self._handle_status_transitions(handler, result, all_records)
+
+            # Attach completed deployments to PROGRESSING handler's result
+            # so the handler's post_process can perform the revision swap.
+            if eval_result.completed:
+                if DeploymentSubStep.PROGRESSING in handler_results:
+                    _, prog_result = handler_results[DeploymentSubStep.PROGRESSING]
+                    prog_result.completed = list(eval_result.completed)
+                else:
+                    # No PROGRESSING group this cycle — create a synthetic entry
+                    progressing_handler = self._deployment_handlers.get((
+                        lifecycle_type,
+                        DeploymentSubStep.PROGRESSING,
+                    ))
+                    if progressing_handler:
+                        handler_results[DeploymentSubStep.PROGRESSING] = (
+                            progressing_handler,
+                            DeploymentExecutionResult(completed=list(eval_result.completed)),
+                        )
+
+            # Post-process outside recorder scope (handler does revision swap here)
+            for sub_step, (handler, result) in handler_results.items():
+                try:
+                    await handler.post_process(result)
+                except Exception as e:
+                    log.error("Error during post-processing for {}: {}", sub_step, e)
+
+            # Lifecycle transition for completed deployments (after revision swap)
+            if eval_result.completed:
+                await self._transition_completed_deployments(eval_result.completed, all_records)
+
     async def _handle_status_transitions(
         self,
         handler: DeploymentHandler,
@@ -224,9 +354,9 @@ class DeploymentCoordinator:
         timestamp_now = datetime.now(UTC).isoformat()
 
         # Handle success transitions
-        next_lifecycle_status = handler.next_status()
-        if next_lifecycle_status is not None and result.successes:
-            next_lifecycle = next_lifecycle_status.lifecycle
+        next_target = handler.next_status()
+        if next_target is not None and result.successes:
+            next_lifecycle = next_target.lifecycle
             endpoint_ids = [d.id for d in result.successes]
             success_history_specs = [
                 DeploymentHistoryCreatorSpec(
@@ -262,9 +392,9 @@ class DeploymentCoordinator:
             ])
 
         # Handle failure transitions
-        failure_lifecycle_status = handler.failure_status()
-        if failure_lifecycle_status is not None and result.errors:
-            failure_lifecycle = failure_lifecycle_status.lifecycle
+        failure_target = handler.failure_status()
+        if failure_target is not None and result.errors:
+            failure_lifecycle = failure_target.lifecycle
             endpoint_ids = [e.deployment_info.id for e in result.errors]
             failure_history_specs = [
                 DeploymentHistoryCreatorSpec(
@@ -312,6 +442,58 @@ class DeploymentCoordinator:
                 await self._event_producer.anycast_event(event)
             except Exception as e:
                 log.warning("Failed to send lifecycle notification: {}", e)
+
+    async def _transition_completed_deployments(
+        self,
+        completed: list[DeploymentInfo],
+        records: Mapping[UUID, ExecutionRecord],
+    ) -> None:
+        """Transition completed deployments from DEPLOYING → READY with history.
+
+        The handler's post_process has already performed the revision swap;
+        this method only updates lifecycle status and records history.
+        """
+        endpoint_ids = [d.id for d in completed]
+        timestamp_now = datetime.now(UTC).isoformat()
+
+        history_specs = [
+            DeploymentHistoryCreatorSpec(
+                deployment_id=d.id,
+                phase="deploying-completed",
+                result=SchedulingResult.SUCCESS,
+                message="Deployment strategy completed successfully",
+                from_status=EndpointLifecycle.DEPLOYING,
+                to_status=EndpointLifecycle.READY,
+                sub_steps=extract_sub_steps_for_entity(d.id, records),
+            )
+            for d in completed
+        ]
+
+        batch_updater = BatchUpdater(
+            spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=EndpointLifecycle.READY),
+            conditions=[
+                DeploymentConditions.by_ids(endpoint_ids),
+                DeploymentConditions.by_lifecycle_stages([EndpointLifecycle.DEPLOYING]),
+            ],
+        )
+
+        await self._deployment_repository.update_endpoint_lifecycle_bulk_with_history(
+            [batch_updater], BulkCreator(specs=history_specs)
+        )
+
+        # Send notification events
+        for d in completed:
+            try:
+                event = self._build_lifecycle_notification_event(
+                    deployment=d,
+                    from_status=EndpointLifecycle.DEPLOYING,
+                    to_status=EndpointLifecycle.READY,
+                    transition_result="success",
+                    timestamp=timestamp_now,
+                )
+                await self._event_producer.anycast_event(event)
+            except Exception as e:
+                log.warning("Failed to send lifecycle notification for {}: {}", d.id, e)
 
     def _build_lifecycle_notification_event(
         self,
@@ -375,6 +557,13 @@ class DeploymentCoordinator:
             # Scaling operations with both short and long cycles
             DeploymentTaskSpec(
                 DeploymentLifecycleType.SCALING,
+                short_interval=5.0,
+                long_interval=30.0,
+                initial_delay=10.0,
+            ),
+            # Deploying (strategy-based) with both short and long cycles (BEP-1049)
+            DeploymentTaskSpec(
+                DeploymentLifecycleType.DEPLOYING,
                 short_interval=5.0,
                 long_interval=30.0,
                 initial_delay=10.0,

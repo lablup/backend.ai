@@ -145,3 +145,15 @@ class RouteUnhealthy(BackendAIError):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class DeploymentAlreadyInProgress(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/deployment-already-in-progress"
+    error_title = "A deployment is already in progress."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_SERVICE,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )

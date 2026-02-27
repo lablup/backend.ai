@@ -7,6 +7,8 @@ from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
     CreateDeploymentRequest,
     CreateDeploymentResponse,
+    CreateRevisionRequest,
+    CreateRevisionResponse,
     DeactivateRevisionResponse,
     DestroyDeploymentResponse,
     GetDeploymentResponse,
@@ -88,6 +90,18 @@ class DeploymentClient(BaseDomainClient):
     # ---------------------------------------------------------------------------
     # Revision operations
     # ---------------------------------------------------------------------------
+
+    async def create_revision(
+        self,
+        deployment_id: uuid.UUID,
+        request: CreateRevisionRequest,
+    ) -> CreateRevisionResponse:
+        return await self._client.typed_request(
+            "POST",
+            f"{self.API_PREFIX}/{deployment_id}/revisions",
+            request=request,
+            response_model=CreateRevisionResponse,
+        )
 
     async def search_revisions(
         self,

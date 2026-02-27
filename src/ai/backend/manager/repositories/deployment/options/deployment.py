@@ -9,8 +9,8 @@ from typing import Any, cast
 import sqlalchemy as sa
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
+from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 

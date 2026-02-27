@@ -37,6 +37,7 @@ __all__ = (
     "ListDeploymentsResponse",
     "UpdateDeploymentResponse",
     "DestroyDeploymentResponse",
+    "CreateRevisionResponse",
     "GetRevisionResponse",
     "ListRevisionsResponse",
     "ActivateRevisionResponse",
@@ -164,6 +165,12 @@ class DestroyDeploymentResponse(BaseResponseModel):
     """Response for destroying a deployment."""
 
     deleted: bool = Field(description="Whether the deployment was deleted")
+
+
+class CreateRevisionResponse(BaseResponseModel):
+    """Response for creating a revision."""
+
+    revision: RevisionDTO = Field(description="Created revision")
 
 
 class GetRevisionResponse(BaseResponseModel):

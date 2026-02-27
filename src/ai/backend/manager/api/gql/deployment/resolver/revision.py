@@ -16,6 +16,8 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     ActivateRevisionPayloadGQL,
     AddRevisionInput,
     AddRevisionPayload,
+    CreateRevisionInput,
+    CreateRevisionPayload,
     ModelRevision,
     ModelRevisionConnection,
     ModelRevisionFilter,
@@ -30,6 +32,9 @@ from ai.backend.manager.data.deployment.inference_runtime_config import (
 )
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
+)
+from ai.backend.manager.services.deployment.actions.model_revision.create_model_revision import (
+    CreateModelRevisionAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
@@ -125,6 +130,21 @@ async def add_model_revision(
     )
 
     return AddRevisionPayload(revision=ModelRevision.from_dataclass(result.revision))
+
+
+@strawberry.mutation(  # type: ignore[misc]
+    description="Added in 25.16.0. Create model revision which is not attached to any deployment."
+)
+async def create_model_revision(
+    input: CreateRevisionInput, info: Info[StrawberryGQLContext]
+) -> CreateRevisionPayload:
+    """Create a new model revision without attaching it to any deployment."""
+    processor = info.context.processors.deployment
+    result = await processor.create_model_revision.wait_for_complete(
+        CreateModelRevisionAction(creator=input.to_model_revision_creator())
+    )
+
+    return CreateRevisionPayload(revision=ModelRevision.from_dataclass(result.revision))
 
 
 @strawberry.mutation(  # type: ignore[misc]

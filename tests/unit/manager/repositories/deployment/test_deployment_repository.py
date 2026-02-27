@@ -14,7 +14,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.types import (
     AccessKey,
@@ -37,7 +37,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.image.types import ImageType
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import AutoScalingPolicyNotFound, DeploymentPolicyNotFound
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
@@ -3498,10 +3498,8 @@ class TestDeploymentRepositoryDuplicateName:
         )
         return RBACEntityCreator(
             spec=spec,
-            element_type=RBACElementType.MODEL_DEPLOYMENT,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.PROJECT, element_id=str(group.id)
-            ),
+            entity_type=EntityType.MODEL_DEPLOYMENT,
+            scope_ref=ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(group.id)),
         )
 
     @pytest.mark.asyncio

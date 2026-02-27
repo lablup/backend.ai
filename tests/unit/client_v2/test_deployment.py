@@ -19,6 +19,7 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
     CreateDeploymentResponse,
+    CreateRevisionResponse,
     DeactivateRevisionResponse,
     DestroyDeploymentResponse,
     GetDeploymentResponse,
@@ -36,6 +37,7 @@ from ai.backend.common.dto.manager.deployment import (
 from ai.backend.common.dto.manager.deployment.request import (
     ClusterConfigInput,
     CreateDeploymentRequest,
+    CreateRevisionRequest,
     DeploymentMetadataInput,
     DeploymentStrategyInput,
     ImageInput,
@@ -259,6 +261,34 @@ class TestDeploymentCRUD:
 
 
 class TestRevisionOperations:
+    @pytest.mark.asyncio
+    async def test_create_revision(self) -> None:
+        resp = _json_response({"revision": _SAMPLE_REVISION_DTO})
+        mock_session = _make_request_session(resp)
+        dc = _make_deployment_client(mock_session)
+
+        request = CreateRevisionRequest(
+            cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
+            resource_config=ResourceConfigInput(
+                resource_group="default",
+                resource_slots={"cpu": "1"},
+            ),
+            image=ImageInput(id=_SAMPLE_IMAGE_ID),
+            model_runtime_config=ModelRuntimeConfigInput(),
+            model_mount_config=ModelMountConfigInput(
+                vfolder_id=_SAMPLE_VFOLDER_ID,
+                definition_path="model.py",
+            ),
+        )
+
+        result = await dc.create_revision(_SAMPLE_DEPLOYMENT_ID, request)
+
+        assert isinstance(result, CreateRevisionResponse)
+        method, url, body = _last_request_call(mock_session)
+        assert method == "POST"
+        assert f"/deployments/{_SAMPLE_DEPLOYMENT_ID}/revisions" in url
+        assert body is not None
+
     @pytest.mark.asyncio
     async def test_search_revisions(self) -> None:
         resp = _json_response({

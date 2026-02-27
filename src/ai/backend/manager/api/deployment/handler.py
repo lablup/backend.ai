@@ -16,6 +16,8 @@ from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
     CreateDeploymentRequest,
     CreateDeploymentResponse,
+    CreateRevisionRequest,
+    CreateRevisionResponse,
     CursorPaginationInfo,
     DeactivateRevisionResponse,
     DeploymentPathParam,
@@ -58,6 +60,9 @@ from ai.backend.manager.services.deployment.actions.destroy_deployment import (
 from ai.backend.manager.services.deployment.actions.get_deployment_by_id import (
     GetDeploymentByIdAction,
 )
+from ai.backend.manager.services.deployment.actions.model_revision.create_model_revision import (
+    CreateModelRevisionAction,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
 )
@@ -83,6 +88,7 @@ from ai.backend.manager.types import OptionalState
 
 from .adapter import (
     CreateDeploymentAdapter,
+    CreateRevisionAdapter,
     DeploymentAdapter,
     RevisionAdapter,
     RouteAdapter,
@@ -99,6 +105,7 @@ class DeploymentAPIHandler:
         self.revision_adapter = RevisionAdapter()
         self.route_adapter = RouteAdapter()
         self.create_deployment_adapter = CreateDeploymentAdapter()
+        self.create_revision_adapter = CreateRevisionAdapter()
 
     def _get_deployment_processors(self, processors: Processors) -> DeploymentProcessors:
         """Get deployment processors, raising ServiceUnavailable if not available."""
@@ -252,6 +259,31 @@ class DeploymentAPIHandler:
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     # Revision Endpoints
+
+    @auth_required_for_method
+    @api_handler
+    async def create_revision(
+        self,
+        _path: PathParam[DeploymentPathParam],
+        body: BodyParam[CreateRevisionRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Create a new revision for a deployment."""
+        deployment_processors = self._get_deployment_processors(processors_ctx.processors)
+
+        # Build creator from request using adapter
+        creator = self.create_revision_adapter.build_creator(body.parsed)
+
+        # Call service action
+        action_result = await deployment_processors.create_model_revision.wait_for_complete(
+            CreateModelRevisionAction(creator=creator)
+        )
+
+        # Build response
+        resp = CreateRevisionResponse(
+            revision=self.revision_adapter.convert_to_dto(action_result.revision)
+        )
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
     @auth_required_for_method
     @api_handler
@@ -429,6 +461,9 @@ def create_app(
     cors.add(app.router.add_route("DELETE", "/{deployment_id}", api_handler.destroy_deployment))
 
     # Revision routes (nested under deployment)
+    cors.add(
+        app.router.add_route("POST", "/{deployment_id}/revisions", api_handler.create_revision)
+    )
     cors.add(
         app.router.add_route(
             "POST", "/{deployment_id}/revisions/search", api_handler.search_revisions

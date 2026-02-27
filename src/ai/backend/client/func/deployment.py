@@ -9,6 +9,8 @@ from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
     CreateDeploymentRequest,
     CreateDeploymentResponse,
+    CreateRevisionRequest,
+    CreateRevisionResponse,
     DeactivateRevisionResponse,
     DestroyDeploymentResponse,
     GetDeploymentResponse,
@@ -103,6 +105,20 @@ class Deployment(BaseFunction):
             return DestroyDeploymentResponse.model_validate(data)
 
     # Revision operations
+
+    @api_function
+    @classmethod
+    async def create_revision(
+        cls,
+        deployment_id: UUID,
+        request: CreateRevisionRequest,
+    ) -> CreateRevisionResponse:
+        """Create a new revision for a deployment."""
+        rqst = Request("POST", f"/deployments/{deployment_id}/revisions")
+        rqst.set_json(request.model_dump(mode="json"))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return CreateRevisionResponse.model_validate(data)
 
     @api_function
     @classmethod

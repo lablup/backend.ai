@@ -224,6 +224,59 @@ def revision() -> None:
     """Manage deployment revisions"""
 
 
+@revision.command("create")
+@pass_ctx_obj
+@click.argument("deployment_id", type=str)
+@click.option(
+    "-f",
+    "--file",
+    "config_file",
+    type=click.Path(exists=True),
+    required=True,
+    help="Path to JSON configuration file for revision",
+)
+def create_revision_cmd(
+    ctx: CLIContext,
+    deployment_id: str,
+    config_file: str,
+) -> None:
+    """Create a new revision for a deployment from a JSON configuration file.
+
+    The configuration file should contain the following structure:
+    {
+        "name": "optional string",
+        "cluster_config": {"mode": "single-node", "size": 1},
+        "resource_config": {"resource_group": "string", "resource_slots": {}},
+        "image": {"name": "string", "architecture": "x86_64"},
+        "model_runtime_config": {"runtime_variant": "CUSTOM"},
+        "model_mount_config": {"vfolder_id": "uuid", "definition_path": "string"},
+        "extra_mounts": [{"vfolder_id": "uuid", "mount_destination": "/path"}]
+    }
+    """
+    import json
+    from uuid import UUID
+
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+    from ai.backend.common.dto.manager.deployment import CreateRevisionRequest
+
+    from .pretty import print_done
+
+    with Session() as session:
+        try:
+            config_file_path = Path(config_file)
+            with config_file_path.open(encoding="utf-8") as f:
+                config_data = json.load(f)
+
+            request = CreateRevisionRequest.model_validate(config_data)
+            result = session.Deployment.create_revision(UUID(deployment_id), request)
+            print_done(f"Revision created: {result.revision.id}")
+            print(json.dumps(result.revision.model_dump(mode="json"), indent=2, default=str))
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
 @revision.command("list")
 @pass_ctx_obj
 @click.argument("deployment_id", type=str)

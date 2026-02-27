@@ -8,7 +8,7 @@ from typing import cast
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
