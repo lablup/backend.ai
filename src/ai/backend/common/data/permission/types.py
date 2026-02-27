@@ -364,6 +364,7 @@ class RBACElementType(enum.StrEnum):
     APP_CONFIG = "app_config"
 
     # === Root-query-enabled entities (superadmin-only) ===
+    AGENT = "agent"
     RESOURCE_PRESET = "resource_preset"
     USER_RESOURCE_POLICY = "user_resource_policy"
     KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"

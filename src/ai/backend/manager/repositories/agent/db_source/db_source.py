@@ -5,6 +5,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import AgentNotFound
 from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -17,6 +18,7 @@ from ai.backend.manager.data.agent.types import (
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
 from ai.backend.manager.models.agent import AgentRow, agents
@@ -27,6 +29,10 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
 from ai.backend.manager.repositories.base import BulkUpserter, execute_bulk_upserter
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.rbac.scope_syncer import (
+    RBACEntityScopeSyncer,
+    execute_rbac_entity_scope_syncer,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -114,6 +120,20 @@ class AgentDBSource:
             )
 
             await session.execute(final_query)
+
+            await execute_rbac_entity_scope_syncer(
+                session,
+                RBACEntityScopeSyncer(
+                    entity_ref=RBACElementRef(
+                        element_type=RBACElementType.AGENT,
+                        element_id=str(upsert_data.metadata.id),
+                    ),
+                    desired_scope_ref=RBACElementRef(
+                        element_type=RBACElementType.RESOURCE_GROUP,
+                        element_id=upsert_data.metadata.scaling_group,
+                    ),
+                ),
+            )
 
             return upsert_result
 
