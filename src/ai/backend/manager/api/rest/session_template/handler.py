@@ -337,12 +337,12 @@ class SessionTemplateHandler:
     async def delete(
         self,
         path: PathParam[TemplatePathParam],
-        body: BodyParam[DeleteSessionTemplateRequest],
+        query: QueryParam[DeleteSessionTemplateRequest],
         ctx: UserContext,
         req: RequestCtx,
     ) -> APIResponse:
         template_id = path.parsed.template_id
-        params = body.parsed
+        params = query.parsed
         requester_access_key, owner_access_key = await get_access_key_scopes(
             req.request, {"owner_access_key": params.owner_access_key}
         )

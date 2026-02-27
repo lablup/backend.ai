@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, Any, Final
 
 import sqlalchemy as sa
 import yaml
-from aiohttp import web
 
 from ai.backend.common.api_handlers import (
     APIResponse,
@@ -227,7 +226,7 @@ class ClusterTemplateHandler:
                 result = await conn.execute(q)
                 entries = []
                 for row in result:
-                    is_owner = row.session_templates_user == user_uuid
+                    is_owner = row.session_templates_user_uuid == user_uuid
                     entries.append({
                         "name": row.session_templates_name,
                         "id": row.session_templates_id,
@@ -285,7 +284,7 @@ class ClusterTemplateHandler:
         query: QueryParam[GetClusterTemplateRequest],
         ctx: UserContext,
         req: RequestCtx,
-    ) -> APIResponse | web.Response:
+    ) -> APIResponse:
         params = query.parsed
         if params.format not in ("yaml", "json"):
             raise InvalidAPIParameters('format should be "yaml" or "json"')
@@ -316,9 +315,6 @@ class ClusterTemplateHandler:
                 raise TaskTemplateNotFound
         if not isinstance(template, dict):
             template = load_json(template)
-        if params.format == "yaml":
-            body = yaml.dump(template)
-            return web.Response(text=body, content_type="text/yaml")
         return APIResponse.build(
             HTTPStatus.OK,
             GetClusterTemplateResponse(root=template),
@@ -382,13 +378,13 @@ class ClusterTemplateHandler:
     async def delete(
         self,
         path: PathParam[TemplatePathParam],
-        body: BodyParam[DeleteClusterTemplateRequest],
+        query: QueryParam[DeleteClusterTemplateRequest],
         ctx: UserContext,
         req: RequestCtx,
     ) -> APIResponse:
         root_ctx: RootContext = req.request.app["_root.context"]
         template_id = path.parsed.template_id
-        params = body.parsed
+        params = query.parsed
 
         requester_access_key, owner_access_key = await get_access_key_scopes(
             req.request, {"owner_access_key": params.owner_access_key}
