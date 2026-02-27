@@ -186,14 +186,16 @@ class MiddlewareParam(ABC, BaseModel):
 
 type JSONDict = dict[str, Any]
 
+type _ResponseData = BaseResponseModel | BaseRootResponseModel[Any]
+
 
 @dataclass
 class APIResponse:
     _status_code: int
-    _data: BaseResponseModel | None
+    _data: _ResponseData | None
 
     @classmethod
-    def build(cls, status_code: int, response_model: BaseResponseModel) -> Self:
+    def build(cls, status_code: int, response_model: _ResponseData) -> Self:
         return cls(_status_code=status_code, _data=response_model)
 
     @classmethod
