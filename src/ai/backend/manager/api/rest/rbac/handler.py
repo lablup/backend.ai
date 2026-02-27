@@ -197,7 +197,7 @@ class RBACHandler:
     ) -> APIResponse:
         """Purge a role (hard delete)."""
         if not ctx.is_superadmin:
-            raise NotEnoughPermission("Only superadmin can delete roles.")
+            raise NotEnoughPermission("Only superadmin can purge roles.")
 
         role_id = body.parsed.role_id
         purger: Purger[RoleRow] = self._role_adapter.build_purger(role_id)
