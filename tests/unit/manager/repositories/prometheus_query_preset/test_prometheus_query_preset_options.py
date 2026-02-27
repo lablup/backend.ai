@@ -298,9 +298,9 @@ class TestPrometheusQueryPresetOptions:
         preset_repository: PrometheusQueryPresetRepository,
         test_case: SearchContext,
     ) -> None:
-        assert isinstance(
-            test_case.case, OrderCase
-        )  # ensure type checker understands the case type for accessing expected fields
+        assert isinstance(test_case.case, OrderCase), (
+            f"Expected OrderCase but got {type(test_case.case).__name__}"
+        )
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
