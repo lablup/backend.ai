@@ -18,7 +18,6 @@ from __future__ import annotations
 import logging
 import os
 import shutil
-import tempfile
 from pathlib import Path
 
 from prometheus_client import CollectorRegistry, generate_latest
@@ -29,8 +28,7 @@ log = logging.getLogger(__spec__.name)
 
 _multiprocess_dir: Path | None = None
 
-_uid = os.getuid() if hasattr(os, "getuid") else "common"
-_DEFAULT_BASE_DIR = Path(tempfile.gettempdir()) / f"backendai.{_uid}" / "prometheus"
+_DEFAULT_BASE_DIR = Path("/tmp/backend.ai/prometheus")
 
 
 def setup_prometheus_multiprocess_dir(
@@ -48,7 +46,7 @@ def setup_prometheus_multiprocess_dir(
     The base directory is resolved in the following priority order:
     1. ``base_dir`` argument (if provided)
     2. ``BACKENDAI_PROMETHEUS_DIR`` environment variable (if set)
-    3. Default: ``/tmp/backendai.<uid>/prometheus/``
+    3. Default: ``/tmp/backend.ai/prometheus/``
 
     Args:
         component: Component name for directory naming (e.g., 'manager', 'agent')
@@ -76,9 +74,8 @@ def setup_prometheus_multiprocess_dir(
     except PermissionError:
         log.error(
             "Cannot create prometheus multiprocess dir %s — permission denied. "
-            "Ensure the directory is writable by the current user (uid=%s).",
+            "Ensure the directory is writable by the current user.",
             multiprocess_dir,
-            _uid,
         )
         raise
 
