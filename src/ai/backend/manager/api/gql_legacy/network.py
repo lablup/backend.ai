@@ -13,7 +13,9 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.common import (
     GenericForbidden,
     ObjectNotFound,
@@ -25,6 +27,11 @@ from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.network import NetworkRow
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
+from ai.backend.manager.repositories.network.creators import NetworkCreatorSpec
 
 from .base import (
     FilterExprArg,
@@ -272,19 +279,26 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
 
         async def _do_mutate() -> CreateNetwork:
             async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
-                row = NetworkRow(
-                    name,
-                    network_name,
-                    _driver,
-                    project.domain_name,
-                    project.id,
-                    options=network_info.options,
+                rbac_creator = RBACEntityCreator(
+                    spec=NetworkCreatorSpec(
+                        name=name,
+                        ref_name=network_name,
+                        driver=_driver,
+                        domain_name=project.domain_name,
+                        project_id=project.id,
+                        options=network_info.options,
+                    ),
+                    element_type=RBACElementType.NETWORK,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.PROJECT,
+                        element_id=str(project.id),
+                    ),
                 )
-                db_session.add(row)
+                result = await execute_rbac_entity_creator(db_session, rbac_creator)
                 return CreateNetwork(
                     ok=True,
                     msg="Network created",
-                    network=NetworkNode.from_row(row),
+                    network=NetworkNode.from_row(result.row),
                 )
 
         return await gql_mutation_wrapper(CreateNetwork, _do_mutate)
