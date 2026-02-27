@@ -181,6 +181,7 @@ class ErrorDomain(enum.StrEnum):
     KEYPAIR_RESOURCE_POLICY = "keypair-resource-policy"
     DATABASE = "database"
     USER_RESOURCE_POLICY = "user-resource-policy"
+    PROMETHEUS_QUERY_PRESET = "prometheus-query-preset"
 
     EXTERNAL_SYSTEM = "external-system"  # Errors from external systems
 
@@ -1166,4 +1167,16 @@ class RBACTypeConversionError(BackendAIError, web.HTTPInternalServerError):
             domain=ErrorDomain.PERMISSION,
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class PrometheusQueryPresetNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/prometheus-query-preset-not-found"
+    error_title = "The prometheus query preset does not exist."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PROMETHEUS_QUERY_PRESET,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
         )

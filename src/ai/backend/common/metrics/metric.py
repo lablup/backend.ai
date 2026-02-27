@@ -423,6 +423,7 @@ class LayerType(enum.StrEnum):
     NOTIFICATION_REPOSITORY = "notification_repository"
     OBJECT_STORAGE_REPOSITORY = "object_storage_repository"
     PERMISSION_CONTROLLER_REPOSITORY = "permission_controller_repository"
+    PROMETHEUS_QUERY_PRESET_REPOSITORY = "prometheus_query_preset_repository"
     PROJECT_RESOURCE_POLICY_REPOSITORY = "project_resource_policy_repository"
     RESERVOIR_REGISTRY_REPOSITORY = "reservoir_registry_repository"
     RESOURCE_PRESET_REPOSITORY = "resource_preset_repository"
