@@ -47,9 +47,7 @@ from ai.backend.common.dto.manager.deployment import (
 )
 from ai.backend.manager.data.deployment.types import RouteTrafficStatus as ManagerRouteTrafficStatus
 from ai.backend.manager.dto.context import UserContext
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentMetadataUpdaterSpec,
@@ -419,10 +417,9 @@ class DeploymentAPIHandler:
         """Create a deployment policy for a deployment."""
         deployment_processors = self._get_deployment_processors()
 
-        creator_spec = self._policy_adapter.build_creator_spec(
-            body.parsed, endpoint_id=path.parsed.deployment_id
+        creator = self._policy_adapter.build_creator(
+            body.parsed, deployment_id=path.parsed.deployment_id
         )
-        creator = Creator[DeploymentPolicyRow](spec=creator_spec)
 
         action_result = await deployment_processors.create_deployment_policy.wait_for_complete(
             CreateDeploymentPolicyAction(creator=creator)
@@ -441,22 +438,17 @@ class DeploymentAPIHandler:
         """Update a deployment policy."""
         deployment_processors = self._get_deployment_processors()
 
-        updater_spec = self._policy_adapter.build_updater_spec(body.parsed)
+        modifier = self._policy_adapter.build_modifier(body.parsed)
 
         # Get the policy first to find its ID
         policy_result = await deployment_processors.get_deployment_policy.wait_for_complete(
             GetDeploymentPolicyAction(endpoint_id=path.parsed.deployment_id)
         )
 
-        updater = Updater[DeploymentPolicyRow](
-            spec=updater_spec,
-            pk_value=policy_result.data.id,
-        )
-
         action_result = await deployment_processors.update_deployment_policy.wait_for_complete(
             UpdateDeploymentPolicyAction(
                 policy_id=policy_result.data.id,
-                updater=updater,
+                modifier=modifier,
             )
         )
 

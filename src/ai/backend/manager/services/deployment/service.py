@@ -32,9 +32,11 @@ from ai.backend.manager.data.deployment.types import (
     RouteInfo,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.service import RoutingNotFound
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base import Creator, Updater
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
@@ -48,6 +50,10 @@ from ai.backend.manager.repositories.deployment.creators import (
     EndpointTokenCreatorSpec,
     ModelRevisionFields,
 )
+from ai.backend.manager.repositories.deployment.creators.policy import (
+    DeploymentPolicyCreatorSpec,
+)
+from ai.backend.manager.repositories.deployment.updaters import DeploymentPolicyUpdaterSpec
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
@@ -489,7 +495,20 @@ class DeploymentService:
         Returns:
             CreateDeploymentPolicyActionResult: Result containing the created policy data
         """
-        data = await self._deployment_repository.create_deployment_policy(action.creator)
+        creator = action.creator
+        deployment_id = creator.deployment_id
+        if deployment_id is None:
+            raise ServerMisconfiguredError(
+                "deployment_id must be set in the creator when creating a deployment policy"
+            )
+        spec = DeploymentPolicyCreatorSpec(
+            endpoint_id=deployment_id,
+            strategy=creator.strategy,
+            strategy_spec=creator.strategy_spec,
+            rollback_on_failure=creator.rollback_on_failure,
+        )
+        repo_creator: Creator[DeploymentPolicyRow] = Creator(spec=spec)
+        data = await self._deployment_repository.create_deployment_policy(repo_creator)
         return CreateDeploymentPolicyActionResult(data=data)
 
     async def update_deployment_policy(
@@ -498,7 +517,7 @@ class DeploymentService:
         """Update a deployment policy.
 
         Args:
-            action: Action containing the policy ID and updater
+            action: Action containing the policy ID and modifier
 
         Returns:
             UpdateDeploymentPolicyActionResult: Result containing the updated policy data
@@ -506,7 +525,17 @@ class DeploymentService:
         Raises:
             DeploymentPolicyNotFound: If the policy does not exist
         """
-        data = await self._deployment_repository.update_deployment_policy(action.updater)
+        modifier = action.modifier
+        updater_spec = DeploymentPolicyUpdaterSpec(
+            strategy=modifier.strategy,
+            strategy_spec=modifier.strategy_spec,
+            rollback_on_failure=modifier.rollback_on_failure,
+        )
+        updater: Updater[DeploymentPolicyRow] = Updater(
+            spec=updater_spec,
+            pk_value=action.policy_id,
+        )
+        data = await self._deployment_repository.update_deployment_policy(updater)
         return UpdateDeploymentPolicyActionResult(data=data)
 
     # ========== Revision Operations ==========

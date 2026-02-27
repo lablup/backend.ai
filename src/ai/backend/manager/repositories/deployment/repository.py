@@ -30,7 +30,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.gql_legacy.statistics import EndpointStatistics, KernelStatistics
-from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
+from ai.backend.manager.data.deployment.creator import DeploymentPolicyCreator
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingRule,
     AutoScalingRuleCreator,
@@ -147,7 +147,7 @@ class DeploymentRepository:
     async def create_endpoint(
         self,
         creator: RBACEntityCreator[EndpointRow],
-        policy_config: DeploymentPolicyConfig | None = None,
+        policy_config: DeploymentPolicyCreator | None = None,
     ) -> DeploymentInfo:
         """Create a new endpoint and return DeploymentInfo.
 

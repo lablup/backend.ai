@@ -52,11 +52,12 @@ from ai.backend.common.dto.manager.deployment.types import (
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.api.adapter import BaseFilterAdapter
 from ai.backend.manager.data.deployment.creator import (
-    DeploymentPolicyConfig,
+    DeploymentPolicyCreator,
     ModelRevisionCreator,
     NewDeploymentCreator,
     VFolderMountsCreator,
 )
+from ai.backend.manager.data.deployment.modifier import DeploymentPolicyModifier
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
@@ -83,9 +84,6 @@ from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
 )
-from ai.backend.manager.repositories.deployment.creators.policy import (
-    DeploymentPolicyCreatorSpec,
-)
 from ai.backend.manager.repositories.deployment.options import (
     DeploymentConditions,
     DeploymentOrders,
@@ -94,7 +92,6 @@ from ai.backend.manager.repositories.deployment.options import (
     RouteConditions,
     RouteOrders,
 )
-from ai.backend.manager.repositories.deployment.updaters import DeploymentPolicyUpdaterSpec
 from ai.backend.manager.types import OptionalState
 
 __all__ = (
@@ -413,7 +410,7 @@ class CreateDeploymentAdapter:
         model_revision = self._build_revision_creator(request.initial_revision)
 
         # Build policy config
-        policy = self._build_policy_config(request.default_deployment_strategy)
+        policy = self._build_legacy_creator(request.default_deployment_strategy)
 
         return NewDeploymentCreator(
             metadata=metadata,
@@ -481,11 +478,11 @@ class CreateDeploymentAdapter:
             execution=execution,
         )
 
-    def _build_policy_config(
+    def _build_legacy_creator(
         self,
         strategy_input: Any,  # DeploymentStrategyInput
-    ) -> DeploymentPolicyConfig:
-        """Build DeploymentPolicyConfig from strategy input."""
+    ) -> DeploymentPolicyCreator:
+        """Build DeploymentPolicyCreator from strategy input."""
         strategy = DeploymentStrategy(strategy_input.type)
 
         strategy_spec: RollingUpdateSpec | BlueGreenSpec
@@ -507,7 +504,7 @@ class CreateDeploymentAdapter:
                         promote_delay_seconds=strategy_input.blue_green.promote_delay_seconds,
                     )
 
-        return DeploymentPolicyConfig(
+        return DeploymentPolicyCreator(
             strategy=strategy,
             strategy_spec=strategy_spec,
             rollback_on_failure=strategy_input.rollback_on_failure,
@@ -528,10 +525,10 @@ class DeploymentPolicyAdapter:
             updated_at=data.updated_at,
         )
 
-    def build_creator_spec(
-        self, request: CreateDeploymentPolicyRequest, endpoint_id: UUID
-    ) -> DeploymentPolicyCreatorSpec:
-        """Build DeploymentPolicyCreatorSpec from create request."""
+    def build_creator(
+        self, request: CreateDeploymentPolicyRequest, deployment_id: UUID
+    ) -> DeploymentPolicyCreator:
+        """Build DeploymentPolicyCreator from create request."""
         strategy = request.strategy
 
         strategy_spec: RollingUpdateSpec | BlueGreenSpec
@@ -555,17 +552,15 @@ class DeploymentPolicyAdapter:
             case _:
                 raise InvalidAPIParameters(f"Unsupported deployment strategy: {strategy}")
 
-        return DeploymentPolicyCreatorSpec(
-            endpoint_id=endpoint_id,
+        return DeploymentPolicyCreator(
+            deployment_id=deployment_id,
             strategy=strategy,
             strategy_spec=strategy_spec,
             rollback_on_failure=request.rollback_on_failure,
         )
 
-    def build_updater_spec(
-        self, request: UpdateDeploymentPolicyRequest
-    ) -> DeploymentPolicyUpdaterSpec:
-        """Build DeploymentPolicyUpdaterSpec from update request."""
+    def build_modifier(self, request: UpdateDeploymentPolicyRequest) -> DeploymentPolicyModifier:
+        """Build DeploymentPolicyModifier from update request."""
         strategy: OptionalState[DeploymentStrategy] = OptionalState.nop()
         strategy_spec: OptionalState[RollingUpdateSpec | BlueGreenSpec] = OptionalState.nop()
         rollback_on_failure: OptionalState[bool] = OptionalState.nop()
@@ -589,7 +584,7 @@ class DeploymentPolicyAdapter:
                 )
             )
 
-        return DeploymentPolicyUpdaterSpec(
+        return DeploymentPolicyModifier(
             strategy=strategy,
             strategy_spec=strategy_spec,
             rollback_on_failure=rollback_on_failure,
