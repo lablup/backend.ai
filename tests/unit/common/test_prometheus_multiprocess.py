@@ -67,6 +67,30 @@ class TestSetupPrometheusMultiprocDir:
 
         assert first == second  # idempotent, returns first result
 
+    def test_base_dir_parameter_overrides_default(self, tmp_path: Path) -> None:
+        custom_base = tmp_path / "custom_base"
+        result = setup_prometheus_multiprocess_dir("manager", base_dir=custom_base)
+
+        assert result == custom_base / "manager"
+        assert result.is_dir()
+        assert os.environ["PROMETHEUS_MULTIPROC_DIR"] == str(result)
+
+    def test_backendai_prometheus_dir_env_var_overrides_default(self, tmp_path: Path) -> None:
+        env_base = tmp_path / "env_base"
+        with patch.dict(os.environ, {"BACKENDAI_PROMETHEUS_DIR": str(env_base)}):
+            result = setup_prometheus_multiprocess_dir("agent")
+            assert result == env_base / "agent"
+            assert result.is_dir()
+            assert os.environ["PROMETHEUS_MULTIPROC_DIR"] == str(result)
+
+    def test_base_dir_parameter_takes_priority_over_env_var(self, tmp_path: Path) -> None:
+        custom_base = tmp_path / "custom_base"
+        env_base = tmp_path / "env_base"
+        with patch.dict(os.environ, {"BACKENDAI_PROMETHEUS_DIR": str(env_base)}):
+            result = setup_prometheus_multiprocess_dir("manager", base_dir=custom_base)
+            assert result == custom_base / "manager"
+            assert result.is_dir()
+
 
 class TestGenerateLatestMultiprocess:
     def test_returns_bytes_normally(self, tmp_path: Path) -> None:
