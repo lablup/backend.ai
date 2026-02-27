@@ -1162,6 +1162,8 @@ configure_backendai() {
   show_info "Setting up databases... (core)"
   echo "(postgres container: ${POSTGRES_CONTAINER_ID})"
   ./backend.ai mgr schema oneshot
+  # Apply any pending migrations for existing databases
+  ./py -m alembic upgrade head
 
   ./backend.ai mgr fixture populate fixtures/manager/example-container-registries-harbor.json
   ./backend.ai mgr fixture populate fixtures/manager/example-users.json

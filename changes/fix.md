@@ -1,0 +1,1 @@
+Remove the `invoked_programmatically` ContextVar that caused `schema oneshot` to silently skip migrations on existing databases, and clarify that `schema oneshot` is only for fresh database initialization.
