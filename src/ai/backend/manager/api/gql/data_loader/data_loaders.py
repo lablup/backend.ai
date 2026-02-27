@@ -9,6 +9,7 @@ from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.agent.types import AgentDetailData
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRevisionData
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryData,
     ModelDeploymentAccessTokenData,
@@ -45,6 +46,7 @@ from .agent import load_agents_by_ids, load_container_counts
 from .artifact import load_artifacts_by_ids
 from .artifact_registry import load_artifact_registries_by_ids
 from .artifact_revision import load_artifact_revisions_by_ids
+from .container_registry import load_container_registries_by_ids
 from .deployment import (
     load_access_tokens_by_ids,
     load_auto_scaling_rules_by_ids,
@@ -121,6 +123,14 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, ArtifactRegistryData | None]:
         return DataLoader(
             load_fn=partial(load_artifact_registries_by_ids, self._processors.artifact_registry)
+        )
+
+    @cached_property
+    def container_registry_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, ContainerRegistryData | None]:
+        return DataLoader(
+            load_fn=partial(load_container_registries_by_ids, self._processors.container_registry)
         )
 
     @cached_property
