@@ -21,8 +21,14 @@ from ai.backend.manager.repositories.base import (
     execute_creator,
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
+    PrometheusQueryPresetUpdaterSpec,
+)
+from ai.backend.manager.types import OptionalState
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
+
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
@@ -46,12 +52,47 @@ class PrometheusQueryPresetDBSource:
             result = await execute_creator(db_sess, creator)
             return result.row.to_data()
 
+    async def _merge_partial_options(
+        self,
+        db_sess: SASession,
+        updater: Updater[PrometheusQueryPresetRow],
+    ) -> Updater[PrometheusQueryPresetRow]:
+        """When only one of filter_labels/group_labels is being updated,
+        fetch the current options to preserve the other field."""
+        updater.spec = cast(PrometheusQueryPresetUpdaterSpec, updater.spec)
+        filter_updating = updater.spec.filter_labels.optional_value() is not None
+        group_updating = updater.spec.group_labels.optional_value() is not None
+
+        # If both are being updated or both are not being updated, no need to merge
+        if filter_updating == group_updating:
+            return updater
+
+        stmt = sa.select(PrometheusQueryPresetRow.options).where(
+            PrometheusQueryPresetRow.id == updater.pk_value
+        )
+        current_options = (await db_sess.execute(stmt)).scalar_one_or_none()
+        if current_options is None:
+            raise PrometheusQueryPresetNotFound(
+                f"Prometheus query preset {updater.pk_value} not found"
+            )
+
+        if filter_updating:
+            updater.spec.group_labels = OptionalState[list[str]].update(
+                list(current_options.group_labels)
+            )
+        if group_updating:
+            updater.spec.filter_labels = OptionalState[list[str]].update(
+                list(current_options.filter_labels)
+            )
+        return updater
+
     async def update(
         self,
         updater: Updater[PrometheusQueryPresetRow],
     ) -> PrometheusQueryPresetData:
         """Updates an existing prometheus query preset."""
         async with self._db.begin_session() as db_sess:
+            updater = await self._merge_partial_options(db_sess, updater)
             result = await execute_updater(db_sess, updater)
             if result is None:
                 raise PrometheusQueryPresetNotFound(

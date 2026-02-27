@@ -204,6 +204,44 @@ class TestPrometheusQueryPresetRepository:
         assert result.time_window is None
 
     @pytest.mark.asyncio
+    async def test_update_filter_labels_only_preserves_group_labels(
+        self,
+        preset_repository: PrometheusQueryPresetRepository,
+        sample_preset_id: uuid.UUID,
+    ) -> None:
+        original = await preset_repository.get_by_id(sample_preset_id)
+
+        updated_filter_labels = ["updated_filter"]
+        updater_spec = PrometheusQueryPresetUpdaterSpec(
+            filter_labels=OptionalState[list[str]].update(updated_filter_labels),
+        )
+        updater = Updater(spec=updater_spec, pk_value=sample_preset_id)
+
+        result = await preset_repository.update(updater=updater)
+
+        assert result.filter_labels == updated_filter_labels
+        assert result.group_labels == original.group_labels
+
+    @pytest.mark.asyncio
+    async def test_update_group_labels_only_preserves_filter_labels(
+        self,
+        preset_repository: PrometheusQueryPresetRepository,
+        sample_preset_id: uuid.UUID,
+    ) -> None:
+        original = await preset_repository.get_by_id(sample_preset_id)
+
+        updated_group_labels = ["updated_group"]
+        updater_spec = PrometheusQueryPresetUpdaterSpec(
+            group_labels=OptionalState[list[str]].update(updated_group_labels),
+        )
+        updater = Updater(spec=updater_spec, pk_value=sample_preset_id)
+
+        result = await preset_repository.update(updater=updater)
+
+        assert result.group_labels == updated_group_labels
+        assert result.filter_labels == original.filter_labels
+
+    @pytest.mark.asyncio
     async def test_delete(
         self,
         preset_repository: PrometheusQueryPresetRepository,

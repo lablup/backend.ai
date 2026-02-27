@@ -36,10 +36,12 @@ class PrometheusQueryPresetUpdaterSpec(UpdaterSpec[PrometheusQueryPresetRow]):
         self.metric_name.update_dict(to_update, "metric_name")
         self.query_template.update_dict(to_update, "query_template")
         self.time_window.update_dict(to_update, "time_window")
+        # filter_labels and group_labels are stored together in the JSONB `options` column.
+        # DBSource._merge_partial_options() ensures both fields are filled before this runs,
+        # so the [] fallback is a safety net that should not be reached in normal flow.
         filter_value = self.filter_labels.optional_value()
         group_value = self.group_labels.optional_value()
         if filter_value is not None or group_value is not None:
-            # Reconstruct options as a PresetOptions model for PydanticColumn
             to_update["options"] = PresetOptions(
                 filter_labels=filter_value if filter_value is not None else [],
                 group_labels=group_value if group_value is not None else [],
