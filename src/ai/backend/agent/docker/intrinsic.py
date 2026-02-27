@@ -245,6 +245,9 @@ class CPUPlugin(AbstractComputePlugin):
         ctx: StatContext,
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
+        if not container_ids:
+            return []
+
         async def sysfs_impl(container_id: str) -> float | None:
             cpu_path = ctx.agent.get_cgroup_path("cpuacct", container_id)
             version = ctx.agent.docker_info["CgroupVersion"]  # type: ignore[attr-defined]
@@ -604,6 +607,9 @@ class MemoryPlugin(AbstractComputePlugin):
     async def gather_container_measures(
         self, ctx: StatContext, container_ids: Sequence[str]
     ) -> Sequence[ContainerMeasurement]:
+        if not container_ids:
+            return []
+
         def get_scratch_size(_container_id: str) -> int:
             # Temporarily disabled as this function incurs too much delay with
             # a large number of files in scratch dirs, causing indefinite accumulation of
