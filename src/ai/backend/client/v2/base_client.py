@@ -15,6 +15,16 @@ from ai.backend.common.api_handlers import (
     BaseResponseModel,
     BaseRootResponseModel,
 )
+from ai.backend.common.dto.manager.auth.request import (
+    AuthorizeRequest,
+    SignupRequest,
+    UpdatePasswordNoAuthRequest,
+)
+from ai.backend.common.dto.manager.auth.response import (
+    AuthorizeResponse,
+    SignupResponse,
+    UpdatePasswordNoAuthResponse,
+)
 
 from .auth import AuthStrategy
 from .config import ClientConfig
@@ -331,6 +341,10 @@ class BackendAIAnonymousClient(BackendAIClient):
 
     Sends only ``Date``, ``Content-Type``, and ``X-BackendAI-Version``
     headers — no ``Authorization`` header is attached.
+
+    Provides convenience methods for the three auth endpoints that do
+    not require authentication: ``authorize``, ``signup``, and
+    ``update_password_no_auth``.
     """
 
     @classmethod
@@ -347,3 +361,29 @@ class BackendAIAnonymousClient(BackendAIClient):
             "Content-Type": content_type,
             "X-BackendAI-Version": self._config.api_version,
         }
+
+    async def authorize(self, request: AuthorizeRequest) -> AuthorizeResponse:
+        return await self.typed_request(
+            "POST",
+            "/auth/authorize",
+            request=request,
+            response_model=AuthorizeResponse,
+        )
+
+    async def signup(self, request: SignupRequest) -> SignupResponse:
+        return await self.typed_request(
+            "POST",
+            "/auth/signup",
+            request=request,
+            response_model=SignupResponse,
+        )
+
+    async def update_password_no_auth(
+        self, request: UpdatePasswordNoAuthRequest
+    ) -> UpdatePasswordNoAuthResponse:
+        return await self.typed_request(
+            "POST",
+            "/auth/update-password-no-auth",
+            request=request,
+            response_model=UpdatePasswordNoAuthResponse,
+        )
