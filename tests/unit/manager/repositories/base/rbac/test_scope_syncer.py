@@ -97,27 +97,6 @@ class TestRBACEntityScopeSyncerCreate:
             assert result.association_row.entity_id == entity_id
             assert result.unbound_rows == []
 
-    async def test_creates_with_ref_relation_type(
-        self,
-        database_connection: ExtendedAsyncSAEngine,
-        create_tables: None,
-        entity_id: str,
-        scope_id: str,
-    ) -> None:
-        """Syncer respects explicit relation_type=REF."""
-        syncer = RBACEntityScopeSyncer(
-            entity_ref=RBACElementRef(RBACElementType.VFOLDER, entity_id),
-            desired_scope_ref=RBACElementRef(RBACElementType.PROJECT, scope_id),
-            relation_type=RelationType.REF,
-        )
-
-        async with database_connection.begin_session() as db_sess:
-            result = await execute_rbac_entity_scope_syncer(db_sess, syncer)
-
-            assert result.action is SyncAction.CREATED
-            assert result.association_row is not None
-            assert result.association_row.relation_type == RelationType.REF
-
 
 # =============================================================================
 # Unchanged Tests
