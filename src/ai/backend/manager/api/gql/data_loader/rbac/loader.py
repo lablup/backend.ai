@@ -117,6 +117,39 @@ async def load_role_assignments_by_role_and_user_ids(
     return [assignment_map.get(key) for key in keys]
 
 
+async def load_assignments_by_role_ids(
+    processor: PermissionControllerProcessors,
+    role_ids: Sequence[uuid.UUID],
+) -> list[list[AssignedUserData]]:
+    """
+    Batch load role assignments by role_ids.
+
+    Returns a list of assignment lists, one for each role_id.
+    Each inner list contains all users assigned to that role.
+    """
+    if not role_ids:
+        return []
+
+    querier = BatchQuerier(
+        pagination=NoPagination(),
+        conditions=[AssignedUserConditions.by_role_ids(role_ids)],
+    )
+
+    action_result = await processor.search_users_assigned_to_role.wait_for_complete(
+        SearchUsersAssignedToRoleAction(querier=querier)
+    )
+
+    # Group assignments by role_id
+    from collections import defaultdict
+
+    assignment_map: dict[uuid.UUID, list[AssignedUserData]] = defaultdict(list)
+    for assignment in action_result.result.items:
+        assignment_map[assignment.role_id].append(assignment)
+
+    # Return in the same order as role_ids, with empty lists for roles with no assignments
+    return [assignment_map.get(role_id, []) for role_id in role_ids]
+
+
 async def load_entities_by_type_and_ids(
     processor: PermissionControllerProcessors,
     keys: Sequence[ObjectId],

@@ -178,6 +178,13 @@ class AssignedUserConditions:
         return inner
 
     @staticmethod
+    def by_role_ids(role_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRoleRow.role_id.in_(role_ids)
+
+        return inner
+
+    @staticmethod
     def by_username_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
