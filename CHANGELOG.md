@@ -16,6 +16,13 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.2.4 (2026-02-27)
+
+### Fixes
+* Fix session `occupied_slots` returning empty by computing from the normalized `resource_allocations` table instead of the deprecated JSONB column that is no longer written to after Phase 3. ([#9433](https://github.com/lablup/backend.ai/issues/9433))
+* Fix Prometheus multiprocess default directory from environment-dependent `tempfile.gettempdir()` to the hardcoded `/tmp/backend.ai/prometheus`, preventing permission issues across different deployment environments; also support overriding via `BACKENDAI_PROMETHEUS_DIR` env var or `base_dir` parameter. ([#9434](https://github.com/lablup/backend.ai/issues/9434))
+
+
 ## 26.2.3 (2026-02-25)
 
 ### Fixes
