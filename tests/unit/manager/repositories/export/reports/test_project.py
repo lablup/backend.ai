@@ -78,8 +78,8 @@ class TestProjectReportDefinition:
         assert PROJECT_REPORT.select_from is GroupRow.__table__
 
     def test_total_field_count(self) -> None:
-        """Should have 27 fields total."""
-        assert len(PROJECT_REPORT.fields) == 27
+        """Should have 28 fields total."""
+        assert len(PROJECT_REPORT.fields) == 28
 
 
 class TestProjectFieldDefinitions:
@@ -107,6 +107,10 @@ class TestProjectFieldDefinitions:
     def test_vfolder_hosts_field_exists(self, field_keys: set[str]) -> None:
         """allowed_vfolder_hosts field should exist."""
         assert "allowed_vfolder_hosts" in field_keys
+
+    def test_container_registry_field_exists(self, field_keys: set[str]) -> None:
+        """container_registry (image commit registry) field should exist."""
+        assert "container_registry" in field_keys
 
     def test_resource_policy_fields_exist(self, field_keys: set[str]) -> None:
         """Resource policy fields should exist."""
@@ -352,7 +356,7 @@ class TestBuildProjectQueryWithRealReport:
             statement_timeout_sec=60,
         )
 
-        assert len(query.fields) == 27
+        assert len(query.fields) == 28
 
     def test_multiple_fields_from_same_join_deduplicate(self, adapter: ExportAdapter) -> None:
         """Multiple fields from same join should not duplicate JOINs."""

@@ -137,7 +137,7 @@ class ProjectExportCSVRequest(BaseRequestModel):
         description=(
             "List of field keys to include in the export. "
             "Available fields: id, name, description, domain_name, is_active, "
-            "total_resource_slots, created_at, modified_at. "
+            "total_resource_slots, created_at, modified_at, container_registry. "
             "If not specified or empty, all available fields will be exported."
         ),
     )

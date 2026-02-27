@@ -160,6 +160,17 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         formatter=_serialize_json,
     ),
     # =========================================================================
+    # Container Registry for Image Commit (no JOIN needed, already in GroupRow as JSONB)
+    # =========================================================================
+    ExportFieldDef(
+        key="container_registry",
+        name="Container Registry",
+        description="Container registry and project for image commit",
+        field_type=ExportFieldType.JSON,
+        column=GroupRow.container_registry,
+        formatter=_serialize_json,
+    ),
+    # =========================================================================
     # Resource Policy Fields (N:1, no duplication)
     # =========================================================================
     ExportFieldDef(
