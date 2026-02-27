@@ -2067,6 +2067,379 @@
         "title": "PurgeImageRequest",
         "type": "object"
       },
+      "CreateUserDotfileRequest": {
+        "description": "Request to create a user dotfile.",
+        "properties": {
+          "path": {
+            "description": "Dotfile path",
+            "title": "Path",
+            "type": "string"
+          },
+          "data": {
+            "description": "Dotfile content",
+            "maxLength": 65536,
+            "title": "Data",
+            "type": "string"
+          },
+          "permission": {
+            "description": "Unix file permission in octal (e.g., '755')",
+            "pattern": "^[0-7]{3}$",
+            "title": "Permission",
+            "type": "string"
+          },
+          "owner_access_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Access key of the target user (for superadmin delegation)",
+            "title": "Owner Access Key"
+          }
+        },
+        "required": [
+          "path",
+          "data",
+          "permission"
+        ],
+        "title": "CreateUserDotfileRequest",
+        "type": "object"
+      },
+      "UpdateUserDotfileRequest": {
+        "description": "Request to update a user dotfile.",
+        "properties": {
+          "path": {
+            "description": "Dotfile path",
+            "title": "Path",
+            "type": "string"
+          },
+          "data": {
+            "description": "Updated dotfile content",
+            "maxLength": 65536,
+            "title": "Data",
+            "type": "string"
+          },
+          "permission": {
+            "description": "Unix file permission in octal (e.g., '755')",
+            "pattern": "^[0-7]{3}$",
+            "title": "Permission",
+            "type": "string"
+          },
+          "owner_access_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Access key of the target user (for superadmin delegation)",
+            "title": "Owner Access Key"
+          }
+        },
+        "required": [
+          "path",
+          "data",
+          "permission"
+        ],
+        "title": "UpdateUserDotfileRequest",
+        "type": "object"
+      },
+      "DeleteUserDotfileRequest": {
+        "description": "Request to delete a user dotfile.",
+        "properties": {
+          "path": {
+            "description": "Dotfile path to delete",
+            "title": "Path",
+            "type": "string"
+          },
+          "owner_access_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Access key of the target user (for superadmin delegation)",
+            "title": "Owner Access Key"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "DeleteUserDotfileRequest",
+        "type": "object"
+      },
+      "UpdateBootstrapScriptRequest": {
+        "description": "Request to update the bootstrap script.",
+        "properties": {
+          "script": {
+            "description": "Bootstrap script content",
+            "maxLength": 65536,
+            "title": "Script",
+            "type": "string"
+          }
+        },
+        "required": [
+          "script"
+        ],
+        "title": "UpdateBootstrapScriptRequest",
+        "type": "object"
+      },
+      "CreateDomainDotfileRequest": {
+        "description": "Request to create a domain dotfile.",
+        "properties": {
+          "domain": {
+            "description": "Domain name",
+            "title": "Domain",
+            "type": "string"
+          },
+          "path": {
+            "description": "Dotfile path",
+            "title": "Path",
+            "type": "string"
+          },
+          "data": {
+            "description": "Dotfile content",
+            "maxLength": 65536,
+            "title": "Data",
+            "type": "string"
+          },
+          "permission": {
+            "description": "Unix file permission in octal (e.g., '755')",
+            "pattern": "^[0-7]{3}$",
+            "title": "Permission",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain",
+          "path",
+          "data",
+          "permission"
+        ],
+        "title": "CreateDomainDotfileRequest",
+        "type": "object"
+      },
+      "UpdateDomainDotfileRequest": {
+        "description": "Request to update a domain dotfile.",
+        "properties": {
+          "domain": {
+            "description": "Domain name",
+            "title": "Domain",
+            "type": "string"
+          },
+          "path": {
+            "description": "Dotfile path",
+            "title": "Path",
+            "type": "string"
+          },
+          "data": {
+            "description": "Updated dotfile content",
+            "maxLength": 65536,
+            "title": "Data",
+            "type": "string"
+          },
+          "permission": {
+            "description": "Unix file permission in octal (e.g., '755')",
+            "pattern": "^[0-7]{3}$",
+            "title": "Permission",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain",
+          "path",
+          "data",
+          "permission"
+        ],
+        "title": "UpdateDomainDotfileRequest",
+        "type": "object"
+      },
+      "DeleteDomainDotfileRequest": {
+        "description": "Request to delete a domain dotfile.",
+        "properties": {
+          "domain": {
+            "description": "Domain name",
+            "title": "Domain",
+            "type": "string"
+          },
+          "path": {
+            "description": "Dotfile path to delete",
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain",
+          "path"
+        ],
+        "title": "DeleteDomainDotfileRequest",
+        "type": "object"
+      },
+      "CreateGroupDotfileRequest": {
+        "description": "Request to create a group dotfile.",
+        "properties": {
+          "group": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "Group UUID or name",
+            "title": "Group"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domain name (required when group is specified by name)",
+            "title": "Domain"
+          },
+          "path": {
+            "description": "Dotfile path",
+            "title": "Path",
+            "type": "string"
+          },
+          "data": {
+            "description": "Dotfile content",
+            "maxLength": 65536,
+            "title": "Data",
+            "type": "string"
+          },
+          "permission": {
+            "description": "Unix file permission in octal (e.g., '755')",
+            "pattern": "^[0-7]{3}$",
+            "title": "Permission",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group",
+          "path",
+          "data",
+          "permission"
+        ],
+        "title": "CreateGroupDotfileRequest",
+        "type": "object"
+      },
+      "UpdateGroupDotfileRequest": {
+        "description": "Request to update a group dotfile.",
+        "properties": {
+          "group": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "Group UUID or name",
+            "title": "Group"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domain name (required when group is specified by name)",
+            "title": "Domain"
+          },
+          "path": {
+            "description": "Dotfile path",
+            "title": "Path",
+            "type": "string"
+          },
+          "data": {
+            "description": "Updated dotfile content",
+            "maxLength": 65536,
+            "title": "Data",
+            "type": "string"
+          },
+          "permission": {
+            "description": "Unix file permission in octal (e.g., '755')",
+            "pattern": "^[0-7]{3}$",
+            "title": "Permission",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group",
+          "path",
+          "data",
+          "permission"
+        ],
+        "title": "UpdateGroupDotfileRequest",
+        "type": "object"
+      },
+      "DeleteGroupDotfileRequest": {
+        "description": "Request to delete a group dotfile.",
+        "properties": {
+          "group": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "Group UUID or name",
+            "title": "Group"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domain name (required when group is specified by name)",
+            "title": "Domain"
+          },
+          "path": {
+            "description": "Dotfile path to delete",
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group",
+          "path"
+        ],
+        "title": "DeleteGroupDotfileRequest",
+        "type": "object"
+      },
       "GetPresignedUploadURLReq": {
         "properties": {
           "artifact_revision_id": {
@@ -7273,7 +7646,7 @@
               }
             ],
             "default": null,
-            "description": "List of field keys to include in the export. Available fields: id, name, description, domain_name, is_active, total_resource_slots, created_at, modified_at. If not specified or empty, all available fields will be exported.",
+            "description": "List of field keys to include in the export. Available fields: id, name, description, domain_name, is_active, total_resource_slots, created_at, modified_at, container_registry. If not specified or empty, all available fields will be exported.",
             "title": "Fields"
           },
           "filter": {
@@ -15753,29 +16126,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "data": {
-                    "type": "string"
-                  },
-                  "path": {
-                    "type": "string"
-                  },
-                  "permission": {
-                    "type": "string",
-                    "pattern": "^[0-7]{3}$"
-                  },
-                  "owner_access_key": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "data",
-                  "path",
-                  "permission"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/CreateUserDotfileRequest"
+              }
             }
           }
         },
@@ -15800,19 +16152,39 @@
         "parameters": [
           {
             "name": "path",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Dotfile path to retrieve; if omitted, lists all dotfiles",
+              "title": "Path"
+            }
           },
           {
             "name": "owner_access_key",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Access key of the target user (for superadmin delegation)",
+              "title": "Owner Access Key"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
@@ -15836,29 +16208,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "data": {
-                    "type": "string"
-                  },
-                  "path": {
-                    "type": "string"
-                  },
-                  "permission": {
-                    "type": "string",
-                    "pattern": "^[0-7]{3}$"
-                  },
-                  "owner_access_key": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "data",
-                  "path",
-                  "permission"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/UpdateUserDotfileRequest"
+              }
             }
           }
         },
@@ -15880,24 +16231,16 @@
             "TokenAuth": []
           }
         ],
-        "parameters": [
-          {
-            "name": "path",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "in": "query"
-          },
-          {
-            "name": "owner_access_key",
-            "schema": {
-              "type": "string"
-            },
-            "required": false,
-            "in": "query"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteUserDotfileRequest"
+              }
+            }
           }
-        ],
+        },
+        "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
@@ -15921,17 +16264,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "script": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "script"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/UpdateBootstrapScriptRequest"
+              }
             }
           }
         },
@@ -15977,30 +16311,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "domain": {
-                    "type": "string"
-                  },
-                  "data": {
-                    "type": "string"
-                  },
-                  "path": {
-                    "type": "string"
-                  },
-                  "permission": {
-                    "type": "string",
-                    "pattern": "^[0-7]{3}$"
-                  }
-                },
-                "required": [
-                  "domain",
-                  "data",
-                  "path",
-                  "permission"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/CreateDomainDotfileRequest"
+              }
             }
           }
         },
@@ -16025,19 +16337,31 @@
         "parameters": [
           {
             "name": "domain",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": true,
-            "in": "query"
+            "schema": {
+              "description": "Domain name",
+              "title": "Domain",
+              "type": "string"
+            }
           },
           {
             "name": "path",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Dotfile path to retrieve; if omitted, lists all dotfiles",
+              "title": "Path"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
@@ -16061,30 +16385,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "domain": {
-                    "type": "string"
-                  },
-                  "data": {
-                    "type": "string"
-                  },
-                  "path": {
-                    "type": "string"
-                  },
-                  "permission": {
-                    "type": "string",
-                    "pattern": "^[0-7]{3}$"
-                  }
-                },
-                "required": [
-                  "domain",
-                  "data",
-                  "path",
-                  "permission"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/UpdateDomainDotfileRequest"
+              }
             }
           }
         },
@@ -16106,24 +16408,16 @@
             "TokenAuth": []
           }
         ],
-        "parameters": [
-          {
-            "name": "domain",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "in": "query"
-          },
-          {
-            "name": "path",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "in": "query"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteDomainDotfileRequest"
+              }
+            }
           }
-        ],
+        },
+        "parameters": [],
         "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
@@ -16221,41 +16515,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "group": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "format": "uuid"
-                      },
-                      {
-                        "type": "string"
-                      }
-                    ]
-                  },
-                  "domain": {
-                    "type": "string"
-                  },
-                  "data": {
-                    "type": "string"
-                  },
-                  "path": {
-                    "type": "string"
-                  },
-                  "permission": {
-                    "type": "string",
-                    "pattern": "^[0-7]{3}$"
-                  }
-                },
-                "required": [
-                  "group",
-                  "data",
-                  "path",
-                  "permission"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/CreateGroupDotfileRequest"
+              }
             }
           }
         },
@@ -16280,35 +16541,57 @@
         "parameters": [
           {
             "name": "group",
+            "in": "query",
+            "required": true,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "format": "uuid",
+                  "type": "string"
                 },
                 {
                   "type": "string"
                 }
-              ]
-            },
-            "required": true,
-            "in": "query"
+              ],
+              "description": "Group UUID or name",
+              "title": "Group"
+            }
           },
           {
             "name": "domain",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Domain name (required when group is specified by name)",
+              "title": "Domain"
+            }
           },
           {
             "name": "path",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Dotfile path to retrieve; if omitted, lists all dotfiles",
+              "title": "Path"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
@@ -16332,41 +16615,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "group": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "format": "uuid"
-                      },
-                      {
-                        "type": "string"
-                      }
-                    ]
-                  },
-                  "domain": {
-                    "type": "string"
-                  },
-                  "data": {
-                    "type": "string"
-                  },
-                  "path": {
-                    "type": "string"
-                  },
-                  "permission": {
-                    "type": "string",
-                    "pattern": "^[0-7]{3}$"
-                  }
-                },
-                "required": [
-                  "group",
-                  "data",
-                  "path",
-                  "permission"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/UpdateGroupDotfileRequest"
+              }
             }
           }
         },
@@ -16388,40 +16638,16 @@
             "TokenAuth": []
           }
         ],
-        "parameters": [
-          {
-            "name": "group",
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "string"
-                }
-              ]
-            },
-            "required": true,
-            "in": "query"
-          },
-          {
-            "name": "domain",
-            "schema": {
-              "type": "string"
-            },
-            "required": false,
-            "in": "query"
-          },
-          {
-            "name": "path",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "in": "query"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteGroupDotfileRequest"
+              }
+            }
           }
-        ],
+        },
+        "parameters": [],
         "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },

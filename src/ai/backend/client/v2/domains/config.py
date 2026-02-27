@@ -74,11 +74,11 @@ class ConfigClient(BaseDomainClient):
         )
 
     async def get_bootstrap_script(self) -> GetBootstrapScriptResponse:
-        # The server returns a bare JSON string (not wrapped in an object),
-        # so we cannot use typed_request() which expects a dict response.
-        data = await self._client._request("GET", "/user-config/bootstrap-script")
-        script = data if isinstance(data, str) else ""
-        return GetBootstrapScriptResponse(script=script)
+        return await self._client.typed_request(
+            "GET",
+            "/user-config/bootstrap-script",
+            response_model=GetBootstrapScriptResponse,
+        )
 
     async def update_bootstrap_script(
         self, request: UpdateBootstrapScriptRequest
