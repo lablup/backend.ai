@@ -12087,32 +12087,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "query": {
-                    "type": "string"
-                  },
-                  "variables": {
-                    "type": "object",
-                    "description": "Mapping(String => Any)",
-                    "additionalProperties": true
-                  },
-                  "operation_name": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "query"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
@@ -12133,32 +12107,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "query": {
-                    "type": "string"
-                  },
-                  "variables": {
-                    "type": "object",
-                    "description": "Mapping(String => Any)",
-                    "additionalProperties": true
-                  },
-                  "operation_name": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "query"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
@@ -16281,28 +16229,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "group_id": {
-                    "type": "string"
-                  },
-                  "quota": {
-                    "type": "integer"
-                  }
-                },
-                "required": [
-                  "group_id",
-                  "quota"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
@@ -16321,16 +16247,7 @@
             "TokenAuth": []
           }
         ],
-        "parameters": [
-          {
-            "name": "group_id",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "in": "query"
-          }
-        ],
+        "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "patch": {
@@ -16348,28 +16265,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "group_id": {
-                    "type": "string"
-                  },
-                  "quota": {
-                    "type": "integer"
-                  }
-                },
-                "required": [
-                  "group_id",
-                  "quota"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
@@ -16388,16 +16283,7 @@
             "TokenAuth": []
           }
         ],
-        "parameters": [
-          {
-            "name": "group_id",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "in": "query"
-          }
-        ],
+        "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },

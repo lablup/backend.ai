@@ -1,8 +1,21 @@
+"""Backward-compatible shim for the admin module.
+
+GraphQL handler logic has been migrated to:
+
+* ``api.rest.admin.handler`` — AdminHandler class
+* ``api.rest.admin`` — register_routes()
+
+This module keeps ``create_app()`` so that the existing server bootstrap
+(which iterates ``global_subapp_pkgs``) continues to work.  The Strawberry
+GraphQL view and the ``PrivateContext`` lifecycle are kept here because
+they are tightly coupled to the subapp startup/shutdown hooks.
+"""
+
 from __future__ import annotations
 
 import logging
 import traceback
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, cast
 
@@ -10,19 +23,21 @@ import aiohttp_cors
 import attrs
 import graphene
 import strawberry
-import trafaret as t
 from aiohttp import web
 from graphene.validation import depth_limit_validator
 from graphql import ValidationRule, parse, validate
-from graphql.error import GraphQLError  # pants: no-infer-dep
 from graphql.execution import ExecutionResult  # pants: no-infer-dep
 from strawberry.aiohttp.views import GraphQLView
 
-from ai.backend.common import validators as tx
+from ai.backend.common.dto.manager.admin.request import GraphQLRequest
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.schema import schema as strawberry_schema
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.rest.admin.handler import (
+    CustomIntrospectionRule,
+    GQLLoggingMiddleware,
+)
 from ai.backend.manager.errors.api import GraphQLError as BackendGQLError
 from ai.backend.manager.errors.auth import AuthorizationFailed
 
@@ -37,11 +52,9 @@ from .gql_legacy.schema import (
 )
 from .manager import GQLMutationUnfrozenRequiredMiddleware
 from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params, set_handler_attr
+from .utils import set_handler_attr
 
 if TYPE_CHECKING:
-    from graphql import FieldNode
-
     from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -58,7 +71,6 @@ class CustomGraphQLView(GraphQLView):
 
         Supports both query/mutation via POST and subscriptions via WebSocket.
         """
-        # Set handler attributes for middleware compatibility
         set_handler_attr(self, "auth_required", True)
         set_handler_attr(self, "auth_scope", "user")
 
@@ -81,40 +93,12 @@ class CustomGraphQLView(GraphQLView):
         )
 
 
-class GQLLoggingMiddleware:
-    def resolve(
-        self, next: Callable[..., Any], root: Any, info: graphene.ResolveInfo, **args: Any
-    ) -> Any:
-        if info.path.prev is None:  # indicates the root query
-            graph_ctx = info.context
-            log.info(
-                "ADMIN.GQL (ak:{}, {}:{}, op:{})",
-                graph_ctx.access_key,
-                info.operation.operation,
-                info.field_name,
-                info.operation.name,
-            )
-        return next(root, info, **args)
-
-
-class CustomIntrospectionRule(ValidationRule):
-    def enter_field(self, node: FieldNode, *_args: Any) -> None:
-        field_name = node.name.value
-        if field_name.startswith("__"):
-            # Allow __typename field for GraphQL Federation, @connection directive
-            if field_name == "__typename":
-                return
-            self.report_error(
-                GraphQLError(f"Cannot query '{field_name}': introspection is disabled.", node)
-            )
-
-
-async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResult:
+async def _handle_gql_common(request: web.Request, params: GraphQLRequest) -> ExecutionResult:
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["admin.context"]
     manager_status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
     known_slot_types = await root_ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
-    rules = []
+    rules: list[type[ValidationRule]] = []
     if not root_ctx.config_provider.config.api.allow_graphql_schema_introspection:
         rules.append(CustomIntrospectionRule)
     max_depth = root_ctx.config_provider.config.api.max_gql_query_depth
@@ -123,7 +107,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
     if rules:
         validate_errors = validate(
             schema=app_ctx.gql_schema.graphql_schema,
-            document_ast=parse(params["query"]),
+            document_ast=parse(params.query),
             rules=rules,
         )
         if validate_errors:
@@ -157,10 +141,10 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
     result = cast(
         ExecutionResult,
         await app_ctx.gql_schema.execute_async(
-            params["query"],
+            params.query,
             None,  # root
-            variable_values=params["variables"],
-            operation_name=params["operation_name"],
+            variable_values=params.variables,
+            operation_name=params.operation_name,
             context_value=gql_ctx,
             middleware=[
                 GQLMutationPrivilegeCheckMiddleware(),
@@ -180,28 +164,18 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
 
 
 @auth_required
-@check_api_params(
-    t.Dict({
-        t.Key("query"): t.String,
-        t.Key("variables", default=None): t.Null | t.Mapping(t.String, t.Any),
-        tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
-    })
-)
-async def handle_gql_graphene(request: web.Request, params: Any) -> web.Response:
+async def handle_gql_graphene(request: web.Request) -> web.Response:
+    body = await request.json()
+    params = GraphQLRequest.model_validate(body)
     result = await _handle_gql_common(request, params)
     return web.json_response(result.formatted, status=HTTPStatus.OK)
 
 
 @auth_required
-@check_api_params(
-    t.Dict({
-        t.Key("query"): t.String,
-        t.Key("variables", default=None): t.Null | t.Mapping(t.String, t.Any),
-        tx.AliasedKey(["operation_name", "operationName"], default=None): t.Null | t.String,
-    })
-)
-async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
+async def handle_gql_legacy(request: web.Request) -> web.Response:
     # FIXME: remove in v21.09
+    body = await request.json()
+    params = GraphQLRequest.model_validate(body)
     result = await _handle_gql_common(request, params)
     if result.errors:
         errors = []

@@ -27,6 +27,8 @@ __all__ = (
     "AddGroupMembersResponse",
     "RemoveGroupMembersResponse",
     "ListGroupMembersResponse",
+    # Registry quota responses
+    "ReadRegistryQuotaResponse",
     # Pagination (re-exported)
     "PaginationInfo",
 )
@@ -110,3 +112,9 @@ class ListGroupMembersResponse(BaseResponseModel):
 
     members: list[GroupMemberDTO] = Field(description="List of group members")
     pagination: PaginationInfo = Field(description="Pagination information")
+
+
+class ReadRegistryQuotaResponse(BaseResponseModel):
+    """Response for reading a registry quota."""
+
+    result: int | None = Field(description="Current quota value, or null if not set")
