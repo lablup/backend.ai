@@ -37,6 +37,9 @@ from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.logs import PrivateContext as LogsPrivateContext
+from ai.backend.manager.api.logs import init as logs_init
+from ai.backend.manager.api.logs import shutdown as logs_shutdown
 from ai.backend.manager.api.rest.acl import register_routes as register_acl_routes
 from ai.backend.manager.api.rest.auth import register_routes as register_auth_routes
 from ai.backend.manager.api.rest.error_log import register_routes as register_error_log_routes
@@ -86,9 +89,10 @@ log = logging.getLogger("tests.component.conftest")
 
 # New-style subapp package names (those using register_routes() instead of create_app()).
 # Used by the server fixture to separate them from legacy subapp packages.
-# NOTE: ".logs" is NOT listed here because its create_app() still provides lifecycle
-# hooks (GlobalTimer init/shutdown).  Its routes are registered separately below.
-_NEWSTYLE_SUBAPP_PKGS: frozenset[str] = frozenset({".auth", ".acl"})
+# ".logs" is included here because its routes are now registered via the new-style
+# register_error_log_routes().  The legacy lifecycle hooks (GlobalTimer init/shutdown)
+# are attached to the main app manually in the server fixture below.
+_NEWSTYLE_SUBAPP_PKGS: frozenset[str] = frozenset({".auth", ".acl", ".logs"})
 
 
 @asynccontextmanager
@@ -935,7 +939,7 @@ async def server(
     # Register new-style route modules.  At this point processors are ready
     # (set by cleanup contexts above) and the router is not yet frozen.
     # auth_middleware is already in app.middlewares (added by build_root_app).
-    newstyle_requested = set(server_subapp_pkgs) & (_NEWSTYLE_SUBAPP_PKGS | {".logs"})
+    newstyle_requested = set(server_subapp_pkgs) & _NEWSTYLE_SUBAPP_PKGS
     if newstyle_requested:
         registry = RouteRegistry(app, root_ctx.cors_options)
         if ".auth" in server_subapp_pkgs:
@@ -943,6 +947,9 @@ async def server(
         if ".acl" in server_subapp_pkgs:
             register_acl_routes(registry)
         if ".logs" in server_subapp_pkgs:
+            app["logs.context"] = LogsPrivateContext()
+            app.on_startup.append(logs_init)
+            app.on_shutdown.append(logs_shutdown)
             register_error_log_routes(registry, root_ctx.processors)
 
     runner = web.AppRunner(app, handle_signals=False)
