@@ -57,6 +57,7 @@ class _ProjectWithRgAndRegistry:
 @dataclass(frozen=True)
 class _ProjectWithMixedRegistries:
     project_id: uuid.UUID
+    unassociated_project_id: uuid.UUID
     global_registry_id: uuid.UUID
     scoped_registry_id: uuid.UUID
 
@@ -1022,10 +1023,15 @@ class TestGlobalContainerRegistryExport:
         self,
         db_engine: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[_ProjectWithMixedRegistries, None]:
-        """Create a project with one global registry and one scoped (associated) registry."""
+        """Create two projects: one with both global and scoped registries, one with no associations.
+
+        project_id: associated with the scoped registry (and implicitly the global registry)
+        unassociated_project_id: has no explicit registry association (only the global registry applies)
+        """
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
         project_id = uuid.uuid4()
+        unassociated_project_id = uuid.uuid4()
         global_registry_id = uuid.uuid4()
         scoped_registry_id = uuid.uuid4()
 
@@ -1052,6 +1058,14 @@ class TestGlobalContainerRegistryExport:
                 GroupRow(
                     id=project_id,
                     name="test-project",
+                    domain_name=domain_name,
+                    resource_policy=policy_name,
+                )
+            )
+            db_sess.add(
+                GroupRow(
+                    id=unassociated_project_id,
+                    name="test-project-unassociated",
                     domain_name=domain_name,
                     resource_policy=policy_name,
                 )
@@ -1085,6 +1099,7 @@ class TestGlobalContainerRegistryExport:
 
         yield _ProjectWithMixedRegistries(
             project_id=project_id,
+            unassociated_project_id=unassociated_project_id,
             global_registry_id=global_registry_id,
             scoped_registry_id=scoped_registry_id,
         )
@@ -1094,7 +1109,14 @@ class TestGlobalContainerRegistryExport:
         db_engine: ExtendedAsyncSAEngine,
         project_with_mixed_registries: _ProjectWithMixedRegistries,
     ) -> None:
-        """Both global and scoped registries must appear in project export (BA-4708)."""
+        """Global registry must appear for all projects; scoped registry only for its associated project.
+
+        Expected rows (BA-4708):
+        - (project_id,              global_registry_id)   — global registry is implicitly connected
+        - (project_id,              scoped_registry_id)   — scoped registry is explicitly associated
+        - (unassociated_project_id, global_registry_id)   — global registry appears for ALL projects
+        The scoped registry must NOT appear for unassociated_project_id.
+        """
         adapter = ExportAdapter()
         query = adapter.build_project_query(
             report=PROJECT_REPORT,
@@ -1110,10 +1132,37 @@ class TestGlobalContainerRegistryExport:
             rows.extend(partition)
 
         data = project_with_mixed_registries
-        registry_ids = {str(row[2]) for row in rows}
-        assert len(rows) == 2
-        assert str(data.global_registry_id) in registry_ids
-        assert str(data.scoped_registry_id) in registry_ids
+
+        # 3 rows: project1 x global, project1 x scoped, project2 x global
+        assert len(rows) == 3, (
+            f"Expected 3 rows, got {len(rows)}. "
+            "project1 should have global+scoped, project2 should have global only."
+        )
+
+        # Build a mapping of (project_id, registry_id) pairs for easy assertion
+        project_registry_pairs = {(str(row[0]), str(row[2])) for row in rows}
+
+        # Global registry must appear for BOTH projects (implicit connection)
+        assert (str(data.project_id), str(data.global_registry_id)) in project_registry_pairs, (
+            "Global registry must appear for the associated project."
+        )
+        assert (
+            str(data.unassociated_project_id),
+            str(data.global_registry_id),
+        ) in project_registry_pairs, (
+            "Global registry must appear for projects with no explicit registry association."
+        )
+
+        # Scoped registry must appear ONLY for the associated project
+        assert (str(data.project_id), str(data.scoped_registry_id)) in project_registry_pairs, (
+            "Scoped registry must appear for its explicitly associated project."
+        )
+        assert (
+            str(data.unassociated_project_id),
+            str(data.scoped_registry_id),
+        ) not in project_registry_pairs, (
+            "Scoped registry must NOT appear for projects with no explicit association."
+        )
 
 
 class TestSerializeJson:
