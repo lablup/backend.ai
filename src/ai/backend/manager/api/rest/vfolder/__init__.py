@@ -124,7 +124,7 @@ def register_routes(
     registry.add("DELETE", "/{name}", handler.delete_by_name, middlewares=_auth_rw())
 
     # --- Utility endpoints ---
-    registry.add("GET", "/_/id", handler.get_vfolder_id, middlewares=_auth_rw())
+    registry.add("GET", "/_/id", handler.get_vfolder_id, middlewares=_auth_ro())
     registry.add("GET", "/_/hosts", handler.list_hosts, middlewares=_auth_ro())
     registry.add("GET", "/_/all-hosts", handler.list_all_hosts, middlewares=_superadmin_ro())
     registry.add("GET", "/_/allowed-types", handler.list_allowed_types, middlewares=_auth_ro())
@@ -164,7 +164,7 @@ def register_routes(
         "/{name}/mkdir",
         handler.mkdir,
         middlewares=[
-            *_auth_ro(),
+            *_auth_rw(),
             _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
         ],
     )
@@ -173,7 +173,7 @@ def register_routes(
         "/{name}/request-upload",
         handler.create_upload_session,
         middlewares=[
-            *_auth_ro(),
+            *_auth_rw(),
             _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
         ],
     )
@@ -200,7 +200,7 @@ def register_routes(
         "/{name}/move-file",
         handler.move_file,
         middlewares=[
-            *_auth_ro(),
+            *_auth_rw(),
             _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
         ],
     )
@@ -209,7 +209,7 @@ def register_routes(
         "/{name}/rename-file",
         handler.rename_file,
         middlewares=[
-            *_auth_ro(),
+            *_auth_rw(),
             _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
         ],
     )
@@ -218,7 +218,7 @@ def register_routes(
         "/{name}/delete-files",
         handler.delete_files,
         middlewares=[
-            *_auth_ro(),
+            *_auth_rw(),
             _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
         ],
     )
@@ -227,7 +227,7 @@ def register_routes(
         "/{name}/delete-files",
         handler.delete_files,
         middlewares=[
-            *_auth_ro(),
+            *_auth_rw(),
             _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
         ],
     )
@@ -236,7 +236,7 @@ def register_routes(
         "/{name}/delete-files-async",
         handler.delete_files_async,
         middlewares=[
-            *_auth_ro(),
+            *_auth_rw(),
             _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
         ],
     )
@@ -246,7 +246,7 @@ def register_routes(
         "/{name}/rename_file",
         handler.rename_file,
         middlewares=[
-            *_auth_ro(),
+            *_auth_rw(),
             _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
         ],
     )
@@ -255,7 +255,7 @@ def register_routes(
         "/{name}/delete_files",
         handler.delete_files,
         middlewares=[
-            *_auth_ro(),
+            *_auth_rw(),
             _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
         ],
     )
@@ -336,7 +336,7 @@ def register_routes(
         "POST",
         "/delete-from-trash-bin",
         handler.delete_from_trash_bin,
-        middlewares=[auth_required],
+        middlewares=_auth_rw(),
     )
     registry.add("DELETE", "/{folder_id}/force", handler.force_delete, middlewares=_auth_rw())
 

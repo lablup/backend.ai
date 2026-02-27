@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING, Any, Final, cast
 
 import aiohttp
 import sqlalchemy as sa
-from aiohttp import web
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
@@ -78,6 +77,7 @@ from ai.backend.common.dto.manager.vfolder.response import (
     GetQuotaResponse,
     GetUsageResponse,
     GetUsedBytesResponse,
+    GetVolumePerfMetricResponse,
     InviteVFolderResponse,
     ListAllHostsResponse,
     ListAllowedTypesResponse,
@@ -525,7 +525,7 @@ class VFolderHandler:
         proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(params.folder_host)
         manager_client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
         storage_reply = await manager_client.get_volume_performance_metric(volume_name)
-        resp = GetQuotaResponse(data=dict(storage_reply))
+        resp = GetVolumePerfMetricResponse(data=dict(storage_reply))
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
@@ -802,7 +802,7 @@ class VFolderHandler:
         body: BodyParam[RenameVFolderReq],
         vfctx: VFolderAuthContext,
         req: RequestCtx,
-    ) -> web.Response:
+    ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
         new_name = params.new_name
@@ -828,7 +828,7 @@ class VFolderHandler:
                 ),
             )
         )
-        return web.Response(status=HTTPStatus.CREATED)
+        return APIResponse.no_content(HTTPStatus.CREATED)
 
     # ------------------------------------------------------------------
     # 13. update_vfolder_options (POST /{name}/update-options)
@@ -839,7 +839,7 @@ class VFolderHandler:
         body: BodyParam[UpdateVFolderOptionsReq],
         vfctx: VFolderAuthContext,
         req: RequestCtx,
-    ) -> web.Response:
+    ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
         log.info(
@@ -872,7 +872,7 @@ class VFolderHandler:
                 ),
             )
         )
-        return web.Response(status=HTTPStatus.CREATED)
+        return APIResponse.no_content(HTTPStatus.CREATED)
 
     # ------------------------------------------------------------------
     # 14. mkdir (POST /{name}/mkdir)
@@ -1558,7 +1558,7 @@ class VFolderHandler:
         ctx: UserContext,
         req: RequestCtx,
         processors_ctx: ProcessorsCtx,
-    ) -> web.Response:
+    ) -> APIResponse:
         params = body.parsed
         resource_policy = req.request["keypair"]["resource_policy"]
         folder_id = params.vfolder_id
@@ -1580,7 +1580,7 @@ class VFolderHandler:
         except VFolderInvalidParameter as e:
             raise InvalidAPIParameters(str(e)) from e
 
-        return web.Response(status=HTTPStatus.NO_CONTENT)
+        return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
     # 32. delete_by_name (DELETE /{name})
@@ -1590,7 +1590,7 @@ class VFolderHandler:
         self,
         ctx: UserContext,
         req: RequestCtx,
-    ) -> web.Response:
+    ) -> APIResponse:
         root_ctx: RootContext = req.request.app["_root.context"]
         domain_name = ctx.user_domain
         user_role = req.request["user"]["role"]
@@ -1622,7 +1622,7 @@ class VFolderHandler:
             domain_name,
             resource_policy,
         )
-        return web.Response(status=HTTPStatus.NO_CONTENT)
+        return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
     # 33. get_vfolder_id (GET /_/id)
@@ -1666,7 +1666,7 @@ class VFolderHandler:
         ctx: UserContext,
         req: RequestCtx,
         processors_ctx: ProcessorsCtx,
-    ) -> web.Response:
+    ) -> APIResponse:
         params = body.parsed
         folder_id = params.vfolder_id
         user_uuid = ctx.user_uuid
@@ -1689,7 +1689,7 @@ class VFolderHandler:
         except TooManyVFoldersFound as e:
             raise InternalServerError("Too many vfolders found") from e
 
-        return web.Response(status=HTTPStatus.NO_CONTENT)
+        return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
     # 35. force_delete (DELETE /{folder_id}/force)
@@ -1700,13 +1700,12 @@ class VFolderHandler:
         ctx: UserContext,
         req: RequestCtx,
         processors_ctx: ProcessorsCtx,
-    ) -> web.Response:
+    ) -> APIResponse:
         piece = req.request.match_info["folder_id"]
         try:
             folder_id = uuid.UUID(piece)
-        except ValueError:
-            log.error(f"Not allowed UUID type value ({piece})")
-            return web.Response(status=HTTPStatus.BAD_REQUEST)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Not allowed UUID type value ({piece})") from e
 
         await processors_ctx.processors.vfolder.force_delete_vfolder.wait_for_complete(
             ForceDeleteVFolderAction(
@@ -1714,7 +1713,7 @@ class VFolderHandler:
                 vfolder_uuid=folder_id,
             )
         )
-        return web.Response(status=HTTPStatus.NO_CONTENT)
+        return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
     # 36. purge (POST /purge)
@@ -1726,7 +1725,7 @@ class VFolderHandler:
         ctx: UserContext,
         req: RequestCtx,
         processors_ctx: ProcessorsCtx,
-    ) -> web.Response:
+    ) -> APIResponse:
         params = body.parsed
         folder_id = params.vfolder_id
         log.info(
@@ -1752,7 +1751,7 @@ class VFolderHandler:
             )
         )
 
-        return web.Response(status=HTTPStatus.NO_CONTENT)
+        return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
     # 37. restore (POST /restore-from-trash-bin)
@@ -1764,7 +1763,7 @@ class VFolderHandler:
         ctx: UserContext,
         req: RequestCtx,
         processors_ctx: ProcessorsCtx,
-    ) -> web.Response:
+    ) -> APIResponse:
         params = body.parsed
         folder_id = params.vfolder_id
         user_uuid = ctx.user_uuid
@@ -1781,7 +1780,7 @@ class VFolderHandler:
                 vfolder_uuid=folder_id,
             )
         )
-        return web.Response(status=HTTPStatus.NO_CONTENT)
+        return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
     # 38. leave (POST /{name}/leave)
@@ -1979,7 +1978,7 @@ class VFolderHandler:
         body: BodyParam[UpdateVFolderSharingStatusReq],
         ctx: UserContext,
         req: RequestCtx,
-    ) -> web.Response:
+    ) -> APIResponse:
         root_ctx: RootContext = req.request.app["_root.context"]
         params = body.parsed
         vfolder_id = params.vfolder_id
@@ -2023,7 +2022,7 @@ class VFolderHandler:
 
         async with root_ctx.db.connect() as db_conn:
             await execute_with_txn_retry(_update_or_delete, root_ctx.db.begin_session, db_conn)
-        return web.Response(status=HTTPStatus.CREATED)
+        return APIResponse.no_content(HTTPStatus.CREATED)
 
     # ------------------------------------------------------------------
     # 43. get_fstab_contents (GET /_/fstab)
@@ -2316,7 +2315,7 @@ class VFolderHandler:
         body: BodyParam[UmountHostReq],
         ctx: UserContext,
         req: RequestCtx,
-    ) -> APIResponse | web.Response:
+    ) -> APIResponse:
         root_ctx: RootContext = req.request.app["_root.context"]
         params = body.parsed
         log_fmt = "VFOLDER.UMOUNT_HOST(ak:{}, name:{}, sg:{})"
@@ -2344,13 +2343,7 @@ class VFolderHandler:
                 if kern.mounts:
                     _mounted.update([m[1] for m in kern.mounts])
             if params.name in _mounted:
-                return web.json_response(
-                    {
-                        "title": "Target host is used in sessions",
-                        "message": "Target host is used in sessions",
-                    },
-                    status=HTTPStatus.CONFLICT,
-                )
+                raise VFolderOperationFailed("Target host is used in sessions")
 
             db_query = (
                 sa.select(agents.c.id)
