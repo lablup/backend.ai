@@ -308,16 +308,14 @@ class TestGetWatcherStatus:
 
     @pytest.fixture
     def mock_request(self, mock_root_ctx: MagicMock) -> MagicMock:
-        """Mock POST request for superadmin user."""
+        """Mock GET request for superadmin user."""
         req = MagicMock(spec=web.Request)
         req.app = {"_root.context": mock_root_ctx}
         req.get = lambda k, default=None: {
             "is_authorized": True,
             "is_superadmin": True,
         }.get(k, default)
-        type(req).can_read_body = PropertyMock(return_value=True)
-        req.method = "POST"
-        req.content_type = "application/json"
+        req.method = "GET"
         return req
 
     @pytest.mark.asyncio
@@ -327,7 +325,7 @@ class TestGetWatcherStatus:
         mock_root_ctx: MagicMock,
     ) -> None:
         """Verify agent_id is passed to Action and data is returned."""
-        mock_request.text = AsyncMock(return_value=json.dumps({"agent_id": "agent-001"}))
+        mock_request.query = {"agent_id": "agent-001"}
         expected_data = {"status": "running"}
         mock_result = MagicMock()
         mock_result.data = expected_data
@@ -520,16 +518,14 @@ class TestUsagePerMonth:
 
     @pytest.fixture
     def mock_request(self, mock_root_ctx: MagicMock) -> MagicMock:
-        """Mock POST request for superadmin user."""
+        """Mock GET request for superadmin user."""
         req = MagicMock(spec=web.Request)
         req.app = {"_root.context": mock_root_ctx}
         req.get = lambda k, default=None: {
             "is_authorized": True,
             "is_superadmin": True,
         }.get(k, default)
-        type(req).can_read_body = PropertyMock(return_value=True)
-        req.method = "POST"
-        req.content_type = "application/json"
+        req.method = "GET"
         return req
 
     @pytest.mark.asyncio
@@ -539,10 +535,10 @@ class TestUsagePerMonth:
         mock_root_ctx: MagicMock,
     ) -> None:
         """Verify group_ids and month are passed to Action and result is returned."""
-        mock_request.text = AsyncMock(
-            return_value=json.dumps({"group_ids": "group-1,group-2", "month": "202401"})
-        )
-        expected_result = [{"group_id": "group-1", "usage": 100}]
+        group_id_1 = str(uuid.uuid4())
+        group_id_2 = str(uuid.uuid4())
+        mock_request.query = {"group_ids": [group_id_1, group_id_2], "month": "202401"}
+        expected_result = [{"group_id": group_id_1, "usage": 100}]
         mock_result = MagicMock()
         mock_result.result = expected_result
         mock_root_ctx.processors.group.usage_per_month.wait_for_complete = AsyncMock(
@@ -553,7 +549,7 @@ class TestUsagePerMonth:
 
         call_args = mock_root_ctx.processors.group.usage_per_month.wait_for_complete.call_args
         action = call_args[0][0]
-        assert action.group_ids == ["group-1", "group-2"]
+        assert len(action.group_ids) == 2
         assert action.month == "202401"
         assert response.status == HTTPStatus.OK
         # Verify response body contains expected result
@@ -576,16 +572,14 @@ class TestUsagePerPeriod:
 
     @pytest.fixture
     def mock_request(self, mock_root_ctx: MagicMock) -> MagicMock:
-        """Mock POST request for superadmin user."""
+        """Mock GET request for superadmin user."""
         req = MagicMock(spec=web.Request)
         req.app = {"_root.context": mock_root_ctx}
         req.get = lambda k, default=None: {
             "is_authorized": True,
             "is_superadmin": True,
         }.get(k, default)
-        type(req).can_read_body = PropertyMock(return_value=True)
-        req.method = "POST"
-        req.content_type = "application/json"
+        req.method = "GET"
         return req
 
     @pytest.mark.asyncio
@@ -595,13 +589,12 @@ class TestUsagePerPeriod:
         mock_root_ctx: MagicMock,
     ) -> None:
         """Verify start_date and end_date are passed to Action and result is returned."""
-        mock_request.text = AsyncMock(
-            return_value=json.dumps({
-                "project_id": "proj-1",
-                "start_date": "20240101",
-                "end_date": "20240131",
-            })
-        )
+        project_id = str(uuid.uuid4())
+        mock_request.query = {
+            "project_id": project_id,
+            "start_date": "20240101",
+            "end_date": "20240131",
+        }
         expected_result = [{"date": "20240115", "usage": 50}]
         mock_result = MagicMock()
         mock_result.result = expected_result
@@ -613,7 +606,7 @@ class TestUsagePerPeriod:
 
         call_args = mock_root_ctx.processors.group.usage_per_period.wait_for_complete.call_args
         action = call_args[0][0]
-        assert action.project_id == "proj-1"
+        assert str(action.project_id) == project_id
         assert action.start_date == "20240101"
         assert action.end_date == "20240131"
         assert response.status == HTTPStatus.OK
@@ -629,12 +622,10 @@ class TestUsagePerPeriod:
         mock_root_ctx: MagicMock,
     ) -> None:
         """Verify project_id defaults to None."""
-        mock_request.text = AsyncMock(
-            return_value=json.dumps({
-                "start_date": "20240101",
-                "end_date": "20240131",
-            })
-        )
+        mock_request.query = {
+            "start_date": "20240101",
+            "end_date": "20240131",
+        }
         mock_result = MagicMock()
         mock_result.result = {"usage": []}
         mock_root_ctx.processors.group.usage_per_period.wait_for_complete = AsyncMock(

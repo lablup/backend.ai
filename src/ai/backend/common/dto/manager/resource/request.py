@@ -46,3 +46,31 @@ class WatcherAgentRequest(BaseRequestModel):
         validation_alias=AliasChoices("agent_id", "agent"),
         description="Agent ID",
     )
+
+
+class UsagePerMonthQuery(BaseRequestModel):
+    """Query parameters for monthly usage statistics (GET)."""
+
+    group_ids: list[uuid.UUID] | None = Field(default=None, description="Group IDs to query")
+    month: str = Field(description="Year-month in YYYYMM format")
+
+
+class UsagePerPeriodQuery(BaseRequestModel):
+    """Query parameters for usage statistics over a date range (GET)."""
+
+    project_id: uuid.UUID | None = Field(
+        default=None,
+        validation_alias=AliasChoices("project_id", "group_id"),
+        description="Project (group) ID to filter",
+    )
+    start_date: str = Field(description="Start date in YYYYMMDD format")
+    end_date: str = Field(description="End date in YYYYMMDD format")
+
+
+class WatcherStatusQuery(BaseRequestModel):
+    """Query parameters for watcher status (GET)."""
+
+    agent_id: str = Field(
+        validation_alias=AliasChoices("agent_id", "agent"),
+        description="Agent ID",
+    )

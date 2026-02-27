@@ -16,9 +16,10 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
 from ai.backend.common.dto.manager.resource.request import (
     CheckPresetsRequest,
     ListPresetsQuery,
-    UsagePerMonthRequest,
-    UsagePerPeriodRequest,
+    UsagePerMonthQuery,
+    UsagePerPeriodQuery,
     WatcherAgentRequest,
+    WatcherStatusQuery,
 )
 from ai.backend.common.dto.manager.resource.response import (
     CheckPresetsResponse,
@@ -149,10 +150,10 @@ class ResourceHandler:
 
     async def usage_per_month(
         self,
-        body: BodyParam[UsagePerMonthRequest],
+        query: QueryParam[UsagePerMonthQuery],
         ctx: UserContext,
     ) -> APIResponse:
-        params = body.parsed
+        params = query.parsed
         log.info(
             "USAGE_PER_MONTH (g:[{}], month:{})",
             ",".join(str(gid) for gid in params.group_ids) if params.group_ids else "",
@@ -172,10 +173,10 @@ class ResourceHandler:
 
     async def usage_per_period(
         self,
-        body: BodyParam[UsagePerPeriodRequest],
+        query: QueryParam[UsagePerPeriodQuery],
         ctx: UserContext,
     ) -> APIResponse:
-        params = body.parsed
+        params = query.parsed
         result = await self._processors.group.usage_per_period.wait_for_complete(
             UsagePerPeriodAction(
                 project_id=params.project_id,
@@ -213,10 +214,10 @@ class ResourceHandler:
 
     async def get_watcher_status(
         self,
-        body: BodyParam[WatcherAgentRequest],
+        query: QueryParam[WatcherStatusQuery],
         ctx: UserContext,
     ) -> APIResponse:
-        params = body.parsed
+        params = query.parsed
         log.info("GET_WATCHER_STATUS (ag:{})", params.agent_id)
         result = await self._processors.agent.get_watcher_status.wait_for_complete(
             GetWatcherStatusAction(agent_id=AgentId(params.agent_id))

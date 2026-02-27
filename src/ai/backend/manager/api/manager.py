@@ -31,8 +31,6 @@ from aiotools import aclosing
 from ai.backend.common.types import QueueSentinel
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api.rest.manager.handler import ManagerHandler
-from ai.backend.manager.api.rest.routing import _wrap_api_handler
 from ai.backend.manager.errors.common import ServerFrozen, ServiceUnavailable
 from ai.backend.manager.models.health import report_manager_status
 
@@ -188,6 +186,9 @@ _HANDLER_APP_KEY = "_manager_handler_wrapped"
 def _ensure_handler(app: web.Application) -> dict[str, WebRequestHandler]:
     """Lazily create ManagerHandler and wrap its methods on first request."""
     if _HANDLER_APP_KEY not in app:
+        from ai.backend.manager.api.rest.manager.handler import ManagerHandler
+        from ai.backend.manager.api.rest.routing import _wrap_api_handler
+
         root_ctx: RootContext = app["_root.context"]
         handler = ManagerHandler(processors=root_ctx.processors)
         app[_HANDLER_APP_KEY] = {
