@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.acl import ACLClient
 from ai.backend.common.dto.manager.acl import GetPermissionsResponse
@@ -37,7 +37,7 @@ def _json_response(data: dict[str, Any], *, status: int = 200) -> AsyncMock:
 
 
 def _make_acl_client(mock_session: MagicMock) -> ACLClient:
-    client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
+    client = BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
     return ACLClient(client)
 
 

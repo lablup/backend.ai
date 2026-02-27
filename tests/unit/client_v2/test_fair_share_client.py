@@ -6,7 +6,7 @@ from uuid import UUID
 import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.fair_share import FairShareClient
 from ai.backend.common.dto.manager.fair_share import (
@@ -55,8 +55,8 @@ _SAMPLE_UUID_2 = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 _SAMPLE_UUID_3 = "cccccccc-cccc-cccc-cccc-cccccccccccc"
 
 
-def _make_client(mock_session: MagicMock | None = None) -> BackendAIClient:
-    return BackendAIClient(
+def _make_client(mock_session: MagicMock | None = None) -> BackendAIAuthClient:
+    return BackendAIAuthClient(
         _DEFAULT_CONFIG,
         MockAuth(),
         mock_session or MagicMock(),

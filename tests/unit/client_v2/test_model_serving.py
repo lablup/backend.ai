@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.model_serving import ModelServingClient
 from ai.backend.common.dto.manager.model_serving import (
@@ -33,8 +33,8 @@ _DEFAULT_CONFIG = ClientConfig(endpoint=URL("https://api.example.com"))
 
 
 def _make_mock_client() -> MagicMock:
-    """Create a mock BackendAIClient with typed_request and _request stubs."""
-    client = MagicMock(spec=BackendAIClient)
+    """Create a mock BackendAIAuthClient with typed_request and _request stubs."""
+    client = MagicMock(spec=BackendAIAuthClient)
     client._config = _DEFAULT_CONFIG
     client._auth = MockAuth()
     client.typed_request = AsyncMock()

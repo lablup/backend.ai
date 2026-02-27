@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.vfolder import VFolderClient
 from ai.backend.common.dto.manager.field import VFolderPermissionField
@@ -84,8 +84,8 @@ _DEFAULT_CONFIG = ClientConfig(endpoint=URL("https://api.example.com"))
 def _make_client(
     mock_session: MagicMock | None = None,
     config: ClientConfig | None = None,
-) -> BackendAIClient:
-    return BackendAIClient(
+) -> BackendAIAuthClient:
+    return BackendAIAuthClient(
         config or _DEFAULT_CONFIG,
         MockAuth(),
         mock_session or MagicMock(),
