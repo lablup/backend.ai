@@ -1,17 +1,20 @@
-"""
-REST API handlers for auto-scaling rule system.
-Provides CRUD endpoints for auto-scaling rules.
+"""Auto-scaling rule handler class using constructor dependency injection.
+
+All handlers use the new ApiHandler pattern: typed parameters
+(``BodyParam``, ``PathParam``, ``UserContext``) are automatically
+extracted by ``_wrap_api_handler`` and responses are returned as
+``APIResponse`` objects.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+import logging
 from http import HTTPStatus
+from typing import Final
 
-import aiohttp_cors
 from aiohttp import web
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
+from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.auto_scaling_rule import (
     CreateAutoScalingRuleRequest,
     CreateAutoScalingRuleResponse,
@@ -24,14 +27,13 @@ from ai.backend.common.dto.manager.auto_scaling_rule import (
     UpdateAutoScalingRuleRequest,
     UpdateAutoScalingRuleResponse,
 )
-from ai.backend.manager.api.auth import auth_required_for_method
-from ai.backend.manager.api.types import CORSOptions, WebMiddleware
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.scale import ModelDeploymentAutoScalingRuleCreator
 from ai.backend.manager.dto.auto_scaling_rule_request import (
     GetAutoScalingRulePathParam,
     UpdateAutoScalingRulePathParam,
 )
-from ai.backend.manager.dto.context import ProcessorsCtx
+from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
 )
@@ -52,32 +54,32 @@ from ai.backend.manager.services.processors import Processors
 
 from .adapter import AutoScalingRuleAdapter
 
-__all__ = ("create_app",)
+log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class AutoScalingRuleAPIHandler:
-    """REST API handler class for auto-scaling rule operations."""
+class AutoScalingRuleHandler:
+    """Auto-scaling rule API handler with constructor-injected dependencies."""
 
-    def __init__(self) -> None:
-        self.adapter = AutoScalingRuleAdapter()
+    def __init__(self, *, processors: Processors) -> None:
+        self._processors = processors
+        self._adapter = AutoScalingRuleAdapter()
 
-    def _get_deployment_processors(self, processors: Processors) -> DeploymentProcessors:
+    def _get_deployment_processors(self) -> DeploymentProcessors:
         """Get deployment processors, raising ServiceUnavailable if not available."""
-        if processors.deployment is None:
+        if self._processors.deployment is None:
             raise web.HTTPServiceUnavailable(
                 reason="Deployment service is not available on this manager"
             )
-        return processors.deployment
+        return self._processors.deployment
 
-    @auth_required_for_method
-    @api_handler
     async def create(
         self,
         body: BodyParam[CreateAutoScalingRuleRequest],
-        processors_ctx: ProcessorsCtx,
+        ctx: UserContext,
     ) -> APIResponse:
         """Create a new auto-scaling rule."""
-        deployment_processors = self._get_deployment_processors(processors_ctx.processors)
+        deployment_processors = self._get_deployment_processors()
+        log.info("AUTO_SCALING_RULE.CREATE (ak:{})", ctx.access_key)
 
         creator = ModelDeploymentAutoScalingRuleCreator(
             model_deployment_id=body.parsed.model_deployment_id,
@@ -96,47 +98,45 @@ class AutoScalingRuleAPIHandler:
         )
 
         resp = CreateAutoScalingRuleResponse(
-            auto_scaling_rule=self.adapter.convert_to_dto(action_result.data)
+            auto_scaling_rule=self._adapter.convert_to_dto(action_result.data)
         )
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
-    @auth_required_for_method
-    @api_handler
     async def get(
         self,
         path: PathParam[GetAutoScalingRulePathParam],
-        processors_ctx: ProcessorsCtx,
+        ctx: UserContext,
     ) -> APIResponse:
         """Get a specific auto-scaling rule."""
-        deployment_processors = self._get_deployment_processors(processors_ctx.processors)
+        deployment_processors = self._get_deployment_processors()
+        log.info("AUTO_SCALING_RULE.GET (ak:{})", ctx.access_key)
 
         action_result = await deployment_processors.get_auto_scaling_rule.wait_for_complete(
             GetAutoScalingRuleAction(auto_scaling_rule_id=path.parsed.rule_id)
         )
 
         resp = GetAutoScalingRuleResponse(
-            auto_scaling_rule=self.adapter.convert_to_dto(action_result.data)
+            auto_scaling_rule=self._adapter.convert_to_dto(action_result.data)
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
-    @auth_required_for_method
-    @api_handler
     async def search(
         self,
         body: BodyParam[SearchAutoScalingRulesRequest],
-        processors_ctx: ProcessorsCtx,
+        ctx: UserContext,
     ) -> APIResponse:
         """Search auto-scaling rules with filters, orders, and pagination."""
-        deployment_processors = self._get_deployment_processors(processors_ctx.processors)
+        deployment_processors = self._get_deployment_processors()
+        log.info("AUTO_SCALING_RULE.SEARCH (ak:{})", ctx.access_key)
 
-        querier = self.adapter.build_querier(body.parsed)
+        querier = self._adapter.build_querier(body.parsed)
 
         action_result = await deployment_processors.search_auto_scaling_rules.wait_for_complete(
             SearchAutoScalingRulesAction(querier=querier)
         )
 
         resp = SearchAutoScalingRulesResponse(
-            auto_scaling_rules=[self.adapter.convert_to_dto(rule) for rule in action_result.data],
+            auto_scaling_rules=[self._adapter.convert_to_dto(rule) for rule in action_result.data],
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,
@@ -145,19 +145,18 @@ class AutoScalingRuleAPIHandler:
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
-    @auth_required_for_method
-    @api_handler
     async def update(
         self,
         path: PathParam[UpdateAutoScalingRulePathParam],
         body: BodyParam[UpdateAutoScalingRuleRequest],
-        processors_ctx: ProcessorsCtx,
+        ctx: UserContext,
     ) -> APIResponse:
         """Update an existing auto-scaling rule."""
-        deployment_processors = self._get_deployment_processors(processors_ctx.processors)
+        deployment_processors = self._get_deployment_processors()
+        log.info("AUTO_SCALING_RULE.UPDATE (ak:{})", ctx.access_key)
 
         rule_id = path.parsed.rule_id
-        modifier = self.adapter.build_modifier(body.parsed)
+        modifier = self._adapter.build_modifier(body.parsed)
 
         action_result = await deployment_processors.update_auto_scaling_rule.wait_for_complete(
             UpdateAutoScalingRuleAction(
@@ -167,19 +166,18 @@ class AutoScalingRuleAPIHandler:
         )
 
         resp = UpdateAutoScalingRuleResponse(
-            auto_scaling_rule=self.adapter.convert_to_dto(action_result.data)
+            auto_scaling_rule=self._adapter.convert_to_dto(action_result.data)
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
-    @auth_required_for_method
-    @api_handler
     async def delete(
         self,
         body: BodyParam[DeleteAutoScalingRuleRequest],
-        processors_ctx: ProcessorsCtx,
+        ctx: UserContext,
     ) -> APIResponse:
         """Delete an auto-scaling rule."""
-        deployment_processors = self._get_deployment_processors(processors_ctx.processors)
+        deployment_processors = self._get_deployment_processors()
+        log.info("AUTO_SCALING_RULE.DELETE (ak:{})", ctx.access_key)
 
         action_result = await deployment_processors.delete_auto_scaling_rule.wait_for_complete(
             DeleteAutoScalingRuleAction(auto_scaling_rule_id=body.parsed.rule_id)
@@ -187,23 +185,3 @@ class AutoScalingRuleAPIHandler:
 
         resp = DeleteAutoScalingRuleResponse(deleted=action_result.success)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
-
-
-def create_app(
-    default_cors_options: CORSOptions,
-) -> tuple[web.Application, Iterable[WebMiddleware]]:
-    """Create aiohttp application for auto-scaling rule API endpoints."""
-    app = web.Application()
-    app["api_versions"] = (4, 5)
-    app["prefix"] = "admin/auto-scaling-rules"
-
-    cors = aiohttp_cors.setup(app, defaults=default_cors_options)
-    api_handler = AutoScalingRuleAPIHandler()
-
-    cors.add(app.router.add_route("POST", "", api_handler.create))
-    cors.add(app.router.add_route("GET", "/{rule_id}", api_handler.get))
-    cors.add(app.router.add_route("POST", "/search", api_handler.search))
-    cors.add(app.router.add_route("PATCH", "/{rule_id}", api_handler.update))
-    cors.add(app.router.add_route("POST", "/delete", api_handler.delete))
-
-    return app, []
