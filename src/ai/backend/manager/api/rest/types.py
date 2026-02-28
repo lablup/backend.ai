@@ -6,7 +6,7 @@ import aiohttp_cors
 from aiohttp import web
 from aiohttp.typedefs import Middleware
 
-from ai.backend.common.api_handlers import APIResponse
+from ai.backend.common.api_handlers import APIResponse, APIStreamResponse
 
 type WebRequestHandler = Callable[
     [web.Request],
@@ -25,4 +25,4 @@ type RouteMiddleware = Callable[
     WebRequestHandler,
 ]
 
-type ApiHandler = Callable[..., Awaitable[APIResponse | web.StreamResponse]]
+type ApiHandler = Callable[..., Awaitable[APIResponse | APIStreamResponse | web.StreamResponse]]

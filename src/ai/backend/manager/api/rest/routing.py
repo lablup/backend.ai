@@ -2,15 +2,47 @@ from __future__ import annotations
 
 import functools
 import inspect
+import logging
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Final
 
 import aiohttp_cors
 from aiohttp import web
 
-from ai.backend.common.api_handlers import extract_param_value, parse_response
+from ai.backend.common.api_handlers import APIStreamResponse, extract_param_value, parse_response
+from ai.backend.logging import BraceStyleAdapter
 
 from .types import ApiHandler, CORSOptions, RouteMiddleware, WebMiddleware, WebRequestHandler
+
+log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+async def _handle_stream_response(
+    request: web.Request,
+    result: APIStreamResponse,
+) -> web.StreamResponse:
+    """Convert an ``APIStreamResponse`` into a ``web.StreamResponse`` with chunked streaming."""
+    resp = web.StreamResponse(status=result.status, headers=result.headers)
+    body_iter = result.body.read()
+
+    try:
+        first_chunk = await body_iter.__anext__()
+        await resp.prepare(request)
+        await resp.write(first_chunk)
+    except Exception as e:
+        raise web.HTTPInternalServerError(
+            reason=f"Failed to send first chunk from stream: {e!r}"
+        ) from e
+
+    try:
+        async for chunk in body_iter:
+            await resp.write(chunk)
+        await resp.write_eof()
+    except Exception:
+        log.exception("Error during streaming response body iteration")
+        resp.force_close()
+
+    return resp
 
 
 def _wrap_api_handler(handler: ApiHandler) -> WebRequestHandler:
@@ -25,6 +57,8 @@ def _wrap_api_handler(handler: ApiHandler) -> WebRequestHandler:
         response = await handler(**kwargs)
         if isinstance(response, web.StreamResponse):
             return response
+        if isinstance(response, APIStreamResponse):
+            return await _handle_stream_response(request, response)
         return parse_response(response)
 
     return wrapped
