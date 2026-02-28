@@ -9428,7 +9428,7 @@
           }
         },
         "parameters": [],
-        "description": "\nImport scanned artifact revisions from external registries.\n\nDownloads the actual files for the specified artifact revisions, transitioning\nthem from SCANNED → PULLING → PULLED → AVAILABLE status.\n\nReturns background tasks that can be monitored for import progress.\nOnce AVAILABLE, artifacts can be used by users in their sessions.\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nImport scanned artifact revisions from external registries.\n\nDownloads the actual files for the specified artifact revisions, transitioning\nthem from SCANNED -> PULLING -> PULLED -> AVAILABLE status.\n\nReturns background tasks that can be monitored for import progress.\nOnce AVAILABLE, artifacts can be used by users in their sessions.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifacts/{artifact_id}": {
@@ -9582,7 +9582,7 @@
           }
         },
         "parameters": [],
-        "description": "\nScan external registries to discover available artifacts.\n\nSearches HuggingFace or Reservoir registries for artifacts matching the specified\ncriteria and registers them in the system with SCANNED status. The artifacts\nbecome available for import but are not downloaded until explicitly imported.\n\nThis is the first step in the artifact workflow: Scan → Import → Use.\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nScan external registries to discover available artifacts.\n\nSearches HuggingFace or Reservoir registries for artifacts matching the specified\ncriteria and registers them in the system with SCANNED status. The artifacts\nbecome available for import but are not downloaded until explicitly imported.\n\nThis is the first step in the artifact workflow: Scan -> Import -> Use.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifact-registries/delegation/scan": {
