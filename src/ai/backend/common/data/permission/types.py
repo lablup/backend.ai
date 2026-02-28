@@ -359,6 +359,7 @@ class RBACElementType(enum.StrEnum):
     STORAGE_HOST = "storage_host"
     AGENT = "agent"
     KERNEL = "kernel"
+    ROUTING = "routing"
     IMAGE = "image"
     ARTIFACT = "artifact"
     ARTIFACT_REGISTRY = "artifact_registry"

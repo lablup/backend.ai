@@ -21,6 +21,7 @@ class TestValidScopeEntityCombinations:
             RBACElementType.USER,
             RBACElementType.PROJECT,
             RBACElementType.NETWORK,
+            RBACElementType.STORAGE_HOST,
         }
 
     def test_project_scope_entities(self) -> None:
@@ -33,6 +34,7 @@ class TestValidScopeEntityCombinations:
             RBACElementType.DEPLOYMENT,
             RBACElementType.NETWORK,
             RBACElementType.USER,
+            RBACElementType.STORAGE_HOST,
         }
 
     def test_user_scope_entities(self) -> None:
@@ -57,6 +59,19 @@ class TestValidScopeEntityCombinations:
             RBACElementType.KERNEL,
         }
 
+    def test_session_scope_entities(self) -> None:
+        entities = VALID_SCOPE_ENTITY_COMBINATIONS[RBACElementType.SESSION]
+        assert entities == {
+            RBACElementType.KERNEL,
+        }
+
+    def test_model_deployment_scope_entities(self) -> None:
+        entities = VALID_SCOPE_ENTITY_COMBINATIONS[RBACElementType.MODEL_DEPLOYMENT]
+        assert entities == {
+            RBACElementType.ROUTING,
+            RBACElementType.SESSION,
+        }
+
     def test_container_registry_scope_entities(self) -> None:
         entities = VALID_SCOPE_ENTITY_COMBINATIONS[RBACElementType.CONTAINER_REGISTRY]
         assert entities == {
@@ -76,6 +91,8 @@ class TestValidScopeEntityCombinations:
             RBACElementType.USER,
             RBACElementType.RESOURCE_GROUP,
             RBACElementType.AGENT,
+            RBACElementType.SESSION,
+            RBACElementType.MODEL_DEPLOYMENT,
             RBACElementType.CONTAINER_REGISTRY,
             RBACElementType.STORAGE_HOST,
         }
@@ -90,6 +107,7 @@ class TestValidScopeEntityCombinations:
             (RBACElementType.USER, RBACElementType.PROJECT),
             (RBACElementType.USER, RBACElementType.CONTAINER_REGISTRY),
             (RBACElementType.SESSION, RBACElementType.VFOLDER),
+            (RBACElementType.SESSION, RBACElementType.SESSION),
         ],
     )
     def test_invalid_combinations(self, scope: RBACElementType, entity: RBACElementType) -> None:

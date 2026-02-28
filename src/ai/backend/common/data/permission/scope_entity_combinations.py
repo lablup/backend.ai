@@ -17,6 +17,7 @@ VALID_SCOPE_ENTITY_COMBINATIONS: dict[RBACElementType, set[RBACElementType]] = {
         RBACElementType.USER,
         RBACElementType.PROJECT,
         RBACElementType.NETWORK,
+        RBACElementType.STORAGE_HOST,
     },
     RBACElementType.PROJECT: {
         RBACElementType.RESOURCE_GROUP,
@@ -26,6 +27,7 @@ VALID_SCOPE_ENTITY_COMBINATIONS: dict[RBACElementType, set[RBACElementType]] = {
         RBACElementType.DEPLOYMENT,
         RBACElementType.NETWORK,
         RBACElementType.USER,
+        RBACElementType.STORAGE_HOST,
     },
     RBACElementType.USER: {
         RBACElementType.RESOURCE_GROUP,
@@ -39,6 +41,13 @@ VALID_SCOPE_ENTITY_COMBINATIONS: dict[RBACElementType, set[RBACElementType]] = {
     },
     RBACElementType.AGENT: {
         RBACElementType.KERNEL,
+    },
+    RBACElementType.SESSION: {
+        RBACElementType.KERNEL,
+    },
+    RBACElementType.MODEL_DEPLOYMENT: {
+        RBACElementType.ROUTING,
+        RBACElementType.SESSION,
     },
     RBACElementType.CONTAINER_REGISTRY: {
         RBACElementType.IMAGE,
