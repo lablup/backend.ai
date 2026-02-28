@@ -189,9 +189,6 @@ type JSONDict = dict[str, Any]
 type _ResponseData = BaseResponseModel | BaseRootResponseModel[Any]
 
 
-type _ResponseData = BaseResponseModel | BaseRootResponseModel[Any]
-
-
 @dataclass
 class APIResponse:
     _status_code: int
