@@ -1,25 +1,10 @@
-"""Backward-compatibility shim for the export module.
-
-All export handler logic has been migrated to:
-
-* ``api.rest.export`` — ExportHandler + register_routes()
-
-This module keeps ``create_app()`` so that the existing server bootstrap
-(which iterates ``global_subapp_pkgs``) continues to work.
+"""
+REST API handlers for CSV export system.
+Provides CRUD endpoints for export reports.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from typing import Any
+from .handler import create_app
 
-from aiohttp import web
-
-from ai.backend.manager.api.types import CORSOptions
-
-
-def create_app(_default_cors_options: CORSOptions) -> tuple[web.Application, Iterable[Any]]:
-    app = web.Application()
-    app["prefix"] = "export"
-    app["api_versions"] = (4, 5)
-    return app, []
+__all__ = ("create_app",)
