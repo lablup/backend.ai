@@ -29,10 +29,11 @@ async def _handle_stream_response(
         first_chunk = await body_iter.__anext__()
         await resp.prepare(request)
         await resp.write(first_chunk)
-    except Exception as e:
+    except Exception:
+        log.exception("Failed to send first chunk from stream")
         raise web.HTTPInternalServerError(
-            reason=f"Failed to send first chunk from stream: {e!r}"
-        ) from e
+            reason="Failed to initialize streaming response"
+        ) from None
 
     try:
         async for chunk in body_iter:
