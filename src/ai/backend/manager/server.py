@@ -147,14 +147,18 @@ from .actions.monitors.reporter import ReporterMonitor
 from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
 from .api.context import RootContext
+from .api.rest.acl import register_routes as register_acl_routes
 from .api.rest.auth import register_routes as register_auth_routes
+from .api.rest.error_log import register_routes as register_logs_routes
 from .api.rest.middleware import (
     build_api_metric_middleware,
     exception_middleware,
     request_id_middleware,
 )
 from .api.rest.middleware.auth import auth_middleware
+from .api.rest.ratelimit import register_routes as register_ratelimit_routes
 from .api.rest.routing import RouteRegistry
+from .api.rest.scaling_group import register_routes as register_scaling_group_routes
 from .clients.agent import AgentClientPool, AgentPoolSpec
 from .clients.appproxy.client import AppProxyClientPool
 from .config.bootstrap import BootstrapConfig
@@ -1395,6 +1399,22 @@ def _register_newstyle_routes(
     if pidx == 0:
         log.info("Loading new-style module: auth")
     register_auth_routes(registry, dep_resources.processing.processors)
+
+    if pidx == 0:
+        log.info("Loading new-style module: acl")
+    register_acl_routes(registry)
+
+    if pidx == 0:
+        log.info("Loading new-style module: scaling_group")
+    register_scaling_group_routes(registry)
+
+    if pidx == 0:
+        log.info("Loading new-style module: logs")
+    register_logs_routes(registry, dep_resources.processing.processors)
+
+    if pidx == 0:
+        log.info("Loading new-style module: ratelimit")
+    register_ratelimit_routes(registry)
 
 
 def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:

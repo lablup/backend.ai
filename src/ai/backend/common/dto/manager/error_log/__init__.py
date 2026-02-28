@@ -7,6 +7,7 @@ from __future__ import annotations
 from .request import (
     AppendErrorLogRequest,
     ListErrorLogsRequest,
+    MarkClearedPathParam,
 )
 from .response import (
     AppendErrorLogResponse,
@@ -19,6 +20,7 @@ __all__ = (
     # Request DTOs
     "AppendErrorLogRequest",
     "ListErrorLogsRequest",
+    "MarkClearedPathParam",
     # Response DTOs - Data
     "ErrorLogDTO",
     # Response DTOs - Responses

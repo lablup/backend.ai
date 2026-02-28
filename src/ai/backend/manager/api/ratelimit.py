@@ -1,8 +1,19 @@
+"""Backward-compatibility shim for the ratelimit module.
+
+The rate-limit middleware logic has been migrated to:
+
+* ``api.rest.ratelimit.handler`` — ``rlim_middleware``
+
+This module keeps ``create_app()`` with the ``PrivateContext`` and
+Valkey client init/shutdown so that the existing server bootstrap
+continues to work.  The ``rlim_middleware`` is re-imported from the new
+location and re-exported for backward compatibility.
+"""
+
 from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from typing import Final
 
 import attrs
 from aiohttp import web
@@ -11,48 +22,19 @@ from aiotools import apartial
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.api import RateLimitExceeded
 
 from .context import RootContext
-from .types import CORSOptions, WebMiddleware, WebRequestHandler
+from .rest.ratelimit.handler import _rlim_window, rlim_middleware
+from .types import CORSOptions, WebMiddleware
+
+__all__ = (
+    "PrivateContext",
+    "_rlim_window",
+    "rlim_middleware",
+    "create_app",
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-_rlim_window: Final = 60 * 15
-
-# We implement rate limiting using a rolling counter, which prevents
-# last-minute and first-minute bursts between the intervals.
-
-
-@web.middleware
-async def rlim_middleware(
-    app: web.Application,
-    request: web.Request,
-    handler: WebRequestHandler,
-) -> web.StreamResponse:
-    # This is a global middleware: request.app is the root app.
-    app_ctx: PrivateContext = app["ratelimit.context"]
-    if request["is_authorized"]:
-        rate_limit = request["keypair"]["rate_limit"]
-        access_key = request["keypair"]["access_key"]
-        rolling_count = await app_ctx.valkey_rate_limit_client.execute_rate_limit_logic(
-            access_key=access_key,
-            window=_rlim_window,
-        )
-        if rate_limit is not None and rolling_count > rate_limit:
-            raise RateLimitExceeded
-        remaining = rate_limit - rolling_count if rate_limit is not None else rolling_count
-        response = await handler(request)
-        response.headers["X-RateLimit-Limit"] = str(rate_limit)
-        response.headers["X-RateLimit-Remaining"] = str(remaining)
-        response.headers["X-RateLimit-Window"] = str(_rlim_window)
-        return response
-    # No checks for rate limiting for non-authorized queries.
-    response = await handler(request)
-    response.headers["X-RateLimit-Limit"] = "1000"
-    response.headers["X-RateLimit-Remaining"] = "1000"
-    response.headers["X-RateLimit-Window"] = str(_rlim_window)
-    return response
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)

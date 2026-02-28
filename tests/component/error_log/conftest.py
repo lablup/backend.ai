@@ -11,6 +11,7 @@ from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import logs as _logs_api
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest import error_log as _error_log_rest
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.models.error_logs import error_logs
 from ai.backend.manager.repositories.repositories import Repositories
@@ -28,9 +29,9 @@ from ai.backend.manager.server import (
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
 
 # Statically imported so that Pants includes these modules in the test PEX.
-# build_root_app() loads them at runtime via importlib.import_module(),
-# which Pants cannot trace statically.
-_ERROR_LOG_SERVER_SUBAPP_MODULES = (_auth_api, _logs_api)
+# _logs_api is kept as legacy subapp (GlobalTimer lifecycle).
+# _error_log_rest provides new-style route registration via parent conftest.
+_ERROR_LOG_SERVER_SUBAPP_MODULES = (_auth_api, _logs_api, _error_log_rest)
 
 
 @asynccontextmanager
