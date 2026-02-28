@@ -57,13 +57,13 @@ class AgentAdapter(BaseFilterAdapter):
             BatchQuerier object with converted conditions, orders, and pagination
         """
         conditions = self._convert_filter(request.filter) if request.filter else []
-        orders: list[QueryOrder] = []
-        if request.order is not None:
-            for order in request.order:
-                orders.append(self._convert_order(order))
-        pagination = self._build_pagination(request.limit, request.offset)
+        orders = [self._convert_order(o) for o in request.order] if request.order else []
 
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return BatchQuerier(
+            conditions=conditions,
+            orders=orders,
+            pagination=OffsetPagination(limit=request.limit, offset=request.offset),
+        )
 
     def _convert_filter(self, filter: AgentFilter) -> list[QueryCondition]:
         """Convert agent filter to list of query conditions."""
@@ -111,7 +111,3 @@ class AgentAdapter(BaseFilterAdapter):
         if order.field == AgentOrderField.RESOURCE_GROUP:
             return QueryOrders.resource_group(ascending=ascending)
         raise ValueError(f"Unknown order field: {order.field}")
-
-    def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
-        """Build pagination from limit and offset."""
-        return OffsetPagination(limit=limit, offset=offset)
