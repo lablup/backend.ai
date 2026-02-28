@@ -357,6 +357,8 @@ class RBACElementType(enum.StrEnum):
     RESOURCE_GROUP = "resource_group"
     CONTAINER_REGISTRY = "container_registry"
     STORAGE_HOST = "storage_host"
+    AGENT = "agent"
+    KERNEL = "kernel"
     IMAGE = "image"
     ARTIFACT = "artifact"
     ARTIFACT_REGISTRY = "artifact_registry"
