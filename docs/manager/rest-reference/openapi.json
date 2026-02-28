@@ -7083,6 +7083,793 @@
         "title": "UpdateResourceGroupFairShareSpecRequest",
         "type": "object"
       },
+      "DateTimeRangeFilter": {
+        "description": "Filters records by a datetime range.\n\nBoth boundaries are inclusive. You can specify just 'after', just 'before',\nor both to define the range. Records matching the boundary values are included.\nThis filter is shared across all report types for datetime fields like\ncreated_at, modified_at, terminated_at, etc.",
+        "properties": {
+          "after": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Include only records created on or after this datetime. Should be in ISO 8601 format (e.g., '2024-01-01T00:00:00Z'). If not specified, there is no lower bound on the datetime range.",
+            "title": "After"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Include only records created on or before this datetime. Should be in ISO 8601 format (e.g., '2024-12-31T23:59:59Z'). If not specified, there is no upper bound on the datetime range.",
+            "title": "Before"
+          }
+        },
+        "title": "DateTimeRangeFilter",
+        "type": "object"
+      },
+      "UserExportFilter": {
+        "description": "Filter conditions specific to user export.\n\nAll specified conditions are combined with AND logic.\nOnly records matching all specified filters will be exported.\nUse this to narrow down the exported user data to specific criteria.",
+        "properties": {
+          "username": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter users by username. Supports various match modes: contains, equals, starts_with, ends_with. Can be case-insensitive and/or negated."
+          },
+          "email": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter users by email address. Supports various match modes: contains, equals, starts_with, ends_with. Useful for finding users from specific email domains."
+          },
+          "domain_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter users by their assigned domain name. Use this to export users belonging to a specific domain."
+          },
+          "role": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter users by role(s). Accepts a list of role values (e.g., ['admin', 'user', 'monitor']). Uses IN query.",
+            "title": "Role"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter users by account status(es). Accepts a list of status values (e.g., ['active', 'inactive']). Uses IN query.",
+            "title": "Status"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeRangeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter users by their registration timestamp. Specify 'after' and/or 'before' to define the datetime range. Useful for exporting users registered within a specific period."
+          }
+        },
+        "title": "UserExportFilter",
+        "type": "object"
+      },
+      "UserExportOrder": {
+        "description": "Specifies how to sort the exported user data.\n\nMultiple UserExportOrder instances can be provided to define multi-level sorting.\nThe order in the list determines priority (first item is primary sort key).",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/UserExportOrderField",
+            "description": "The field to sort by. Must be one of the valid user orderable fields: username, email, full_name, domain_name, role, status, created_at, modified_at."
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Sort direction. 'asc' for ascending (A-Z, oldest-first), 'desc' for descending (Z-A, newest-first). Default is 'asc'."
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "UserExportOrder",
+        "type": "object"
+      },
+      "UserExportOrderField": {
+        "description": "Orderable fields for user export.\n\nThese are the fields that can be used for sorting user export results.\nNot all user fields are sortable - only commonly used sort keys are included.",
+        "enum": [
+          "username",
+          "email",
+          "full_name",
+          "domain_name",
+          "role",
+          "status",
+          "created_at",
+          "modified_at"
+        ],
+        "title": "UserExportOrderField",
+        "type": "string"
+      },
+      "UserExportCSVRequest": {
+        "description": "Request body for user CSV export operations.\n\nThis is the request model for POST /export/users/csv endpoint.\nAll parameters are optional to allow flexible export configurations.",
+        "properties": {
+          "fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "List of field keys to include in the export. Available fields: uuid, username, email, full_name, domain_name, role, status, created_at, modified_at. If not specified or empty, all available fields will be exported.",
+            "title": "Fields"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserExportFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions to apply before export. Only users matching all specified conditions will be included. If not specified, all users (up to max_rows limit) will be exported."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UserExportOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "List of ordering specifications for sorting the exported data. Multiple orders can be specified for multi-level sorting. The first item in the list is the primary sort key.",
+            "title": "Order"
+          },
+          "encoding": {
+            "default": "utf-8",
+            "description": "Character encoding for the CSV output. Supported values: 'utf-8' (default, recommended for most uses), 'euc-kr' (for Korean systems requiring legacy encoding).",
+            "title": "Encoding",
+            "type": "string"
+          }
+        },
+        "title": "UserExportCSVRequest",
+        "type": "object"
+      },
+      "SessionExportFilter": {
+        "description": "Filter conditions specific to session export.\n\nAll specified conditions are combined with AND logic.\nOnly records matching all specified filters will be exported.\nUse this to narrow down the exported session data to specific criteria.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter sessions by name. Supports various match modes: contains, equals, starts_with, ends_with. Can be case-insensitive and/or negated."
+          },
+          "session_type": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter sessions by type(s). Accepts a list of type values (e.g., ['interactive', 'batch', 'inference']). Uses IN query.",
+            "title": "Session Type"
+          },
+          "domain_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter sessions by domain name. Use this to export sessions belonging to a specific domain."
+          },
+          "access_key": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter sessions by the owning access key. Use this to export sessions created by a specific user/keypair."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter sessions by status(es). Accepts a list of status values (e.g., ['PENDING', 'RUNNING', 'TERMINATED']). Uses IN query.",
+            "title": "Status"
+          },
+          "scaling_group_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter sessions by scaling group name. Use this to export sessions running on specific resource pools."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeRangeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter sessions by creation timestamp. Specify 'after' and/or 'before' to define the datetime range. Useful for exporting sessions created within a specific period."
+          },
+          "terminated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeRangeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter sessions by termination timestamp. Specify 'after' and/or 'before' to define the datetime range. Useful for exporting sessions that ended within a specific period. Note: Only terminated sessions have this field populated."
+          }
+        },
+        "title": "SessionExportFilter",
+        "type": "object"
+      },
+      "SessionExportOrder": {
+        "description": "Specifies how to sort the exported session data.\n\nMultiple SessionExportOrder instances can be provided to define multi-level sorting.\nThe order in the list determines priority (first item is primary sort key).",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/SessionExportOrderField",
+            "description": "The field to sort by. Must be one of the valid session orderable fields: name, session_type, domain_name, access_key, status, scaling_group_name, cluster_size, created_at, terminated_at."
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Sort direction. 'asc' for ascending (A-Z, oldest-first), 'desc' for descending (Z-A, newest-first). Default is 'asc'."
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "SessionExportOrder",
+        "type": "object"
+      },
+      "SessionExportOrderField": {
+        "description": "Orderable fields for session export.\n\nThese are the fields that can be used for sorting session export results.\nIncludes both creation and termination timestamps for flexible time-based ordering.",
+        "enum": [
+          "name",
+          "session_type",
+          "domain_name",
+          "access_key",
+          "status",
+          "scaling_group_name",
+          "cluster_size",
+          "created_at",
+          "terminated_at"
+        ],
+        "title": "SessionExportOrderField",
+        "type": "string"
+      },
+      "SessionExportCSVRequest": {
+        "description": "Request body for session CSV export operations.\n\nThis is the request model for POST /export/sessions/csv endpoint.\nAll parameters are optional to allow flexible export configurations.",
+        "properties": {
+          "fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "List of field keys to include in the export. Available fields: id, name, session_type, domain_name, access_key, status, status_info, scaling_group_name, cluster_size, occupying_slots, created_at, terminated_at. If not specified or empty, all available fields will be exported.",
+            "title": "Fields"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionExportFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions to apply before export. Only sessions matching all specified conditions will be included. If not specified, all sessions (up to max_rows limit) will be exported."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionExportOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "List of ordering specifications for sorting the exported data. Multiple orders can be specified for multi-level sorting. The first item in the list is the primary sort key.",
+            "title": "Order"
+          },
+          "encoding": {
+            "default": "utf-8",
+            "description": "Character encoding for the CSV output. Supported values: 'utf-8' (default, recommended for most uses), 'euc-kr' (for Korean systems requiring legacy encoding).",
+            "title": "Encoding",
+            "type": "string"
+          }
+        },
+        "title": "SessionExportCSVRequest",
+        "type": "object"
+      },
+      "BooleanFilter": {
+        "description": "Filter for boolean fields.\n\nSimple filter that matches records where the field equals the specified value.",
+        "properties": {
+          "equals": {
+            "description": "The boolean value to match. Set to true to include only records where the field is true, or false to include only records where the field is false.",
+            "title": "Equals",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "equals"
+        ],
+        "title": "BooleanFilter",
+        "type": "object"
+      },
+      "ProjectExportFilter": {
+        "description": "Filter conditions specific to project export.\n\nAll specified conditions are combined with AND logic.\nOnly records matching all specified filters will be exported.\nUse this to narrow down the exported project data to specific criteria.\n\nOnly base project fields are supported for filtering.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter projects by name. Supports various match modes: contains, equals, starts_with, ends_with. Can be case-insensitive and/or negated."
+          },
+          "domain_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter projects by domain name. Use this to export projects belonging to a specific domain."
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BooleanFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter projects by active status. Set equals to true for active projects only, or false for inactive/archived projects only."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeRangeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter projects by creation timestamp. Specify 'after' and/or 'before' to define the datetime range. Useful for exporting projects created within a specific period."
+          }
+        },
+        "title": "ProjectExportFilter",
+        "type": "object"
+      },
+      "ProjectExportOrder": {
+        "description": "Specifies how to sort the exported project data.\n\nMultiple ProjectExportOrder instances can be provided to define multi-level sorting.\nThe order in the list determines priority (first item is primary sort key).",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/ProjectExportOrderField",
+            "description": "The field to sort by. Only base project fields are supported: name, domain_name, is_active, created_at, modified_at. JOIN fields (resource_policy, scaling_group, container_registry) are not orderable."
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Sort direction. 'asc' for ascending (A-Z, oldest-first, false-first), 'desc' for descending (Z-A, newest-first, true-first). Default is 'asc'."
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "ProjectExportOrder",
+        "type": "object"
+      },
+      "ProjectExportOrderField": {
+        "description": "Orderable fields for project export.\n\nThese are the fields that can be used for sorting project export results.\nOnly base project fields are supported for ordering.",
+        "enum": [
+          "name",
+          "domain_name",
+          "is_active",
+          "created_at",
+          "modified_at"
+        ],
+        "title": "ProjectExportOrderField",
+        "type": "string"
+      },
+      "ProjectExportCSVRequest": {
+        "description": "Request body for project CSV export operations.\n\nThis is the request model for POST /export/projects/csv endpoint.\nAll parameters are optional to allow flexible export configurations.",
+        "properties": {
+          "fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "List of field keys to include in the export. Available fields: id, name, description, domain_name, is_active, total_resource_slots, created_at, modified_at, container_registry. If not specified or empty, all available fields will be exported.",
+            "title": "Fields"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectExportFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions to apply before export. Only projects matching all specified conditions will be included. If not specified, all projects (up to max_rows limit) will be exported."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ProjectExportOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "List of ordering specifications for sorting the exported data. Multiple orders can be specified for multi-level sorting. The first item in the list is the primary sort key.",
+            "title": "Order"
+          },
+          "encoding": {
+            "default": "utf-8",
+            "description": "Character encoding for the CSV output. Supported values: 'utf-8' (default, recommended for most uses), 'euc-kr' (for Korean systems requiring legacy encoding).",
+            "title": "Encoding",
+            "type": "string"
+          }
+        },
+        "title": "ProjectExportCSVRequest",
+        "type": "object"
+      },
+      "KeypairExportCSVRequest": {
+        "description": "Request body for keypair CSV export operations.\n\nThis is the request model for POST /export/keypairs/csv endpoint.\nNote: Filtering and ordering are not yet supported for keypair exports.",
+        "properties": {
+          "fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "List of field keys to include in the export. Available basic fields: access_key, user_id, user_uuid, is_active, is_admin, created_at, modified_at, last_used, resource_policy_name. Available JOIN fields: user_*, resource_policy_*, resource_group_*, session_*. If not specified or empty, all available fields will be exported.",
+            "title": "Fields"
+          },
+          "encoding": {
+            "default": "utf-8",
+            "description": "Character encoding for the CSV output. Supported values: 'utf-8' (default, recommended for most uses), 'euc-kr' (for Korean systems requiring legacy encoding).",
+            "title": "Encoding",
+            "type": "string"
+          }
+        },
+        "title": "KeypairExportCSVRequest",
+        "type": "object"
+      },
+      "AuditLogExportFilter": {
+        "description": "Filter conditions specific to audit log export.\n\nAll specified conditions are combined with AND logic.\nOnly records matching all specified filters will be exported.\nUse this to narrow down the exported audit log data to specific criteria.",
+        "properties": {
+          "entity_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter audit logs by entity type (e.g., 'session', 'user', 'keypair'). Use exact match (equals) to filter by specific entity type."
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter audit logs by entity ID. Use this to export audit logs for a specific entity."
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter audit logs by operation type (e.g., 'create', 'update', 'delete'). Use exact match (equals) to filter by specific operation."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter audit logs by status(es). Accepts a list of status values (e.g., ['success', 'failure']). Uses IN query.",
+            "title": "Status"
+          },
+          "triggered_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter audit logs by the user or system that triggered the action. Use this to export audit logs initiated by a specific actor."
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter audit logs by request ID. Use this to export audit logs for a specific API request."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeRangeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter audit logs by creation timestamp. Specify 'after' and/or 'before' to define the datetime range. Useful for exporting audit logs within a specific period."
+          }
+        },
+        "title": "AuditLogExportFilter",
+        "type": "object"
+      },
+      "AuditLogExportOrder": {
+        "description": "Specifies how to sort the exported audit log data.\n\nMultiple AuditLogExportOrder instances can be provided to define multi-level sorting.\nThe order in the list determines priority (first item is primary sort key).",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/AuditLogExportOrderField",
+            "description": "The field to sort by. Must be one of the valid audit log orderable fields: entity_type, entity_id, operation, status, created_at, triggered_by."
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Sort direction. 'asc' for ascending (A-Z, oldest-first), 'desc' for descending (Z-A, newest-first). Default is 'asc'."
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "AuditLogExportOrder",
+        "type": "object"
+      },
+      "AuditLogExportOrderField": {
+        "description": "Orderable fields for audit log export.\n\nThese are the fields that can be used for sorting audit log export results.",
+        "enum": [
+          "entity_type",
+          "entity_id",
+          "operation",
+          "status",
+          "created_at",
+          "triggered_by"
+        ],
+        "title": "AuditLogExportOrderField",
+        "type": "string"
+      },
+      "AuditLogExportCSVRequest": {
+        "description": "Request body for audit log CSV export operations.\n\nThis is the request model for POST /export/audit-logs/csv endpoint.\nAll parameters are optional to allow flexible export configurations.",
+        "properties": {
+          "fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "List of field keys to include in the export. Available fields: id, action_id, entity_type, entity_id, operation, status, created_at, description, request_id, triggered_by, duration. If not specified or empty, all available fields will be exported.",
+            "title": "Fields"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuditLogExportFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions to apply before export. Only audit logs matching all specified conditions will be included. If not specified, all audit logs (up to max_rows limit) will be exported."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AuditLogExportOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "List of ordering specifications for sorting the exported data. Multiple orders can be specified for multi-level sorting. The first item in the list is the primary sort key.",
+            "title": "Order"
+          },
+          "encoding": {
+            "default": "utf-8",
+            "description": "Character encoding for the CSV output. Supported values: 'utf-8' (default, recommended for most uses), 'euc-kr' (for Korean systems requiring legacy encoding).",
+            "title": "Encoding",
+            "type": "string"
+          }
+        },
+        "title": "AuditLogExportCSVRequest",
+        "type": "object"
+      },
       "AgentFilter": {
         "description": "Filter for agents.",
         "properties": {
@@ -16990,6 +17777,200 @@
         ],
         "parameters": [],
         "description": "Search all resource groups with their fair share specs.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/reports": {
+      "get": {
+        "operationId": "export.list_reports",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "List available export reports.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/reports/{report_key}": {
+      "get": {
+        "operationId": "export.get_report",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific export report by key.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/users/csv": {
+      "post": {
+        "operationId": "export.export_csv",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserExportCSVRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Export user data as CSV.\n\nPOST /export/users/csv\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/sessions/csv": {
+      "post": {
+        "operationId": "export.export_csv.2",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionExportCSVRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Export session data as CSV.\n\nPOST /export/sessions/csv\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/projects/csv": {
+      "post": {
+        "operationId": "export.export_csv.3",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectExportCSVRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Export project data as CSV.\n\nPOST /export/projects/csv\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/keypairs/csv": {
+      "post": {
+        "operationId": "export.export_csv.4",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeypairExportCSVRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Export keypair data as CSV.\n\nPOST /export/keypairs/csv\n\nNote: Keypair export does not currently support filtering or ordering.\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/audit-logs/csv": {
+      "post": {
+        "operationId": "export.export_csv.5",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditLogExportCSVRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Export audit log data as CSV.\n\nPOST /export/audit-logs/csv\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/agents/search": {
