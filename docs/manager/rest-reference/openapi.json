@@ -2057,6 +2057,154 @@
         "title": "UpdateQuotaReq",
         "type": "object"
       },
+      "CreateClusterTemplateRequest": {
+        "description": "Request body for creating a cluster template.",
+        "properties": {
+          "group": {
+            "default": "default",
+            "description": "Group name",
+            "title": "Group",
+            "type": "string"
+          },
+          "domain": {
+            "default": "default",
+            "description": "Domain name",
+            "title": "Domain",
+            "type": "string"
+          },
+          "owner_access_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Access key of the owner (for admin use)",
+            "title": "Owner Access Key"
+          },
+          "payload": {
+            "description": "JSON or YAML string containing cluster template definition",
+            "title": "Payload",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payload"
+        ],
+        "title": "CreateClusterTemplateRequest",
+        "type": "object"
+      },
+      "UpdateClusterTemplateRequest": {
+        "description": "Request body for updating a cluster template.",
+        "properties": {
+          "payload": {
+            "description": "JSON or YAML string containing cluster template definition",
+            "title": "Payload",
+            "type": "string"
+          },
+          "owner_access_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Access key of the owner (for admin use)",
+            "title": "Owner Access Key"
+          }
+        },
+        "required": [
+          "payload"
+        ],
+        "title": "UpdateClusterTemplateRequest",
+        "type": "object"
+      },
+      "CreateSessionTemplateRequest": {
+        "description": "Request body for creating a session template.",
+        "properties": {
+          "group": {
+            "default": "default",
+            "description": "Group name",
+            "title": "Group",
+            "type": "string"
+          },
+          "domain": {
+            "default": "default",
+            "description": "Domain name",
+            "title": "Domain",
+            "type": "string"
+          },
+          "owner_access_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Access key of the owner (for admin use)",
+            "title": "Owner Access Key"
+          },
+          "payload": {
+            "description": "JSON or YAML string containing template definition",
+            "title": "Payload",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payload"
+        ],
+        "title": "CreateSessionTemplateRequest",
+        "type": "object"
+      },
+      "UpdateSessionTemplateRequest": {
+        "description": "Request body for updating a session template.",
+        "properties": {
+          "group": {
+            "default": "default",
+            "description": "Group name",
+            "title": "Group",
+            "type": "string"
+          },
+          "domain": {
+            "default": "default",
+            "description": "Domain name",
+            "title": "Domain",
+            "type": "string"
+          },
+          "payload": {
+            "description": "JSON or YAML string containing template definition",
+            "title": "Payload",
+            "type": "string"
+          },
+          "owner_access_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Access key of the owner (for admin use)",
+            "title": "Owner Access Key"
+          }
+        },
+        "required": [
+          "payload"
+        ],
+        "title": "UpdateSessionTemplateRequest",
+        "type": "object"
+      },
       "ImageFilter": {
         "description": "Filter for images.",
         "properties": {
@@ -13794,30 +13942,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "group": {
-                    "type": "string",
-                    "default": "default"
-                  },
-                  "domain": {
-                    "type": "string",
-                    "default": "default"
-                  },
-                  "owner_access_key": {
-                    "type": "string"
-                  },
-                  "payload": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "group",
-                  "domain",
-                  "payload"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/CreateClusterTemplateRequest"
+              }
             }
           }
         },
@@ -13825,7 +13951,7 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "get": {
-        "operationId": "template/cluster.list_template",
+        "operationId": "template/cluster.list_templates",
         "tags": [
           "template/cluster"
         ],
@@ -13842,27 +13968,32 @@
         "parameters": [
           {
             "name": "all",
+            "in": "query",
+            "required": false,
             "schema": {
+              "default": false,
+              "description": "List all templates (superadmin only)",
+              "title": "All",
               "type": "boolean"
-            },
-            "required": true,
-            "in": "query"
+            }
           },
           {
             "name": "group_id",
+            "in": "query",
+            "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
-                  "type": "string"
+                  "type": "null"
                 }
-              ]
-            },
-            "required": false,
-            "in": "query"
+              ],
+              "default": null,
+              "description": "Filter by group ID",
+              "title": "Group Id"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
@@ -13895,30 +14026,42 @@
           },
           {
             "name": "format",
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": "string",
+              "default": "yaml",
+              "description": "Response format: \"yaml\" or \"json\"",
               "enum": [
                 "yaml",
                 "json"
               ],
-              "default": "yaml"
-            },
-            "required": false,
-            "in": "query"
+              "title": "Format",
+              "type": "string"
+            }
           },
           {
             "name": "owner_access_key",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Access key of the owner (for admin use)",
+              "title": "Owner Access Key"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "put": {
-        "operationId": "template/cluster.put",
+        "operationId": "template/cluster.update",
         "tags": [
           "template/cluster"
         ],
@@ -13936,20 +14079,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "payload": {
-                    "type": "string"
-                  },
-                  "owner_access_key": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "payload"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/UpdateClusterTemplateRequest"
+              }
             }
           }
         },
@@ -13991,11 +14122,21 @@
           },
           {
             "name": "owner_access_key",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Access key of the owner (for admin use)",
+              "title": "Owner Access Key"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
@@ -14021,30 +14162,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "group": {
-                    "type": "string",
-                    "default": "default"
-                  },
-                  "domain": {
-                    "type": "string",
-                    "default": "default"
-                  },
-                  "owner_access_key": {
-                    "type": "string"
-                  },
-                  "payload": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "group",
-                  "domain",
-                  "payload"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/CreateSessionTemplateRequest"
+              }
             }
           }
         },
@@ -14052,7 +14171,7 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "get": {
-        "operationId": "template/session.list_template",
+        "operationId": "template/session.list_templates",
         "tags": [
           "template/session"
         ],
@@ -14069,27 +14188,32 @@
         "parameters": [
           {
             "name": "all",
+            "in": "query",
+            "required": false,
             "schema": {
+              "default": false,
+              "description": "List all templates (superadmin only)",
+              "title": "All",
               "type": "boolean"
-            },
-            "required": true,
-            "in": "query"
+            }
           },
           {
             "name": "group_id",
+            "in": "query",
+            "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
-                  "type": "string"
+                  "type": "null"
                 }
-              ]
-            },
-            "required": false,
-            "in": "query"
+              ],
+              "default": null,
+              "description": "Filter by group ID",
+              "title": "Group Id"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
@@ -14122,30 +14246,42 @@
           },
           {
             "name": "format",
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": "string",
+              "default": "json",
+              "description": "Response format: \"yaml\" or \"json\"",
               "enum": [
                 "yaml",
                 "json"
               ],
-              "default": "json"
-            },
-            "required": false,
-            "in": "query"
+              "title": "Format",
+              "type": "string"
+            }
           },
           {
             "name": "owner_access_key",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Access key of the owner (for admin use)",
+              "title": "Owner Access Key"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "put": {
-        "operationId": "template/session.put",
+        "operationId": "template/session.update",
         "tags": [
           "template/session"
         ],
@@ -14163,30 +14299,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "group": {
-                    "type": "string",
-                    "default": "default"
-                  },
-                  "domain": {
-                    "type": "string",
-                    "default": "default"
-                  },
-                  "payload": {
-                    "type": "string"
-                  },
-                  "owner_access_key": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "group",
-                  "domain",
-                  "payload"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/UpdateSessionTemplateRequest"
+              }
             }
           }
         },
@@ -14228,11 +14342,21 @@
           },
           {
             "name": "owner_access_key",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Access key of the owner (for admin use)",
+              "title": "Owner Access Key"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
