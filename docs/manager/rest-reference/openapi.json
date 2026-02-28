@@ -2205,6 +2205,428 @@
         "title": "UpdateSessionTemplateRequest",
         "type": "object"
       },
+      "ImageFilter": {
+        "description": "Filter for images.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by image name"
+          },
+          "architecture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by architecture"
+          }
+        },
+        "title": "ImageFilter",
+        "type": "object"
+      },
+      "ImageOrder": {
+        "description": "Order specification for images.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/ImageOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "ImageOrder",
+        "type": "object"
+      },
+      "ImageOrderField": {
+        "description": "Fields available for ordering images.",
+        "enum": [
+          "name",
+          "created_at"
+        ],
+        "title": "ImageOrderField",
+        "type": "string"
+      },
+      "OrderDirection": {
+        "enum": [
+          "asc",
+          "desc"
+        ],
+        "title": "OrderDirection",
+        "type": "string"
+      },
+      "StringFilter": {
+        "description": "Comprehensive string field filter supporting multiple match operations.\n\nProvides flexible string matching with four operation types (equals, contains,\nstarts_with, ends_with), each available in case-sensitive, case-insensitive,\nand negated variants for complete filtering control.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match (case-sensitive)",
+            "title": "Equals"
+          },
+          "contains": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Contains (case-sensitive)",
+            "title": "Contains"
+          },
+          "starts_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Starts with (case-sensitive)",
+            "title": "Starts With"
+          },
+          "ends_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Ends with (case-sensitive)",
+            "title": "Ends With"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not equals (case-sensitive)",
+            "title": "Not Equals"
+          },
+          "not_contains": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not contains (case-sensitive)",
+            "title": "Not Contains"
+          },
+          "not_starts_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not starts with (case-sensitive)",
+            "title": "Not Starts With"
+          },
+          "not_ends_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not ends with (case-sensitive)",
+            "title": "Not Ends With"
+          },
+          "i_equals": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match (case-insensitive)",
+            "title": "I Equals"
+          },
+          "i_contains": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Contains (case-insensitive)",
+            "title": "I Contains"
+          },
+          "i_starts_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Starts with (case-insensitive)",
+            "title": "I Starts With"
+          },
+          "i_ends_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Ends with (case-insensitive)",
+            "title": "I Ends With"
+          },
+          "i_not_equals": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not equals (case-insensitive)",
+            "title": "I Not Equals"
+          },
+          "i_not_contains": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not contains (case-insensitive)",
+            "title": "I Not Contains"
+          },
+          "i_not_starts_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not starts with (case-insensitive)",
+            "title": "I Not Starts With"
+          },
+          "i_not_ends_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not ends with (case-insensitive)",
+            "title": "I Not Ends With"
+          }
+        },
+        "title": "StringFilter",
+        "type": "object"
+      },
+      "SearchImagesRequest": {
+        "description": "Request body for searching images with filters, orders, and pagination.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ImageOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum items to return",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Number of items to skip",
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "title": "SearchImagesRequest",
+        "type": "object"
+      },
+      "RescanImagesRequest": {
+        "description": "Request body for rescanning images from a registry.",
+        "properties": {
+          "canonical": {
+            "description": "Image canonical name to rescan",
+            "title": "Canonical",
+            "type": "string"
+          },
+          "architecture": {
+            "description": "Image architecture to rescan",
+            "title": "Architecture",
+            "type": "string"
+          }
+        },
+        "required": [
+          "canonical",
+          "architecture"
+        ],
+        "title": "RescanImagesRequest",
+        "type": "object"
+      },
+      "AliasImageRequest": {
+        "description": "Request body for creating an image alias.",
+        "properties": {
+          "image_id": {
+            "description": "ID of the image to alias",
+            "format": "uuid",
+            "title": "Image Id",
+            "type": "string"
+          },
+          "alias": {
+            "description": "Alias name to assign",
+            "title": "Alias",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_id",
+          "alias"
+        ],
+        "title": "AliasImageRequest",
+        "type": "object"
+      },
+      "DealiasImageRequest": {
+        "description": "Request body for removing an image alias.",
+        "properties": {
+          "alias": {
+            "description": "Alias name to remove",
+            "title": "Alias",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alias"
+        ],
+        "title": "DealiasImageRequest",
+        "type": "object"
+      },
+      "ForgetImageRequest": {
+        "description": "Request body for forgetting (soft-deleting) an image.",
+        "properties": {
+          "image_id": {
+            "description": "ID of the image to forget",
+            "format": "uuid",
+            "title": "Image Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_id"
+        ],
+        "title": "ForgetImageRequest",
+        "type": "object"
+      },
+      "PurgeImageRequest": {
+        "description": "Request body for purging (hard-deleting) an image.",
+        "properties": {
+          "image_id": {
+            "description": "ID of the image to purge",
+            "format": "uuid",
+            "title": "Image Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_id"
+        ],
+        "title": "PurgeImageRequest",
+        "type": "object"
+      },
       "CreateUserDotfileRequest": {
         "description": "Request to create a user dotfile.",
         "properties": {
@@ -3045,229 +3467,6 @@
         ],
         "title": "NotificationChannelOrderField",
         "type": "string"
-      },
-      "OrderDirection": {
-        "enum": [
-          "asc",
-          "desc"
-        ],
-        "title": "OrderDirection",
-        "type": "string"
-      },
-      "StringFilter": {
-        "description": "Comprehensive string field filter supporting multiple match operations.\n\nProvides flexible string matching with four operation types (equals, contains,\nstarts_with, ends_with), each available in case-sensitive, case-insensitive,\nand negated variants for complete filtering control.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact match (case-sensitive)",
-            "title": "Equals"
-          },
-          "contains": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Contains (case-sensitive)",
-            "title": "Contains"
-          },
-          "starts_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Starts with (case-sensitive)",
-            "title": "Starts With"
-          },
-          "ends_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Ends with (case-sensitive)",
-            "title": "Ends With"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not equals (case-sensitive)",
-            "title": "Not Equals"
-          },
-          "not_contains": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not contains (case-sensitive)",
-            "title": "Not Contains"
-          },
-          "not_starts_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not starts with (case-sensitive)",
-            "title": "Not Starts With"
-          },
-          "not_ends_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not ends with (case-sensitive)",
-            "title": "Not Ends With"
-          },
-          "i_equals": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact match (case-insensitive)",
-            "title": "I Equals"
-          },
-          "i_contains": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Contains (case-insensitive)",
-            "title": "I Contains"
-          },
-          "i_starts_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Starts with (case-insensitive)",
-            "title": "I Starts With"
-          },
-          "i_ends_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Ends with (case-insensitive)",
-            "title": "I Ends With"
-          },
-          "i_not_equals": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not equals (case-insensitive)",
-            "title": "I Not Equals"
-          },
-          "i_not_contains": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not contains (case-insensitive)",
-            "title": "I Not Contains"
-          },
-          "i_not_starts_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not starts with (case-insensitive)",
-            "title": "I Not Starts With"
-          },
-          "i_not_ends_with": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not ends with (case-insensitive)",
-            "title": "I Not Ends With"
-          }
-        },
-        "title": "StringFilter",
-        "type": "object"
       },
       "SearchNotificationChannelsRequest": {
         "description": "Request body for searching notification channels with filters, orders, and pagination.",
@@ -8200,6 +8399,157 @@
           "name"
         ],
         "title": "PurgeDomainRequest",
+        "type": "object"
+      },
+      "QuotaScopeFilter": {
+        "properties": {
+          "quota_scope_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by quota scope ID"
+          },
+          "storage_host_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by storage host name"
+          }
+        },
+        "title": "QuotaScopeFilter",
+        "type": "object"
+      },
+      "QuotaScopeOrder": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/QuotaScopeOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "QuotaScopeOrder",
+        "type": "object"
+      },
+      "QuotaScopeOrderField": {
+        "enum": [
+          "quota_scope_id",
+          "storage_host_name"
+        ],
+        "title": "QuotaScopeOrderField",
+        "type": "string"
+      },
+      "SearchQuotaScopesRequest": {
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuotaScopeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/QuotaScopeOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum items to return",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Number of items to skip",
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "title": "SearchQuotaScopesRequest",
+        "type": "object"
+      },
+      "SetQuotaRequest": {
+        "properties": {
+          "storage_host_name": {
+            "description": "Storage host name",
+            "title": "Storage Host Name",
+            "type": "string"
+          },
+          "quota_scope_id": {
+            "description": "Quota scope ID (e.g. 'user:<uuid>' or 'project:<uuid>')",
+            "title": "Quota Scope Id",
+            "type": "string"
+          },
+          "hard_limit_bytes": {
+            "description": "Hard limit in bytes for the quota scope",
+            "title": "Hard Limit Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "storage_host_name",
+          "quota_scope_id",
+          "hard_limit_bytes"
+        ],
+        "title": "SetQuotaRequest",
+        "type": "object"
+      },
+      "UnsetQuotaRequest": {
+        "properties": {
+          "storage_host_name": {
+            "description": "Storage host name",
+            "title": "Storage Host Name",
+            "type": "string"
+          },
+          "quota_scope_id": {
+            "description": "Quota scope ID (e.g. 'user:<uuid>' or 'project:<uuid>')",
+            "title": "Quota Scope Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "storage_host_name",
+          "quota_scope_id"
+        ],
+        "title": "UnsetQuotaRequest",
         "type": "object"
       },
       "UserRole": {
@@ -14012,6 +14362,209 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
+    "/admin/images/search": {
+      "post": {
+        "operationId": "admin/images.search",
+        "tags": [
+          "admin/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchImagesRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search images with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/images/{image_id}": {
+      "get": {
+        "operationId": "admin/images.get",
+        "tags": [
+          "admin/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a single image by ID.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/images/rescan": {
+      "post": {
+        "operationId": "admin/images.rescan",
+        "tags": [
+          "admin/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescanImagesRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Rescan an image from the registry.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/images/alias": {
+      "post": {
+        "operationId": "admin/images.alias",
+        "tags": [
+          "admin/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AliasImageRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Create an image alias.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/images/dealias": {
+      "post": {
+        "operationId": "admin/images.dealias",
+        "tags": [
+          "admin/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DealiasImageRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Remove an image alias.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/images/forget": {
+      "post": {
+        "operationId": "admin/images.forget",
+        "tags": [
+          "admin/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgetImageRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Forget (soft-delete) an image.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/images/purge": {
+      "post": {
+        "operationId": "admin/images.purge",
+        "tags": [
+          "admin/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurgeImageRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge (hard-delete) an image.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/user-config/dotfiles": {
       "post": {
         "operationId": "user-config.create",
@@ -17628,6 +18181,130 @@
         },
         "parameters": [],
         "description": "Permanently purge a domain.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/quota-scopes/{storage_host_name}/{quota_scope_id}": {
+      "get": {
+        "operationId": "admin/quota-scopes.get",
+        "tags": [
+          "admin/quota-scopes"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "storage_host_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "quota_scope_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/quota-scopes/search": {
+      "post": {
+        "operationId": "admin/quota-scopes.search",
+        "tags": [
+          "admin/quota-scopes"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchQuotaScopesRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/quota-scopes/set": {
+      "post": {
+        "operationId": "admin/quota-scopes.set_quota",
+        "tags": [
+          "admin/quota-scopes"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetQuotaRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/quota-scopes/unset": {
+      "post": {
+        "operationId": "admin/quota-scopes.unset_quota",
+        "tags": [
+          "admin/quota-scopes"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnsetQuotaRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/admin/users": {
