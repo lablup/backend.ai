@@ -111,5 +111,5 @@ class TestValidScopeEntityCombinations:
         ],
     )
     def test_invalid_combinations(self, scope: RBACElementType, entity: RBACElementType) -> None:
-        entities = VALID_SCOPE_ENTITY_COMBINATIONS.get(scope, set())
+        entities = VALID_SCOPE_ENTITY_COMBINATIONS.get(scope, frozenset())
         assert entity not in entities

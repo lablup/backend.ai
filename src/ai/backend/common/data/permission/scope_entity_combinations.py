@@ -8,18 +8,20 @@ under each scope type. It is used for:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from ai.backend.common.data.permission.types import RBACElementType
 
-VALID_SCOPE_ENTITY_COMBINATIONS: dict[RBACElementType, set[RBACElementType]] = {
-    RBACElementType.DOMAIN: {
+VALID_SCOPE_ENTITY_COMBINATIONS: Mapping[RBACElementType, frozenset[RBACElementType]] = {
+    RBACElementType.DOMAIN: frozenset({
         RBACElementType.RESOURCE_GROUP,
         RBACElementType.CONTAINER_REGISTRY,
         RBACElementType.USER,
         RBACElementType.PROJECT,
         RBACElementType.NETWORK,
         RBACElementType.STORAGE_HOST,
-    },
-    RBACElementType.PROJECT: {
+    }),
+    RBACElementType.PROJECT: frozenset({
         RBACElementType.RESOURCE_GROUP,
         RBACElementType.CONTAINER_REGISTRY,
         RBACElementType.SESSION,
@@ -28,31 +30,31 @@ VALID_SCOPE_ENTITY_COMBINATIONS: dict[RBACElementType, set[RBACElementType]] = {
         RBACElementType.NETWORK,
         RBACElementType.USER,
         RBACElementType.STORAGE_HOST,
-    },
-    RBACElementType.USER: {
+    }),
+    RBACElementType.USER: frozenset({
         RBACElementType.RESOURCE_GROUP,
         RBACElementType.SESSION,
         RBACElementType.VFOLDER,
         RBACElementType.DEPLOYMENT,
         RBACElementType.KEYPAIR,
-    },
-    RBACElementType.RESOURCE_GROUP: {
+    }),
+    RBACElementType.RESOURCE_GROUP: frozenset({
         RBACElementType.AGENT,
-    },
-    RBACElementType.AGENT: {
+    }),
+    RBACElementType.AGENT: frozenset({
         RBACElementType.KERNEL,
-    },
-    RBACElementType.SESSION: {
+    }),
+    RBACElementType.SESSION: frozenset({
         RBACElementType.KERNEL,
-    },
-    RBACElementType.MODEL_DEPLOYMENT: {
+    }),
+    RBACElementType.MODEL_DEPLOYMENT: frozenset({
         RBACElementType.ROUTING,
         RBACElementType.SESSION,
-    },
-    RBACElementType.CONTAINER_REGISTRY: {
+    }),
+    RBACElementType.CONTAINER_REGISTRY: frozenset({
         RBACElementType.IMAGE,
-    },
-    RBACElementType.STORAGE_HOST: {
+    }),
+    RBACElementType.STORAGE_HOST: frozenset({
         RBACElementType.VFOLDER,
-    },
+    }),
 }
