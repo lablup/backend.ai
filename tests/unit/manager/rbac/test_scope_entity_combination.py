@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
-import pytest
-
 from ai.backend.manager.api.gql.rbac.resolver.permission import rbac_scope_entity_combinations
 from ai.backend.manager.api.gql.rbac.types.permission import (
     RBACElementTypeGQL,
@@ -37,14 +33,6 @@ class TestScopeEntityCombinationGQL:
 
 
 class TestRbacScopeEntityCombinationsQuery:
-    @pytest.mark.asyncio
-    async def test_resolver_raises_not_implemented(self) -> None:
-        """Test that the resolver raises NotImplementedError."""
-        mock_info = MagicMock()
-        resolver_fn = rbac_scope_entity_combinations.base_resolver.wrapped_func
-        with pytest.raises(NotImplementedError, match="not yet implemented"):
-            await resolver_fn(info=mock_info)
-
     def test_query_field_exists_in_schema(self) -> None:
         """Test that rbacScopeEntityCombinations is registered as a strawberry field."""
         assert rbac_scope_entity_combinations.base_resolver is not None
