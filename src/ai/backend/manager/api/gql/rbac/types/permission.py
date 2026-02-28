@@ -349,6 +349,15 @@ class DeletePermissionPayload:
 # ==================== Connection Types ====================
 
 
+@strawberry.type(
+    name="ScopeEntityCombination",
+    description="Added in 26.3.0. Valid scope-entity type combination for RBAC permissions.",
+)
+class ScopeEntityCombinationGQL:
+    scope_type: RBACElementTypeGQL
+    valid_entity_types: list[RBACElementTypeGQL]
+
+
 PermissionEdge = Edge[PermissionGQL]
 
 

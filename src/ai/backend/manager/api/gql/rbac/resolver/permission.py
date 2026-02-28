@@ -14,6 +14,7 @@ from ai.backend.manager.api.gql.rbac.types import (
     PermissionFilter,
     PermissionGQL,
     PermissionOrderBy,
+    ScopeEntityCombinationGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -51,6 +52,13 @@ async def admin_permissions(
         limit=limit,
         offset=offset,
     )
+
+
+@strawberry.field(description="Added in 26.3.0. List valid RBAC scope-entity type combinations.")  # type: ignore[misc]
+async def rbac_scope_entity_combinations(
+    info: Info[StrawberryGQLContext],
+) -> list[ScopeEntityCombinationGQL]:
+    raise NotImplementedError("rbac_scope_entity_combinations is not yet implemented")
 
 
 # ==================== Mutation Resolvers ====================
