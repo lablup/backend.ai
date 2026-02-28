@@ -11,7 +11,7 @@ from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
-from ai.backend.manager.api.rest.session.handler import find_dependency_sessions
+from ai.backend.manager.api.session import find_dependency_sessions
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
 from ai.backend.manager.data.kernel.types import KernelListResult
 from ai.backend.manager.data.session.types import SessionListResult
