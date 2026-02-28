@@ -1,47 +1,42 @@
+"""Backward-compatibility shim for the manager module.
+
+Handler logic has been migrated to ``api.rest.manager.handler.ManagerHandler``.
+This module keeps ``create_app()`` functional so that ``server.py`` can still
+load it as a legacy subapp.
+
+Exported symbols used by other modules are preserved:
+- ``server_status_required``, ``READ_ALLOWED``, ``ALL_ALLOWED``
+- ``GQLMutationUnfrozenRequiredMiddleware``
+- ``SchedulerOps``
+- ``PrivateContext``, ``init``, ``shutdown``
+- ``detect_status_update``, ``report_status_bgtask``
+"""
+
 from __future__ import annotations
 
 import asyncio
 import enum
 import functools
-import json
 import logging
-import socket
-import textwrap
 from collections.abc import Callable, Iterable
-from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final
 
 import aiohttp_cors
 import attrs
 import graphene
-import sqlalchemy as sa
-import trafaret as t
 from aiohttp import web
 from aiohttp.typedefs import Handler
 from aiotools import aclosing
 
-from ai.backend.common import validators as tx
-from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive, QueueSentinel
+from ai.backend.common.types import QueueSentinel
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager import __version__
 from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import GenericBadRequest, ServerFrozen, ServiceUnavailable
-from ai.backend.manager.errors.resource import InstanceNotFound
-from ai.backend.manager.models.agent import agents
-from ai.backend.manager.models.health import (
-    get_manager_db_cxn_status,
-    report_manager_status,
-)
-from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+from ai.backend.manager.errors.common import ServerFrozen, ServiceUnavailable
+from ai.backend.manager.models.health import report_manager_status
 
 from .auth import superadmin_required
-from .types import CORSOptions, WebMiddleware
-from .utils import (
-    check_api_params,
-    set_handler_attr,
-)
+from .types import CORSOptions, WebMiddleware, WebRequestHandler
+from .utils import set_handler_attr
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext
@@ -51,9 +46,19 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+# ------------------------------------------------------------------
+# SchedulerOps (re-exported from DTO for backward compat)
+# ------------------------------------------------------------------
+
+
 class SchedulerOps(enum.Enum):
     INCLUDE_AGENTS = "include-agents"
     EXCLUDE_AGENTS = "exclude-agents"
+
+
+# ------------------------------------------------------------------
+# server_status_required — used by 15+ modules
+# ------------------------------------------------------------------
 
 
 def server_status_required(
@@ -79,8 +84,16 @@ def server_status_required(
     return decorator
 
 
-READ_ALLOWED: Final = frozenset({ManagerStatus.RUNNING, ManagerStatus.FROZEN})
-ALL_ALLOWED: Final = frozenset({ManagerStatus.RUNNING})
+READ_ALLOWED: Final[frozenset[ManagerStatus]] = frozenset({
+    ManagerStatus.RUNNING,
+    ManagerStatus.FROZEN,
+})
+ALL_ALLOWED: Final[frozenset[ManagerStatus]] = frozenset({ManagerStatus.RUNNING})
+
+
+# ------------------------------------------------------------------
+# GQL middleware — used by admin.py
+# ------------------------------------------------------------------
 
 
 class GQLMutationUnfrozenRequiredMiddleware:
@@ -94,6 +107,11 @@ class GQLMutationUnfrozenRequiredMiddleware:
         ):
             raise ServerFrozen
         return next(root, info, **args)
+
+
+# ------------------------------------------------------------------
+# Background tasks — lifecycle management
+# ------------------------------------------------------------------
 
 
 async def detect_status_update(root_ctx: RootContext) -> None:
@@ -119,7 +137,6 @@ async def detect_status_update(root_ctx: RootContext) -> None:
 async def report_status_bgtask(root_ctx: RootContext) -> None:
     interval = root_ctx.config_provider.config.manager.status_update_interval
     if interval is None:
-        # Do not run bgtask if interval is not set
         return
     try:
         while True:
@@ -130,270 +147,6 @@ async def report_status_bgtask(root_ctx: RootContext) -> None:
                 log.exception(f"Failed to report manager health status (e:{e!s})")
     except asyncio.CancelledError:
         pass
-
-
-async def fetch_manager_status(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
-    log.info("MANAGER.FETCH_MANAGER_STATUS ()")
-    try:
-        status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
-        # etcd_info = await root_ctx.shared_config.get_manager_nodes_info()
-        configs = root_ctx.config_provider.config.manager
-
-        async with root_ctx.db.begin() as conn:
-            query = (
-                sa.select(sa.func.count())
-                .select_from(kernels)
-                .where(
-                    (kernels.c.cluster_role == DEFAULT_ROLE)
-                    & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
-                )
-            )
-            active_sessions_num = await conn.scalar(query)
-
-            _id = configs.id if configs.id else socket.gethostname()
-            nodes = [
-                {
-                    "id": _id,
-                    "num_proc": configs.num_proc,
-                    "service_addr": str(configs.service_addr),
-                    "heartbeat_timeout": configs.heartbeat_timeout,
-                    "ssl_enabled": configs.ssl_enabled,
-                    "active_sessions": active_sessions_num,
-                    "status": status.value,
-                    "version": __version__,
-                    "api_version": request["api_version"],
-                },
-            ]
-            return web.json_response({
-                "nodes": nodes,
-                "status": status.value,  # legacy?
-                "active_sessions": active_sessions_num,  # legacy?
-            })
-    except Exception:
-        log.exception("GET_MANAGER_STATUS: exception")
-        raise
-
-
-@superadmin_required
-@check_api_params(
-    t.Dict({
-        t.Key("status"): tx.Enum(ManagerStatus),
-        t.Key("force_kill", default=False): t.ToBool,
-    })
-)
-async def update_manager_status(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
-    log.info(
-        "MANAGER.UPDATE_MANAGER_STATUS (status:{}, force_kill:{})",
-        params["status"],
-        params["force_kill"],
-    )
-    try:
-        status = params["status"]
-        force_kill = params["force_kill"]
-    except json.JSONDecodeError as e:
-        raise InvalidAPIParameters(extra_msg="No request body!") from e
-    except (AssertionError, ValueError) as e:
-        raise InvalidAPIParameters(extra_msg=str(e.args[0])) from e
-
-    if force_kill:
-        # It supposed to kill all running sessions and kernels
-        # but there is no RPC to do that.
-        pass
-    await root_ctx.config_provider.legacy_etcd_config_loader.update_manager_status(status)
-
-    return web.Response(status=HTTPStatus.NO_CONTENT)
-
-
-async def get_announcement(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
-    data = await root_ctx.etcd.get("manager/announcement")
-    if data is None:
-        ret = {"enabled": False, "message": ""}
-    else:
-        ret = {"enabled": True, "message": data}
-    return web.json_response(ret)
-
-
-@superadmin_required
-@check_api_params(
-    t.Dict({
-        t.Key("enabled", default="false"): t.ToBool,
-        t.Key("message", default=None): t.Null | t.String,
-    })
-)
-async def update_announcement(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
-
-    if params["enabled"]:
-        if not params["message"]:
-            raise InvalidAPIParameters(extra_msg="Empty message not allowed to enable announcement")
-        await root_ctx.etcd.put("manager/announcement", params["message"])
-    else:
-        await root_ctx.etcd.delete("manager/announcement")
-    return web.Response(status=HTTPStatus.NO_CONTENT)
-
-
-iv_scheduler_ops_args = {
-    SchedulerOps.INCLUDE_AGENTS: t.List(t.String),
-    SchedulerOps.EXCLUDE_AGENTS: t.List(t.String),
-}
-
-
-@superadmin_required
-@check_api_params(
-    t.Dict({
-        t.Key("op"): tx.Enum(SchedulerOps),
-        t.Key("args"): t.Any,
-    })
-)
-async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
-    try:
-        args = iv_scheduler_ops_args[params["op"]].check(params["args"])
-    except t.DataError as e:
-        raise InvalidAPIParameters(
-            f"Input validation failed for args with {params['op']}",
-            extra_data=e.as_dict(),
-        ) from e
-    if params["op"] in (SchedulerOps.INCLUDE_AGENTS, SchedulerOps.EXCLUDE_AGENTS):
-        schedulable = params["op"] == SchedulerOps.INCLUDE_AGENTS
-        async with root_ctx.db.begin() as conn:
-            query = agents.update().values(schedulable=schedulable).where(agents.c.id.in_(args))
-            result = await conn.execute(query)
-            if result.rowcount < len(args):
-                raise InstanceNotFound()
-    else:
-        raise GenericBadRequest("Unknown scheduler operation")
-    return web.Response(status=HTTPStatus.NO_CONTENT)
-
-
-@superadmin_required
-async def scheduler_trigger(_request: web.Request) -> web.Response:
-    # Legacy scheduler events are no longer supported with Sokovan scheduler
-    raise InvalidAPIParameters("Legacy scheduler trigger API is no longer supported")
-
-
-@superadmin_required
-async def scheduler_healthcheck(_request: web.Request) -> web.Response:
-    # Legacy scheduler status check is no longer supported with Sokovan scheduler
-    raise InvalidAPIParameters("Legacy scheduler healthcheck API is no longer supported")
-
-
-class SQLAlchemyConnectionMetric(PromMetric):
-    def __init__(self, node_id: str, pid: int, val: int) -> None:
-        self.mgr_id = f"{node_id}:{pid}"
-        self.val = val
-
-    def metric_value_string(self, metric_name: str, _primitive: PromMetricPrimitive) -> str:
-        return f"""{metric_name}{{mgr_id="{self.mgr_id}"}} {self.val}"""
-
-
-class SQLAlchemyTotalConnectionMetricGroup(PromMetricGroup[SQLAlchemyConnectionMetric]):
-    @property
-    def metric_name(self) -> str:
-        return "sqlalchemy_total_connection"
-
-    @property
-    def description(self) -> str:
-        return "The number of total connections in SQLAlchemy connection pool."
-
-    @property
-    def metric_primitive(self) -> PromMetricPrimitive:
-        return PromMetricPrimitive.gauge
-
-
-class SQLAlchemyOpenConnectionMetricGroup(PromMetricGroup[SQLAlchemyConnectionMetric]):
-    @property
-    def metric_name(self) -> str:
-        return "sqlalchemy_open_connection"
-
-    @property
-    def description(self) -> str:
-        return "The number of open connections in SQLAlchemy connection pool."
-
-    @property
-    def metric_primitive(self) -> PromMetricPrimitive:
-        return PromMetricPrimitive.gauge
-
-
-class SQLAlchemyClosedConnectionMetricGroup(PromMetricGroup[SQLAlchemyConnectionMetric]):
-    @property
-    def metric_name(self) -> str:
-        return "sqlalchemy_closed_connection"
-
-    @property
-    def description(self) -> str:
-        return "The number of closed connections in SQLAlchemy connection pool."
-
-    @property
-    def metric_primitive(self) -> PromMetricPrimitive:
-        return PromMetricPrimitive.gauge
-
-
-class RedisConnectionMetric(PromMetric):
-    def __init__(self, node_id: str, pid: int, redis_obj_name: str, val: int) -> None:
-        self.redis_obj_name = redis_obj_name
-        self.mgr_id = f"{node_id}:{pid}"
-        self.val = val
-
-    def metric_value_string(self, metric_name: str, _primitive: PromMetricPrimitive) -> str:
-        return (
-            f"""{metric_name}{{mgr_id="{self.mgr_id}",name="{self.redis_obj_name}"}} {self.val}"""
-        )
-
-
-class RedisConnectionMetricGroup(PromMetricGroup[RedisConnectionMetric]):
-    @property
-    def metric_name(self) -> str:
-        return "redis_connection"
-
-    @property
-    def description(self) -> str:
-        return "The number of connections in Redis Client's connection pool."
-
-    @property
-    def metric_primitive(self) -> PromMetricPrimitive:
-        return PromMetricPrimitive.gauge
-
-
-async def get_manager_status_for_prom(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
-    status = await get_manager_db_cxn_status(root_ctx)
-
-    total_cxn_metrics = []
-    open_cxn_metrics = []
-    closed_cxn_metrics = []
-    redis_cxn_metrics = []
-    for stat in status:
-        sqlalchemy_info = stat.sqlalchemy_info
-
-        total_cxn_metrics.append(
-            SQLAlchemyConnectionMetric(stat.node_id, stat.pid, sqlalchemy_info.total_cxn)
-        )
-        open_cxn_metrics.append(
-            SQLAlchemyConnectionMetric(stat.node_id, stat.pid, sqlalchemy_info.num_checkedout_cxn)
-        )
-        closed_cxn_metrics.append(
-            SQLAlchemyConnectionMetric(stat.node_id, stat.pid, sqlalchemy_info.num_checkedin_cxn)
-        )
-
-        for redis_info in stat.redis_connection_info:
-            if (num_cxn := redis_info.num_connections) is not None:
-                redis_cxn_metrics.append(
-                    RedisConnectionMetric(stat.node_id, stat.pid, redis_info.name, num_cxn)
-                )
-
-    metric_string = (
-        SQLAlchemyTotalConnectionMetricGroup(total_cxn_metrics).metric_string(),
-        SQLAlchemyOpenConnectionMetricGroup(open_cxn_metrics).metric_string(),
-        SQLAlchemyClosedConnectionMetricGroup(closed_cxn_metrics).metric_string(),
-        RedisConnectionMetricGroup(redis_cxn_metrics).metric_string(),
-    )
-
-    result = "\n".join(metric_string)
-    return web.Response(text=textwrap.dedent(result))
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
@@ -423,6 +176,55 @@ async def shutdown(app: web.Application) -> None:
             await app_ctx.db_status_report_task
 
 
+# ------------------------------------------------------------------
+# Lazy handler initialization helpers
+# ------------------------------------------------------------------
+
+_HANDLER_APP_KEY = "_manager_handler_wrapped"
+
+
+def _ensure_handler(app: web.Application) -> dict[str, WebRequestHandler]:
+    """Lazily create ManagerHandler and wrap its methods on first request."""
+    if _HANDLER_APP_KEY not in app:
+        from ai.backend.manager.api.rest.manager.handler import ManagerHandler
+        from ai.backend.manager.api.rest.routing import _wrap_api_handler
+
+        root_ctx: RootContext = app["_root.context"]
+        handler = ManagerHandler(processors=root_ctx.processors)
+        app[_HANDLER_APP_KEY] = {
+            name: _wrap_api_handler(getattr(handler, name))
+            for name in (
+                "fetch_manager_status",
+                "update_manager_status",
+                "get_announcement",
+                "update_announcement",
+                "perform_scheduler_ops",
+                "scheduler_trigger",
+                "scheduler_healthcheck",
+                "get_manager_status_for_prom",
+            )
+        }
+    result: dict[str, WebRequestHandler] = app[_HANDLER_APP_KEY]
+    return result
+
+
+def _delegate(method_name: str) -> WebRequestHandler:
+    """Return a handler function that delegates to the new-style ManagerHandler."""
+
+    async def _handler(request: web.Request) -> web.StreamResponse:
+        wrapped = _ensure_handler(request.app)
+        return await wrapped[method_name](request)
+
+    _handler.__name__ = method_name
+    _handler.__qualname__ = f"manager._delegate.<{method_name}>"
+    return _handler
+
+
+# ------------------------------------------------------------------
+# Legacy create_app() entry point
+# ------------------------------------------------------------------
+
+
 def create_app(
     default_cors_options: CORSOptions,
 ) -> tuple[web.Application, Iterable[WebMiddleware]]:
@@ -432,16 +234,40 @@ def create_app(
     app["prefix"] = "manager"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     status_resource = cors.add(app.router.add_resource("/status"))
-    cors.add(status_resource.add_route("GET", fetch_manager_status))
-    cors.add(status_resource.add_route("PUT", update_manager_status))
+    cors.add(status_resource.add_route("GET", _delegate("fetch_manager_status")))
+    cors.add(
+        status_resource.add_route("PUT", superadmin_required(_delegate("update_manager_status")))
+    )
     announcement_resource = cors.add(app.router.add_resource("/announcement"))
-    cors.add(announcement_resource.add_route("GET", get_announcement))
-    cors.add(announcement_resource.add_route("POST", update_announcement))
-    cors.add(app.router.add_route("POST", "/scheduler/operation", perform_scheduler_ops))
-    cors.add(app.router.add_route("POST", "/scheduler/trigger", scheduler_trigger))
-    cors.add(app.router.add_route("GET", "/scheduler/status", scheduler_healthcheck))
+    cors.add(announcement_resource.add_route("GET", _delegate("get_announcement")))
+    cors.add(
+        announcement_resource.add_route(
+            "POST", superadmin_required(_delegate("update_announcement"))
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "POST",
+            "/scheduler/operation",
+            superadmin_required(_delegate("perform_scheduler_ops")),
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "POST",
+            "/scheduler/trigger",
+            superadmin_required(_delegate("scheduler_trigger")),
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "GET",
+            "/scheduler/status",
+            superadmin_required(_delegate("scheduler_healthcheck")),
+        )
+    )
     prom_resource = cors.add(app.router.add_resource("/prom"))
-    cors.add(prom_resource.add_route("GET", get_manager_status_for_prom))
+    cors.add(prom_resource.add_route("GET", _delegate("get_manager_status_for_prom")))
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     return app, []

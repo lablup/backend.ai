@@ -13422,34 +13422,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "terminated",
-                      "preparing",
-                      "running",
-                      "frozen"
-                    ]
-                  },
-                  "force_kill": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "status",
-                  "force_kill"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
@@ -13483,28 +13455,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "enabled": {
-                    "type": "boolean",
-                    "default": "false"
-                  },
-                  "message": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "enabled"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
@@ -13525,32 +13475,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "op": {
-                    "type": "string",
-                    "enum": [
-                      "include-agents",
-                      "exclude-agents"
-                    ]
-                  },
-                  "args": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "op",
-                  "args"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
@@ -13627,7 +13551,7 @@
           }
         ],
         "parameters": [],
-        "description": "\nReturns the list of all resource presets.\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/resource/container-registries": {
@@ -13647,7 +13571,7 @@
           }
         ],
         "parameters": [],
-        "description": "\nReturns the list of all registered container registries.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/resource/check-presets": {
@@ -13666,29 +13590,8 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "scaling_group": {
-                    "type": "string"
-                  },
-                  "group": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "group"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
-        "description": "\nReturns the list of all resource presets in the current scaling group,\nwith additional information including allocatability of each preset,\namount of total remaining resources, and the current keypair resource limits.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/resource/recalculate-usage": {
@@ -13708,7 +13611,7 @@
           }
         ],
         "parameters": [],
-        "description": "\nUpdate `keypair_resource_usages` in redis and `agents.c.occupied_slots`.\n\nThose two values are sometimes out of sync. In that case, calling this API\nre-calculates the values for running containers and updates them in DB.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/resource/usage/month": {
@@ -13727,30 +13630,8 @@
             "TokenAuth": []
           }
         ],
-        "parameters": [
-          {
-            "name": "group_ids",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "List of items separated by a delimiter (default: comma). Items may contain spaces, but not the delimiter."
-            },
-            "required": false,
-            "in": "query"
-          },
-          {
-            "name": "month",
-            "schema": {
-              "type": "string",
-              "pattern": "^\\d{6}"
-            },
-            "required": true,
-            "in": "query"
-          }
-        ],
-        "description": "\nReturn usage statistics of terminated containers for a specified month.\nThe date/time comparison is done using the configured timezone.\n\n:param group_ids: If not None, query containers only in those groups.\n:param month: The year-month to query usage statistics. ex) \"202006\" to query for Jun 2020\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/resource/usage/period": {
@@ -13769,35 +13650,8 @@
             "TokenAuth": []
           }
         ],
-        "parameters": [
-          {
-            "name": "project_id",
-            "schema": {
-              "type": "string"
-            },
-            "required": false,
-            "in": "query"
-          },
-          {
-            "name": "start_date",
-            "schema": {
-              "type": "string",
-              "pattern": "^\\d{8}$"
-            },
-            "required": true,
-            "in": "query"
-          },
-          {
-            "name": "end_date",
-            "schema": {
-              "type": "string",
-              "pattern": "^\\d{8}$"
-            },
-            "required": true,
-            "in": "query"
-          }
-        ],
-        "description": "\nReturn usage statistics of terminated containers belonged to the given group for a specified\nperiod in dates.\nThe date/time comparison is done using the configured timezone.\n\n:param project_id: If not None, query containers only in the project.\n:param start_date str: \"yyyymmdd\" format.\n:param end_date str: \"yyyymmdd\" format.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/resource/stats/user/month": {
@@ -13817,7 +13671,7 @@
           }
         ],
         "parameters": [],
-        "description": "\nReturn time-binned (15 min) stats for terminated user sessions\nover last 30 days.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/resource/stats/admin/month": {
@@ -13837,7 +13691,7 @@
           }
         ],
         "parameters": [],
-        "description": "\nReturn time-binned (15 min) stats for all terminated sessions\nover last 30 days.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/resource/watcher": {
@@ -13856,16 +13710,7 @@
             "TokenAuth": []
           }
         ],
-        "parameters": [
-          {
-            "name": "agent_id",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "in": "query"
-          }
-        ],
+        "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
@@ -13885,24 +13730,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "agent_id": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "agent_id"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
@@ -13923,24 +13750,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "agent_id": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "agent_id"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
@@ -13961,24 +13770,6 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "agent_id": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "agent_id"
-                ]
-              },
-              "examples": {}
-            }
-          }
-        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }

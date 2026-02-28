@@ -275,6 +275,9 @@ split-on-trailing-comma = true
 "src/ai/backend/manager/container_registry/factory.py" = ["PLC0415"]
 # - Session API shim uses lazy import to break circular dependency with rest/session
 "src/ai/backend/manager/api/session.py" = ["PLC0415"]
+# - REST handler shims use lazy imports to break circular dependencies with handler modules
+"src/ai/backend/manager/api/manager.py" = ["PLC0415"]
+"src/ai/backend/manager/api/resource.py" = ["PLC0415"]
 
 [tool.ruff.format]
 preview = true  # enable the black's preview style
