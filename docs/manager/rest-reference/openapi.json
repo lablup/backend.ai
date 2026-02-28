@@ -3137,6 +3137,729 @@
         "title": "VFSListFilesReq",
         "type": "object"
       },
+      "EmailMessage": {
+        "description": "Email message settings.",
+        "properties": {
+          "from_email": {
+            "description": "Sender email address",
+            "title": "From Email",
+            "type": "string"
+          },
+          "to_emails": {
+            "description": "List of recipient email addresses",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "To Emails",
+            "type": "array"
+          },
+          "subject_template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Template for the email subject. If None, the first line of the message will be used.",
+            "title": "Subject Template"
+          }
+        },
+        "required": [
+          "from_email",
+          "to_emails"
+        ],
+        "title": "EmailMessage",
+        "type": "object"
+      },
+      "EmailSpec": {
+        "description": "Configuration for email notification channel.",
+        "properties": {
+          "smtp": {
+            "$ref": "#/components/schemas/SMTPConnection",
+            "description": "SMTP server connection settings"
+          },
+          "message": {
+            "$ref": "#/components/schemas/EmailMessage",
+            "description": "Email message settings"
+          },
+          "auth": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SMTPAuth"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "SMTP authentication credentials"
+          }
+        },
+        "required": [
+          "smtp",
+          "message"
+        ],
+        "title": "EmailSpec",
+        "type": "object"
+      },
+      "NotificationChannelType": {
+        "description": "Notification channel types.",
+        "enum": [
+          "webhook",
+          "email"
+        ],
+        "title": "NotificationChannelType",
+        "type": "string"
+      },
+      "SMTPAuth": {
+        "description": "SMTP authentication credentials.",
+        "properties": {
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "SMTP username for authentication",
+            "title": "Username"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "SMTP password for authentication",
+            "title": "Password"
+          }
+        },
+        "title": "SMTPAuth",
+        "type": "object"
+      },
+      "SMTPConnection": {
+        "description": "SMTP server connection settings.",
+        "properties": {
+          "host": {
+            "description": "SMTP server host",
+            "title": "Host",
+            "type": "string"
+          },
+          "port": {
+            "description": "SMTP server port",
+            "maximum": 65535,
+            "minimum": 1,
+            "title": "Port",
+            "type": "integer"
+          },
+          "use_tls": {
+            "default": true,
+            "description": "Whether to use STARTTLS for secure connection",
+            "title": "Use Tls",
+            "type": "boolean"
+          },
+          "timeout": {
+            "default": 30,
+            "description": "SMTP connection timeout in seconds",
+            "exclusiveMinimum": 0,
+            "title": "Timeout",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "host",
+          "port"
+        ],
+        "title": "SMTPConnection",
+        "type": "object"
+      },
+      "WebhookSpec": {
+        "description": "Configuration for webhook notification channel.",
+        "properties": {
+          "url": {
+            "description": "Webhook endpoint URL",
+            "title": "Url",
+            "type": "string"
+          },
+          "method": {
+            "default": "POST",
+            "description": "HTTP method (POST or GET)",
+            "title": "Method",
+            "type": "string"
+          },
+          "content_type": {
+            "default": "application/json",
+            "description": "Content-Type header for the request body",
+            "title": "Content Type",
+            "type": "string"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Additional HTTP headers to send",
+            "title": "Headers",
+            "type": "object"
+          },
+          "timeout": {
+            "default": 30,
+            "description": "Request timeout in seconds",
+            "title": "Timeout",
+            "type": "integer"
+          },
+          "success_status_codes": {
+            "default": [
+              200,
+              201,
+              202,
+              204
+            ],
+            "description": "HTTP status codes considered as successful delivery",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Success Status Codes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "WebhookSpec",
+        "type": "object"
+      },
+      "CreateNotificationChannelRequest": {
+        "description": "Request to create a notification channel.",
+        "properties": {
+          "name": {
+            "description": "Channel name",
+            "title": "Name",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Channel description",
+            "title": "Description"
+          },
+          "channel_type": {
+            "$ref": "#/components/schemas/NotificationChannelType",
+            "description": "Channel type"
+          },
+          "spec": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebhookSpec"
+              },
+              {
+                "$ref": "#/components/schemas/EmailSpec"
+              }
+            ],
+            "description": "Channel specification",
+            "title": "Spec"
+          },
+          "enabled": {
+            "default": true,
+            "description": "Whether the channel is enabled",
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "channel_type",
+          "spec"
+        ],
+        "title": "CreateNotificationChannelRequest",
+        "type": "object"
+      },
+      "NotificationChannelFilter": {
+        "description": "Filter for notification channels.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by name"
+          },
+          "channel_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NotificationChannelType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by channel types",
+            "title": "Channel Types"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by enabled status",
+            "title": "Enabled"
+          }
+        },
+        "title": "NotificationChannelFilter",
+        "type": "object"
+      },
+      "NotificationChannelOrder": {
+        "description": "Order specification for notification channels.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/NotificationChannelOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "NotificationChannelOrder",
+        "type": "object"
+      },
+      "NotificationChannelOrderField": {
+        "description": "Fields available for ordering notification channels.",
+        "enum": [
+          "name",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "NotificationChannelOrderField",
+        "type": "string"
+      },
+      "SearchNotificationChannelsRequest": {
+        "description": "Request body for searching notification channels with filters, orders, and pagination.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NotificationChannelFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NotificationChannelOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum items to return",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Number of items to skip",
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "title": "SearchNotificationChannelsRequest",
+        "type": "object"
+      },
+      "UpdateNotificationChannelRequest": {
+        "description": "Request to update a notification channel.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated channel name",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated channel description",
+            "title": "Description"
+          },
+          "spec": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebhookSpec"
+              },
+              {
+                "$ref": "#/components/schemas/EmailSpec"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated channel specification",
+            "title": "Spec"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated enabled status",
+            "title": "Enabled"
+          }
+        },
+        "title": "UpdateNotificationChannelRequest",
+        "type": "object"
+      },
+      "ValidateNotificationChannelRequest": {
+        "description": "Request body for validating a notification channel.",
+        "properties": {
+          "test_message": {
+            "description": "Test message to send through the channel (max 5KB)",
+            "maxLength": 5000,
+            "title": "Test Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "test_message"
+        ],
+        "title": "ValidateNotificationChannelRequest",
+        "type": "object"
+      },
+      "NotificationRuleType": {
+        "description": "Types of notification rules that can be created.",
+        "enum": [
+          "session.started",
+          "session.terminated",
+          "artifact.download.completed",
+          "endpoint.lifecycle.changed"
+        ],
+        "title": "NotificationRuleType",
+        "type": "string"
+      },
+      "CreateNotificationRuleRequest": {
+        "description": "Request to create a notification rule.",
+        "properties": {
+          "name": {
+            "description": "Rule name",
+            "title": "Name",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Rule description",
+            "title": "Description"
+          },
+          "rule_type": {
+            "$ref": "#/components/schemas/NotificationRuleType",
+            "description": "Rule type"
+          },
+          "channel_id": {
+            "description": "ID of the channel to use",
+            "format": "uuid",
+            "title": "Channel Id",
+            "type": "string"
+          },
+          "message_template": {
+            "description": "Jinja2 template for notification message (max 64KB)",
+            "maxLength": 65536,
+            "title": "Message Template",
+            "type": "string"
+          },
+          "enabled": {
+            "default": true,
+            "description": "Whether the rule is enabled",
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "rule_type",
+          "channel_id",
+          "message_template"
+        ],
+        "title": "CreateNotificationRuleRequest",
+        "type": "object"
+      },
+      "NotificationRuleFilter": {
+        "description": "Filter for notification rules.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by name"
+          },
+          "rule_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NotificationRuleType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by rule types",
+            "title": "Rule Types"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by enabled status",
+            "title": "Enabled"
+          }
+        },
+        "title": "NotificationRuleFilter",
+        "type": "object"
+      },
+      "NotificationRuleOrder": {
+        "description": "Order specification for notification rules.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/NotificationRuleOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "asc",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "NotificationRuleOrder",
+        "type": "object"
+      },
+      "NotificationRuleOrderField": {
+        "description": "Fields available for ordering notification rules.",
+        "enum": [
+          "name",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "NotificationRuleOrderField",
+        "type": "string"
+      },
+      "SearchNotificationRulesRequest": {
+        "description": "Request body for searching notification rules with filters, orders, and pagination.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NotificationRuleFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NotificationRuleOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum items to return",
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "description": "Number of items to skip",
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "title": "SearchNotificationRulesRequest",
+        "type": "object"
+      },
+      "UpdateNotificationRuleRequest": {
+        "description": "Request to update a notification rule.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated rule name",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated rule description",
+            "title": "Description"
+          },
+          "message_template": {
+            "anyOf": [
+              {
+                "maxLength": 65536,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated message template (max 64KB)",
+            "title": "Message Template"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated enabled status",
+            "title": "Enabled"
+          }
+        },
+        "title": "UpdateNotificationRuleRequest",
+        "type": "object"
+      },
+      "ValidateNotificationRuleRequest": {
+        "description": "Request body for validating a notification rule.",
+        "properties": {
+          "notification_data": {
+            "additionalProperties": true,
+            "description": "Test notification data to use in template rendering",
+            "title": "Notification Data",
+            "type": "object"
+          }
+        },
+        "title": "ValidateNotificationRuleRequest",
+        "type": "object"
+      },
       "BlueGreenConfigInput": {
         "description": "Configuration for blue-green deployment strategy.",
         "properties": {
@@ -14637,6 +15360,431 @@
         ],
         "parameters": [],
         "description": "\nList all VFS storages.\n\nReturns:\n    APIResponse with storage information\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/channels": {
+      "post": {
+        "operationId": "notifications.create_channel",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNotificationChannelRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Create a new notification channel.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/channels/search": {
+      "post": {
+        "operationId": "notifications.search_channels",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchNotificationChannelsRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search notification channels with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/channels/{channel_id}": {
+      "get": {
+        "operationId": "notifications.get_channel",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific notification channel.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "notifications.update_channel",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotificationChannelRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an existing notification channel.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "notifications.delete_channel",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Delete a notification channel.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/channels/{channel_id}/validate": {
+      "post": {
+        "operationId": "notifications.validate_channel",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateNotificationChannelRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Validate a notification channel by sending a test webhook.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/rule-types": {
+      "get": {
+        "operationId": "notifications.list_rule_types",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "List all available notification rule types.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/rule-types/{rule_type}/schema": {
+      "get": {
+        "operationId": "notifications.get_rule_type_schema",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get JSON schema for a notification rule type's message format.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/rules": {
+      "post": {
+        "operationId": "notifications.create_rule",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNotificationRuleRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Create a new notification rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/rules/search": {
+      "post": {
+        "operationId": "notifications.search_rules",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchNotificationRulesRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search notification rules with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/rules/{rule_id}": {
+      "get": {
+        "operationId": "notifications.get_rule",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific notification rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "notifications.update_rule",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotificationRuleRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an existing notification rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "notifications.delete_rule",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Delete a notification rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/rules/{rule_id}/validate": {
+      "post": {
+        "operationId": "notifications.validate_rule",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateNotificationRuleRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Validate a notification rule by rendering its template with test data.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/deployments/": {
