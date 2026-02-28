@@ -7867,14 +7867,6 @@ type PermissionEdge
   node: Permission!
 }
 
-"""Added in 26.3.0. Valid scope-entity type combination for RBAC permissions."""
-type ScopeEntityCombination
-  @join__type(graph: STRAWBERRY)
-{
-  scopeType: RBACElementType!
-  validEntityTypes: [RBACElementType!]!
-}
-
 """Added in 26.3.0. Filter for scoped permissions"""
 input PermissionFilter
   @join__type(graph: STRAWBERRY)
@@ -10969,6 +10961,16 @@ enum SchedulingStatus
   TERMINATED @join__enumValue(graph: STRAWBERRY)
   CANCELLED @join__enumValue(graph: STRAWBERRY)
   ERROR @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.3.0. Valid scope-entity type combination for RBAC permissions.
+"""
+type ScopeEntityCombination
+  @join__type(graph: STRAWBERRY)
+{
+  scopeType: RBACElementType!
+  validEntityTypes: [RBACElementType!]!
 }
 
 """

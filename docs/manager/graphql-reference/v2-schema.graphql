@@ -4187,12 +4187,6 @@ type PermissionEdge {
   node: Permission!
 }
 
-"""Added in 26.3.0. Valid scope-entity type combination for RBAC permissions."""
-type ScopeEntityCombination {
-  scopeType: RBACElementType!
-  validEntityTypes: [RBACElementType!]!
-}
-
 """Added in 26.3.0. Filter for scoped permissions"""
 input PermissionFilter {
   roleId: UUID = null
@@ -6328,6 +6322,14 @@ enum SchedulingStatus {
   TERMINATED
   CANCELLED
   ERROR
+}
+
+"""
+Added in 26.3.0. Valid scope-entity type combination for RBAC permissions.
+"""
+type ScopeEntityCombination {
+  scopeType: RBACElementType!
+  validEntityTypes: [RBACElementType!]!
 }
 
 """Added in 26.3.0. A registered service instance in the catalog."""
