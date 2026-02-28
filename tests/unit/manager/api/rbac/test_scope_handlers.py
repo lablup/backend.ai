@@ -90,7 +90,7 @@ class TestGetScopeTypesHandler:
 
         assert response.status_code == HTTPStatus.OK
         response_json = response.to_json
-        assert response_json is not None
+        assert isinstance(response_json, dict)
         assert "items" in response_json
         assert len(response_json["items"]) == self.EXPECTED_SCOPE_TYPES_COUNT
 
@@ -210,7 +210,7 @@ class TestSearchScopesHandler:
 
         assert response.status_code == HTTPStatus.OK
         response_json = response.to_json
-        assert response_json is not None
+        assert isinstance(response_json, dict)
         assert "items" in response_json
         assert len(response_json["items"]) == len(single_scope_result.result.items)
         assert response_json["items"][0]["scope_type"] == self.TEST_SCOPE_TYPE.value
@@ -234,7 +234,7 @@ class TestSearchScopesHandler:
         response = await handler.search_scopes(path=path, body=body, ctx=ctx)
 
         response_json = response.to_json
-        assert response_json is not None
+        assert isinstance(response_json, dict)
         pagination = response_json["pagination"]
         assert pagination["total"] == self.PAGINATION_TOTAL
         assert pagination["offset"] == self.DEFAULT_OFFSET
