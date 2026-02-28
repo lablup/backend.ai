@@ -97,13 +97,13 @@ class DomainAdapter(BaseFilterAdapter):
 
         return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
-    def _convert_filter(self, filter: DomainFilter) -> list[QueryCondition]:
+    def _convert_filter(self, filter_req: DomainFilter) -> list[QueryCondition]:
         """Convert domain filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.name is not None:
+        if filter_req.name is not None:
             condition = self.convert_string_filter(
-                filter.name,
+                filter_req.name,
                 contains_factory=DomainConditions.by_name_contains,
                 equals_factory=DomainConditions.by_name_equals,
                 starts_with_factory=DomainConditions.by_name_starts_with,
@@ -112,8 +112,8 @@ class DomainAdapter(BaseFilterAdapter):
             if condition is not None:
                 conditions.append(condition)
 
-        if filter.is_active is not None:
-            conditions.append(DomainConditions.by_is_active(filter.is_active))
+        if filter_req.is_active is not None:
+            conditions.append(DomainConditions.by_is_active(filter_req.is_active))
 
         return conditions
 
