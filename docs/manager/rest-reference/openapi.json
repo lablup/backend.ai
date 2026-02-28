@@ -1258,15 +1258,14 @@
         "title": "DeleteConfigRequest",
         "type": "object"
       },
-      "VFolderMountPermission": {
-        "description": "Permissions for a virtual folder given to a specific access key.\nRW_DELETE includes READ_WRITE and READ_WRITE includes READ_ONLY.",
+      "VFolderPermissionField": {
         "enum": [
           "ro",
           "rw",
           "wd",
           "wd"
         ],
-        "title": "VFolderMountPermission",
+        "title": "VFolderPermissionField",
         "type": "string"
       },
       "VFolderUsageMode": {
@@ -1279,7 +1278,8 @@
         "title": "VFolderUsageMode",
         "type": "string"
       },
-      "CreateRequestModel": {
+      "VFolderCreateReq": {
+        "description": "Request to create a new virtual folder.",
         "properties": {
           "name": {
             "description": "Name of the vfolder",
@@ -1303,7 +1303,7 @@
             "default": "general"
           },
           "permission": {
-            "$ref": "#/components/schemas/VFolderMountPermission",
+            "$ref": "#/components/schemas/VFolderPermissionField",
             "default": "rw"
           },
           "unmanagedPath": {
@@ -1321,6 +1321,7 @@
           "group": {
             "anyOf": [
               {
+                "format": "uuid",
                 "type": "string"
               },
               {
@@ -1339,13 +1340,14 @@
         "required": [
           "name"
         ],
-        "title": "CreateRequestModel",
+        "title": "VFolderCreateReq",
         "type": "object"
       },
-      "DeleteRequestModel": {
+      "DeleteVFolderByIDReq": {
+        "description": "Request to delete a virtual folder by ID.",
         "properties": {
           "vfolderId": {
-            "description": "Target vfolder id to soft-delete, to go to trash bin",
+            "description": "VFolder ID to delete",
             "format": "uuid",
             "title": "Vfolderid",
             "type": "string"
@@ -1354,52 +1356,11 @@
         "required": [
           "vfolderId"
         ],
-        "title": "DeleteRequestModel",
+        "title": "DeleteVFolderByIDReq",
         "type": "object"
       },
-      "IDRequestModel": {
-        "properties": {
-          "vfolder_name": {
-            "description": "Target vfolder name",
-            "title": "Vfolder Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "vfolder_name"
-        ],
-        "title": "IDRequestModel",
-        "type": "object"
-      },
-      "CompactVFolderInfoModel": {
-        "properties": {
-          "status": {
-            "default": 200,
-            "exclusiveMaximum": 600,
-            "minimum": 100,
-            "title": "Status",
-            "type": "integer"
-          },
-          "id": {
-            "description": "Unique ID referencing the vfolder.",
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "name": {
-            "description": "Name of the vfolder.",
-            "title": "Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name"
-        ],
-        "title": "CompactVFolderInfoModel",
-        "type": "object"
-      },
-      "RenameRequestModel": {
+      "RenameVFolderReq": {
+        "description": "Request to rename a virtual folder.",
         "properties": {
           "new_name": {
             "description": "Name of the vfolder",
@@ -1410,91 +1371,508 @@
         "required": [
           "new_name"
         ],
-        "title": "RenameRequestModel",
+        "title": "RenameVFolderReq",
         "type": "object"
       },
-      "PurgeRequestModel": {
+      "UpdateVFolderOptionsReq": {
+        "description": "Request to update virtual folder options.",
         "properties": {
-          "id": {
-            "description": "Target vfolder id to purge, permanently remove from DB",
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ],
-        "title": "PurgeRequestModel",
-        "type": "object"
-      },
-      "RestoreRequestModel": {
-        "properties": {
-          "id": {
-            "description": "Target vfolder id to restore",
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ],
-        "title": "RestoreRequestModel",
-        "type": "object"
-      },
-      "DeleteFromTrashRequestModel": {
-        "properties": {
-          "id": {
-            "description": "Target vfolder id to hard-delete, permanently remove from storage",
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ],
-        "title": "DeleteFromTrashRequestModel",
-        "type": "object"
-      },
-      "UserPermMapping": {
-        "properties": {
-          "user": {
-            "description": "Target user id to update sharing status.",
-            "format": "uuid",
-            "title": "User",
-            "type": "string"
-          },
-          "permission": {
+          "cloneable": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/VFolderMountPermission"
+                "type": "boolean"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Permission to update. Delete the sharing between vfolder and user if this value is null. Should be one of ['ro', 'rw', 'wd']. Default value is null."
+            "description": "Whether the vfolder is cloneable",
+            "title": "Cloneable"
+          },
+          "permission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderPermissionField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Permission level of the vfolder"
+          }
+        },
+        "title": "UpdateVFolderOptionsReq",
+        "type": "object"
+      },
+      "MkdirReq": {
+        "description": "Request to create directories inside a virtual folder.",
+        "properties": {
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "description": "Directory path(s) to create",
+            "title": "Path"
+          },
+          "parents": {
+            "default": true,
+            "description": "Create parent directories if needed",
+            "title": "Parents",
+            "type": "boolean"
+          },
+          "exist_ok": {
+            "default": false,
+            "description": "Do not raise error if directory exists",
+            "title": "Exist Ok",
+            "type": "boolean"
           }
         },
         "required": [
+          "path"
+        ],
+        "title": "MkdirReq",
+        "type": "object"
+      },
+      "CreateUploadSessionReq": {
+        "description": "Request to create a file upload session.",
+        "properties": {
+          "path": {
+            "description": "File path to upload to",
+            "title": "Path",
+            "type": "string"
+          },
+          "size": {
+            "description": "File size in bytes",
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "path",
+          "size"
+        ],
+        "title": "CreateUploadSessionReq",
+        "type": "object"
+      },
+      "CreateDownloadSessionReq": {
+        "description": "Request to create a file download session.",
+        "properties": {
+          "path": {
+            "description": "File path to download",
+            "title": "Path",
+            "type": "string"
+          },
+          "archive": {
+            "default": false,
+            "description": "Whether to archive the file for download",
+            "title": "Archive",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "CreateDownloadSessionReq",
+        "type": "object"
+      },
+      "MoveFileReq": {
+        "description": "Request to move a file inside a virtual folder.",
+        "properties": {
+          "src": {
+            "description": "Source file path",
+            "title": "Src",
+            "type": "string"
+          },
+          "dst": {
+            "description": "Destination file path",
+            "title": "Dst",
+            "type": "string"
+          }
+        },
+        "required": [
+          "src",
+          "dst"
+        ],
+        "title": "MoveFileReq",
+        "type": "object"
+      },
+      "RenameFileReq": {
+        "description": "Request to rename a file inside a virtual folder.",
+        "properties": {
+          "target_path": {
+            "description": "Path of the file to rename",
+            "title": "Target Path",
+            "type": "string"
+          },
+          "new_name": {
+            "description": "New name for the file",
+            "title": "New Name",
+            "type": "string"
+          },
+          "is_dir": {
+            "default": false,
+            "description": "Whether the target is a directory (ignored)",
+            "title": "Is Dir",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "target_path",
+          "new_name"
+        ],
+        "title": "RenameFileReq",
+        "type": "object"
+      },
+      "DeleteFilesReq": {
+        "description": "Request to delete files inside a virtual folder.",
+        "properties": {
+          "files": {
+            "description": "List of file paths to delete",
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "recursive": {
+            "default": false,
+            "description": "Whether to delete directories recursively",
+            "title": "Recursive",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "files"
+        ],
+        "title": "DeleteFilesReq",
+        "type": "object"
+      },
+      "DeleteFilesAsyncBodyParam": {
+        "description": "Body parameter for delete_files_async endpoint.",
+        "properties": {
+          "files": {
+            "description": "List of file paths to delete within the vfolder. Paths are relative to the vfolder root.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "recursive": {
+            "default": false,
+            "description": "Whether to delete directories recursively. Set to True when deleting non-empty directories.",
+            "title": "Recursive",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "files"
+        ],
+        "title": "DeleteFilesAsyncBodyParam",
+        "type": "object"
+      },
+      "InviteVFolderReq": {
+        "description": "Request to invite users to a virtual folder.",
+        "properties": {
+          "perm": {
+            "$ref": "#/components/schemas/VFolderPermissionField",
+            "default": "rw",
+            "description": "Permission level for invitees"
+          },
+          "emails": {
+            "description": "Email addresses of users to invite",
+            "items": {
+              "type": "string"
+            },
+            "title": "Emails",
+            "type": "array"
+          }
+        },
+        "required": [
+          "emails"
+        ],
+        "title": "InviteVFolderReq",
+        "type": "object"
+      },
+      "LeaveVFolderReq": {
+        "description": "Request to leave a shared virtual folder.",
+        "properties": {
+          "shared_user_uuid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Shared user UUID (for admin leaving on behalf of another user)",
+            "title": "Shared User Uuid"
+          }
+        },
+        "title": "LeaveVFolderReq",
+        "type": "object"
+      },
+      "ShareVFolderReq": {
+        "description": "Request to share a virtual folder with users.",
+        "properties": {
+          "permission": {
+            "$ref": "#/components/schemas/VFolderPermissionField",
+            "default": "rw",
+            "description": "Permission level for shared users"
+          },
+          "emails": {
+            "description": "Email addresses of users to share with",
+            "items": {
+              "type": "string"
+            },
+            "title": "Emails",
+            "type": "array"
+          }
+        },
+        "required": [
+          "emails"
+        ],
+        "title": "ShareVFolderReq",
+        "type": "object"
+      },
+      "UnshareVFolderReq": {
+        "description": "Request to unshare a virtual folder from users.",
+        "properties": {
+          "emails": {
+            "description": "Email addresses of users to unshare from",
+            "items": {
+              "type": "string"
+            },
+            "title": "Emails",
+            "type": "array"
+          }
+        },
+        "required": [
+          "emails"
+        ],
+        "title": "UnshareVFolderReq",
+        "type": "object"
+      },
+      "CloneVFolderReq": {
+        "description": "Request to clone a virtual folder.",
+        "properties": {
+          "target_name": {
+            "description": "Name for the cloned vfolder",
+            "title": "Target Name",
+            "type": "string"
+          },
+          "target_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Target host for the clone",
+            "title": "Target Host"
+          },
+          "cloneable": {
+            "default": false,
+            "description": "Whether the cloned vfolder is cloneable",
+            "title": "Cloneable",
+            "type": "boolean"
+          },
+          "usage_mode": {
+            "$ref": "#/components/schemas/VFolderUsageMode",
+            "default": "general"
+          },
+          "permission": {
+            "$ref": "#/components/schemas/VFolderPermissionField",
+            "default": "rw"
+          }
+        },
+        "required": [
+          "target_name"
+        ],
+        "title": "CloneVFolderReq",
+        "type": "object"
+      },
+      "PurgeVFolderReq": {
+        "description": "Request to purge a virtual folder.",
+        "properties": {
+          "id": {
+            "description": "VFolder ID to purge",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "PurgeVFolderReq",
+        "type": "object"
+      },
+      "RestoreVFolderReq": {
+        "description": "Request to restore a virtual folder from trash.",
+        "properties": {
+          "id": {
+            "description": "VFolder ID to restore",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "RestoreVFolderReq",
+        "type": "object"
+      },
+      "DeleteVFolderFromTrashReq": {
+        "description": "Request to permanently delete a virtual folder from trash.",
+        "properties": {
+          "id": {
+            "description": "VFolder ID to delete from trash",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "DeleteVFolderFromTrashReq",
+        "type": "object"
+      },
+      "UpdateInvitationReq": {
+        "description": "Request to update a virtual folder invitation permission.",
+        "properties": {
+          "perm": {
+            "$ref": "#/components/schemas/VFolderPermissionField",
+            "description": "New permission level"
+          }
+        },
+        "required": [
+          "perm"
+        ],
+        "title": "UpdateInvitationReq",
+        "type": "object"
+      },
+      "AcceptInvitationReq": {
+        "description": "Request to accept a virtual folder invitation.",
+        "properties": {
+          "inv_id": {
+            "description": "Invitation ID to accept",
+            "title": "Inv Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "inv_id"
+        ],
+        "title": "AcceptInvitationReq",
+        "type": "object"
+      },
+      "DeleteInvitationReq": {
+        "description": "Request to delete a virtual folder invitation.",
+        "properties": {
+          "inv_id": {
+            "description": "Invitation ID to delete",
+            "title": "Inv Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "inv_id"
+        ],
+        "title": "DeleteInvitationReq",
+        "type": "object"
+      },
+      "UpdateSharedVFolderReq": {
+        "description": "Request to update shared virtual folder permission for a user.",
+        "properties": {
+          "vfolder": {
+            "description": "VFolder ID",
+            "format": "uuid",
+            "title": "Vfolder",
+            "type": "string"
+          },
+          "user": {
+            "description": "User ID",
+            "format": "uuid",
+            "title": "User",
+            "type": "string"
+          },
+          "perm": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderPermissionField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "New permission level (None to remove)"
+          }
+        },
+        "required": [
+          "vfolder",
           "user"
+        ],
+        "title": "UpdateSharedVFolderReq",
+        "type": "object"
+      },
+      "UserPermMapping": {
+        "description": "Mapping of user ID to permission for batch sharing status updates.",
+        "properties": {
+          "user_id": {
+            "description": "User ID",
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          },
+          "perm": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderPermissionField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Permission level (None to remove)"
+          }
+        },
+        "required": [
+          "user_id"
         ],
         "title": "UserPermMapping",
         "type": "object"
       },
-      "UpdateSharedRequestModel": {
+      "UpdateVFolderSharingStatusReq": {
+        "description": "Request to batch update virtual folder sharing permissions.",
         "properties": {
           "vfolder": {
-            "description": "Target vfolder id to update sharing status.",
+            "description": "VFolder ID",
             "format": "uuid",
             "title": "Vfolder",
             "type": "string"
           },
           "user_perm": {
-            "description": "A list of user and permission mappings.",
+            "description": "List of user-permission mappings",
             "items": {
               "$ref": "#/components/schemas/UserPermMapping"
             },
@@ -1506,7 +1884,177 @@
           "vfolder",
           "user_perm"
         ],
-        "title": "UpdateSharedRequestModel",
+        "title": "UpdateVFolderSharingStatusReq",
+        "type": "object"
+      },
+      "MountHostReq": {
+        "description": "Request to mount a host filesystem.",
+        "properties": {
+          "fs_location": {
+            "description": "Filesystem location to mount",
+            "title": "Fs Location",
+            "type": "string"
+          },
+          "name": {
+            "description": "Name for the mount",
+            "title": "Name",
+            "type": "string"
+          },
+          "fs_type": {
+            "default": "nfs",
+            "description": "Filesystem type",
+            "title": "Fs Type",
+            "type": "string"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Mount options",
+            "title": "Options"
+          },
+          "scaling_group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Target scaling group",
+            "title": "Scaling Group"
+          },
+          "fstab_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Path to fstab file",
+            "title": "Fstab Path"
+          },
+          "edit_fstab": {
+            "default": false,
+            "description": "Whether to edit fstab file",
+            "title": "Edit Fstab",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "fs_location",
+          "name"
+        ],
+        "title": "MountHostReq",
+        "type": "object"
+      },
+      "UmountHostReq": {
+        "description": "Request to unmount a host filesystem.",
+        "properties": {
+          "name": {
+            "description": "Name of the mount to remove",
+            "title": "Name",
+            "type": "string"
+          },
+          "scaling_group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Target scaling group",
+            "title": "Scaling Group"
+          },
+          "fstab_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Path to fstab file",
+            "title": "Fstab Path"
+          },
+          "edit_fstab": {
+            "default": false,
+            "description": "Whether to edit fstab file",
+            "title": "Edit Fstab",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "UmountHostReq",
+        "type": "object"
+      },
+      "ChangeVFolderOwnershipReq": {
+        "description": "Request to change virtual folder ownership.",
+        "properties": {
+          "vfolder": {
+            "description": "VFolder ID",
+            "format": "uuid",
+            "title": "Vfolder",
+            "type": "string"
+          },
+          "user_email": {
+            "description": "Email of the new owner",
+            "title": "User Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "vfolder",
+          "user_email"
+        ],
+        "title": "ChangeVFolderOwnershipReq",
+        "type": "object"
+      },
+      "UpdateQuotaReq": {
+        "description": "Request to update quota for a folder host.",
+        "properties": {
+          "folder_host": {
+            "description": "Folder host",
+            "title": "Folder Host",
+            "type": "string"
+          },
+          "id": {
+            "description": "Quota scope ID",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input": {
+            "additionalProperties": true,
+            "description": "Quota update input containing size_bytes",
+            "title": "Input",
+            "type": "object"
+          }
+        },
+        "required": [
+          "folder_host",
+          "id",
+          "input"
+        ],
+        "title": "UpdateQuotaReq",
         "type": "object"
       },
       "ImageFilter": {
@@ -9393,7 +9941,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateRequestModel"
+                "$ref": "#/components/schemas/VFolderCreateReq"
               }
             }
           }
@@ -9419,36 +9967,51 @@
         "parameters": [
           {
             "name": "all",
+            "in": "query",
+            "required": false,
             "schema": {
+              "default": false,
+              "description": "List all vfolders regardless of ownership",
+              "title": "All",
               "type": "boolean"
-            },
-            "required": true,
-            "in": "query"
+            }
           },
           {
             "name": "group_id",
+            "in": "query",
+            "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "format": "uuid",
+                  "type": "string"
                 },
                 {
-                  "type": "string"
+                  "type": "null"
                 }
-              ]
-            },
-            "required": false,
-            "in": "query"
+              ],
+              "default": null,
+              "description": "Filter by group ID",
+              "title": "Group Id"
+            }
           },
           {
             "name": "owner_user_email",
-            "schema": {
-              "type": "string",
-              "format": "email"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Filter by owner email",
+              "title": "Owner User Email"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
@@ -9472,7 +10035,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DeleteRequestModel"
+                "$ref": "#/components/schemas/DeleteVFolderByIDReq"
               }
             }
           }
@@ -9545,14 +10108,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CompactVFolderInfoModel"
-                }
-              }
-            }
+            "description": "Successful response"
           }
         },
         "security": [
@@ -9560,17 +10116,19 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/IDRequestModel"
-              }
+        "parameters": [
+          {
+            "name": "vfolder_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "description": "VFolder name to look up",
+              "title": "Vfolder Name",
+              "type": "string"
             }
           }
-        },
-        "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
+        ],
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/folders/_/hosts": {
@@ -9592,19 +10150,22 @@
         "parameters": [
           {
             "name": "group_id",
+            "in": "query",
+            "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "format": "uuid",
+                  "type": "string"
                 },
                 {
-                  "type": "string"
+                  "type": "null"
                 }
-              ]
-            },
-            "required": false,
-            "in": "query"
+              ],
+              "default": null,
+              "description": "Filter by group ID",
+              "title": "Group Id"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
@@ -9709,11 +10270,13 @@
         "parameters": [
           {
             "name": "folder_host",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": true,
-            "in": "query"
+            "schema": {
+              "description": "Folder host to get metrics for",
+              "title": "Folder Host",
+              "type": "string"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
@@ -9739,7 +10302,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RenameRequestModel"
+                "$ref": "#/components/schemas/RenameVFolderReq"
               }
             }
           }
@@ -9777,23 +10340,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "cloneable": {
-                    "type": "boolean"
-                  },
-                  "permission": {
-                    "type": "string",
-                    "enum": [
-                      "ro",
-                      "rw",
-                      "wd"
-                    ]
-                  }
-                },
-                "required": []
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/UpdateVFolderOptionsReq"
+              }
             }
           }
         },
@@ -9830,36 +10378,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "path": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      }
-                    ]
-                  },
-                  "parents": {
-                    "type": "boolean",
-                    "default": true
-                  },
-                  "exist_ok": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "path",
-                  "parents",
-                  "exist_ok"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/MkdirReq"
+              }
             }
           }
         },
@@ -9873,7 +10393,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/request-upload": {
@@ -9896,21 +10416,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "path": {
-                    "type": "string"
-                  },
-                  "size": {
-                    "type": "integer"
-                  }
-                },
-                "required": [
-                  "path",
-                  "size"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/CreateUploadSessionReq"
+              }
             }
           }
         },
@@ -9924,7 +10431,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/request-download": {
@@ -9947,21 +10454,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "path": {
-                    "type": "string"
-                  },
-                  "archive": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "path",
-                  "archive"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/CreateDownloadSessionReq"
+              }
             }
           }
         },
@@ -9998,20 +10492,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "files": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "required": [
-                  "files"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/CreateDownloadSessionReq"
+              }
             }
           }
         },
@@ -10025,7 +10507,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "Create a download session for archived files.\n\nReuses CreateDownloadSessionReq body param -- the caller must supply\n``files`` in the JSON body.  Since the existing legacy handler read\n``params[\"files\"]`` from a trafaret schema, we fall back to reading\n``files`` from the raw request body when the DTO does not carry it.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/folders/{name}/move-file": {
@@ -10048,21 +10530,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "src": {
-                    "type": "string"
-                  },
-                  "dst": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "src",
-                  "dst"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/MoveFileReq"
+              }
             }
           }
         },
@@ -10076,7 +10545,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/rename-file": {
@@ -10099,25 +10568,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "target_path": {
-                    "type": "string"
-                  },
-                  "new_name": {
-                    "type": "string"
-                  },
-                  "is_dir": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "target_path",
-                  "new_name",
-                  "is_dir"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/RenameFileReq"
+              }
             }
           }
         },
@@ -10131,7 +10583,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/delete-files": {
@@ -10154,24 +10606,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "files": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "recursive": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "files",
-                  "recursive"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/DeleteFilesReq"
+              }
             }
           }
         },
@@ -10185,7 +10621,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "delete": {
         "operationId": "folders.delete_files.2",
@@ -10202,6 +10638,15 @@
             "TokenAuth": []
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteFilesReq"
+              }
+            }
+          }
+        },
         "parameters": [
           {
             "name": "name",
@@ -10210,28 +10655,9 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "files",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "required": true,
-            "in": "query"
-          },
-          {
-            "name": "recursive",
-            "schema": {
-              "type": "boolean"
-            },
-            "required": true,
-            "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/delete-files-async": {
@@ -10254,24 +10680,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "files": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "recursive": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "files",
-                  "recursive"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/DeleteFilesAsyncBodyParam"
+              }
             }
           }
         },
@@ -10285,7 +10695,7 @@
             }
           }
         ],
-        "description": "Delete files asynchronously within a vfolder.\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/rename_file": {
@@ -10308,25 +10718,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "target_path": {
-                    "type": "string"
-                  },
-                  "new_name": {
-                    "type": "string"
-                  },
-                  "is_dir": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "target_path",
-                  "new_name",
-                  "is_dir"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/RenameFileReq"
+              }
             }
           }
         },
@@ -10340,7 +10733,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/delete_files": {
@@ -10359,6 +10752,15 @@
             "TokenAuth": []
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteFilesReq"
+              }
+            }
+          }
+        },
         "parameters": [
           {
             "name": "name",
@@ -10367,28 +10769,9 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "files",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "required": true,
-            "in": "query"
-          },
-          {
-            "name": "recursive",
-            "schema": {
-              "type": "boolean"
-            },
-            "required": true,
-            "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/files": {
@@ -10418,11 +10801,14 @@
           },
           {
             "name": "path",
+            "in": "query",
+            "required": false,
             "schema": {
+              "default": "",
+              "description": "Directory path to list files from",
+              "title": "Path",
               "type": "string"
-            },
-            "required": true,
-            "in": "query"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
@@ -10448,30 +10834,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "perm": {
-                    "type": "string",
-                    "enum": [
-                      "ro",
-                      "rw",
-                      "wd"
-                    ],
-                    "default": "rw"
-                  },
-                  "emails": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "required": [
-                  "perm",
-                  "emails"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/InviteVFolderReq"
+              }
             }
           }
         },
@@ -10508,15 +10872,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "shared_user_uuid": {
-                    "type": "string"
-                  }
-                },
-                "required": []
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/LeaveVFolderReq"
+              }
             }
           }
         },
@@ -10530,7 +10887,7 @@
             }
           }
         ],
-        "description": "\nLeave from shared VFolder.\n\nCannot leave a group VFolder or a VFolder that the requesting user owns.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/share": {
@@ -10553,30 +10910,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "permission": {
-                    "type": "string",
-                    "enum": [
-                      "ro",
-                      "rw",
-                      "wd"
-                    ],
-                    "default": "rw"
-                  },
-                  "emails": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "required": [
-                  "permission",
-                  "emails"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/ShareVFolderReq"
+              }
             }
           }
         },
@@ -10590,7 +10925,7 @@
             }
           }
         ],
-        "description": "\nShare a group folder to users with overriding permission.\n\nThis will create vfolder_permission(s) relation directly without\ncreating invitation(s). Only group-type vfolders are allowed to\nbe shared directly.\n\n\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: RUNNING\n"
+        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/unshare": {
@@ -10613,20 +10948,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "emails": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "required": [
-                  "emails"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/UnshareVFolderReq"
+              }
             }
           }
         },
@@ -10640,7 +10963,7 @@
             }
           }
         ],
-        "description": "\nUnshare a group folder from users.\n\n\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: RUNNING\n"
+        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: RUNNING\n"
       },
       "delete": {
         "operationId": "folders.unshare.2",
@@ -10657,6 +10980,15 @@
             "TokenAuth": []
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnshareVFolderReq"
+              }
+            }
+          }
+        },
         "parameters": [
           {
             "name": "name",
@@ -10665,20 +10997,9 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "emails",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "required": true,
-            "in": "query"
           }
         ],
-        "description": "\nUnshare a group folder from users.\n\n\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: RUNNING\n"
+        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/clone": {
@@ -10701,43 +11022,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "cloneable": {
-                    "type": "boolean"
-                  },
-                  "target_name": {
-                    "type": "string",
-                    "description": "String composed of alpha-numeric characters with hyphen and underscores in the middle (space and dot may be additionally allowed depending on the used locations)"
-                  },
-                  "target_host": {
-                    "type": "string"
-                  },
-                  "usage_mode": {
-                    "type": "string",
-                    "enum": [
-                      "general",
-                      "model",
-                      "data"
-                    ],
-                    "default": "general"
-                  },
-                  "permission": {
-                    "type": "string",
-                    "enum": [
-                      "ro",
-                      "rw",
-                      "wd"
-                    ],
-                    "default": "rw"
-                  }
-                },
-                "required": [
-                  "cloneable",
-                  "target_name"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/CloneVFolderReq"
+              }
             }
           }
         },
@@ -10774,13 +11060,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PurgeRequestModel"
+                "$ref": "#/components/schemas/PurgeVFolderReq"
               }
             }
           }
         },
         "parameters": [],
-        "description": "\nDelete `delete-complete`d vfolder rows in DB\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/restore-from-trash-bin": {
@@ -10803,13 +11089,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RestoreRequestModel"
+                "$ref": "#/components/schemas/RestoreVFolderReq"
               }
             }
           }
         },
         "parameters": [],
-        "description": "\nRecover vfolder from trash bin, by changing status.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/delete-from-trash-bin": {
@@ -10832,13 +11118,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DeleteFromTrashRequestModel"
+                "$ref": "#/components/schemas/DeleteVFolderFromTrashReq"
               }
             }
           }
         },
         "parameters": [],
-        "description": "\nDelete `delete-pending` vfolders in storage proxy\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{folder_id}/force": {
@@ -10930,22 +11216,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "perm": {
-                    "type": "string",
-                    "enum": [
-                      "ro",
-                      "rw",
-                      "wd"
-                    ]
-                  }
-                },
-                "required": [
-                  "perm"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/UpdateInvitationReq"
+              }
             }
           }
         },
@@ -10959,7 +11231,7 @@
             }
           }
         ],
-        "description": "\nUpdate sent invitation's permission. Other fields are not allowed to be updated.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/invitations/list": {
@@ -11002,22 +11274,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "inv_id": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "inv_id"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/AcceptInvitationReq"
+              }
             }
           }
         },
         "parameters": [],
-        "description": "Accept invitation by invitee.\n\n* `inv_ak` parameter is removed from 19.06 since virtual folder's ownership is\nmoved from keypair to a user or a group.\n\n:param inv_id: ID of vfolder_invitations row.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/invitations/delete": {
@@ -11040,17 +11303,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "inv_id": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "inv_id"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/DeleteInvitationReq"
+              }
             }
           }
         },
@@ -11072,16 +11326,16 @@
             "TokenAuth": []
           }
         ],
-        "parameters": [
-          {
-            "name": "inv_id",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "in": "query"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteInvitationReq"
+              }
+            }
           }
-        ],
+        },
+        "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
@@ -11104,15 +11358,25 @@
         "parameters": [
           {
             "name": "vfolder_id",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Filter by specific vfolder ID",
+              "title": "Vfolder Id"
+            }
           }
         ],
-        "description": "\nList shared vfolders.\n\nNot available for group vfolders.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "post": {
         "operationId": "folders.update_shared_vfolder",
@@ -11133,36 +11397,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "vfolder": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "user": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "perm": {
-                    "type": "string",
-                    "enum": [
-                      "ro",
-                      "rw",
-                      "wd"
-                    ]
-                  }
-                },
-                "required": [
-                  "vfolder",
-                  "user"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/UpdateSharedVFolderReq"
+              }
             }
           }
         },
         "parameters": [],
-        "description": "\nUpdate permission for shared vfolders.\n\nIf params['perm'] is None, remove user's permission for the vfolder.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/_/sharing": {
@@ -11185,13 +11426,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateSharedRequestModel"
+                "$ref": "#/components/schemas/UpdateVFolderSharingStatusReq"
               }
             }
           }
         },
         "parameters": [],
-        "description": "\nUpdate permission for shared vfolders.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/_/fstab": {
@@ -11213,22 +11454,42 @@
         "parameters": [
           {
             "name": "fstab_path",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Path to fstab file",
+              "title": "Fstab Path"
+            }
           },
           {
             "name": "agent_id",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": false,
-            "in": "query"
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Agent ID to query",
+              "title": "Agent Id"
+            }
           }
         ],
-        "description": "\nReturn the contents of `/etc/fstab` file.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/folders/_/mounts": {
@@ -11248,7 +11509,7 @@
           }
         ],
         "parameters": [],
-        "description": "\nList all mounted vfolder hosts in vfroot.\n\nAll mounted hosts from connected (ALIVE) agents are also gathered.\nGenerally, agents should be configured to have same hosts structure,\nbut newly introduced one may not.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       },
       "post": {
         "operationId": "folders.mount_host",
@@ -11269,44 +11530,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "fs_location": {
-                    "type": "string"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "fs_type": {
-                    "type": "string",
-                    "default": "nfs"
-                  },
-                  "options": {
-                    "type": "string"
-                  },
-                  "scaling_group": {
-                    "type": "string"
-                  },
-                  "fstab_path": {
-                    "type": "string"
-                  },
-                  "edit_fstab": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "fs_location",
-                  "name",
-                  "fs_type",
-                  "edit_fstab"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/MountHostReq"
+              }
             }
           }
         },
         "parameters": [],
-        "description": "\nMount device into vfolder host.\n\nMount a device (eg: nfs) located at `fs_location` into `<vfroot>/name` in the\nhost machines (manager and all agents). `fs_type` can be specified by requester,\nwhich fallbaks to 'nfs'.\n\nIf `scaling_group` is specified, try to mount for agents in the scaling group.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       },
       "delete": {
         "operationId": "folders.umount_host.2",
@@ -11323,41 +11553,17 @@
             "TokenAuth": []
           }
         ],
-        "parameters": [
-          {
-            "name": "name",
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "in": "query"
-          },
-          {
-            "name": "scaling_group",
-            "schema": {
-              "type": "string"
-            },
-            "required": false,
-            "in": "query"
-          },
-          {
-            "name": "fstab_path",
-            "schema": {
-              "type": "string"
-            },
-            "required": false,
-            "in": "query"
-          },
-          {
-            "name": "edit_fstab",
-            "schema": {
-              "type": "boolean"
-            },
-            "required": true,
-            "in": "query"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UmountHostReq"
+              }
+            }
           }
-        ],
-        "description": "\nUnmount device from vfolder host.\n\nUnmount a device (eg: nfs) located at `<vfroot>/name` from the host machines\n(manager and all agents).\n\nIf `scaling_group` is specified, try to unmount for agents in the scaling group.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/_/umounts": {
@@ -11380,32 +11586,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "scaling_group": {
-                    "type": "string"
-                  },
-                  "fstab_path": {
-                    "type": "string"
-                  },
-                  "edit_fstab": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "name",
-                  "edit_fstab"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/UmountHostReq"
+              }
             }
           }
         },
         "parameters": [],
-        "description": "\nUnmount device from vfolder host.\n\nUnmount a device (eg: nfs) located at `<vfroot>/name` from the host machines\n(manager and all agents).\n\nIf `scaling_group` is specified, try to unmount for agents in the scaling group.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/_/change-ownership": {
@@ -11428,27 +11615,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "vfolder": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "user_email": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "vfolder",
-                  "user_email"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/ChangeVFolderOwnershipReq"
+              }
             }
           }
         },
         "parameters": [],
-        "description": "\nChange the ownership of vfolder\nFor now, we only provide changing the ownership of user-folder\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/_/quota": {
@@ -11470,20 +11643,24 @@
         "parameters": [
           {
             "name": "folder_host",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": true,
-            "in": "query"
+            "schema": {
+              "description": "Folder host",
+              "title": "Folder Host",
+              "type": "string"
+            }
           },
           {
             "name": "id",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
+            "in": "query",
             "required": true,
-            "in": "query"
+            "schema": {
+              "description": "Quota scope ID",
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
@@ -11507,28 +11684,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "folder_host": {
-                    "type": "string"
-                  },
-                  "id": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "input": {
-                    "type": "object",
-                    "description": "Mapping(String => Any)",
-                    "additionalProperties": true
-                  }
-                },
-                "required": [
-                  "folder_host",
-                  "id",
-                  "input"
-                ]
-              },
-              "examples": {}
+                "$ref": "#/components/schemas/UpdateQuotaReq"
+              }
             }
           }
         },
@@ -11555,20 +11712,24 @@
         "parameters": [
           {
             "name": "folder_host",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": true,
-            "in": "query"
+            "schema": {
+              "description": "Folder host",
+              "title": "Folder Host",
+              "type": "string"
+            }
           },
           {
             "name": "id",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
+            "in": "query",
             "required": true,
-            "in": "query"
+            "schema": {
+              "description": "Quota scope ID",
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
@@ -11593,20 +11754,24 @@
         "parameters": [
           {
             "name": "folder_host",
-            "schema": {
-              "type": "string"
-            },
+            "in": "query",
             "required": true,
-            "in": "query"
+            "schema": {
+              "description": "Folder host",
+              "title": "Folder Host",
+              "type": "string"
+            }
           },
           {
             "name": "id",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
+            "in": "query",
             "required": true,
-            "in": "query"
+            "schema": {
+              "description": "Quota scope ID",
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
           }
         ],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"

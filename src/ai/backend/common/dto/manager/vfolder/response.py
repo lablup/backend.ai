@@ -51,6 +51,7 @@ __all__ = (
     # Response wrappers - Admin
     "GetFstabContentsResponse",
     "GetQuotaResponse",
+    "GetVolumePerfMetricResponse",
     "GetUsageResponse",
     "GetUsedBytesResponse",
     "ListAllHostsResponse",
@@ -318,6 +319,12 @@ class ListAllowedTypesResponse(BaseResponseModel):
     """Response for listing allowed vfolder types."""
 
     allowed_types: list[str] = Field(description="Allowed vfolder types")
+
+
+class GetVolumePerfMetricResponse(BaseResponseModel):
+    """Response for getting volume performance metrics."""
+
+    data: dict[str, Any] = Field(description="Performance metric data from storage proxy")
 
 
 class GetQuotaResponse(BaseResponseModel):
