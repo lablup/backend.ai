@@ -85,6 +85,8 @@ class NotificationChannelAdapter(BaseFilterAdapter):
                     message=data.spec.message,
                     auth=data.spec.auth,
                 )
+            case _:
+                raise InvalidNotificationSpec(f"Unsupported channel type: {data.channel_type}")
         return NotificationChannelDTO(
             id=data.id,
             name=data.name,
@@ -191,15 +193,17 @@ class NotificationChannelAdapter(BaseFilterAdapter):
 class NotificationRuleAdapter(BaseFilterAdapter):
     """Adapter for converting notification rule requests to repository queries."""
 
+    def __init__(self) -> None:
+        self._channel_adapter = NotificationChannelAdapter()
+
     def convert_to_dto(self, data: NotificationRuleData) -> NotificationRuleDTO:
         """Convert NotificationRuleData to DTO."""
-        channel_adapter = NotificationChannelAdapter()
         return NotificationRuleDTO(
             id=data.id,
             name=data.name,
             description=data.description,
             rule_type=data.rule_type,
-            channel=channel_adapter.convert_to_dto(data.channel),
+            channel=self._channel_adapter.convert_to_dto(data.channel),
             message_template=data.message_template,
             enabled=data.enabled,
             created_at=data.created_at,
