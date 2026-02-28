@@ -49,7 +49,7 @@ from ai.backend.manager.errors.auth import (
     InvalidAuthParameters,
     InvalidClientIPConfig,
 )
-from ai.backend.manager.errors.common import RejectedByHook
+from ai.backend.manager.errors.common import GenericForbidden, RejectedByHook
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.resource_policy import (
     keypair_resource_policies,
@@ -718,9 +718,11 @@ def auth_required_for_method(
 def admin_required(handler: WebRequestHandler) -> WebRequestHandler:
     @functools.wraps(handler)
     async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
-        if request.get("is_authorized", False) and request.get("is_admin", False):
-            return await handler(request, *args, **kwargs)
-        raise AuthorizationFailed("Unauthorized access")
+        if not request.get("is_authorized", False):
+            raise AuthorizationFailed("Unauthorized access")
+        if not request.get("is_admin", False):
+            raise GenericForbidden("Insufficient privileges")
+        return await handler(request, *args, **kwargs)
 
     set_handler_attr(wrapped, "auth_required", True)
     set_handler_attr(wrapped, "auth_scope", "admin")
@@ -746,9 +748,11 @@ def admin_required_for_method(
 def superadmin_required(handler: WebRequestHandler) -> WebRequestHandler:
     @functools.wraps(handler)
     async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
-        if request.get("is_authorized", False) and request.get("is_superadmin", False):
-            return await handler(request, *args, **kwargs)
-        raise AuthorizationFailed("Unauthorized access")
+        if not request.get("is_authorized", False):
+            raise AuthorizationFailed("Unauthorized access")
+        if not request.get("is_superadmin", False):
+            raise GenericForbidden("Insufficient privileges")
+        return await handler(request, *args, **kwargs)
 
     set_handler_attr(wrapped, "auth_required", True)
     set_handler_attr(wrapped, "auth_scope", "superadmin")

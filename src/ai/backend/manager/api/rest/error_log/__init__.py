@@ -23,19 +23,19 @@ def register_routes(
 
     registry.add(
         "POST",
-        "/logs/error",
+        "/error",
         handler.append,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
     registry.add(
         "GET",
-        "/logs/error",
+        "/error",
         handler.list_logs,
         middlewares=[auth_required, server_status_required(READ_ALLOWED)],
     )
     registry.add(
         "POST",
-        "/logs/error/{log_id}/clear",
+        "/error/{log_id}/clear",
         handler.mark_cleared,
         middlewares=[auth_required, server_status_required(READ_ALLOWED)],
     )

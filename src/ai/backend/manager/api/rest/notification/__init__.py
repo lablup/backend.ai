@@ -23,37 +23,37 @@ def register_routes(
     # Channel routes
     registry.add(
         "POST",
-        "/notifications/channels",
+        "/channels",
         handler.create_channel,
         middlewares=[superadmin_required],
     )
     registry.add(
         "POST",
-        "/notifications/channels/search",
+        "/channels/search",
         handler.search_channels,
         middlewares=[superadmin_required],
     )
     registry.add(
         "GET",
-        "/notifications/channels/{channel_id}",
+        "/channels/{channel_id}",
         handler.get_channel,
         middlewares=[superadmin_required],
     )
     registry.add(
         "PATCH",
-        "/notifications/channels/{channel_id}",
+        "/channels/{channel_id}",
         handler.update_channel,
         middlewares=[superadmin_required],
     )
     registry.add(
         "DELETE",
-        "/notifications/channels/{channel_id}",
+        "/channels/{channel_id}",
         handler.delete_channel,
         middlewares=[superadmin_required],
     )
     registry.add(
         "POST",
-        "/notifications/channels/{channel_id}/validate",
+        "/channels/{channel_id}/validate",
         handler.validate_channel,
         middlewares=[superadmin_required],
     )
@@ -61,13 +61,13 @@ def register_routes(
     # Rule type routes
     registry.add(
         "GET",
-        "/notifications/rule-types",
+        "/rule-types",
         handler.list_rule_types,
         middlewares=[superadmin_required],
     )
     registry.add(
         "GET",
-        "/notifications/rule-types/{rule_type}/schema",
+        "/rule-types/{rule_type}/schema",
         handler.get_rule_type_schema,
         middlewares=[superadmin_required],
     )
@@ -75,37 +75,37 @@ def register_routes(
     # Rule routes
     registry.add(
         "POST",
-        "/notifications/rules",
+        "/rules",
         handler.create_rule,
         middlewares=[superadmin_required],
     )
     registry.add(
         "POST",
-        "/notifications/rules/search",
+        "/rules/search",
         handler.search_rules,
         middlewares=[superadmin_required],
     )
     registry.add(
         "GET",
-        "/notifications/rules/{rule_id}",
+        "/rules/{rule_id}",
         handler.get_rule,
         middlewares=[superadmin_required],
     )
     registry.add(
         "PATCH",
-        "/notifications/rules/{rule_id}",
+        "/rules/{rule_id}",
         handler.update_rule,
         middlewares=[superadmin_required],
     )
     registry.add(
         "DELETE",
-        "/notifications/rules/{rule_id}",
+        "/rules/{rule_id}",
         handler.delete_rule,
         middlewares=[superadmin_required],
     )
     registry.add(
         "POST",
-        "/notifications/rules/{rule_id}/validate",
+        "/rules/{rule_id}/validate",
         handler.validate_rule,
         middlewares=[superadmin_required],
     )

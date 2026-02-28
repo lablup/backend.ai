@@ -22,16 +22,8 @@ def register_routes(
     handler = AutoScalingRuleHandler(processors=processors)
     _middlewares = [server_status_required(READ_ALLOWED), auth_required]
 
-    registry.add("POST", "/admin/auto-scaling-rules", handler.create, middlewares=_middlewares)
-    registry.add(
-        "GET", "/admin/auto-scaling-rules/{rule_id}", handler.get, middlewares=_middlewares
-    )
-    registry.add(
-        "POST", "/admin/auto-scaling-rules/search", handler.search, middlewares=_middlewares
-    )
-    registry.add(
-        "PATCH", "/admin/auto-scaling-rules/{rule_id}", handler.update, middlewares=_middlewares
-    )
-    registry.add(
-        "POST", "/admin/auto-scaling-rules/delete", handler.delete, middlewares=_middlewares
-    )
+    registry.add("POST", "", handler.create, middlewares=_middlewares)
+    registry.add("GET", "/{rule_id}", handler.get, middlewares=_middlewares)
+    registry.add("POST", "/search", handler.search, middlewares=_middlewares)
+    registry.add("PATCH", "/{rule_id}", handler.update, middlewares=_middlewares)
+    registry.add("POST", "/delete", handler.delete, middlewares=_middlewares)

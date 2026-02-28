@@ -22,10 +22,10 @@ def register_routes(
 
     _mw = [auth_required, superadmin_required]
 
-    registry.add("POST", "/admin/images/search", handler.search, middlewares=_mw)
-    registry.add("GET", "/admin/images/{image_id}", handler.get, middlewares=_mw)
-    registry.add("POST", "/admin/images/rescan", handler.rescan, middlewares=_mw)
-    registry.add("POST", "/admin/images/alias", handler.alias, middlewares=_mw)
-    registry.add("POST", "/admin/images/dealias", handler.dealias, middlewares=_mw)
-    registry.add("POST", "/admin/images/forget", handler.forget, middlewares=_mw)
-    registry.add("POST", "/admin/images/purge", handler.purge, middlewares=_mw)
+    registry.add("POST", "/search", handler.search, middlewares=_mw)
+    registry.add("GET", "/{image_id}", handler.get, middlewares=_mw)
+    registry.add("POST", "/rescan", handler.rescan, middlewares=_mw)
+    registry.add("POST", "/alias", handler.alias, middlewares=_mw)
+    registry.add("POST", "/dealias", handler.dealias, middlewares=_mw)
+    registry.add("POST", "/forget", handler.forget, middlewares=_mw)
+    registry.add("POST", "/purge", handler.purge, middlewares=_mw)

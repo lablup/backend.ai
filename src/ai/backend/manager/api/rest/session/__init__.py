@@ -41,25 +41,25 @@ def register_routes(
     # --- Session creation ---
     registry.add(
         "POST",
-        "/session",
+        "",
         handler.create_from_params,
         middlewares=[server_status_required(ALL_ALLOWED), auth_required],
     )
     registry.add(
         "POST",
-        "/session/_/create",
+        "/_/create",
         handler.create_from_params,
         middlewares=[server_status_required(ALL_ALLOWED), auth_required],
     )
     registry.add(
         "POST",
-        "/session/_/create-from-template",
+        "/_/create-from-template",
         handler.create_from_template,
         middlewares=[server_status_required(ALL_ALLOWED), auth_required],
     )
     registry.add(
         "POST",
-        "/session/_/create-cluster",
+        "/_/create-cluster",
         handler.create_cluster,
         middlewares=[server_status_required(ALL_ALLOWED), auth_required],
     )
@@ -67,19 +67,19 @@ def register_routes(
     # --- Session matching / utilities ---
     registry.add(
         "GET",
-        "/session/_/match",
+        "/_/match",
         handler.match_sessions,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
     registry.add(
         "POST",
-        "/session/_/sync-agent-registry",
+        "/_/sync-agent-registry",
         handler.sync_agent_registry,
         middlewares=[server_status_required(ALL_ALLOWED), auth_required],
     )
     registry.add(
         "POST",
-        "/session/_/transit-status",
+        "/_/transit-status",
         handler.check_and_transit_status,
         middlewares=[auth_required, server_status_required(ALL_ALLOWED)],
     )
@@ -87,13 +87,13 @@ def register_routes(
     # --- Task logs ---
     registry.add(
         "HEAD",
-        "/session/_/logs",
+        "/_/logs",
         handler.get_task_logs,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
     registry.add(
         "GET",
-        "/session/_/logs",
+        "/_/logs",
         handler.get_task_logs,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
@@ -101,25 +101,25 @@ def register_routes(
     # --- Per-session CRUD ---
     registry.add(
         "GET",
-        r"/session/{session_name}",
+        r"/{session_name}",
         handler.get_info,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
     registry.add(
         "PATCH",
-        r"/session/{session_name}",
+        r"/{session_name}",
         handler.restart,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
     registry.add(
         "DELETE",
-        r"/session/{session_name}",
+        r"/{session_name}",
         handler.destroy,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
     registry.add(
         "POST",
-        r"/session/{session_name}",
+        r"/{session_name}",
         handler.execute,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
@@ -127,103 +127,103 @@ def register_routes(
     # --- Per-session sub-resources ---
     registry.add(
         "GET",
-        r"/session/{session_name}/direct-access-info",
+        r"/{session_name}/direct-access-info",
         handler.get_direct_access_info,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
     registry.add(
         "GET",
-        r"/session/{session_name}/logs",
+        r"/{session_name}/logs",
         handler.get_container_logs,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
     registry.add(
         "POST",
-        r"/session/{session_name}/rename",
+        r"/{session_name}/rename",
         handler.rename_session,
         middlewares=[server_status_required(ALL_ALLOWED), auth_required],
     )
     registry.add(
         "POST",
-        r"/session/{session_name}/interrupt",
+        r"/{session_name}/interrupt",
         handler.interrupt,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
     registry.add(
         "POST",
-        r"/session/{session_name}/complete",
+        r"/{session_name}/complete",
         handler.complete,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
     registry.add(
         "POST",
-        r"/session/{session_name}/shutdown-service",
+        r"/{session_name}/shutdown-service",
         handler.shutdown_service,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
     registry.add(
         "POST",
-        r"/session/{session_name}/upload",
+        r"/{session_name}/upload",
         handler.upload_files,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
     registry.add(
         "POST",
-        r"/session/{session_name}/download",
+        r"/{session_name}/download",
         handler.download_files,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
     registry.add(
         "POST",
-        r"/session/{session_name}/download_single",
+        r"/{session_name}/download_single",
         handler.download_single,
         middlewares=[auth_required, server_status_required(READ_ALLOWED)],
     )
     registry.add(
         "GET",
-        r"/session/{session_name}/files",
+        r"/{session_name}/files",
         handler.list_files,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
     registry.add(
         "POST",
-        r"/session/{session_name}/start-service",
+        r"/{session_name}/start-service",
         handler.start_service,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
     registry.add(
         "POST",
-        r"/session/{session_name}/commit",
+        r"/{session_name}/commit",
         handler.commit_session,
         middlewares=[server_status_required(ALL_ALLOWED), auth_required],
     )
     registry.add(
         "POST",
-        r"/session/{session_name}/imagify",
+        r"/{session_name}/imagify",
         handler.convert_session_to_image,
         middlewares=[auth_required, server_status_required(ALL_ALLOWED)],
     )
     registry.add(
         "GET",
-        r"/session/{session_name}/commit",
+        r"/{session_name}/commit",
         handler.get_commit_status,
         middlewares=[server_status_required(ALL_ALLOWED), auth_required],
     )
     registry.add(
         "GET",
-        r"/session/{session_name}/status-history",
+        r"/{session_name}/status-history",
         handler.get_status_history,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )
     registry.add(
         "GET",
-        r"/session/{session_name}/abusing-report",
+        r"/{session_name}/abusing-report",
         handler.get_abusing_report,
         middlewares=[server_status_required(ALL_ALLOWED), auth_required],
     )
     registry.add(
         "GET",
-        r"/session/{session_name}/dependency-graph",
+        r"/{session_name}/dependency-graph",
         handler.get_dependency_graph,
         middlewares=[server_status_required(READ_ALLOWED), auth_required],
     )

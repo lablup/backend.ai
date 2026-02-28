@@ -23,7 +23,7 @@ def register_routes(
 
     registry.add(
         "POST",
-        "/compute-sessions/search",
+        "/search",
         handler.search_sessions,
         middlewares=[superadmin_required, server_status_required(ALL_ALLOWED)],
     )

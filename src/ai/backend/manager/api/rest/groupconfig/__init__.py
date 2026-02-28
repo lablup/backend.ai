@@ -25,25 +25,25 @@ def register_routes(
 
     registry.add(
         "POST",
-        "/group-config/dotfiles",
+        "/dotfiles",
         handler.create,
         middlewares=[_status_readable, admin_required],
     )
     registry.add(
         "GET",
-        "/group-config/dotfiles",
+        "/dotfiles",
         handler.list_or_get,
         middlewares=[_status_readable, auth_required],
     )
     registry.add(
         "PATCH",
-        "/group-config/dotfiles",
+        "/dotfiles",
         handler.update,
         middlewares=[_status_readable, admin_required],
     )
     registry.add(
         "DELETE",
-        "/group-config/dotfiles",
+        "/dotfiles",
         handler.delete,
         middlewares=[_status_readable, admin_required],
     )

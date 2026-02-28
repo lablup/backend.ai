@@ -17,7 +17,7 @@ def register_routes(
 
     registry.add(
         "GET",
-        "/acl",
+        "",
         handler.get_permission,
         middlewares=[auth_required, server_status_required(ALL_ALLOWED)],
     )

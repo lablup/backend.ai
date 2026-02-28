@@ -65,6 +65,10 @@ def _wrap_api_handler(handler: ApiHandler) -> WebRequestHandler:
     return wrapped
 
 
+async def _on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
+    response.headers["Server"] = "BackendAI"
+
+
 class RouteRegistry:
     """Registry for API routes with three-tier middleware support.
 
@@ -84,6 +88,8 @@ class RouteRegistry:
     single chain in declaration order.
     """
 
+    _root_app: web.Application | None
+
     def __init__(
         self,
         app: web.Application,
@@ -93,10 +99,59 @@ class RouteRegistry:
         middlewares: Sequence[RouteMiddleware] | None = None,
     ) -> None:
         self._app = app
+        self._root_app = None
         self._cors = aiohttp_cors.setup(app, defaults=cors_options)
         self._middlewares: list[RouteMiddleware] = list(middlewares or [])
         if global_middlewares:
             app.middlewares.extend(global_middlewares)
+
+    @classmethod
+    def create_subapp(
+        cls,
+        root_app: web.Application,
+        prefix: str,
+        cors_options: CORSOptions,
+        *,
+        middlewares: Sequence[RouteMiddleware] = (),
+        global_middlewares: Sequence[WebMiddleware] = (),
+    ) -> RouteRegistry:
+        """Create a new sub-application with its own ``RouteRegistry``.
+
+        The sub-application is mounted at ``/{prefix}`` on *root_app* and
+        automatically receives a bridge to the root context at startup.
+        """
+        subapp = web.Application()
+        subapp["prefix"] = prefix
+
+        async def _bridge_root_ctx(subapp: web.Application) -> None:
+            subapp["_root.context"] = root_app["_root.context"]
+            subapp["_root_app"] = root_app
+
+        subapp.on_startup.insert(0, _bridge_root_ctx)
+        subapp.on_response_prepare.append(_on_prepare)
+        registry = cls(
+            subapp,
+            cors_options,
+            middlewares=middlewares,
+            global_middlewares=global_middlewares,
+        )
+        # Defer mounting: add_subapp() freezes the subapp (router +
+        # signal lists), so routes must be registered first.  The
+        # caller should invoke ``registry.mount()`` after registering
+        # all routes.
+        registry._root_app = root_app
+        return registry
+
+    def mount(self) -> None:
+        """Mount the subapp on its root application.
+
+        Must be called after all routes have been registered via
+        ``add()`` because ``add_subapp()`` freezes the sub-application.
+        Only meaningful for registries created via ``create_subapp()``.
+        """
+        if self._root_app is not None:
+            self._root_app.add_subapp("/" + self._app["prefix"], self._app)
+            self._root_app = None
 
     @property
     def app(self) -> web.Application:

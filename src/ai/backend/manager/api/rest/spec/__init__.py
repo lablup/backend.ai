@@ -22,24 +22,24 @@ def register_routes(
 
     registry.add(
         "GET",
-        "/spec/graphiql",
+        "/graphiql",
         handler.render_graphiql_graphene_html,
         middlewares=[auth_required],
     )
     registry.add(
         "GET",
-        "/spec/graphiql/strawberry",
+        "/graphiql/strawberry",
         handler.render_graphiql_strawberry_html,
     )
     registry.add(
         "GET",
-        "/spec/openapi",
+        "/openapi",
         handler.render_openapi_html,
         middlewares=[auth_required],
     )
     registry.add(
         "GET",
-        "/spec/openapi/spec.json",
+        "/openapi/spec.json",
         handler.generate_openapi_spec,
         middlewares=[auth_required],
     )

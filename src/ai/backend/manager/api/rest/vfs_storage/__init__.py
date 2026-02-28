@@ -16,25 +16,25 @@ def register_routes(
 
     registry.add(
         "POST",
-        "/vfs-storages/{storage_name}/download",
+        "/{storage_name}/download",
         handler.download_file,
         middlewares=[auth_required],
     )
     registry.add(
         "GET",
-        "/vfs-storages/{storage_name}/files",
+        "/{storage_name}/files",
         handler.list_files,
         middlewares=[auth_required],
     )
     registry.add(
         "GET",
-        "/vfs-storages/{storage_name}",
+        "/{storage_name}",
         handler.get_storage,
         middlewares=[auth_required],
     )
     registry.add(
         "GET",
-        "/vfs-storages",
+        "/",
         handler.list_storages,
         middlewares=[auth_required],
     )

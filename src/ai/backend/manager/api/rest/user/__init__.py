@@ -22,25 +22,19 @@ def register_routes(
     """Register user admin routes on the given RouteRegistry."""
     handler = UserHandler(processors=processors, auth_config=auth_config)
 
-    registry.add("POST", "/admin/users", handler.create_user, middlewares=[superadmin_required])
+    registry.add("POST", "", handler.create_user, middlewares=[superadmin_required])
     registry.add(
         "GET",
-        r"/admin/users/{user_id}",
+        r"/{user_id}",
         handler.get_user,
         middlewares=[superadmin_required],
     )
-    registry.add(
-        "POST", "/admin/users/search", handler.search_users, middlewares=[superadmin_required]
-    )
+    registry.add("POST", "/search", handler.search_users, middlewares=[superadmin_required])
     registry.add(
         "PATCH",
-        r"/admin/users/{user_id}",
+        r"/{user_id}",
         handler.update_user,
         middlewares=[superadmin_required],
     )
-    registry.add(
-        "POST", "/admin/users/delete", handler.delete_user, middlewares=[superadmin_required]
-    )
-    registry.add(
-        "POST", "/admin/users/purge", handler.purge_user, middlewares=[superadmin_required]
-    )
+    registry.add("POST", "/delete", handler.delete_user, middlewares=[superadmin_required])
+    registry.add("POST", "/purge", handler.purge_user, middlewares=[superadmin_required])

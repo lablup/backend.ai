@@ -16,32 +16,32 @@ def register_routes(
 
     registry.add(
         "POST",
-        "/object-storages/presigned/upload",
+        "/presigned/upload",
         handler.get_presigned_upload_url,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
-        "/object-storages/presigned/download",
+        "/presigned/download",
         handler.get_presigned_download_url,
         middlewares=[auth_required],
     )
     # TODO: deprecate these APIs, and use /storage-namespaces instead
     registry.add(
         "GET",
-        "/object-storages/buckets",
+        "/buckets",
         handler.get_all_buckets,
         middlewares=[auth_required],
     )
     registry.add(
         "GET",
-        "/object-storages/{storage_id}/buckets",
+        "/{storage_id}/buckets",
         handler.get_buckets,
         middlewares=[auth_required],
     )
     registry.add(
         "GET",
-        "/object-storages",
+        "/",
         handler.list_object_storages,
         middlewares=[auth_required],
     )

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.manager import ALL_ALLOWED, server_status_required
 from ai.backend.manager.api.rest.middleware.auth import superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
@@ -23,19 +22,19 @@ def register_routes(
 
     registry.add(
         "POST",
-        "/scheduling-history/sessions/search",
+        "/sessions/search",
         handler.search_session_history,
-        middlewares=[superadmin_required, server_status_required(ALL_ALLOWED)],
+        middlewares=[superadmin_required],
     )
     registry.add(
         "POST",
-        "/scheduling-history/deployments/search",
+        "/deployments/search",
         handler.search_deployment_history,
-        middlewares=[superadmin_required, server_status_required(ALL_ALLOWED)],
+        middlewares=[superadmin_required],
     )
     registry.add(
         "POST",
-        "/scheduling-history/routes/search",
+        "/routes/search",
         handler.search_route_history,
-        middlewares=[superadmin_required, server_status_required(ALL_ALLOWED)],
+        middlewares=[superadmin_required],
     )

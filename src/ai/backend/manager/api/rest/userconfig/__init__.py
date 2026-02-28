@@ -25,37 +25,37 @@ def register_routes(
 
     registry.add(
         "POST",
-        "/user-config/dotfiles",
+        "/dotfiles",
         handler.create,
         middlewares=[_status_readable, auth_required],
     )
     registry.add(
         "GET",
-        "/user-config/dotfiles",
+        "/dotfiles",
         handler.list_or_get,
         middlewares=[_status_readable, auth_required],
     )
     registry.add(
         "PATCH",
-        "/user-config/dotfiles",
+        "/dotfiles",
         handler.update,
         middlewares=[_status_readable, auth_required],
     )
     registry.add(
         "DELETE",
-        "/user-config/dotfiles",
+        "/dotfiles",
         handler.delete,
         middlewares=[_status_readable, auth_required],
     )
     registry.add(
         "POST",
-        "/user-config/bootstrap-script",
+        "/bootstrap-script",
         handler.update_bootstrap_script,
         middlewares=[_status_readable, auth_required],
     )
     registry.add(
         "GET",
-        "/user-config/bootstrap-script",
+        "/bootstrap-script",
         handler.get_bootstrap_script,
         middlewares=[_status_readable, auth_required],
     )

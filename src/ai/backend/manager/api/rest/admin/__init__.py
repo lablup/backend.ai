@@ -23,13 +23,13 @@ def register_routes(
 
     registry.add(
         "POST",
-        "/admin/graphql",
+        "/graphql",
         handler.handle_gql_legacy,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
-        "/admin/gql",
+        "/gql",
         handler.handle_gql_graphene,
         middlewares=[auth_required],
     )

@@ -22,10 +22,8 @@ def register_routes(
     handler = SessionTemplateHandler(processors=processors)
     _middlewares = [server_status_required(READ_ALLOWED), auth_required]
 
-    registry.add("POST", "/template/session", handler.create, middlewares=_middlewares)
-    registry.add("GET", "/template/session", handler.list_templates, middlewares=_middlewares)
-    registry.add("GET", "/template/session/{template_id}", handler.get, middlewares=_middlewares)
-    registry.add("PUT", "/template/session/{template_id}", handler.update, middlewares=_middlewares)
-    registry.add(
-        "DELETE", "/template/session/{template_id}", handler.delete, middlewares=_middlewares
-    )
+    registry.add("POST", "", handler.create, middlewares=_middlewares)
+    registry.add("GET", "", handler.list_templates, middlewares=_middlewares)
+    registry.add("GET", "/{template_id}", handler.get, middlewares=_middlewares)
+    registry.add("PUT", "/{template_id}", handler.update, middlewares=_middlewares)
+    registry.add("DELETE", "/{template_id}", handler.delete, middlewares=_middlewares)

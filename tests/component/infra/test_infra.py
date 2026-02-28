@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 
-from ai.backend.client.v2.exceptions import AuthenticationError
+from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.infra import (
     CheckPresetsRequest,
@@ -150,7 +150,7 @@ class TestEtcdConfigCRUD:
         user_registry: BackendAIClientRegistry,
     ) -> None:
         """Regular users are blocked from reading etcd config (superadmin only)."""
-        with pytest.raises(AuthenticationError):
+        with pytest.raises(PermissionDeniedError):
             await user_registry.infra.get_config(GetConfigRequest(key="test/any-key"))
 
     @pytest.mark.asyncio
@@ -159,7 +159,7 @@ class TestEtcdConfigCRUD:
         user_registry: BackendAIClientRegistry,
     ) -> None:
         """Regular users are blocked from writing etcd config (superadmin only)."""
-        with pytest.raises(AuthenticationError):
+        with pytest.raises(PermissionDeniedError):
             await user_registry.infra.set_config(
                 SetConfigRequest(key="test/any-key", value="any-value")
             )
@@ -170,7 +170,7 @@ class TestEtcdConfigCRUD:
         user_registry: BackendAIClientRegistry,
     ) -> None:
         """Regular users are blocked from deleting etcd config (superadmin only)."""
-        with pytest.raises(AuthenticationError):
+        with pytest.raises(PermissionDeniedError):
             await user_registry.infra.delete_config(DeleteConfigRequest(key="test/any-key"))
 
 
@@ -193,7 +193,7 @@ class TestContainerRegistries:
         user_registry: BackendAIClientRegistry,
     ) -> None:
         """Regular users are blocked from listing container registries (superadmin only)."""
-        with pytest.raises(AuthenticationError):
+        with pytest.raises(PermissionDeniedError):
             await user_registry.infra.get_container_registries()
 
 
@@ -329,7 +329,7 @@ class TestUsageStats:
         user_registry: BackendAIClientRegistry,
     ) -> None:
         """Regular users are blocked from admin usage stats (superadmin only)."""
-        with pytest.raises(AuthenticationError):
+        with pytest.raises(PermissionDeniedError):
             await user_registry.infra.get_usage_per_month(
                 UsagePerMonthRequest(group_ids=[], month="202601")
             )
@@ -340,7 +340,7 @@ class TestUsageStats:
         user_registry: BackendAIClientRegistry,
     ) -> None:
         """Regular users are blocked from recalculating usage (superadmin only)."""
-        with pytest.raises(AuthenticationError):
+        with pytest.raises(PermissionDeniedError):
             await user_registry.infra.recalculate_usage()
 
 

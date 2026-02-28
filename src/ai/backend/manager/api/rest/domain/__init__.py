@@ -20,19 +20,19 @@ def register_routes(
     """Register domain routes on the given RouteRegistry."""
     handler = DomainHandler(processors=processors)
 
-    registry.add("POST", "/admin/domains", handler.create, middlewares=[superadmin_required])
+    registry.add("POST", "", handler.create, middlewares=[superadmin_required])
     registry.add(
         "GET",
-        r"/admin/domains/{domain_name}",
+        r"/{domain_name}",
         handler.get,
         middlewares=[superadmin_required],
     )
-    registry.add("POST", "/admin/domains/search", handler.search, middlewares=[superadmin_required])
+    registry.add("POST", "/search", handler.search, middlewares=[superadmin_required])
     registry.add(
         "PATCH",
-        r"/admin/domains/{domain_name}",
+        r"/{domain_name}",
         handler.update,
         middlewares=[superadmin_required],
     )
-    registry.add("POST", "/admin/domains/delete", handler.delete, middlewares=[superadmin_required])
-    registry.add("POST", "/admin/domains/purge", handler.purge, middlewares=[superadmin_required])
+    registry.add("POST", "/delete", handler.delete, middlewares=[superadmin_required])
+    registry.add("POST", "/purge", handler.purge, middlewares=[superadmin_required])

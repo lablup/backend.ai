@@ -22,25 +22,25 @@ def register_routes(
 
     registry.add(
         "POST",
-        "/group/registry-quota",
+        "/registry-quota",
         handler.create_registry_quota,
         middlewares=[superadmin_required],
     )
     registry.add(
         "GET",
-        "/group/registry-quota",
+        "/registry-quota",
         handler.read_registry_quota,
         middlewares=[superadmin_required],
     )
     registry.add(
         "PATCH",
-        "/group/registry-quota",
+        "/registry-quota",
         handler.update_registry_quota,
         middlewares=[superadmin_required],
     )
     registry.add(
         "DELETE",
-        "/group/registry-quota",
+        "/registry-quota",
         handler.delete_registry_quota,
         middlewares=[superadmin_required],
     )

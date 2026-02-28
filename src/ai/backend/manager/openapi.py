@@ -1,12 +1,10 @@
 import asyncio
-import importlib
 import inspect
 import textwrap
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, cast, get_args, get_origin, get_type_hints
 
-import aiohttp_cors
 import click
 import trafaret as t
 from aiohttp import web
@@ -22,7 +20,6 @@ from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.session import UndefChecker
 from ai.backend.manager.api.utils import Undefined
 from ai.backend.manager.models.vfolder import VFolderPermissionValidator
-from ai.backend.manager.server import global_subapp_pkgs
 
 
 class ParseError(Exception):
@@ -527,18 +524,9 @@ def generate_openapi(subapps: list[web.Application], verbose: bool = False) -> d
 
 
 async def generate() -> dict[str, Any]:
-    cors_options = {
-        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
-            allow_credentials=False, expose_headers="*", allow_headers="*"
-        ),
-    }
-
-    subapps: list[web.Application] = []
-    for subapp in global_subapp_pkgs:
-        pkg = importlib.import_module("ai.backend.manager.api" + subapp)
-        app, _ = pkg.create_app(cors_options)
-        subapps.append(app)
-    return generate_openapi(subapps, verbose=True)
+    # All API modules have been migrated to the RouteRegistry pattern.
+    # Legacy create_app()-based subapp packages are no longer available.
+    return generate_openapi([], verbose=True)
 
 
 @click.command()

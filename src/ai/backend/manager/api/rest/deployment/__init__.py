@@ -21,22 +21,18 @@ def register_routes(
     handler = DeploymentAPIHandler(processors=processors)
 
     # Deployment routes
-    registry.add("POST", "/deployments", handler.create_deployment, middlewares=[auth_required])
-    registry.add(
-        "POST", "/deployments/search", handler.search_deployments, middlewares=[auth_required]
-    )
-    registry.add(
-        "GET", "/deployments/{deployment_id}", handler.get_deployment, middlewares=[auth_required]
-    )
+    registry.add("POST", "/", handler.create_deployment, middlewares=[auth_required])
+    registry.add("POST", "/search", handler.search_deployments, middlewares=[auth_required])
+    registry.add("GET", "/{deployment_id}", handler.get_deployment, middlewares=[auth_required])
     registry.add(
         "PATCH",
-        "/deployments/{deployment_id}",
+        "/{deployment_id}",
         handler.update_deployment,
         middlewares=[auth_required],
     )
     registry.add(
         "DELETE",
-        "/deployments/{deployment_id}",
+        "/{deployment_id}",
         handler.destroy_deployment,
         middlewares=[auth_required],
     )
@@ -44,25 +40,25 @@ def register_routes(
     # Revision routes (nested under deployment)
     registry.add(
         "POST",
-        "/deployments/{deployment_id}/revisions/search",
+        "/{deployment_id}/revisions/search",
         handler.search_revisions,
         middlewares=[auth_required],
     )
     registry.add(
         "GET",
-        "/deployments/{deployment_id}/revisions/{revision_id}",
+        "/{deployment_id}/revisions/{revision_id}",
         handler.get_revision,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
-        "/deployments/{deployment_id}/revisions/{revision_id}/activate",
+        "/{deployment_id}/revisions/{revision_id}/activate",
         handler.activate_revision,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
-        "/deployments/{deployment_id}/revisions/{revision_id}/deactivate",
+        "/{deployment_id}/revisions/{revision_id}/deactivate",
         handler.deactivate_revision,
         middlewares=[auth_required],
     )
@@ -70,13 +66,13 @@ def register_routes(
     # Route routes (nested under deployment)
     registry.add(
         "POST",
-        "/deployments/{deployment_id}/routes/search",
+        "/{deployment_id}/routes/search",
         handler.search_routes,
         middlewares=[auth_required],
     )
     registry.add(
         "PATCH",
-        "/deployments/{deployment_id}/routes/{route_id}/traffic-status",
+        "/{deployment_id}/routes/{route_id}/traffic-status",
         handler.update_route_traffic_status,
         middlewares=[auth_required],
     )

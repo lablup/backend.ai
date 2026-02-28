@@ -39,6 +39,7 @@ import click
 import uvloop
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
+from aiotools import apartial
 from opentelemetry.instrumentation.aiohttp_server import (
     middleware as otel_server_middleware,
 )
@@ -146,19 +147,81 @@ from .actions.monitors.prometheus import PrometheusMonitor
 from .actions.monitors.reporter import ReporterMonitor
 from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
+from .api.admin import PrivateContext as AdminPrivateContext
+from .api.admin import init as admin_init
+from .api.admin import shutdown as admin_shutdown
 from .api.context import RootContext
+from .api.etcd import app_ctx as etcd_app_ctx
+from .api.logs import PrivateContext as LogsPrivateContext
+from .api.logs import init as logs_init
+from .api.logs import shutdown as logs_shutdown
+from .api.manager import PrivateContext as ManagerApiPrivateContext
+from .api.manager import init as manager_api_init
+from .api.manager import shutdown as manager_api_shutdown
+from .api.ratelimit import PrivateContext as RatelimitPrivateContext
+from .api.ratelimit import init as rlim_init
+from .api.ratelimit import rlim_middleware
+from .api.ratelimit import shutdown as rlim_shutdown
 from .api.rest.acl import register_routes as register_acl_routes
+from .api.rest.admin import register_routes as register_admin_routes
+from .api.rest.agent import register_routes as register_agent_routes
+from .api.rest.artifact import register_routes as register_artifact_routes
+from .api.rest.artifact_registry import register_routes as register_artifact_registry_routes
 from .api.rest.auth import register_routes as register_auth_routes
+from .api.rest.auto_scaling_rule import register_routes as register_auto_scaling_rule_routes
+from .api.rest.cluster_template import register_routes as register_cluster_template_routes
+from .api.rest.compute_sessions import register_routes as register_compute_sessions_routes
+from .api.rest.container_registry import register_routes as register_container_registry_routes
+from .api.rest.deployment import register_routes as register_deployment_routes
+from .api.rest.domain import register_routes as register_domain_routes
+from .api.rest.domainconfig import register_routes as register_domainconfig_routes
 from .api.rest.error_log import register_routes as register_logs_routes
+from .api.rest.etcd import register_routes as register_etcd_routes
+from .api.rest.events import register_routes as register_events_routes
+from .api.rest.events.handler import PrivateContext as EventsPrivateContext
+from .api.rest.events.handler import events_app_ctx, events_shutdown
+from .api.rest.export import register_routes as register_export_routes
+from .api.rest.fair_share import register_routes as register_fair_share_routes
+from .api.rest.group import register_routes as register_group_routes
+from .api.rest.groupconfig import register_routes as register_groupconfig_routes
+from .api.rest.image import register_routes as register_image_routes
+from .api.rest.manager import register_routes as register_manager_routes
 from .api.rest.middleware import (
     build_api_metric_middleware,
     exception_middleware,
     request_id_middleware,
 )
 from .api.rest.middleware.auth import auth_middleware
+from .api.rest.notification import register_routes as register_notification_routes
+from .api.rest.object_storage import register_routes as register_object_storage_routes
+from .api.rest.quota_scope import register_routes as register_quota_scope_routes
 from .api.rest.ratelimit import register_routes as register_ratelimit_routes
+from .api.rest.rbac import register_routes as register_rbac_routes
+from .api.rest.resource import register_routes as register_resource_routes
 from .api.rest.routing import RouteRegistry
 from .api.rest.scaling_group import register_routes as register_scaling_group_routes
+from .api.rest.scheduling_history import register_routes as register_scheduling_history_routes
+from .api.rest.service import register_routes as register_service_routes
+from .api.rest.session import register_routes as register_session_routes
+from .api.rest.session_template import register_routes as register_session_template_routes
+from .api.rest.spec import register_routes as register_spec_routes
+from .api.rest.stream import register_routes as register_stream_routes
+from .api.rest.stream.handler import PrivateContext as StreamPrivateContext
+from .api.rest.stream.handler import stream_app_ctx, stream_shutdown
+from .api.rest.user import register_routes as register_user_routes
+from .api.rest.userconfig import register_routes as register_userconfig_routes
+from .api.rest.vfolder import register_routes as register_vfolder_routes
+from .api.rest.vfs_storage import register_routes as register_vfs_storage_routes
+from .api.service import PrivateContext as ServicePrivateContext
+from .api.service import init as service_init
+from .api.service import shutdown as service_shutdown
+from .api.session import PrivateContext as SessionPrivateContext
+from .api.session import init as session_init
+from .api.session import shutdown as session_shutdown
+from .api.spec import init as spec_init
+from .api.vfolder import PrivateContext as VfolderPrivateContext
+from .api.vfolder import init as vfolder_init
+from .api.vfolder import shutdown as vfolder_shutdown
 from .clients.agent import AgentClientPool, AgentPoolSpec
 from .clients.appproxy.client import AppProxyClientPool
 from .config.bootstrap import BootstrapConfig
@@ -313,45 +376,7 @@ PUBLIC_INTERFACES: Final = [
 public_interface_objs: MutableMapping[str, Any] = {}
 
 global_subapp_pkgs: Final[list[str]] = [
-    ".acl",
-    ".container_registry",
-    ".artifact",
-    ".artifact_registry",
-    ".etcd",
-    ".events",
-    # ".auth" — migrated to new-style (api/rest/auth)
-    ".ratelimit",
-    ".vfolder",
-    ".admin",
-    ".spec",
-    ".service",
-    ".session",
-    ".stream",
-    ".manager",
-    ".resource",
-    ".scaling_group",
-    ".cluster_template",
-    ".session_template",
-    ".image",
-    ".userconfig",
-    ".domainconfig",
-    ".group",
-    ".groupconfig",
-    ".logs",
-    ".object_storage",
-    ".vfs_storage",
-    ".notification",
-    ".deployment",
-    ".auto_scaling_rule",
-    ".rbac",
-    ".scheduling_history",
-    ".compute_sessions",
-    ".fair_share",
-    ".export",
-    ".agent",
-    ".domain",
-    ".quota_scope",
-    ".user",
+    # All modules migrated to new-style via _register_newstyle_modules().
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
@@ -1379,42 +1404,249 @@ def init_subapp(pkg_name: str, root_app: web.Application, create_subapp: AppCrea
     _init_subapp(pkg_name, root_app, subapp, global_middlewares)
 
 
-def _register_newstyle_routes(
+_ALL_MODULES: Final[list[str]] = [
+    ".auth",
+    ".acl",
+    ".scaling_group",
+    ".logs",
+    ".ratelimit",
+    ".container_registry",
+    ".artifact",
+    ".artifact_registry",
+    ".etcd",
+    ".events",
+    ".vfolder",
+    ".admin",
+    ".spec",
+    ".service",
+    ".session",
+    ".stream",
+    ".manager",
+    ".resource",
+    ".cluster_template",
+    ".session_template",
+    ".image",
+    ".userconfig",
+    ".domainconfig",
+    ".group",
+    ".groupconfig",
+    ".object_storage",
+    ".vfs_storage",
+    ".notification",
+    ".deployment",
+    ".auto_scaling_rule",
+    ".rbac",
+    ".scheduling_history",
+    ".compute_sessions",
+    ".fair_share",
+    ".export",
+    ".agent",
+    ".domain",
+    ".quota_scope",
+    ".user",
+]
+
+
+def _register_newstyle_modules(
     root_app: web.Application,
     dep_resources: DependencyResources,
     pidx: int,
 ) -> None:
-    """Register new-style modules that use the ``register_routes()`` pattern.
+    """Register all API modules using ``RouteRegistry.create_subapp()``.
+
+    Each module gets its own ``web.Application`` mounted at its URL prefix.
 
     Must be called **after** the Composer has run (so that
     ``dep_resources.processing.processors`` is available) but **before**
     ``runner.setup()`` freezes the application router.
-
-    Global middlewares (e.g. ``auth_middleware``) are registered separately
-    in ``build_root_app()`` — route modules only register their routes here.
     """
     root_ctx: RootContext = root_app["_root.context"]
-    registry = RouteRegistry(root_app, root_ctx.cors_options)
+    cors = root_ctx.cors_options
+    processors = dep_resources.processing.processors
+    for name in _ALL_MODULES:
+        if pidx == 0:
+            log.info("Loading module: {}", name[1:])
+        _register_module(name, root_app, cors, processors, root_ctx)
 
-    if pidx == 0:
-        log.info("Loading new-style module: auth")
-    register_auth_routes(registry, dep_resources.processing.processors)
 
-    if pidx == 0:
-        log.info("Loading new-style module: acl")
-    register_acl_routes(registry)
+def _register_module(
+    name: str,
+    root_app: web.Application,
+    cors: Mapping[str, aiohttp_cors.ResourceOptions],
+    processors: Any,
+    root_ctx: RootContext,
+) -> None:
+    """Register a single API module by its package name."""
+    match name:
+        case ".auth":
+            reg = RouteRegistry.create_subapp(root_app, "auth", cors)
+            register_auth_routes(reg, processors)
+        case ".acl":
+            reg = RouteRegistry.create_subapp(root_app, "acl", cors)
+            register_acl_routes(reg)
+        case ".scaling_group":
+            reg = RouteRegistry.create_subapp(root_app, "scaling-groups", cors)
+            register_scaling_group_routes(reg)
+        case ".logs":
+            reg = RouteRegistry.create_subapp(root_app, "logs", cors)
+            reg.app["logs.context"] = LogsPrivateContext()
+            reg.app.on_startup.append(logs_init)
+            reg.app.on_shutdown.append(logs_shutdown)
+            register_logs_routes(reg, processors)
+        case ".ratelimit":
+            reg = RouteRegistry.create_subapp(root_app, "ratelimit", cors)
+            reg.app["ratelimit.context"] = RatelimitPrivateContext()
+            reg.app.on_startup.append(rlim_init)
+            reg.app.on_shutdown.append(rlim_shutdown)
+            root_app.middlewares.append(web.middleware(apartial(rlim_middleware, reg.app)))
+            register_ratelimit_routes(reg)
+        case ".container_registry":
+            reg = RouteRegistry.create_subapp(root_app, "container-registries", cors)
+            register_container_registry_routes(reg)
+        case ".artifact":
+            reg = RouteRegistry.create_subapp(root_app, "artifacts", cors)
+            register_artifact_routes(reg, processors)
+        case ".artifact_registry":
+            reg = RouteRegistry.create_subapp(root_app, "artifact-registries", cors)
+            register_artifact_registry_routes(reg, processors)
+        case ".etcd":
+            reg = RouteRegistry.create_subapp(root_app, "config", cors)
+            reg.app.cleanup_ctx.append(etcd_app_ctx)
+            register_etcd_routes(reg)
+        case ".events":
+            reg = RouteRegistry.create_subapp(root_app, "events", cors)
+            reg.app["events.context"] = EventsPrivateContext()
+            reg.app.on_shutdown.append(events_shutdown)
+            reg.app.cleanup_ctx.append(events_app_ctx)
+            register_events_routes(reg)
+        case ".vfolder":
+            reg = RouteRegistry.create_subapp(root_app, "folders", cors)
+            reg.app["folders.context"] = VfolderPrivateContext()
+            reg.app.on_startup.append(vfolder_init)
+            reg.app.on_shutdown.append(vfolder_shutdown)
+            register_vfolder_routes(reg)
+        case ".admin":
+            reg = RouteRegistry.create_subapp(root_app, "admin", cors)
+            reg.app["admin.context"] = AdminPrivateContext()
+            reg.app.on_startup.append(admin_init)
+            reg.app.on_shutdown.append(admin_shutdown)
+            register_admin_routes(reg, processors)
+        case ".spec":
+            reg = RouteRegistry.create_subapp(root_app, "spec", cors)
+            reg.app.on_startup.append(spec_init)
+            register_spec_routes(reg, processors)
+        case ".service":
+            reg = RouteRegistry.create_subapp(root_app, "services", cors)
+            reg.app["services.context"] = ServicePrivateContext()
+            reg.app.on_startup.append(service_init)
+            reg.app.on_shutdown.append(service_shutdown)
+            register_service_routes(reg, processors)
+        case ".session":
+            reg = RouteRegistry.create_subapp(root_app, "session", cors)
+            reg.app["session.context"] = SessionPrivateContext()
+            reg.app.on_startup.append(session_init)
+            reg.app.on_shutdown.append(session_shutdown)
+            register_session_routes(reg, processors)
+        case ".stream":
+            reg = RouteRegistry.create_subapp(root_app, "stream", cors)
+            reg.app["stream.context"] = StreamPrivateContext()
+            reg.app["database_ptask_group"] = aiotools.PersistentTaskGroup()
+            reg.app["rpc_ptask_group"] = aiotools.PersistentTaskGroup()
+            reg.app.cleanup_ctx.append(stream_app_ctx)
+            reg.app.on_shutdown.append(stream_shutdown)
+            register_stream_routes(reg)
+        case ".manager":
+            reg = RouteRegistry.create_subapp(root_app, "manager", cors)
+            reg.app["manager.context"] = ManagerApiPrivateContext()
+            reg.app.on_startup.append(manager_api_init)
+            reg.app.on_shutdown.append(manager_api_shutdown)
+            register_manager_routes(reg, processors)
+        case ".resource":
+            reg = RouteRegistry.create_subapp(root_app, "resource", cors)
+            register_resource_routes(reg, processors)
+        case ".cluster_template":
+            reg = RouteRegistry.create_subapp(root_app, "template/cluster", cors)
+            register_cluster_template_routes(reg, processors)
+        case ".session_template":
+            reg = RouteRegistry.create_subapp(root_app, "template/session", cors)
+            register_session_template_routes(reg, processors)
+        case ".image":
+            reg = RouteRegistry.create_subapp(root_app, "admin/images", cors)
+            register_image_routes(reg, processors)
+        case ".userconfig":
+            reg = RouteRegistry.create_subapp(root_app, "user-config", cors)
+            register_userconfig_routes(reg, processors)
+        case ".domainconfig":
+            reg = RouteRegistry.create_subapp(root_app, "domain-config", cors)
+            register_domainconfig_routes(reg, processors)
+        case ".group":
+            reg = RouteRegistry.create_subapp(root_app, "group", cors)
+            register_group_routes(reg, root_ctx.services_ctx)
+        case ".groupconfig":
+            reg = RouteRegistry.create_subapp(root_app, "group-config", cors)
+            register_groupconfig_routes(reg, processors)
+        case ".object_storage":
+            reg = RouteRegistry.create_subapp(root_app, "object-storages", cors)
+            register_object_storage_routes(reg)
+        case ".vfs_storage":
+            reg = RouteRegistry.create_subapp(root_app, "vfs-storages", cors)
+            register_vfs_storage_routes(reg)
+        case ".notification":
+            reg = RouteRegistry.create_subapp(root_app, "notifications", cors)
+            register_notification_routes(reg, processors)
+        case ".deployment":
+            reg = RouteRegistry.create_subapp(root_app, "deployments", cors)
+            register_deployment_routes(reg, processors)
+        case ".auto_scaling_rule":
+            reg = RouteRegistry.create_subapp(root_app, "admin/auto-scaling-rules", cors)
+            register_auto_scaling_rule_routes(reg, processors)
+        case ".rbac":
+            reg = RouteRegistry.create_subapp(root_app, "admin/rbac", cors)
+            register_rbac_routes(reg, processors)
+        case ".scheduling_history":
+            reg = RouteRegistry.create_subapp(root_app, "scheduling-history", cors)
+            register_scheduling_history_routes(reg, processors)
+        case ".compute_sessions":
+            reg = RouteRegistry.create_subapp(root_app, "compute-sessions", cors)
+            register_compute_sessions_routes(reg, processors)
+        case ".fair_share":
+            reg = RouteRegistry.create_subapp(root_app, "fair-share", cors)
+            register_fair_share_routes(reg)
+        case ".export":
+            reg = RouteRegistry.create_subapp(root_app, "export", cors)
+            register_export_routes(reg, processors)
+        case ".agent":
+            reg = RouteRegistry.create_subapp(root_app, "agents", cors)
+            register_agent_routes(reg, processors)
+        case ".domain":
+            reg = RouteRegistry.create_subapp(root_app, "admin/domains", cors)
+            register_domain_routes(reg, processors)
+        case ".quota_scope":
+            reg = RouteRegistry.create_subapp(root_app, "admin/quota-scopes", cors)
+            register_quota_scope_routes(reg, root_ctx.storage_manager)
+        case ".user":
+            reg = RouteRegistry.create_subapp(root_app, "admin/users", cors)
+            register_user_routes(reg, processors, root_ctx.config_provider.config.auth)
+        case _:
+            raise ValueError(f"Unknown module: {name}")
+    reg.mount()
 
-    if pidx == 0:
-        log.info("Loading new-style module: scaling_group")
-    register_scaling_group_routes(registry)
 
-    if pidx == 0:
-        log.info("Loading new-style module: logs")
-    register_logs_routes(registry, dep_resources.processing.processors)
+def register_modules(
+    root_app: web.Application,
+    module_names: Sequence[str],
+    *,
+    processors: Any,
+) -> None:
+    """Register a subset of API modules by their package names.
 
-    if pidx == 0:
-        log.info("Loading new-style module: ratelimit")
-    register_ratelimit_routes(registry)
+    This is the public entry point used by test fixtures to register
+    only the modules they need.
+    """
+    root_ctx: RootContext = root_app["_root.context"]
+    cors = root_ctx.cors_options
+    for name in module_names:
+        _register_module(name, root_app, cors, processors, root_ctx)
 
 
 def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
@@ -1755,7 +1987,7 @@ async def server_main(
 
     await manager_init_stack.__aenter__()
     try:
-        root_app = build_root_app(pidx, boostrap_config, subapp_pkgs=global_subapp_pkgs)
+        root_app = build_root_app(pidx, boostrap_config)
         root_ctx: RootContext = root_app["_root.context"]
 
         await manager_init_stack.enter_async_context(aiomonitor_ctx())
@@ -1779,7 +2011,7 @@ async def server_main(
         # Register new-style modules that use register_routes() pattern.
         # Must happen after bridging (cors_options must be set) and before
         # runner.setup() which freezes the application router.
-        _register_newstyle_routes(root_app, dep_resources, pidx)
+        _register_newstyle_modules(root_app, dep_resources, pidx)
 
         # TODO: Remove manual middleware injection once the manager startup is
         # decoupled from the aiohttp Application lifecycle. Currently root_app is

@@ -24,10 +24,10 @@ def register_routes(
 
     registry.add(
         "GET",
-        "/admin/quota-scopes/{storage_host_name}/{quota_scope_id}",
+        "/{storage_host_name}/{quota_scope_id}",
         handler.get,
         middlewares=_mw,
     )
-    registry.add("POST", "/admin/quota-scopes/search", handler.search, middlewares=_mw)
-    registry.add("POST", "/admin/quota-scopes/set", handler.set_quota, middlewares=_mw)
-    registry.add("POST", "/admin/quota-scopes/unset", handler.unset_quota, middlewares=_mw)
+    registry.add("POST", "/search", handler.search, middlewares=_mw)
+    registry.add("POST", "/set", handler.set_quota, middlewares=_mw)
+    registry.add("POST", "/unset", handler.unset_quota, middlewares=_mw)

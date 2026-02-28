@@ -37,13 +37,6 @@ from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.logs import PrivateContext as LogsPrivateContext
-from ai.backend.manager.api.logs import init as logs_init
-from ai.backend.manager.api.logs import shutdown as logs_shutdown
-from ai.backend.manager.api.rest.acl import register_routes as register_acl_routes
-from ai.backend.manager.api.rest.auth import register_routes as register_auth_routes
-from ai.backend.manager.api.rest.error_log import register_routes as register_error_log_routes
-from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
@@ -77,7 +70,7 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.vfolder import vfolders
-from ai.backend.manager.server import build_root_app
+from ai.backend.manager.server import build_root_app, register_modules
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
@@ -86,13 +79,6 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
 from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger("tests.component.conftest")
-
-# New-style subapp package names (those using register_routes() instead of create_app()).
-# Used by the server fixture to separate them from legacy subapp packages.
-# ".logs" is included here because its routes are now registered via the new-style
-# register_error_log_routes().  The legacy lifecycle hooks (GlobalTimer init/shutdown)
-# are attached to the main app manually in the server fixture below.
-_NEWSTYLE_SUBAPP_PKGS: frozenset[str] = frozenset({".auth", ".acl", ".logs"})
 
 
 @asynccontextmanager
@@ -885,28 +871,15 @@ async def server(
     """
     Start a full manager server and return its connection info.
 
-    This is the only fixture that depends on server internals
-    (build_root_app, cleanup_contexts). When Handler-based migration
-    happens, only this fixture's implementation changes.
-
-    New-style modules (those in ``_NEWSTYLE_SUBAPP_PKGS``) are automatically
-    separated from ``server_subapp_pkgs``.  Their routes are registered
-    *after* cleanup contexts have initialised ``root_ctx.processors`` but
-    *before* ``runner.setup()`` freezes the router.
+    All modules are registered via ``register_modules()`` after cleanup
+    contexts have initialised ``root_ctx.processors`` but before
+    ``runner.setup()`` freezes the router.
     """
-    # Separate legacy subapp packages from new-style route packages.
-    # Domain conftest files can keep returning [".auth", ".acl", ...] and
-    # the split is handled here transparently.
-    legacy_pkgs = [p for p in server_subapp_pkgs if p not in _NEWSTYLE_SUBAPP_PKGS]
-
-    # Build the app with only legacy subapps and NO cleanup contexts.
-    # Cleanup contexts are managed manually below so that we can register
-    # new-style routes between "processors ready" and "router frozen".
     app = build_root_app(
         0,
         bootstrap_config,
         cleanup_contexts=[],
-        subapp_pkgs=legacy_pkgs,
+        subapp_pkgs=[],
     )
     root_ctx: RootContext = app["_root.context"]
 
@@ -936,21 +909,11 @@ async def server(
     for cctx in server_cleanup_contexts:
         await exit_stack.enter_async_context(cctx(root_ctx))
 
-    # Register new-style route modules.  At this point processors are ready
-    # (set by cleanup contexts above) and the router is not yet frozen.
-    # auth_middleware is already in app.middlewares (added by build_root_app).
-    newstyle_requested = set(server_subapp_pkgs) & _NEWSTYLE_SUBAPP_PKGS
-    if newstyle_requested:
-        registry = RouteRegistry(app, root_ctx.cors_options)
-        if ".auth" in server_subapp_pkgs:
-            register_auth_routes(registry, root_ctx.processors)
-        if ".acl" in server_subapp_pkgs:
-            register_acl_routes(registry)
-        if ".logs" in server_subapp_pkgs:
-            app["logs.context"] = LogsPrivateContext()
-            app.on_startup.append(logs_init)
-            app.on_shutdown.append(logs_shutdown)
-            register_error_log_routes(registry, root_ctx.processors)
+    # Register all requested modules using the unified dispatch.
+    # At this point processors are ready (set by cleanup contexts above)
+    # and the router is not yet frozen.
+    if server_subapp_pkgs:
+        register_modules(app, server_subapp_pkgs, processors=root_ctx.processors)
 
     runner = web.AppRunner(app, handle_signals=False)
     await runner.setup()

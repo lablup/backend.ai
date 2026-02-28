@@ -23,13 +23,13 @@ def register_routes(
     # Report metadata endpoints
     registry.add(
         "GET",
-        "/export/reports",
+        "/reports",
         handler.list_reports,
         middlewares=[auth_required, superadmin_required],
     )
     registry.add(
         "GET",
-        "/export/reports/{report_key}",
+        "/reports/{report_key}",
         handler.get_report,
         middlewares=[auth_required, superadmin_required],
     )
@@ -37,31 +37,31 @@ def register_routes(
     # CSV export endpoints
     registry.add(
         "POST",
-        "/export/users/csv",
+        "/users/csv",
         handler.export_users_csv,
         middlewares=[auth_required, superadmin_required],
     )
     registry.add(
         "POST",
-        "/export/sessions/csv",
+        "/sessions/csv",
         handler.export_sessions_csv,
         middlewares=[auth_required, superadmin_required],
     )
     registry.add(
         "POST",
-        "/export/projects/csv",
+        "/projects/csv",
         handler.export_projects_csv,
         middlewares=[auth_required, superadmin_required],
     )
     registry.add(
         "POST",
-        "/export/keypairs/csv",
+        "/keypairs/csv",
         handler.export_keypairs_csv,
         middlewares=[auth_required, superadmin_required],
     )
     registry.add(
         "POST",
-        "/export/audit-logs/csv",
+        "/audit-logs/csv",
         handler.export_audit_logs_csv,
         middlewares=[auth_required, superadmin_required],
     )

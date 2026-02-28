@@ -17,13 +17,13 @@ def register_routes(
 
     registry.add(
         "GET",
-        "/scaling-groups",
+        "",
         handler.list_available_sgroups,
         middlewares=[auth_required, server_status_required(READ_ALLOWED)],
     )
     registry.add(
         "GET",
-        "/scaling-groups/{scaling_group}/wsproxy-version",
+        "/{scaling_group}/wsproxy-version",
         handler.get_wsproxy_version,
         middlewares=[auth_required, server_status_required(READ_ALLOWED)],
     )

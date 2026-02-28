@@ -21,29 +21,21 @@ def register_routes(
     handler = AuthHandler(processors=processors)
 
     # /auth root — test endpoint (GET and POST split into separate handlers)
-    registry.add("GET", "/auth", handler.test_get, middlewares=[auth_required])
-    registry.add("POST", "/auth", handler.test_post, middlewares=[auth_required])
-    registry.add("GET", "/auth/test", handler.test_get, middlewares=[auth_required])
-    registry.add("POST", "/auth/test", handler.test_post, middlewares=[auth_required])
+    registry.add("GET", "", handler.test_get, middlewares=[auth_required])
+    registry.add("POST", "", handler.test_post, middlewares=[auth_required])
+    registry.add("GET", "/test", handler.test_get, middlewares=[auth_required])
+    registry.add("POST", "/test", handler.test_post, middlewares=[auth_required])
 
     # Public endpoints (no auth_required)
-    registry.add("POST", "/auth/authorize", handler.authorize)
-    registry.add("POST", "/auth/signup", handler.signup)
-    registry.add("POST", "/auth/update-password-no-auth", handler.update_password_no_auth)
+    registry.add("POST", "/authorize", handler.authorize)
+    registry.add("POST", "/signup", handler.signup)
+    registry.add("POST", "/update-password-no-auth", handler.update_password_no_auth)
 
     # Authenticated endpoints
-    registry.add("GET", "/auth/role", handler.get_role, middlewares=[auth_required])
-    registry.add("POST", "/auth/signout", handler.signout, middlewares=[auth_required])
-    registry.add(
-        "POST", "/auth/update-password", handler.update_password, middlewares=[auth_required]
-    )
-    registry.add(
-        "POST", "/auth/update-full-name", handler.update_full_name, middlewares=[auth_required]
-    )
-    registry.add("GET", "/auth/ssh-keypair", handler.get_ssh_keypair, middlewares=[auth_required])
-    registry.add(
-        "PATCH", "/auth/ssh-keypair", handler.generate_ssh_keypair, middlewares=[auth_required]
-    )
-    registry.add(
-        "POST", "/auth/ssh-keypair", handler.upload_ssh_keypair, middlewares=[auth_required]
-    )
+    registry.add("GET", "/role", handler.get_role, middlewares=[auth_required])
+    registry.add("POST", "/signout", handler.signout, middlewares=[auth_required])
+    registry.add("POST", "/update-password", handler.update_password, middlewares=[auth_required])
+    registry.add("POST", "/update-full-name", handler.update_full_name, middlewares=[auth_required])
+    registry.add("GET", "/ssh-keypair", handler.get_ssh_keypair, middlewares=[auth_required])
+    registry.add("PATCH", "/ssh-keypair", handler.generate_ssh_keypair, middlewares=[auth_required])
+    registry.add("POST", "/ssh-keypair", handler.upload_ssh_keypair, middlewares=[auth_required])

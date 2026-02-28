@@ -22,37 +22,37 @@ def register_routes(
 
     registry.add(
         "POST",
-        "/artifact-registries/scan",
+        "/scan",
         handler.scan_artifacts,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
-        "/artifact-registries/delegation/scan",
+        "/delegation/scan",
         handler.delegate_scan_artifacts,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
-        "/artifact-registries/delegation/import",
+        "/delegation/import",
         handler.delegate_import_artifacts,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
-        "/artifact-registries/search",
+        "/search",
         handler.search_artifacts,
         middlewares=[auth_required],
     )
     registry.add(
         "GET",
-        "/artifact-registries/model/{model_id}",
+        "/model/{model_id}",
         handler.scan_single_model,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
-        "/artifact-registries/models/batch",
+        "/models/batch",
         handler.scan_models,
         middlewares=[auth_required],
     )

@@ -22,55 +22,55 @@ def register_routes(
 
     registry.add(
         "POST",
-        "/artifacts/revisions/cleanup",
+        "/revisions/cleanup",
         handler.cleanup_artifacts,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
-        "/artifacts/revisions/{artifact_revision_id}/approval",
+        "/revisions/{artifact_revision_id}/approval",
         handler.approve_artifact_revision,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
-        "/artifacts/revisions/{artifact_revision_id}/rejection",
+        "/revisions/{artifact_revision_id}/rejection",
         handler.reject_artifact_revision,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
-        "/artifacts/task/cancel",
+        "/task/cancel",
         handler.cancel_import_artifact,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
-        "/artifacts/import",
+        "/import",
         handler.import_artifacts,
         middlewares=[auth_required],
     )
     registry.add(
         "PATCH",
-        "/artifacts/{artifact_id}",
+        "/{artifact_id}",
         handler.update_artifact,
         middlewares=[auth_required],
     )
     registry.add(
         "GET",
-        "/artifacts/revisions/{artifact_revision_id}/readme",
+        "/revisions/{artifact_revision_id}/readme",
         handler.get_artifact_revision_readme,
         middlewares=[auth_required],
     )
     registry.add(
         "GET",
-        "/artifacts/revisions/{artifact_revision_id}/verification-result",
+        "/revisions/{artifact_revision_id}/verification-result",
         handler.get_artifact_revision_verification_result,
         middlewares=[auth_required],
     )
     registry.add(
         "GET",
-        "/artifacts/revisions/{artifact_revision_id}/download-progress",
+        "/revisions/{artifact_revision_id}/download-progress",
         handler.get_download_progress,
         middlewares=[auth_required],
     )

@@ -21,61 +21,61 @@ def register_routes(
     handler = ServiceHandler(processors=processors)
 
     # Service list & create (root)
-    registry.add("GET", "/services", handler.list_serve, middlewares=[auth_required])
-    registry.add("POST", "/services", handler.create, middlewares=[auth_required])
+    registry.add("GET", "", handler.list_serve, middlewares=[auth_required])
+    registry.add("POST", "", handler.create, middlewares=[auth_required])
 
     # Search & utilities
-    registry.add("POST", "/services/_/search", handler.search_services, middlewares=[auth_required])
-    registry.add("POST", "/services/_/try", handler.try_start, middlewares=[auth_required])
+    registry.add("POST", "/_/search", handler.search_services, middlewares=[auth_required])
+    registry.add("POST", "/_/try", handler.try_start, middlewares=[auth_required])
     registry.add(
         "GET",
-        "/services/_/runtimes",
+        "/_/runtimes",
         handler.list_supported_runtimes,
         middlewares=[auth_required],
     )
 
     # Per-service endpoints
-    registry.add("GET", "/services/{service_id}", handler.get_info, middlewares=[auth_required])
-    registry.add("DELETE", "/services/{service_id}", handler.delete, middlewares=[auth_required])
+    registry.add("GET", "/{service_id}", handler.get_info, middlewares=[auth_required])
+    registry.add("DELETE", "/{service_id}", handler.delete, middlewares=[auth_required])
     registry.add(
         "GET",
-        "/services/{service_id}/errors",
+        "/{service_id}/errors",
         handler.list_errors,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
-        "/services/{service_id}/errors/clear",
+        "/{service_id}/errors/clear",
         handler.clear_error,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
-        "/services/{service_id}/scale",
+        "/{service_id}/scale",
         handler.scale,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
-        "/services/{service_id}/sync",
+        "/{service_id}/sync",
         handler.sync,
         middlewares=[auth_required],
     )
     registry.add(
         "PUT",
-        "/services/{service_id}/routings/{route_id}",
+        "/{service_id}/routings/{route_id}",
         handler.update_route,
         middlewares=[auth_required],
     )
     registry.add(
         "DELETE",
-        "/services/{service_id}/routings/{route_id}",
+        "/{service_id}/routings/{route_id}",
         handler.delete_route,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
-        "/services/{service_id}/token",
+        "/{service_id}/token",
         handler.generate_token,
         middlewares=[auth_required],
     )
