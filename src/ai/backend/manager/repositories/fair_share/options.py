@@ -956,12 +956,23 @@ class RGDomainFairShareConditions:
 class RGDomainFairShareOrders:
     """Query orders for rg-scoped domain fair share queries.
 
-    Uses DomainRow (base table) columns for reliable sorting.
+    Uses DomainRow (base table) columns for reliable sorting,
+    and DomainFairShareRow (LEFT JOIN'd) for fair-share-specific ordering.
     """
 
     @staticmethod
     def by_domain_name(ascending: bool = True) -> QueryOrder:
         col = DomainRow.name
+        return col.asc() if ascending else col.desc()
+
+    @staticmethod
+    def by_fair_share_factor(ascending: bool = False) -> QueryOrder:
+        col = DomainFairShareRow.fair_share_factor
+        return col.asc() if ascending else col.desc()
+
+    @staticmethod
+    def by_created_at(ascending: bool = True) -> QueryOrder:
+        col = DomainFairShareRow.created_at
         return col.asc() if ascending else col.desc()
 
 
@@ -1109,6 +1120,23 @@ class RGProjectFairShareConditions:
             return condition
 
         return inner
+
+
+class RGProjectFairShareOrders:
+    """Query orders for rg-scoped project fair share queries.
+
+    Uses ProjectFairShareRow (LEFT JOIN'd) for fair-share-specific ordering.
+    """
+
+    @staticmethod
+    def by_fair_share_factor(ascending: bool = False) -> QueryOrder:
+        col = ProjectFairShareRow.fair_share_factor
+        return col.asc() if ascending else col.desc()
+
+    @staticmethod
+    def by_created_at(ascending: bool = True) -> QueryOrder:
+        col = ProjectFairShareRow.created_at
+        return col.asc() if ascending else col.desc()
 
 
 class RGUserFairShareConditions:
@@ -1275,3 +1303,20 @@ class RGUserFairShareConditions:
             return condition
 
         return inner
+
+
+class RGUserFairShareOrders:
+    """Query orders for rg-scoped user fair share queries.
+
+    Uses UserFairShareRow (LEFT JOIN'd) for fair-share-specific ordering.
+    """
+
+    @staticmethod
+    def by_fair_share_factor(ascending: bool = False) -> QueryOrder:
+        col = UserFairShareRow.fair_share_factor
+        return col.asc() if ascending else col.desc()
+
+    @staticmethod
+    def by_created_at(ascending: bool = True) -> QueryOrder:
+        col = UserFairShareRow.created_at
+        return col.asc() if ascending else col.desc()

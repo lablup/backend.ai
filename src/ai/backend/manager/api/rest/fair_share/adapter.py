@@ -74,7 +74,9 @@ from ai.backend.manager.repositories.fair_share.options import (
     RGDomainFairShareConditions,
     RGDomainFairShareOrders,
     RGProjectFairShareConditions,
+    RGProjectFairShareOrders,
     RGUserFairShareConditions,
+    RGUserFairShareOrders,
     UserFairShareConditions,
     UserFairShareOrders,
 )
@@ -214,11 +216,11 @@ class FairShareAdapter:
 
         match order.field:
             case DomainFairShareOrderField.FAIR_SHARE_FACTOR:
-                return DomainFairShareOrders.by_fair_share_factor(ascending=ascending)
+                return RGDomainFairShareOrders.by_fair_share_factor(ascending=ascending)
             case DomainFairShareOrderField.DOMAIN_NAME:
                 return RGDomainFairShareOrders.by_domain_name(ascending=ascending)
             case DomainFairShareOrderField.CREATED_AT:
-                return DomainFairShareOrders.by_created_at(ascending=ascending)
+                return RGDomainFairShareOrders.by_created_at(ascending=ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -326,7 +328,7 @@ class FairShareAdapter:
             self._convert_project_fair_share_filter_rg(request.filter) if request.filter else []
         )
         orders = (
-            [self._convert_project_fair_share_order(o) for o in request.order]
+            [self._convert_project_fair_share_order_rg(o) for o in request.order]
             if request.order
             else []
         )
@@ -369,6 +371,18 @@ class FairShareAdapter:
                 conditions.append(cond)
 
         return conditions
+
+    def _convert_project_fair_share_order_rg(self, order: ProjectFairShareOrder) -> QueryOrder:
+        """Convert project fair share order using RG-context orders."""
+        ascending = order.direction == OrderDirection.ASC
+
+        match order.field:
+            case ProjectFairShareOrderField.FAIR_SHARE_FACTOR:
+                return RGProjectFairShareOrders.by_fair_share_factor(ascending=ascending)
+            case ProjectFairShareOrderField.CREATED_AT:
+                return RGProjectFairShareOrders.by_created_at(ascending=ascending)
+
+        raise ValueError(f"Unknown order field: {order.field}")
 
     def convert_project_fair_share_to_dto(self, data: ProjectFairShareData) -> ProjectFairShareDTO:
         """Convert ProjectFairShareData to DTO."""
@@ -475,7 +489,9 @@ class FairShareAdapter:
             self._convert_user_fair_share_filter_rg(request.filter) if request.filter else []
         )
         orders = (
-            [self._convert_user_fair_share_order(o) for o in request.order] if request.order else []
+            [self._convert_user_fair_share_order_rg(o) for o in request.order]
+            if request.order
+            else []
         )
         pagination = OffsetPagination(limit=request.limit, offset=request.offset)
 
@@ -524,6 +540,18 @@ class FairShareAdapter:
                 conditions.append(cond)
 
         return conditions
+
+    def _convert_user_fair_share_order_rg(self, order: UserFairShareOrder) -> QueryOrder:
+        """Convert user fair share order using RG-context orders."""
+        ascending = order.direction == OrderDirection.ASC
+
+        match order.field:
+            case UserFairShareOrderField.FAIR_SHARE_FACTOR:
+                return RGUserFairShareOrders.by_fair_share_factor(ascending=ascending)
+            case UserFairShareOrderField.CREATED_AT:
+                return RGUserFairShareOrders.by_created_at(ascending=ascending)
+
+        raise ValueError(f"Unknown order field: {order.field}")
 
     def convert_user_fair_share_to_dto(self, data: UserFairShareData) -> UserFairShareDTO:
         """Convert UserFairShareData to DTO."""
