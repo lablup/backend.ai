@@ -27,6 +27,8 @@ from ai.backend.manager.services.vfolder.actions.invite import (
     LeaveInvitedVFolderActionResult,
     ListInvitationAction,
     ListInvitationActionResult,
+    ListSentInvitationsAction,
+    ListSentInvitationsActionResult,
     RejectInvitationAction,
     RejectInvitationActionResult,
     RevokeInvitedVFolderAction,
@@ -294,3 +296,32 @@ class VFolderInviteService:
         return UpdateInvitedVFolderMountPermissionActionResult(
             action.vfolder_id, action.user_id, action.permission
         )
+
+    async def list_sent_invitations(
+        self, action: ListSentInvitationsAction
+    ) -> ListSentInvitationsActionResult:
+        requester_email = await self._vfolder_repository.get_user_email_by_id(
+            action.requester_user_uuid
+        )
+        if not requester_email:
+            raise VFolderNotFound()
+
+        invitation_pairs = await self._vfolder_repository.get_sent_invitations_for_user(
+            requester_email
+        )
+        invs_info: list[VFolderInvitationInfo] = []
+        for invitation_data, vfolder_data in invitation_pairs:
+            info = VFolderInvitationInfo(
+                id=invitation_data.id,
+                vfolder_id=invitation_data.vfolder,
+                vfolder_name=vfolder_data.name,
+                invitee_user_email=invitation_data.invitee,
+                inviter_user_email=invitation_data.inviter,
+                mount_permission=invitation_data.permission,
+                created_at=invitation_data.created_at,
+                modified_at=invitation_data.modified_at,
+                status=VFolderInvitationState.PENDING,
+            )
+            invs_info.append(info)
+
+        return ListSentInvitationsActionResult(invitations=invs_info)

@@ -79,6 +79,18 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.storage_ops import (
+    GetVFolderUsageAction,
+    GetVFolderUsageActionResult,
+    GetVFolderUsedBytesAction,
+    GetVFolderUsedBytesActionResult,
+    GetVolumePerfMetricAction,
+    GetVolumePerfMetricActionResult,
+    ListAllHostsAction,
+    ListAllHostsActionResult,
+    ListAllowedTypesAction,
+    ListAllowedTypesActionResult,
+)
 from ai.backend.manager.services.vfolder.types import (
     VFolderBaseInfo,
     VFolderOwnershipInfo,
@@ -751,3 +763,47 @@ class VFolderService:
             if prepared:
                 await response.write_eof()
         return GetTaskLogsActionResult(response=response, vfolder_data=log_vfolder_data)
+
+    async def list_allowed_types(
+        self, action: ListAllowedTypesAction
+    ) -> ListAllowedTypesActionResult:
+        allowed_vfolder_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        )
+        return ListAllowedTypesActionResult(allowed_types=list(allowed_vfolder_types))
+
+    async def list_all_hosts(self, action: ListAllHostsAction) -> ListAllHostsActionResult:
+        all_volumes = await self._storage_manager.get_all_volumes()
+        all_hosts = {
+            f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes
+        }
+        default_host = self._config_provider.config.volumes.default_host
+        if default_host not in all_hosts:
+            default_host = None
+        return ListAllHostsActionResult(default=default_host, allowed=sorted(all_hosts))
+
+    async def get_volume_perf_metric(
+        self, action: GetVolumePerfMetricAction
+    ) -> GetVolumePerfMetricActionResult:
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(action.folder_host)
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        storage_reply = await manager_client.get_volume_performance_metric(volume_name)
+        return GetVolumePerfMetricActionResult(data=dict(storage_reply))
+
+    async def get_usage(self, action: GetVFolderUsageAction) -> GetVFolderUsageActionResult:
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            action.folder_host, is_unmanaged(action.unmanaged_path)
+        )
+        client = self._storage_manager.get_manager_facing_client(proxy_name)
+        usage = await client.get_folder_usage(volume_name, action.vfolder_id)
+        return GetVFolderUsageActionResult(data=dict(usage))
+
+    async def get_used_bytes(
+        self, action: GetVFolderUsedBytesAction
+    ) -> GetVFolderUsedBytesActionResult:
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            action.folder_host, is_unmanaged(action.unmanaged_path)
+        )
+        client = self._storage_manager.get_manager_facing_client(proxy_name)
+        usage = await client.get_used_bytes(volume_name, action.vfolder_id)
+        return GetVFolderUsedBytesActionResult(data=dict(usage))

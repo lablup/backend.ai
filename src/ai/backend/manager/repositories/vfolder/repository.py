@@ -1103,6 +1103,49 @@ class VfolderRepository:
             return results
 
     @vfolder_repository_resilience.apply()
+    async def get_sent_invitations_for_user(
+        self, user_email: str
+    ) -> list[tuple[VFolderInvitationData, VFolderData]]:
+        """
+        Get all pending invitations sent by a user (as inviter) with VFolder info.
+        """
+        async with self._db.begin_readonly_session_read_committed() as session:
+            j = sa.join(
+                VFolderInvitationRow, VFolderRow, VFolderInvitationRow.vfolder == VFolderRow.id
+            )
+            query = (
+                sa.select(VFolderInvitationRow)
+                .select_from(j)
+                .where(
+                    sa.and_(
+                        VFolderInvitationRow.inviter == user_email,
+                        VFolderInvitationRow.state == VFolderInvitationState.PENDING,
+                    )
+                )
+                .options(
+                    contains_eager(VFolderInvitationRow.vfolder_row),
+                )
+            )
+            result = await session.scalars(query)
+            invitation_rows = list(result.all())
+
+            results = []
+            for inv_row in invitation_rows:
+                invitation_data = VFolderInvitationData(
+                    id=inv_row.id,
+                    vfolder=inv_row.vfolder,
+                    inviter=inv_row.inviter or "",
+                    invitee=inv_row.invitee,
+                    permission=inv_row.permission or VFolderMountPermission.READ_ONLY,
+                    created_at=inv_row.created_at or datetime.now(UTC),
+                    modified_at=inv_row.modified_at,
+                )
+                vfolder_data = self._vfolder_row_to_data(inv_row.vfolder_row)
+                results.append((invitation_data, vfolder_data))
+
+            return results
+
+    @vfolder_repository_resilience.apply()
     async def ensure_host_permission_allowed(
         self,
         folder_host: str,

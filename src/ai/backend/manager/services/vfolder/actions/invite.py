@@ -222,3 +222,28 @@ class UpdateInvitedVFolderMountPermissionActionResult(BaseActionResult):
     @override
     def entity_id(self) -> str | None:
         return str(self.vfolder_id)
+
+
+@dataclass
+class ListSentInvitationsAction(VFolderInvitationAction):
+    """List invitations sent by the requester."""
+
+    requester_user_uuid: uuid.UUID
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.requester_user_uuid)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+
+@dataclass
+class ListSentInvitationsActionResult(BaseActionResult):
+    invitations: list[VFolderInvitationInfo]
+
+    @override
+    def entity_id(self) -> str | None:
+        return None

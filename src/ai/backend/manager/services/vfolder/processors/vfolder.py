@@ -1,6 +1,7 @@
 from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
@@ -28,6 +29,18 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.storage_ops import (
+    GetVFolderUsageAction,
+    GetVFolderUsageActionResult,
+    GetVFolderUsedBytesAction,
+    GetVFolderUsedBytesActionResult,
+    GetVolumePerfMetricAction,
+    GetVolumePerfMetricActionResult,
+    ListAllHostsAction,
+    ListAllHostsActionResult,
+    ListAllowedTypesAction,
+    ListAllowedTypesActionResult,
+)
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 
 
@@ -53,6 +66,13 @@ class VFolderProcessors(AbstractProcessorPackage):
     ]
     clone_vfolder: SingleEntityActionProcessor[CloneVFolderAction, CloneVFolderActionResult]
     get_task_logs: SingleEntityActionProcessor[GetTaskLogsAction, GetTaskLogsActionResult]
+    list_allowed_types: ActionProcessor[ListAllowedTypesAction, ListAllowedTypesActionResult]
+    list_all_hosts: ActionProcessor[ListAllHostsAction, ListAllHostsActionResult]
+    get_volume_perf_metric: ActionProcessor[
+        GetVolumePerfMetricAction, GetVolumePerfMetricActionResult
+    ]
+    get_usage: ActionProcessor[GetVFolderUsageAction, GetVFolderUsageActionResult]
+    get_used_bytes: ActionProcessor[GetVFolderUsedBytesAction, GetVFolderUsedBytesActionResult]
 
     def __init__(self, service: VFolderService, action_monitors: list[ActionMonitor]) -> None:
         self.create_vfolder = ScopeActionProcessor(service.create, action_monitors)
@@ -76,6 +96,13 @@ class VFolderProcessors(AbstractProcessorPackage):
         )
         self.clone_vfolder = SingleEntityActionProcessor(service.clone, action_monitors)
         self.get_task_logs = SingleEntityActionProcessor(service.get_task_logs, action_monitors)
+        self.list_allowed_types = ActionProcessor(service.list_allowed_types, action_monitors)
+        self.list_all_hosts = ActionProcessor(service.list_all_hosts, action_monitors)
+        self.get_volume_perf_metric = ActionProcessor(
+            service.get_volume_perf_metric, action_monitors
+        )
+        self.get_usage = ActionProcessor(service.get_usage, action_monitors)
+        self.get_used_bytes = ActionProcessor(service.get_used_bytes, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -91,4 +118,9 @@ class VFolderProcessors(AbstractProcessorPackage):
             ForceDeleteVFolderAction.spec(),
             CloneVFolderAction.spec(),
             GetTaskLogsAction.spec(),
+            ListAllowedTypesAction.spec(),
+            ListAllHostsAction.spec(),
+            GetVolumePerfMetricAction.spec(),
+            GetVFolderUsageAction.spec(),
+            GetVFolderUsedBytesAction.spec(),
         ]

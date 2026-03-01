@@ -157,7 +157,6 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import execute_with_retry, execute_with_txn_retry
 from ai.backend.manager.models.vfolder import (
-    VFolderInvitationState,
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
@@ -200,6 +199,7 @@ from ai.backend.manager.services.vfolder.actions.file import (
     DeleteFilesAsyncAction,
     ListFilesAction,
     MkdirAction,
+    MoveFileAction,
     RenameFileAction,
 )
 from ai.backend.manager.services.vfolder.actions.invite import (
@@ -207,10 +207,18 @@ from ai.backend.manager.services.vfolder.actions.invite import (
     InviteVFolderAction,
     LeaveInvitedVFolderAction,
     ListInvitationAction,
+    ListSentInvitationsAction,
     RejectInvitationAction,
     RevokeInvitedVFolderAction,
     UpdateInvitationAction,
     UpdateInvitedVFolderMountPermissionAction,
+)
+from ai.backend.manager.services.vfolder.actions.storage_ops import (
+    GetVFolderUsageAction,
+    GetVFolderUsedBytesAction,
+    GetVolumePerfMetricAction,
+    ListAllHostsAction,
+    ListAllowedTypesAction,
 )
 from ai.backend.manager.types import OptionalState
 
@@ -484,24 +492,19 @@ class VFolderHandler:
     async def list_all_hosts(
         self,
         ctx: UserContext,
-        req: RequestCtx,
+        procs: ProcessorsCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         log.info(
             "VFOLDER.LIST_ALL_HOSTS (email:{}, ak:{})",
             ctx.user_email,
             ctx.access_key,
         )
-        all_volumes = await root_ctx.storage_manager.get_all_volumes()
-        all_hosts = {
-            f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes
-        }
-        default_host = root_ctx.config_provider.config.volumes.default_host
-        if default_host not in all_hosts:
-            default_host = None
+        result = await procs.processors.vfolder.list_all_hosts.wait_for_complete(
+            ListAllHostsAction()
+        )
         resp = ListAllHostsResponse(
-            default=default_host,
-            allowed=sorted(all_hosts),
+            default=result.default,
+            allowed=result.allowed,
         )
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -513,19 +516,18 @@ class VFolderHandler:
         self,
         query: QueryParam[GetVolumePerfMetricQuery],
         ctx: UserContext,
-        req: RequestCtx,
+        procs: ProcessorsCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         params = query.parsed
         log.info(
             "VFOLDER.VOLUME_PERF_METRIC (email:{}, ak:{})",
             ctx.user_email,
             ctx.access_key,
         )
-        proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(params.folder_host)
-        manager_client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
-        storage_reply = await manager_client.get_volume_performance_metric(volume_name)
-        resp = GetVolumePerfMetricResponse(data=dict(storage_reply))
+        result = await procs.processors.vfolder.get_volume_perf_metric.wait_for_complete(
+            GetVolumePerfMetricAction(folder_host=params.folder_host)
+        )
+        resp = GetVolumePerfMetricResponse(data=result.data)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
@@ -535,18 +537,17 @@ class VFolderHandler:
     async def list_allowed_types(
         self,
         ctx: UserContext,
-        req: RequestCtx,
+        procs: ProcessorsCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         log.info(
             "VFOLDER.LIST_ALLOWED_TYPES (email:{}, ak:{})",
             ctx.user_email,
             ctx.access_key,
         )
-        allowed_vfolder_types = (
-            await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        result = await procs.processors.vfolder.list_allowed_types.wait_for_complete(
+            ListAllowedTypesAction()
         )
-        resp = ListAllowedTypesResponse(allowed_types=list(allowed_vfolder_types))
+        resp = ListAllowedTypesResponse(allowed_types=result.allowed_types)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
@@ -745,26 +746,26 @@ class VFolderHandler:
         query: QueryParam[GetUsageQuery],
         ctx: UserContext,
         req: RequestCtx,
+        procs: ProcessorsCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         params = query.parsed
         vfolder_row = (
             await resolve_vfolder_rows(req.request, VFolderPermissionSetAlias.READABLE, params.id)
         )[0]
         await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
-        proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
-            params.folder_host, is_unmanaged(vfolder_row["unmanaged_path"])
-        )
         log.info(
-            "VFOLDER.GET_USAGE (email:{}, volume_name:{}, vf:{})",
+            "VFOLDER.GET_USAGE (email:{}, vf:{})",
             ctx.user_email,
-            volume_name,
             params.id,
         )
-        client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
-        vfid = str(VFolderID(vfolder_row["quota_scope_id"], params.id))
-        usage = await client.get_folder_usage(volume_name, vfid)
-        resp = GetUsageResponse(data=dict(usage))
+        result = await procs.processors.vfolder.get_usage.wait_for_complete(
+            GetVFolderUsageAction(
+                folder_host=params.folder_host,
+                vfolder_id=str(VFolderID(vfolder_row["quota_scope_id"], params.id)),
+                unmanaged_path=vfolder_row["unmanaged_path"],
+            )
+        )
+        resp = GetUsageResponse(data=result.data)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
@@ -776,21 +777,22 @@ class VFolderHandler:
         query: QueryParam[GetUsedBytesQuery],
         ctx: UserContext,
         req: RequestCtx,
+        procs: ProcessorsCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         params = query.parsed
         vfolder_row = (
             await resolve_vfolder_rows(req.request, VFolderPermissionSetAlias.READABLE, params.id)
         )[0]
         await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
-        proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
-            params.folder_host, is_unmanaged(vfolder_row["unmanaged_path"])
+        log.info("VFOLDER.GET_USED_BYTES (vf:{})", params.id)
+        result = await procs.processors.vfolder.get_used_bytes.wait_for_complete(
+            GetVFolderUsedBytesAction(
+                folder_host=params.folder_host,
+                vfolder_id=str(VFolderID(vfolder_row["quota_scope_id"], params.id)),
+                unmanaged_path=vfolder_row["unmanaged_path"],
+            )
         )
-        log.info("VFOLDER.GET_USED_BYTES (volume_name:{}, vf:{})", volume_name, params.id)
-        client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
-        vfid = str(VFolderID(vfolder_row["quota_scope_id"], params.id))
-        usage = await client.get_used_bytes(volume_name, vfid)
-        resp = GetUsedBytesResponse(data=dict(usage))
+        resp = GetUsedBytesResponse(data=result.data)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
@@ -1057,26 +1059,25 @@ class VFolderHandler:
         self,
         body: BodyParam[MoveFileReq],
         vfctx: VFolderAuthContext,
-        req: RequestCtx,
     ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
         log.info(
-            "VFOLDER.MOVE_FILE (email:{}, ak:{}, vf:{} (resolved-from:{!r}), src:{}, dst:{})",
+            "VFOLDER.MOVE_FILE (email:{}, ak:{}, vf:{}, src:{}, dst:{})",
             vfctx.user_email,
             vfctx.access_key,
             row["id"],
-            req.request.match_info["name"],
             params.src,
             params.dst,
         )
-        root_ctx: RootContext = req.request.app["_root.context"]
-        proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
-            row["host"], is_unmanaged(row["unmanaged_path"])
+        await vfctx.processors.vfolder_file.move_file.wait_for_complete(
+            MoveFileAction(
+                user_uuid=vfctx.user_uuid,
+                vfolder_uuid=row["id"],
+                src=params.src,
+                dst=params.dst,
+            )
         )
-        manager_client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
-        vfid = str(VFolderID(row["quota_scope_id"], row["id"]))
-        await manager_client.move_file(volume_name, vfid, params.src, params.dst)
         resp = MessageResponse(msg="")
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -1187,41 +1188,29 @@ class VFolderHandler:
     async def list_sent_invitations(
         self,
         ctx: UserContext,
-        req: RequestCtx,
+        procs: ProcessorsCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         log.info(
             "VFOLDER.LIST_SENT_INVITATIONS (email:{}, ak:{})",
             ctx.user_email,
             ctx.access_key,
         )
-        async with root_ctx.db.begin() as conn:
-            j = sa.join(
-                vfolders, vfolder_invitations, vfolders.c.id == vfolder_invitations.c.vfolder
-            )
-            db_query = (
-                sa.select(vfolder_invitations, vfolders.c.name)
-                .select_from(j)
-                .where(
-                    (vfolder_invitations.c.inviter == ctx.user_email)
-                    & (vfolder_invitations.c.state == VFolderInvitationState.PENDING),
-                )
-            )
-            result = await conn.execute(db_query)
-            invitations = result.fetchall()
+        result = await procs.processors.vfolder_invite.list_sent_invitations.wait_for_complete(
+            ListSentInvitationsAction(requester_user_uuid=ctx.user_uuid)
+        )
         invs_info = []
-        for inv in invitations:
+        for inv in result.invitations:
             invs_info.append(
                 VFolderInvitationDTO(
                     id=str(inv.id),
-                    inviter=inv.inviter,
-                    invitee=inv.invitee,
-                    perm=inv.permission,
-                    state=inv.state.value,
+                    inviter=inv.inviter_user_email,
+                    invitee=inv.invitee_user_email,
+                    perm=VFolderPermissionField(inv.mount_permission.value),
+                    state=inv.status.value,
                     created_at=str(inv.created_at),
                     modified_at=str(inv.modified_at),
-                    vfolder_id=str(inv.vfolder),
-                    vfolder_name=inv.name,
+                    vfolder_id=str(inv.vfolder_id),
+                    vfolder_name=inv.vfolder_name,
                 )
             )
         resp = ListSentInvitationsResponse(invitations=invs_info)
