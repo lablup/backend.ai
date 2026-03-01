@@ -413,6 +413,7 @@ class LayerType(enum.StrEnum):
     CONTAINER_REGISTRY_REPOSITORY = "container_registry_repository"
     DEPLOYMENT_REPOSITORY = "deployment_repository"
     DOMAIN_REPOSITORY = "domain_repository"
+    DOTFILE_REPOSITORY = "dotfile_repository"
     ERROR_LOG_REPOSITORY = "error_log_repository"
     GROUP_REPOSITORY = "group_repository"
     HUGGINGFACE_REGISTRY_REPOSITORY = "huggingface_registry_repository"

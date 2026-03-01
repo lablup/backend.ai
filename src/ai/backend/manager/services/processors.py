@@ -45,6 +45,8 @@ from ai.backend.manager.services.deployment.processors import DeploymentProcesso
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.dotfile.processors import DotfileProcessors
+from ai.backend.manager.services.dotfile.service import DotfileService
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.error_log.service import ErrorLogService
 from ai.backend.manager.services.export.processors import ExportProcessors
@@ -155,6 +157,7 @@ class Services:
     agent: AgentService
     app_config: AppConfigService
     domain: DomainService
+    dotfile: DotfileService
     error_log: ErrorLogService
     export: ExportService
     fair_share: FairShareService
@@ -207,6 +210,9 @@ class Services:
             app_config_repository=repositories.app_config.repository,
         )
         domain_service = DomainService(repositories.domain.repository)
+        dotfile_service = DotfileService(
+            repository=repositories.dotfile.repository,
+        )
         error_log_service = ErrorLogService(
             repository=repositories.error_log.repository,
         )
@@ -379,6 +385,7 @@ class Services:
             agent=agent_service,
             app_config=app_config_service,
             domain=domain_service,
+            dotfile=dotfile_service,
             error_log=error_log_service,
             export=export_service,
             fair_share=fair_share_service,
@@ -426,6 +433,7 @@ class Processors(AbstractProcessorPackage):
     agent: AgentProcessors
     app_config: AppConfigProcessors
     domain: DomainProcessors
+    dotfile: DotfileProcessors
     error_log: ErrorLogProcessors
     export: ExportProcessors
     fair_share: FairShareProcessors
@@ -467,6 +475,7 @@ class Processors(AbstractProcessorPackage):
         agent_processors = AgentProcessors(services.agent, action_monitors)
         app_config_processors = AppConfigProcessors(services.app_config, action_monitors)
         domain_processors = DomainProcessors(services.domain, action_monitors)
+        dotfile_processors = DotfileProcessors(services.dotfile, action_monitors)
         error_log_processors = ErrorLogProcessors(services.error_log, action_monitors)
         export_processors = ExportProcessors(services.export, action_monitors)
         fair_share_processors = FairShareProcessors(services.fair_share, action_monitors)
@@ -540,6 +549,7 @@ class Processors(AbstractProcessorPackage):
             agent=agent_processors,
             app_config=app_config_processors,
             domain=domain_processors,
+            dotfile=dotfile_processors,
             error_log=error_log_processors,
             export=export_processors,
             fair_share=fair_share_processors,
@@ -582,6 +592,7 @@ class Processors(AbstractProcessorPackage):
             *self.agent.supported_actions(),
             *self.app_config.supported_actions(),
             *self.domain.supported_actions(),
+            *self.dotfile.supported_actions(),
             *self.error_log.supported_actions(),
             *self.export.supported_actions(),
             *self.fair_share.supported_actions(),

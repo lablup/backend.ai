@@ -110,6 +110,7 @@ class EntityType(enum.StrEnum):
     RESOURCE_GROUP = "resource_group"
     RESOURCE_PRESET = "resource_preset"
     ROLE = "role"
+    DOTFILE = "dotfile"
     STORAGE_NAMESPACE = "storage_namespace"
     VFS_STORAGE = "vfs_storage"
 

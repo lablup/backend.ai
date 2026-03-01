@@ -14,6 +14,7 @@ from ai.backend.manager.repositories.container_registry.repositories import (
 )
 from ai.backend.manager.repositories.deployment.repositories import DeploymentRepositories
 from ai.backend.manager.repositories.domain.repositories import DomainRepositories
+from ai.backend.manager.repositories.dotfile.repositories import DotfileRepositories
 from ai.backend.manager.repositories.error_log.repositories import ErrorLogRepositories
 from ai.backend.manager.repositories.export.repositories import ExportRepositories
 from ai.backend.manager.repositories.fair_share.repositories import FairShareRepositories
@@ -69,6 +70,7 @@ class Repositories:
     container_registry: ContainerRegistryRepositories
     deployment: DeploymentRepositories
     domain: DomainRepositories
+    dotfile: DotfileRepositories
     error_log: ErrorLogRepositories
     export: ExportRepositories
     fair_share: FairShareRepositories
@@ -107,6 +109,7 @@ class Repositories:
         container_registry_repositories = ContainerRegistryRepositories.create(args)
         deployment_repositories = DeploymentRepositories.create(args)
         domain_repositories = DomainRepositories.create(args)
+        dotfile_repositories = DotfileRepositories.create(args)
         error_log_repositories = ErrorLogRepositories.create(args)
         export_repositories = ExportRepositories.create(args)
         fair_share_repositories = FairShareRepositories.create(args)
@@ -144,6 +147,7 @@ class Repositories:
             container_registry=container_registry_repositories,
             deployment=deployment_repositories,
             domain=domain_repositories,
+            dotfile=dotfile_repositories,
             error_log=error_log_repositories,
             export=export_repositories,
             fair_share=fair_share_repositories,
