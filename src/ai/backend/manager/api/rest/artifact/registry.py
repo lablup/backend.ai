@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_artifact_module(deps: ModuleDeps) -> RouteRegistry:
+def register_artifact_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the artifact sub-application."""
     reg = RouteRegistry.create("artifacts", deps.cors_options)
     handler = ArtifactHandler(processors=deps.processors)

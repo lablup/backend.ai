@@ -3,7 +3,7 @@
 All session template handler logic has been migrated to:
 
 * ``api.rest.session_template.handler`` — SessionTemplateHandler class
-* ``api.rest.session_template`` — register_routes()
+* ``api.rest.session_template`` — route registration
 
 This module keeps the ``create_app()`` entry-point so that
 ``server.py`` continues to mount the sub-application without modification.

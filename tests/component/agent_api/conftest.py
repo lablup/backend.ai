@@ -14,8 +14,8 @@ from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import agent as _agent_api
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.rest.agent.registry import register_agent_module
-from ai.backend.manager.api.rest.auth.registry import register_auth_module
+from ai.backend.manager.api.rest.agent.registry import register_agent_routes
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -112,7 +112,7 @@ async def _agent_api_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @pytest.fixture()
 def server_module_registrars() -> list[ModuleRegistrar]:
     """Load only the modules required for agent-api-domain tests."""
-    return [register_auth_module, register_agent_module]
+    return [register_auth_routes, register_agent_routes]
 
 
 @pytest.fixture()

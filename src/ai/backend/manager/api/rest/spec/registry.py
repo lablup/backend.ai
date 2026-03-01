@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_spec_module(deps: ModuleDeps) -> RouteRegistry:
+def register_spec_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the spec sub-application."""
     from ai.backend.manager.api.spec import init as spec_init
 

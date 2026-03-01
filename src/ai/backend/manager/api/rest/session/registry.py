@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_session_module(deps: ModuleDeps) -> RouteRegistry:
+def register_session_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the session sub-application."""
     from ai.backend.manager.api.session import (
         PrivateContext as SessionPrivateContext,

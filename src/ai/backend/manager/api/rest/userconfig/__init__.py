@@ -1,3 +1,3 @@
-from .registry import register_routes, register_userconfig_module
+from .registry import register_userconfig_routes
 
-__all__ = ["register_userconfig_module", "register_routes"]
+__all__ = ["register_userconfig_routes"]

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_agent_module(deps: ModuleDeps) -> RouteRegistry:
+def register_agent_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the agent sub-application."""
     reg = RouteRegistry.create("agents", deps.cors_options)
     if deps.processors is None:

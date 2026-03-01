@@ -9,39 +9,9 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
-    from ai.backend.manager.services.processors import Processors
 
 
-def register_routes(
-    registry: RouteRegistry,
-    processors: Processors,
-) -> None:
-    """Register scheduling history routes on the given RouteRegistry (legacy API)."""
-    from .handler import SchedulingHistoryHandler
-
-    handler = SchedulingHistoryHandler(processors=processors)
-
-    registry.add(
-        "POST",
-        "/sessions/search",
-        handler.search_session_history,
-        middlewares=[superadmin_required],
-    )
-    registry.add(
-        "POST",
-        "/deployments/search",
-        handler.search_deployment_history,
-        middlewares=[superadmin_required],
-    )
-    registry.add(
-        "POST",
-        "/routes/search",
-        handler.search_route_history,
-        middlewares=[superadmin_required],
-    )
-
-
-def register_scheduling_history_module(deps: ModuleDeps) -> RouteRegistry:
+def register_scheduling_history_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the scheduling history sub-application."""
     # Import handler inside function to avoid circular imports
     from .handler import SchedulingHistoryHandler

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_acl_module(deps: ModuleDeps) -> RouteRegistry:
+def register_acl_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the ACL sub-application."""
     reg = RouteRegistry.create("acl", deps.cors_options)
     handler = AclHandler()

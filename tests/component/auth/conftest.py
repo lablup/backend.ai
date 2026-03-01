@@ -24,7 +24,7 @@ from ai.backend.common.plugin.hook import HookResult, HookResults
 # which Pants cannot trace statically.
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.rest.auth.registry import register_auth_module
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -132,7 +132,7 @@ async def _auth_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @pytest.fixture()
 def server_module_registrars() -> list[ModuleRegistrar]:
     """Load only the auth module for auth-domain tests."""
-    return [register_auth_module]
+    return [register_auth_routes]
 
 
 @pytest.fixture()

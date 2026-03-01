@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_error_log_module(deps: ModuleDeps) -> RouteRegistry:
+def register_error_log_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the error log sub-application."""
     from ai.backend.manager.api.logs import (
         PrivateContext as LogsPrivateContext,

@@ -146,7 +146,6 @@ from ai.backend.manager.types import OptionalState
 
 from .auth import admin_required, auth_required, superadmin_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
-from .types import CORSOptions
 from .utils import (
     LegacyBaseRequestModel,
     LegacyBaseResponseModel,
@@ -2868,22 +2867,3 @@ async def shutdown(app: web.Application) -> None:
     app_ctx: PrivateContext = app["folders.context"]
     await app_ctx.database_ptask_group.shutdown()
     await app_ctx.storage_ptask_group.shutdown()
-
-
-def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list[Any]]:
-    # Lazy imports to avoid circular references at module load time.
-    # These modules depend on this module's utility functions (check_vfolder_status,
-    # resolve_vfolder_rows, etc.), so importing them at the top level would create
-    # a circular import chain.
-    from ai.backend.manager.api.rest.routing import RouteRegistry  # PLC0415: intentional
-    from ai.backend.manager.api.rest.vfolder import register_routes  # PLC0415: intentional
-
-    app = web.Application()
-    app["prefix"] = "folders"
-    app["api_versions"] = (2, 3, 4)
-    app.on_startup.append(init)
-    app.on_shutdown.append(shutdown)
-    app["folders.context"] = PrivateContext()
-    registry = RouteRegistry(app, default_cors_options)
-    register_routes(registry)
-    return app, []

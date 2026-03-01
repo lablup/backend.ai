@@ -10,8 +10,8 @@ from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import export as _export_api
 from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.rest.auth.registry import register_auth_module
-from ai.backend.manager.api.rest.export.registry import register_export_module
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.export.registry import register_export_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.repositories.repositories import Repositories
@@ -88,7 +88,7 @@ async def _export_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @pytest.fixture()
 def server_module_registrars() -> list[ModuleRegistrar]:
     """Load only the modules required for export-domain tests."""
-    return [register_auth_module, register_export_module]
+    return [register_auth_routes, register_export_routes]
 
 
 @pytest.fixture()

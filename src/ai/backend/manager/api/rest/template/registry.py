@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_template_module(deps: ModuleDeps) -> RouteRegistry:
+def register_template_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the template tree: cluster + session sub-registries."""
     from ai.backend.manager.api.rest.cluster_template.registry import (
         register_cluster_template_routes,

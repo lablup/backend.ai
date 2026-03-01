@@ -12,8 +12,8 @@ import pytest
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import quota_scope as _quota_scope_api
 from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.rest.admin.registry import register_admin_module
-from ai.backend.manager.api.rest.auth.registry import register_auth_module
+from ai.backend.manager.api.rest.admin.registry import register_admin_routes
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.repositories.repositories import Repositories
@@ -101,7 +101,7 @@ async def _quota_scope_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @pytest.fixture()
 def server_module_registrars() -> list[ModuleRegistrar]:
     """Load only the modules required for quota-scope-domain tests."""
-    return [register_auth_module, register_admin_module]
+    return [register_auth_routes, register_admin_routes]
 
 
 @pytest.fixture()

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_compute_sessions_module(deps: ModuleDeps) -> RouteRegistry:
+def register_compute_sessions_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the compute sessions sub-application."""
     reg = RouteRegistry.create("compute-sessions", deps.cors_options)
     if deps.processors is None:

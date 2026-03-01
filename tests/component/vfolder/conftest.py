@@ -26,9 +26,9 @@ from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import vfolder as _vfolder_api
 from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.rest.auth.registry import register_auth_module
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
-from ai.backend.manager.api.rest.vfolder.registry import register_vfolder_module
+from ai.backend.manager.api.rest.vfolder.registry import register_vfolder_routes
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
@@ -138,7 +138,7 @@ async def _vfolder_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @pytest.fixture()
 def server_module_registrars() -> list[ModuleRegistrar]:
     """Load only the modules required for vfolder-domain tests."""
-    return [register_auth_module, register_vfolder_module]
+    return [register_auth_routes, register_vfolder_routes]
 
 
 @pytest.fixture()

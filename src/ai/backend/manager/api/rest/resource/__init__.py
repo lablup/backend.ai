@@ -1,3 +1,3 @@
-from .registry import register_resource_module, register_routes
+from .registry import register_resource_routes
 
-__all__ = ["register_resource_module", "register_routes"]
+__all__ = ["register_resource_routes"]

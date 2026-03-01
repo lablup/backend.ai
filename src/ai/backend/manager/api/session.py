@@ -3,7 +3,7 @@
 All session handler logic has been migrated to:
 
 * ``api.rest.session.handler`` — SessionHandler class
-* ``api.rest.session`` — register_routes() + _make_lazy_handler()
+* ``api.rest.session`` — route registration
 
 This module keeps ``create_app()`` so that the existing ``server.py``
 subapp-loading mechanism continues to work unmodified.  It also
@@ -15,12 +15,10 @@ from __future__ import annotations
 import asyncio
 import functools
 import logging
-from collections.abc import Iterable
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
-import aiohttp_cors
 import aiotools
 import attrs
 import sqlalchemy as sa
@@ -45,10 +43,7 @@ from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.utils import query_userinfo as _query_userinfo
 
-from .auth import auth_required
-from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
-from .types import CORSOptions, WebMiddleware
-from .utils import catch_unexpected, deprecated_stub, undefined
+from .utils import catch_unexpected, undefined
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -306,196 +301,3 @@ async def shutdown(app: web.Application) -> None:
     await app_ctx.webhook_ptask_group.shutdown()
     await app_ctx.database_ptask_group.shutdown()
     await app_ctx.rpc_ptask_group.shutdown()
-
-
-# ---------------------------------------------------------------------------
-# create_app() — backward-compatible shim
-# ---------------------------------------------------------------------------
-
-
-def create_app(
-    default_cors_options: CORSOptions,
-) -> tuple[web.Application, Iterable[WebMiddleware]]:
-    app = web.Application()
-    app.on_startup.append(init)
-    app.on_shutdown.append(shutdown)
-    app["api_versions"] = (1, 2, 3, 4)
-    app["session.context"] = PrivateContext()
-    app["prefix"] = "session"
-
-    deprecated_get_stub = deprecated_stub(
-        "Use the HTTP POST method to invoke this API with parameters in the request body."
-    )
-
-    # Lazy import to break circular dependency:
-    # api/session.py → rest/session/ → handler.py → dto → services → repositories → api/session.py
-    from .rest.session import _make_lazy_handler
-
-    # Helper: compose middleware decorators around a lazy handler.
-    def _h(method_name: str, *, status: Any = ALL_ALLOWED, auth: bool = True) -> Any:
-        wrapped = _make_lazy_handler(method_name)
-        if auth:
-            wrapped = auth_required(wrapped)
-        return server_status_required(status)(wrapped)
-
-    cors = aiohttp_cors.setup(app, defaults=default_cors_options)
-
-    # --- Session creation ---
-    cors.add(app.router.add_route("POST", "", _h("create_from_params")))
-    cors.add(app.router.add_route("POST", "/_/create", _h("create_from_params")))
-    cors.add(app.router.add_route("POST", "/_/create-from-template", _h("create_from_template")))
-    cors.add(app.router.add_route("POST", "/_/create-cluster", _h("create_cluster")))
-
-    # --- Session matching / utilities ---
-    cors.add(app.router.add_route("GET", "/_/match", _h("match_sessions", status=READ_ALLOWED)))
-    cors.add(app.router.add_route("POST", "/_/sync-agent-registry", _h("sync_agent_registry")))
-    cors.add(
-        app.router.add_route(
-            "POST",
-            "/_/transit-status",
-            _h("check_and_transit_status"),
-        )
-    )
-
-    # --- Per-session CRUD ---
-    session_resource = cors.add(app.router.add_resource(r"/{session_name}"))
-    cors.add(session_resource.add_route("GET", _h("get_info", status=READ_ALLOWED)))
-    cors.add(session_resource.add_route("PATCH", _h("restart", status=READ_ALLOWED)))
-    cors.add(session_resource.add_route("DELETE", _h("destroy", status=READ_ALLOWED)))
-    cors.add(session_resource.add_route("POST", _h("execute", status=READ_ALLOWED)))
-
-    # --- Task logs ---
-    task_log_resource = cors.add(app.router.add_resource(r"/_/logs"))
-    cors.add(task_log_resource.add_route("HEAD", _h("get_task_logs", status=READ_ALLOWED)))
-    cors.add(task_log_resource.add_route("GET", _h("get_task_logs", status=READ_ALLOWED)))
-
-    # --- Per-session sub-resources ---
-    cors.add(
-        app.router.add_route(
-            "GET",
-            "/{session_name}/direct-access-info",
-            _h("get_direct_access_info", status=READ_ALLOWED),
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "GET",
-            "/{session_name}/logs",
-            _h("get_container_logs", status=READ_ALLOWED),
-        )
-    )
-    cors.add(app.router.add_route("POST", "/{session_name}/rename", _h("rename_session")))
-    cors.add(
-        app.router.add_route(
-            "POST",
-            "/{session_name}/interrupt",
-            _h("interrupt", status=READ_ALLOWED),
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "POST",
-            "/{session_name}/complete",
-            _h("complete", status=READ_ALLOWED),
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "POST",
-            "/{session_name}/shutdown-service",
-            _h("shutdown_service", status=READ_ALLOWED),
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "POST",
-            "/{session_name}/upload",
-            _h("upload_files", status=READ_ALLOWED),
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "GET",
-            "/{session_name}/download",
-            deprecated_get_stub,
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "GET",
-            "/{session_name}/download_single",
-            deprecated_get_stub,
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "POST",
-            "/{session_name}/download",
-            _h("download_files", status=READ_ALLOWED),
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "POST",
-            "/{session_name}/download_single",
-            _h("download_single", status=READ_ALLOWED),
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "GET",
-            "/{session_name}/files",
-            _h("list_files", status=READ_ALLOWED),
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "POST",
-            "/{session_name}/start-service",
-            _h("start_service", status=READ_ALLOWED),
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "POST",
-            "/{session_name}/commit",
-            _h("commit_session"),
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "POST",
-            "/{session_name}/imagify",
-            _h("convert_session_to_image"),
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "GET",
-            "/{session_name}/commit",
-            _h("get_commit_status"),
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "GET",
-            "/{session_name}/status-history",
-            _h("get_status_history", status=READ_ALLOWED),
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "GET",
-            "/{session_name}/abusing-report",
-            _h("get_abusing_report"),
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "GET",
-            "/{session_name}/dependency-graph",
-            _h("get_dependency_graph", status=READ_ALLOWED),
-        )
-    )
-
-    return app, []

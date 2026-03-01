@@ -3,7 +3,7 @@
 GraphQL handler logic has been migrated to:
 
 * ``api.rest.admin.handler`` — AdminHandler class
-* ``api.rest.admin`` — register_routes()
+* ``api.rest.admin`` — route registration
 
 This module keeps ``create_app()`` so that the existing server bootstrap
 (which iterates ``global_subapp_pkgs``) continues to work.  The Strawberry

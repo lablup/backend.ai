@@ -9,45 +9,9 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
-    from ai.backend.manager.service.base import ServicesContext
 
 
-def register_routes(
-    registry: RouteRegistry,
-    services_ctx: ServicesContext,
-) -> None:
-    """Register group routes on the given RouteRegistry (legacy API)."""
-    from .handler import GroupHandler
-
-    handler = GroupHandler(services_ctx=services_ctx)
-
-    registry.add(
-        "POST",
-        "/registry-quota",
-        handler.create_registry_quota,
-        middlewares=[superadmin_required],
-    )
-    registry.add(
-        "GET",
-        "/registry-quota",
-        handler.read_registry_quota,
-        middlewares=[superadmin_required],
-    )
-    registry.add(
-        "PATCH",
-        "/registry-quota",
-        handler.update_registry_quota,
-        middlewares=[superadmin_required],
-    )
-    registry.add(
-        "DELETE",
-        "/registry-quota",
-        handler.delete_registry_quota,
-        middlewares=[superadmin_required],
-    )
-
-
-def register_group_module(deps: ModuleDeps) -> RouteRegistry:
+def register_group_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the group sub-application."""
     # Import handler inside function to avoid circular imports
     from .handler import GroupHandler

@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_service_module(deps: ModuleDeps) -> RouteRegistry:
+def register_service_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the service (model serving) sub-application."""
     from ai.backend.manager.api.service import (
         PrivateContext as ServicePrivateContext,

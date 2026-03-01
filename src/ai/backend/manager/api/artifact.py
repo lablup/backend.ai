@@ -3,7 +3,7 @@
 All artifact handler logic has been migrated to:
 
 * ``api.rest.artifact.handler`` — ArtifactHandler class
-* ``api.rest.artifact`` — register_routes()
+* ``api.rest.artifact`` — route registration
 
 This module keeps the ``create_app()`` entry-point so that
 ``server.py`` continues to mount the sub-application without modification.

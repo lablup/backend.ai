@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_deployment_module(deps: ModuleDeps) -> RouteRegistry:
+def register_deployment_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the deployment sub-application."""
     reg = RouteRegistry.create("deployments", deps.cors_options)
     handler = DeploymentAPIHandler(processors=deps.processors)

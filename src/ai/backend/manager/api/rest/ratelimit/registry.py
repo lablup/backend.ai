@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_ratelimit_module(deps: ModuleDeps) -> RouteRegistry:
+def register_ratelimit_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the ratelimit sub-application.
 
     This module does not register any routes -- it only provides the

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_stream_module(deps: ModuleDeps) -> RouteRegistry:
+def register_stream_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the stream sub-application."""
     from .handler import PrivateContext, StreamHandler, stream_app_ctx, stream_shutdown
 

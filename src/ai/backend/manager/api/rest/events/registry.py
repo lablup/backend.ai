@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_events_module(deps: ModuleDeps) -> RouteRegistry:
+def register_events_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the events sub-application."""
     from .handler import EventsHandler, PrivateContext, events_app_ctx, events_shutdown
 

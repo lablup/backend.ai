@@ -19,9 +19,9 @@ from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import etcd as _etcd_api
 from ai.backend.manager.api import resource as _resource_api
 from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.rest.auth.registry import register_auth_module
-from ai.backend.manager.api.rest.etcd.registry import register_etcd_module
-from ai.backend.manager.api.rest.resource.registry import register_resource_module
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
+from ai.backend.manager.api.rest.resource.registry import register_resource_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.models.group import GroupRow
@@ -142,7 +142,7 @@ async def _infra_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @pytest.fixture()
 def server_module_registrars() -> list[ModuleRegistrar]:
     """Load only the modules required for infra-domain tests."""
-    return [register_auth_module, register_etcd_module, register_resource_module]
+    return [register_auth_routes, register_etcd_routes, register_resource_routes]
 
 
 @pytest.fixture()

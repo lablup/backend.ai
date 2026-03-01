@@ -85,7 +85,7 @@ def _vfolder_resolver(
     return middleware
 
 
-def register_vfolder_module(deps: ModuleDeps) -> RouteRegistry:
+def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the vfolder sub-application."""
     from ai.backend.manager.api.vfolder import (
         PrivateContext as VfolderPrivateContext,

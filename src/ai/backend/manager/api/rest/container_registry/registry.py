@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_container_registry_module(deps: ModuleDeps) -> RouteRegistry:
+def register_container_registry_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the container registry sub-application."""
     reg = RouteRegistry.create("container-registries", deps.cors_options)
     handler = ContainerRegistryHandler()

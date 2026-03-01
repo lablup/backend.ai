@@ -23,8 +23,8 @@ from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import stream as _stream_api
 from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.rest.auth.registry import register_auth_module
-from ai.backend.manager.api.rest.stream.registry import register_stream_module
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.stream.registry import register_stream_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -152,7 +152,7 @@ async def _streaming_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @pytest.fixture()
 def server_module_registrars() -> list[ModuleRegistrar]:
     """Load only the modules required for streaming component tests."""
-    return [register_auth_module, register_stream_module]
+    return [register_auth_routes, register_stream_routes]
 
 
 @pytest.fixture()

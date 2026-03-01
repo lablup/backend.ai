@@ -5,8 +5,8 @@ The handler logic has been migrated to
 dependency injection.  This module provides ``create_app()`` so that the
 legacy subapp loading in server.py continues to work.
 
-Once server.py is updated to call ``register_routes()`` directly, this
-module can be removed.
+Once server.py is fully migrated to the new-style module registration,
+this module can be removed.
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ def create_app(
     This is a backward-compatible shim.  The canonical handler lives in
     ``ai.backend.manager.api.rest.rbac.handler.RBACHandler`` and the
     forward-looking entry point is
-    ``ai.backend.manager.api.rest.rbac.register_routes()``.
+    ``ai.backend.manager.api.rest.rbac.register_rbac_routes()``.
     """
     app = web.Application()
     app["api_versions"] = (4, 5)

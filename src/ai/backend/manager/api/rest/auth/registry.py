@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_auth_module(deps: ModuleDeps) -> RouteRegistry:
+def register_auth_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the auth sub-application."""
     reg = RouteRegistry.create("auth", deps.cors_options)
     if deps.processors is None:

@@ -2,7 +2,7 @@
 
 All group config (dotfile) logic has been migrated to:
 
-* ``api.rest.groupconfig`` — GroupConfigHandler + register_routes()
+* ``api.rest.groupconfig`` — GroupConfigHandler + route registration
 
 This module keeps ``create_app()`` so that the existing server bootstrap
 (``server.py``) continues to work without modification.

@@ -30,8 +30,8 @@ from ai.backend.manager.api import domainconfig as _domainconfig_api
 from ai.backend.manager.api import groupconfig as _groupconfig_api
 from ai.backend.manager.api import userconfig as _userconfig_api
 from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.rest.auth.registry import register_auth_module
-from ai.backend.manager.api.rest.groupconfig.registry import register_groupconfig_module
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.groupconfig.registry import register_groupconfig_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.repositories.repositories import Repositories
@@ -130,7 +130,7 @@ async def _config_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @pytest.fixture()
 def server_module_registrars() -> list[ModuleRegistrar]:
     """Load only the modules required for config-domain tests."""
-    return [register_auth_module, register_groupconfig_module]
+    return [register_auth_routes, register_groupconfig_routes]
 
 
 @pytest.fixture()

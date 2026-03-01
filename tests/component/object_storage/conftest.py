@@ -15,8 +15,8 @@ from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import object_storage as _object_storage_api
 from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.rest.auth.registry import register_auth_module
-from ai.backend.manager.api.rest.object_storage.registry import register_object_storage_module
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.object_storage.registry import register_object_storage_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.models.object_storage import ObjectStorageRow
@@ -100,7 +100,7 @@ async def _object_storage_domain_ctx(root_ctx: RootContext) -> AsyncIterator[Non
 @pytest.fixture()
 def server_module_registrars() -> list[ModuleRegistrar]:
     """Load only the modules required for object-storage-domain tests."""
-    return [register_auth_module, register_object_storage_module]
+    return [register_auth_routes, register_object_storage_routes]
 
 
 @pytest.fixture()

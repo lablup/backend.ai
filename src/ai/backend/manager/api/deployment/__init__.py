@@ -2,7 +2,7 @@
 
 All deployment handler logic has been migrated to:
 * ``api.rest.deployment.handler`` — DeploymentAPIHandler (constructor DI)
-* ``api.rest.deployment`` — register_routes()
+* ``api.rest.deployment`` — route registration
 
 This module keeps ``create_app()`` working for the legacy sub-app
 bootstrap in ``server.py``.

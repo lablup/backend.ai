@@ -3,7 +3,7 @@
 All authentication/authorization logic has been migrated to:
 
 * ``api.rest.middleware.auth`` — auth_middleware + decorators
-* ``api.rest.auth`` — AuthHandler + register_routes()
+* ``api.rest.auth`` — AuthHandler + route registration
 
 This module re-exports the public names so that existing code that does
 ``from ai.backend.manager.api.auth import auth_required`` continues to

@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_manager_api_module(deps: ModuleDeps) -> RouteRegistry:
+def register_manager_api_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the manager sub-application."""
     from ai.backend.manager.api.manager import (
         PrivateContext as ManagerApiPrivateContext,

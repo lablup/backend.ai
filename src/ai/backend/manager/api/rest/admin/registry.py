@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_admin_module(deps: ModuleDeps) -> RouteRegistry:
+def register_admin_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the admin tree: admin's own routes + six sub-registries."""
     reg = RouteRegistry.create("admin", deps.cors_options)
 

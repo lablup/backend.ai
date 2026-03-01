@@ -2,7 +2,7 @@
 
 All domain config (dotfile) logic has been migrated to:
 
-* ``api.rest.domainconfig`` — DomainConfigHandler + register_routes()
+* ``api.rest.domainconfig`` — DomainConfigHandler + route registration
 
 This module keeps ``create_app()`` so that the existing server bootstrap
 (``server.py``) continues to work without modification.

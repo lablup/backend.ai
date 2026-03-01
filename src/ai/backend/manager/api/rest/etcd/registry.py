@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 
-def register_etcd_module(deps: ModuleDeps) -> RouteRegistry:
+def register_etcd_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the etcd config sub-application."""
     from ai.backend.manager.api.etcd import app_ctx as etcd_app_ctx
 
