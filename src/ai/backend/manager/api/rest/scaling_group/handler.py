@@ -18,10 +18,14 @@ from ai.backend.common.dto.manager.scaling_group.response import (
     WsproxyVersionResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.dto.context import RequestCtx, UserContext
-from ai.backend.manager.errors.common import ObjectNotFound
-from ai.backend.manager.models.scaling_group import query_allowed_sgroups
+from ai.backend.manager.dto.context import UserContext
+from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.scaling_group.actions.get_wsproxy_version import (
+    GetWsproxyVersionAction,
+)
+from ai.backend.manager.services.scaling_group.actions.list_allowed import (
+    ListAllowedScalingGroupsAction,
+)
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -29,13 +33,14 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ScalingGroupHandler:
     """Scaling group API handler with constructor-injected dependencies."""
 
+    def __init__(self, *, processors: Processors) -> None:
+        self._processors = processors
+
     async def list_available_sgroups(
         self,
         query: QueryParam[ListScalingGroupsRequest],
         ctx: UserContext,
-        req: RequestCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         params = query.parsed
         log.info(
             "SGROUPS.LIST(ak:{}, g:{}, d:{})",
@@ -43,25 +48,24 @@ class ScalingGroupHandler:
             params.group,
             ctx.user_domain,
         )
-        async with root_ctx.db.begin() as conn:
-            sgroups = await query_allowed_sgroups(
-                conn, ctx.user_domain, params.group, ctx.access_key
-            )
-            if not ctx.is_admin:
-                sgroups = [sg for sg in sgroups if sg.is_public]
-            resp = ListScalingGroupsResponse(
-                scaling_groups=[ScalingGroupItem(name=sg.name) for sg in sgroups],
-            )
-            return APIResponse.build(HTTPStatus.OK, resp)
+        action = ListAllowedScalingGroupsAction(
+            domain_name=ctx.user_domain,
+            group=params.group,
+            access_key=ctx.access_key,
+            is_admin=ctx.is_admin,
+        )
+        result = await self._processors.scaling_group.list_allowed_sgroups.wait_for_complete(action)
+        resp = ListScalingGroupsResponse(
+            scaling_groups=[ScalingGroupItem(name=name) for name in result.scaling_group_names],
+        )
+        return APIResponse.build(HTTPStatus.OK, resp)
 
     async def get_wsproxy_version(
         self,
         path: PathParam[WsproxyVersionPathParam],
         query: QueryParam[WsproxyVersionQueryParam],
         ctx: UserContext,
-        req: RequestCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         path_params = path.parsed
         query_params = query.parsed
         scaling_group_name = path_params.scaling_group
@@ -72,21 +76,12 @@ class ScalingGroupHandler:
             group_id_or_name,
             ctx.user_domain,
         )
-        async with root_ctx.db.begin_readonly() as conn:
-            sgroups = await query_allowed_sgroups(
-                conn, ctx.user_domain, group_id_or_name or "", ctx.access_key
-            )
-            sgroup_filtered = [sg for sg in sgroups if sg.name == scaling_group_name]
-            if not sgroup_filtered:
-                raise ObjectNotFound(object_name="scaling group")
-            sgroup = sgroup_filtered[0]
-
-            if not sgroup.wsproxy_addr:
-                raise ObjectNotFound(object_name="AppProxy address")
-            client = root_ctx.appproxy_client_pool.load_client(
-                sgroup.wsproxy_addr, sgroup.wsproxy_api_token or ""
-            )
-            status = await client.fetch_status()
-
-            resp = WsproxyVersionResponse(wsproxy_version=status.api_version)
-            return APIResponse.build(HTTPStatus.OK, resp)
+        action = GetWsproxyVersionAction(
+            scaling_group_name=scaling_group_name,
+            domain_name=ctx.user_domain,
+            group=group_id_or_name or "",
+            access_key=ctx.access_key,
+        )
+        result = await self._processors.scaling_group.get_wsproxy_version.wait_for_complete(action)
+        resp = WsproxyVersionResponse(wsproxy_version=result.wsproxy_version)
+        return APIResponse.build(HTTPStatus.OK, resp)

@@ -284,6 +284,7 @@ class Services:
         )
         scaling_group_service = ScalingGroupService(
             repositories.scaling_group.repository,
+            appproxy_client_pool=args.appproxy_client_pool,
         )
         utilization_metric_service = UtilizationMetricService(
             args.prometheus_client,

@@ -18,7 +18,7 @@ def register_scaling_group_routes(deps: ModuleDeps) -> RouteRegistry:
     from .handler import ScalingGroupHandler
 
     reg = RouteRegistry.create("scaling-groups", deps.cors_options)
-    handler = ScalingGroupHandler()
+    handler = ScalingGroupHandler(processors=deps.processors)
 
     reg.add(
         "GET",
