@@ -121,10 +121,7 @@ async def admin_role_assignments(
 
 
 @strawberry.field(
-    description=(
-        "Added in 26.3.0. List roles assigned to the current authenticated user. "
-        "No RBAC check required — users can always see their own roles."
-    )
+    description="Added in 26.3.0. List roles assigned to the current authenticated user.",
 )  # type: ignore[misc]
 async def my_roles(
     info: Info[StrawberryGQLContext],
