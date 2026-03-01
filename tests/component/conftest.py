@@ -14,6 +14,7 @@ from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontext
 from dataclasses import dataclass
 from functools import partial, update_wrapper
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import asyncpg
 import pytest
@@ -915,10 +916,10 @@ async def server(
     if server_module_registrars:
         deps = ModuleDeps(
             cors_options=root_ctx.cors_options,
-            processors=root_ctx.processors,
-            services_ctx=root_ctx.services_ctx,
-            storage_manager=root_ctx.storage_manager,
-            auth_config=root_ctx.config_provider.config.auth,
+            processors=getattr(root_ctx, "processors", None) or MagicMock(),
+            services_ctx=getattr(root_ctx, "services_ctx", None) or MagicMock(),
+            storage_manager=getattr(root_ctx, "storage_manager", None) or MagicMock(),
+            auth_config=getattr(root_ctx.config_provider.config, "auth", None) or MagicMock(),
         )
         register_modules(app, server_module_registrars, deps=deps)
 
