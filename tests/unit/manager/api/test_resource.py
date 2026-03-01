@@ -44,6 +44,7 @@ from ai.backend.manager.api.resource import (
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.auth import AuthorizationFailed
+from ai.backend.manager.errors.common import GenericForbidden
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -170,7 +171,7 @@ class TestRecalculateUsage:
         authorized_request: MagicMock,
     ) -> None:
         """Verify non-superadmin request is rejected."""
-        with pytest.raises(AuthorizationFailed):
+        with pytest.raises(GenericForbidden):
             await recalculate_usage(authorized_request)
 
 
@@ -206,7 +207,7 @@ class TestAdminMonthStats:
         authorized_request: MagicMock,
     ) -> None:
         """Verify non-superadmin request is rejected."""
-        with pytest.raises(AuthorizationFailed):
+        with pytest.raises(GenericForbidden):
             await admin_month_stats(authorized_request)
 
 
@@ -243,7 +244,7 @@ class TestGetContainerRegistries:
         authorized_request: MagicMock,
     ) -> None:
         """Verify non-superadmin request is rejected."""
-        with pytest.raises(AuthorizationFailed):
+        with pytest.raises(GenericForbidden):
             await get_container_registries(authorized_request)
 
 
@@ -408,7 +409,7 @@ class TestGetWatcherStatus:
         authorized_request: MagicMock,
     ) -> None:
         """Verify non-superadmin request is rejected."""
-        with pytest.raises(AuthorizationFailed):
+        with pytest.raises(GenericForbidden):
             await get_watcher_status(authorized_request)
 
 
@@ -446,7 +447,7 @@ class TestWatcherAgentStart:
         authorized_request: MagicMock,
     ) -> None:
         """Verify non-superadmin request is rejected."""
-        with pytest.raises(AuthorizationFailed):
+        with pytest.raises(GenericForbidden):
             await watcher_agent_start(authorized_request)
 
 
@@ -484,7 +485,7 @@ class TestWatcherAgentStop:
         authorized_request: MagicMock,
     ) -> None:
         """Verify non-superadmin request is rejected."""
-        with pytest.raises(AuthorizationFailed):
+        with pytest.raises(GenericForbidden):
             await watcher_agent_stop(authorized_request)
 
 
@@ -522,7 +523,7 @@ class TestWatcherAgentRestart:
         authorized_request: MagicMock,
     ) -> None:
         """Verify non-superadmin request is rejected."""
-        with pytest.raises(AuthorizationFailed):
+        with pytest.raises(GenericForbidden):
             await watcher_agent_restart(authorized_request)
 
 
@@ -584,7 +585,7 @@ class TestUsagePerMonth:
         authorized_request: MagicMock,
     ) -> None:
         """Verify non-superadmin request is rejected."""
-        with pytest.raises(AuthorizationFailed):
+        with pytest.raises(GenericForbidden):
             await usage_per_month(authorized_request)
 
 
@@ -675,7 +676,7 @@ class TestUsagePerPeriod:
         authorized_request: MagicMock,
     ) -> None:
         """Verify non-superadmin request is rejected."""
-        with pytest.raises(AuthorizationFailed):
+        with pytest.raises(GenericForbidden):
             await usage_per_period(authorized_request)
 
 

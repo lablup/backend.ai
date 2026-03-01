@@ -9,6 +9,7 @@ from aiohttp import web
 from dateutil.tz import gettz, tzutc
 
 from ai.backend.manager.api.auth import _extract_auth_params, check_date
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.server import (
     agent_registry_ctx,
@@ -124,7 +125,7 @@ async def test_authorize(
             event_dispatcher_plugin_ctx,
             agent_registry_ctx,
         ],
-        [".auth"],
+        [register_auth_routes],
     )
 
     async def do_authorize(hash_type: str, api_version: str) -> None:
@@ -164,7 +165,7 @@ async def test_authorize(
 #             monitoring_ctx,
 #             hook_plugin_ctx,
 #         ],
-#         [".auth"],
+#         [register_auth_routes],
 #     )
 
 #     allowed_client_ip = "10.10.10.10"

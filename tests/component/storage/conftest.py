@@ -11,6 +11,10 @@ from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import object_storage as _object_storage_api
 from ai.backend.manager.api import vfs_storage as _vfs_storage_api
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.object_storage.registry import register_object_storage_routes
+from ai.backend.manager.api.rest.types import ModuleRegistrar
+from ai.backend.manager.api.rest.vfs_storage.registry import register_vfs_storage_routes
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
@@ -100,9 +104,9 @@ async def _storage_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @pytest.fixture()
-def server_subapp_pkgs() -> list[str]:
-    """Load only the subapps required for storage-domain tests."""
-    return [".auth", ".object_storage", ".vfs_storage"]
+def server_module_registrars() -> list[ModuleRegistrar]:
+    """Load only the modules required for storage-domain tests."""
+    return [register_auth_routes, register_object_storage_routes, register_vfs_storage_routes]
 
 
 @pytest.fixture()

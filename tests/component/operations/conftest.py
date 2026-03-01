@@ -17,6 +17,10 @@ from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import logs as _logs_api
 from ai.backend.manager.api import manager as _manager_api
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.error_log.registry import register_error_log_routes
+from ai.backend.manager.api.rest.manager.registry import register_manager_api_routes
+from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.error_logs import error_logs
@@ -115,9 +119,9 @@ async def _operations_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @pytest.fixture()
-def server_subapp_pkgs() -> list[str]:
-    """Load only the subapps required for operations-domain tests."""
-    return [".auth", ".logs", ".manager"]
+def server_module_registrars() -> list[ModuleRegistrar]:
+    """Load only the modules required for operations-domain tests."""
+    return [register_auth_routes, register_error_log_routes, register_manager_api_routes]
 
 
 @pytest.fixture()

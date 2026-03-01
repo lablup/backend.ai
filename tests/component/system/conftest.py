@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import pytest
 
+from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.server import monitoring_ctx
 
 
 @pytest.fixture()
-def server_subapp_pkgs() -> list[str]:
-    """No subapps needed — the hello() handler is on the root app."""
+def server_module_registrars() -> list[ModuleRegistrar]:
+    """No modules needed — the hello() handler is on the root app."""
     return []
 
 

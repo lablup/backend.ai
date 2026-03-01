@@ -30,6 +30,11 @@ from ai.backend.manager.api import domainconfig as _domainconfig_api
 from ai.backend.manager.api import groupconfig as _groupconfig_api
 from ai.backend.manager.api import userconfig as _userconfig_api
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.domainconfig.registry import register_domainconfig_routes
+from ai.backend.manager.api.rest.groupconfig.registry import register_groupconfig_routes
+from ai.backend.manager.api.rest.types import ModuleRegistrar
+from ai.backend.manager.api.rest.userconfig.registry import register_userconfig_routes
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
@@ -125,9 +130,14 @@ async def _config_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @pytest.fixture()
-def server_subapp_pkgs() -> list[str]:
-    """Load only the subapps required for config-domain tests."""
-    return [".auth", ".userconfig", ".groupconfig", ".domainconfig"]
+def server_module_registrars() -> list[ModuleRegistrar]:
+    """Load only the modules required for config-domain tests."""
+    return [
+        register_auth_routes,
+        register_groupconfig_routes,
+        register_userconfig_routes,
+        register_domainconfig_routes,
+    ]
 
 
 @pytest.fixture()

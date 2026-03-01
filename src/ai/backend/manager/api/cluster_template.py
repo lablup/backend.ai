@@ -3,7 +3,7 @@
 All cluster template handler logic has been migrated to:
 
 * ``api.rest.cluster_template.handler`` — ClusterTemplateHandler class
-* ``api.rest.cluster_template`` — register_routes()
+* ``api.rest.cluster_template`` — route registration
 
 This module keeps the ``create_app()`` entry-point so that
 ``server.py`` continues to mount the sub-application without modification.

@@ -2,7 +2,7 @@
 
 All error log handler logic has been migrated to:
 
-* ``api.rest.error_log`` — ErrorLogHandler + register_routes()
+* ``api.rest.error_log`` — ErrorLogHandler + route registration
 
 This module keeps ``create_app()`` with the ``PrivateContext`` and
 background timer so that the existing server bootstrap continues to work.

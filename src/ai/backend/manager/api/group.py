@@ -3,7 +3,7 @@
 Registry-quota handler logic has been migrated to:
 
 * ``api.rest.group.handler`` — GroupHandler class
-* ``api.rest.group`` — register_routes()
+* ``api.rest.group`` — route registration
 
 This module keeps ``create_app()`` so that the existing server bootstrap
 (which iterates ``global_subapp_pkgs``) continues to work.

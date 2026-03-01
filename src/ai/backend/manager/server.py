@@ -39,6 +39,7 @@ import click
 import uvloop
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
+from aiotools import apartial
 from opentelemetry.instrumentation.aiohttp_server import (
     middleware as otel_server_middleware,
 )
@@ -147,18 +148,16 @@ from .actions.monitors.reporter import ReporterMonitor
 from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
 from .api.context import RootContext
-from .api.rest.acl import register_routes as register_acl_routes
-from .api.rest.auth import register_routes as register_auth_routes
-from .api.rest.error_log import register_routes as register_logs_routes
+from .api.ratelimit import rlim_middleware
+from .api.rest import build_api_routes
 from .api.rest.middleware import (
     build_api_metric_middleware,
     exception_middleware,
     request_id_middleware,
 )
 from .api.rest.middleware.auth import auth_middleware
-from .api.rest.ratelimit import register_routes as register_ratelimit_routes
 from .api.rest.routing import RouteRegistry
-from .api.rest.scaling_group import register_routes as register_scaling_group_routes
+from .api.rest.types import ModuleDeps, ModuleRegistrar
 from .clients.agent import AgentClientPool, AgentPoolSpec
 from .clients.appproxy.client import AppProxyClientPool
 from .config.bootstrap import BootstrapConfig
@@ -313,45 +312,7 @@ PUBLIC_INTERFACES: Final = [
 public_interface_objs: MutableMapping[str, Any] = {}
 
 global_subapp_pkgs: Final[list[str]] = [
-    ".acl",
-    ".container_registry",
-    ".artifact",
-    ".artifact_registry",
-    ".etcd",
-    ".events",
-    # ".auth" — migrated to new-style (api/rest/auth)
-    ".ratelimit",
-    ".vfolder",
-    ".admin",
-    ".spec",
-    ".service",
-    ".session",
-    ".stream",
-    ".manager",
-    ".resource",
-    ".scaling_group",
-    ".cluster_template",
-    ".session_template",
-    ".image",
-    ".userconfig",
-    ".domainconfig",
-    ".group",
-    ".groupconfig",
-    ".logs",
-    ".object_storage",
-    ".vfs_storage",
-    ".notification",
-    ".deployment",
-    ".auto_scaling_rule",
-    ".rbac",
-    ".scheduling_history",
-    ".compute_sessions",
-    ".fair_share",
-    ".export",
-    ".agent",
-    ".domain",
-    ".quota_scope",
-    ".user",
+    # All modules migrated to new-style via _register_newstyle_modules().
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
@@ -1379,42 +1340,85 @@ def init_subapp(pkg_name: str, root_app: web.Application, create_subapp: AppCrea
     _init_subapp(pkg_name, root_app, subapp, global_middlewares)
 
 
-def _register_newstyle_routes(
+def _mount_registry_tree(
+    root_app: web.Application,
+    root_registry: RouteRegistry,
+    pidx: int = 0,
+) -> None:
+    """Flatten the registry tree and mount all subapps on *root_app*.
+
+    Each sub-application receives a bridge to the root context at
+    startup so that legacy handlers can still access
+    ``app["_root.context"]``.
+    """
+
+    async def _bridge_root_ctx(subapp: web.Application) -> None:
+        subapp["_root.context"] = root_app["_root.context"]
+        subapp["_root_app"] = root_app
+
+    for prefix, app, _reg in root_registry.collect_apps():
+        if pidx == 0:
+            log.info("Loading module: {}", prefix)
+        app["_registry_prefix"] = prefix
+        app.on_startup.insert(0, _bridge_root_ctx)
+        root_app.add_subapp("/" + prefix, app)
+
+
+def _setup_api(
     root_app: web.Application,
     dep_resources: DependencyResources,
     pidx: int,
 ) -> None:
-    """Register new-style modules that use the ``register_routes()`` pattern.
+    """Build the full API module tree and mount it on *root_app*.
 
     Must be called **after** the Composer has run (so that
     ``dep_resources.processing.processors`` is available) but **before**
     ``runner.setup()`` freezes the application router.
-
-    Global middlewares (e.g. ``auth_middleware``) are registered separately
-    in ``build_root_app()`` — route modules only register their routes here.
     """
     root_ctx: RootContext = root_app["_root.context"]
-    registry = RouteRegistry(root_app, root_ctx.cors_options)
+    deps = ModuleDeps(
+        cors_options=root_ctx.cors_options,
+        processors=dep_resources.processing.processors,
+        services_ctx=root_ctx.services_ctx,
+        storage_manager=root_ctx.storage_manager,
+        auth_config=root_ctx.config_provider.config.auth,
+    )
 
-    if pidx == 0:
-        log.info("Loading new-style module: auth")
-    register_auth_routes(registry, dep_resources.processing.processors)
+    # 1. Build API module tree
+    root_registry = RouteRegistry.create("", deps.cors_options)
+    for sub in build_api_routes(deps):
+        root_registry.add_subregistry(sub)
 
-    if pidx == 0:
-        log.info("Loading new-style module: acl")
-    register_acl_routes(registry)
+    # 2. Flatten and mount all on root_app
+    _mount_registry_tree(root_app, root_registry, pidx)
 
-    if pidx == 0:
-        log.info("Loading new-style module: scaling_group")
-    register_scaling_group_routes(registry)
+    # 3. Root middleware — only registered here, never from modules
+    rlim_reg = root_registry.find_subregistry("ratelimit")
+    if rlim_reg is not None and rlim_reg.ratelimit_ctx is not None:
+        root_app.middlewares.append(web.middleware(apartial(rlim_middleware, rlim_reg.app)))
 
-    if pidx == 0:
-        log.info("Loading new-style module: logs")
-    register_logs_routes(registry, dep_resources.processing.processors)
 
-    if pidx == 0:
-        log.info("Loading new-style module: ratelimit")
-    register_ratelimit_routes(registry)
+def register_modules(
+    root_app: web.Application,
+    registrars: Sequence[ModuleRegistrar],
+    *,
+    deps: ModuleDeps,
+) -> None:
+    """Register selected modules for test fixtures.
+
+    Public API used by ``tests/component/conftest.py`` to register only
+    the modules needed for a particular test.
+    """
+    root_registry = RouteRegistry.create("", deps.cors_options)
+    for registrar in registrars:
+        sub = registrar(deps)
+        root_registry.add_subregistry(sub)
+    _mount_registry_tree(root_app, root_registry)
+
+    # Install ratelimit middleware on root app if the module is present
+    rlim_reg = root_registry.find_subregistry("ratelimit")
+    if rlim_reg is not None and rlim_reg.ratelimit_ctx is not None:
+        root_app.middlewares.append(web.middleware(apartial(rlim_middleware, rlim_reg.app)))
 
 
 def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
@@ -1755,7 +1759,7 @@ async def server_main(
 
     await manager_init_stack.__aenter__()
     try:
-        root_app = build_root_app(pidx, boostrap_config, subapp_pkgs=global_subapp_pkgs)
+        root_app = build_root_app(pidx, boostrap_config)
         root_ctx: RootContext = root_app["_root.context"]
 
         await manager_init_stack.enter_async_context(aiomonitor_ctx())
@@ -1776,10 +1780,10 @@ async def server_main(
         # Bridge all Composer outputs to RootContext for backward compatibility
         _bridge_resources_to_root_ctx(root_ctx, dep_resources)
 
-        # Register new-style modules that use register_routes() pattern.
+        # Build and mount the API module tree.
         # Must happen after bridging (cors_options must be set) and before
         # runner.setup() which freezes the application router.
-        _register_newstyle_routes(root_app, dep_resources, pidx)
+        _setup_api(root_app, dep_resources, pidx)
 
         # TODO: Remove manual middleware injection once the manager startup is
         # decoupled from the aiohttp Application lifecycle. Currently root_app is

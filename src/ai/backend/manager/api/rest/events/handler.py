@@ -77,8 +77,8 @@ class PrivateContext:
 class EventsHandler:
     """Events API handler with constructor-injected dependencies."""
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, *, private_ctx: PrivateContext) -> None:
+        self._ctx = private_ctx
 
     # ------------------------------------------------------------------
     # push_session_events (GET /events/session)
@@ -116,7 +116,7 @@ class EventsHandler:
             group_name,
             scope,
         )
-        priv_ctx: PrivateContext = request.app["events.context"]
+        priv_ctx = self._ctx
         current_task = asyncio.current_task()
         if current_task is None:
             raise NoCurrentTaskContext("Cannot get current asyncio task for event streaming")
@@ -212,7 +212,7 @@ class EventsHandler:
     ) -> web.StreamResponse:
         request = ctx.request
         root_ctx: RootContext = request.app["_root.context"]
-        priv_ctx: PrivateContext = request.app["events.context"]
+        priv_ctx = self._ctx
         task_id = query.parsed.task_id
         access_key = user_ctx.access_key
         log.info("PUSH_BACKGROUND_TASK_EVENTS (ak:{}, t:{})", access_key, task_id)
@@ -292,10 +292,15 @@ async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
     yield
 
 
-async def events_shutdown(app: web.Application) -> None:
-    """Shutdown handler for events app."""
+async def events_shutdown(app: web.Application, priv_ctx: PrivateContext | None = None) -> None:
+    """Shutdown handler for events app.
+
+    When *priv_ctx* is ``None`` (legacy call path), falls back to
+    ``app["events.context"]``.
+    """
     root_ctx: RootContext = app["_root.context"]
-    priv_ctx: PrivateContext = app["events.context"]
+    if priv_ctx is None:
+        priv_ctx = app["events.context"]
     await root_ctx.event_hub.shutdown()
     cancelled_tasks: list[asyncio.Task[Any]] = []
     for task in priv_ctx.active_tasks:

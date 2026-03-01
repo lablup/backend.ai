@@ -15,6 +15,9 @@ from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import artifact as _artifact_api
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest.artifact.registry import register_artifact_routes
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
@@ -105,9 +108,9 @@ async def _artifact_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @pytest.fixture()
-def server_subapp_pkgs() -> list[str]:
-    """Load only the subapps required for artifact-domain tests."""
-    return [".auth", ".artifact"]
+def server_module_registrars() -> list[ModuleRegistrar]:
+    """Load only the modules required for artifact-domain tests."""
+    return [register_auth_routes, register_artifact_routes]
 
 
 @pytest.fixture()

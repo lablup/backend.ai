@@ -8,6 +8,8 @@ from aioresponses import aioresponses
 
 # Explicitly import to ensure Pants includes this module in the test build
 import ai.backend.manager.api.group  # noqa: F401
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.group.registry import register_group_routes
 from ai.backend.manager.server import (
     database_ctx,
     hook_plugin_ctx,
@@ -69,7 +71,7 @@ async def test_harbor_create_project_quota(
             redis_ctx,
             services_ctx,
         ],
-        [".group", ".auth"],
+        [register_group_routes, register_auth_routes],
     )
 
     mock_harbor_responses = test_case["mock_harbor_responses"]
@@ -157,7 +159,7 @@ async def test_harbor_read_project_quota(
             redis_ctx,
             services_ctx,
         ],
-        [".group", ".auth"],
+        [register_group_routes, register_auth_routes],
     )
 
     mock_harbor_responses = test_case["mock_harbor_responses"]
@@ -238,7 +240,7 @@ async def test_harbor_update_project_quota(
             redis_ctx,
             services_ctx,
         ],
-        [".group", ".auth"],
+        [register_group_routes, register_auth_routes],
     )
 
     mock_harbor_responses = test_case["mock_harbor_responses"]
@@ -326,7 +328,7 @@ async def test_harbor_delete_project_quota(
             redis_ctx,
             services_ctx,
         ],
-        [".group", ".auth"],
+        [register_group_routes, register_auth_routes],
     )
 
     mock_harbor_responses = test_case["mock_harbor_responses"]

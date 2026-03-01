@@ -2,7 +2,7 @@
 
 All user config (dotfile) logic has been migrated to:
 
-* ``api.rest.userconfig`` — UserConfigHandler + register_routes()
+* ``api.rest.userconfig`` — UserConfigHandler + route registration
 
 This module keeps ``create_app()`` so that the existing server bootstrap
 (``server.py``) continues to work without modification.

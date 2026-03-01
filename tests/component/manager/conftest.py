@@ -56,8 +56,16 @@ from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.rest.auth import register_routes as register_auth_routes
-from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.admin.registry import register_admin_routes
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.compute_sessions.registry import register_compute_sessions_routes
+from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
+from ai.backend.manager.api.rest.events.registry import register_events_routes
+from ai.backend.manager.api.rest.manager.registry import register_manager_api_routes
+from ai.backend.manager.api.rest.ratelimit.registry import register_ratelimit_routes
+from ai.backend.manager.api.rest.stream.registry import register_stream_routes
+from ai.backend.manager.api.rest.types import ModuleDeps, ModuleRegistrar
+from ai.backend.manager.api.rest.vfolder.registry import register_vfolder_routes
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
@@ -99,7 +107,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, connect_datab
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.server import build_root_app
+from ai.backend.manager.server import build_root_app, register_modules
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
@@ -108,9 +116,6 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
 from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger(__name__)
-
-# New-style subapp package names (those using register_routes() instead of create_app()).
-_NEWSTYLE_SUBAPP_PKGS: frozenset[str] = frozenset({".auth"})
 
 
 @actxmgr
@@ -192,7 +197,7 @@ class AppBuilder(Protocol):
         self,
         cleanup_contexts: Sequence[Callable[[RootContext], AbstractAsyncContextManager[None]]]
         | None = None,
-        subapp_pkgs: Sequence[str] | None = None,
+        registrars: Sequence[ModuleRegistrar] | None = None,
         scheduler_opts: Mapping[str, Any] | None = None,
     ) -> tuple[web.Application, Client]: ...
 
@@ -818,7 +823,7 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
     async def app_builder(
         cleanup_contexts: Sequence[Callable[[RootContext], AbstractAsyncContextManager[None]]]
         | None = None,
-        subapp_pkgs: Sequence[str] | None = None,
+        registrars: Sequence[ModuleRegistrar] | None = None,
         scheduler_opts: Mapping[str, Any] | None = None,
     ) -> tuple[web.Application, Client]:
         nonlocal client, client_session, runner
@@ -827,10 +832,7 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
         if scheduler_opts is None:
             scheduler_opts = {}
 
-        # Separate legacy subapp packages from new-style route packages.
-        all_pkgs = list(subapp_pkgs or [])
-        legacy_pkgs = [p for p in all_pkgs if p not in _NEWSTYLE_SUBAPP_PKGS]
-        has_auth = ".auth" in all_pkgs
+        all_registrars = list(registrars or [])
 
         _cleanup_ctxs: list[Callable[[RootContext], AbstractAsyncContextManager[None]]] = []
         _outer_ctx_classes: list[type[AbstractAsyncContextManager[Any, Any]]] = []
@@ -842,14 +844,11 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
                 else:
                     _cleanup_ctxs.append(ctx)
 
-        # Build app with only legacy subapps and NO cleanup contexts.
-        # Cleanup contexts are managed manually so that new-style routes
-        # can be registered between "processors ready" and "router frozen".
         app = build_root_app(
             0,
             bootstrap_config,
             cleanup_contexts=[],
-            subapp_pkgs=legacy_pkgs,
+            subapp_pkgs=[],
             scheduler_opts={
                 "close_timeout": 10,
                 **scheduler_opts,
@@ -867,15 +866,19 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
             _outer_ctxs.append(octx)
             await octx.__aenter__()
 
-        # Register new-style route modules.  If cleanup contexts already
-        # set root_ctx.processors, use it; otherwise fall back to a mock
-        # (sufficient for endpoints that don't invoke service actions, such
-        # as /auth/test).
-        # auth_middleware is already in app.middlewares (added by build_root_app).
-        if has_auth:
-            processors = getattr(root_ctx, "processors", None) or MagicMock()
-            registry = RouteRegistry(app, root_ctx.cors_options)
-            register_auth_routes(registry, processors)
+        # Register all requested modules using the unified dispatch.
+        # Not all cleanup-context combinations set every RootContext attr
+        # (e.g. processors_ctx is often omitted), so fall back to MagicMock
+        # for deps that the test's cleanup contexts did not initialise.
+        if all_registrars:
+            deps = ModuleDeps(
+                cors_options=root_ctx.cors_options,
+                processors=getattr(root_ctx, "processors", None) or MagicMock(),
+                services_ctx=getattr(root_ctx, "services_ctx", None) or MagicMock(),
+                storage_manager=getattr(root_ctx, "storage_manager", None) or MagicMock(),
+                auth_config=root_ctx.config_provider.config.auth,
+            )
+            register_modules(app, all_registrars, deps=deps)
 
         runner = web.AppRunner(app, handle_signals=False)
         await runner.setup()
@@ -1012,16 +1015,16 @@ async def prepare_kernel(
     sess_id = f"test-kernel-session-{secrets.token_hex(8)}"
     app, client = await create_app_and_client(
         cleanup_contexts=None,
-        subapp_pkgs=[
-            "etcd",
-            "events",
-            "auth",
-            "vfolder",
-            "admin",
-            "ratelimit",
-            "kernel",
-            "stream",
-            "manager",
+        registrars=[
+            register_etcd_routes,
+            register_events_routes,
+            register_auth_routes,
+            register_vfolder_routes,
+            register_admin_routes,
+            register_ratelimit_routes,
+            register_compute_sessions_routes,
+            register_stream_routes,
+            register_manager_api_routes,
         ],
         scheduler_opts=None,
     )

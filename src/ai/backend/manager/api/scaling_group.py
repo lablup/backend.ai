@@ -2,7 +2,7 @@
 
 All scaling group handler logic has been migrated to:
 
-* ``api.rest.scaling_group`` — ScalingGroupHandler + register_routes()
+* ``api.rest.scaling_group`` — ScalingGroupHandler + route registration
 
 This module keeps ``create_app()`` so that the existing server bootstrap
 (which iterates ``global_subapp_pkgs``) continues to work.

@@ -12,6 +12,11 @@ import pytest
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import scheduling_history as _scheduling_history_api
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.scheduling_history.registry import (
+    register_scheduling_history_routes,
+)
+from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
@@ -95,9 +100,9 @@ async def _scheduling_history_domain_ctx(root_ctx: RootContext) -> AsyncIterator
 
 
 @pytest.fixture()
-def server_subapp_pkgs() -> list[str]:
-    """Load only the subapps required for scheduling-history domain tests."""
-    return [".auth", ".scheduling_history"]
+def server_module_registrars() -> list[ModuleRegistrar]:
+    """Load only the modules required for scheduling-history domain tests."""
+    return [register_auth_routes, register_scheduling_history_routes]
 
 
 @pytest.fixture()

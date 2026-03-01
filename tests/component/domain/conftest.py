@@ -23,6 +23,9 @@ from ai.backend.common.dto.manager.domain import (
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import domain as _domain_api
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest.admin.registry import register_admin_routes
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
@@ -110,9 +113,9 @@ async def _domain_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @pytest.fixture()
-def server_subapp_pkgs() -> list[str]:
-    """Load only the subapps required for domain-domain tests."""
-    return [".auth", ".domain"]
+def server_module_registrars() -> list[ModuleRegistrar]:
+    """Load only the modules required for domain-domain tests."""
+    return [register_auth_routes, register_admin_routes]
 
 
 @pytest.fixture()

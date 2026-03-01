@@ -3,7 +3,7 @@
 Documentation-serving handler logic has been migrated to:
 
 * ``api.rest.spec.handler`` — SpecHandler class
-* ``api.rest.spec`` — register_routes()
+* ``api.rest.spec`` — route registration
 
 This module keeps ``create_app()`` so that the existing server bootstrap
 (which iterates ``global_subapp_pkgs``) continues to work.

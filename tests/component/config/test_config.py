@@ -6,9 +6,9 @@ import uuid
 import pytest
 
 from ai.backend.client.v2.exceptions import (
-    AuthenticationError,
     InvalidRequestError,
     NotFoundError,
+    PermissionDeniedError,
 )
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.config import (
@@ -257,9 +257,7 @@ class TestGroupDotfileCreate:
         group_fixture: uuid.UUID,
     ) -> None:
         unique = secrets.token_hex(4)
-        # The server's @admin_required decorator raises AuthorizationFailed (HTTP 401),
-        # not GenericForbidden (HTTP 403).
-        with pytest.raises(AuthenticationError):
+        with pytest.raises(PermissionDeniedError):
             await user_registry.config.create_group_dotfile(
                 CreateGroupDotfileRequest(
                     group=str(group_fixture),
@@ -389,9 +387,7 @@ class TestDomainDotfileCreate:
         domain_fixture: str,
     ) -> None:
         unique = secrets.token_hex(4)
-        # The server's @admin_required decorator raises AuthorizationFailed (HTTP 401),
-        # not GenericForbidden (HTTP 403).
-        with pytest.raises(AuthenticationError):
+        with pytest.raises(PermissionDeniedError):
             await user_registry.config.create_domain_dotfile(
                 CreateDomainDotfileRequest(
                     domain=domain_fixture,

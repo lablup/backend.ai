@@ -12,6 +12,9 @@ from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import logs as _logs_api
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.rest import error_log as _error_log_rest
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.error_log.registry import register_error_log_routes
+from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.models.error_logs import error_logs
 from ai.backend.manager.repositories.repositories import Repositories
@@ -111,9 +114,9 @@ async def _error_log_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @pytest.fixture()
-def server_subapp_pkgs() -> list[str]:
-    """Load only the subapps required for error-log domain tests."""
-    return [".auth", ".logs"]
+def server_module_registrars() -> list[ModuleRegistrar]:
+    """Load only the modules required for error-log domain tests."""
+    return [register_auth_routes, register_error_log_routes]
 
 
 @pytest.fixture()

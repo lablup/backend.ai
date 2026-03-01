@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 
-from ai.backend.client.v2.exceptions import AuthenticationError, ServerError
+from ai.backend.client.v2.exceptions import PermissionDeniedError, ServerError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.container_registry.request import (
     HarborWebhookRequestModel,
@@ -36,9 +36,7 @@ class TestContainerRegistryPatch:
         user_registry: BackendAIClientRegistry,
         container_registry_fixture: uuid.UUID,
     ) -> None:
-        # superadmin_required raises AuthorizationFailed (HTTPUnauthorized/401),
-        # which the client SDK maps to AuthenticationError (not PermissionDeniedError/403).
-        with pytest.raises(AuthenticationError):
+        with pytest.raises(PermissionDeniedError):
             await user_registry.container_registry.patch(
                 str(container_registry_fixture),
                 PatchContainerRegistryRequestModel(ssl_verify=False),
