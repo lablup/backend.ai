@@ -867,12 +867,15 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
             await octx.__aenter__()
 
         # Register all requested modules using the unified dispatch.
+        # Not all cleanup-context combinations set every RootContext attr
+        # (e.g. processors_ctx is often omitted), so fall back to MagicMock
+        # for deps that the test's cleanup contexts did not initialise.
         if all_registrars:
             deps = ModuleDeps(
                 cors_options=root_ctx.cors_options,
-                processors=root_ctx.processors,
-                services_ctx=MagicMock(),
-                storage_manager=root_ctx.storage_manager,
+                processors=getattr(root_ctx, "processors", None) or MagicMock(),
+                services_ctx=getattr(root_ctx, "services_ctx", None) or MagicMock(),
+                storage_manager=getattr(root_ctx, "storage_manager", None) or MagicMock(),
                 auth_config=root_ctx.config_provider.config.auth,
             )
             register_modules(app, all_registrars, deps=deps)

@@ -864,19 +864,19 @@ type ModuleDepsFactory = Callable[[RootContext], ModuleDeps]
 
 @pytest.fixture()
 def server_module_deps_factory() -> ModuleDepsFactory:
-    """Build ``ModuleDeps`` from a fully-initialised ``RootContext``.
+    """Build ``ModuleDeps`` from a ``RootContext``.
 
-    Override this fixture in domain-specific conftest.py when the
-    domain's cleanup contexts set additional attributes (e.g.
-    ``services_ctx``) that the default implementation does not read.
+    Falls back to ``MagicMock()`` for attributes not initialised by the
+    test's cleanup contexts.  Override in domain-specific conftest.py
+    when custom construction logic is needed.
     """
 
     def _factory(root_ctx: RootContext) -> ModuleDeps:
         return ModuleDeps(
             cors_options=root_ctx.cors_options,
-            processors=root_ctx.processors,
-            services_ctx=MagicMock(),
-            storage_manager=root_ctx.storage_manager,
+            processors=getattr(root_ctx, "processors", None) or MagicMock(),
+            services_ctx=getattr(root_ctx, "services_ctx", None) or MagicMock(),
+            storage_manager=getattr(root_ctx, "storage_manager", None) or MagicMock(),
             auth_config=root_ctx.config_provider.config.auth,
         )
 
