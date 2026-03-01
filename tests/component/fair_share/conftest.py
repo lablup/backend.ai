@@ -14,6 +14,9 @@ from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import fair_share as _fair_share_api
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest.auth.registry import register_auth_module
+from ai.backend.manager.api.rest.fair_share.registry import register_fair_share_module
+from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.scaling_group import sgroups_for_groups
@@ -105,9 +108,9 @@ async def _fair_share_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @pytest.fixture()
-def server_subapp_pkgs() -> list[str]:
-    """Load only the subapps required for fair-share-domain tests."""
-    return [".auth", ".fair_share"]
+def server_module_registrars() -> list[ModuleRegistrar]:
+    """Load only the modules required for fair-share-domain tests."""
+    return [register_auth_module, register_fair_share_module]
 
 
 @pytest.fixture()

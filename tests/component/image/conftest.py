@@ -18,6 +18,9 @@ from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import image as _image_api
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest.admin.registry import register_admin_module
+from ai.backend.manager.api.rest.auth.registry import register_auth_module
+from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -105,9 +108,9 @@ async def _image_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @pytest.fixture()
-def server_subapp_pkgs() -> list[str]:
-    """Load only the subapps required for image-domain tests."""
-    return [".auth", ".image"]
+def server_module_registrars() -> list[ModuleRegistrar]:
+    """Load only the modules required for image-domain tests."""
+    return [register_auth_module, register_admin_module]
 
 
 @pytest.fixture()

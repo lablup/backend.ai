@@ -1,23 +1,27 @@
-"""New-style auth module using RouteRegistry and constructor DI."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import auth_required
-from ai.backend.manager.api.rest.routing import RouteRegistry
-
-from .handler import AuthHandler
+from .registry import register_auth_module
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.rest.routing import RouteRegistry
     from ai.backend.manager.services.processors import Processors
 
+__all__ = ["register_auth_module"]
 
-def register_routes(
-    registry: RouteRegistry,
-    processors: Processors,
-) -> None:
-    """Register auth routes on the given RouteRegistry."""
+
+def register_routes(registry: RouteRegistry, processors: Processors) -> None:
+    """Backward-compatible shim — delegates to the old inline logic.
+
+    The canonical entry-point is :func:`register_auth_module`; this wrapper
+    exists only so that ``server.py`` keeps working until it is migrated to
+    the new ``ModuleDeps`` convention.
+    """
+    from ai.backend.manager.api.rest.middleware.auth import auth_required
+
+    from .handler import AuthHandler
+
     handler = AuthHandler(processors=processors)
 
     # /auth root — test endpoint (GET and POST split into separate handlers)

@@ -1,15 +1,26 @@
-"""New-style etcd (config) module using RouteRegistry."""
-
 from __future__ import annotations
 
-from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
-from ai.backend.manager.api.rest.routing import RouteRegistry
+from typing import TYPE_CHECKING
 
-from .handler import EtcdHandler
+from .registry import register_etcd_module
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.rest.routing import RouteRegistry
+
+__all__ = ["register_etcd_module"]
 
 
 def register_routes(registry: RouteRegistry) -> None:
-    """Register etcd config routes on the given RouteRegistry."""
+    """Backward-compatible shim -- delegates to the old inline logic.
+
+    The canonical entry-point is :func:`register_etcd_module`; this wrapper
+    exists only so that ``server.py`` keeps working until it is migrated to
+    the new ``ModuleDeps`` convention.
+    """
+    from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
+
+    from .handler import EtcdHandler
+
     handler = EtcdHandler()
 
     # Public endpoints (auth_required only)

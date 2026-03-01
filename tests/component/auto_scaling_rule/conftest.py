@@ -17,6 +17,9 @@ from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import auto_scaling_rule as _auto_scaling_rule_api
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest.admin.registry import register_admin_module
+from ai.backend.manager.api.rest.auth.registry import register_auth_module
+from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
@@ -142,9 +145,9 @@ async def _auto_scaling_rule_domain_ctx(root_ctx: RootContext) -> AsyncIterator[
 
 
 @pytest.fixture()
-def server_subapp_pkgs() -> list[str]:
-    """Load only the subapps required for auto-scaling-rule-domain tests."""
-    return [".auth", ".auto_scaling_rule"]
+def server_module_registrars() -> list[ModuleRegistrar]:
+    """Load only the modules required for auto-scaling-rule-domain tests."""
+    return [register_auth_module, register_admin_module]
 
 
 @pytest.fixture()

@@ -1,18 +1,21 @@
-"""New-style ratelimit module.
-
-This module does not register any routes — it only provides the
-``rlim_middleware`` global middleware for rate-limiting authorized
-requests.  The middleware and its supporting ``PrivateContext`` are
-exposed here so that ``server.py`` can reference them from a single
-canonical location.
-"""
-
 from __future__ import annotations
 
-from ai.backend.manager.api.rest.routing import RouteRegistry
+from typing import TYPE_CHECKING
+
+from .registry import register_ratelimit_module
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.rest.routing import RouteRegistry
+
+__all__ = ["register_ratelimit_module"]
 
 
-def register_routes(
-    registry: RouteRegistry,
-) -> None:
-    """No routes to register — ratelimit is middleware-only."""
+def register_routes(registry: RouteRegistry) -> None:
+    """Backward-compatible shim -- no routes to register.
+
+    The canonical entry-point is :func:`register_ratelimit_module`; this wrapper
+    exists only so that ``server.py`` keeps working until it is migrated to
+    the new ``ModuleDeps`` convention.
+
+    Ratelimit is middleware-only; there are no routes.
+    """

@@ -10,6 +10,9 @@ from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
 from ai.backend.manager.api import scaling_group as _scaling_group_api
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest.auth.registry import register_auth_module
+from ai.backend.manager.api.rest.scaling_group.registry import register_scaling_group_module
+from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
@@ -105,9 +108,9 @@ async def _scaling_group_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None
 
 
 @pytest.fixture()
-def server_subapp_pkgs() -> list[str]:
-    """Load only the subapps required for scaling-group-domain tests."""
-    return [".auth", ".scaling_group"]
+def server_module_registrars() -> list[ModuleRegistrar]:
+    """Load only the modules required for scaling-group-domain tests."""
+    return [register_auth_module, register_scaling_group_module]
 
 
 @pytest.fixture()

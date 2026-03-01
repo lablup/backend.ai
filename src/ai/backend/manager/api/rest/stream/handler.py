@@ -80,8 +80,8 @@ class PrivateContext:
 class StreamHandler:
     """Stream API handler with constructor-injected dependencies."""
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, *, private_ctx: PrivateContext) -> None:
+        self._ctx = private_ctx
 
     # ------------------------------------------------------------------
     # stream_pty (GET /stream/session/{session_name}/pty)
@@ -95,7 +95,7 @@ class StreamHandler:
     ) -> web.StreamResponse:
         request = ctx.request
         root_ctx: RootContext = request.app["_root.context"]
-        app_ctx: PrivateContext = request.app["stream.context"]
+        app_ctx = self._ctx
         database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
         session_name = path.parsed.session_name
         access_key = AccessKey(user_ctx.access_key)
@@ -299,7 +299,7 @@ class StreamHandler:
         """WebSocket-version of gateway.kernel.execute()."""
         request = ctx.request
         root_ctx: RootContext = request.app["_root.context"]
-        app_ctx: PrivateContext = request.app["stream.context"]
+        app_ctx = self._ctx
         database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
         rpc_ptask_group: aiotools.PersistentTaskGroup = request.app["rpc_ptask_group"]
 
@@ -423,7 +423,7 @@ class StreamHandler:
     ) -> web.StreamResponse:
         request = ctx.request
         root_ctx: RootContext = request.app["_root.context"]
-        app_ctx: PrivateContext = request.app["stream.context"]
+        app_ctx = self._ctx
         database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
         rpc_ptask_group: aiotools.PersistentTaskGroup = request.app["rpc_ptask_group"]
         session_name: str = path.parsed.session_name
@@ -715,9 +715,19 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
         pass
 
 
-async def stream_app_ctx(app: web.Application) -> AsyncIterator[None]:
+async def stream_app_ctx(
+    app: web.Application,
+    priv_ctx: PrivateContext | None = None,
+) -> AsyncIterator[None]:
+    """Initialize stream application context.
+
+    When *priv_ctx* is ``None`` (legacy call path), falls back to
+    ``app["stream.context"]``.
+    """
     root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["stream.context"]
+    if priv_ctx is None:
+        priv_ctx = app["stream.context"]
+    app_ctx = priv_ctx
 
     app_ctx.stream_pty_handlers = defaultdict(weakref.WeakSet)
     app_ctx.stream_execute_handlers = defaultdict(weakref.WeakSet)
@@ -737,13 +747,23 @@ async def stream_app_ctx(app: web.Application) -> AsyncIterator[None]:
     app_ctx.zctx.term()
 
 
-async def stream_shutdown(app: web.Application) -> None:
+async def stream_shutdown(
+    app: web.Application,
+    priv_ctx: PrivateContext | None = None,
+) -> None:
+    """Shutdown handler for stream app.
+
+    When *priv_ctx* is ``None`` (legacy call path), falls back to
+    ``app["stream.context"]``.
+    """
     database_ptask_group: aiotools.PersistentTaskGroup = app["database_ptask_group"]
     rpc_ptask_group: aiotools.PersistentTaskGroup = app["rpc_ptask_group"]
     await database_ptask_group.shutdown()
     await rpc_ptask_group.shutdown()
     cancelled_tasks: list[asyncio.Task[Any]] = []
-    app_ctx: PrivateContext = app["stream.context"]
+    if priv_ctx is None:
+        priv_ctx = app["stream.context"]
+    app_ctx = priv_ctx
     app_ctx.conn_tracker_gc_task.cancel()
     cancelled_tasks.append(app_ctx.conn_tracker_gc_task)
     for per_kernel_handlers in app_ctx.stream_pty_handlers.values():

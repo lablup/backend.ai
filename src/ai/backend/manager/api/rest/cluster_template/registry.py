@@ -1,0 +1,28 @@
+"""Cluster template module registrar."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from ai.backend.manager.api.manager import READ_ALLOWED, server_status_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required
+from ai.backend.manager.api.rest.routing import RouteRegistry
+
+from .handler import ClusterTemplateHandler
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.rest.types import ModuleDeps
+
+
+def register_cluster_template_routes(deps: ModuleDeps) -> RouteRegistry:
+    """Build the cluster template sub-application."""
+    reg = RouteRegistry.create("cluster", deps.cors_options)
+    handler = ClusterTemplateHandler(processors=deps.processors)
+    _middlewares = [server_status_required(READ_ALLOWED), auth_required]
+
+    reg.add("POST", "", handler.create, middlewares=_middlewares)
+    reg.add("GET", "", handler.list_templates, middlewares=_middlewares)
+    reg.add("GET", "/{template_id}", handler.get, middlewares=_middlewares)
+    reg.add("PUT", "/{template_id}", handler.update, middlewares=_middlewares)
+    reg.add("DELETE", "/{template_id}", handler.delete, middlewares=_middlewares)
+    return reg

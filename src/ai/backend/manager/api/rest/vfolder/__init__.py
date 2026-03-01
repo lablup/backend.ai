@@ -1,96 +1,91 @@
-"""New-style vfolder module using RouteRegistry and constructor DI."""
-
 from __future__ import annotations
 
-import functools
-import uuid
-from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import TYPE_CHECKING
 
-from aiohttp import web
+from .registry import register_vfolder_module
 
-from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api.manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
-from ai.backend.manager.api.rest.middleware.auth import (
-    admin_required,
-    auth_required,
-    superadmin_required,
-)
-from ai.backend.manager.api.rest.routing import RouteRegistry
-from ai.backend.manager.api.rest.types import RouteMiddleware, WebRequestHandler
-from ai.backend.manager.api.vfolder import (
-    check_vfolder_status,
-    resolve_vfolder_rows,
-)
-from ai.backend.manager.errors.storage import TooManyVFoldersFound, VFolderNotFound
-from ai.backend.manager.models.vfolder import (
-    VFolderPermission,
-    VFolderPermissionSetAlias,
-    VFolderStatusSet,
-)
+if TYPE_CHECKING:
+    from ai.backend.manager.api.rest.routing import RouteRegistry
 
-from .handler import VFolderHandler
+__all__ = ["register_vfolder_module"]
 
 
-def _server_status_required_middleware(
-    allowed_status: frozenset[ManagerStatus],
-) -> RouteMiddleware:
-    """Create a RouteMiddleware version of server_status_required."""
-    return server_status_required(allowed_status)
+def register_routes(registry: RouteRegistry) -> None:
+    """Backward-compatible shim -- delegates to the old inline logic.
 
-
-def _vfolder_resolver(
-    perm: VFolderPermissionSetAlias | VFolderPermission,
-    status: VFolderStatusSet,
-    *,
-    allow_privileged_access: bool = False,
-) -> RouteMiddleware:
-    """Route middleware that resolves vfolder rows and checks status.
-
-    Combines the logic of ``with_vfolder_rows_resolved`` and
-    ``with_vfolder_status_checked`` into a single middleware compatible
-    with RouteRegistry.
-
-    Sets ``request["vfolder_row"]`` so that ``VFolderAuthContext`` can
-    extract the row in handler methods.
+    The canonical entry-point is :func:`register_vfolder_module`; this wrapper
+    exists only so that ``server.py`` keeps working until it is migrated to
+    the new ``ModuleDeps`` convention.
     """
+    import functools
+    import uuid
+    from collections.abc import Mapping, Sequence
+    from typing import Any
 
-    def middleware(handler: WebRequestHandler) -> WebRequestHandler:
-        @functools.wraps(handler)
-        async def wrapper(request: web.Request) -> web.StreamResponse:
-            piece = request.match_info["name"]
-            folder_name_or_id: str | uuid.UUID
-            try:
-                folder_name_or_id = uuid.UUID(piece)
-            except ValueError:
-                folder_name_or_id = piece
-            vfolder_rows: Sequence[Mapping[str, Any]] = await resolve_vfolder_rows(
-                request,
-                perm,
-                folder_name_or_id,
-                allow_privileged_access=allow_privileged_access,
-            )
-            if len(vfolder_rows) > 1:
-                raise TooManyVFoldersFound(vfolder_rows)
-            if len(vfolder_rows) == 0:
-                raise VFolderNotFound()
-            row = vfolder_rows[0]
-            await check_vfolder_status(row, status)
-            request["vfolder_row"] = row
-            return await handler(request)
+    from aiohttp import web
 
-        return wrapper
+    from ai.backend.manager.api import ManagerStatus
+    from ai.backend.manager.api.manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
+    from ai.backend.manager.api.rest.middleware.auth import (
+        admin_required,
+        auth_required,
+        superadmin_required,
+    )
+    from ai.backend.manager.api.rest.types import RouteMiddleware, WebRequestHandler
+    from ai.backend.manager.api.vfolder import (
+        check_vfolder_status,
+        resolve_vfolder_rows,
+    )
+    from ai.backend.manager.errors.storage import TooManyVFoldersFound, VFolderNotFound
+    from ai.backend.manager.models.vfolder import (
+        VFolderPermission,
+        VFolderPermissionSetAlias,
+        VFolderStatusSet,
+    )
 
-    return middleware
+    from .handler import VFolderHandler
 
+    def _server_status_required_middleware(
+        allowed_status: frozenset[ManagerStatus],
+    ) -> RouteMiddleware:
+        return server_status_required(allowed_status)
 
-def register_routes(
-    registry: RouteRegistry,
-) -> None:
-    """Register vfolder routes on the given RouteRegistry."""
+    def _vfolder_resolver(
+        perm: VFolderPermissionSetAlias | VFolderPermission,
+        status: VFolderStatusSet,
+        *,
+        allow_privileged_access: bool = False,
+    ) -> RouteMiddleware:
+        def middleware(handler: WebRequestHandler) -> WebRequestHandler:
+            @functools.wraps(handler)
+            async def wrapper(request: web.Request) -> web.StreamResponse:
+                piece = request.match_info["name"]
+                folder_name_or_id: str | uuid.UUID
+                try:
+                    folder_name_or_id = uuid.UUID(piece)
+                except ValueError:
+                    folder_name_or_id = piece
+                vfolder_rows: Sequence[Mapping[str, Any]] = await resolve_vfolder_rows(
+                    request,
+                    perm,
+                    folder_name_or_id,
+                    allow_privileged_access=allow_privileged_access,
+                )
+                if len(vfolder_rows) > 1:
+                    raise TooManyVFoldersFound(vfolder_rows)
+                if len(vfolder_rows) == 0:
+                    raise VFolderNotFound()
+                row = vfolder_rows[0]
+                await check_vfolder_status(row, status)
+                request["vfolder_row"] = row
+                return await handler(request)
+
+            return wrapper
+
+        return middleware
+
     handler = VFolderHandler()
 
-    # Helper to build middleware lists
     def _auth_rw() -> list[RouteMiddleware]:
         return [auth_required, _server_status_required_middleware(ALL_ALLOWED)]
 
@@ -106,12 +101,12 @@ def register_routes(
     def _admin_rw() -> list[RouteMiddleware]:
         return [admin_required, _server_status_required_middleware(ALL_ALLOWED)]
 
-    # --- Root resource: POST / (create), GET / (list), DELETE / (delete_by_id) ---
+    # --- Root resource ---
     registry.add("POST", "", handler.create, middlewares=_auth_rw())
     registry.add("GET", "", handler.list_folders, middlewares=_auth_ro())
     registry.add("DELETE", "", handler.delete_by_id, middlewares=_auth_rw())
 
-    # --- Named resource: GET /{name} (get_info), DELETE /{name} (delete_by_name) ---
+    # --- Named resource ---
     registry.add(
         "GET",
         "/{name}",
@@ -128,12 +123,8 @@ def register_routes(
     registry.add("GET", "/_/hosts", handler.list_hosts, middlewares=_auth_ro())
     registry.add("GET", "/_/all-hosts", handler.list_all_hosts, middlewares=_superadmin_ro())
     registry.add("GET", "/_/allowed-types", handler.list_allowed_types, middlewares=_auth_ro())
-    registry.add(
-        "GET", "/_/all_hosts", handler.list_all_hosts, middlewares=_superadmin_ro()
-    )  # legacy underbar
-    registry.add(
-        "GET", "/_/allowed_types", handler.list_allowed_types, middlewares=_auth_ro()
-    )  # legacy underbar
+    registry.add("GET", "/_/all_hosts", handler.list_all_hosts, middlewares=_superadmin_ro())
+    registry.add("GET", "/_/allowed_types", handler.list_allowed_types, middlewares=_auth_ro())
     registry.add(
         "GET", "/_/perf-metric", handler.get_volume_perf_metric, middlewares=_superadmin_ro()
     )
@@ -349,7 +340,7 @@ def register_routes(
         "/invitations/list_sent",
         handler.list_sent_invitations,
         middlewares=_auth_ro(),
-    )  # legacy underbar
+    )
     registry.add(
         "POST", "/invitations/update/{inv_id}", handler.update_invitation, middlewares=_auth_rw()
     )

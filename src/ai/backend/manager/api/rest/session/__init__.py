@@ -1,41 +1,31 @@
-"""New-style session module using RouteRegistry and constructor DI."""
-
 from __future__ import annotations
 
-import inspect
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from aiohttp import web
-
-from ai.backend.common.api_handlers import extract_param_value, parse_response
-from ai.backend.manager.api.rest.middleware.auth import auth_required
-from ai.backend.manager.api.rest.routing import RouteRegistry
-
-from .handler import SessionHandler
+from .registry import register_session_module
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.context import RootContext
+    from ai.backend.manager.api.rest.routing import RouteRegistry
     from ai.backend.manager.api.rest.types import WebRequestHandler
     from ai.backend.manager.services.processors import Processors
 
-# Re-export server_status_required from the legacy manager module so
-# that the shim layer does not need its own import.
-from ai.backend.manager.api.manager import (
-    ALL_ALLOWED,
-    READ_ALLOWED,
-    server_status_required,
-)
+__all__ = ["register_session_module"]
 
 
-def register_routes(
-    registry: RouteRegistry,
-    processors: Processors,
-) -> None:
-    """Register session routes on the given RouteRegistry.
+def register_routes(registry: RouteRegistry, processors: Processors | None = None) -> None:
+    """Backward-compatible shim -- delegates to the old inline logic.
 
-    This is the forward-looking API for when ``server.py`` migrates to
-    the ``register_routes()`` pattern.
+    The canonical entry-point is :func:`register_session_module`; this wrapper
+    exists only so that ``server.py`` keeps working until it is migrated to
+    the new ``ModuleDeps`` convention.
     """
+    from ai.backend.manager.api.manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
+    from ai.backend.manager.api.rest.middleware.auth import auth_required
+
+    from .handler import SessionHandler
+
+    if processors is None:
+        raise RuntimeError("processors is required for session module")
     handler = SessionHandler(processors=processors)
 
     # --- Session creation ---
@@ -243,11 +233,20 @@ def _make_lazy_handler(method_name: str) -> WebRequestHandler:
     (``BodyParam``, ``QueryParam``, ``MiddlewareParam``, etc.) are extracted
     from the ``web.Request`` in the same way ``_wrap_api_handler`` does.
     """
+    import inspect
+    from typing import Any
+
+    from aiohttp import web
+
+    from ai.backend.common.api_handlers import extract_param_value, parse_response
+
+    from .handler import SessionHandler
+
     method = getattr(SessionHandler, method_name)
     sig = inspect.signature(method, eval_str=True)
 
     async def _handler(request: web.Request) -> web.StreamResponse:
-        root_ctx: RootContext = request.app["_root.context"]
+        root_ctx = request.app["_root.context"]
         instance = SessionHandler(processors=root_ctx.processors)
         bound = getattr(instance, method_name)
 

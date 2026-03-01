@@ -285,7 +285,7 @@ def generate_openapi(subapps: list[web.Application], verbose: bool = False) -> d
     }
     operation_id_mapping: defaultdict[str, int] = defaultdict(lambda: 0)
     for app in subapps:
-        prefix = app.get("prefix", "root")
+        prefix = app.get("_registry_prefix", app.get("prefix", "root"))
         for route in app.router.routes():
             resource = route.resource
             if not resource:

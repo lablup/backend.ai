@@ -1,23 +1,29 @@
-"""New-style service (model serving) module using RouteRegistry and constructor DI."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import auth_required
-from ai.backend.manager.api.rest.routing import RouteRegistry
-
-from .handler import ServiceHandler
+from .registry import register_service_module
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.rest.routing import RouteRegistry
     from ai.backend.manager.services.processors import Processors
 
+__all__ = ["register_service_module"]
 
-def register_routes(
-    registry: RouteRegistry,
-    processors: Processors,
-) -> None:
-    """Register service (model serving) routes on the given RouteRegistry."""
+
+def register_routes(registry: RouteRegistry, processors: Processors | None = None) -> None:
+    """Backward-compatible shim -- delegates to the old inline logic.
+
+    The canonical entry-point is :func:`register_service_module`; this wrapper
+    exists only so that ``server.py`` keeps working until it is migrated to
+    the new ``ModuleDeps`` convention.
+    """
+    from ai.backend.manager.api.rest.middleware.auth import auth_required
+
+    from .handler import ServiceHandler
+
+    if processors is None:
+        raise RuntimeError("processors is required for service module")
     handler = ServiceHandler(processors=processors)
 
     # Service list & create (root)

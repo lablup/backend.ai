@@ -37,6 +37,7 @@ from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest.types import ModuleDeps, ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
@@ -832,15 +833,14 @@ class _TestConfigProvider(ManagerConfigProvider):
 
 
 @pytest.fixture()
-def server_subapp_pkgs() -> list[str]:
+def server_module_registrars() -> list[ModuleRegistrar]:
     """
-    The list of manager API subapp packages to load for the test server.
+    The list of module registrar functions to load for the test server.
 
     Override this fixture in domain-specific conftest.py to load only the
-    subapp packages relevant to that domain's tests. Each domain conftest
-    must statically import the corresponding API modules so that Pants can
-    include them in the test PEX (build_root_app loads them via importlib
-    at runtime).
+    modules relevant to that domain's tests. Each domain conftest must
+    statically import the corresponding API modules so that Pants can
+    include them in the test PEX.
     """
     return []
 
@@ -865,7 +865,7 @@ async def server(
     mock_etcd_ctx: EtcdCtxFactory,
     etcd_fixture: None,
     database_fixture: None,
-    server_subapp_pkgs: list[str],
+    server_module_registrars: list[ModuleRegistrar],
     server_cleanup_contexts: list[CleanupContext],
 ) -> AsyncIterator[ServerInfo]:
     """
@@ -912,8 +912,15 @@ async def server(
     # Register all requested modules using the unified dispatch.
     # At this point processors are ready (set by cleanup contexts above)
     # and the router is not yet frozen.
-    if server_subapp_pkgs:
-        register_modules(app, server_subapp_pkgs, processors=root_ctx.processors)
+    if server_module_registrars:
+        deps = ModuleDeps(
+            cors_options=root_ctx.cors_options,
+            processors=getattr(root_ctx, "processors", None),
+            services_ctx=getattr(root_ctx, "services_ctx", None),
+            storage_manager=getattr(root_ctx, "storage_manager", None),
+            auth_config=getattr(root_ctx.config_provider.config, "auth", None),
+        )
+        register_modules(app, server_module_registrars, deps=deps)
 
     runner = web.AppRunner(app, handle_signals=False)
     await runner.setup()
