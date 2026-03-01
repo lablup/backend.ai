@@ -144,17 +144,6 @@ class RoleConditions:
 
         return inner
 
-    @staticmethod
-    def by_assigned_user_id(user_id: uuid.UUID) -> QueryCondition:
-        """Filter roles assigned to a specific user via user_roles table."""
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RoleRow.id.in_(
-                sa.select(UserRoleRow.role_id).where(UserRoleRow.user_id == user_id)
-            )
-
-        return inner
-
 
 class RoleOrders:
     """Query orders for roles."""
@@ -180,6 +169,13 @@ class RoleOrders:
 
 class AssignedUserConditions:
     """Query conditions for assigned users."""
+
+    @staticmethod
+    def by_user_id(user_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRoleRow.user_id == user_id
+
+        return inner
 
     @staticmethod
     def by_role_id(role_id: uuid.UUID) -> QueryCondition:
