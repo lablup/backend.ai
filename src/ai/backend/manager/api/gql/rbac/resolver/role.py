@@ -139,9 +139,9 @@ async def my_roles(
 ) -> RoleConnection:
     me = current_user()
     if me is None:
-        from aiohttp import web
+        from ai.backend.manager.errors.auth import InsufficientPrivilege
 
-        raise web.HTTPUnauthorized(reason="Authentication required")
+        raise InsufficientPrivilege("Authentication required")
 
     return await fetch_roles(
         info,
