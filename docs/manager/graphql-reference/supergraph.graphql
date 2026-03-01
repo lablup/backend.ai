@@ -5042,7 +5042,7 @@ type ImageV2Edge
 Added in 26.2.0.
 
 Filter options for images based on various criteria such as status,
-name, and architecture.
+name, architecture, and alias.
 
 Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
 """
@@ -5052,6 +5052,7 @@ input ImageV2FilterGQL
   status: [ImageV2Status!] = null
   name: StringFilter = null
   architecture: StringFilter = null
+  alias: StringFilter = null
   AND: [ImageV2FilterGQL!] = null
   OR: [ImageV2FilterGQL!] = null
   NOT: [ImageV2FilterGQL!] = null
