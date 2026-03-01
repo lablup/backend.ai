@@ -13801,9 +13801,6 @@ type UserV2 implements Node
 
   """Projects this user is a member of."""
   projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection!
-
-  """Added in 26.3.0. RBAC roles assigned to this user."""
-  myRoles: [RoleAssignment!]!
 }
 
 """
