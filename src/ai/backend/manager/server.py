@@ -1415,6 +1415,11 @@ def register_modules(
         root_registry.add_subregistry(sub)
     _mount_registry_tree(root_app, root_registry)
 
+    # Install ratelimit middleware on root app if the module is present
+    rlim_reg = root_registry.find_subregistry("ratelimit")
+    if rlim_reg is not None and rlim_reg.ratelimit_ctx is not None:
+        root_app.middlewares.append(web.middleware(apartial(rlim_middleware, rlim_reg.app)))
+
 
 def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
     ipc_base_path = root_ctx.config_provider.config.manager.ipc_base_path
