@@ -193,5 +193,6 @@ For complete TDD workflow (scenario definition → test writing → implementati
 - Run `pants lint` and fix issues
 - Run `pants check` and fix type errors
 - Do NOT use `# noqa` or `# type: ignore`
+- Do NOT use `@pytest.mark.asyncio` - unnecessary with pytest-asyncio plugin
 
 See `BUILDING.md` for quality enforcement details.
