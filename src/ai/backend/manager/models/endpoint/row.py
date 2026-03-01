@@ -845,6 +845,7 @@ class EndpointRow(Base):  # type: ignore[misc]
                 ),
             ],
             current_revision_id=self.current_revision,
+            deploying_revision_id=self.deploying_revision,
         )
 
     def _to_deployment_info_legacy(self) -> DeploymentInfo:
@@ -906,6 +907,7 @@ class EndpointRow(Base):  # type: ignore[misc]
                 ),
             ],
             current_revision_id=self.current_revision,
+            deploying_revision_id=self.deploying_revision,
         )
 
 

@@ -26,8 +26,9 @@ from ai.backend.common.events.event_types.schedule.anycast import (
 from ai.backend.common.leader.tasks.event_task import EventTaskSpec
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentSubStep
 from ai.backend.manager.data.session.types import SchedulingResult
+from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
@@ -51,12 +52,19 @@ from .executor import DeploymentExecutor
 from .handlers import (
     CheckPendingDeploymentHandler,
     CheckReplicaDeploymentHandler,
+    DeployingProgressingHandler,
+    DeployingProvisioningHandler,
+    DeployingRolledBackHandler,
     DeploymentHandler,
     DestroyingDeploymentHandler,
     ReconcileDeploymentHandler,
     ScalingDeploymentHandler,
 )
+from .strategy.evaluator import DeploymentStrategyEvaluator
 from .types import DeploymentExecutionResult, DeploymentLifecycleType
+
+# Handler key: either a simple lifecycle type or a (lifecycle, sub-step) tuple
+HandlerKey = DeploymentLifecycleType | tuple[DeploymentLifecycleType, DeploymentSubStep]
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -95,7 +103,8 @@ class DeploymentCoordinator:
     _valkey_schedule: ValkeyScheduleClient
     _deployment_controller: DeploymentController
     _deployment_repository: DeploymentRepository
-    _deployment_handlers: Mapping[DeploymentLifecycleType, DeploymentHandler]
+    _deployment_handlers: Mapping[HandlerKey, DeploymentHandler]
+    _deployment_evaluators: Mapping[DeploymentLifecycleType, DeploymentStrategyEvaluator]
     _lock_factory: DistributedLockFactory
     _config_provider: ManagerConfigProvider
     _event_producer: EventProducer
@@ -131,12 +140,17 @@ class DeploymentCoordinator:
             valkey_stat=valkey_stat,
         )
         self._deployment_handlers = self._init_handlers(executor)
+        self._deployment_evaluators = {
+            DeploymentLifecycleType.DEPLOYING: DeploymentStrategyEvaluator(
+                deployment_repo=self._deployment_repository,
+            ),
+        }
 
     def _init_handlers(
         self, executor: DeploymentExecutor
-    ) -> Mapping[DeploymentLifecycleType, DeploymentHandler]:
-        """Initialize and return the mapping of deployment lifecycle types to their handlers."""
-        return {
+    ) -> Mapping[HandlerKey, DeploymentHandler]:
+        """Initialize and return the mapping of handler keys to their handlers."""
+        handlers: dict[HandlerKey, DeploymentHandler] = {
             DeploymentLifecycleType.CHECK_PENDING: CheckPendingDeploymentHandler(
                 deployment_executor=executor,
                 deployment_controller=self._deployment_controller,
@@ -159,12 +173,37 @@ class DeploymentCoordinator:
                 deployment_controller=self._deployment_controller,
                 route_controller=self._route_controller,
             ),
+            # DEPLOYING sub-step handlers (keyed by composite key)
+            (DeploymentLifecycleType.DEPLOYING, DeploymentSubStep.PROVISIONING): (
+                DeployingProvisioningHandler(
+                    deployment_controller=self._deployment_controller,
+                    route_controller=self._route_controller,
+                )
+            ),
+            (DeploymentLifecycleType.DEPLOYING, DeploymentSubStep.PROGRESSING): (
+                DeployingProgressingHandler(
+                    deployment_controller=self._deployment_controller,
+                    route_controller=self._route_controller,
+                )
+            ),
+            (DeploymentLifecycleType.DEPLOYING, DeploymentSubStep.ROLLED_BACK): (
+                DeployingRolledBackHandler(
+                    deployment_repo=self._deployment_repository,
+                )
+            ),
         }
+        return handlers
 
     async def process_deployment_lifecycle(
         self,
         lifecycle_type: DeploymentLifecycleType,
     ) -> None:
+        # Check if this lifecycle type uses an evaluator (e.g. DEPLOYING)
+        evaluator = self._deployment_evaluators.get(lifecycle_type)
+        if evaluator is not None:
+            await self._process_with_evaluator(lifecycle_type, evaluator)
+            return
+
         handler = self._deployment_handlers.get(lifecycle_type)
         if not handler:
             log.warning("No handler for deployment lifecycle type: {}", lifecycle_type.value)
@@ -314,6 +353,134 @@ class DeploymentCoordinator:
             except Exception as e:
                 log.warning("Failed to send lifecycle notification: {}", e)
 
+    async def _process_with_evaluator(
+        self,
+        lifecycle_type: DeploymentLifecycleType,
+        evaluator: DeploymentStrategyEvaluator,
+    ) -> None:
+        """Process deployments that use a strategy evaluator (e.g. DEPLOYING).
+
+        1. Acquire distributed lock.
+        2. Load DEPLOYING deployments.
+        3. Run evaluator (evaluates strategy FSM + applies route mutations).
+        4. For each sub-step group, run the corresponding handler.
+        5. For completed deployments, swap revisions and transition to READY.
+        """
+        lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
+        async with self._lock_factory(LockID.LOCKID_DEPLOYMENT_DEPLOYING, lock_lifetime):
+            deployments = await self._deployment_repository.get_endpoints_by_statuses([
+                EndpointLifecycle.DEPLOYING
+            ])
+            if not deployments:
+                log.trace("No DEPLOYING deployments to process")
+                return
+            log.info("DEPLOYING: processing {} deployments", len(deployments))
+
+            deployment_ids = [d.id for d in deployments]
+            with DeploymentRecorderContext.scope(
+                lifecycle_type.value, entity_ids=deployment_ids
+            ) as pool:
+                eval_result = await evaluator.evaluate(deployments)
+                all_records = pool.build_all_records()
+
+                # Process each sub-step group with its handler
+                for sub_step, group in eval_result.groups.items():
+                    handler_key: HandlerKey = (lifecycle_type, sub_step)
+                    handler = self._deployment_handlers.get(handler_key)
+                    if handler is None:
+                        log.warning(
+                            "No handler for sub-step {}/{}", lifecycle_type.value, sub_step.value
+                        )
+                        continue
+
+                    sub_result = await handler.execute(group.deployments)
+                    await self._handle_status_transitions(handler, sub_result, all_records)
+
+            # Post-process outside recorder scope
+            for sub_step, group in eval_result.groups.items():
+                handler_key = (lifecycle_type, sub_step)
+                handler = self._deployment_handlers.get(handler_key)
+                if handler is None:
+                    continue
+                try:
+                    result_for_post = DeploymentExecutionResult(successes=group.deployments)
+                    await handler.post_process(result_for_post)
+                except Exception as e:
+                    log.error(
+                        "Error during post-processing for sub-step {}: {}",
+                        sub_step.value,
+                        e,
+                    )
+
+            # Transition completed deployments: swap revision and move to READY
+            if eval_result.completed:
+                await self._transition_completed_deployments(lifecycle_type, eval_result.completed)
+
+    async def _transition_completed_deployments(
+        self,
+        lifecycle_type: DeploymentLifecycleType,
+        completed: list[DeploymentInfo],
+    ) -> None:
+        """Transition completed DEPLOYING deployments to READY.
+
+        1. Swap deploying_revision → current_revision.
+        2. Update lifecycle to READY with history recording.
+        3. Send notification events.
+        """
+        endpoint_ids = {deployment.id for deployment in completed}
+
+        # Swap revisions
+        await self._deployment_repository.complete_deployment_revision_swap(endpoint_ids)
+        log.info(
+            "Swapped deploying_revision → current_revision for {} deployments",
+            len(endpoint_ids),
+        )
+
+        # Build lifecycle transition
+        target_statuses = [EndpointLifecycle.DEPLOYING]
+        from_status = EndpointLifecycle.DEPLOYING
+        to_status = EndpointLifecycle.READY
+
+        batch_updater = BatchUpdater(
+            spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=to_status),
+            conditions=[
+                DeploymentConditions.by_ids(list(endpoint_ids)),
+                DeploymentConditions.by_lifecycle_stages(target_statuses),
+            ],
+        )
+
+        timestamp_now = datetime.now(UTC).isoformat()
+        history_specs = [
+            DeploymentHistoryCreatorSpec(
+                deployment_id=deployment.id,
+                phase=lifecycle_type.value,
+                result=SchedulingResult.SUCCESS,
+                message="Rolling update completed successfully",
+                from_status=from_status,
+                to_status=to_status,
+                sub_steps=[],
+            )
+            for deployment in completed
+        ]
+
+        await self._deployment_repository.update_endpoint_lifecycle_bulk_with_history(
+            [batch_updater], BulkCreator(specs=history_specs)
+        )
+
+        # Send notifications
+        for deployment in completed:
+            try:
+                event = self._build_lifecycle_notification_event(
+                    deployment=deployment,
+                    from_status=from_status,
+                    to_status=to_status,
+                    transition_result="success",
+                    timestamp=timestamp_now,
+                )
+                await self._event_producer.anycast_event(event)
+            except Exception as e:
+                log.warning("Failed to send lifecycle notification: {}", e)
+
     def _build_lifecycle_notification_event(
         self,
         deployment: DeploymentInfo,
@@ -383,6 +550,13 @@ class DeploymentCoordinator:
             DeploymentTaskSpec(
                 DeploymentLifecycleType.RECONCILE,
                 short_interval=None,
+                long_interval=30.0,
+                initial_delay=10.0,
+            ),
+            # Deploying (rolling update) - both short and long cycles
+            DeploymentTaskSpec(
+                DeploymentLifecycleType.DEPLOYING,
+                short_interval=5.0,
                 long_interval=30.0,
                 initial_delay=10.0,
             ),
