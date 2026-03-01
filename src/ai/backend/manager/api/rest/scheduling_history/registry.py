@@ -17,8 +17,6 @@ def register_scheduling_history_routes(deps: ModuleDeps) -> RouteRegistry:
     from .handler import SchedulingHistoryHandler
 
     reg = RouteRegistry.create("scheduling-history", deps.cors_options)
-    if deps.processors is None:
-        raise RuntimeError("processors is required for scheduling_history module")
     handler = SchedulingHistoryHandler(processors=deps.processors)
 
     reg.add(

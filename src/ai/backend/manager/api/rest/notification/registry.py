@@ -17,8 +17,6 @@ def register_notification_routes(deps: ModuleDeps) -> RouteRegistry:
     from .handler import NotificationHandler
 
     reg = RouteRegistry.create("notifications", deps.cors_options)
-    if deps.processors is None:
-        raise RuntimeError("processors is required for notification module")
     handler = NotificationHandler(processors=deps.processors)
 
     # Channel routes

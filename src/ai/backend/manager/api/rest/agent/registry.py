@@ -17,8 +17,6 @@ if TYPE_CHECKING:
 def register_agent_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the agent sub-application."""
     reg = RouteRegistry.create("agents", deps.cors_options)
-    if deps.processors is None:
-        raise RuntimeError("processors is required for agent module")
     handler = AgentHandler(processors=deps.processors)
 
     reg.add(

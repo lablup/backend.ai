@@ -17,8 +17,6 @@ def register_group_routes(deps: ModuleDeps) -> RouteRegistry:
     from .handler import GroupHandler
 
     reg = RouteRegistry.create("group", deps.cors_options)
-    if deps.services_ctx is None:
-        raise RuntimeError("services_ctx is required for group module")
     handler = GroupHandler(services_ctx=deps.services_ctx)
 
     reg.add(

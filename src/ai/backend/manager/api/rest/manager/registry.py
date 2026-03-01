@@ -35,9 +35,6 @@ def register_manager_api_routes(deps: ModuleDeps) -> RouteRegistry:
     # Wire lifecycle hooks
     reg.app.on_startup.append(manager_api_init)
     reg.app.on_shutdown.append(manager_api_shutdown)
-
-    if deps.processors is None:
-        raise RuntimeError("processors is required for manager module")
     handler = ManagerHandler(processors=deps.processors)
 
     # Public endpoints (no auth required)

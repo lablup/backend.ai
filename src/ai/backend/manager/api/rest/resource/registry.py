@@ -17,8 +17,6 @@ def register_resource_routes(deps: ModuleDeps) -> RouteRegistry:
     from .handler import ResourceHandler
 
     reg = RouteRegistry.create("resource", deps.cors_options)
-    if deps.processors is None:
-        raise RuntimeError("processors is required for resource module")
     handler = ResourceHandler(processors=deps.processors)
 
     # Public preset listing (auth required)

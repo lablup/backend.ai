@@ -17,8 +17,6 @@ if TYPE_CHECKING:
 def register_auto_scaling_rule_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the auto-scaling-rule sub-registry (child of admin)."""
     reg = RouteRegistry.create("auto-scaling-rules", deps.cors_options)
-    if deps.processors is None:
-        raise RuntimeError("processors is required for auto_scaling_rule module")
     handler = AutoScalingRuleHandler(processors=deps.processors)
     _middlewares = [server_status_required(READ_ALLOWED), auth_required]
 

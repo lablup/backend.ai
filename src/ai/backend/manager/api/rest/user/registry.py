@@ -16,10 +16,6 @@ if TYPE_CHECKING:
 def register_user_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the user sub-registry (child of admin)."""
     reg = RouteRegistry.create("users", deps.cors_options)
-    if deps.processors is None:
-        raise RuntimeError("processors is required for user module")
-    if deps.auth_config is None:
-        raise RuntimeError("auth_config is required for user module")
     handler = UserHandler(processors=deps.processors, auth_config=deps.auth_config)
 
     reg.add("POST", "", handler.create_user, middlewares=[superadmin_required])

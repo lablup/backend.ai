@@ -16,8 +16,6 @@ if TYPE_CHECKING:
 def register_rbac_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the RBAC sub-registry (child of admin)."""
     reg = RouteRegistry.create("rbac", deps.cors_options)
-    if deps.processors is None:
-        raise RuntimeError("processors is required for rbac module")
     handler = RBACHandler(processors=deps.processors)
 
     # Role management routes

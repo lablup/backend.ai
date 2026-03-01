@@ -16,8 +16,6 @@ if TYPE_CHECKING:
 def register_auth_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the auth sub-application."""
     reg = RouteRegistry.create("auth", deps.cors_options)
-    if deps.processors is None:
-        raise RuntimeError("processors is required for auth module")
     handler = AuthHandler(processors=deps.processors)
 
     # /auth root — test endpoint (GET and POST split into separate handlers)

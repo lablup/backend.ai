@@ -16,8 +16,6 @@ if TYPE_CHECKING:
 def register_domain_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the domain sub-registry (child of admin)."""
     reg = RouteRegistry.create("domains", deps.cors_options)
-    if deps.processors is None:
-        raise RuntimeError("processors is required for domain module")
     handler = DomainHandler(processors=deps.processors)
 
     reg.add("POST", "", handler.create, middlewares=[superadmin_required])

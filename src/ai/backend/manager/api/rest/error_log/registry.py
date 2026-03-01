@@ -36,9 +36,6 @@ def register_error_log_routes(deps: ModuleDeps) -> RouteRegistry:
     # Wire lifecycle hooks
     reg.app.on_startup.append(logs_init)
     reg.app.on_shutdown.append(logs_shutdown)
-
-    if deps.processors is None:
-        raise RuntimeError("processors is required for error_log module")
     handler = ErrorLogHandler(processors=deps.processors)
 
     reg.add(

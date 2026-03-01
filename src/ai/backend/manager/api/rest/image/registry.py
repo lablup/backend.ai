@@ -16,8 +16,6 @@ if TYPE_CHECKING:
 def register_image_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the image sub-registry (child of admin)."""
     reg = RouteRegistry.create("images", deps.cors_options)
-    if deps.processors is None:
-        raise RuntimeError("processors is required for image module")
     handler = ImageHandler(processors=deps.processors)
 
     _mw = [auth_required, superadmin_required]

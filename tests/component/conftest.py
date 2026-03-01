@@ -915,10 +915,10 @@ async def server(
     if server_module_registrars:
         deps = ModuleDeps(
             cors_options=root_ctx.cors_options,
-            processors=getattr(root_ctx, "processors", None),
-            services_ctx=getattr(root_ctx, "services_ctx", None),
-            storage_manager=getattr(root_ctx, "storage_manager", None),
-            auth_config=getattr(root_ctx.config_provider.config, "auth", None),
+            processors=root_ctx.processors,
+            services_ctx=root_ctx.services_ctx,
+            storage_manager=root_ctx.storage_manager,
+            auth_config=root_ctx.config_provider.config.auth,
         )
         register_modules(app, server_module_registrars, deps=deps)
 

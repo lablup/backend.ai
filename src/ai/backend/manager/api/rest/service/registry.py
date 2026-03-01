@@ -35,9 +35,6 @@ def register_service_routes(deps: ModuleDeps) -> RouteRegistry:
     # Wire lifecycle hooks
     reg.app.on_startup.append(service_init)
     reg.app.on_shutdown.append(service_shutdown)
-
-    if deps.processors is None:
-        raise RuntimeError("processors is required for service module")
     handler = ServiceHandler(processors=deps.processors)
 
     # Service list & create (root)

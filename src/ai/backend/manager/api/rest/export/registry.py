@@ -17,8 +17,6 @@ def register_export_routes(deps: ModuleDeps) -> RouteRegistry:
     from .handler import ExportHandler
 
     reg = RouteRegistry.create("export", deps.cors_options)
-    if deps.processors is None:
-        raise RuntimeError("processors is required for export module")
     handler = ExportHandler(processors=deps.processors)
 
     # Report metadata endpoints

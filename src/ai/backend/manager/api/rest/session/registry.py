@@ -36,9 +36,6 @@ def register_session_routes(deps: ModuleDeps) -> RouteRegistry:
     # Wire lifecycle hooks
     reg.app.on_startup.append(session_init)
     reg.app.on_shutdown.append(session_shutdown)
-
-    if deps.processors is None:
-        raise RuntimeError("processors is required for session module")
     handler = SessionHandler(processors=deps.processors)
 
     # --- Session creation ---

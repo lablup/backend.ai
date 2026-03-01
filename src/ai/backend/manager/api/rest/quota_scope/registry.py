@@ -16,8 +16,6 @@ if TYPE_CHECKING:
 def register_quota_scope_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the quota-scope sub-registry (child of admin)."""
     reg = RouteRegistry.create("quota-scopes", deps.cors_options)
-    if deps.storage_manager is None:
-        raise RuntimeError("storage_manager is required for quota_scope module")
     handler = QuotaScopeHandler(storage_manager=deps.storage_manager)
 
     _mw = [auth_required, superadmin_required]

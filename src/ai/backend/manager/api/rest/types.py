@@ -43,10 +43,10 @@ class ModuleDeps:
     """Shared dependencies injected into all API module registrar functions."""
 
     cors_options: CORSOptions
-    processors: Processors | None = None
-    services_ctx: ServicesContext | None = None
-    storage_manager: StorageSessionManager | None = None
-    auth_config: AuthConfig | None = None
+    processors: Processors
+    services_ctx: ServicesContext
+    storage_manager: StorageSessionManager
+    auth_config: AuthConfig
 
 
 type ModuleRegistrar = Callable[[ModuleDeps], RouteRegistry]

@@ -17,8 +17,6 @@ if TYPE_CHECKING:
 def register_compute_sessions_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the compute sessions sub-application."""
     reg = RouteRegistry.create("compute-sessions", deps.cors_options)
-    if deps.processors is None:
-        raise RuntimeError("processors is required for compute_sessions module")
     handler = ComputeSessionsHandler(processors=deps.processors)
 
     reg.add(
