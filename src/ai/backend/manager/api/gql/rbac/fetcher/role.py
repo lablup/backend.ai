@@ -30,6 +30,7 @@ from ai.backend.manager.repositories.permission_controller.options import (
     RoleConditions,
     RoleOrders,
 )
+from ai.backend.manager.repositories.permission_controller.types import RoleSearchScope
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
 )
@@ -86,6 +87,7 @@ async def fetch_roles(
     limit: int | None = None,
     offset: int | None = None,
     base_conditions: list[QueryCondition] | None = None,
+    scope: RoleSearchScope | None = None,
 ) -> RoleConnection:
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
@@ -104,7 +106,7 @@ async def fetch_roles(
 
     action_result = (
         await info.context.processors.permission_controller.search_roles.wait_for_complete(
-            SearchRolesAction(querier=querier)
+            SearchRolesAction(querier=querier, scope=scope)
         )
     )
 

@@ -50,6 +50,7 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.types import (
     ObjectPermissionSearchScope,
     PermissionSearchScope,
+    RoleSearchScope,
 )
 
 from .db_source.db_source import CreateRoleInput, PermissionDBSource
@@ -219,9 +220,10 @@ class PermissionControllerRepository:
     async def search_roles(
         self,
         querier: BatchQuerier,
+        scope: RoleSearchScope | None = None,
     ) -> RoleListResult:
         """Searches roles with pagination and filtering."""
-        return await self._db_source.search_roles(querier=querier)
+        return await self._db_source.search_roles(querier=querier, scope=scope)
 
     @permission_controller_repository_resilience.apply()
     async def search_permissions(

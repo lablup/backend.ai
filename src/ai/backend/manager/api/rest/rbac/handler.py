@@ -54,6 +54,7 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base import Creator, Purger, Updater
 from ai.backend.manager.repositories.permission_controller.creators import RoleCreatorSpec
+from ai.backend.manager.repositories.permission_controller.types import RoleSearchScope
 from ai.backend.manager.services.permission_contoller.actions import (
     AssignRoleAction,
     CreateRoleAction,
@@ -120,13 +121,18 @@ class RBACHandler:
         body: BodyParam[SearchRolesRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        """Search roles with filters, orders, and pagination."""
+        """Search roles with filters, orders, and pagination.
+
+        Admin users see all roles. Non-admin users see only roles
+        assigned to them via RBAC (user_roles or association_scopes_entities).
+        """
+        scope: RoleSearchScope | None = None
         if not ctx.is_superadmin:
-            raise NotEnoughPermission("Only superadmin can search roles.")
+            scope = RoleSearchScope(user_id=ctx.user_uuid)
 
         querier = self._role_adapter.build_querier(body.parsed)
         action_result = await self._processors.permission_controller.search_roles.wait_for_complete(
-            SearchRolesAction(querier=querier)
+            SearchRolesAction(querier=querier, scope=scope)
         )
         resp = SearchRolesResponse(
             roles=[self._role_adapter.convert_to_dto(role) for role in action_result.result.items],

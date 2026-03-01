@@ -67,6 +67,7 @@ from ai.backend.manager.repositories.permission_controller.creators import (
 from ai.backend.manager.repositories.permission_controller.types import (
     ObjectPermissionSearchScope,
     PermissionSearchScope,
+    RoleSearchScope,
 )
 
 
@@ -533,12 +534,16 @@ class PermissionDBSource:
     async def search_roles(
         self,
         querier: BatchQuerier,
+        scope: RoleSearchScope | None = None,
     ) -> RoleListResult:
         """Searches roles with pagination and filtering.
 
         Uses LEFT JOIN with ObjectPermissionRow to support
         entity-based filtering. The JOIN is always performed to
         simplify the implementation, with distinct() used to prevent duplicates.
+
+        When scope is provided, only roles visible to the scoped user
+        (via direct assignment or RBAC association_scopes_entities) are returned.
         """
         async with self._db.begin_readonly_session() as db_sess:
             # Build query with LEFT JOIN to support entity filtering
@@ -555,6 +560,7 @@ class PermissionDBSource:
                 db_sess,
                 query,
                 querier,
+                scope,
             )
 
             items = [row.RoleRow.to_data() for row in result.rows]

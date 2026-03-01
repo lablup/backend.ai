@@ -13,7 +13,11 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.permission.types import EntityType, RelationType, ScopeType
 from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -26,6 +30,7 @@ from ai.backend.manager.repositories.permission_controller.options import (
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
+from ai.backend.manager.repositories.permission_controller.types import RoleSearchScope
 from ai.backend.testutils.db import with_tables
 
 
@@ -151,3 +156,179 @@ class TestSearchRoles:
         assert role_ids == expected_role_ids, (
             f"Failed to order roles by created_at: got {[r.created_at for r in result.items]}, expected {[r.created_at for r in created_roles]}"
         )
+
+
+class TestSearchRolesWithRBACScope:
+    """Tests for RBAC visibility scoping in search_roles()."""
+
+    @pytest.fixture
+    async def db_with_rbac_tables(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                RoleRow,
+                UserRoleRow,
+                PermissionRow,
+                ObjectPermissionRow,
+                AssociationScopesEntitiesRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def repository(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+    ) -> PermissionControllerRepository:
+        return PermissionControllerRepository(db_with_rbac_tables)
+
+    @pytest.fixture
+    async def roles_and_users(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+    ) -> dict[str, uuid.UUID]:
+        """Create roles and user assignments for RBAC testing.
+
+        Creates:
+        - 3 roles: admin-role, editor-role, viewer-role
+        - 2 users: user_a (assigned admin-role via user_roles),
+                    user_b (assigned editor-role via association_scopes_entities)
+        - viewer-role is not assigned to anyone
+        """
+        ids: dict[str, uuid.UUID] = {}
+        user_a_id = uuid.uuid4()
+        user_b_id = uuid.uuid4()
+        ids["user_a"] = user_a_id
+        ids["user_b"] = user_b_id
+
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            for name in ("admin-role", "editor-role", "viewer-role"):
+                role = RoleRow(name=name, description=f"{name} desc")
+                db_sess.add(role)
+                await db_sess.flush()
+                ids[name] = role.id
+
+            # user_a has admin-role via direct user_roles assignment
+            user_role = UserRoleRow(
+                user_id=user_a_id,
+                role_id=ids["admin-role"],
+            )
+            db_sess.add(user_role)
+
+            # user_b has editor-role via association_scopes_entities
+            assoc = AssociationScopesEntitiesRow(
+                scope_type=ScopeType.ROLE,
+                scope_id=str(ids["editor-role"]),
+                entity_type=EntityType.USER,
+                entity_id=str(user_b_id),
+                relation_type=RelationType.AUTO,
+            )
+            db_sess.add(assoc)
+
+        return ids
+
+    async def test_admin_sees_all_roles_without_scope(
+        self,
+        repository: PermissionControllerRepository,
+        roles_and_users: dict[str, uuid.UUID],
+    ) -> None:
+        """Without scope (admin), all roles should be returned."""
+        querier = BatchQuerier(
+            conditions=[],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await repository.search_roles(querier, scope=None)
+
+        assert result.total_count == 3
+
+    async def test_user_sees_only_directly_assigned_roles(
+        self,
+        repository: PermissionControllerRepository,
+        roles_and_users: dict[str, uuid.UUID],
+    ) -> None:
+        """User with direct user_roles assignment sees only their assigned roles."""
+        querier = BatchQuerier(
+            conditions=[],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+        scope = RoleSearchScope(user_id=roles_and_users["user_a"])
+
+        result = await repository.search_roles(querier, scope=scope)
+
+        assert result.total_count == 1
+        assert result.items[0].id == roles_and_users["admin-role"]
+
+    async def test_user_sees_roles_via_scope_association(
+        self,
+        repository: PermissionControllerRepository,
+        roles_and_users: dict[str, uuid.UUID],
+    ) -> None:
+        """User associated via association_scopes_entities sees the associated role."""
+        querier = BatchQuerier(
+            conditions=[],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+        scope = RoleSearchScope(user_id=roles_and_users["user_b"])
+
+        result = await repository.search_roles(querier, scope=scope)
+
+        assert result.total_count == 1
+        assert result.items[0].id == roles_and_users["editor-role"]
+
+    async def test_user_with_no_assignments_sees_no_roles(
+        self,
+        repository: PermissionControllerRepository,
+        roles_and_users: dict[str, uuid.UUID],
+    ) -> None:
+        """User with no role assignments sees no roles."""
+        querier = BatchQuerier(
+            conditions=[],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+        unassigned_user_id = uuid.uuid4()
+        scope = RoleSearchScope(user_id=unassigned_user_id)
+
+        result = await repository.search_roles(querier, scope=scope)
+
+        assert result.total_count == 0
+        assert result.items == []
+
+    async def test_user_sees_roles_from_both_sources(
+        self,
+        repository: PermissionControllerRepository,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        roles_and_users: dict[str, uuid.UUID],
+    ) -> None:
+        """User with both direct assignment and scope association sees all their roles."""
+        user_id = roles_and_users["user_a"]
+
+        # Also add scope association for viewer-role to user_a
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            assoc = AssociationScopesEntitiesRow(
+                scope_type=ScopeType.ROLE,
+                scope_id=str(roles_and_users["viewer-role"]),
+                entity_type=EntityType.USER,
+                entity_id=str(user_id),
+                relation_type=RelationType.AUTO,
+            )
+            db_sess.add(assoc)
+
+        querier = BatchQuerier(
+            conditions=[],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+        scope = RoleSearchScope(user_id=user_id)
+        result = await repository.search_roles(querier, scope=scope)
+
+        assert result.total_count == 2
+        result_ids = {item.id for item in result.items}
+        assert result_ids == {roles_and_users["admin-role"], roles_and_users["viewer-role"]}

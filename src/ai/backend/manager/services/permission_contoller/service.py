@@ -193,7 +193,7 @@ class PermissionControllerService:
 
     async def search_roles(self, action: SearchRolesAction) -> SearchRolesActionResult:
         """Search roles with pagination and filtering."""
-        result = await self._repository.search_roles(action.querier)
+        result = await self._repository.search_roles(action.querier, scope=action.scope)
         return SearchRolesActionResult(result=result)
 
     async def search_permissions(
