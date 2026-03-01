@@ -23,7 +23,7 @@ def register_etcd_routes(deps: ModuleDeps) -> RouteRegistry:
     # no PrivateContext needed.
     reg.app.cleanup_ctx.append(etcd_app_ctx)
 
-    handler = EtcdHandler()
+    handler = EtcdHandler(processors=deps.processors)
 
     # Public endpoints (auth_required only)
     reg.add("GET", "/resource-slots", handler.get_resource_slots, middlewares=[auth_required])

@@ -111,6 +111,8 @@ class EntityType(enum.StrEnum):
     RESOURCE_PRESET = "resource_preset"
     ROLE = "role"
     DOTFILE = "dotfile"
+    ETCD_CONFIG = "etcd_config"
+    MANAGER_ADMIN = "manager_admin"
     STORAGE_NAMESPACE = "storage_namespace"
     VFS_STORAGE = "vfs_storage"
 

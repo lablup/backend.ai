@@ -49,6 +49,8 @@ from ai.backend.manager.services.dotfile.processors import DotfileProcessors
 from ai.backend.manager.services.dotfile.service import DotfileService
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.error_log.service import ErrorLogService
+from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
+from ai.backend.manager.services.etcd_config.service import EtcdConfigService
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.export.service import ExportService
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
@@ -61,6 +63,8 @@ from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
 from ai.backend.manager.services.keypair_resource_policy.service import KeypairResourcePolicyService
+from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
+from ai.backend.manager.services.manager_admin.service import ManagerAdminService
 from ai.backend.manager.services.metric.processors.utilization_metric import (
     UtilizationMetricProcessors,
 )
@@ -159,6 +163,7 @@ class Services:
     domain: DomainService
     dotfile: DotfileService
     error_log: ErrorLogService
+    etcd_config: EtcdConfigService
     export: ExportService
     fair_share: FairShareService
     group: GroupService
@@ -170,6 +175,7 @@ class Services:
     vfolder_invite: VFolderInviteService
     session: SessionService
     keypair_resource_policy: KeypairResourcePolicyService
+    manager_admin: ManagerAdminService
     user_resource_policy: UserResourcePolicyService
     project_resource_policy: ProjectResourcePolicyService
     resource_preset: ResourcePresetService
@@ -215,6 +221,12 @@ class Services:
         )
         error_log_service = ErrorLogService(
             repository=repositories.error_log.repository,
+        )
+        etcd_config_service = EtcdConfigService(
+            repository=repositories.etcd_config.repository,
+            config_provider=args.config_provider,
+            etcd=args.etcd,
+            valkey_stat=args.valkey_stat_client,
         )
         export_service = ExportService(
             repository=repositories.export.repository,
@@ -274,6 +286,11 @@ class Services:
         )
         keypair_resource_policy_service = KeypairResourcePolicyService(
             repositories.keypair_resource_policy.repository
+        )
+        manager_admin_service = ManagerAdminService(
+            repository=repositories.manager_admin.repository,
+            config_provider=args.config_provider,
+            etcd=args.etcd,
         )
         user_resource_policy_service = UserResourcePolicyService(
             repositories.user_resource_policy.repository
@@ -387,6 +404,7 @@ class Services:
             domain=domain_service,
             dotfile=dotfile_service,
             error_log=error_log_service,
+            etcd_config=etcd_config_service,
             export=export_service,
             fair_share=fair_share_service,
             group=group_service,
@@ -398,6 +416,7 @@ class Services:
             vfolder_invite=vfolder_invite_service,
             session=session_service,
             keypair_resource_policy=keypair_resource_policy_service,
+            manager_admin=manager_admin_service,
             user_resource_policy=user_resource_policy_service,
             project_resource_policy=project_resource_policy_service,
             resource_preset=resource_preset_service,
@@ -435,6 +454,7 @@ class Processors(AbstractProcessorPackage):
     domain: DomainProcessors
     dotfile: DotfileProcessors
     error_log: ErrorLogProcessors
+    etcd_config: EtcdConfigProcessors
     export: ExportProcessors
     fair_share: FairShareProcessors
     group: GroupProcessors
@@ -446,6 +466,7 @@ class Processors(AbstractProcessorPackage):
     session: SessionProcessors
     container_registry: ContainerRegistryProcessors
     keypair_resource_policy: KeypairResourcePolicyProcessors
+    manager_admin: ManagerAdminProcessors
     user_resource_policy: UserResourcePolicyProcessors
     project_resource_policy: ProjectResourcePolicyProcessors
     resource_preset: ResourcePresetProcessors
@@ -477,6 +498,7 @@ class Processors(AbstractProcessorPackage):
         domain_processors = DomainProcessors(services.domain, action_monitors)
         dotfile_processors = DotfileProcessors(services.dotfile, action_monitors)
         error_log_processors = ErrorLogProcessors(services.error_log, action_monitors)
+        etcd_config_processors = EtcdConfigProcessors(services.etcd_config, action_monitors)
         export_processors = ExportProcessors(services.export, action_monitors)
         fair_share_processors = FairShareProcessors(services.fair_share, action_monitors)
         group_processors = GroupProcessors(services.group, action_monitors)
@@ -494,6 +516,7 @@ class Processors(AbstractProcessorPackage):
         keypair_resource_policy_processors = KeypairResourcePolicyProcessors(
             services.keypair_resource_policy, action_monitors
         )
+        manager_admin_processors = ManagerAdminProcessors(services.manager_admin, action_monitors)
         user_resource_policy_processors = UserResourcePolicyProcessors(
             services.user_resource_policy, action_monitors
         )
@@ -551,6 +574,7 @@ class Processors(AbstractProcessorPackage):
             domain=domain_processors,
             dotfile=dotfile_processors,
             error_log=error_log_processors,
+            etcd_config=etcd_config_processors,
             export=export_processors,
             fair_share=fair_share_processors,
             group=group_processors,
@@ -562,6 +586,7 @@ class Processors(AbstractProcessorPackage):
             vfolder_invite=vfolder_invite_processors,
             session=session_processors,
             keypair_resource_policy=keypair_resource_policy_processors,
+            manager_admin=manager_admin_processors,
             user_resource_policy=user_resource_policy_processors,
             project_resource_policy=project_resource_policy_processors,
             resource_preset=resource_preset_processors,
@@ -594,6 +619,7 @@ class Processors(AbstractProcessorPackage):
             *self.domain.supported_actions(),
             *self.dotfile.supported_actions(),
             *self.error_log.supported_actions(),
+            *self.etcd_config.supported_actions(),
             *self.export.supported_actions(),
             *self.fair_share.supported_actions(),
             *self.group.supported_actions(),
@@ -605,6 +631,7 @@ class Processors(AbstractProcessorPackage):
             *self.vfolder_invite.supported_actions(),
             *self.session.supported_actions(),
             *self.keypair_resource_policy.supported_actions(),
+            *self.manager_admin.supported_actions(),
             *self.user_resource_policy.supported_actions(),
             *self.project_resource_policy.supported_actions(),
             *self.resource_preset.supported_actions(),

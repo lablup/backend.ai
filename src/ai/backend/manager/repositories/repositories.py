@@ -16,6 +16,7 @@ from ai.backend.manager.repositories.deployment.repositories import DeploymentRe
 from ai.backend.manager.repositories.domain.repositories import DomainRepositories
 from ai.backend.manager.repositories.dotfile.repositories import DotfileRepositories
 from ai.backend.manager.repositories.error_log.repositories import ErrorLogRepositories
+from ai.backend.manager.repositories.etcd_config.repositories import EtcdConfigRepositories
 from ai.backend.manager.repositories.export.repositories import ExportRepositories
 from ai.backend.manager.repositories.fair_share.repositories import FairShareRepositories
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
@@ -26,6 +27,7 @@ from ai.backend.manager.repositories.image.repositories import ImageRepositories
 from ai.backend.manager.repositories.keypair_resource_policy.repositories import (
     KeypairResourcePolicyRepositories,
 )
+from ai.backend.manager.repositories.manager_admin.repositories import ManagerAdminRepositories
 from ai.backend.manager.repositories.metric.repositories import MetricRepositories
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.notification.repositories import NotificationRepositories
@@ -72,11 +74,13 @@ class Repositories:
     domain: DomainRepositories
     dotfile: DotfileRepositories
     error_log: ErrorLogRepositories
+    etcd_config: EtcdConfigRepositories
     export: ExportRepositories
     fair_share: FairShareRepositories
     group: GroupRepositories
     image: ImageRepositories
     keypair_resource_policy: KeypairResourcePolicyRepositories
+    manager_admin: ManagerAdminRepositories
     metric: MetricRepositories
     model_serving: ModelServingRepositories
     notification: NotificationRepositories
@@ -111,11 +115,13 @@ class Repositories:
         domain_repositories = DomainRepositories.create(args)
         dotfile_repositories = DotfileRepositories.create(args)
         error_log_repositories = ErrorLogRepositories.create(args)
+        etcd_config_repositories = EtcdConfigRepositories.create(args)
         export_repositories = ExportRepositories.create(args)
         fair_share_repositories = FairShareRepositories.create(args)
         group_repositories = GroupRepositories.create(args)
         image_repositories = ImageRepositories.create(args)
         keypair_resource_policy_repositories = KeypairResourcePolicyRepositories.create(args)
+        manager_admin_repositories = ManagerAdminRepositories.create(args)
         metric_repositories = MetricRepositories.create(args)
         model_serving_repositories = ModelServingRepositories.create(args)
         notification_repositories = NotificationRepositories.create(args)
@@ -149,11 +155,13 @@ class Repositories:
             domain=domain_repositories,
             dotfile=dotfile_repositories,
             error_log=error_log_repositories,
+            etcd_config=etcd_config_repositories,
             export=export_repositories,
             fair_share=fair_share_repositories,
             group=group_repositories,
             image=image_repositories,
             keypair_resource_policy=keypair_resource_policy_repositories,
+            manager_admin=manager_admin_repositories,
             metric=metric_repositories,
             model_serving=model_serving_repositories,
             notification=notification_repositories,
