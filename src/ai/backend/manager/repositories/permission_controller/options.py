@@ -330,6 +330,13 @@ class AssignedUserConditions:
         return inner
 
     @staticmethod
+    def by_user_ids(user_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRoleRow.user_id.in_(user_ids)
+
+        return inner
+
+    @staticmethod
     def by_role_and_user_ids(
         pairs: Collection[tuple[uuid.UUID, uuid.UUID]],
     ) -> QueryCondition:

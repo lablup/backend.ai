@@ -221,3 +221,25 @@ async def load_element_associations_by_ids(
 
     association_map = {a.id: a for a in action_result.result.items}
     return [association_map.get(aid) for aid in ids]
+
+
+async def load_role_assignments_by_user_ids(
+    processor: PermissionControllerProcessors,
+    user_ids: Sequence[uuid.UUID],
+) -> list[list[AssignedUserData]]:
+    if not user_ids:
+        return []
+
+    querier = BatchQuerier(
+        pagination=NoPagination(),
+        conditions=[AssignedUserConditions.by_user_ids(user_ids)],
+    )
+
+    action_result = await processor.search_users_assigned_to_role.wait_for_complete(
+        SearchUsersAssignedToRoleAction(querier=querier)
+    )
+
+    assignments_by_user: defaultdict[uuid.UUID, list[AssignedUserData]] = defaultdict(list)
+    for assignment in action_result.result.items:
+        assignments_by_user[assignment.user_id].append(assignment)
+    return [assignments_by_user.get(user_id, []) for user_id in user_ids]

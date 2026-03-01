@@ -36,6 +36,7 @@ if TYPE_CHECKING:
         ProjectV2OrderBy,
     )
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2Connection
+    from ai.backend.manager.api.gql.rbac.types.role import RoleAssignmentGQL
     from ai.backend.manager.data.user.types import UserData
 
 
@@ -244,6 +245,25 @@ class UserV2GQL(Node):
             limit=limit,
             offset=offset,
         )
+
+    @strawberry.field(  # type: ignore[misc]
+        description="Added in 26.3.0. RBAC roles assigned to this user.",
+    )
+    async def my_roles(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> list[
+        Annotated[
+            RoleAssignmentGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.role"),
+        ]
+    ]:
+        from ai.backend.manager.api.gql.rbac.types.role import RoleAssignmentGQL
+
+        assignments = await info.context.data_loaders.role_assignments_by_user_loader.load(
+            UUID(str(self.id))
+        )
+        return [RoleAssignmentGQL.from_dataclass(a) for a in assignments]
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
