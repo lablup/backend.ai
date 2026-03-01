@@ -4,6 +4,8 @@ from typing import Any
 import pytest
 
 import ai.backend.manager.api.ratelimit as rlim
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.ratelimit.registry import register_ratelimit_routes
 from ai.backend.manager.server import (
     agent_registry_ctx,
     database_ctx,
@@ -45,7 +47,7 @@ async def test_check_rlim_for_anonymous_query(
             event_dispatcher_plugin_ctx,
             agent_registry_ctx,
         ],
-        [".auth", ".ratelimit"],
+        [register_auth_routes, register_ratelimit_routes],
     )
     ret = await client.get("/")
     assert ret.status == 200
@@ -80,7 +82,7 @@ async def test_check_rlim_for_authorized_query(
             event_dispatcher_plugin_ctx,
             agent_registry_ctx,
         ],
-        [".auth", ".ratelimit"],
+        [register_auth_routes, register_ratelimit_routes],
     )
     url = "/auth/test"
     req_bytes = json.dumps({"echo": "hello!"}).encode()

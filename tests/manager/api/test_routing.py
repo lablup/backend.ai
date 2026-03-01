@@ -111,20 +111,6 @@ class TestRouteRegistryInit:
         reg = RouteRegistry(app, cors_options, middlewares=[mw])
         assert reg.middlewares == [mw]
 
-    def test_global_middlewares_added_to_app(
-        self, app: web.Application, cors_options: CORSOptions
-    ) -> None:
-        @web.middleware
-        async def global_mw(
-            request: web.Request,
-            handler: Callable[..., Awaitable[web.StreamResponse]],
-        ) -> web.StreamResponse:
-            return await handler(request)
-
-        assert global_mw not in app.middlewares
-        RouteRegistry(app, cors_options, global_middlewares=[global_mw])
-        assert global_mw in app.middlewares
-
 
 class TestRouteRegistryAdd:
     def test_adds_route_to_app(self, registry: RouteRegistry) -> None:

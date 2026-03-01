@@ -56,6 +56,16 @@ from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest.admin.registry import register_admin_routes
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.compute_sessions.registry import register_compute_sessions_routes
+from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
+from ai.backend.manager.api.rest.events.registry import register_events_routes
+from ai.backend.manager.api.rest.manager.registry import register_manager_api_routes
+from ai.backend.manager.api.rest.ratelimit.registry import register_ratelimit_routes
+from ai.backend.manager.api.rest.stream.registry import register_stream_routes
+from ai.backend.manager.api.rest.types import ModuleDeps, ModuleRegistrar
+from ai.backend.manager.api.rest.vfolder.registry import register_vfolder_routes
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
@@ -187,7 +197,7 @@ class AppBuilder(Protocol):
         self,
         cleanup_contexts: Sequence[Callable[[RootContext], AbstractAsyncContextManager[None]]]
         | None = None,
-        subapp_pkgs: Sequence[str] | None = None,
+        registrars: Sequence[ModuleRegistrar] | None = None,
         scheduler_opts: Mapping[str, Any] | None = None,
     ) -> tuple[web.Application, Client]: ...
 
@@ -813,7 +823,7 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
     async def app_builder(
         cleanup_contexts: Sequence[Callable[[RootContext], AbstractAsyncContextManager[None]]]
         | None = None,
-        subapp_pkgs: Sequence[str] | None = None,
+        registrars: Sequence[ModuleRegistrar] | None = None,
         scheduler_opts: Mapping[str, Any] | None = None,
     ) -> tuple[web.Application, Client]:
         nonlocal client, client_session, runner
@@ -822,7 +832,7 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
         if scheduler_opts is None:
             scheduler_opts = {}
 
-        all_pkgs = list(subapp_pkgs or [])
+        all_registrars = list(registrars or [])
 
         _cleanup_ctxs: list[Callable[[RootContext], AbstractAsyncContextManager[None]]] = []
         _outer_ctx_classes: list[type[AbstractAsyncContextManager[Any, Any]]] = []
@@ -857,12 +867,15 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
             await octx.__aenter__()
 
         # Register all requested modules using the unified dispatch.
-        # If cleanup contexts already set root_ctx.processors, use it;
-        # otherwise fall back to a mock (sufficient for endpoints that
-        # don't invoke service actions, such as /auth/test).
-        if all_pkgs:
-            processors = getattr(root_ctx, "processors", None) or MagicMock()
-            register_modules(app, all_pkgs, processors=processors)
+        if all_registrars:
+            deps = ModuleDeps(
+                cors_options=root_ctx.cors_options,
+                processors=getattr(root_ctx, "processors", None),
+                services_ctx=getattr(root_ctx, "services_ctx", None),
+                storage_manager=getattr(root_ctx, "storage_manager", None),
+                auth_config=getattr(root_ctx.config_provider.config, "auth", None),
+            )
+            register_modules(app, all_registrars, deps=deps)
 
         runner = web.AppRunner(app, handle_signals=False)
         await runner.setup()
@@ -999,16 +1012,16 @@ async def prepare_kernel(
     sess_id = f"test-kernel-session-{secrets.token_hex(8)}"
     app, client = await create_app_and_client(
         cleanup_contexts=None,
-        subapp_pkgs=[
-            "etcd",
-            "events",
-            "auth",
-            "vfolder",
-            "admin",
-            "ratelimit",
-            "kernel",
-            "stream",
-            "manager",
+        registrars=[
+            register_etcd_routes,
+            register_events_routes,
+            register_auth_routes,
+            register_vfolder_routes,
+            register_admin_routes,
+            register_ratelimit_routes,
+            register_compute_sessions_routes,
+            register_stream_routes,
+            register_manager_api_routes,
         ],
         scheduler_opts=None,
     )
