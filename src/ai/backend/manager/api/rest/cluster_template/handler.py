@@ -11,9 +11,8 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from collections.abc import Mapping
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Final
 
 import sqlalchemy as sa
 import yaml
@@ -45,18 +44,26 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.utils import get_access_key_scopes
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.resource import DBOperationFailed, TaskTemplateNotFound
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import association_groups_users as agus
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.session_template import (
-    TemplateType,
-    check_cluster_template,
-    query_accessible_session_templates,
-    session_templates,
-)
 from ai.backend.manager.models.user import UserRole, users
+from ai.backend.manager.services.template.actions.create_cluster_template import (
+    CreateClusterTemplateAction,
+)
+from ai.backend.manager.services.template.actions.delete_cluster_template import (
+    DeleteClusterTemplateAction,
+)
+from ai.backend.manager.services.template.actions.get_cluster_template import (
+    GetClusterTemplateAction,
+)
+from ai.backend.manager.services.template.actions.list_cluster_templates import (
+    ListClusterTemplatesAction,
+)
+from ai.backend.manager.services.template.actions.update_cluster_template import (
+    UpdateClusterTemplateAction,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.context import RootContext
@@ -68,7 +75,7 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ClusterTemplateHandler:
     """Cluster template API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors | None = None) -> None:
+    def __init__(self, *, processors: Processors) -> None:
         self._processors = processors
 
     async def create(
@@ -90,8 +97,8 @@ class ClusterTemplateHandler:
             requester_access_key,
             owner_access_key if owner_access_key != requester_access_key else "*",
         )
-        user_uuid = ctx.user_uuid
 
+        # Resolve owner and group via role-based auth (Phase 2 will move this to service)
         async with root_ctx.db.begin() as conn:
             if requester_access_key != owner_access_key:
                 query = (
@@ -167,32 +174,24 @@ class ClusterTemplateHandler:
             if group_id is None:
                 raise InvalidAPIParameters("Invalid group")
 
-            log.debug("Params: {0}", params)
+        try:
+            payload = load_json(params.payload)
+        except json.JSONDecodeError:
             try:
-                payload = load_json(params.payload)
-            except json.JSONDecodeError:
-                try:
-                    payload = yaml.safe_load(params.payload)
-                except (yaml.YAMLError, yaml.MarkedYAMLError) as e:
-                    raise InvalidAPIParameters("Malformed payload") from e
-            template_data = check_cluster_template(payload)
-            template_id = uuid.uuid4().hex
-            insert_query = session_templates.insert().values({
-                "id": template_id,
-                "domain_name": domain,
-                "group_id": group_id,
-                "user_uuid": user_uuid,
-                "name": template_data["metadata"]["name"],
-                "template": template_data,
-                "type": TemplateType.CLUSTER,
-            })
-            result = await conn.execute(insert_query)
-            if result.rowcount != 1:
-                raise DBOperationFailed(f"Failed to create cluster template: {template_id}")
+                payload = yaml.safe_load(params.payload)
+            except (yaml.YAMLError, yaml.MarkedYAMLError) as e:
+                raise InvalidAPIParameters("Malformed payload") from e
 
+        action = CreateClusterTemplateAction(
+            domain_name=domain,
+            user_uuid=ctx.user_uuid,
+            group_id=group_id,
+            template_data=payload,
+        )
+        create_result = await self._processors.template.create_cluster.wait_for_complete(action)
         return APIResponse.build(
             HTTPStatus.OK,
-            CreateClusterTemplateResponse(id=template_id, user=user_uuid.hex),
+            CreateClusterTemplateResponse(id=create_result.id, user=create_result.user),
         )
 
     async def list_templates(
@@ -202,81 +201,40 @@ class ClusterTemplateHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = query.parsed
-        root_ctx: RootContext = req.request.app["_root.context"]
-        domain_name = ctx.user_domain
-        user_uuid = ctx.user_uuid
         user_role = req.request["user"]["role"]
 
         log.info("CLUSTER_TEMPLATE.LIST (ak:{})", ctx.access_key)
-        async with root_ctx.db.begin() as conn:
-            entries: list[Mapping[str, Any]]
-            if ctx.is_superadmin and params.all:
-                j = session_templates.join(
-                    users, session_templates.c.user_uuid == users.c.uuid, isouter=True
-                ).join(groups, session_templates.c.group_id == groups.c.id, isouter=True)
-                q = (
-                    sa.select(session_templates, users.c.email, groups.c.name)
-                    .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
-                    .select_from(j)
-                    .where(
-                        (session_templates.c.is_active)
-                        & (session_templates.c.type == TemplateType.CLUSTER),
-                    )
-                )
-                result = await conn.execute(q)
-                entries = []
-                for row in result:
-                    is_owner = row.session_templates_user_uuid == user_uuid
-                    entries.append({
-                        "name": row.session_templates_name,
-                        "id": row.session_templates_id,
-                        "created_at": row.session_templates_created_at,
-                        "is_owner": is_owner,
-                        "user": (
-                            str(row.session_templates_user_uuid)
-                            if row.session_templates_user_uuid
-                            else None
-                        ),
-                        "group": (
-                            str(row.session_templates_group_id)
-                            if row.session_templates_group_id
-                            else None
-                        ),
-                        "user_email": row.users_email,
-                        "group_name": row.groups_name,
-                    })
-            else:
-                extra_conds = None
-                if params.group_id is not None:
-                    extra_conds = session_templates.c.group_id == params.group_id
-                entries = await query_accessible_session_templates(
-                    conn,
-                    user_uuid,
-                    TemplateType.CLUSTER,
-                    user_role=user_role,
-                    domain_name=domain_name,
-                    allowed_types=["user", "group"],
-                    extra_conds=extra_conds,
-                )
 
-            items = [
-                ClusterTemplateListItemDTO(
-                    name=entry["name"],
-                    id=entry["id"].hex if hasattr(entry["id"], "hex") else str(entry["id"]),
-                    created_at=entry["created_at"],
-                    is_owner=entry["is_owner"],
-                    user=str(entry["user"]) if entry["user"] is not None else None,
-                    group=str(entry["group"]) if entry["group"] is not None else None,
-                    user_email=entry["user_email"],
-                    group_name=entry["group_name"],
-                    type="user" if entry["user"] is not None else "group",
-                )
-                for entry in entries
-            ]
-            return APIResponse.build(
-                HTTPStatus.OK,
-                ListClusterTemplatesResponse(root=items),
+        raw_group_id = params.group_id if hasattr(params, "group_id") else None
+        group_id_filter = uuid.UUID(raw_group_id) if raw_group_id is not None else None
+        action = ListClusterTemplatesAction(
+            user_uuid=ctx.user_uuid,
+            user_role=user_role,
+            domain_name=ctx.user_domain,
+            is_superadmin=ctx.is_superadmin,
+            list_all=params.all if hasattr(params, "all") else False,
+            group_id_filter=group_id_filter,
+        )
+        result = await self._processors.template.list_cluster.wait_for_complete(action)
+
+        items = [
+            ClusterTemplateListItemDTO(
+                name=entry["name"],
+                id=entry["id"].hex if hasattr(entry["id"], "hex") else str(entry["id"]),
+                created_at=entry["created_at"],
+                is_owner=entry["is_owner"],
+                user=str(entry["user"]) if entry["user"] is not None else None,
+                group=str(entry["group"]) if entry["group"] is not None else None,
+                user_email=entry["user_email"],
+                group_name=entry["group_name"],
+                type="user" if entry["user"] is not None else "group",
             )
+            for entry in result.entries
+        ]
+        return APIResponse.build(
+            HTTPStatus.OK,
+            ListClusterTemplatesResponse(root=items),
+        )
 
     async def get(
         self,
@@ -298,26 +256,11 @@ class ClusterTemplateHandler:
         )
 
         template_id = path.parsed.template_id
-        root_ctx: RootContext = req.request.app["_root.context"]
-
-        async with root_ctx.db.begin() as conn:
-            q = (
-                sa.select(session_templates.c.template)
-                .select_from(session_templates)
-                .where(
-                    (session_templates.c.id == template_id)
-                    & (session_templates.c.is_active)
-                    & (session_templates.c.type == TemplateType.CLUSTER),
-                )
-            )
-            template = await conn.scalar(q)
-            if not template:
-                raise TaskTemplateNotFound
-        if not isinstance(template, dict):
-            template = load_json(template)
+        action = GetClusterTemplateAction(template_id=template_id)
+        result = await self._processors.template.get_cluster.wait_for_complete(action)
         return APIResponse.build(
             HTTPStatus.OK,
-            GetClusterTemplateResponse(root=template),
+            GetClusterTemplateResponse(root=result.template),
         )
 
     async def update(
@@ -327,7 +270,6 @@ class ClusterTemplateHandler:
         ctx: UserContext,
         req: RequestCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         template_id = path.parsed.template_id
         params = body.parsed
 
@@ -340,40 +282,23 @@ class ClusterTemplateHandler:
             owner_access_key if owner_access_key != requester_access_key else "*",
         )
 
-        async with root_ctx.db.begin() as conn:
-            select_query = (
-                sa.select(session_templates.c.id)
-                .select_from(session_templates)
-                .where(
-                    (session_templates.c.id == template_id)
-                    & (session_templates.c.is_active)
-                    & (session_templates.c.type == TemplateType.CLUSTER),
-                )
-            )
-            result = await conn.scalar(select_query)
-            if not result:
-                raise TaskTemplateNotFound
+        try:
+            payload = load_json(params.payload)
+        except json.JSONDecodeError:
             try:
-                payload = load_json(params.payload)
-            except json.JSONDecodeError:
-                try:
-                    payload = yaml.safe_load(params.payload)
-                except (yaml.YAMLError, yaml.MarkedYAMLError) as e:
-                    raise InvalidAPIParameters("Malformed payload") from e
-            template_data = check_cluster_template(payload)
-            update_query = (
-                sa.update(session_templates)
-                .values(template=template_data, name=template_data["metadata"]["name"])
-                .where(session_templates.c.id == template_id)
-            )
-            result = await conn.execute(update_query)
-            if result.rowcount != 1:
-                raise DBOperationFailed(f"Failed to update cluster template: {template_id}")
+                payload = yaml.safe_load(params.payload)
+            except (yaml.YAMLError, yaml.MarkedYAMLError) as e:
+                raise InvalidAPIParameters("Malformed payload") from e
 
-            return APIResponse.build(
-                HTTPStatus.OK,
-                UpdateClusterTemplateResponse(success=True),
-            )
+        action = UpdateClusterTemplateAction(
+            template_id=template_id,
+            template_data=payload,
+        )
+        await self._processors.template.update_cluster.wait_for_complete(action)
+        return APIResponse.build(
+            HTTPStatus.OK,
+            UpdateClusterTemplateResponse(success=True),
+        )
 
     async def delete(
         self,
@@ -382,7 +307,6 @@ class ClusterTemplateHandler:
         ctx: UserContext,
         req: RequestCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         template_id = path.parsed.template_id
         params = query.parsed
 
@@ -395,30 +319,9 @@ class ClusterTemplateHandler:
             owner_access_key if owner_access_key != requester_access_key else "*",
         )
 
-        async with root_ctx.db.begin() as conn:
-            select_query = (
-                sa.select(session_templates.c.id)
-                .select_from(session_templates)
-                .where(
-                    (session_templates.c.id == template_id)
-                    & (session_templates.c.is_active)
-                    & (session_templates.c.type == TemplateType.CLUSTER),
-                )
-            )
-            result = await conn.scalar(select_query)
-            if not result:
-                raise TaskTemplateNotFound
-
-            update_query = (
-                sa.update(session_templates)
-                .values(is_active=False)
-                .where(session_templates.c.id == template_id)
-            )
-            result = await conn.execute(update_query)
-            if result.rowcount != 1:
-                raise DBOperationFailed(f"Failed to delete cluster template: {template_id}")
-
-            return APIResponse.build(
-                HTTPStatus.OK,
-                DeleteClusterTemplateResponse(success=True),
-            )
+        action = DeleteClusterTemplateAction(template_id=template_id)
+        await self._processors.template.delete_cluster.wait_for_complete(action)
+        return APIResponse.build(
+            HTTPStatus.OK,
+            DeleteClusterTemplateResponse(success=True),
+        )

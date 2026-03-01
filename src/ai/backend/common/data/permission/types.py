@@ -113,6 +113,7 @@ class EntityType(enum.StrEnum):
     DOTFILE = "dotfile"
     ETCD_CONFIG = "etcd_config"
     MANAGER_ADMIN = "manager_admin"
+    SESSION_TEMPLATE = "session_template"
     STORAGE_NAMESPACE = "storage_namespace"
     VFS_STORAGE = "vfs_storage"
 

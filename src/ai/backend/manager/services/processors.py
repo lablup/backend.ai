@@ -107,6 +107,8 @@ from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
 from ai.backend.manager.services.storage_namespace.service import StorageNamespaceService
+from ai.backend.manager.services.template.processors import TemplateProcessors
+from ai.backend.manager.services.template.service import TemplateService
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.services.user_resource_policy.processors import UserResourcePolicyProcessors
@@ -198,6 +200,7 @@ class Services:
     audit_log: AuditLogService
     scheduling_history: SchedulingHistoryService
     service_catalog: ServiceCatalogService
+    template: TemplateService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -397,6 +400,9 @@ class Services:
             repositories.scheduling_history.repository
         )
         service_catalog_service = ServiceCatalogService(args.db)
+        template_service = TemplateService(
+            repository=repositories.template.repository,
+        )
 
         return cls(
             agent=agent_service,
@@ -439,6 +445,7 @@ class Services:
             audit_log=audit_log_service,
             scheduling_history=scheduling_history_service,
             service_catalog=service_catalog_service,
+            template=template_service,
         )
 
 
@@ -489,6 +496,7 @@ class Processors(AbstractProcessorPackage):
     audit_log: AuditLogProcessors
     scheduling_history: SchedulingHistoryProcessors
     service_catalog: ServiceCatalogProcessors
+    template: TemplateProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -567,6 +575,7 @@ class Processors(AbstractProcessorPackage):
         service_catalog_processors = ServiceCatalogProcessors(
             services.service_catalog, action_monitors
         )
+        template_processors = TemplateProcessors(services.template, action_monitors)
 
         return cls(
             agent=agent_processors,
@@ -609,6 +618,7 @@ class Processors(AbstractProcessorPackage):
             audit_log=audit_log_processors,
             scheduling_history=scheduling_history_processors,
             service_catalog=service_catalog_processors,
+            template=template_processors,
         )
 
     @override
@@ -654,4 +664,5 @@ class Processors(AbstractProcessorPackage):
             *self.audit_log.supported_actions(),
             *self.scheduling_history.supported_actions(),
             *self.service_catalog.supported_actions(),
+            *self.template.supported_actions(),
         ]

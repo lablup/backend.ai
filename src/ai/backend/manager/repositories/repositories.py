@@ -55,6 +55,7 @@ from ai.backend.manager.repositories.session.repositories import SessionReposito
 from ai.backend.manager.repositories.storage_namespace.repositories import (
     StorageNamespaceRepositories,
 )
+from ai.backend.manager.repositories.template.repositories import TemplateRepositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.repositories.user.repositories import UserRepositories
 from ai.backend.manager.repositories.user_resource_policy.repositories import (
@@ -94,6 +95,7 @@ class Repositories:
     scheduler: SchedulerRepositories
     scheduling_history: SchedulingHistoryRepositories
     session: SessionRepositories
+    template: TemplateRepositories
     user: UserRepositories
     user_resource_policy: UserResourcePolicyRepositories
     vfolder: VfolderRepositories
@@ -135,6 +137,7 @@ class Repositories:
         scheduler_repositories = SchedulerRepositories.create(args)
         scheduling_history_repositories = SchedulingHistoryRepositories.create(args)
         session_repositories = SessionRepositories.create(args)
+        template_repositories = TemplateRepositories.create(args)
         user_repositories = UserRepositories.create(args)
         user_resource_policy_repositories = UserResourcePolicyRepositories.create(args)
         vfolder_repositories = VfolderRepositories.create(args)
@@ -175,6 +178,7 @@ class Repositories:
             scheduler=scheduler_repositories,
             scheduling_history=scheduling_history_repositories,
             session=session_repositories,
+            template=template_repositories,
             user=user_repositories,
             user_resource_policy=user_resource_policy_repositories,
             vfolder=vfolder_repositories,
