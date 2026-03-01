@@ -16,6 +16,7 @@ class DeploymentLifecycleType(StrEnum):
     CHECK_REPLICA = "check_replica"
     SCALING = "scaling"
     RECONCILE = "reconcile"
+    DEPLOYING = "deploying"
     DESTROYING = "destroying"
 
 
@@ -34,6 +35,7 @@ class DeploymentExecutionResult:
     successes: list[DeploymentInfo] = field(default_factory=list)
     errors: list[DeploymentExecutionError] = field(default_factory=list)
     skipped: list[DeploymentInfo] = field(default_factory=list)
+    completed: list[DeploymentInfo] = field(default_factory=list)
 
 
 @dataclass

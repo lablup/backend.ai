@@ -157,6 +157,19 @@ class DeploymentSubStatus(enum.StrEnum):
     """
 
 
+class DeploymentSubStep(DeploymentSubStatus):
+    """Sub-steps for the DEPLOYING lifecycle phase.
+
+    - PROVISIONING: New revision routes are being provisioned; waiting for readiness.
+    - PROGRESSING: Actively replacing old routes with new routes.
+    - ROLLED_BACK: All new routes failed; deployment rolled back to previous revision.
+    """
+
+    PROVISIONING = "provisioning"
+    PROGRESSING = "progressing"
+    ROLLED_BACK = "rolled_back"
+
+
 @dataclass(frozen=True)
 class DeploymentLifecycleStatus:
     """Target lifecycle state for a deployment status transition.
@@ -353,6 +366,7 @@ class DeploymentInfo:
     network: DeploymentNetworkSpec
     model_revisions: list[ModelRevisionSpec]
     current_revision_id: UUID | None = None
+    deploying_revision_id: UUID | None = None
 
     def target_revision(self) -> ModelRevisionSpec | None:
         if self.model_revisions:

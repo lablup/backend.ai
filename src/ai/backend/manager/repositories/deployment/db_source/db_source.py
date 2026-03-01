@@ -2257,6 +2257,74 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             return await execute_purger(db_sess, purger)
 
+    async def fetch_deployment_policies_by_endpoint_ids(
+        self,
+        endpoint_ids: set[uuid.UUID],
+    ) -> Mapping[uuid.UUID, DeploymentPolicyData]:
+        """Fetch deployment policies for multiple endpoints in bulk.
+
+        Args:
+            endpoint_ids: Set of endpoint IDs to fetch policies for.
+
+        Returns:
+            Mapping of endpoint ID to DeploymentPolicyData.
+        """
+        if not endpoint_ids:
+            return {}
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(DeploymentPolicyRow).where(
+                DeploymentPolicyRow.endpoint.in_(endpoint_ids)
+            )
+            result = await db_sess.execute(query)
+            rows = result.scalars().all()
+            return {row.endpoint: row.to_data() for row in rows}
+
+    async def complete_deployment_revision_swap(
+        self,
+        endpoint_ids: set[uuid.UUID],
+    ) -> None:
+        """Swap deploying_revision to current_revision for completed deployments.
+
+        Sets current_revision = deploying_revision and deploying_revision = NULL
+        for the given endpoints.
+
+        Args:
+            endpoint_ids: Set of endpoint IDs to swap revisions for.
+        """
+        if not endpoint_ids:
+            return
+        async with self._begin_session_read_committed() as db_sess:
+            stmt = (
+                sa.update(EndpointRow)
+                .where(EndpointRow.id.in_(endpoint_ids))
+                .values(
+                    current_revision=EndpointRow.deploying_revision,
+                    deploying_revision=None,
+                )
+            )
+            await db_sess.execute(stmt)
+
+    async def clear_deploying_revision(
+        self,
+        endpoint_ids: set[uuid.UUID],
+    ) -> None:
+        """Clear deploying_revision for rolled-back deployments.
+
+        Sets deploying_revision = NULL without modifying current_revision.
+
+        Args:
+            endpoint_ids: Set of endpoint IDs to clear deploying revision for.
+        """
+        if not endpoint_ids:
+            return
+        async with self._begin_session_read_committed() as db_sess:
+            stmt = (
+                sa.update(EndpointRow)
+                .where(EndpointRow.id.in_(endpoint_ids))
+                .values(deploying_revision=None)
+            )
+            await db_sess.execute(stmt)
+
     # ========== Access Token Operations ==========
 
     async def create_access_token(
