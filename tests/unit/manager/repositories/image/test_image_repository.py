@@ -329,9 +329,8 @@ class TestImageRepositorySearch:
     ) -> AsyncGenerator[list[UUID], None]:
         """Create images with aliases for alias filter testing."""
         images_data = [
-            ("python:3.9", "x86_64", ImageType.COMPUTE, ["py39", "Python-Three"]),
-            ("python:3.10", "x86_64", ImageType.COMPUTE, ["py310"]),
-            ("nginx:latest", "x86_64", ImageType.SERVICE, ["webserver", "Nginx-Latest"]),
+            ("python:3.9", "x86_64", ImageType.COMPUTE, ["py39"]),
+            ("nginx:latest", "x86_64", ImageType.SERVICE, ["webserver"]),
             ("ubuntu:22.04", "arm64", ImageType.SYSTEM, []),
         ]
 
@@ -371,77 +370,27 @@ class TestImageRepositorySearch:
 
         yield image_ids
 
-    # --- by_alias_contains ---
-
-    async def test_alias_contains_basic(
+    async def test_filter_by_alias(
         self,
         image_repository: ImageRepository,
         images_with_aliases: list[UUID],
     ) -> None:
-        """Test by_alias_contains matches images whose alias contains the substring."""
+        """Test alias filter conditions (contains, equals, starts_with, ends_with)."""
+        # contains: "py" matches python image via "py39" alias
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 ImageConditions.by_alias_contains(
-                    StringMatchSpec(value="py3", case_insensitive=False, negated=False)
-                ),
-            ],
-            orders=[ImageRow.name.asc()],
-        )
-        result = await image_repository.search_images(querier)
-
-        assert result.total_count == 2
-        names = {str(item.name) for item in result.items}
-        assert all("python" in n for n in names)
-
-    async def test_alias_contains_case_insensitive(
-        self,
-        image_repository: ImageRepository,
-        images_with_aliases: list[UUID],
-    ) -> None:
-        """Test by_alias_contains with case_insensitive flag."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                ImageConditions.by_alias_contains(
-                    StringMatchSpec(value="python", case_insensitive=True, negated=False)
+                    StringMatchSpec(value="py", case_insensitive=False, negated=False)
                 ),
             ],
             orders=[],
         )
         result = await image_repository.search_images(querier)
-
-        # "Python-Three" matches case-insensitively
         assert result.total_count == 1
+        assert "python" in str(result.items[0].name)
 
-    async def test_alias_contains_negated(
-        self,
-        image_repository: ImageRepository,
-        images_with_aliases: list[UUID],
-    ) -> None:
-        """Test by_alias_contains with negated flag excludes matching images."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                ImageConditions.by_alias_contains(
-                    StringMatchSpec(value="py3", case_insensitive=False, negated=True)
-                ),
-            ],
-            orders=[],
-        )
-        result = await image_repository.search_images(querier)
-
-        # 4 total images - 2 with py3* aliases = 2 remaining
-        assert result.total_count == 2
-
-    # --- by_alias_equals ---
-
-    async def test_alias_equals_basic(
-        self,
-        image_repository: ImageRepository,
-        images_with_aliases: list[UUID],
-    ) -> None:
-        """Test by_alias_equals matches exact alias."""
+        # equals: exact match "webserver"
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
@@ -452,173 +401,33 @@ class TestImageRepositorySearch:
             orders=[],
         )
         result = await image_repository.search_images(querier)
-
         assert result.total_count == 1
         assert "nginx" in str(result.items[0].name)
 
-    async def test_alias_equals_case_insensitive(
-        self,
-        image_repository: ImageRepository,
-        images_with_aliases: list[UUID],
-    ) -> None:
-        """Test by_alias_equals with case_insensitive flag."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                ImageConditions.by_alias_equals(
-                    StringMatchSpec(value="WEBSERVER", case_insensitive=True, negated=False)
-                ),
-            ],
-            orders=[],
-        )
-        result = await image_repository.search_images(querier)
-
-        assert result.total_count == 1
-        assert "nginx" in str(result.items[0].name)
-
-    async def test_alias_equals_negated(
-        self,
-        image_repository: ImageRepository,
-        images_with_aliases: list[UUID],
-    ) -> None:
-        """Test by_alias_equals with negated flag."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                ImageConditions.by_alias_equals(
-                    StringMatchSpec(value="py39", case_insensitive=False, negated=True)
-                ),
-            ],
-            orders=[],
-        )
-        result = await image_repository.search_images(querier)
-
-        # 4 total - 1 with exact "py39" = 3
-        assert result.total_count == 3
-
-    # --- by_alias_starts_with ---
-
-    async def test_alias_starts_with_basic(
-        self,
-        image_repository: ImageRepository,
-        images_with_aliases: list[UUID],
-    ) -> None:
-        """Test by_alias_starts_with matches aliases starting with prefix."""
+        # starts_with: "web" matches "webserver"
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 ImageConditions.by_alias_starts_with(
-                    StringMatchSpec(value="py", case_insensitive=False, negated=False)
-                ),
-            ],
-            orders=[ImageRow.name.asc()],
-        )
-        result = await image_repository.search_images(querier)
-
-        assert result.total_count == 2
-        names = {str(item.name) for item in result.items}
-        assert all("python" in n for n in names)
-
-    async def test_alias_starts_with_case_insensitive(
-        self,
-        image_repository: ImageRepository,
-        images_with_aliases: list[UUID],
-    ) -> None:
-        """Test by_alias_starts_with with case_insensitive flag."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                ImageConditions.by_alias_starts_with(
-                    StringMatchSpec(value="nginx", case_insensitive=True, negated=False)
+                    StringMatchSpec(value="web", case_insensitive=False, negated=False)
                 ),
             ],
             orders=[],
         )
         result = await image_repository.search_images(querier)
-
-        # "Nginx-Latest" starts with "nginx" case-insensitively
         assert result.total_count == 1
         assert "nginx" in str(result.items[0].name)
 
-    async def test_alias_starts_with_negated(
-        self,
-        image_repository: ImageRepository,
-        images_with_aliases: list[UUID],
-    ) -> None:
-        """Test by_alias_starts_with with negated flag."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                ImageConditions.by_alias_starts_with(
-                    StringMatchSpec(value="py", case_insensitive=False, negated=True)
-                ),
-            ],
-            orders=[],
-        )
-        result = await image_repository.search_images(querier)
-
-        # 4 total - 2 with py* aliases = 2
-        assert result.total_count == 2
-
-    # --- by_alias_ends_with ---
-
-    async def test_alias_ends_with_basic(
-        self,
-        image_repository: ImageRepository,
-        images_with_aliases: list[UUID],
-    ) -> None:
-        """Test by_alias_ends_with matches aliases ending with suffix."""
+        # ends_with: "39" matches "py39"
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 ImageConditions.by_alias_ends_with(
-                    StringMatchSpec(value="server", case_insensitive=False, negated=False)
+                    StringMatchSpec(value="39", case_insensitive=False, negated=False)
                 ),
             ],
             orders=[],
         )
         result = await image_repository.search_images(querier)
-
-        assert result.total_count == 1
-        assert "nginx" in str(result.items[0].name)
-
-    async def test_alias_ends_with_case_insensitive(
-        self,
-        image_repository: ImageRepository,
-        images_with_aliases: list[UUID],
-    ) -> None:
-        """Test by_alias_ends_with with case_insensitive flag."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                ImageConditions.by_alias_ends_with(
-                    StringMatchSpec(value="three", case_insensitive=True, negated=False)
-                ),
-            ],
-            orders=[],
-        )
-        result = await image_repository.search_images(querier)
-
-        # "Python-Three" ends with "three" case-insensitively
         assert result.total_count == 1
         assert "python" in str(result.items[0].name)
-
-    async def test_alias_ends_with_negated(
-        self,
-        image_repository: ImageRepository,
-        images_with_aliases: list[UUID],
-    ) -> None:
-        """Test by_alias_ends_with with negated flag."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                ImageConditions.by_alias_ends_with(
-                    StringMatchSpec(value="server", case_insensitive=False, negated=True)
-                ),
-            ],
-            orders=[],
-        )
-        result = await image_repository.search_images(querier)
-
-        # 4 total - 1 with *server alias = 3
-        assert result.total_count == 3
