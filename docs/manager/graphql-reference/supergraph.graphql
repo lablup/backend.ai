@@ -9359,7 +9359,7 @@ type Query
   adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection! @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.3.0. List roles assigned to the current authenticated user. No RBAC check required — users can always see their own roles.
+  Added in 26.3.0. List roles assigned to the current authenticated user.
   """
   myRoles(filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection! @join__field(graph: STRAWBERRY)
 
