@@ -158,6 +158,67 @@ class ImageConditions:
 
         return inner
 
+    # String filter factories for alias (subquery-based)
+    @staticmethod
+    def by_alias_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = sa.select(ImageAliasRow.image_id).where(
+                ImageAliasRow.alias.ilike(f"%{spec.value}%")
+                if spec.case_insensitive
+                else ImageAliasRow.alias.like(f"%{spec.value}%")
+            )
+            condition = ImageRow.id.in_(subquery)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_alias_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = sa.select(ImageAliasRow.image_id).where(
+                sa.func.lower(ImageAliasRow.alias) == spec.value.lower()
+                if spec.case_insensitive
+                else ImageAliasRow.alias == spec.value
+            )
+            condition = ImageRow.id.in_(subquery)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_alias_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = sa.select(ImageAliasRow.image_id).where(
+                ImageAliasRow.alias.ilike(f"{spec.value}%")
+                if spec.case_insensitive
+                else ImageAliasRow.alias.like(f"{spec.value}%")
+            )
+            condition = ImageRow.id.in_(subquery)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_alias_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = sa.select(ImageAliasRow.image_id).where(
+                ImageAliasRow.alias.ilike(f"%{spec.value}")
+                if spec.case_insensitive
+                else ImageAliasRow.alias.like(f"%{spec.value}")
+            )
+            condition = ImageRow.id.in_(subquery)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
 
 class ImageOrders:
     """Query orders for images."""
