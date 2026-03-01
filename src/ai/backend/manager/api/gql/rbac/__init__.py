@@ -14,6 +14,7 @@ from .resolver import (
     admin_role_assignments,
     admin_roles,
     admin_update_role,
+    my_roles,
 )
 from .types import (
     AssignRoleInput,
@@ -79,6 +80,7 @@ __all__ = (
     "admin_permissions",
     "admin_role_assignments",
     "admin_entities",
+    "my_roles",
     # Mutation resolvers
     "admin_create_role",
     "admin_update_role",

@@ -7,6 +7,7 @@ import uuid
 import strawberry
 from strawberry import ID, Info
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.permission.types import RoleStatus
 from ai.backend.manager.api.gql.rbac.fetcher.role import (
     fetch_role,
@@ -34,6 +35,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.permission_controller.options import RoleConditions
 from ai.backend.manager.repositories.permission_controller.updaters import RoleUpdaterSpec
 from ai.backend.manager.services.permission_contoller.actions.assign_role import (
     AssignRoleAction,
@@ -115,6 +117,43 @@ async def admin_role_assignments(
         last=last,
         limit=limit,
         offset=offset,
+    )
+
+
+@strawberry.field(
+    description=(
+        "Added in 26.3.0. List roles assigned to the current authenticated user. "
+        "No RBAC check required — users can always see their own roles."
+    )
+)  # type: ignore[misc]
+async def my_roles(
+    info: Info[StrawberryGQLContext],
+    filter: RoleFilter | None = None,
+    order_by: list[RoleOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> RoleConnection:
+    me = current_user()
+    if me is None:
+        from aiohttp import web
+
+        raise web.HTTPUnauthorized(reason="Authentication required")
+
+    return await fetch_roles(
+        info,
+        filter=filter,
+        order_by=order_by,
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
+        base_conditions=[RoleConditions.by_assigned_user_id(me.user_id)],
     )
 
 
