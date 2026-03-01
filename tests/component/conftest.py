@@ -859,6 +859,30 @@ def server_cleanup_contexts() -> list[CleanupContext]:
     return []
 
 
+type ModuleDepsFactory = Callable[[RootContext], ModuleDeps]
+
+
+@pytest.fixture()
+def server_module_deps_factory() -> ModuleDepsFactory:
+    """Build ``ModuleDeps`` from a fully-initialised ``RootContext``.
+
+    Override this fixture in domain-specific conftest.py when the
+    domain's cleanup contexts set additional attributes (e.g.
+    ``services_ctx``) that the default implementation does not read.
+    """
+
+    def _factory(root_ctx: RootContext) -> ModuleDeps:
+        return ModuleDeps(
+            cors_options=root_ctx.cors_options,
+            processors=root_ctx.processors,
+            services_ctx=MagicMock(),
+            storage_manager=root_ctx.storage_manager,
+            auth_config=root_ctx.config_provider.config.auth,
+        )
+
+    return _factory
+
+
 @pytest.fixture()
 async def server(
     bootstrap_config: BootstrapConfig,
@@ -868,6 +892,7 @@ async def server(
     database_fixture: None,
     server_module_registrars: list[ModuleRegistrar],
     server_cleanup_contexts: list[CleanupContext],
+    server_module_deps_factory: ModuleDepsFactory,
 ) -> AsyncIterator[ServerInfo]:
     """
     Start a full manager server and return its connection info.
@@ -914,13 +939,7 @@ async def server(
     # At this point processors are ready (set by cleanup contexts above)
     # and the router is not yet frozen.
     if server_module_registrars:
-        deps = ModuleDeps(
-            cors_options=root_ctx.cors_options,
-            processors=getattr(root_ctx, "processors", None) or MagicMock(),
-            services_ctx=getattr(root_ctx, "services_ctx", None) or MagicMock(),
-            storage_manager=getattr(root_ctx, "storage_manager", None) or MagicMock(),
-            auth_config=getattr(root_ctx.config_provider.config, "auth", None) or MagicMock(),
-        )
+        deps = server_module_deps_factory(root_ctx)
         register_modules(app, server_module_registrars, deps=deps)
 
     runner = web.AppRunner(app, handle_signals=False)
