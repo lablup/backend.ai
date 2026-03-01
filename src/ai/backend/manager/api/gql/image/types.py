@@ -516,7 +516,7 @@ class ImageV2ScopeGQL:
     Added in 26.2.0.
 
     Filter options for images based on various criteria such as status,
-    name, and architecture.
+    name, architecture, and alias.
 
     Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
     """)
@@ -525,6 +525,7 @@ class ImageV2FilterGQL(GQLFilter):
     status: list[ImageV2StatusGQL] | None = None
     name: StringFilter | None = None
     architecture: StringFilter | None = None
+    alias: StringFilter | None = None
 
     AND: list[ImageV2FilterGQL] | None = None
     OR: list[ImageV2FilterGQL] | None = None
@@ -565,6 +566,17 @@ class ImageV2FilterGQL(GQLFilter):
             )
             if arch_condition:
                 field_conditions.append(arch_condition)
+
+        # Apply alias filter
+        if self.alias:
+            alias_condition = self.alias.build_query_condition(
+                contains_factory=ImageAliasConditions.by_alias_contains,
+                equals_factory=ImageAliasConditions.by_alias_equals,
+                starts_with_factory=ImageAliasConditions.by_alias_starts_with,
+                ends_with_factory=ImageAliasConditions.by_alias_ends_with,
+            )
+            if alias_condition:
+                field_conditions.append(alias_condition)
 
         # Handle AND logical operator
         if self.AND:
