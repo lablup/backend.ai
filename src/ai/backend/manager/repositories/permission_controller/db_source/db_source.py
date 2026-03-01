@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
 from ai.backend.common.data.permission.types import (
+    RBACElementType,
     RelationType,
 )
 from ai.backend.manager.data.permission.entity import (
@@ -256,6 +257,15 @@ class PermissionDBSource:
                 )
             )
             result = await execute_creator(db_session, creator)
+            db_session.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=RBACElementType.USER.to_scope_type(),
+                    scope_id=str(data.user_id),
+                    entity_type=RBACElementType.ROLE.to_entity_type(),
+                    entity_id=str(data.role_id),
+                    relation_type=RelationType.AUTO,
+                ),
+            )
             return result.row
 
     async def revoke_role(self, data: UserRoleRevocationInput) -> uuid.UUID:
@@ -274,6 +284,18 @@ class PermissionDBSource:
 
             user_role_id = user_role_row.id
             await db_session.delete(user_role_row)
+            await db_session.execute(
+                sa.delete(AssociationScopesEntitiesRow).where(
+                    sa.and_(
+                        AssociationScopesEntitiesRow.scope_type
+                        == RBACElementType.USER.to_scope_type(),
+                        AssociationScopesEntitiesRow.scope_id == str(data.user_id),
+                        AssociationScopesEntitiesRow.entity_type
+                        == RBACElementType.ROLE.to_entity_type(),
+                        AssociationScopesEntitiesRow.entity_id == str(data.role_id),
+                    )
+                )
+            )
             await db_session.flush()
             return user_role_id
 
