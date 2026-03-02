@@ -95,12 +95,6 @@ class RoutingRow(Base):  # type: ignore[misc]
 
     # Revision reference without FK (relationship only)
     revision: Mapped[uuid.UUID | None] = mapped_column("revision", GUID, nullable=True)
-    status_updated_at: Mapped[datetime | None] = mapped_column(
-        "status_updated_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.text("now()"),
-        nullable=True,
-    )
     traffic_status: Mapped[RouteTrafficStatus] = mapped_column(
         "traffic_status",
         EnumValueType(RouteTrafficStatus),
@@ -261,6 +255,5 @@ class RoutingRow(Base):  # type: ignore[misc]
             created_at=self.created_at,
             revision_id=self.revision,
             traffic_status=self.traffic_status,
-            status_updated_at=self.status_updated_at,
             error_data=self.error_data or {},
         )
