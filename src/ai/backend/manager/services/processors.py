@@ -265,6 +265,7 @@ class Services:
             args.background_task_manager,
             repositories.vfolder.repository,
             repositories.user.repository,
+            args.valkey_stat_client,
         )
         vfolder_file_service = VFolderFileService(
             args.config_provider,

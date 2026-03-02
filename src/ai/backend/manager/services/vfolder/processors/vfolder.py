@@ -30,6 +30,10 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.storage_ops import (
+    ChangeVFolderOwnershipAction,
+    ChangeVFolderOwnershipActionResult,
+    GetQuotaAction,
+    GetQuotaActionResult,
     GetVFolderUsageAction,
     GetVFolderUsageActionResult,
     GetVFolderUsedBytesAction,
@@ -40,6 +44,10 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ListAllHostsActionResult,
     ListAllowedTypesAction,
     ListAllowedTypesActionResult,
+    ListHostsAction,
+    ListHostsActionResult,
+    UpdateQuotaAction,
+    UpdateQuotaActionResult,
 )
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 
@@ -73,6 +81,12 @@ class VFolderProcessors(AbstractProcessorPackage):
     ]
     get_usage: ActionProcessor[GetVFolderUsageAction, GetVFolderUsageActionResult]
     get_used_bytes: ActionProcessor[GetVFolderUsedBytesAction, GetVFolderUsedBytesActionResult]
+    list_hosts: ActionProcessor[ListHostsAction, ListHostsActionResult]
+    get_quota: ActionProcessor[GetQuotaAction, GetQuotaActionResult]
+    update_quota: ActionProcessor[UpdateQuotaAction, UpdateQuotaActionResult]
+    change_vfolder_ownership: ActionProcessor[
+        ChangeVFolderOwnershipAction, ChangeVFolderOwnershipActionResult
+    ]
 
     def __init__(self, service: VFolderService, action_monitors: list[ActionMonitor]) -> None:
         self.create_vfolder = ScopeActionProcessor(service.create, action_monitors)
@@ -103,6 +117,12 @@ class VFolderProcessors(AbstractProcessorPackage):
         )
         self.get_usage = ActionProcessor(service.get_usage, action_monitors)
         self.get_used_bytes = ActionProcessor(service.get_used_bytes, action_monitors)
+        self.list_hosts = ActionProcessor(service.list_hosts, action_monitors)
+        self.get_quota = ActionProcessor(service.get_quota, action_monitors)
+        self.update_quota = ActionProcessor(service.update_quota, action_monitors)
+        self.change_vfolder_ownership = ActionProcessor(
+            service.change_vfolder_ownership, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -123,4 +143,8 @@ class VFolderProcessors(AbstractProcessorPackage):
             GetVolumePerfMetricAction.spec(),
             GetVFolderUsageAction.spec(),
             GetVFolderUsedBytesAction.spec(),
+            ListHostsAction.spec(),
+            GetQuotaAction.spec(),
+            UpdateQuotaAction.spec(),
+            ChangeVFolderOwnershipAction.spec(),
         ]

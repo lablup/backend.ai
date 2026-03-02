@@ -35,6 +35,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderPermissionData,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import ProjectNotFound
@@ -43,15 +44,23 @@ from ai.backend.manager.errors.storage import (
     VFolderFilterStatusFailed,
     VFolderInvalidParameter,
     VFolderNotFound,
+    VFolderOperationFailed,
 )
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.group import association_groups_users as agus
-from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.user import ACTIVE_USER_STATUSES, UserRole, UserRow
+from ai.backend.manager.models.user import (
+    ACTIVE_USER_STATUSES,
+    UserRole,
+    UserRow,
+    UserStatus,
+    users,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import (
     HARD_DELETED_VFOLDER_STATUSES,
@@ -67,9 +76,13 @@ from ai.backend.manager.models.vfolder import (
     VFolderStatusSet,
     delete_vfolder_relation_rows,
     ensure_host_permission_allowed,
+    get_allowed_vfolder_hosts_by_group,
+    get_allowed_vfolder_hosts_by_user,
     get_sessions_by_mounted_folder,
     is_unmanaged,
     query_accessible_vfolders,
+    vfolder_invitations,
+    vfolder_permissions,
     vfolder_status_map,
     vfolders,
 )
@@ -1527,3 +1540,177 @@ class VfolderRepository:
                     .where(VFolderPermissionRow.user == user_id)
                 )
                 await session.execute(update_stmt)
+
+    @vfolder_repository_resilience.apply()
+    async def check_vfolder_accessible(
+        self,
+        vfolder_id: uuid.UUID,
+        user_uuid: uuid.UUID,
+        user_role: UserRole,
+        domain_name: str,
+        allowed_vfolder_types: Sequence[str],
+    ) -> bool:
+        """
+        Check if a vfolder is accessible by the user.
+        Returns True if accessible, raises VFolderNotFound if not.
+        """
+        async with self._db.begin_readonly_session() as session:
+            conn = await session.connection()
+            extra_vf_conds = [vfolders.c.id == vfolder_id]
+            entries = await query_accessible_vfolders(
+                conn,
+                user_uuid,
+                user_role=user_role,
+                domain_name=domain_name,
+                allowed_vfolder_types=allowed_vfolder_types,
+                extra_vf_conds=(sa.and_(*extra_vf_conds)),
+            )
+        if len(entries) == 0:
+            raise VFolderNotFound(extra_data=vfolder_id)
+        return True
+
+    @vfolder_repository_resilience.apply()
+    async def update_vfolder_max_size(
+        self,
+        vfolder_id: uuid.UUID,
+        max_size_mib: int,
+    ) -> None:
+        """
+        Update the max_size field of a vfolder in MiB.
+        """
+        async with self._db.begin_session() as session:
+            conn = await session.connection()
+            update_query = (
+                sa.update(vfolders).values(max_size=max_size_mib).where(vfolders.c.id == vfolder_id)
+            )
+            db_result = await conn.execute(update_query)
+            if db_result.rowcount != 1:
+                raise VFolderOperationFailed(
+                    f"Failed to update vfolder quota: expected 1 row, got {db_result.rowcount}"
+                )
+
+    @vfolder_repository_resilience.apply()
+    async def get_allowed_hosts_for_listing(
+        self,
+        user_uuid: uuid.UUID,
+        domain_name: str,
+        group_id: uuid.UUID | None,
+        resource_policy: Mapping[str, Any],
+        allowed_vfolder_types: Sequence[str],
+    ) -> VFolderHostPermissionMap:
+        """
+        Get the combined allowed vfolder hosts for user and group.
+        """
+        async with self._db.begin_readonly_session() as session:
+            conn = await session.connection()
+            allowed_hosts = VFolderHostPermissionMap()
+            if "user" in allowed_vfolder_types:
+                allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
+                    conn, resource_policy, domain_name, user_uuid, group_id
+                )
+                allowed_hosts = cast(
+                    VFolderHostPermissionMap, allowed_hosts | allowed_hosts_by_user
+                )
+            if "group" in allowed_vfolder_types:
+                allowed_hosts_by_group = await get_allowed_vfolder_hosts_by_group(
+                    conn,
+                    resource_policy,
+                    domain_name,
+                    group_id,
+                )
+                allowed_hosts = cast(
+                    VFolderHostPermissionMap, allowed_hosts | allowed_hosts_by_group
+                )
+            return allowed_hosts
+
+    @vfolder_repository_resilience.apply()
+    async def change_vfolder_ownership(
+        self,
+        vfolder_id: uuid.UUID,
+        user_email: str,
+    ) -> None:
+        """
+        Change ownership of a user vfolder to another user.
+        Validates user exists with allowed host access, updates owner,
+        and removes related invitations/permissions for the new owner.
+        """
+        # Step 1: Get target user info and their allowed hosts
+        async with self._db.begin_readonly_session() as session:
+            conn = await session.connection()
+            j = sa.join(users, keypairs, users.c.email == keypairs.c.user_id)
+            db_query = (
+                sa.select(users.c.uuid, users.c.domain_name, keypairs.c.resource_policy)
+                .select_from(j)
+                .where((users.c.email == user_email) & (users.c.status == UserStatus.ACTIVE))
+            )
+            try:
+                result = await conn.execute(db_query)
+            except sa.exc.DataError as e:
+                raise InvalidAPIParameters from e
+            user_info = result.first()
+            if user_info is None:
+                raise ObjectNotFound(object_name="user")
+
+            resource_policy_name = user_info.resource_policy
+            result = await conn.execute(
+                sa.select(keypair_resource_policies.c.allowed_vfolder_hosts).where(
+                    keypair_resource_policies.c.name == resource_policy_name
+                )
+            )
+            resource_policy_row = result.first()
+            allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
+                conn=conn,
+                resource_policy=dict(resource_policy_row._mapping) if resource_policy_row else {},
+                domain_name=user_info.domain_name,
+                user_uuid=user_info.uuid,
+            )
+
+        # Step 2: Check vfolder host is accessible by new owner
+        async with self._db.begin_readonly_session() as session:
+            conn = await session.connection()
+            db_query = (
+                sa.select(vfolders.c.host)
+                .select_from(vfolders)
+                .where(
+                    (vfolders.c.id == vfolder_id)
+                    & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+                )
+            )
+            folder_host = await conn.scalar(db_query)
+        if folder_host not in allowed_hosts_by_user:
+            raise VFolderOperationFailed(
+                "User to migrate vfolder needs an access to the storage host."
+            )
+
+        # Step 3: Update vfolder owner
+        async def _update() -> None:
+            async with self._db.begin_session() as session:
+                conn = await session.connection()
+                update_query = (
+                    sa.update(vfolders)
+                    .values(user=user_info.uuid)
+                    .where(
+                        (vfolders.c.id == vfolder_id)
+                        & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+                    )
+                )
+                await conn.execute(update_query)
+
+        await execute_with_retry(_update)
+
+        # Step 4: Delete related invitations and permissions for new owner
+        async def _delete_related_rows() -> None:
+            async with self._db.begin_session() as session:
+                conn = await session.connection()
+                del_query = sa.delete(vfolder_invitations).where(
+                    (vfolder_invitations.c.invitee == user_email)
+                    & (vfolder_invitations.c.vfolder == vfolder_id)
+                )
+                await conn.execute(del_query)
+                del_query = sa.delete(vfolder_permissions).where(
+                    (vfolder_permissions.c.vfolder == vfolder_id)
+                    & (vfolder_permissions.c.user == user_info.uuid)
+                )
+                await conn.execute(del_query)
+
+        await execute_with_retry(_delete_related_rows)

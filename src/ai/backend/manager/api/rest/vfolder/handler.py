@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import math
 import uuid
 from collections.abc import Mapping
 from http import HTTPStatus
@@ -106,7 +105,6 @@ from ai.backend.common.dto.manager.vfolder.response import (
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     VFolderHostPermission,
-    VFolderHostPermissionMap,
     VFolderID,
     VFolderUsageMode,
 )
@@ -115,7 +113,6 @@ from ai.backend.manager.api.resource import get_watcher_info
 from ai.backend.manager.api.utils import get_user_scopes
 from ai.backend.manager.api.vfolder import (
     check_vfolder_status,
-    fetch_exposed_volume_fields,
     resolve_vfolder_rows,
 )
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -130,7 +127,7 @@ from ai.backend.manager.dto.context import (
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.common import InternalServerError, ObjectNotFound
+from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.kernel import BackendAgentError
 from ai.backend.manager.errors.service import ModelServiceDependencyNotCleared
 from ai.backend.manager.errors.storage import (
@@ -138,20 +135,14 @@ from ai.backend.manager.errors.storage import (
     VFolderAlreadyExists,
     VFolderBadRequest,
     VFolderInvalidParameter,
-    VFolderNotFound,
     VFolderOperationFailed,
 )
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.user import (
     UserRole,
-    UserStatus,
-    users,
 )
-from ai.backend.manager.models.utils import execute_with_retry
 from ai.backend.manager.models.vfolder import (
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -161,14 +152,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderStatusSet,
     delete_vfolder_relation_rows,
     ensure_host_permission_allowed,
-    get_allowed_vfolder_hosts_by_group,
-    get_allowed_vfolder_hosts_by_user,
-    is_unmanaged,
-    query_accessible_vfolders,
     update_vfolder_status,
-    vfolder_invitations,
-    vfolder_permissions,
-    vfolders,
 )
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.repositories.base.updater import Updater
@@ -215,11 +199,15 @@ from ai.backend.manager.services.vfolder.actions.sharing import (
     UpdateVFolderSharingStatusAction,
 )
 from ai.backend.manager.services.vfolder.actions.storage_ops import (
+    ChangeVFolderOwnershipAction,
+    GetQuotaAction,
     GetVFolderUsageAction,
     GetVFolderUsedBytesAction,
     GetVolumePerfMetricAction,
     ListAllHostsAction,
     ListAllowedTypesAction,
+    ListHostsAction,
+    UpdateQuotaAction,
 )
 from ai.backend.manager.types import OptionalState
 
@@ -394,94 +382,37 @@ class VFolderHandler:
         query: QueryParam[ListHostsQuery],
         ctx: UserContext,
         req: RequestCtx,
+        procs: ProcessorsCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         params = query.parsed
         log.info(
             "VFOLDER.LIST_HOSTS (email:{}, ak:{})",
             ctx.user_email,
             ctx.access_key,
         )
-        domain_name = ctx.user_domain
-        group_id = params.group_id
         resource_policy = req.request["keypair"]["resource_policy"]
-        allowed_vfolder_types = (
-            await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
-        )
-        async with root_ctx.db.begin() as conn:
-            allowed_hosts = VFolderHostPermissionMap()
-            if "user" in allowed_vfolder_types:
-                allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
-                    conn, resource_policy, domain_name, ctx.user_uuid, group_id
-                )
-                allowed_hosts = cast(
-                    VFolderHostPermissionMap, allowed_hosts | allowed_hosts_by_user
-                )
-            if "group" in allowed_vfolder_types:
-                allowed_hosts_by_group = await get_allowed_vfolder_hosts_by_group(
-                    conn,
-                    resource_policy,
-                    domain_name,
-                    group_id,
-                )
-                allowed_hosts = cast(
-                    VFolderHostPermissionMap, allowed_hosts | allowed_hosts_by_group
-                )
-        all_volumes = await root_ctx.storage_manager.get_all_volumes()
-        all_hosts = {
-            f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes
-        }
-        allowed_hosts = VFolderHostPermissionMap({
-            host: perms for host, perms in allowed_hosts.items() if host in all_hosts
-        })
 
-        default_host = root_ctx.config_provider.config.volumes.default_host
-        if default_host not in allowed_hosts:
-            default_host = None
-
-        volumes = [
-            (proxy_name, volume_data)
-            for proxy_name, volume_data in all_volumes
-            if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
-        ]
-
-        fetch_exposed_volume_fields_tasks = [
-            fetch_exposed_volume_fields(
-                storage_manager=root_ctx.storage_manager,
-                valkey_stat_client=root_ctx.valkey_stat,
-                proxy_name=proxy_name,
-                volume_name=volume_data["name"],
+        result = await procs.processors.vfolder.list_hosts.wait_for_complete(
+            ListHostsAction(
+                user_uuid=ctx.user_uuid,
+                domain_name=ctx.user_domain,
+                group_id=params.group_id,
+                resource_policy=resource_policy,
             )
-            for proxy_name, volume_data in volumes
-        ]
-        get_sftp_scaling_groups_tasks = [
-            root_ctx.storage_manager.get_sftp_scaling_groups(proxy_name)
-            for proxy_name, volume_data in volumes
-        ]
-
-        fetch_exposed_volume_fields_results, get_sftp_scaling_groups_results = await asyncio.gather(
-            asyncio.gather(*fetch_exposed_volume_fields_tasks),
-            asyncio.gather(*get_sftp_scaling_groups_tasks),
         )
 
         volume_info = {}
-        for (proxy_name, volume_data), usage, sftp_scaling_groups in zip(
-            volumes,
-            fetch_exposed_volume_fields_results,
-            get_sftp_scaling_groups_results,
-            strict=True,
-        ):
-            host_key = f"{proxy_name}:{volume_data['name']}"
+        for host_key, info in result.volume_info.items():
             volume_info[host_key] = VolumeInfoDTO(
-                backend=volume_data["backend"],
-                capabilities=volume_data["capabilities"],
-                usage=usage,
-                sftp_scaling_groups=sftp_scaling_groups,
+                backend=info["backend"],
+                capabilities=info["capabilities"],
+                usage=info["usage"],
+                sftp_scaling_groups=info["sftp_scaling_groups"],
             )
 
         resp = ListHostsResponse(
-            default=default_host,
-            allowed=sorted(allowed_hosts),
+            default=result.default,
+            allowed=result.allowed,
             volume_info=volume_info,
         )
         return APIResponse.build(HTTPStatus.OK, resp)
@@ -608,49 +539,34 @@ class VFolderHandler:
         query: QueryParam[GetQuotaQuery],
         ctx: UserContext,
         req: RequestCtx,
+        procs: ProcessorsCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         params = query.parsed
         vfolder_row = (
             await resolve_vfolder_rows(req.request, VFolderPermissionSetAlias.READABLE, params.id)
         )[0]
         await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
-        proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
-            params.folder_host, is_unmanaged(vfolder_row["unmanaged_path"])
-        )
         log.info(
-            "VFOLDER.GET_QUOTA (email:{}, volume_name:{}, vf:{})",
+            "VFOLDER.GET_QUOTA (email:{}, vf:{})",
             ctx.user_email,
-            volume_name,
             params.id,
         )
 
         user_role = req.request["user"]["role"]
-        user_uuid = ctx.user_uuid
-        domain_name = ctx.user_domain
-        if user_role == UserRole.SUPERADMIN:
-            pass
-        else:
-            allowed_vfolder_types = (
-                await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
-            )
-            async with root_ctx.db.begin_readonly() as conn:
-                extra_vf_conds = [vfolders.c.id == params.id]
-                entries = await query_accessible_vfolders(
-                    conn,
-                    user_uuid,
-                    user_role=user_role,
-                    domain_name=domain_name,
-                    allowed_vfolder_types=allowed_vfolder_types,
-                    extra_vf_conds=(sa.and_(*extra_vf_conds)),
-                )
-            if len(entries) == 0:
-                raise VFolderNotFound(extra_data=params.id)
-
-        manager_client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
         vfid = str(VFolderID.from_row(vfolder_row))
-        storage_reply = await manager_client.get_volume_quota(volume_name, vfid)
-        resp = GetQuotaResponse(data=dict(storage_reply))
+
+        result = await procs.processors.vfolder.get_quota.wait_for_complete(
+            GetQuotaAction(
+                folder_host=params.folder_host,
+                vfid=vfid,
+                vfolder_id=params.id,
+                unmanaged_path=vfolder_row["unmanaged_path"],
+                user_role=user_role,
+                user_uuid=ctx.user_uuid,
+                domain_name=ctx.user_domain,
+            )
+        )
+        resp = GetQuotaResponse(data=result.data)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
@@ -662,80 +578,39 @@ class VFolderHandler:
         body: BodyParam[UpdateQuotaReq],
         ctx: UserContext,
         req: RequestCtx,
+        procs: ProcessorsCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         params = body.parsed
         vfolder_row = (
             await resolve_vfolder_rows(req.request, VFolderPermissionSetAlias.READABLE, params.id)
         )[0]
         await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
-        folder_host = params.folder_host
-        proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
-            folder_host, is_unmanaged(vfolder_row["unmanaged_path"])
-        )
         quota = int(params.input["size_bytes"])
         log.info(
-            "VFOLDER.UPDATE_QUOTA (email:{}, volume_name:{}, quota:{}, vf:{})",
+            "VFOLDER.UPDATE_QUOTA (email:{}, quota:{}, vf:{})",
             ctx.user_email,
-            volume_name,
             quota,
             params.id,
         )
 
         user_role = req.request["user"]["role"]
-        user_uuid = ctx.user_uuid
-        domain_name = ctx.user_domain
         resource_policy = req.request["keypair"]["resource_policy"]
-
-        if user_role == UserRole.SUPERADMIN:
-            pass
-        else:
-            allowed_vfolder_types = (
-                await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
-            )
-            async with root_ctx.db.begin_readonly() as conn:
-                await ensure_host_permission_allowed(
-                    conn,
-                    folder_host,
-                    allowed_vfolder_types=allowed_vfolder_types,
-                    user_uuid=user_uuid,
-                    resource_policy=resource_policy,
-                    domain_name=domain_name,
-                    permission=VFolderHostPermission.MODIFY,
-                )
-                extra_vf_conds = [vfolders.c.id == params.id]
-                entries = await query_accessible_vfolders(
-                    conn,
-                    user_uuid,
-                    user_role=user_role,
-                    domain_name=domain_name,
-                    allowed_vfolder_types=allowed_vfolder_types,
-                    extra_vf_conds=(sa.and_(*extra_vf_conds)),
-                )
-            if len(entries) == 0:
-                raise VFolderNotFound(extra_data=params.id)
-
-        max_quota_scope_size = resource_policy.get("max_quota_scope_size", 0)
-        if max_quota_scope_size > 0 and (quota <= 0 or quota > max_quota_scope_size):
-            quota = max_quota_scope_size
-
-        manager_client = root_ctx.storage_manager.get_manager_facing_client(proxy_name)
         vfid = str(VFolderID.from_row(vfolder_row))
-        await manager_client.update_volume_quota(volume_name, vfid, quota)
 
-        async with root_ctx.db.begin() as conn:
-            update_query = (
-                sa.update(vfolders)
-                .values(max_size=math.ceil(quota / 2**20))
-                .where(vfolders.c.id == params.id)
+        result = await procs.processors.vfolder.update_quota.wait_for_complete(
+            UpdateQuotaAction(
+                folder_host=params.folder_host,
+                vfid=vfid,
+                vfolder_id=params.id,
+                unmanaged_path=vfolder_row["unmanaged_path"],
+                user_role=user_role,
+                user_uuid=ctx.user_uuid,
+                domain_name=ctx.user_domain,
+                resource_policy=resource_policy,
+                size_bytes=quota,
             )
-            db_result = await conn.execute(update_query)
-            if db_result.rowcount != 1:
-                raise VFolderOperationFailed(
-                    f"Failed to update vfolder quota: expected 1 row, got {db_result.rowcount}"
-                )
-
-        resp = UpdateQuotaResponse(size_bytes=quota)
+        )
+        resp = UpdateQuotaResponse(size_bytes=result.size_bytes)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
@@ -1481,11 +1356,8 @@ class VFolderHandler:
         self,
         ctx: UserContext,
         req: RequestCtx,
+        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
-        domain_name = ctx.user_domain
-        user_role = req.request["user"]["role"]
-        user_uuid = ctx.user_uuid
         resource_policy = req.request["keypair"]["resource_policy"]
         folder_name = req.request.match_info["name"]
 
@@ -1505,14 +1377,16 @@ class VFolderHandler:
             row["id"],
             folder_name,
         )
-        await _delete(
-            root_ctx,
-            row,
-            user_uuid,
-            user_role,
-            domain_name,
-            resource_policy,
-        )
+        try:
+            await processors_ctx.processors.vfolder.move_to_trash_vfolder.wait_for_complete(
+                MoveToTrashVFolderAction(
+                    user_uuid=ctx.user_uuid,
+                    keypair_resource_policy=resource_policy,
+                    vfolder_uuid=row["id"],
+                )
+            )
+        except VFolderInvalidParameter as e:
+            raise InvalidAPIParameters(str(e)) from e
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
@@ -2289,93 +2163,22 @@ class VFolderHandler:
         self,
         body: BodyParam[ChangeVFolderOwnershipReq],
         ctx: UserContext,
-        req: RequestCtx,
+        procs: ProcessorsCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         params = body.parsed
-        vfolder_id = params.vfolder
-        user_email = params.user_email
-
-        allowed_hosts_by_user = VFolderHostPermissionMap()
-        async with root_ctx.db.begin_readonly() as conn:
-            j = sa.join(users, keypairs, users.c.email == keypairs.c.user_id)
-            db_query = (
-                sa.select(users.c.uuid, users.c.domain_name, keypairs.c.resource_policy)
-                .select_from(j)
-                .where((users.c.email == user_email) & (users.c.status == UserStatus.ACTIVE))
-            )
-            try:
-                result = await conn.execute(db_query)
-            except sa.exc.DataError as e:
-                raise InvalidAPIParameters from e
-
-            user_info = result.first()
-            if user_info is None:
-                raise ObjectNotFound(object_name="user")
-            resource_policy_name = user_info.resource_policy
-            result = await conn.execute(
-                sa.select(keypair_resource_policies.c.allowed_vfolder_hosts).where(
-                    keypair_resource_policies.c.name == resource_policy_name
-                )
-            )
-            resource_policy_row = result.first()
-            allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
-                conn=conn,
-                resource_policy=dict(resource_policy_row._mapping) if resource_policy_row else {},
-                domain_name=user_info.domain_name,
-                user_uuid=user_info.uuid,
-            )
         log.info(
-            "VFOLDER.CHANGE_VFOLDER_OWNERSHIP(email:{}, ak:{}, vfid:{}, uid:{})",
+            "VFOLDER.CHANGE_VFOLDER_OWNERSHIP(email:{}, ak:{}, vfid:{}, target:{})",
             ctx.user_email,
             ctx.access_key,
-            vfolder_id,
-            user_info.uuid,
+            params.vfolder,
+            params.user_email,
         )
-        async with root_ctx.db.begin_readonly() as conn:
-            db_query = (
-                sa.select(vfolders.c.host)
-                .select_from(vfolders)
-                .where(
-                    (vfolders.c.id == vfolder_id)
-                    & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
-                )
+        await procs.processors.vfolder.change_vfolder_ownership.wait_for_complete(
+            ChangeVFolderOwnershipAction(
+                vfolder_id=params.vfolder,
+                user_email=params.user_email,
             )
-            folder_host = await conn.scalar(db_query)
-        if folder_host not in allowed_hosts_by_user:
-            raise VFolderOperationFailed(
-                "User to migrate vfolder needs an access to the storage host."
-            )
-
-        async def _update() -> None:
-            async with root_ctx.db.begin() as conn:
-                update_query = (
-                    sa.update(vfolders)
-                    .values(user=user_info.uuid)
-                    .where(
-                        (vfolders.c.id == vfolder_id)
-                        & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
-                    )
-                )
-                await conn.execute(update_query)
-
-        await execute_with_retry(_update)
-
-        async def _delete_vfolder_related_rows() -> None:
-            async with root_ctx.db.begin() as conn:
-                del_query = sa.delete(vfolder_invitations).where(
-                    (vfolder_invitations.c.invitee == user_email)
-                    & (vfolder_invitations.c.vfolder == vfolder_id)
-                )
-                await conn.execute(del_query)
-                del_query = sa.delete(vfolder_permissions).where(
-                    (vfolder_permissions.c.vfolder == vfolder_id)
-                    & (vfolder_permissions.c.user == user_info.uuid)
-                )
-                await conn.execute(del_query)
-
-        await execute_with_retry(_delete_vfolder_related_rows)
-
+        )
         resp = MessageResponse(msg="")
         return APIResponse.build(HTTPStatus.OK, resp)
 

@@ -1,20 +1,26 @@
+import asyncio
 import logging
+import math
 import uuid
 from pathlib import PurePosixPath
 from typing import (
+    Any,
     cast,
 )
 
 import aiohttp
+import msgpack
 from aiohttp import hdrs, web
 from sqlalchemy import exc as sa_exc
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
     VFolderHostPermission,
+    VFolderHostPermissionMap,
     VFolderID,
     VFolderUsageMode,
 )
@@ -80,6 +86,10 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.storage_ops import (
+    ChangeVFolderOwnershipAction,
+    ChangeVFolderOwnershipActionResult,
+    GetQuotaAction,
+    GetQuotaActionResult,
     GetVFolderUsageAction,
     GetVFolderUsageActionResult,
     GetVFolderUsedBytesAction,
@@ -90,6 +100,10 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ListAllHostsActionResult,
     ListAllowedTypesAction,
     ListAllowedTypesActionResult,
+    ListHostsAction,
+    ListHostsActionResult,
+    UpdateQuotaAction,
+    UpdateQuotaActionResult,
 )
 from ai.backend.manager.services.vfolder.types import (
     VFolderBaseInfo,
@@ -121,6 +135,7 @@ class VFolderService:
     _background_task_manager: BackgroundTaskManager
     _vfolder_repository: VfolderRepository
     _user_repository: UserRepository
+    _valkey_stat_client: ValkeyStatClient
 
     def __init__(
         self,
@@ -129,12 +144,14 @@ class VFolderService:
         background_task_manager: BackgroundTaskManager,
         vfolder_repository: VfolderRepository,
         user_repository: UserRepository,
+        valkey_stat_client: ValkeyStatClient,
     ) -> None:
         self._config_provider = config_provider
         self._storage_manager = storage_manager
         self._vfolder_repository = vfolder_repository
         self._user_repository = user_repository
         self._background_task_manager = background_task_manager
+        self._valkey_stat_client = valkey_stat_client
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
         user_role = action.user_role
@@ -807,3 +824,172 @@ class VFolderService:
         client = self._storage_manager.get_manager_facing_client(proxy_name)
         usage = await client.get_used_bytes(volume_name, action.vfolder_id)
         return GetVFolderUsedBytesActionResult(data=dict(usage))
+
+    async def list_hosts(self, action: ListHostsAction) -> ListHostsActionResult:
+        allowed_vfolder_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        )
+        allowed_hosts = await self._vfolder_repository.get_allowed_hosts_for_listing(
+            user_uuid=action.user_uuid,
+            domain_name=action.domain_name,
+            group_id=action.group_id,
+            resource_policy=action.resource_policy,
+            allowed_vfolder_types=list(allowed_vfolder_types),
+        )
+        all_volumes = await self._storage_manager.get_all_volumes()
+        all_hosts = {
+            f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes
+        }
+        allowed_hosts = VFolderHostPermissionMap({
+            host: perms for host, perms in allowed_hosts.items() if host in all_hosts
+        })
+
+        default_host = self._config_provider.config.volumes.default_host
+        if default_host not in allowed_hosts:
+            default_host = None
+
+        volumes = [
+            (proxy_name, volume_data)
+            for proxy_name, volume_data in all_volumes
+            if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
+        ]
+
+        fetch_volume_tasks = [
+            self._fetch_exposed_volume_fields(proxy_name, volume_data["name"])
+            for proxy_name, volume_data in volumes
+        ]
+        get_sftp_tasks = [
+            self._storage_manager.get_sftp_scaling_groups(proxy_name)
+            for proxy_name, volume_data in volumes
+        ]
+
+        fetch_results, sftp_results = await asyncio.gather(
+            asyncio.gather(*fetch_volume_tasks),
+            asyncio.gather(*get_sftp_tasks),
+        )
+
+        volume_info: dict[str, Any] = {}
+        for (proxy_name, volume_data), usage, sftp_scaling_groups in zip(
+            volumes,
+            fetch_results,
+            sftp_results,
+            strict=True,
+        ):
+            host_key = f"{proxy_name}:{volume_data['name']}"
+            volume_info[host_key] = {
+                "backend": volume_data["backend"],
+                "capabilities": volume_data["capabilities"],
+                "usage": usage,
+                "sftp_scaling_groups": sftp_scaling_groups,
+            }
+
+        return ListHostsActionResult(
+            default=default_host,
+            allowed=sorted(allowed_hosts),
+            volume_info=volume_info,
+        )
+
+    async def _fetch_exposed_volume_fields(
+        self,
+        proxy_name: str,
+        volume_name: str,
+    ) -> dict[str, int | float]:
+        """Fetch exposed volume usage fields (percentage, used_bytes, capacity_bytes)."""
+        volume_usage: dict[str, int | float] = {}
+        exposed = self._storage_manager._exposed_volume_info
+
+        show_percentage = "percentage" in exposed
+        show_used = "used_bytes" in exposed
+        show_total = "capacity_bytes" in exposed
+
+        if show_percentage or show_used or show_total:
+            volume_usage_cache = await self._valkey_stat_client.get_volume_usage(
+                proxy_name, volume_name
+            )
+            if volume_usage_cache:
+                volume_usage = msgpack.unpackb(volume_usage_cache)
+            else:
+                manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+                storage_reply = await manager_client.get_fs_usage(volume_name)
+                storage_used_bytes = storage_reply["used_bytes"]
+                storage_capacity_bytes = storage_reply["capacity_bytes"]
+
+                if show_used:
+                    volume_usage["used"] = storage_used_bytes
+                if show_total:
+                    volume_usage["total"] = storage_capacity_bytes
+                if show_percentage:
+                    try:
+                        volume_usage["percentage"] = storage_used_bytes / storage_capacity_bytes
+                    except ZeroDivisionError:
+                        volume_usage["percentage"] = 0.0
+
+        return volume_usage
+
+    async def get_quota(self, action: GetQuotaAction) -> GetQuotaActionResult:
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            action.folder_host, is_unmanaged(action.unmanaged_path)
+        )
+
+        if action.user_role != UserRole.SUPERADMIN:
+            allowed_vfolder_types = (
+                await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+            )
+            await self._vfolder_repository.check_vfolder_accessible(
+                vfolder_id=action.vfolder_id,
+                user_uuid=action.user_uuid,
+                user_role=action.user_role,
+                domain_name=action.domain_name,
+                allowed_vfolder_types=list(allowed_vfolder_types),
+            )
+
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        storage_reply = await manager_client.get_volume_quota(volume_name, action.vfid)
+        return GetQuotaActionResult(data=dict(storage_reply))
+
+    async def update_quota(self, action: UpdateQuotaAction) -> UpdateQuotaActionResult:
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            action.folder_host, is_unmanaged(action.unmanaged_path)
+        )
+        quota = action.size_bytes
+
+        if action.user_role != UserRole.SUPERADMIN:
+            allowed_vfolder_types = (
+                await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+            )
+            await self._vfolder_repository.ensure_host_permission_allowed(
+                action.folder_host,
+                permission=VFolderHostPermission.MODIFY,
+                allowed_vfolder_types=list(allowed_vfolder_types),
+                user_uuid=action.user_uuid,
+                resource_policy=action.resource_policy,
+                domain_name=action.domain_name,
+            )
+            await self._vfolder_repository.check_vfolder_accessible(
+                vfolder_id=action.vfolder_id,
+                user_uuid=action.user_uuid,
+                user_role=action.user_role,
+                domain_name=action.domain_name,
+                allowed_vfolder_types=list(allowed_vfolder_types),
+            )
+
+        max_quota_scope_size = action.resource_policy.get("max_quota_scope_size", 0)
+        if max_quota_scope_size > 0 and (quota <= 0 or quota > max_quota_scope_size):
+            quota = max_quota_scope_size
+
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        await manager_client.update_volume_quota(volume_name, action.vfid, quota)
+
+        await self._vfolder_repository.update_vfolder_max_size(
+            action.vfolder_id, math.ceil(quota / 2**20)
+        )
+
+        return UpdateQuotaActionResult(size_bytes=quota)
+
+    async def change_vfolder_ownership(
+        self, action: ChangeVFolderOwnershipAction
+    ) -> ChangeVFolderOwnershipActionResult:
+        await self._vfolder_repository.change_vfolder_ownership(
+            action.vfolder_id, action.user_email
+        )
+        return ChangeVFolderOwnershipActionResult()
