@@ -645,7 +645,11 @@ class DeploymentService:
     async def activate_revision(
         self, action: ActivateRevisionAction
     ) -> ActivateRevisionActionResult:
-        """Activate a specific revision to be the current revision.
+        """Activate a specific revision by initiating the deployment strategy.
+
+        Sets deploying_revision and transitions the deployment to DEPLOYING state.
+        The coordinator will execute the configured deployment strategy (rolling update,
+        blue-green, etc.) and swap deploying_revision → current_revision on completion.
 
         Args:
             action: Action containing deployment and revision IDs
@@ -656,18 +660,16 @@ class DeploymentService:
         # 1. Validate revision exists (raises exception if not found)
         _revision = await self._deployment_repository.get_revision(action.revision_id)
 
-        # 2. Update endpoint.current_revision and get previous revision
-        previous_revision_id = await self._deployment_repository.update_current_revision(
+        # 2. Set deploying_revision and transition to DEPLOYING lifecycle
+        previous_revision_id = await self._deployment_repository.start_deploying_revision(
             action.deployment_id, action.revision_id
         )
 
-        # 3. Trigger lifecycle check to update routes with new revision
-        await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.CHECK_REPLICA
-        )
+        # 3. Trigger DEPLOYING lifecycle to start strategy execution
+        await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.DEPLOYING)
 
         log.info(
-            "Activated revision {} for deployment {} (previous: {})",
+            "Started deploying revision {} for deployment {} (current: {})",
             action.revision_id,
             action.deployment_id,
             previous_revision_id,
