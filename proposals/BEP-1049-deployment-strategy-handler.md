@@ -30,7 +30,7 @@ Rolling Update similarly progresses gradually across cycles. Both strategies **k
 
 ### Evaluator + Sub-Step Handler Pattern
 
-A single `evaluate()` call may produce different sub-steps for different deployments — some completed, others still PROGRESSING. To handle this, a **strategy evaluator** groups deployments by sub-step, and **per-sub-step handlers** process each group. Completed deployments are returned separately in `EvaluationResult.completed` and processed via the PROGRESSING handler's `post_process`.
+A single `evaluate()` call may produce different sub-steps for different deployments — some completed, others still PROGRESSING. To handle this, a **strategy evaluator** groups deployments by sub-step, and **per-sub-step handlers** process each group. Completed deployments are returned separately in `EvaluationResult.completed` and processed directly by the coordinator's `_transition_completed_deployments()`.
 
 | Aspect | How it works |
 |--------|-------------|
@@ -81,7 +81,7 @@ Core idea: A **strategy evaluator** evaluates DEPLOYING-state deployments and gr
 │    ├─ evaluator exists → _process_with_evaluator() (evaluator path)          │
 │    └─ no evaluator → existing single-handler path                            │
 │                                                                              │
-│  Handler map key: HandlerKey                                                 │
+│  Handler map key: DeploymentHandlerKey                                       │
 │    DeploymentLifecycleType                        ← single handlers          │
 │    | (DeploymentLifecycleType, DeploymentSubStep) ← sub-step handlers        │
 │                                                                              │
@@ -113,8 +113,6 @@ Core idea: A **strategy evaluator** evaluates DEPLOYING-state deployments and gr
                             │  (DEPLOYING, PROGRESSING)            │
                             │    → DeployingProgressingHandler     │
                             │      next_status: DEPLOYING          │
-                            │      post_process: revision swap     │
-                            │        for completed deployments     │
                             │                                      │
                             │  (DEPLOYING, ROLLED_BACK)            │
                             │    → DeployingRolledBackHandler      │
@@ -168,7 +166,7 @@ Both Blue-Green and Rolling Update cycle FSMs share a common set of **sub-step v
 | **progressing** | Strategy making active progress — health checks pending, promotion waiting, or routes being replaced | DeployingProgressingHandler | DEPLOYING → DEPLOYING |
 | **rolled_back** | Strategy failed — rolled back to previous revision | DeployingRolledBackHandler | DEPLOYING → READY |
 
-Completion is not a sub-step but a signal on `CycleEvaluationResult.completed`. When the strategy FSM detects that all new routes are healthy and no old routes remain, it returns `CycleEvaluationResult(sub_step=PROGRESSING, completed=True)`. The evaluator collects these into `EvaluationResult.completed`, and the coordinator passes them to the PROGRESSING handler's `post_process` for revision swap, then transitions to READY.
+Completion is not a sub-step but a signal on `CycleEvaluationResult.completed`. When the strategy FSM detects that all new routes are healthy and no old routes remain, it returns `CycleEvaluationResult(sub_step=PROGRESSING, completed=True)`. The evaluator collects these into `EvaluationResult.completed`, and the coordinator directly calls `_transition_completed_deployments()` which atomically performs the revision swap and DEPLOYING→READY transition.
 
 ### DeploymentStrategyEvaluator
 
@@ -266,20 +264,14 @@ class DeployingInProgressHandler(DeploymentHandler):
         return DeploymentExecutionResult(successes=list(deployments))
 
     async def post_process(self, result):
-        if result.successes:
-            await self._deployment_controller.mark_lifecycle_needed(
-                DeploymentLifecycleType.DEPLOYING       # reschedule next cycle
-            )
-        await self._route_controller.mark_lifecycle_needed(
-            RouteLifecycleType.PROVISIONING              # trigger new route provisioning
+        # Re-schedule DEPLOYING for the next coordinator cycle
+        await self._deployment_controller.mark_lifecycle_needed(
+            DeploymentLifecycleType.DEPLOYING
         )
-        # Revision swap for completed deployments
-        # (coordinator attaches eval_result.completed to result.completed)
-        if result.completed:
-            swap_ids = [d.id for d in result.completed
-                        if d.deploying_revision_id is not None]
-            if swap_ids:
-                await repo.complete_deployment_revision_swap(swap_ids)
+        # Trigger route provisioning so new routes get sessions
+        await self._route_controller.mark_lifecycle_needed(
+            RouteLifecycleType.PROVISIONING
+        )
 
 
 class DeployingProvisioningHandler(DeployingInProgressHandler):
@@ -302,7 +294,7 @@ class DeployingProgressingHandler(DeployingInProgressHandler):
 
 `next_status().lifecycle == DEPLOYING` so the coordinator records DEPLOYING→DEPLOYING SUCCESS history for in-progress deployments. The deployment stays in DEPLOYING state and is re-evaluated next cycle.
 
-For completed deployments, the coordinator passes `EvaluationResult.completed` to the PROGRESSING handler's `post_process` via `result.completed`. The handler performs the revision swap, then the coordinator transitions the deployment to READY with history recording.
+For completed deployments, the coordinator directly calls `_transition_completed_deployments()` after all handler post-processing. This method atomically performs the revision swap (`complete_deployment_revision_swap`) and transitions the deployment to READY with history recording.
 
 #### DeployingRolledBackHandler (ROLLED_BACK)
 
@@ -357,24 +349,20 @@ _process_with_evaluator(lifecycle_type, evaluator)
     │  │                                                               │
     │  └───────────────────────────────────────────────────────────────┘
     │
-    │  4. Attach completed deployments to PROGRESSING handler's result
-    │  if eval_result.completed:
-    │    handler_results[PROGRESSING].result.completed = eval_result.completed
-    │
-    │  5. Post-process outside RecorderContext scope
+    │  4. Post-process outside RecorderContext scope
     │  for sub_step, (handler, result) in handler_results:
     │    handler.post_process(result)
-    │    ↑ PROGRESSING handler performs revision swap for result.completed
+    │    ↑ reschedule DEPLOYING cycle + trigger route provisioning
     │
-    │  6. Lifecycle transition for completed deployments
+    │  5. Transition completed deployments (coordinator direct)
     │  if eval_result.completed:
-    │    _transition_completed_deployments(completed, all_records)
-    │    ↑ DEPLOYING → READY + history recording
+    │    _transition_completed_deployments(completed)
+    │    ↑ atomic revision swap + DEPLOYING → READY + history recording
     │
     ▼
 ```
 
-Key: `_handle_status_transitions()` uses the **exact same generic method** as the single-handler path. It performs batch updates and history recording based on each handler's `next_status()`/`failure_status()`. Completed deployments bypass this path — their lifecycle transition is handled by `_transition_completed_deployments()` after the revision swap in `post_process`.
+Key: `_handle_status_transitions()` uses the **exact same generic method** as the single-handler path. It performs batch updates and history recording based on each handler's `next_status()`/`failure_status()`. Completed deployments bypass this path — their lifecycle transition is handled directly by the coordinator's `_transition_completed_deployments()`, which atomically performs the revision swap and DEPLOYING→READY transition.
 
 ### Sub-Step Recording
 
@@ -413,7 +401,7 @@ sub_steps:
   [strategy_result]         determine_sub_step   → success (message: "completed")
 ```
 
-The revision swap (`complete_deployment_revision_swap`) is performed by the PROGRESSING handler's `post_process` outside the recorder scope, so it does not appear in sub_steps. The coordinator then transitions the deployment to READY with history recording.
+The revision swap (`complete_deployment_revision_swap`) is performed by the coordinator's `_transition_completed_deployments()` outside the recorder scope, so it does not appear in sub_steps. This method atomically swaps the revision and transitions the deployment to READY with history recording.
 
 Format is `[phase] step`. The `determine_sub_step` step's `message` field records the determined sub-step value. This information is stored as JSON in the `deployment_history` table's `sub_steps` column and is queryable via API/CLI.
 
