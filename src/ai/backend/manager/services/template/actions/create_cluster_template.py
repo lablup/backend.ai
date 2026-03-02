@@ -7,6 +7,7 @@ from typing import Any, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.models.user import UserRole
 
 from .base import TemplateAction
 
@@ -16,8 +17,12 @@ class CreateClusterTemplateAction(TemplateAction):
     """Action to create a cluster template."""
 
     domain_name: str
-    user_uuid: uuid.UUID
-    group_id: uuid.UUID
+    requesting_group: str
+    requester_uuid: uuid.UUID
+    requester_access_key: str
+    requester_role: UserRole
+    requester_domain: str
+    owner_access_key: str | None
     template_data: Mapping[str, Any]
 
     @override

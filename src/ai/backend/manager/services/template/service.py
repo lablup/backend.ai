@@ -71,6 +71,17 @@ class TemplateService:
         self, action: CreateTaskTemplateAction
     ) -> CreateTaskTemplateActionResult:
         """Validate and create one or more task templates."""
+        # Resolve owner UUID and group ID (moved from handler)
+        default_user_uuid, default_group_id = await self._repository.resolve_owner(
+            requester_uuid=action.requester_uuid,
+            requester_access_key=action.requester_access_key,
+            requester_role=action.requester_role,
+            requester_domain=action.requester_domain,
+            requesting_domain=action.domain_name,
+            requesting_group=action.requesting_group,
+            owner_access_key=action.owner_access_key,
+        )
+
         items: list[dict[str, Any]] = []
         for item_input in action.items:
             template_data = check_task_template(item_input.template)
@@ -80,13 +91,9 @@ class TemplateService:
                 if item_input.name is not None
                 else template_data["metadata"]["name"]
             )
-            group_id = (
-                item_input.group_id if item_input.group_id is not None else action.default_group_id
-            )
+            group_id = item_input.group_id if item_input.group_id is not None else default_group_id
             user_uuid = (
-                item_input.user_uuid
-                if item_input.user_uuid is not None
-                else action.default_user_uuid
+                item_input.user_uuid if item_input.user_uuid is not None else default_user_uuid
             )
             items.append({
                 "id": template_id,
@@ -132,6 +139,17 @@ class TemplateService:
         if not exists:
             raise TaskTemplateNotFound
 
+        # Resolve owner UUID and group ID (moved from handler)
+        default_user_uuid, default_group_id = await self._repository.resolve_owner(
+            requester_uuid=action.requester_uuid,
+            requester_access_key=action.requester_access_key,
+            requester_role=action.requester_role,
+            requester_domain=action.requester_domain,
+            requesting_domain=action.domain_name,
+            requesting_group=action.requesting_group,
+            owner_access_key=action.owner_access_key,
+        )
+
         for item_input in action.items:
             template_data = check_task_template(item_input.template)
             name = (
@@ -139,9 +157,9 @@ class TemplateService:
                 if item_input.name is not None
                 else template_data["metadata"]["name"]
             )
-            group_id = item_input.group_id if item_input.group_id is not None else action.group_id
+            group_id = item_input.group_id if item_input.group_id is not None else default_group_id
             user_uuid = (
-                item_input.user_uuid if item_input.user_uuid is not None else action.user_uuid
+                item_input.user_uuid if item_input.user_uuid is not None else default_user_uuid
             )
             rowcount = await self._repository.update_task_template(
                 action.template_id, group_id, user_uuid, name, template_data
@@ -170,16 +188,27 @@ class TemplateService:
         self, action: CreateClusterTemplateAction
     ) -> CreateClusterTemplateActionResult:
         """Validate and create a cluster template."""
+        # Resolve owner UUID and group ID (moved from handler)
+        owner_uuid, group_id = await self._repository.resolve_owner(
+            requester_uuid=action.requester_uuid,
+            requester_access_key=action.requester_access_key,
+            requester_role=action.requester_role,
+            requester_domain=action.requester_domain,
+            requesting_domain=action.domain_name,
+            requesting_group=action.requesting_group,
+            owner_access_key=action.owner_access_key,
+        )
+
         template_data = check_cluster_template(action.template_data)
         name = template_data["metadata"]["name"]
         template_id = await self._repository.create_cluster_template(
             action.domain_name,
-            action.group_id,
-            action.user_uuid,
+            group_id,
+            owner_uuid,
             name,
             template_data,
         )
-        return CreateClusterTemplateActionResult(id=template_id, user=action.user_uuid.hex)
+        return CreateClusterTemplateActionResult(id=template_id, user=owner_uuid.hex)
 
     async def list_cluster_templates(
         self, action: ListClusterTemplatesAction

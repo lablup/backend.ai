@@ -7,11 +7,16 @@ from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import DBOperationFailed
+from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import association_groups_users as agus
 from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.session_template import TemplateType, session_templates
 from ai.backend.manager.models.user import UserRole, users
+from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -24,6 +29,104 @@ class TemplateDBSource:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+
+    # --- Owner resolution ---
+
+    async def resolve_owner(
+        self,
+        requester_uuid: uuid.UUID,
+        requester_access_key: str,
+        requester_role: UserRole,
+        requester_domain: str,
+        requesting_domain: str,
+        requesting_group: str,
+        owner_access_key: str | None = None,
+    ) -> tuple[uuid.UUID, uuid.UUID]:
+        """Resolve owner UUID and group ID for template operations.
+
+        Adapted from utils.query_userinfo — handles on-behalf-of access key
+        delegation, domain validation, and role-based group resolution.
+        """
+        async with self._db.begin_readonly() as conn:
+            if owner_access_key is not None and owner_access_key != requester_access_key:
+                query = (
+                    sa.select(keypairs.c.user, users.c.role, users.c.domain_name)
+                    .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
+                    .where(keypairs.c.access_key == owner_access_key)
+                )
+                result = await conn.execute(query)
+                row = result.first()
+                if row is None:
+                    raise InvalidAPIParameters("Unknown owner access key")
+                owner_domain = row.domain_name
+                owner_uuid = row.user
+                owner_role = row.role
+                try:
+                    check_if_requester_is_eligible_to_act_as_target_user(
+                        requester_role,
+                        requester_domain,
+                        owner_role,
+                        owner_domain,
+                    )
+                except RuntimeError as e:
+                    raise GenericForbidden(str(e)) from e
+            else:
+                owner_domain = requester_domain
+                owner_uuid = requester_uuid
+                owner_role = requester_role
+
+            # Validate domain is active
+            query = (
+                sa.select(domains.c.name)
+                .select_from(domains)
+                .where((domains.c.name == owner_domain) & domains.c.is_active)
+            )
+            qresult = await conn.execute(query)
+            if qresult.scalar() is None:
+                raise InvalidAPIParameters("Invalid domain")
+
+            # Resolve group by role
+            if owner_role == UserRole.SUPERADMIN:
+                query = (
+                    sa.select(groups.c.id)
+                    .select_from(groups)
+                    .where(
+                        (groups.c.domain_name == requesting_domain)
+                        & (groups.c.name == requesting_group)
+                        & groups.c.is_active,
+                    )
+                )
+            elif owner_role == UserRole.ADMIN:
+                if requesting_domain != owner_domain:
+                    raise InvalidAPIParameters("You can only set the domain to the owner's domain.")
+                query = (
+                    sa.select(groups.c.id)
+                    .select_from(groups)
+                    .where(
+                        (groups.c.domain_name == owner_domain)
+                        & (groups.c.name == requesting_group)
+                        & groups.c.is_active,
+                    )
+                )
+            else:
+                if requesting_domain != owner_domain:
+                    raise InvalidAPIParameters("You can only set the domain to your domain.")
+                query = (
+                    sa.select(agus.c.group_id)
+                    .select_from(agus.join(groups, agus.c.group_id == groups.c.id))
+                    .where(
+                        (agus.c.user_id == owner_uuid)
+                        & (groups.c.domain_name == owner_domain)
+                        & (groups.c.name == requesting_group)
+                        & groups.c.is_active,
+                    )
+                )
+            qresult = await conn.execute(query)
+            group_id = qresult.scalar()
+            if group_id is None:
+                raise InvalidAPIParameters("Invalid group")
+
+        return owner_uuid, group_id
 
     # --- Task template operations ---
 

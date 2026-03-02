@@ -36,17 +36,16 @@ from ai.backend.manager import __version__
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericBadRequest
-from ai.backend.manager.models.health import get_manager_db_cxn_status
 from ai.backend.manager.services.manager_admin import (
     FetchManagerStatusAction,
     GetAnnouncementAction,
+    GetDbCxnStatusAction,
     PerformSchedulerOpsAction,
     UpdateAnnouncementAction,
     UpdateManagerStatusAction,
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.context import RootContext
     from ai.backend.manager.services.processors import Processors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -279,12 +278,10 @@ class ManagerHandler:
     # get_manager_status_for_prom (GET /manager/prom)
     # ------------------------------------------------------------------
 
-    async def get_manager_status_for_prom(self, req: RequestCtx) -> web.StreamResponse:
-        # NOTE: This endpoint accesses root_ctx directly for infrastructure
-        # monitoring (pool stats, valkey connections). It returns Prometheus
-        # text format, not JSON. Will be refactored in Phase 2.
-        root_ctx: RootContext = req.request.app["_root.context"]
-        status = await get_manager_db_cxn_status(root_ctx)
+    async def get_manager_status_for_prom(self) -> web.StreamResponse:
+        action = GetDbCxnStatusAction()
+        result = await self._processors.manager_admin.get_db_cxn_status.wait_for_complete(action)
+        status = result.cxn_infos
 
         total_cxn_metrics: list[SQLAlchemyConnectionMetric] = []
         open_cxn_metrics: list[SQLAlchemyConnectionMetric] = []
@@ -320,5 +317,5 @@ class ManagerHandler:
             RedisConnectionMetricGroup(redis_cxn_metrics).metric_string(),
         )
 
-        result = "\n".join(metric_string)
-        return web.Response(text=textwrap.dedent(result))
+        prom_output = "\n".join(metric_string)
+        return web.Response(text=textwrap.dedent(prom_output))

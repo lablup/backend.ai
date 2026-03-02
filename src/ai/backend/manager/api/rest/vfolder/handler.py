@@ -8,16 +8,10 @@ returned as ``APIResponse`` objects.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import uuid
-from collections.abc import Mapping
 from http import HTTPStatus
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final, cast
-
-import aiohttp
-import sqlalchemy as sa
+from typing import Any, Final, cast
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
 from ai.backend.common.dto.manager.field import (
@@ -104,20 +98,14 @@ from ai.backend.common.dto.manager.vfolder.response import (
 )
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
-    VFolderHostPermission,
     VFolderID,
-    VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.resource import get_watcher_info
 from ai.backend.manager.api.utils import get_user_scopes
 from ai.backend.manager.api.vfolder import (
     check_vfolder_status,
     resolve_vfolder_rows,
 )
-from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.dto.context import (
     ProcessorsCtx,
@@ -128,31 +116,20 @@ from ai.backend.manager.dto.context import (
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.common import InternalServerError
-from ai.backend.manager.errors.kernel import BackendAgentError
-from ai.backend.manager.errors.service import ModelServiceDependencyNotCleared
 from ai.backend.manager.errors.storage import (
     TooManyVFoldersFound,
     VFolderAlreadyExists,
-    VFolderBadRequest,
     VFolderInvalidParameter,
-    VFolderOperationFailed,
 )
-from ai.backend.manager.models.agent import agents
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.user import (
     UserRole,
 )
 from ai.backend.manager.models.vfolder import (
-    VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
     VFolderPermissionSetAlias,
     VFolderRow,
     VFolderStatusSet,
-    delete_vfolder_relation_rows,
-    ensure_host_permission_allowed,
-    update_vfolder_status,
 )
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.repositories.base.updater import Updater
@@ -200,6 +177,7 @@ from ai.backend.manager.services.vfolder.actions.sharing import (
 )
 from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ChangeVFolderOwnershipAction,
+    GetFstabContentsAction,
     GetQuotaAction,
     GetVFolderUsageAction,
     GetVFolderUsedBytesAction,
@@ -207,12 +185,12 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ListAllHostsAction,
     ListAllowedTypesAction,
     ListHostsAction,
+    ListMountsAction,
+    MountHostAction,
+    UmountHostAction,
     UpdateQuotaAction,
 )
 from ai.backend.manager.types import OptionalState
-
-if TYPE_CHECKING:
-    from ai.backend.manager.api.context import RootContext
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -1763,7 +1741,7 @@ class VFolderHandler:
         self,
         query: QueryParam[GetFstabContentsQuery],
         ctx: UserContext,
-        req: RequestCtx,
+        procs: ProcessorsCtx,
     ) -> APIResponse:
         params = query.parsed
         log.info(
@@ -1772,57 +1750,18 @@ class VFolderHandler:
             ctx.access_key,
             params.agent_id,
         )
-        fstab_path = params.fstab_path
-        if fstab_path is None:
-            fstab_path = "/etc/fstab"
-        if params.agent_id is not None:
-            watcher_info = await get_watcher_info(req.request, params.agent_id)
-            try:
-                client_timeout = aiohttp.ClientTimeout(total=10.0)
-                async with aiohttp.ClientSession(timeout=client_timeout) as sess:
-                    headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                    url = watcher_info["addr"] / "fstab"
-                    query_params = {"fstab_path": fstab_path}
-                    async with sess.get(url, headers=headers, params=query_params) as watcher_resp:
-                        if watcher_resp.status == 200:
-                            content = await watcher_resp.text()
-                            resp = GetFstabContentsResponse(
-                                content=content,
-                                node="agent",
-                                node_id=params.agent_id,
-                            )
-                            return APIResponse.build(HTTPStatus.OK, resp)
-                        message = await watcher_resp.text()
-                        raise BackendAgentError(
-                            "FAILURE",
-                            f"({watcher_resp.status}: {watcher_resp.reason}) {message}",
-                        )
-            except asyncio.CancelledError:
-                raise
-            except TimeoutError as e:
-                log.error(
-                    "VFOLDER.GET_FSTAB_CONTENTS(u:{}): timeout from watcher (agent:{})",
-                    ctx.access_key,
-                    params.agent_id,
-                )
-                raise BackendAgentError("TIMEOUT", "Could not fetch fstab data from agent") from e
-            except Exception as e:
-                log.exception(
-                    "VFOLDER.GET_FSTAB_CONTENTS(u:{}): "
-                    "unexpected error while reading from watcher (agent:{})",
-                    ctx.access_key,
-                    params.agent_id,
-                )
-                raise InternalServerError from e
-        else:
-            resp = GetFstabContentsResponse(
-                content=(
-                    "# Since Backend.AI 20.09, reading the manager fstab is no longer supported."
-                ),
-                node="manager",
-                node_id="manager",
+        result = await procs.processors.vfolder.get_fstab_contents.wait_for_complete(
+            GetFstabContentsAction(
+                agent_id=params.agent_id,
+                fstab_path=params.fstab_path,
             )
-            return APIResponse.build(HTTPStatus.OK, resp)
+        )
+        resp = GetFstabContentsResponse(
+            content=result.content,
+            node=result.node,
+            node_id=result.node_id,
+        )
+        return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
     # 44. list_mounts (GET /_/mounts)
@@ -1831,105 +1770,32 @@ class VFolderHandler:
     async def list_mounts(
         self,
         ctx: UserContext,
-        req: RequestCtx,
+        procs: ProcessorsCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         log.info(
             "VFOLDER.LIST_MOUNTS(ak:{})",
             ctx.access_key,
         )
-        mount_prefix = await root_ctx.config_provider.legacy_etcd_config_loader.get_raw(
-            "volumes/_mount"
-        )
-        if mount_prefix is None:
-            mount_prefix = "/mnt"
-
-        all_volumes = [*await root_ctx.storage_manager.get_all_volumes()]
-        all_mounts = [volume_data["path"] for proxy_name, volume_data in all_volumes]
-        all_vfolder_hosts = [
-            f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes
-        ]
-
-        manager_result = MountResultDTO(
-            success=True,
-            mounts=all_mounts,
-            message="(legacy)",
-        )
-        storage_proxy_result = MountResultDTO(
-            success=True,
-            mounts=[list(pair) for pair in zip(all_vfolder_hosts, all_mounts, strict=True)],
-            message="",
-        )
-
-        async def _fetch_mounts(
-            sema: asyncio.Semaphore,
-            sess: aiohttp.ClientSession,
-            agent_id: str,
-        ) -> tuple[str, MountResultDTO]:
-            async with sema:
-                watcher_info = await get_watcher_info(req.request, agent_id)
-                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                url = watcher_info["addr"] / "mounts"
-                try:
-                    async with sess.get(url, headers=headers) as watcher_resp:
-                        if watcher_resp.status == 200:
-                            data = MountResultDTO(
-                                success=True,
-                                mounts=await watcher_resp.json(),
-                                message="",
-                            )
-                        else:
-                            data = MountResultDTO(
-                                success=False,
-                                mounts=[],
-                                message=await watcher_resp.text(),
-                            )
-                        return (agent_id, data)
-                except asyncio.CancelledError:
-                    raise
-                except TimeoutError:
-                    log.error(
-                        "VFOLDER.LIST_MOUNTS(u:{}): timeout from watcher (agent:{})",
-                        ctx.access_key,
-                        agent_id,
-                    )
-                    raise
-                except Exception:
-                    log.exception(
-                        "VFOLDER.LIST_MOUNTS(u:{}): "
-                        "unexpected error while reading from watcher (agent:{})",
-                        ctx.access_key,
-                        agent_id,
-                    )
-                    raise
-
-        async with root_ctx.db.begin() as conn:
-            db_query = (
-                sa.select(agents.c.id)
-                .select_from(agents)
-                .where(agents.c.status == AgentStatus.ALIVE)
-            )
-            result = await conn.execute(db_query)
-            rows = result.fetchall()
-
-        agents_result: dict[str, MountResultDTO] = {}
-        client_timeout = aiohttp.ClientTimeout(total=10.0)
-        async with aiohttp.ClientSession(timeout=client_timeout) as sess:
-            sema = asyncio.Semaphore(8)
-            mounts = await asyncio.gather(
-                *[_fetch_mounts(sema, sess, row.id) for row in rows], return_exceptions=True
-            )
-            for mount in mounts:
-                match mount:
-                    case BaseException():
-                        continue
-                    case _:
-                        agents_result[mount[0]] = mount[1]
-
+        result = await procs.processors.vfolder.list_mounts.wait_for_complete(ListMountsAction())
         resp = ListMountsResponse(
-            manager=manager_result,
-            storage_proxy=storage_proxy_result,
-            agents=agents_result,
+            manager=MountResultDTO(
+                success=result.manager.success,
+                mounts=result.manager.mounts,
+                message=result.manager.message,
+            ),
+            storage_proxy=MountResultDTO(
+                success=result.storage_proxy.success,
+                mounts=result.storage_proxy.mounts,
+                message=result.storage_proxy.message,
+            ),
+            agents={
+                agent_id: MountResultDTO(
+                    success=data.success,
+                    mounts=data.mounts,
+                    message=data.message,
+                )
+                for agent_id, data in result.agents.items()
+            },
         )
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -1941,99 +1807,41 @@ class VFolderHandler:
         self,
         body: BodyParam[MountHostReq],
         ctx: UserContext,
-        req: RequestCtx,
+        procs: ProcessorsCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         params = body.parsed
-        log_fmt = "VFOLDER.MOUNT_HOST(ak:{}, name:{}, fs:{}, sg:{})"
-        log_args = (ctx.access_key, params.name, params.fs_location, params.scaling_group)
-        log.info(log_fmt, *log_args)
-        mount_prefix = await root_ctx.config_provider.legacy_etcd_config_loader.get_raw(
-            "volumes/_mount"
+        log.info(
+            "VFOLDER.MOUNT_HOST(ak:{}, name:{}, fs:{}, sg:{})",
+            ctx.access_key,
+            params.name,
+            params.fs_location,
+            params.scaling_group,
         )
-        if mount_prefix is None:
-            mount_prefix = "/mnt"
-
-        manager_result = MountResultDTO(
-            success=True,
-            message="Managers do not have mountpoints since v20.09.",
+        result = await procs.processors.vfolder.mount_host.wait_for_complete(
+            MountHostAction(
+                name=params.name,
+                fs_location=params.fs_location,
+                fs_type=params.fs_type,
+                options=params.options,
+                scaling_group=params.scaling_group,
+                fstab_path=params.fstab_path,
+                edit_fstab=params.edit_fstab,
+            )
         )
-
-        async with root_ctx.db.begin() as conn:
-            db_query = (
-                sa.select(agents.c.id)
-                .select_from(agents)
-                .where(agents.c.status == AgentStatus.ALIVE)
-            )
-            if params.scaling_group is not None:
-                db_query = db_query.where(agents.c.scaling == params.scaling_group)
-            result = await conn.execute(db_query)
-            rows = result.fetchall()
-
-        mount_params = {
-            "fs_location": params.fs_location,
-            "name": params.name,
-            "fs_type": params.fs_type,
-            "options": params.options,
-            "scaling_group": params.scaling_group,
-            "fstab_path": params.fstab_path,
-            "edit_fstab": params.edit_fstab,
-        }
-
-        async def _mount(
-            sema: asyncio.Semaphore,
-            sess: aiohttp.ClientSession,
-            agent_id: str,
-        ) -> tuple[str, MountResultDTO]:
-            async with sema:
-                watcher_info = await get_watcher_info(req.request, agent_id)
-                try:
-                    headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                    url = watcher_info["addr"] / "mounts"
-                    async with sess.post(url, json=mount_params, headers=headers) as resp:
-                        if resp.status == 200:
-                            data = MountResultDTO(
-                                success=True,
-                                message=await resp.text(),
-                            )
-                        else:
-                            data = MountResultDTO(
-                                success=False,
-                                message=await resp.text(),
-                            )
-                        return (agent_id, data)
-                except asyncio.CancelledError:
-                    raise
-                except TimeoutError:
-                    log.error(
-                        log_fmt + ": timeout from watcher (ag:{})",
-                        *log_args,
-                        agent_id,
-                    )
-                    raise
-                except Exception:
-                    log.exception(
-                        log_fmt + ": unexpected error while reading from watcher (ag:{})",
-                        *log_args,
-                        agent_id,
-                    )
-                    raise
-
-        agents_result: dict[str, MountResultDTO] = {}
-        client_timeout = aiohttp.ClientTimeout(total=10)
-        async with aiohttp.ClientSession(timeout=client_timeout) as sess:
-            sema = asyncio.Semaphore(8)
-            mount_results = await asyncio.gather(
-                *[_mount(sema, sess, row.id) for row in rows], return_exceptions=True
-            )
-            for mount_result in mount_results:
-                if isinstance(mount_result, BaseException):
-                    continue
-                agents_result[mount_result[0]] = mount_result[1]
-
         resp = ListMountsResponse(
-            manager=manager_result,
-            agents=agents_result,
+            manager=MountResultDTO(
+                success=result.manager.success,
+                mounts=result.manager.mounts,
+                message=result.manager.message,
+            ),
+            agents={
+                agent_id: MountResultDTO(
+                    success=data.success,
+                    mounts=data.mounts,
+                    message=data.message,
+                )
+                for agent_id, data in result.agents.items()
+            },
         )
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -2045,113 +1853,37 @@ class VFolderHandler:
         self,
         body: BodyParam[UmountHostReq],
         ctx: UserContext,
-        req: RequestCtx,
+        procs: ProcessorsCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         params = body.parsed
-        log_fmt = "VFOLDER.UMOUNT_HOST(ak:{}, name:{}, sg:{})"
-        log_args = (ctx.access_key, params.name, params.scaling_group)
-        log.info(log_fmt, *log_args)
-        mount_prefix = await root_ctx.config_provider.legacy_etcd_config_loader.get_raw(
-            "volumes/_mount"
+        log.info(
+            "VFOLDER.UMOUNT_HOST(ak:{}, name:{}, sg:{})",
+            ctx.access_key,
+            params.name,
+            params.scaling_group,
         )
-        if mount_prefix is None:
-            mount_prefix = "/mnt"
-        mountpoint = Path(mount_prefix) / params.name
-        if Path(mount_prefix) == mountpoint:
-            raise VFolderBadRequest("Mount prefix and mountpoint cannot be the same")
-
-        async with root_ctx.db.begin() as conn, conn.begin():
-            db_query = (
-                sa.select(kernels.c.mounts)
-                .select_from(kernels)
-                .where(kernels.c.status != KernelStatus.TERMINATED)
+        result = await procs.processors.vfolder.umount_host.wait_for_complete(
+            UmountHostAction(
+                name=params.name,
+                scaling_group=params.scaling_group,
+                fstab_path=params.fstab_path,
+                edit_fstab=params.edit_fstab,
             )
-            result = await conn.execute(db_query)
-            _kernels = result.fetchall()
-            _mounted = set()
-            for kern in _kernels:
-                if kern.mounts:
-                    _mounted.update([m[1] for m in kern.mounts])
-            if params.name in _mounted:
-                raise VFolderOperationFailed("Target host is used in sessions")
-
-            db_query = (
-                sa.select(agents.c.id)
-                .select_from(agents)
-                .where(agents.c.status == AgentStatus.ALIVE)
-            )
-            if params.scaling_group is not None:
-                db_query = db_query.where(agents.c.scaling == params.scaling_group)
-            result = await conn.execute(db_query)
-            _agents = result.fetchall()
-
-        manager_result = MountResultDTO(
-            success=True,
-            message="Managers do not have mountpoints since v20.09.",
         )
-
-        umount_params = {
-            "name": params.name,
-            "scaling_group": params.scaling_group,
-            "fstab_path": params.fstab_path,
-            "edit_fstab": params.edit_fstab,
-        }
-
-        async def _umount(
-            sema: asyncio.Semaphore,
-            sess: aiohttp.ClientSession,
-            agent_id: str,
-        ) -> tuple[str, MountResultDTO]:
-            async with sema:
-                watcher_info = await get_watcher_info(req.request, agent_id)
-                try:
-                    headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                    url = watcher_info["addr"] / "mounts"
-                    async with sess.delete(url, json=umount_params, headers=headers) as resp:
-                        if resp.status == 200:
-                            data = MountResultDTO(
-                                success=True,
-                                message=await resp.text(),
-                            )
-                        else:
-                            data = MountResultDTO(
-                                success=False,
-                                message=await resp.text(),
-                            )
-                        return (agent_id, data)
-                except asyncio.CancelledError:
-                    raise
-                except TimeoutError:
-                    log.error(
-                        log_fmt + ": timeout from watcher (agent:{})",
-                        *log_args,
-                        agent_id,
-                    )
-                    raise
-                except Exception:
-                    log.exception(
-                        log_fmt + ": unexpected error while reading from watcher (agent:{})",
-                        *log_args,
-                        agent_id,
-                    )
-                    raise
-
-        agents_result: dict[str, MountResultDTO] = {}
-        client_timeout = aiohttp.ClientTimeout(total=10.0)
-        async with aiohttp.ClientSession(timeout=client_timeout) as sess:
-            sema = asyncio.Semaphore(8)
-            umount_results = await asyncio.gather(
-                *[_umount(sema, sess, _agent.id) for _agent in _agents], return_exceptions=True
-            )
-            for umount_result in umount_results:
-                if isinstance(umount_result, BaseException):
-                    continue
-                agents_result[umount_result[0]] = umount_result[1]
-
         resp = ListMountsResponse(
-            manager=manager_result,
-            agents=agents_result,
+            manager=MountResultDTO(
+                success=result.manager.success,
+                mounts=result.manager.mounts,
+                message=result.manager.message,
+            ),
+            agents={
+                agent_id: MountResultDTO(
+                    success=data.success,
+                    mounts=data.mounts,
+                    message=data.message,
+                )
+                for agent_id, data in result.agents.items()
+            },
         )
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -2181,52 +1913,3 @@ class VFolderHandler:
         )
         resp = MessageResponse(msg="")
         return APIResponse.build(HTTPStatus.OK, resp)
-
-
-# ------------------------------------------------------------------
-# Module-level helper used by delete_by_name
-# ------------------------------------------------------------------
-
-
-async def _delete(
-    root_ctx: RootContext,
-    vfolder_row: Mapping[str, Any],
-    user_uuid: uuid.UUID,
-    _user_role: UserRole,
-    domain_name: str,
-    resource_policy: Mapping[str, Any],
-) -> None:
-    if not vfolder_row["is_owner"]:
-        raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
-    await check_vfolder_status(vfolder_row, VFolderStatusSet.DELETABLE)
-    async with root_ctx.db.begin_readonly_session() as db_session:
-        if vfolder_row["usage_mode"] == VFolderUsageMode.MODEL:
-            live_endpoints = await EndpointRow.list_by_model(db_session, vfolder_row["id"])
-            if (
-                len([e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED])
-                > 0
-            ):
-                raise ModelServiceDependencyNotCleared
-        folder_host = vfolder_row["host"]
-        allowed_vfolder_types = (
-            await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
-        )
-        conn = await db_session.connection()
-        await ensure_host_permission_allowed(
-            conn,
-            folder_host,
-            allowed_vfolder_types=allowed_vfolder_types,
-            user_uuid=user_uuid,
-            resource_policy=resource_policy,
-            domain_name=domain_name,
-            permission=VFolderHostPermission.DELETE,
-        )
-
-    vfolder_row_ids = (vfolder_row["id"],)
-    async with root_ctx.db.connect() as db_conn:
-        await delete_vfolder_relation_rows(db_conn, root_ctx.db.begin_session, vfolder_row_ids)
-    await update_vfolder_status(
-        root_ctx.db,
-        vfolder_row_ids,
-        VFolderOperationStatus.DELETE_PENDING,
-    )

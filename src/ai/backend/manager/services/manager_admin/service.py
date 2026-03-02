@@ -7,9 +7,11 @@ from typing import TYPE_CHECKING
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.resource import InstanceNotFound
+from ai.backend.manager.models.health import get_manager_db_cxn_status
 
 from .actions.fetch_status import FetchManagerStatusAction, FetchManagerStatusActionResult
 from .actions.get_announcement import GetAnnouncementAction, GetAnnouncementActionResult
+from .actions.get_db_cxn_status import GetDbCxnStatusAction, GetDbCxnStatusActionResult
 from .actions.perform_scheduler_ops import (
     PerformSchedulerOpsAction,
     PerformSchedulerOpsActionResult,
@@ -18,8 +20,10 @@ from .actions.update_announcement import UpdateAnnouncementAction, UpdateAnnounc
 from .actions.update_status import UpdateManagerStatusAction, UpdateManagerStatusActionResult
 
 if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.manager.config.provider import ManagerConfigProvider
+    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
     from ai.backend.manager.repositories.manager_admin import ManagerAdminRepository
 
 __all__ = ("ManagerAdminService",)
@@ -32,6 +36,8 @@ class ManagerAdminService:
     _repository: ManagerAdminRepository
     _config_provider: ManagerConfigProvider
     _etcd: AsyncEtcd
+    _db: ExtendedAsyncSAEngine
+    _valkey_stat: ValkeyStatClient
 
     def __init__(
         self,
@@ -39,10 +45,14 @@ class ManagerAdminService:
         repository: ManagerAdminRepository,
         config_provider: ManagerConfigProvider,
         etcd: AsyncEtcd,
+        db: ExtendedAsyncSAEngine,
+        valkey_stat: ValkeyStatClient,
     ) -> None:
         self._repository = repository
         self._config_provider = config_provider
         self._etcd = etcd
+        self._db = db
+        self._valkey_stat = valkey_stat
 
     async def fetch_status(
         self, action: FetchManagerStatusAction
@@ -101,3 +111,10 @@ class ManagerAdminService:
         if rowcount < len(action.agent_ids):
             raise InstanceNotFound()
         return PerformSchedulerOpsActionResult()
+
+    async def get_db_cxn_status(self, action: GetDbCxnStatusAction) -> GetDbCxnStatusActionResult:
+        """Get database connection status from all manager processes."""
+        cxn_infos = await get_manager_db_cxn_status(
+            self._valkey_stat, self._db, self._config_provider
+        )
+        return GetDbCxnStatusActionResult(cxn_infos=cxn_infos)

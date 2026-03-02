@@ -42,6 +42,9 @@ from ai.backend.manager.reporters.hub import ReporterHub, ReporterHubArgs
 from ai.backend.manager.reporters.smtp import SMTPReporter, SMTPSenderArgs
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.service.container_registry.harbor import (
+    AbstractPerProjectContainerRegistryQuotaService,
+)
 from ai.backend.manager.services.processors import Processors, ServiceArgs
 from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
@@ -104,6 +107,9 @@ class ProcessingInput:
     notification_center: NotificationCenter
     appproxy_client_pool: AppProxyClientPool
     prometheus_client: PrometheusClient
+
+    # Registry quota service
+    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None
 
     # BgtaskRegistry creation (additional)
     agent_client_pool: AgentClientPool
@@ -218,6 +224,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             notification_center=setup_input.notification_center,
             appproxy_client_pool=setup_input.appproxy_client_pool,
             prometheus_client=setup_input.prometheus_client,
+            registry_quota_service=setup_input.registry_quota_service,
         )
 
         processors = await stack.enter_dependency(

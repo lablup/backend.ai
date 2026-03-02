@@ -39,7 +39,9 @@ def register_admin_routes(deps: ModuleDeps) -> RouteRegistry:
     reg.app.on_shutdown.append(admin_shutdown)
 
     # Admin's own routes (GraphQL)
-    handler = AdminHandler(gql_schema=graphene_schema)
+    if deps.gql_context_deps is None:
+        raise RuntimeError("GQLContextDeps required for admin routes")
+    handler = AdminHandler(gql_schema=graphene_schema, gql_deps=deps.gql_context_deps)
     reg.add(
         "POST",
         "/graphql",

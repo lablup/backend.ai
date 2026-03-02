@@ -176,7 +176,7 @@ from ai.backend.manager.services.session.actions.upload_files import (
 from ai.backend.manager.services.vfolder.actions.base import GetTaskLogsAction
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.context import RootContext
+    from ai.backend.manager.config.provider import ManagerConfigProvider
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -232,8 +232,14 @@ def _validate_creation_config(
 class SessionHandler:
     """Session API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
+    def __init__(
+        self,
+        *,
+        processors: Processors,
+        config_provider: ManagerConfigProvider,
+    ) -> None:
         self._processors = processors
+        self._config_provider = config_provider
 
     # ------------------------------------------------------------------
     # create_from_template (POST /_/create-from-template)
@@ -360,10 +366,9 @@ class SessionHandler:
 
         agent_list = cast(list[str] | None, validated_config.get("agent_list"))
         if agent_list is not None:
-            root_ctx: RootContext = request.app["_root.context"]
             if (
                 request["user"]["role"] != UserRole.SUPERADMIN
-                and root_ctx.config_provider.config.manager.hide_agents
+                and self._config_provider.config.manager.hide_agents
             ):
                 raise InsufficientPrivilege(
                     "You are not allowed to manually assign agents for your session."

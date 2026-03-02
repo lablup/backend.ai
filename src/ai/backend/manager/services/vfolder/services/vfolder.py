@@ -2,7 +2,7 @@ import asyncio
 import logging
 import math
 import uuid
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import (
     Any,
     cast,
@@ -10,12 +10,14 @@ from typing import (
 
 import aiohttp
 import msgpack
+import yarl
 from aiohttp import hdrs, web
 from sqlalchemy import exc as sa_exc
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -31,17 +33,20 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderMountPermission,
 )
-from ai.backend.manager.errors.common import Forbidden, ObjectNotFound
+from ai.backend.manager.errors.common import Forbidden, InternalServerError, ObjectNotFound
+from ai.backend.manager.errors.kernel import BackendAgentError
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
     UnexpectedStorageProxyResponseError,
     VFolderAlreadyExists,
+    VFolderBadRequest,
     VFolderCreationFailure,
     VFolderFilterStatusFailed,
     VFolderFilterStatusNotAvailable,
     VFolderGone,
     VFolderInvalidParameter,
     VFolderNotFound,
+    VFolderOperationFailed,
 )
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.group import ProjectType
@@ -88,6 +93,8 @@ from ai.backend.manager.services.vfolder.actions.base import (
 from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ChangeVFolderOwnershipAction,
     ChangeVFolderOwnershipActionResult,
+    GetFstabContentsAction,
+    GetFstabContentsActionResult,
     GetQuotaAction,
     GetQuotaActionResult,
     GetVFolderUsageAction,
@@ -102,6 +109,13 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ListAllowedTypesActionResult,
     ListHostsAction,
     ListHostsActionResult,
+    ListMountsAction,
+    ListMountsActionResult,
+    MountHostAction,
+    MountHostActionResult,
+    MountResultData,
+    UmountHostAction,
+    UmountHostActionResult,
     UpdateQuotaAction,
     UpdateQuotaActionResult,
 )
@@ -131,6 +145,7 @@ async def _check_vfolder_status(
 
 class VFolderService:
     _config_provider: ManagerConfigProvider
+    _etcd: AsyncEtcd
     _storage_manager: StorageSessionManager
     _background_task_manager: BackgroundTaskManager
     _vfolder_repository: VfolderRepository
@@ -140,6 +155,7 @@ class VFolderService:
     def __init__(
         self,
         config_provider: ManagerConfigProvider,
+        etcd: AsyncEtcd,
         storage_manager: StorageSessionManager,
         background_task_manager: BackgroundTaskManager,
         vfolder_repository: VfolderRepository,
@@ -147,6 +163,7 @@ class VFolderService:
         valkey_stat_client: ValkeyStatClient,
     ) -> None:
         self._config_provider = config_provider
+        self._etcd = etcd
         self._storage_manager = storage_manager
         self._vfolder_repository = vfolder_repository
         self._user_repository = user_repository
@@ -993,3 +1010,266 @@ class VFolderService:
             action.vfolder_id, action.user_email
         )
         return ChangeVFolderOwnershipActionResult()
+
+    # ------------------------------------------------------------------
+    # Mount operations (superadmin-only, agent watcher orchestration)
+    # ------------------------------------------------------------------
+
+    async def _get_watcher_info(self, agent_id: str) -> dict[str, Any]:
+        """Get watcher connection info for an agent."""
+        token = self._config_provider.config.watcher.token
+        if token is None:
+            token = "insecure"
+        agent_ip = await self._etcd.get(f"nodes/agents/{agent_id}/ip")
+        raw_watcher_port = await self._etcd.get(
+            f"nodes/agents/{agent_id}/watcher_port",
+        )
+        watcher_port = 6099 if raw_watcher_port is None else int(raw_watcher_port)
+        addr = yarl.URL(f"http://{agent_ip}:{watcher_port}")
+        return {
+            "addr": addr,
+            "token": token,
+        }
+
+    async def _get_mount_prefix(self) -> str:
+        mount_prefix = await self._config_provider.legacy_etcd_config_loader.get_raw(
+            "volumes/_mount"
+        )
+        if mount_prefix is None:
+            mount_prefix = "/mnt"
+        return mount_prefix
+
+    async def list_mounts(self, action: ListMountsAction) -> ListMountsActionResult:
+        """List mount points from manager, storage proxy, and agents."""
+        mount_prefix = await self._get_mount_prefix()
+        _ = mount_prefix  # mount_prefix used contextually by caller if needed
+
+        all_volumes = [*await self._storage_manager.get_all_volumes()]
+        all_mounts: list[Any] = [volume_data["path"] for _proxy_name, volume_data in all_volumes]
+        all_vfolder_hosts = [
+            f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes
+        ]
+
+        manager_result = MountResultData(
+            success=True,
+            mounts=all_mounts,
+            message="(legacy)",
+        )
+        storage_proxy_result = MountResultData(
+            success=True,
+            mounts=[list(pair) for pair in zip(all_vfolder_hosts, all_mounts, strict=True)],
+            message="",
+        )
+
+        agent_ids = await self._vfolder_repository.get_alive_agent_ids()
+
+        async def _fetch_mounts(
+            sema: asyncio.Semaphore,
+            sess: aiohttp.ClientSession,
+            agent_id: str,
+        ) -> tuple[str, MountResultData]:
+            async with sema:
+                watcher_info = await self._get_watcher_info(agent_id)
+                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
+                url = watcher_info["addr"] / "mounts"
+                async with sess.get(url, headers=headers) as watcher_resp:
+                    if watcher_resp.status == 200:
+                        data = MountResultData(
+                            success=True,
+                            mounts=await watcher_resp.json(),
+                            message="",
+                        )
+                    else:
+                        data = MountResultData(
+                            success=False,
+                            mounts=[],
+                            message=await watcher_resp.text(),
+                        )
+                    return (agent_id, data)
+
+        agents_result: dict[str, MountResultData] = {}
+        client_timeout = aiohttp.ClientTimeout(total=10.0)
+        async with aiohttp.ClientSession(timeout=client_timeout) as sess:
+            sema = asyncio.Semaphore(8)
+            mounts = await asyncio.gather(
+                *[_fetch_mounts(sema, sess, aid) for aid in agent_ids],
+                return_exceptions=True,
+            )
+            for mount in mounts:
+                if isinstance(mount, BaseException):
+                    continue
+                agents_result[mount[0]] = mount[1]
+
+        return ListMountsActionResult(
+            manager=manager_result,
+            storage_proxy=storage_proxy_result,
+            agents=agents_result,
+        )
+
+    async def mount_host(self, action: MountHostAction) -> MountHostActionResult:
+        """Mount a filesystem on agents via agent watchers."""
+        manager_result = MountResultData(
+            success=True,
+            message="Managers do not have mountpoints since v20.09.",
+        )
+
+        agent_ids = await self._vfolder_repository.get_alive_agent_ids(action.scaling_group)
+
+        mount_params = {
+            "fs_location": action.fs_location,
+            "name": action.name,
+            "fs_type": action.fs_type,
+            "options": action.options,
+            "scaling_group": action.scaling_group,
+            "fstab_path": action.fstab_path,
+            "edit_fstab": action.edit_fstab,
+        }
+
+        async def _mount(
+            sema: asyncio.Semaphore,
+            sess: aiohttp.ClientSession,
+            agent_id: str,
+        ) -> tuple[str, MountResultData]:
+            async with sema:
+                watcher_info = await self._get_watcher_info(agent_id)
+                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
+                url = watcher_info["addr"] / "mounts"
+                async with sess.post(url, json=mount_params, headers=headers) as resp:
+                    if resp.status == 200:
+                        data = MountResultData(
+                            success=True,
+                            message=await resp.text(),
+                        )
+                    else:
+                        data = MountResultData(
+                            success=False,
+                            message=await resp.text(),
+                        )
+                    return (agent_id, data)
+
+        agents_result: dict[str, MountResultData] = {}
+        client_timeout = aiohttp.ClientTimeout(total=10)
+        async with aiohttp.ClientSession(timeout=client_timeout) as sess:
+            sema = asyncio.Semaphore(8)
+            mount_results = await asyncio.gather(
+                *[_mount(sema, sess, aid) for aid in agent_ids],
+                return_exceptions=True,
+            )
+            for mount_result in mount_results:
+                if isinstance(mount_result, BaseException):
+                    continue
+                agents_result[mount_result[0]] = mount_result[1]
+
+        return MountHostActionResult(
+            manager=manager_result,
+            agents=agents_result,
+        )
+
+    async def umount_host(self, action: UmountHostAction) -> UmountHostActionResult:
+        """Unmount a filesystem from agents via agent watchers."""
+        mount_prefix = await self._get_mount_prefix()
+        mountpoint = Path(mount_prefix) / action.name
+        if Path(mount_prefix) == mountpoint:
+            raise VFolderBadRequest("Mount prefix and mountpoint cannot be the same")
+
+        # Check that no active kernel is using this mount
+        mounted_names = await self._vfolder_repository.get_active_kernel_mount_names()
+        if action.name in mounted_names:
+            raise VFolderOperationFailed("Target host is used in sessions")
+
+        agent_ids = await self._vfolder_repository.get_alive_agent_ids(action.scaling_group)
+
+        manager_result = MountResultData(
+            success=True,
+            message="Managers do not have mountpoints since v20.09.",
+        )
+
+        umount_params = {
+            "name": action.name,
+            "scaling_group": action.scaling_group,
+            "fstab_path": action.fstab_path,
+            "edit_fstab": action.edit_fstab,
+        }
+
+        async def _umount(
+            sema: asyncio.Semaphore,
+            sess: aiohttp.ClientSession,
+            agent_id: str,
+        ) -> tuple[str, MountResultData]:
+            async with sema:
+                watcher_info = await self._get_watcher_info(agent_id)
+                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
+                url = watcher_info["addr"] / "mounts"
+                async with sess.delete(url, json=umount_params, headers=headers) as resp:
+                    if resp.status == 200:
+                        data = MountResultData(
+                            success=True,
+                            message=await resp.text(),
+                        )
+                    else:
+                        data = MountResultData(
+                            success=False,
+                            message=await resp.text(),
+                        )
+                    return (agent_id, data)
+
+        agents_result: dict[str, MountResultData] = {}
+        client_timeout = aiohttp.ClientTimeout(total=10.0)
+        async with aiohttp.ClientSession(timeout=client_timeout) as sess:
+            sema = asyncio.Semaphore(8)
+            umount_results = await asyncio.gather(
+                *[_umount(sema, sess, aid) for aid in agent_ids],
+                return_exceptions=True,
+            )
+            for umount_result in umount_results:
+                if isinstance(umount_result, BaseException):
+                    continue
+                agents_result[umount_result[0]] = umount_result[1]
+
+        return UmountHostActionResult(
+            manager=manager_result,
+            agents=agents_result,
+        )
+
+    async def get_fstab_contents(
+        self, action: GetFstabContentsAction
+    ) -> GetFstabContentsActionResult:
+        """Get fstab contents from an agent watcher or return a manager stub."""
+        fstab_path = action.fstab_path if action.fstab_path is not None else "/etc/fstab"
+        if action.agent_id is None:
+            return GetFstabContentsActionResult(
+                content=(
+                    "# Since Backend.AI 20.09, reading the manager fstab is no longer supported."
+                ),
+                node="manager",
+                node_id="manager",
+            )
+
+        watcher_info = await self._get_watcher_info(action.agent_id)
+        try:
+            client_timeout = aiohttp.ClientTimeout(total=10.0)
+            async with aiohttp.ClientSession(timeout=client_timeout) as sess:
+                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
+                url = watcher_info["addr"] / "fstab"
+                params = {"fstab_path": fstab_path}
+                async with sess.get(url, headers=headers, params=params) as resp:
+                    if resp.status == 200:
+                        content = await resp.text()
+                        return GetFstabContentsActionResult(
+                            content=content,
+                            node="agent",
+                            node_id=action.agent_id,
+                        )
+                    message = await resp.text()
+                    raise BackendAgentError(
+                        "FAILURE",
+                        f"({resp.status}: {resp.reason}) {message}",
+                    )
+        except asyncio.CancelledError:
+            raise
+        except BackendAgentError:
+            raise
+        except TimeoutError as e:
+            raise BackendAgentError("TIMEOUT", "Could not fetch fstab data from agent") from e
+        except Exception as e:
+            raise InternalServerError from e

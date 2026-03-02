@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.quota_scope import (
@@ -19,11 +19,17 @@ from ai.backend.common.dto.manager.quota_scope import (
     UnsetQuotaResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.quota_scope_request import GetQuotaScopePathParam
+from ai.backend.manager.services.vfs_storage.actions.get_quota_scope import GetQuotaScopeAction
+from ai.backend.manager.services.vfs_storage.actions.search_quota_scopes import (
+    SearchQuotaScopesAction,
+)
+from ai.backend.manager.services.vfs_storage.actions.set_quota_scope import SetQuotaScopeAction
+from ai.backend.manager.services.vfs_storage.actions.unset_quota_scope import UnsetQuotaScopeAction
 
-from .adapter import QuotaScopeAdapter
+if TYPE_CHECKING:
+    from ai.backend.manager.services.processors import Processors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -31,9 +37,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class QuotaScopeHandler:
     """Quota scope API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, storage_manager: StorageSessionManager) -> None:
-        self._storage_manager = storage_manager
-        self._adapter = QuotaScopeAdapter()
+    def __init__(self, *, processors: Processors) -> None:
+        self._processors = processors
 
     async def get(
         self,
@@ -42,12 +47,19 @@ class QuotaScopeHandler:
     ) -> APIResponse:
         """Get a single quota scope by storage host and scope ID."""
         log.info("GET (ak:{})", ctx.access_key)
-        storage_host_name = path.parsed.storage_host_name
-        quota_scope_id = path.parsed.quota_scope_id
-        proxy_name, volume_name = StorageSessionManager.get_proxy_and_volume(storage_host_name)
-        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
-        quota_config = await manager_client.get_quota_scope(volume_name, quota_scope_id)
-        dto = self._adapter.convert_to_dto(quota_scope_id, storage_host_name, quota_config)
+        result = await self._processors.vfs_storage.get_quota_scope.wait_for_complete(
+            GetQuotaScopeAction(
+                storage_host_name=path.parsed.storage_host_name,
+                quota_scope_id=path.parsed.quota_scope_id,
+            )
+        )
+        dto = QuotaScopeDTO(
+            quota_scope_id=result.quota_scope_id,
+            storage_host_name=result.storage_host_name,
+            usage_bytes=result.usage_bytes,
+            usage_count=result.usage_count,
+            hard_limit_bytes=result.hard_limit_bytes,
+        )
         resp = GetQuotaScopeResponse(quota_scope=dto)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -58,17 +70,19 @@ class QuotaScopeHandler:
     ) -> APIResponse:
         """Search all quota scopes across all volumes."""
         log.info("SEARCH (ak:{})", ctx.access_key)
-        all_volumes = await self._storage_manager.get_all_volumes()
-        quota_scopes: list[QuotaScopeDTO] = []
-        for host, volume_info in all_volumes:
-            proxy_name, volume_name = StorageSessionManager.get_proxy_and_volume(host)
-            manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
-            try:
-                quota_config = await manager_client.get_quota_scope(volume_name, "")
-                dto = self._adapter.convert_to_dto("", host, quota_config)
-                quota_scopes.append(dto)
-            except Exception:
-                pass
+        result = await self._processors.vfs_storage.search_quota_scopes.wait_for_complete(
+            SearchQuotaScopesAction()
+        )
+        quota_scopes = [
+            QuotaScopeDTO(
+                quota_scope_id=qs.quota_scope_id,
+                storage_host_name=qs.storage_host_name,
+                usage_bytes=qs.usage_bytes,
+                usage_count=qs.usage_count,
+                hard_limit_bytes=qs.hard_limit_bytes,
+            )
+            for qs in result.quota_scopes
+        ]
         total_count = len(quota_scopes)
         offset = body.parsed.offset
         limit = body.parsed.limit
@@ -90,17 +104,20 @@ class QuotaScopeHandler:
     ) -> APIResponse:
         """Set quota limit for a scope."""
         log.info("SET_QUOTA (ak:{})", ctx.access_key)
-        storage_host_name = body.parsed.storage_host_name
-        quota_scope_id = body.parsed.quota_scope_id
-        proxy_name, volume_name = StorageSessionManager.get_proxy_and_volume(storage_host_name)
-        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
-        await manager_client.update_quota_scope(
-            volume_name,
-            quota_scope_id,
-            body.parsed.hard_limit_bytes,
+        result = await self._processors.vfs_storage.set_quota_scope.wait_for_complete(
+            SetQuotaScopeAction(
+                storage_host_name=body.parsed.storage_host_name,
+                quota_scope_id=body.parsed.quota_scope_id,
+                hard_limit_bytes=body.parsed.hard_limit_bytes,
+            )
         )
-        quota_config = await manager_client.get_quota_scope(volume_name, quota_scope_id)
-        dto = self._adapter.convert_to_dto(quota_scope_id, storage_host_name, quota_config)
+        dto = QuotaScopeDTO(
+            quota_scope_id=result.quota_scope_id,
+            storage_host_name=result.storage_host_name,
+            usage_bytes=result.usage_bytes,
+            usage_count=result.usage_count,
+            hard_limit_bytes=result.hard_limit_bytes,
+        )
         resp = SetQuotaResponse(quota_scope=dto)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -111,14 +128,15 @@ class QuotaScopeHandler:
     ) -> APIResponse:
         """Unset (remove) quota limit for a scope."""
         log.info("UNSET_QUOTA (ak:{})", ctx.access_key)
-        storage_host_name = body.parsed.storage_host_name
-        quota_scope_id = body.parsed.quota_scope_id
-        proxy_name, volume_name = StorageSessionManager.get_proxy_and_volume(storage_host_name)
-        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
-        await manager_client.delete_quota_scope_quota(volume_name, quota_scope_id)
+        result = await self._processors.vfs_storage.unset_quota_scope.wait_for_complete(
+            UnsetQuotaScopeAction(
+                storage_host_name=body.parsed.storage_host_name,
+                quota_scope_id=body.parsed.quota_scope_id,
+            )
+        )
         dto = QuotaScopeDTO(
-            quota_scope_id=quota_scope_id,
-            storage_host_name=storage_host_name,
+            quota_scope_id=result.quota_scope_id,
+            storage_host_name=result.storage_host_name,
             usage_bytes=None,
             usage_count=None,
             hard_limit_bytes=None,

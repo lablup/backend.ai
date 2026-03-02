@@ -8,6 +8,7 @@ from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpe
 
 from .actions.fetch_status import FetchManagerStatusAction, FetchManagerStatusActionResult
 from .actions.get_announcement import GetAnnouncementAction, GetAnnouncementActionResult
+from .actions.get_db_cxn_status import GetDbCxnStatusAction, GetDbCxnStatusActionResult
 from .actions.perform_scheduler_ops import (
     PerformSchedulerOpsAction,
     PerformSchedulerOpsActionResult,
@@ -29,6 +30,7 @@ class ManagerAdminProcessors(AbstractProcessorPackage):
     perform_scheduler_ops: ActionProcessor[
         PerformSchedulerOpsAction, PerformSchedulerOpsActionResult
     ]
+    get_db_cxn_status: ActionProcessor[GetDbCxnStatusAction, GetDbCxnStatusActionResult]
 
     def __init__(self, service: ManagerAdminService, action_monitors: list[ActionMonitor]) -> None:
         self.fetch_status = ActionProcessor(service.fetch_status, action_monitors)
@@ -36,6 +38,7 @@ class ManagerAdminProcessors(AbstractProcessorPackage):
         self.get_announcement = ActionProcessor(service.get_announcement, action_monitors)
         self.update_announcement = ActionProcessor(service.update_announcement, action_monitors)
         self.perform_scheduler_ops = ActionProcessor(service.perform_scheduler_ops, action_monitors)
+        self.get_db_cxn_status = ActionProcessor(service.get_db_cxn_status, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -45,4 +48,5 @@ class ManagerAdminProcessors(AbstractProcessorPackage):
             GetAnnouncementAction.spec(),
             UpdateAnnouncementAction.spec(),
             PerformSchedulerOpsAction.spec(),
+            GetDbCxnStatusAction.spec(),
         ]

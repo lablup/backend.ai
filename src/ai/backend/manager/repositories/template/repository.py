@@ -40,6 +40,29 @@ class TemplateRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db_source = TemplateDBSource(db)
 
+    # --- Owner resolution ---
+
+    @template_repository_resilience.apply()
+    async def resolve_owner(
+        self,
+        requester_uuid: uuid.UUID,
+        requester_access_key: str,
+        requester_role: UserRole,
+        requester_domain: str,
+        requesting_domain: str,
+        requesting_group: str,
+        owner_access_key: str | None = None,
+    ) -> tuple[uuid.UUID, uuid.UUID]:
+        return await self._db_source.resolve_owner(
+            requester_uuid,
+            requester_access_key,
+            requester_role,
+            requester_domain,
+            requesting_domain,
+            requesting_group,
+            owner_access_key,
+        )
+
     # --- Task template ---
 
     @template_repository_resilience.apply()

@@ -1,7 +1,7 @@
 """Group handler class using constructor dependency injection.
 
 All handlers use the new ApiHandler pattern: typed parameters
-(``BodyParam``, ``UserContext``, ``ServicesCtx``) are automatically
+(``BodyParam``, ``UserContext``) are automatically
 extracted by ``_wrap_api_handler`` and responses are returned as
 ``APIResponse`` objects.
 """
@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import uuid
 from http import HTTPStatus
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
 from ai.backend.common.dto.manager.group.request import (
@@ -21,7 +21,21 @@ from ai.backend.common.dto.manager.group.request import (
 from ai.backend.common.dto.manager.group.response import ReadRegistryQuotaResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.rbac import ProjectScope
-from ai.backend.manager.service.base import ServicesContext
+from ai.backend.manager.services.container_registry.actions.create_registry_quota import (
+    CreateRegistryQuotaAction,
+)
+from ai.backend.manager.services.container_registry.actions.delete_registry_quota import (
+    DeleteRegistryQuotaAction,
+)
+from ai.backend.manager.services.container_registry.actions.read_registry_quota import (
+    ReadRegistryQuotaAction,
+)
+from ai.backend.manager.services.container_registry.actions.update_registry_quota import (
+    UpdateRegistryQuotaAction,
+)
+
+if TYPE_CHECKING:
+    from ai.backend.manager.services.processors import Processors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -29,8 +43,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class GroupHandler:
     """Group API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, services_ctx: ServicesContext) -> None:
-        self._services_ctx = services_ctx
+    def __init__(self, *, processors: Processors) -> None:
+        self._processors = processors
 
     # ------------------------------------------------------------------
     # create_registry_quota (POST /group/registry-quota)
@@ -43,8 +57,8 @@ class GroupHandler:
         params = body.parsed
         log.info("CREATE_REGISTRY_QUOTA (group:{})", params.group_id)
         scope_id = ProjectScope(project_id=uuid.UUID(params.group_id), domain_name=None)
-        await self._services_ctx.per_project_container_registries_quota.create_quota(
-            scope_id, params.quota
+        await self._processors.container_registry.create_registry_quota.wait_for_complete(
+            CreateRegistryQuotaAction(scope_id=scope_id, quota=params.quota)
         )
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
@@ -59,10 +73,10 @@ class GroupHandler:
         params = query.parsed
         log.info("READ_REGISTRY_QUOTA (group:{})", params.group_id)
         scope_id = ProjectScope(project_id=uuid.UUID(params.group_id), domain_name=None)
-        quota = await self._services_ctx.per_project_container_registries_quota.read_quota(
-            scope_id,
+        result = await self._processors.container_registry.read_registry_quota.wait_for_complete(
+            ReadRegistryQuotaAction(scope_id=scope_id)
         )
-        resp = ReadRegistryQuotaResponse(result=quota)
+        resp = ReadRegistryQuotaResponse(result=result.quota)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
@@ -76,8 +90,8 @@ class GroupHandler:
         params = body.parsed
         log.info("UPDATE_REGISTRY_QUOTA (group:{})", params.group_id)
         scope_id = ProjectScope(project_id=uuid.UUID(params.group_id), domain_name=None)
-        await self._services_ctx.per_project_container_registries_quota.update_quota(
-            scope_id, params.quota
+        await self._processors.container_registry.update_registry_quota.wait_for_complete(
+            UpdateRegistryQuotaAction(scope_id=scope_id, quota=params.quota)
         )
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
@@ -92,5 +106,7 @@ class GroupHandler:
         params = body.parsed
         log.info("DELETE_REGISTRY_QUOTA (group:{})", params.group_id)
         scope_id = ProjectScope(project_id=uuid.UUID(params.group_id), domain_name=None)
-        await self._services_ctx.per_project_container_registries_quota.delete_quota(scope_id)
+        await self._processors.container_registry.delete_registry_quota.wait_for_complete(
+            DeleteRegistryQuotaAction(scope_id=scope_id)
+        )
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)

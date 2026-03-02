@@ -157,7 +157,7 @@ from .api.rest.middleware import (
 )
 from .api.rest.middleware.auth import auth_middleware
 from .api.rest.routing import RouteRegistry
-from .api.rest.types import ModuleDeps, ModuleRegistrar
+from .api.rest.types import GQLContextDeps, ModuleDeps, ModuleRegistrar
 from .clients.agent import AgentClientPool, AgentPoolSpec
 from .clients.appproxy.client import AppProxyClientPool
 from .config.bootstrap import BootstrapConfig
@@ -671,6 +671,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 notification_center=root_ctx.notification_center,
                 appproxy_client_pool=root_ctx.appproxy_client_pool,
                 prometheus_client=root_ctx.prometheus_client,
+                registry_quota_service=root_ctx.services_ctx.per_project_container_registries_quota,
             ),
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
@@ -1376,12 +1377,31 @@ def _setup_api(
     ``runner.setup()`` freezes the application router.
     """
     root_ctx: RootContext = root_app["_root.context"]
+    gql_context_deps = GQLContextDeps(
+        config_provider=root_ctx.config_provider,
+        etcd=root_ctx.etcd,
+        db=root_ctx.db,
+        valkey_stat=root_ctx.valkey_stat,
+        valkey_image=root_ctx.valkey_image,
+        valkey_live=root_ctx.valkey_live,
+        valkey_schedule=root_ctx.valkey_schedule,
+        network_plugin_ctx=root_ctx.network_plugin_ctx,
+        background_task_manager=root_ctx.background_task_manager,
+        services_ctx=root_ctx.services_ctx,
+        storage_manager=root_ctx.storage_manager,
+        registry=root_ctx.registry,
+        idle_checker_host=root_ctx.idle_checker_host,
+        metric_observer=root_ctx.metrics.gql,
+        processors=dep_resources.processing.processors,
+        scheduler_repository=root_ctx.repositories.scheduler.repository,
+        user_repository=root_ctx.repositories.user.repository,
+        agent_repository=root_ctx.repositories.agent.repository,
+    )
     deps = ModuleDeps(
         cors_options=root_ctx.cors_options,
         processors=dep_resources.processing.processors,
-        services_ctx=root_ctx.services_ctx,
-        storage_manager=root_ctx.storage_manager,
-        auth_config=root_ctx.config_provider.config.auth,
+        config_provider=root_ctx.config_provider,
+        gql_context_deps=gql_context_deps,
     )
 
     # 1. Build API module tree

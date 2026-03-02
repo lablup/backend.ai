@@ -40,8 +40,6 @@ from ai.backend.common.dto.manager.template.response import (
 )
 from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.session import query_userinfo
-from ai.backend.manager.api.utils import get_access_key_scopes
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.services.template.actions.create_task_template import (
@@ -62,7 +60,6 @@ from ai.backend.manager.services.template.actions.update_task_template import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.context import RootContext
     from ai.backend.manager.services.processors import Processors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -81,25 +78,13 @@ class SessionTemplateHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = body.parsed
-        request = req.request
-        root_ctx: RootContext = request.app["_root.context"]
-
         domain = params.domain or ctx.user_domain
-        requester_access_key, owner_access_key = await get_access_key_scopes(
-            request, {"owner_access_key": params.owner_access_key}
-        )
+        owner_access_key = params.owner_access_key
         log.info(
             "SESSION_TEMPLATE.CREATE (ak:{0}/{1})",
-            requester_access_key,
-            owner_access_key if owner_access_key != requester_access_key else "*",
+            ctx.access_key,
+            owner_access_key if owner_access_key and owner_access_key != ctx.access_key else "*",
         )
-        async with root_ctx.db.begin() as conn:
-            params_dict = {
-                "domain": domain,
-                "group": params.group,
-                "owner_access_key": params.owner_access_key,
-            }
-            user_uuid, group_id, _ = await query_userinfo(request, params_dict, conn)
 
         try:
             payload = load_json(params.payload)
@@ -121,8 +106,12 @@ class SessionTemplateHandler:
 
         action = CreateTaskTemplateAction(
             domain_name=domain,
-            default_user_uuid=user_uuid,
-            default_group_id=group_id,
+            requesting_group=params.group,
+            requester_uuid=ctx.user_uuid,
+            requester_access_key=ctx.access_key,
+            requester_role=req.request["user"]["role"],
+            requester_domain=ctx.user_domain,
+            owner_access_key=owner_access_key,
             items=items,
         )
         result = await self._processors.template.create_task.wait_for_complete(action)
@@ -174,13 +163,12 @@ class SessionTemplateHandler:
         params = query.parsed
         if params.format not in ("yaml", "json"):
             raise InvalidAPIParameters('format should be "yaml" or "json"')
-        requester_access_key, owner_access_key = await get_access_key_scopes(
-            req.request, {"owner_access_key": params.owner_access_key}
-        )
         log.info(
             "SESSION_TEMPLATE.GET (ak:{0}/{1})",
-            requester_access_key,
-            owner_access_key if owner_access_key != requester_access_key else "*",
+            ctx.access_key,
+            params.owner_access_key
+            if params.owner_access_key and params.owner_access_key != ctx.access_key
+            else "*",
         )
 
         template_id = path.parsed.template_id
@@ -205,27 +193,14 @@ class SessionTemplateHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = body.parsed
-        request = req.request
-        root_ctx: RootContext = request.app["_root.context"]
         template_id = path.parsed.template_id
-
         domain = params.domain or ctx.user_domain
-        requester_access_key, owner_access_key = await get_access_key_scopes(
-            request, {"owner_access_key": params.owner_access_key}
-        )
+        owner_access_key = params.owner_access_key
         log.info(
             "SESSION_TEMPLATE.PUT (ak:{0}/{1})",
-            requester_access_key,
-            owner_access_key if owner_access_key != requester_access_key else "*",
+            ctx.access_key,
+            owner_access_key if owner_access_key and owner_access_key != ctx.access_key else "*",
         )
-
-        async with root_ctx.db.begin() as conn:
-            params_dict = {
-                "domain": domain,
-                "group": params.group,
-                "owner_access_key": params.owner_access_key,
-            }
-            user_uuid, group_id, _ = await query_userinfo(request, params_dict, conn)
 
         try:
             payload = load_json(params.payload)
@@ -247,8 +222,13 @@ class SessionTemplateHandler:
 
         action = UpdateTaskTemplateAction(
             template_id=template_id,
-            user_uuid=user_uuid,
-            group_id=group_id,
+            domain_name=domain,
+            requesting_group=params.group,
+            requester_uuid=ctx.user_uuid,
+            requester_access_key=ctx.access_key,
+            requester_role=req.request["user"]["role"],
+            requester_domain=ctx.user_domain,
+            owner_access_key=owner_access_key,
             items=items,
         )
         await self._processors.template.update_task.wait_for_complete(action)
@@ -266,13 +246,12 @@ class SessionTemplateHandler:
     ) -> APIResponse:
         template_id = path.parsed.template_id
         params = query.parsed
-        requester_access_key, owner_access_key = await get_access_key_scopes(
-            req.request, {"owner_access_key": params.owner_access_key}
-        )
         log.info(
             "SESSION_TEMPLATE.DELETE (ak:{0}/{1})",
-            requester_access_key,
-            owner_access_key if owner_access_key != requester_access_key else "*",
+            ctx.access_key,
+            params.owner_access_key
+            if params.owner_access_key and params.owner_access_key != ctx.access_key
+            else "*",
         )
 
         action = DeleteTaskTemplateAction(template_id=template_id)

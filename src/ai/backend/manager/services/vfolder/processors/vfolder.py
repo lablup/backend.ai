@@ -32,6 +32,8 @@ from ai.backend.manager.services.vfolder.actions.base import (
 from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ChangeVFolderOwnershipAction,
     ChangeVFolderOwnershipActionResult,
+    GetFstabContentsAction,
+    GetFstabContentsActionResult,
     GetQuotaAction,
     GetQuotaActionResult,
     GetVFolderUsageAction,
@@ -46,6 +48,12 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ListAllowedTypesActionResult,
     ListHostsAction,
     ListHostsActionResult,
+    ListMountsAction,
+    ListMountsActionResult,
+    MountHostAction,
+    MountHostActionResult,
+    UmountHostAction,
+    UmountHostActionResult,
     UpdateQuotaAction,
     UpdateQuotaActionResult,
 )
@@ -87,6 +95,10 @@ class VFolderProcessors(AbstractProcessorPackage):
     change_vfolder_ownership: ActionProcessor[
         ChangeVFolderOwnershipAction, ChangeVFolderOwnershipActionResult
     ]
+    list_mounts: ActionProcessor[ListMountsAction, ListMountsActionResult]
+    mount_host: ActionProcessor[MountHostAction, MountHostActionResult]
+    umount_host: ActionProcessor[UmountHostAction, UmountHostActionResult]
+    get_fstab_contents: ActionProcessor[GetFstabContentsAction, GetFstabContentsActionResult]
 
     def __init__(self, service: VFolderService, action_monitors: list[ActionMonitor]) -> None:
         self.create_vfolder = ScopeActionProcessor(service.create, action_monitors)
@@ -123,6 +135,10 @@ class VFolderProcessors(AbstractProcessorPackage):
         self.change_vfolder_ownership = ActionProcessor(
             service.change_vfolder_ownership, action_monitors
         )
+        self.list_mounts = ActionProcessor(service.list_mounts, action_monitors)
+        self.mount_host = ActionProcessor(service.mount_host, action_monitors)
+        self.umount_host = ActionProcessor(service.umount_host, action_monitors)
+        self.get_fstab_contents = ActionProcessor(service.get_fstab_contents, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -147,4 +163,8 @@ class VFolderProcessors(AbstractProcessorPackage):
             GetQuotaAction.spec(),
             UpdateQuotaAction.spec(),
             ChangeVFolderOwnershipAction.spec(),
+            ListMountsAction.spec(),
+            MountHostAction.spec(),
+            UmountHostAction.spec(),
+            GetFstabContentsAction.spec(),
         ]

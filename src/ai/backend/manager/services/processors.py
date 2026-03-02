@@ -25,6 +25,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.notification import NotificationCenter
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.repositories import Repositories
+from ai.backend.manager.service.container_registry.harbor import (
+    AbstractPerProjectContainerRegistryQuotaService,
+)
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
@@ -158,6 +161,7 @@ class ServiceArgs:
     notification_center: NotificationCenter
     appproxy_client_pool: AppProxyClientPool
     prometheus_client: PrometheusClient
+    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None
 
 
 @dataclass
@@ -258,9 +262,11 @@ class Services:
         container_registry_service = ContainerRegistryService(
             args.db,
             repositories.container_registry.repository,
+            quota_service=args.registry_quota_service,
         )
         vfolder_service = VFolderService(
             args.config_provider,
+            args.etcd,
             args.storage_manager,
             args.background_task_manager,
             repositories.vfolder.repository,
@@ -303,6 +309,8 @@ class Services:
             repository=repositories.manager_admin.repository,
             config_provider=args.config_provider,
             etcd=args.etcd,
+            db=args.db,
+            valkey_stat=args.valkey_stat_client,
         )
         user_resource_policy_service = UserResourcePolicyService(
             repositories.user_resource_policy.repository
@@ -341,6 +349,7 @@ class Services:
             deployment_controller=args.deployment_controller,
             scheduling_controller=args.scheduling_controller,
             revision_generator_registry=args.revision_generator_registry,
+            db=args.db,
         )
 
         model_serving_auto_scaling = AutoScalingService(
@@ -367,6 +376,7 @@ class Services:
         )
         vfs_storage_service = VFSStorageService(
             vfs_storage_repository=repositories.vfs_storage.repository,
+            storage_manager=args.storage_manager,
         )
         artifact_service = ArtifactService(
             artifact_repository=repositories.artifact.repository,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, override
 
 from ai.backend.manager.actions.action import BaseActionResult
@@ -251,6 +251,134 @@ class ChangeVFolderOwnershipAction(VFolderAction):
 
 @dataclass
 class ChangeVFolderOwnershipActionResult(BaseActionResult):
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+
+# ------------------------------------------------------------------
+# Mount operations (superadmin-only, agent watcher orchestration)
+# ------------------------------------------------------------------
+
+
+@dataclass
+class MountResultData:
+    """Result from a single mount/umount operation on a manager or agent."""
+
+    success: bool
+    mounts: list[Any] | None = None
+    message: str = ""
+
+
+@dataclass
+class ListMountsAction(VFolderAction):
+    """List mount points from manager, storage proxy, and agents."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+
+@dataclass
+class ListMountsActionResult(BaseActionResult):
+    manager: MountResultData
+    storage_proxy: MountResultData
+    agents: dict[str, MountResultData] = field(default_factory=dict)
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+
+@dataclass
+class MountHostAction(VFolderAction):
+    """Mount a filesystem on agents via agent watchers."""
+
+    name: str
+    fs_location: str
+    fs_type: str | None = None
+    options: str | None = None
+    scaling_group: str | None = None
+    fstab_path: str | None = None
+    edit_fstab: bool = False
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+
+@dataclass
+class MountHostActionResult(BaseActionResult):
+    manager: MountResultData
+    agents: dict[str, MountResultData] = field(default_factory=dict)
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+
+@dataclass
+class UmountHostAction(VFolderAction):
+    """Unmount a filesystem from agents via agent watchers."""
+
+    name: str
+    scaling_group: str | None = None
+    fstab_path: str | None = None
+    edit_fstab: bool = False
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+
+@dataclass
+class UmountHostActionResult(BaseActionResult):
+    manager: MountResultData
+    agents: dict[str, MountResultData] = field(default_factory=dict)
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+
+@dataclass
+class GetFstabContentsAction(VFolderAction):
+    """Get fstab contents from an agent watcher or return a manager stub."""
+
+    agent_id: str | None
+    fstab_path: str | None = None
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+    @override
+    def entity_id(self) -> str | None:
+        return self.agent_id
+
+
+@dataclass
+class GetFstabContentsActionResult(BaseActionResult):
+    content: str
+    node: str
+    node_id: str
+
     @override
     def entity_id(self) -> str | None:
         return None

@@ -16,6 +16,8 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderID
+from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
@@ -47,8 +49,10 @@ from ai.backend.manager.errors.storage import (
     VFolderOperationFailed,
 )
 from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.group import association_groups_users as agus
+from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -1714,3 +1718,30 @@ class VfolderRepository:
                 await conn.execute(del_query)
 
         await execute_with_retry(_delete_related_rows)
+
+    @vfolder_repository_resilience.apply()
+    async def get_alive_agent_ids(
+        self,
+        scaling_group: str | None = None,
+    ) -> list[str]:
+        """Get IDs of agents with ALIVE status, optionally filtered by scaling group."""
+        async with self._db.begin_readonly_session() as session:
+            conn = await session.connection()
+            stmt = sa.select(agents.c.id).where(agents.c.status == AgentStatus.ALIVE)
+            if scaling_group is not None:
+                stmt = stmt.where(agents.c.scaling == scaling_group)
+            result = await conn.execute(stmt)
+            return [row.id for row in result.fetchall()]
+
+    @vfolder_repository_resilience.apply()
+    async def get_active_kernel_mount_names(self) -> set[str]:
+        """Get mount names from all non-terminated kernels."""
+        async with self._db.begin_readonly_session() as session:
+            conn = await session.connection()
+            stmt = sa.select(kernels.c.mounts).where(kernels.c.status != KernelStatus.TERMINATED)
+            result = await conn.execute(stmt)
+            mounted: set[str] = set()
+            for row in result.fetchall():
+                if row.mounts:
+                    mounted.update(m[1] for m in row.mounts)
+            return mounted

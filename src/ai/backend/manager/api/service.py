@@ -52,7 +52,9 @@ def _lazy_handler(
     async def handler(request: web.Request) -> web.StreamResponse:
         if "wrapped" not in _cache:
             root_ctx: RootContext = request.app["_root.context"]
-            instance = ServiceHandler(processors=root_ctx.processors)
+            instance = ServiceHandler(
+                processors=root_ctx.processors,
+            )
             method = getattr(instance, method_name)
             _cache["wrapped"] = _wrap_api_handler(method)
         return await _cache["wrapped"](request)
