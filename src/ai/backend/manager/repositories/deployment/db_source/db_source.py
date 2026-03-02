@@ -2143,24 +2143,30 @@ class DeploymentDBSource:
 
             return row.to_deployment_info()
 
-    async def update_current_revision(
+    async def start_deploying_revision(
         self,
         endpoint_id: uuid.UUID,
         revision_id: uuid.UUID,
     ) -> uuid.UUID | None:
-        """Update the current_revision of an endpoint and return the previous revision ID."""
+        """Set deploying_revision and transition lifecycle to DEPLOYING.
+
+        Returns the current (previous) revision ID for reference.
+        The coordinator will swap deploying_revision → current_revision on completion.
+        """
         async with self._begin_session_read_committed() as db_sess:
             # Get current revision first
             query = sa.select(EndpointRow.current_revision).where(EndpointRow.id == endpoint_id)
             result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
-            previous_revision_id = row
+            previous_revision_id = result.scalar_one_or_none()
 
-            # Update to new revision
+            # Set deploying_revision and transition to DEPLOYING
             update_query = (
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
-                .values(current_revision=revision_id)
+                .values(
+                    deploying_revision=revision_id,
+                    lifecycle_stage=EndpointLifecycle.DEPLOYING,
+                )
             )
             await db_sess.execute(update_query)
 

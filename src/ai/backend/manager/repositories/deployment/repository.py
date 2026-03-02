@@ -1128,17 +1128,17 @@ class DeploymentRepository:
         return await self._db_source.update_endpoint(updater)
 
     @deployment_repository_resilience.apply()
-    async def update_current_revision(
+    async def start_deploying_revision(
         self,
         endpoint_id: uuid.UUID,
         revision_id: uuid.UUID,
     ) -> uuid.UUID | None:
-        """Update the current revision of a deployment.
+        """Set deploying_revision and transition lifecycle to DEPLOYING.
 
         Returns:
-            The previous revision ID, or None if there was no previous revision.
+            The current (previous) revision ID, or None if there was no previous revision.
         """
-        return await self._db_source.update_current_revision(endpoint_id, revision_id)
+        return await self._db_source.start_deploying_revision(endpoint_id, revision_id)
 
     # ========== Deployment Auto-Scaling Policy Operations ==========
 
