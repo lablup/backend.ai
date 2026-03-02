@@ -25,6 +25,7 @@ class RouteChanges:
 
     rollout_specs: list[Creator[RoutingRow]] = field(default_factory=list)
     drain_route_ids: list[UUID] = field(default_factory=list)
+    promote_route_ids: list[UUID] = field(default_factory=list)
 
 
 @dataclass

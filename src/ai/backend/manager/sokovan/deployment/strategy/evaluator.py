@@ -97,6 +97,7 @@ class DeploymentStrategyEvaluator:
             changes = cycle_result.route_changes
             result.route_changes.rollout_specs.extend(changes.rollout_specs)
             result.route_changes.drain_route_ids.extend(changes.drain_route_ids)
+            result.route_changes.promote_route_ids.extend(changes.promote_route_ids)
             DeploymentStrategyEvaluator._record_route_changes(deployment, changes)
 
             # Classify into assignments
@@ -106,8 +107,8 @@ class DeploymentStrategyEvaluator:
 
     @staticmethod
     def _record_route_changes(deployment: DeploymentInfo, changes: RouteChanges) -> None:
-        """Record rollout/drain operations as sub-steps for observability."""
-        if not changes.rollout_specs and not changes.drain_route_ids:
+        """Record rollout/drain/promote operations as sub-steps for observability."""
+        if not changes.rollout_specs and not changes.drain_route_ids and not changes.promote_route_ids:
             return
         pool = DeploymentRecorderContext.current_pool()
         recorder = pool.recorder(deployment.id)
@@ -122,6 +123,12 @@ class DeploymentStrategyEvaluator:
                 with recorder.step(
                     "drain",
                     success_detail=f"{len(changes.drain_route_ids)} route(s)",
+                ):
+                    pass
+            if changes.promote_route_ids:
+                with recorder.step(
+                    "promote",
+                    success_detail=f"{len(changes.promote_route_ids)} route(s)",
                 ):
                     pass
 

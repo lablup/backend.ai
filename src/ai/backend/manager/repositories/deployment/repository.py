@@ -557,8 +557,9 @@ class DeploymentRepository:
         self,
         scale_out_creators: Sequence[Creator[RoutingRow]],
         scale_in_updater: BatchUpdater[RoutingRow] | None,
+        promote_updater: BatchUpdater[RoutingRow] | None = None,
     ) -> None:
-        await self._db_source.scale_routes(scale_out_creators, scale_in_updater)
+        await self._db_source.scale_routes(scale_out_creators, scale_in_updater, promote_updater)
 
     # Route operations
 
