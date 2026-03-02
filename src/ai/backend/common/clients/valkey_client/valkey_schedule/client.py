@@ -365,7 +365,7 @@ class ValkeyScheduleClient:
             return
         key = self._get_session_failed_agents_key(session_id)
         members: list[str] = [str(aid) for aid in agent_ids]
-        batch = Batch(is_atomic=False)
+        batch = Batch(is_atomic=True)
         batch.sadd(key, members)
         batch.expire(key, ttl_sec)
         await self._client.client.exec(batch, raise_on_error=True)
@@ -383,16 +383,6 @@ class ValkeyScheduleClient:
         if not result:
             return frozenset()
         return frozenset(AgentId(member.decode()) for member in result)
-
-    @valkey_schedule_resilience.apply()
-    async def clear_session_failed_agents(self, session_id: SessionId) -> None:
-        """
-        Clear the failed agents record for a specific session.
-
-        :param session_id: The session to clear
-        """
-        key = self._get_session_failed_agents_key(session_id)
-        await self._client.client.delete([key])
 
     @valkey_schedule_resilience.apply()
     async def mark_deployment_needed(self, lifecycle_type: str) -> None:

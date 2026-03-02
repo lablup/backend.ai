@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import logging
 from collections import defaultdict
@@ -176,20 +177,20 @@ class SessionProvisioner:
         base_workloads = [
             session.to_session_workload() for session in scheduling_data.pending_sessions.sessions
         ]
-
-        # Load per-session failed agents from Valkey for retry deprioritization
-        workloads: list[SessionWorkload] = []
-        for wl in base_workloads:
-            failed_agents = await self._valkey_schedule.get_session_failed_agents(wl.session_id)
-            if failed_agents:
-                wl = dataclasses.replace(wl, failed_agent_ids=failed_agents)
-            workloads.append(wl)
-
         sg_info = scheduling_data.scaling_group
 
         if not scheduling_data.snapshot_data:
             log.warning("Missing snapshot data for scaling group {}", scaling_group)
             return ScheduleResult()
+
+        # Load per-session failed agents from Valkey for retry deprioritization
+        failed_agents_list = await asyncio.gather(*[
+            self._valkey_schedule.get_session_failed_agents(wl.session_id) for wl in base_workloads
+        ])
+        workloads = [
+            dataclasses.replace(wl, failed_agent_ids=fa) if fa else wl
+            for wl, fa in zip(base_workloads, failed_agents_list, strict=True)
+        ]
 
         # Convert snapshot data to SystemSnapshot
         system_snapshot = scheduling_data.snapshot_data.to_system_snapshot(

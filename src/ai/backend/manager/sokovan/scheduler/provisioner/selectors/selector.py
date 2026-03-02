@@ -423,18 +423,7 @@ class AgentSelector:
             )
             raise NoAvailableAgentError(f"no available agents. Details: {error_messages_summary}")
 
-        # Third pass: deprioritize agents that previously failed for this session
-        if criteria.failed_agent_ids:
-            non_failed = [
-                t
-                for t in compatible_trackers
-                if t.original_agent.agent_id not in criteria.failed_agent_ids
-            ]
-            if non_failed:
-                compatible_trackers = non_failed
-            # If ALL compatible agents have failed, keep all of them to avoid blocking
-
-        # Handle designated agent if specified
+        # Handle designated agent first (user's explicit choice takes precedence)
         if designated_agent_ids:
             for tracker in compatible_trackers:
                 if tracker.original_agent.agent_id in designated_agent_ids:
@@ -450,6 +439,17 @@ class AgentSelector:
             raise NoAvailableAgentError(
                 f"Designated agent '{designated_agent_ids}' is not compatible. Details: {error_message}"
             )
+
+        # Third pass: deprioritize agents that previously failed for this session
+        if criteria.failed_agent_ids:
+            non_failed = [
+                t
+                for t in compatible_trackers
+                if t.original_agent.agent_id not in criteria.failed_agent_ids
+            ]
+            if non_failed:
+                compatible_trackers = non_failed
+            # If ALL compatible agents have failed, keep all of them to avoid blocking
 
         # Use strategy to select from compatible trackers
         return self._strategy.select_tracker_by_strategy(

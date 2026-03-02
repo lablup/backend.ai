@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Mapping, Sequence
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import datetime
@@ -1268,11 +1268,27 @@ class ScheduleCoordinator:
         if not session_ids:
             return
 
-        # Record current agent assignments before they are cleared by the reset
+        # Record current agent assignments before they are cleared by the reset.
+        # This is best-effort: Valkey issues must not block kernel resets.
         agent_ids_by_session = await self._repository.get_kernel_agent_ids_for_sessions(session_ids)
+        record_sessions: list[SessionId] = []
+        record_tasks: list[Awaitable[None]] = []
         for sid, agent_ids in agent_ids_by_session.items():
             if agent_ids:
-                await self._valkey_schedule.record_session_failed_agents(sid, agent_ids)
+                record_sessions.append(sid)
+                record_tasks.append(
+                    self._valkey_schedule.record_session_failed_agents(sid, agent_ids)
+                )
+        if record_tasks:
+            results = await asyncio.gather(*record_tasks, return_exceptions=True)
+            for sid, result in zip(record_sessions, results, strict=True):
+                if isinstance(result, Exception):
+                    log.warning(
+                        "{}: Failed to record failed agents for session {}: {}",
+                        handler_name,
+                        sid,
+                        result,
+                    )
 
         reset_count = await self._kernel_state_engine.reset_kernels_to_pending_for_sessions(
             session_ids,

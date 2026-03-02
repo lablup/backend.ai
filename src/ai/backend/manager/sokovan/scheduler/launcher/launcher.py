@@ -428,9 +428,16 @@ class SessionLauncher:
                         *log_args,
                         failed_agent_ids,
                     )
-                    await self._valkey_schedule.record_session_failed_agents(
-                        session.session_id, failed_agent_ids
-                    )
+                    try:
+                        await self._valkey_schedule.record_session_failed_agents(
+                            session.session_id, failed_agent_ids
+                        )
+                    except Exception:
+                        log.warning(
+                            log_fmt + "failed to record failed agents in Valkey",
+                            *log_args,
+                            exc_info=True,
+                        )
 
             log.info(log_fmt + "started", *log_args)
 

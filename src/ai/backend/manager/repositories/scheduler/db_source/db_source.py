@@ -2309,6 +2309,7 @@ class ScheduleDBSource:
                 sa.and_(
                     KernelRow.session_id.in_(session_ids),
                     KernelRow.agent.isnot(None),
+                    KernelRow.status.in_(KernelStatus.retriable_statuses()),
                 )
             )
             rows = (await db_conn.execute(stmt)).fetchall()
