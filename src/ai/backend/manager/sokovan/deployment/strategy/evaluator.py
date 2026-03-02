@@ -75,7 +75,7 @@ class DeploymentStrategyEvaluator:
             )
         )
         policy_map = {p.endpoint: p for p in policy_search.items}
-        route_map = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(endpoint_ids)
+        route_map = await self._deployment_repo.fetch_routes_by_endpoint_ids(endpoint_ids)
 
         # ── 2. Per-deployment evaluation ──
         for deployment in deployments:

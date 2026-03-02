@@ -1453,6 +1453,32 @@ class DeploymentDBSource:
                 routes_by_endpoint[row.endpoint].append(row.to_route_info())
             return routes_by_endpoint
 
+    async def fetch_routes_by_endpoint_ids(
+        self,
+        endpoint_ids: set[uuid.UUID],
+    ) -> Mapping[uuid.UUID, list[RouteInfo]]:
+        """Fetch all routes for given endpoint IDs (no status filter).
+
+        Unlike fetch_active_routes_by_endpoint_ids, this includes routes
+        in all statuses (FAILED_TO_START, TERMINATED, etc.), which is
+        required for blue-green rollback detection.
+        """
+        if not endpoint_ids:
+            return {}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(RoutingRow).where(
+                RoutingRow.endpoint.in_(endpoint_ids),
+            )
+            result = await db_sess.execute(query)
+            rows: Sequence[RoutingRow] = result.scalars().all()
+            routes_by_endpoint: defaultdict[uuid.UUID, list[RouteInfo]] = defaultdict(list)
+            for row in rows:
+                if row.endpoint not in routes_by_endpoint:
+                    routes_by_endpoint[row.endpoint] = []
+                routes_by_endpoint[row.endpoint].append(row.to_route_info())
+            return routes_by_endpoint
+
     async def scale_routes(
         self,
         scale_out_creators: Sequence[Creator[RoutingRow]],

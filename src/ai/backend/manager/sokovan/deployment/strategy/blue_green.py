@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import override
 
 from ai.backend.logging import BraceStyleAdapter
@@ -139,14 +140,24 @@ class BlueGreenStrategy(AbstractDeploymentStrategy):
             )
             return StrategyCycleResult(sub_step=DeploymentSubStep.PROGRESSING)
 
-        # ── 7. auto_promote=True + delay>0 → PROGRESSING (delay wait) ──
+        # ── 7. auto_promote=True + delay>0 → check elapsed time ──
         if self._spec.promote_delay_seconds > 0:
-            log.debug(
-                "deployment {}: all green healthy, waiting for promote delay ({}s)",
-                deployment.id,
-                self._spec.promote_delay_seconds,
-            )
-            return StrategyCycleResult(sub_step=DeploymentSubStep.PROGRESSING)
+            latest_healthy_at = _latest_status_updated_at(green_healthy)
+            if latest_healthy_at is None:
+                log.debug(
+                    "deployment {}: all green healthy but status_updated_at unknown — waiting",
+                    deployment.id,
+                )
+                return StrategyCycleResult(sub_step=DeploymentSubStep.PROGRESSING)
+            elapsed = (datetime.now(UTC) - latest_healthy_at).total_seconds()
+            if elapsed < self._spec.promote_delay_seconds:
+                log.debug(
+                    "deployment {}: promote delay {:.0f}/{} seconds elapsed — waiting",
+                    deployment.id,
+                    elapsed,
+                    self._spec.promote_delay_seconds,
+                )
+                return StrategyCycleResult(sub_step=DeploymentSubStep.PROGRESSING)
 
         # ── 8. Promotion: green → ACTIVE, blue → TERMINATING ──
         log.info(
@@ -163,6 +174,12 @@ class BlueGreenStrategy(AbstractDeploymentStrategy):
             sub_step=DeploymentSubStep.COMPLETED,
             route_changes=route_changes,
         )
+
+
+def _latest_status_updated_at(routes: list[RouteInfo]) -> datetime | None:
+    """Return the most recent status_updated_at among the given routes."""
+    timestamps = [r.status_updated_at for r in routes if r.status_updated_at is not None]
+    return max(timestamps) if timestamps else None
 
 
 def _build_route_creators(

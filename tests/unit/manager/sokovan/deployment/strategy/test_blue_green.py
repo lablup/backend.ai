@@ -15,7 +15,7 @@ Tests cover:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -84,6 +84,7 @@ def make_route(
     route_id: UUID | None = None,
     traffic_status: RouteTrafficStatus | None = None,
     traffic_ratio: float | None = None,
+    status_updated_at: datetime | None = None,
 ) -> RouteInfo:
     if traffic_status is None:
         traffic_status = (
@@ -100,6 +101,7 @@ def make_route(
         created_at=datetime.now(UTC),
         revision_id=revision_id,
         traffic_status=traffic_status,
+        status_updated_at=status_updated_at,
     )
 
 
@@ -142,6 +144,7 @@ def _green_routes(
     status: RouteStatus = RouteStatus.HEALTHY,
     traffic_status: RouteTrafficStatus = RouteTrafficStatus.INACTIVE,
     traffic_ratio: float = 0.0,
+    status_updated_at: datetime | None = None,
 ) -> list[RouteInfo]:
     return [
         make_route(
@@ -149,6 +152,7 @@ def _green_routes(
             status=status,
             traffic_status=traffic_status,
             traffic_ratio=traffic_ratio,
+            status_updated_at=status_updated_at,
         )
         for _ in range(count)
     ]
@@ -259,10 +263,13 @@ class TestAutoPromote:
         assert len(_scale_in_ids(result)) == 0
 
     def test_auto_promote_true_delay_positive_waits(self) -> None:
-        """auto_promote=True, delay>0 → PROGRESSING (delay wait)."""
+        """auto_promote=True, delay>0 + recently healthy → PROGRESSING (delay wait)."""
         deployment = make_deployment(desired=3)
         spec = BlueGreenSpec(auto_promote=True, promote_delay_seconds=60)
-        routes = _blue_routes(3) + _green_routes(3, status=RouteStatus.HEALTHY)
+        recently_healthy = datetime.now(UTC) - timedelta(seconds=10)
+        routes = _blue_routes(3) + _green_routes(
+            3, status=RouteStatus.HEALTHY, status_updated_at=recently_healthy
+        )
 
         result = blue_green_evaluate(deployment, routes, spec)
 
@@ -284,15 +291,74 @@ class TestAutoPromote:
         assert len(_promote_ids(result)) == 0
 
     def test_auto_promote_true_delay_1_second_waits(self) -> None:
-        """auto_promote=True, delay=1 → still waits (any positive delay)."""
+        """auto_promote=True, delay=1 + just became healthy → still waits."""
         deployment = make_deployment(desired=2)
         spec = BlueGreenSpec(auto_promote=True, promote_delay_seconds=1)
-        routes = _blue_routes(2) + _green_routes(2, status=RouteStatus.HEALTHY)
+        just_now = datetime.now(UTC)
+        routes = _blue_routes(2) + _green_routes(
+            2, status=RouteStatus.HEALTHY, status_updated_at=just_now
+        )
 
         result = blue_green_evaluate(deployment, routes, spec)
 
         assert not result.completed
         assert len(_promote_ids(result)) == 0
+
+    def test_auto_promote_true_delay_elapsed_promotes(self) -> None:
+        """auto_promote=True, delay>0 + delay fully elapsed → completed."""
+        deployment = make_deployment(desired=3)
+        spec = BlueGreenSpec(auto_promote=True, promote_delay_seconds=30)
+        long_ago = datetime.now(UTC) - timedelta(seconds=60)
+        routes = _blue_routes(3) + _green_routes(
+            3, status=RouteStatus.HEALTHY, status_updated_at=long_ago
+        )
+
+        result = blue_green_evaluate(deployment, routes, spec)
+
+        assert result.completed
+        assert len(_promote_ids(result)) == 3
+        assert len(_scale_in_ids(result)) == 3
+
+    def test_auto_promote_delay_no_status_updated_at_waits(self) -> None:
+        """auto_promote=True, delay>0 + status_updated_at=None → PROGRESSING (wait)."""
+        deployment = make_deployment(desired=2)
+        spec = BlueGreenSpec(auto_promote=True, promote_delay_seconds=30)
+        routes = _blue_routes(2) + _green_routes(
+            2, status=RouteStatus.HEALTHY, status_updated_at=None
+        )
+
+        result = blue_green_evaluate(deployment, routes, spec)
+
+        assert not result.completed
+        assert result.sub_step == DeploymentSubStep.PROGRESSING
+        assert len(_promote_ids(result)) == 0
+
+    def test_auto_promote_delay_uses_latest_timestamp(self) -> None:
+        """With mixed timestamps, delay check uses the latest one."""
+        deployment = make_deployment(desired=2)
+        spec = BlueGreenSpec(auto_promote=True, promote_delay_seconds=30)
+        # One route healthy long ago, another route healthy recently
+        old_healthy = make_route(
+            revision_id=NEW_REV,
+            status=RouteStatus.HEALTHY,
+            traffic_status=RouteTrafficStatus.INACTIVE,
+            traffic_ratio=0.0,
+            status_updated_at=datetime.now(UTC) - timedelta(seconds=120),
+        )
+        recent_healthy = make_route(
+            revision_id=NEW_REV,
+            status=RouteStatus.HEALTHY,
+            traffic_status=RouteTrafficStatus.INACTIVE,
+            traffic_ratio=0.0,
+            status_updated_at=datetime.now(UTC) - timedelta(seconds=5),
+        )
+        routes = _blue_routes(2) + [old_healthy, recent_healthy]
+
+        result = blue_green_evaluate(deployment, routes, spec)
+
+        # Latest is 5 seconds ago, delay is 30 seconds → not elapsed yet
+        assert not result.completed
+        assert result.sub_step == DeploymentSubStep.PROGRESSING
 
     def test_default_spec_auto_promote_false(self) -> None:
         """Default BlueGreenSpec has auto_promote=False."""

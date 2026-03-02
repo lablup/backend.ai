@@ -414,6 +414,7 @@ class RouteInfo:
     created_at: datetime
     revision_id: UUID | None
     traffic_status: RouteTrafficStatus
+    status_updated_at: datetime | None = None
     error_data: dict[str, Any] = field(default_factory=dict)
 
 
