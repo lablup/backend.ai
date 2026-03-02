@@ -55,13 +55,13 @@ The `DeploymentStrategyEvaluator` periodically evaluates each Rolling Update dep
 
 ### Sub-Step Variants
 
-Each cycle evaluation directly returns one of the shared sub-step variants:
+Each cycle evaluation directly returns one of the shared sub-step variants. Completion is not a sub-step but a signal on `CycleEvaluationResult(sub_step=PROGRESSING, completed=True)` — the coordinator handles revision swap and READY transition directly.
 
 | Sub-Step | Condition | Handler Action |
 |----------|-----------|----------------|
-| **provisioning** | New routes are PROVISIONING | DeployingInProgressHandler → DEPLOYING→DEPLOYING, reschedule |
-| **progressing** | Calculated surge/unavailable, created/terminated routes | DeployingInProgressHandler → DEPLOYING→DEPLOYING, reschedule |
-| **completed** | No Old routes and New healthy >= desired_replicas | DeployingCompletedHandler → DEPLOYING→READY, revision swap |
+| **provisioning** | New routes are PROVISIONING | DeployingProvisioningHandler → DEPLOYING→DEPLOYING, reschedule |
+| **progressing** | Calculated surge/unavailable, created/terminated routes | DeployingProgressingHandler → DEPLOYING→DEPLOYING, reschedule |
+| **progressing** (`completed=True`) | No Old routes and New healthy >= desired_replicas | Coordinator → atomic revision swap + DEPLOYING→READY |
 
 ## max_surge / max_unavailable Calculation
 
@@ -227,11 +227,12 @@ Example with `desired_replicas = 3`, `max_surge = 1`, `max_unavailable = 1`:
   ┌──────────────────────────────────────────────────────────────┐
   │  Per-Sub-Step Handlers (coordinator generic path)            │
   │                                                              │
-  │  PROVISIONING/PROGRESSING → DeployingInProgressHandler       │
+  │  PROVISIONING → DeployingProvisioningHandler                  │
   │    next_status: DEPLOYING → coordinator records history      │
   │                                                              │
-  │  COMPLETED → DeployingCompletedHandler                       │
-  │    next_status: READY → revision swap + coordinator transit  │
+  │  PROGRESSING → DeployingProgressingHandler                   │
+  │    next_status: DEPLOYING → coordinator records history      │
+  │    completed=True → coordinator atomic revision swap + READY │
   └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -243,12 +244,11 @@ When all Old routes are removed and New routes reach desired_replicas or above a
   completed determination (evaluator)
        │
        ▼
-  DeployingCompletedHandler.execute()
-    → complete_deployment_revision_swap(ids)
-      current_revision = deploying_revision
-      deploying_revision = NULL
-       │
-       ▼
-  Coordinator generic path
-    → DEPLOYING → READY history recording + lifecycle transition
+  Coordinator._transition_completed_deployments()
+    → Atomic transaction:
+      1. complete_deployment_revision_swap(ids)
+         current_revision = deploying_revision
+         deploying_revision = NULL
+      2. DEPLOYING → READY lifecycle transition
+      3. History recording
 ```
