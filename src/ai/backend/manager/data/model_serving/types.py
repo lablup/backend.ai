@@ -18,6 +18,7 @@ from ai.backend.common.types import (
     ClusterMode,
     MountPermission,
     MountTypes,
+    QuotaScopeID,
     ResourceSlot,
     RuntimeVariant,
     VFolderMount,
@@ -143,6 +144,24 @@ class UserData:
 class ScalingGroupData:
     wsproxy_addr: str
     wsproxy_api_token: str
+
+
+@dataclass(frozen=True)
+class ModelServiceValidationContext:
+    """Data resolved from DB during model service validation."""
+
+    model_id: uuid.UUID
+    model_folder_host: str
+    model_folder_quota_scope_id: QuotaScopeID | None
+    model_folder_usage_mode: str
+    requester_access_key: AccessKey
+    owner_access_key: AccessKey
+    owner_uuid: uuid.UUID
+    owner_role: UserRole
+    group_id: uuid.UUID
+    resource_policy: dict[str, Any]
+    scaling_group: str
+    extra_mounts: Sequence[VFolderMount]
 
 
 @dataclass

@@ -7,7 +7,6 @@ from http import HTTPStatus
 from typing import Any, cast
 
 import aiohttp
-import sqlalchemy as sa
 from pydantic import HttpUrl
 from yarl import URL
 
@@ -37,7 +36,6 @@ from ai.backend.common.types import (
     RuntimeVariant,
     SessionTypes,
     VFolderID,
-    VFolderUsageMode,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -62,20 +60,15 @@ from ai.backend.manager.data.model_serving.types import (
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
-from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.errors.service import (
     EndpointAccessForbiddenError,
     EndpointNotFound,
     ModelServiceNotFound,
     RouteNotFound,
 )
-from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, ModelServiceHelper
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import query_accessible_vfolders, vfolders
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -155,7 +148,6 @@ from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import MountOptionModel, UserScope
-from ai.backend.manager.utils import query_userinfo
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -169,7 +161,6 @@ class ModelServingService:
     _config_provider: ManagerConfigProvider
     _repository: ModelServingRepository
     _deployment_repository: DeploymentRepository
-    _db: ExtendedAsyncSAEngine
 
     _valkey_live: ValkeyLiveClient
     _deployment_controller: DeploymentController
@@ -190,7 +181,6 @@ class ModelServingService:
         deployment_controller: DeploymentController,
         scheduling_controller: SchedulingController,
         revision_generator_registry: RevisionGeneratorRegistry,
-        db: ExtendedAsyncSAEngine,
     ) -> None:
         self._agent_registry = agent_registry
         self._background_task_manager = background_task_manager
@@ -204,7 +194,6 @@ class ModelServingService:
         self._deployment_controller = deployment_controller
         self._scheduling_controller = scheduling_controller
         self._revision_generator_registry = revision_generator_registry
-        self._db = db
         # Map SessionStatus to legacy event names for backward compatibility
         self._status_to_event_name: dict[SessionStatus, str] = {
             SessionStatus.PENDING: "session_enqueued",
@@ -908,114 +897,49 @@ class ModelServingService:
                 " sessions for a single service"
             )
 
-        requester_access_key = action.requester_access_key
         owner_access_key = action.owner_access_key
         if action.owner_access_key_override is not None:
             owner_access_key = action.owner_access_key_override
 
-        async with self._db.begin_readonly() as conn:
-            checked_scaling_group = await ModelServiceHelper.check_scaling_group(
-                conn,
-                action.config.scaling_group,
-                owner_access_key,
-                action.domain_name,
-                action.group_name,
+        extra_mounts_typed: dict[uuid.UUID, MountOptionModel] = {
+            k: MountOptionModel(
+                mount_destination=v.mount_destination,
+                type=v.type,
+                permission=v.permission,
             )
+            for k, v in action.config.extra_mounts.items()
+        }
 
-            try:
-                owner_uuid, group_id, resource_policy = await query_userinfo(
-                    conn,
-                    action.requester_uuid,
-                    requester_access_key,
-                    action.requester_role,
-                    action.requester_domain,
-                    action.keypair_resource_policy,
-                    action.domain_name or action.requester_domain,
-                    action.group_name,
-                    query_on_behalf_of=action.owner_access_key_override,
-                )
-            except ValueError as e:
-                raise InvalidAPIParameters(str(e)) from e
-
-            owner_role_query = sa.select(UserRow.role).where(UserRow.uuid == owner_uuid)
-            owner_role = (await conn.execute(owner_role_query)).scalar()
-            if not owner_role:
-                raise InvalidAuthParameters("Owner role is required to create a model service")
-
-            allowed_vfolder_types = (
-                await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
-            )
-            try:
-                extra_vf_conds = vfolders.c.id == uuid.UUID(action.config.model)
-                matched_vfolders = await query_accessible_vfolders(
-                    conn,
-                    owner_uuid,
-                    user_role=owner_role,
-                    domain_name=action.domain_name,
-                    allowed_vfolder_types=allowed_vfolder_types,
-                    extra_vf_conds=extra_vf_conds,
-                )
-            except Exception as e:
-                if isinstance(e, (ValueError, VFolderNotFound)):
-                    try:
-                        extra_vf_conds = (vfolders.c.name == action.config.model) & (
-                            vfolders.c.usage_mode == VFolderUsageMode.MODEL
-                        )
-                        matched_vfolders = await query_accessible_vfolders(
-                            conn,
-                            owner_uuid,
-                            user_role=owner_role,
-                            domain_name=action.domain_name,
-                            allowed_vfolder_types=allowed_vfolder_types,
-                            extra_vf_conds=extra_vf_conds,
-                        )
-                    except VFolderNotFound as e:
-                        raise VFolderNotFound("Cannot find model folder") from e
-                else:
-                    raise
-            if len(matched_vfolders) == 0:
-                raise VFolderNotFound
-            folder_row = matched_vfolders[0]
-            if folder_row["usage_mode"] != VFolderUsageMode.MODEL:
-                raise InvalidAPIParameters("Selected VFolder is not a model folder")
-
-            model_id = folder_row["id"]
-
-            extra_mounts_typed: dict[uuid.UUID, MountOptionModel] = {
-                k: MountOptionModel(
-                    mount_destination=v.mount_destination,
-                    type=v.type,
-                    permission=v.permission,
-                )
-                for k, v in action.config.extra_mounts.items()
-            }
-            vfolder_mounts = await ModelServiceHelper.check_extra_mounts(
-                conn,
-                self._config_provider.legacy_etcd_config_loader,
-                self._storage_manager,
-                model_id,
-                action.config.model_mount_destination,
-                extra_mounts_typed,
-                UserScope(
-                    domain_name=action.domain_name,
-                    group_id=group_id,
-                    user_uuid=owner_uuid,
-                    user_role=owner_role,
-                ),
-                resource_policy,
-            )
+        # Delegate all DB-dependent resolution to the repository.
+        ctx = await self._repository.resolve_model_service_validation_context(
+            scaling_group=action.config.scaling_group,
+            owner_access_key=owner_access_key,
+            domain_name=action.domain_name,
+            group_name=action.group_name,
+            requester_uuid=action.requester_uuid,
+            requester_access_key=action.requester_access_key,
+            requester_role=action.requester_role,
+            requester_domain=action.requester_domain,
+            keypair_resource_policy=action.keypair_resource_policy,
+            owner_access_key_override=action.owner_access_key_override,
+            model=action.config.model,
+            model_mount_destination=action.config.model_mount_destination,
+            extra_mounts=extra_mounts_typed,
+            legacy_etcd_loader=self._config_provider.legacy_etcd_config_loader,
+            storage_manager=self._storage_manager,
+        )
 
         if action.runtime_variant == RuntimeVariant.CUSTOM:
-            vfid = VFolderID(folder_row["quota_scope_id"], folder_row["id"])
+            vfid = VFolderID(ctx.model_folder_quota_scope_id, ctx.model_id)
             yaml_path = await ModelServiceHelper.validate_model_definition_file_exists(
                 self._storage_manager,
-                folder_row["host"],
+                ctx.model_folder_host,
                 vfid,
                 action.config.model_definition_path,
             )
             await ModelServiceHelper.validate_model_definition(
                 self._storage_manager,
-                folder_row["host"],
+                ctx.model_folder_host,
                 vfid,
                 yaml_path,
             )
@@ -1030,14 +954,14 @@ class ModelServingService:
             yaml_path = "model-definition.yaml"
 
         return ValidateModelServiceActionResult(
-            model_id=model_id,
+            model_id=ctx.model_id,
             model_definition_path=yaml_path,
-            requester_access_key=requester_access_key,
-            owner_access_key=owner_access_key,
-            owner_uuid=owner_uuid,
-            owner_role=owner_role,
-            group_id=group_id,
-            resource_policy=resource_policy,
-            scaling_group=checked_scaling_group,
-            extra_mounts=vfolder_mounts,
+            requester_access_key=ctx.requester_access_key,
+            owner_access_key=ctx.owner_access_key,
+            owner_uuid=ctx.owner_uuid,
+            owner_role=ctx.owner_role,
+            group_id=ctx.group_id,
+            resource_policy=ctx.resource_policy,
+            scaling_group=ctx.scaling_group,
+            extra_mounts=ctx.extra_mounts,
         )

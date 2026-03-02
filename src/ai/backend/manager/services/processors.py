@@ -349,7 +349,6 @@ class Services:
             deployment_controller=args.deployment_controller,
             scheduling_controller=args.scheduling_controller,
             revision_generator_registry=args.revision_generator_registry,
-            db=args.db,
         )
 
         model_serving_auto_scaling = AutoScalingService(
