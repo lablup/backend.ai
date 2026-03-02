@@ -175,6 +175,8 @@ class AgentSelectionCriteria:
     kernel_requirements: Mapping[UUID, KernelResourceSpec]
     # Kernel counts at endpoint for each agent (for concentrated selector spreading)
     kernel_counts_at_endpoint: Mapping[AgentId, int] | None = None
+    # Agents that previously failed for this session (for deprioritization on retry)
+    failed_agent_ids: frozenset[AgentId] = frozenset()
 
     def get_resource_requirements(self) -> Sequence[ResourceRequirements]:
         """
@@ -420,6 +422,17 @@ class AgentSelector:
                 f"{count}x {msg}" for msg, count in error_messages.items()
             )
             raise NoAvailableAgentError(f"no available agents. Details: {error_messages_summary}")
+
+        # Third pass: deprioritize agents that previously failed for this session
+        if criteria.failed_agent_ids:
+            non_failed = [
+                t
+                for t in compatible_trackers
+                if t.original_agent.agent_id not in criteria.failed_agent_ids
+            ]
+            if non_failed:
+                compatible_trackers = non_failed
+            # If ALL compatible agents have failed, keep all of them to avoid blocking
 
         # Handle designated agent if specified
         if designated_agent_ids:

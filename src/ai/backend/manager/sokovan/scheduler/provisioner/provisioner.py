@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
@@ -172,9 +173,18 @@ class SessionProvisioner:
         """
         # Use data from scheduling_data instead of making DB calls
         # Convert PendingSessionData to SessionWorkload
-        workloads = [
+        base_workloads = [
             session.to_session_workload() for session in scheduling_data.pending_sessions.sessions
         ]
+
+        # Load per-session failed agents from Valkey for retry deprioritization
+        workloads: list[SessionWorkload] = []
+        for wl in base_workloads:
+            failed_agents = await self._valkey_schedule.get_session_failed_agents(wl.session_id)
+            if failed_agents:
+                wl = dataclasses.replace(wl, failed_agent_ids=failed_agents)
+            workloads.append(wl)
+
         sg_info = scheduling_data.scaling_group
 
         if not scheduling_data.snapshot_data:
@@ -444,6 +454,7 @@ class SessionProvisioner:
             session_metadata=session_metadata,
             kernel_requirements=kernel_requirements,
             kernel_counts_at_endpoint=session_workload.kernel_counts_at_endpoint,
+            failed_agent_ids=session_workload.failed_agent_ids,
         )
 
         # Use batch selection method - it will get resource requirements internally

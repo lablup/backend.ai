@@ -1258,6 +1258,8 @@ class ScheduleCoordinator:
 
         When sessions exceed max retries, they go back to PENDING for re-scheduling.
         This also resets their kernels to PENDING and clears agent assignments.
+        Before resetting, records the current agent assignments as failed agents
+        so the scheduler can deprioritize them on retry.
 
         Args:
             handler_name: Name of the handler for logging
@@ -1265,6 +1267,12 @@ class ScheduleCoordinator:
         """
         if not session_ids:
             return
+
+        # Record current agent assignments before they are cleared by the reset
+        agent_ids_by_session = await self._repository.get_kernel_agent_ids_for_sessions(session_ids)
+        for sid, agent_ids in agent_ids_by_session.items():
+            if agent_ids:
+                await self._valkey_schedule.record_session_failed_agents(sid, agent_ids)
 
         reset_count = await self._kernel_state_engine.reset_kernels_to_pending_for_sessions(
             session_ids,

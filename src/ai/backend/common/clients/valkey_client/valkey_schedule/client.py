@@ -24,6 +24,7 @@ from ai.backend.common.resilience import (
 from ai.backend.common.types import AgentId, KernelId, SessionId, ValkeyTarget
 
 PENDING_QUEUE_EXPIRY_SEC = 600  # 10 minutes
+SESSION_FAILED_AGENTS_TTL_SEC = 3600  # 1 hour
 ROUTE_HEALTH_TTL_SEC = 120  # 2 minutes
 MAX_HEALTH_STALENESS_SEC = 300  # 5 minutes - threshold for health status staleness
 KERNEL_HEALTH_TTL_SEC = 300  # 5 minutes - TTL for kernel health status
@@ -333,6 +334,65 @@ class ValkeyScheduleClient:
                 except ValueError:
                     result.append(None)
         return result
+
+    # ==================== Session Failed Agents Methods ====================
+
+    def _get_session_failed_agents_key(self, session_id: SessionId) -> str:
+        """
+        Generate the Redis key for session-scoped failed agent tracking.
+
+        :param session_id: The session ID
+        :return: The formatted key string
+        """
+        return f"session:failed_agents:{session_id}"
+
+    @valkey_schedule_resilience.apply()
+    async def record_session_failed_agents(
+        self,
+        session_id: SessionId,
+        agent_ids: Sequence[AgentId],
+        ttl_sec: int = SESSION_FAILED_AGENTS_TTL_SEC,
+    ) -> None:
+        """
+        Record agents that failed for a specific session.
+        Uses SADD to append to the set, so repeated calls accumulate failed agents.
+
+        :param session_id: The session that experienced the failure
+        :param agent_ids: Agent IDs that failed for this session
+        :param ttl_sec: TTL in seconds for auto-cleanup (default 1 hour)
+        """
+        if not agent_ids:
+            return
+        key = self._get_session_failed_agents_key(session_id)
+        members: list[str] = [str(aid) for aid in agent_ids]
+        batch = Batch(is_atomic=False)
+        batch.sadd(key, members)
+        batch.expire(key, ttl_sec)
+        await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_schedule_resilience.apply()
+    async def get_session_failed_agents(self, session_id: SessionId) -> frozenset[AgentId]:
+        """
+        Get the set of agents that previously failed for a specific session.
+
+        :param session_id: The session to look up
+        :return: Frozenset of failed agent IDs (empty if none)
+        """
+        key = self._get_session_failed_agents_key(session_id)
+        result = await self._client.client.smembers(key)
+        if not result:
+            return frozenset()
+        return frozenset(AgentId(member.decode()) for member in result)
+
+    @valkey_schedule_resilience.apply()
+    async def clear_session_failed_agents(self, session_id: SessionId) -> None:
+        """
+        Clear the failed agents record for a specific session.
+
+        :param session_id: The session to clear
+        """
+        key = self._get_session_failed_agents_key(session_id)
+        await self._client.client.delete([key])
 
     @valkey_schedule_resilience.apply()
     async def mark_deployment_needed(self, lifecycle_type: str) -> None:

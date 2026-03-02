@@ -502,6 +502,13 @@ class SchedulerRepository:
         return await self._db_source.update_kernel_status_terminated(kernel_id, reason, exit_code)
 
     @scheduler_repository_resilience.apply()
+    async def get_kernel_agent_ids_for_sessions(
+        self, session_ids: list[SessionId]
+    ) -> dict[SessionId, list[AgentId]]:
+        """Get agent IDs assigned to kernels for the given sessions."""
+        return await self._db_source.get_kernel_agent_ids_for_sessions(session_ids)
+
+    @scheduler_repository_resilience.apply()
     async def reset_kernels_to_pending_for_sessions(
         self, session_ids: list[SessionId], reason: str
     ) -> int:
