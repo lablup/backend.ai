@@ -108,11 +108,11 @@ class ProcessingInput:
     appproxy_client_pool: AppProxyClientPool
     prometheus_client: PrometheusClient
 
-    # Registry quota service
-    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None
-
     # BgtaskRegistry creation (additional)
     agent_client_pool: AgentClientPool
+
+    # Registry quota service (optional, defaults to None)
+    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None = None
 
 
 @dataclass

@@ -161,7 +161,7 @@ class ServiceArgs:
     notification_center: NotificationCenter
     appproxy_client_pool: AppProxyClientPool
     prometheus_client: PrometheusClient
-    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None
+    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None = None
 
 
 @dataclass

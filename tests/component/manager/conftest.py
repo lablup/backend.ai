@@ -874,9 +874,7 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
             deps = ModuleDeps(
                 cors_options=root_ctx.cors_options,
                 processors=getattr(root_ctx, "processors", None) or MagicMock(),
-                services_ctx=getattr(root_ctx, "services_ctx", None) or MagicMock(),
-                storage_manager=getattr(root_ctx, "storage_manager", None) or MagicMock(),
-                auth_config=root_ctx.config_provider.config.auth,
+                config_provider=root_ctx.config_provider,
             )
             register_modules(app, all_registrars, deps=deps)
 
