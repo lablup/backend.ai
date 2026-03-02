@@ -19,6 +19,7 @@ class RouteChanges:
 
     scale_out_specs: list[Creator[RoutingRow]] = field(default_factory=list)
     scale_in_route_ids: list[UUID] = field(default_factory=list)
+    promote_route_ids: list[UUID] = field(default_factory=list)
 
 
 @dataclass
