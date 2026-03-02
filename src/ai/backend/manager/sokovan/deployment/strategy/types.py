@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import UUID
 
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentSubStep,
@@ -23,7 +24,7 @@ class RouteChanges:
 
 @dataclass
 class CycleEvaluationResult:
-    """Result of evaluating a single deployment's rolling update cycle."""
+    """Result of evaluating a single deployment's strategy cycle."""
 
     sub_step: DeploymentSubStep
     completed: bool = False
@@ -42,7 +43,23 @@ class EvaluationGroup:
 class EvaluationResult:
     """Aggregate result of evaluating all DEPLOYING deployments."""
 
+    # In-progress deployments grouped by sub-step (PROVISIONING, PROGRESSING, etc.).
+    # The coordinator looks up the handler for each sub-step and calls execute().
     groups: dict[DeploymentSubStep, EvaluationGroup] = field(default_factory=dict)
+
+    # Deployments that satisfied all strategy FSM conditions and are ready to finish.
+    # The coordinator performs an atomic revision swap + READY transition for these.
     completed: list[DeploymentInfo] = field(default_factory=list)
+
+    # Maps each completed deployment to the strategy (ROLLING, BLUE_GREEN) it used.
+    # The coordinator includes this in the history message for observability.
+    completed_strategies: dict[UUID, DeploymentStrategy] = field(default_factory=dict)
+
+    # Deployments skipped because no deployment policy was found.
+    # The coordinator records SKIPPED history and emits a warning log.
     skipped: list[DeploymentInfo] = field(default_factory=list)
+
+    # Deployments that raised an exception during strategy FSM evaluation, paired
+    # with the error message. The coordinator records NEED_RETRY history and keeps
+    # the lifecycle at DEPLOYING so the next cycle can retry.
     errors: list[tuple[DeploymentInfo, str]] = field(default_factory=list)

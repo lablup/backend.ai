@@ -1235,6 +1235,18 @@ class DeploymentRepository:
         await self._db_source.complete_deployment_revision_swap(endpoint_ids)
 
     @deployment_repository_resilience.apply()
+    async def complete_deployment_and_transition_to_ready(
+        self,
+        endpoint_ids: set[uuid.UUID],
+        batch_updaters: list[BatchUpdater[EndpointRow]],
+        bulk_creator: BulkCreator[DeploymentHistoryRow],
+    ) -> None:
+        """Atomically swap revisions, update lifecycle, and record history."""
+        await self._db_source.complete_deployment_and_transition_to_ready(
+            endpoint_ids, batch_updaters, bulk_creator
+        )
+
+    @deployment_repository_resilience.apply()
     async def clear_deploying_revision(
         self,
         endpoint_ids: set[uuid.UUID],

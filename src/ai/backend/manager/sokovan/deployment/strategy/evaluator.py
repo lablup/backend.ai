@@ -93,6 +93,7 @@ class DeploymentStrategyEvaluator:
             # Group by sub-step
             if cycle_result.completed:
                 result.completed.append(deployment)
+                result.completed_strategies[deployment.id] = policy.strategy
             else:
                 group = result.groups.setdefault(
                     cycle_result.sub_step,

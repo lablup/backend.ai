@@ -15,6 +15,7 @@ from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.notification import NotificationRuleType
 from ai.backend.common.data.notification.messages import EndpointLifecycleChangedMessage
 from ai.backend.common.events.dispatcher import EventProducer
@@ -364,7 +365,8 @@ class DeploymentCoordinator:
         2. Load DEPLOYING deployments.
         3. Run evaluator (evaluates strategy FSM + applies route mutations).
         4. For each sub-step group, run the corresponding handler.
-        5. For completed deployments, swap revisions and transition to READY.
+        5. Handle errors and skipped deployments.
+        6. For completed deployments, swap revisions and transition to READY.
         """
         lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
         async with self._lock_factory(LockID.LOCKID_DEPLOYMENT_DEPLOYING, lock_lifetime):
@@ -377,6 +379,7 @@ class DeploymentCoordinator:
             log.info("DEPLOYING: processing {} deployments", len(deployments))
 
             deployment_ids = [d.id for d in deployments]
+            sub_results: dict[DeploymentSubStep, DeploymentExecutionResult] = {}
             with DeploymentRecorderContext.scope(
                 lifecycle_type.value, entity_ids=deployment_ids
             ) as pool:
@@ -394,17 +397,61 @@ class DeploymentCoordinator:
                         continue
 
                     sub_result = await handler.execute(group.deployments)
+                    sub_results[sub_step] = sub_result
                     await self._handle_status_transitions(handler, sub_result, all_records)
 
-            # Post-process outside recorder scope
+            # Handle evaluation errors (Finding 3) — record history, keep DEPLOYING
+            if eval_result.errors:
+                error_history_specs = [
+                    DeploymentHistoryCreatorSpec(
+                        deployment_id=deployment.id,
+                        phase=lifecycle_type.value,
+                        result=SchedulingResult.NEED_RETRY,
+                        message=f"Evaluation error: {reason}",
+                        from_status=EndpointLifecycle.DEPLOYING,
+                        to_status=None,
+                        sub_steps=[],
+                    )
+                    for deployment, reason in eval_result.errors
+                ]
+                await self._deployment_repository.update_endpoint_lifecycle_bulk_with_history(
+                    [], BulkCreator(specs=error_history_specs)
+                )
+                for deployment, reason in eval_result.errors:
+                    log.error("Deployment {} evaluation error: {}", deployment.id, reason)
+
+            # Handle skipped deployments (Finding 5) — record history, keep DEPLOYING
+            if eval_result.skipped:
+                skipped_history_specs = [
+                    DeploymentHistoryCreatorSpec(
+                        deployment_id=deployment.id,
+                        phase=lifecycle_type.value,
+                        result=SchedulingResult.SKIPPED,
+                        message="No deployment policy found",
+                        from_status=EndpointLifecycle.DEPLOYING,
+                        to_status=None,
+                        sub_steps=[],
+                    )
+                    for deployment in eval_result.skipped
+                ]
+                await self._deployment_repository.update_endpoint_lifecycle_bulk_with_history(
+                    [], BulkCreator(specs=skipped_history_specs)
+                )
+                for deployment in eval_result.skipped:
+                    log.warning("Deployment {} skipped: no deployment policy found", deployment.id)
+
+            # Post-process outside recorder scope using actual sub_results (Finding 4)
             for sub_step, group in eval_result.groups.items():
                 handler_key = (lifecycle_type, sub_step)
                 handler = self._deployment_handlers.get(handler_key)
                 if handler is None:
                     continue
                 try:
-                    result_for_post = DeploymentExecutionResult(successes=group.deployments)
-                    await handler.post_process(result_for_post)
+                    actual_result = sub_results.get(
+                        sub_step,
+                        DeploymentExecutionResult(successes=group.deployments),
+                    )
+                    await handler.post_process(actual_result)
                 except Exception as e:
                     log.error(
                         "Error during post-processing for sub-step {}: {}",
@@ -414,27 +461,26 @@ class DeploymentCoordinator:
 
             # Transition completed deployments: swap revision and move to READY
             if eval_result.completed:
-                await self._transition_completed_deployments(lifecycle_type, eval_result.completed)
+                await self._transition_completed_deployments(
+                    lifecycle_type,
+                    eval_result.completed,
+                    strategies=eval_result.completed_strategies,
+                )
 
     async def _transition_completed_deployments(
         self,
         lifecycle_type: DeploymentLifecycleType,
         completed: list[DeploymentInfo],
+        strategies: dict[UUID, DeploymentStrategy],
     ) -> None:
         """Transition completed DEPLOYING deployments to READY.
 
-        1. Swap deploying_revision → current_revision.
+        Atomically:
+        1. Swap deploying_revision → current_revision (with idempotency guard).
         2. Update lifecycle to READY with history recording.
         3. Send notification events.
         """
         endpoint_ids = {deployment.id for deployment in completed}
-
-        # Swap revisions
-        await self._deployment_repository.complete_deployment_revision_swap(endpoint_ids)
-        log.info(
-            "Swapped deploying_revision → current_revision for {} deployments",
-            len(endpoint_ids),
-        )
 
         # Build lifecycle transition
         target_statuses = [EndpointLifecycle.DEPLOYING]
@@ -455,7 +501,9 @@ class DeploymentCoordinator:
                 deployment_id=deployment.id,
                 phase=lifecycle_type.value,
                 result=SchedulingResult.SUCCESS,
-                message="Rolling update completed successfully",
+                message=f"Deployment completed successfully (strategy: {strategies[deployment.id].value})"
+                if deployment.id in strategies
+                else "Deployment completed successfully",
                 from_status=from_status,
                 to_status=to_status,
                 sub_steps=[],
@@ -463,8 +511,13 @@ class DeploymentCoordinator:
             for deployment in completed
         ]
 
-        await self._deployment_repository.update_endpoint_lifecycle_bulk_with_history(
-            [batch_updater], BulkCreator(specs=history_specs)
+        # Atomic: revision swap + lifecycle update + history recording
+        await self._deployment_repository.complete_deployment_and_transition_to_ready(
+            endpoint_ids, [batch_updater], BulkCreator(specs=history_specs)
+        )
+        log.info(
+            "Atomically swapped revision and transitioned {} deployments to READY",
+            len(endpoint_ids),
         )
 
         # Send notifications
