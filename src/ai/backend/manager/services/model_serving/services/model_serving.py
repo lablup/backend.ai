@@ -190,7 +190,7 @@ class ModelServingService:
         deployment_controller: DeploymentController,
         scheduling_controller: SchedulingController,
         revision_generator_registry: RevisionGeneratorRegistry,
-        db: ExtendedAsyncSAEngine | None = None,
+        db: ExtendedAsyncSAEngine,
     ) -> None:
         self._agent_registry = agent_registry
         self._background_task_manager = background_task_manager
@@ -204,7 +204,7 @@ class ModelServingService:
         self._deployment_controller = deployment_controller
         self._scheduling_controller = scheduling_controller
         self._revision_generator_registry = revision_generator_registry
-        self._db = db  # type: ignore[assignment]
+        self._db = db
         # Map SessionStatus to legacy event names for backward compatibility
         self._status_to_event_name: dict[SessionStatus, str] = {
             SessionStatus.PENDING: "session_enqueued",
@@ -922,17 +922,20 @@ class ModelServingService:
                 action.group_name,
             )
 
-            owner_uuid, group_id, resource_policy = await query_userinfo(
-                conn,
-                action.requester_uuid,
-                requester_access_key,
-                action.requester_role,
-                action.requester_domain,
-                action.keypair_resource_policy,
-                action.domain_name or action.requester_domain,
-                action.group_name,
-                query_on_behalf_of=action.owner_access_key_override,
-            )
+            try:
+                owner_uuid, group_id, resource_policy = await query_userinfo(
+                    conn,
+                    action.requester_uuid,
+                    requester_access_key,
+                    action.requester_role,
+                    action.requester_domain,
+                    action.keypair_resource_policy,
+                    action.domain_name or action.requester_domain,
+                    action.group_name,
+                    query_on_behalf_of=action.owner_access_key_override,
+                )
+            except ValueError as e:
+                raise InvalidAPIParameters(str(e)) from e
 
             owner_role_query = sa.select(UserRow.role).where(UserRow.uuid == owner_uuid)
             owner_role = (await conn.execute(owner_role_query)).scalar()
