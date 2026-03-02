@@ -11,8 +11,6 @@ from pathlib import PurePosixPath
 from typing import Any
 from uuid import UUID, uuid4
 
-
-
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.model_deployment.types import (
     RouteStatus as CommonRouteStatus,
@@ -24,7 +22,6 @@ from ai.backend.common.dto.manager.deployment import (
     ClusterConfigDTO,
     CreateDeploymentPolicyRequest,
     CreateDeploymentRequest,
-    CreateRevisionRequest,
     DeploymentDTO,
     DeploymentFilter,
     DeploymentOrder,
@@ -55,7 +52,6 @@ from ai.backend.common.dto.manager.deployment.types import (
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.api.adapter import BaseFilterAdapter
 from ai.backend.manager.data.deployment.creator import (
-    DeploymentPolicyConfig,
     DeploymentPolicyCreator,
     ModelRevisionCreator,
     NewDeploymentCreator,
@@ -486,8 +482,8 @@ class CreateDeploymentAdapter:
     def _build_policy_config(
         self,
         strategy_input: Any,  # DeploymentStrategyInput
-    ) -> DeploymentPolicyConfig:
-        """Build DeploymentPolicyConfig from strategy input."""
+    ) -> DeploymentPolicyCreator:
+        """Build DeploymentPolicyCreator from strategy input."""
         strategy = DeploymentStrategy(strategy_input.type)
 
         strategy_spec: RollingUpdateSpec | BlueGreenSpec
@@ -509,7 +505,7 @@ class CreateDeploymentAdapter:
                         promote_delay_seconds=strategy_input.blue_green.promote_delay_seconds,
                     )
 
-        return DeploymentPolicyConfig(
+        return DeploymentPolicyCreator(
             strategy=strategy,
             strategy_spec=strategy_spec,
             rollback_on_failure=strategy_input.rollback_on_failure,
@@ -519,12 +515,12 @@ class CreateDeploymentAdapter:
 class CreateRevisionAdapter:
     """Adapter for converting create revision request to creators."""
 
-    def build_creator(self, request: CreateRevisionRequest) -> ModelRevisionCreator:
+    def build_creator(self, request: RevisionInput) -> ModelRevisionCreator:
         """
-        Convert CreateRevisionRequest to ModelRevisionCreator.
+        Convert RevisionInput to ModelRevisionCreator.
 
         Args:
-            request: Create revision request DTO
+            request: Revision input DTO
 
         Returns:
             ModelRevisionCreator for service layer
