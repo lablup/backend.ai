@@ -19,7 +19,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.models.deployment_policy import RollingUpdateSpec
+from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
@@ -27,6 +27,7 @@ from ai.backend.manager.repositories.deployment.creators import RouteBatchUpdate
 from ai.backend.manager.repositories.deployment.options import RouteConditions
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 
+from .blue_green import blue_green_evaluate
 from .rolling_update import rolling_update_evaluate
 from .types import CycleEvaluationResult, EvaluationGroup, EvaluationResult
 
@@ -119,6 +120,14 @@ class DeploymentStrategyEvaluator:
                     f"Expected RollingUpdateSpec for ROLLING strategy, got {type(spec).__name__}"
                 )
             return rolling_update_evaluate(deployment, routes, spec)
+
+        if strategy == DeploymentStrategy.BLUE_GREEN:
+            spec = policy.strategy_spec
+            if not isinstance(spec, BlueGreenSpec):
+                raise ValueError(
+                    f"Expected BlueGreenSpec for BLUE_GREEN strategy, got {type(spec).__name__}"
+                )
+            return blue_green_evaluate(deployment, routes, spec)
 
         raise ValueError(f"Unsupported deployment strategy: {strategy}")
 
