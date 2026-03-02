@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING, Any, Final, cast
 
 import aiohttp
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
 from ai.backend.common.dto.manager.field import (
@@ -144,23 +143,19 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import association_groups_users as agus
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.user import (
-    ACTIVE_USER_STATUSES,
     UserRole,
-    UserRow,
     UserStatus,
     users,
 )
-from ai.backend.manager.models.utils import execute_with_retry, execute_with_txn_retry
+from ai.backend.manager.models.utils import execute_with_retry
 from ai.backend.manager.models.vfolder import (
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
-    VFolderPermissionRow,
     VFolderPermissionSetAlias,
     VFolderRow,
     VFolderStatusSet,
@@ -212,6 +207,12 @@ from ai.backend.manager.services.vfolder.actions.invite import (
     RevokeInvitedVFolderAction,
     UpdateInvitationAction,
     UpdateInvitedVFolderMountPermissionAction,
+)
+from ai.backend.manager.services.vfolder.actions.sharing import (
+    ListSharedVFoldersAction,
+    ShareVFolderAction,
+    UnshareVFolderAction,
+    UpdateVFolderSharingStatusAction,
 )
 from ai.backend.manager.services.vfolder.actions.storage_ops import (
     GetVFolderUsageAction,
@@ -1257,7 +1258,6 @@ class VFolderHandler:
     ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
-        root_ctx: RootContext = req.request.app["_root.context"]
         perm = VFolderPermission(params.permission.value)
         invitee_emails = params.emails
         log.info(
@@ -1268,20 +1268,13 @@ class VFolderHandler:
             req.request.match_info["name"],
             ",".join(invitee_emails),
         )
-        async with root_ctx.db.begin_readonly_session() as db_session:
-            user_rows = await db_session.scalars(
-                sa.select(UserRow).where(UserRow.email.in_(invitee_emails))
-            )
-            user_uuids = [user_row.uuid for user_row in user_rows]
-        if not user_uuids:
-            raise VFolderNotFound("No users found with the provided emails.")
         result = await vfctx.processors.vfolder_invite.invite_vfolder.wait_for_complete(
             InviteVFolderAction(
                 keypair_resource_policy=req.request["keypair"]["resource_policy"],
                 user_uuid=vfctx.user_uuid,
                 vfolder_uuid=row["id"],
                 mount_permission=perm,
-                invitee_user_uuids=user_uuids,
+                invitee_emails=invitee_emails,
             )
         )
         resp = InviteVFolderResponse(invited_ids=result.invitation_ids)
@@ -1394,7 +1387,6 @@ class VFolderHandler:
     ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
-        root_ctx: RootContext = req.request.app["_root.context"]
         log.info(
             "VFOLDER.SHARE (email:{}, ak:{}, vf:{} (resolved-from:{!r}), perm:{}, users:{})",
             vfctx.user_email,
@@ -1404,80 +1396,16 @@ class VFolderHandler:
             params.permission,
             ",".join(params.emails),
         )
-        user_uuid = vfctx.user_uuid
-        domain_name = req.request["user"]["domain_name"]
-        resource_policy = req.request["keypair"]["resource_policy"]
-        if row["ownership_type"] != VFolderOwnershipType.GROUP:
-            raise VFolderNotFound("Only project folders are directly sharable.")
-        async with root_ctx.db.begin() as conn:
-            allowed_vfolder_types = (
-                await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        result = await vfctx.processors.vfolder_sharing.share.wait_for_complete(
+            ShareVFolderAction(
+                user_uuid=vfctx.user_uuid,
+                vfolder_uuid=row["id"],
+                resource_policy=req.request["keypair"]["resource_policy"],
+                permission=VFolderPermission(params.permission.value),
+                emails=params.emails,
             )
-            await ensure_host_permission_allowed(
-                conn,
-                row["host"],
-                allowed_vfolder_types=allowed_vfolder_types,
-                user_uuid=user_uuid,
-                resource_policy=resource_policy,
-                domain_name=domain_name,
-                permission=VFolderHostPermission.SET_USER_PERM,
-            )
-
-            j = users.join(agus, users.c.uuid == agus.c.user_id)
-            db_query = (
-                sa.select(users.c.uuid, users.c.email)
-                .select_from(j)
-                .where(
-                    (users.c.email.in_(params.emails))
-                    & (users.c.email != vfctx.user_email)
-                    & (agus.c.group_id == row["group"])
-                    & (users.c.status.in_(ACTIVE_USER_STATUSES)),
-                )
-            )
-            result = await conn.execute(db_query)
-            user_info = result.fetchall()
-            users_to_share = [u.uuid for u in user_info]
-            emails_to_share = [u.email for u in user_info]
-            if len(user_info) < 1:
-                raise ObjectNotFound(object_name="user")
-            if len(user_info) < len(params.emails):
-                users_not_invfolder_group = list(set(params.emails) - set(emails_to_share))
-                raise ObjectNotFound(
-                    "Some users do not belong to folder's group:"
-                    f" {','.join(users_not_invfolder_group)}",
-                    object_name="user",
-                )
-
-            db_query = (
-                sa.select(vfolder_permissions)
-                .select_from(vfolder_permissions)
-                .where(
-                    (vfolder_permissions.c.user.in_(users_to_share))
-                    & (vfolder_permissions.c.vfolder == row["id"]),
-                )
-            )
-            result = await conn.execute(db_query)
-            users_not_to_share = [u.user for u in result.fetchall()]
-            users_to_share = list(set(users_to_share) - set(users_not_to_share))
-
-            permission_value = VFolderPermission(params.permission.value)
-            for _user in users_to_share:
-                insert_stmt = sa.insert(vfolder_permissions).values(
-                    permission=permission_value,
-                    vfolder=row["id"],
-                    user=_user,
-                )
-                await conn.execute(insert_stmt)
-            for _user in users_not_to_share:
-                update_stmt = (
-                    sa.update(vfolder_permissions)
-                    .values(permission=permission_value)
-                    .where(vfolder_permissions.c.vfolder == row["id"])
-                    .where(vfolder_permissions.c.user == _user)
-                )
-                await conn.execute(update_stmt)
-
-        resp = ShareVFolderResponse(shared_emails=emails_to_share)
+        )
+        resp = ShareVFolderResponse(shared_emails=result.shared_emails)
         return APIResponse.build(HTTPStatus.CREATED, resp)
 
     # ------------------------------------------------------------------
@@ -1492,7 +1420,6 @@ class VFolderHandler:
     ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
-        root_ctx: RootContext = req.request.app["_root.context"]
         log.info(
             "VFOLDER.UNSHARE (email:{}, ak:{}, vf:{} (resolved-from:{!r}), users:{})",
             vfctx.user_email,
@@ -1501,40 +1428,15 @@ class VFolderHandler:
             req.request.match_info["name"],
             ",".join(params.emails),
         )
-        user_uuid = vfctx.user_uuid
-        domain_name = req.request["user"]["domain_name"]
-        resource_policy = req.request["keypair"]["resource_policy"]
-        if row["ownership_type"] != VFolderOwnershipType.GROUP:
-            raise VFolderNotFound("Only project folders are directly unsharable.")
-        async with root_ctx.db.begin() as conn:
-            allowed_vfolder_types = (
-                await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        result = await vfctx.processors.vfolder_sharing.unshare.wait_for_complete(
+            UnshareVFolderAction(
+                user_uuid=vfctx.user_uuid,
+                vfolder_uuid=row["id"],
+                resource_policy=req.request["keypair"]["resource_policy"],
+                emails=params.emails,
             )
-            await ensure_host_permission_allowed(
-                conn,
-                row["host"],
-                allowed_vfolder_types=allowed_vfolder_types,
-                user_uuid=user_uuid,
-                resource_policy=resource_policy,
-                domain_name=domain_name,
-                permission=VFolderHostPermission.SET_USER_PERM,
-            )
-
-            db_query = (
-                sa.select(users.c.uuid).select_from(users).where(users.c.email.in_(params.emails))
-            )
-            result = await conn.execute(db_query)
-            users_to_unshare = [u.uuid for u in result.fetchall()]
-            if len(users_to_unshare) < 1:
-                raise ObjectNotFound(object_name="user(s).")
-
-            delete_stmt = sa.delete(vfolder_permissions).where(
-                (vfolder_permissions.c.vfolder == row["id"])
-                & (vfolder_permissions.c.user.in_(users_to_unshare)),
-            )
-            await conn.execute(delete_stmt)
-
-        resp = UnshareVFolderResponse(unshared_emails=params.emails)
+        )
+        resp = UnshareVFolderResponse(unshared_emails=result.unshared_emails)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
@@ -1871,9 +1773,8 @@ class VFolderHandler:
         self,
         query: QueryParam[ListSharedVFoldersQuery],
         ctx: UserContext,
-        req: RequestCtx,
+        procs: ProcessorsCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         params = query.parsed
         target_vfid = params.vfolder_id
         log.info(
@@ -1882,39 +1783,23 @@ class VFolderHandler:
             ctx.access_key,
             target_vfid,
         )
-        async with root_ctx.db.begin() as conn:
-            j = vfolder_permissions.join(
-                vfolders, vfolders.c.id == vfolder_permissions.c.vfolder
-            ).join(users, users.c.uuid == vfolder_permissions.c.user)
-            db_query = sa.select(
-                vfolder_permissions,
-                vfolders.c.id.label("vfolder_id"),
-                vfolders.c.name,
-                vfolders.c.group,
-                vfolders.c.status,
-                vfolders.c.user.label("vfolder_user"),
-                users.c.email,
-            ).select_from(j)
-            if target_vfid is not None:
-                db_query = db_query.where(vfolders.c.id == target_vfid)
-            result = await conn.execute(db_query)
-            shared_list = result.fetchall()
+        result = await procs.processors.vfolder_sharing.list_shared.wait_for_complete(
+            ListSharedVFoldersAction(vfolder_id=target_vfid)
+        )
         shared_info = []
-        for shared in shared_list:
-            owner = shared.group if shared.group else shared.vfolder_user
-            folder_type = "project" if shared.group else "user"
+        for shared in result.shared:
             shared_info.append(
                 VFolderSharedInfoDTO(
                     vfolder_id=str(shared.vfolder_id),
-                    vfolder_name=str(shared.name),
+                    vfolder_name=shared.vfolder_name,
                     status=shared.status.value,
-                    owner=str(owner),
-                    type=folder_type,
+                    owner=shared.owner,
+                    type=shared.folder_type,
                     shared_to={
-                        "uuid": str(shared.user),
-                        "email": shared.email,
+                        "uuid": str(shared.shared_user_uuid),
+                        "email": shared.shared_user_email,
                     },
-                    perm=shared.permission.value,
+                    perm=VFolderPermissionField(shared.permission.value),
                 )
             )
         resp = ListSharedVFoldersResponse(shared=shared_info)
@@ -1966,9 +1851,8 @@ class VFolderHandler:
         self,
         body: BodyParam[UpdateVFolderSharingStatusReq],
         ctx: UserContext,
-        req: RequestCtx,
+        procs: ProcessorsCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         params = body.parsed
         vfolder_id = params.vfolder_id
         user_perm_list = params.user_perm_list
@@ -1981,36 +1865,20 @@ class VFolderHandler:
         )
 
         to_delete: list[uuid.UUID] = []
-        to_update: list[Mapping[str, Any]] = []
+        to_update: list[tuple[uuid.UUID, VFolderPermission]] = []
         for mapping in user_perm_list:
             if mapping.perm is None:
                 to_delete.append(mapping.user_id)
             else:
-                to_update.append({
-                    "user_id": mapping.user_id,
-                    "perm": VFolderPermission(mapping.perm.value),
-                })
+                to_update.append((mapping.user_id, VFolderPermission(mapping.perm.value)))
 
-        async def _update_or_delete(db_session: SASession) -> None:
-            if to_delete:
-                delete_stmt = (
-                    sa.delete(VFolderPermissionRow)
-                    .where(VFolderPermissionRow.vfolder == vfolder_id)
-                    .where(VFolderPermissionRow.user.in_(to_delete))
-                )
-                await db_session.execute(delete_stmt)
-
-            if to_update:
-                update_stmt = (
-                    sa.update(VFolderPermissionRow)
-                    .values(permission=sa.bindparam("perm"))
-                    .where(VFolderPermissionRow.vfolder == vfolder_id)
-                    .where(VFolderPermissionRow.user == sa.bindparam("user_id"))
-                )
-                await db_session.execute(update_stmt, to_update)
-
-        async with root_ctx.db.connect() as db_conn:
-            await execute_with_txn_retry(_update_or_delete, root_ctx.db.begin_session, db_conn)
+        await procs.processors.vfolder_sharing.update_sharing_status.wait_for_complete(
+            UpdateVFolderSharingStatusAction(
+                vfolder_id=vfolder_id,
+                to_delete=to_delete,
+                to_update=to_update,
+            )
+        )
         return APIResponse.no_content(HTTPStatus.CREATED)
 
     # ------------------------------------------------------------------

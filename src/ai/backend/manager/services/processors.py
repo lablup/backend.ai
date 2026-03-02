@@ -117,9 +117,11 @@ from ai.backend.manager.services.vfolder.processors import (
     VFolderFileProcessors,
     VFolderInviteProcessors,
     VFolderProcessors,
+    VFolderSharingProcessors,
 )
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService
+from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
@@ -175,6 +177,7 @@ class Services:
     vfolder: VFolderService
     vfolder_file: VFolderFileService
     vfolder_invite: VFolderInviteService
+    vfolder_sharing: VFolderSharingService
     session: SessionService
     keypair_resource_policy: KeypairResourcePolicyService
     manager_admin: ManagerAdminService
@@ -270,6 +273,11 @@ class Services:
             repositories.user.repository,
         )
         vfolder_invite_service = VFolderInviteService(
+            args.config_provider,
+            repositories.vfolder.repository,
+            repositories.user.repository,
+        )
+        vfolder_sharing_service = VFolderSharingService(
             args.config_provider,
             repositories.vfolder.repository,
             repositories.user.repository,
@@ -420,6 +428,7 @@ class Services:
             vfolder=vfolder_service,
             vfolder_file=vfolder_file_service,
             vfolder_invite=vfolder_invite_service,
+            vfolder_sharing=vfolder_sharing_service,
             session=session_service,
             keypair_resource_policy=keypair_resource_policy_service,
             manager_admin=manager_admin_service,
@@ -469,6 +478,7 @@ class Processors(AbstractProcessorPackage):
     image: ImageProcessors
     vfolder: VFolderProcessors
     vfolder_invite: VFolderInviteProcessors
+    vfolder_sharing: VFolderSharingProcessors
     vfolder_file: VFolderFileProcessors
     session: SessionProcessors
     container_registry: ContainerRegistryProcessors
@@ -519,6 +529,9 @@ class Processors(AbstractProcessorPackage):
         vfolder_file_processors = VFolderFileProcessors(services.vfolder_file, action_monitors)
         vfolder_invite_processors = VFolderInviteProcessors(
             services.vfolder_invite, action_monitors
+        )
+        vfolder_sharing_processors = VFolderSharingProcessors(
+            services.vfolder_sharing, action_monitors
         )
         session_processors = SessionProcessors(services.session, action_monitors)
         keypair_resource_policy_processors = KeypairResourcePolicyProcessors(
@@ -593,6 +606,7 @@ class Processors(AbstractProcessorPackage):
             vfolder=vfolder_processors,
             vfolder_file=vfolder_file_processors,
             vfolder_invite=vfolder_invite_processors,
+            vfolder_sharing=vfolder_sharing_processors,
             session=session_processors,
             keypair_resource_policy=keypair_resource_policy_processors,
             manager_admin=manager_admin_processors,
@@ -639,6 +653,7 @@ class Processors(AbstractProcessorPackage):
             *self.vfolder.supported_actions(),
             *self.vfolder_file.supported_actions(),
             *self.vfolder_invite.supported_actions(),
+            *self.vfolder_sharing.supported_actions(),
             *self.session.supported_actions(),
             *self.keypair_resource_policy.supported_actions(),
             *self.manager_admin.supported_actions(),

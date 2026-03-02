@@ -28,7 +28,7 @@ class InviteVFolderAction(VFolderInvitationAction):
 
     vfolder_uuid: uuid.UUID
     mount_permission: VFolderMountPermission
-    invitee_user_uuids: list[uuid.UUID]
+    invitee_emails: list[str]
 
     @override
     def entity_id(self) -> str | None:

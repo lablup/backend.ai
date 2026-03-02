@@ -80,12 +80,15 @@ class VFolderInviteService:
         if not inviter_email:
             raise VFolderNotFound()
 
-        # Get invitee user info by UUIDs
-        invitee_users = await self._vfolder_repository.get_users_by_ids(action.invitee_user_uuids)
+        # Resolve invitee emails to user info
+        invitee_users = await self._vfolder_repository.get_users_by_emails(action.invitee_emails)
+        if not invitee_users:
+            raise VFolderNotFound("No users found with the provided emails.")
+        invitee_user_uuids = [user_id for user_id, _ in invitee_users]
 
         # Check if users already have permission
         has_permission = await self._vfolder_repository.check_user_has_vfolder_permission(
-            action.vfolder_uuid, action.invitee_user_uuids
+            action.vfolder_uuid, invitee_user_uuids
         )
         if has_permission:
             raise VFolderGrantAlreadyExists(
