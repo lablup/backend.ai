@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from typing import Any, override
 
 from ai.backend.manager.data.deployment.types import RouteStatus, RouteTrafficStatus
@@ -67,7 +66,6 @@ class RouteBatchUpdaterSpec(BatchUpdaterSpec[RoutingRow]):
         values: dict[str, Any] = {}
         if self.status is not None:
             values["status"] = self.status
-            values["status_updated_at"] = datetime.now(UTC)
         if self.traffic_ratio is not None:
             values["traffic_ratio"] = self.traffic_ratio
         if self.traffic_status is not None:

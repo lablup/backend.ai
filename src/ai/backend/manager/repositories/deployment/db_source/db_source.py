@@ -1422,37 +1422,10 @@ class DeploymentDBSource:
                 routes_by_endpoint[row.endpoint].append(row.to_route_info())
             return routes_by_endpoint
 
-    async def fetch_routes_by_endpoint_ids(
-        self,
-        endpoint_ids: set[uuid.UUID],
-    ) -> Mapping[uuid.UUID, list[RouteInfo]]:
-        """Fetch all routes for given endpoint IDs (no status filter).
-
-        Unlike fetch_active_routes_by_endpoint_ids, this includes routes
-        in all statuses (FAILED_TO_START, TERMINATED, etc.), which is
-        required for blue-green rollback detection.
-        """
-        if not endpoint_ids:
-            return {}
-
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(RoutingRow).where(
-                RoutingRow.endpoint.in_(endpoint_ids),
-            )
-            result = await db_sess.execute(query)
-            rows: Sequence[RoutingRow] = result.scalars().all()
-            routes_by_endpoint: defaultdict[uuid.UUID, list[RouteInfo]] = defaultdict(list)
-            for row in rows:
-                if row.endpoint not in routes_by_endpoint:
-                    routes_by_endpoint[row.endpoint] = []
-                routes_by_endpoint[row.endpoint].append(row.to_route_info())
-            return routes_by_endpoint
-
     async def scale_routes(
         self,
         scale_out_creators: Sequence[Creator[RoutingRow]],
         scale_in_updater: BatchUpdater[RoutingRow] | None,
-        promote_updater: BatchUpdater[RoutingRow] | None = None,
     ) -> None:
         """Scale out/in routes based on provided creators and updater."""
         async with self._begin_session_read_committed() as db_sess:
@@ -1462,9 +1435,6 @@ class DeploymentDBSource:
             # Scale in routes
             if scale_in_updater:
                 await execute_batch_updater(db_sess, scale_in_updater)
-            # Promote routes (blue-green)
-            if promote_updater:
-                await execute_batch_updater(db_sess, promote_updater)
 
     # Route operations
 
@@ -2366,6 +2336,76 @@ class DeploymentDBSource:
                 )
             )
             await db_sess.execute(stmt)
+
+    async def complete_deployment_and_transition_to_ready(
+        self,
+        endpoint_ids: set[uuid.UUID],
+        batch_updaters: Sequence[BatchUpdater[EndpointRow]],
+        bulk_creator: BulkCreator[DeploymentHistoryRow],
+    ) -> None:
+        """Atomically swap revisions, update lifecycle, and record history.
+
+        Performs all three operations in a single transaction to prevent
+        inconsistent state if the process crashes between steps.
+
+        The revision swap includes an idempotency guard
+        (deploying_revision IS NOT NULL) to prevent double-call issues.
+
+        Args:
+            endpoint_ids: Set of endpoint IDs to swap revisions for.
+            batch_updaters: Sequence of BatchUpdaters for lifecycle status updates.
+            bulk_creator: BulkCreator containing all history records.
+        """
+        if not endpoint_ids:
+            return
+        async with self._begin_session_read_committed() as db_sess:
+            # 1. Swap revisions with idempotency guard
+            swap_stmt = (
+                sa.update(EndpointRow)
+                .where(
+                    EndpointRow.id.in_(endpoint_ids),
+                    EndpointRow.deploying_revision.isnot(None),
+                )
+                .values(
+                    current_revision=EndpointRow.deploying_revision,
+                    deploying_revision=None,
+                )
+            )
+            await db_sess.execute(swap_stmt)
+
+            # 2. Execute all lifecycle status updates
+            for batch_updater in batch_updaters:
+                await execute_batch_updater(db_sess, batch_updater)
+
+            # 3. Record history (same logic as update_endpoint_lifecycle_bulk_with_history)
+            if not bulk_creator.specs:
+                return
+
+            new_rows = [spec.build_row() for spec in bulk_creator.specs]
+            deployment_ids = [row.deployment_id for row in new_rows]
+
+            last_records = await self._get_last_deployment_histories_bulk(db_sess, deployment_ids)
+
+            merge_ids: list[uuid.UUID] = []
+            create_rows: list[DeploymentHistoryRow] = []
+
+            for new_row in new_rows:
+                last_row = last_records.get(new_row.deployment_id)
+                if last_row is not None and last_row.should_merge_with(new_row):
+                    merge_ids.append(last_row.id)
+                else:
+                    create_rows.append(new_row)
+
+            if merge_ids:
+                await db_sess.execute(
+                    sa.update(DeploymentHistoryRow)
+                    .where(DeploymentHistoryRow.id.in_(merge_ids))
+                    .values(attempts=DeploymentHistoryRow.attempts + 1)
+                )
+
+            if create_rows:
+                db_sess.add_all(create_rows)
+                await db_sess.flush()
 
     async def clear_deploying_revision(
         self,

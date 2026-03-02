@@ -63,12 +63,11 @@ class DeploymentStrategyEvaluator:
         policy_map = await self._deployment_repo.fetch_deployment_policies_by_endpoint_ids(
             endpoint_ids
         )
-        route_map = await self._deployment_repo.fetch_routes_by_endpoint_ids(endpoint_ids)
+        route_map = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(endpoint_ids)
 
         # ── 2. Per-deployment evaluation ──
         all_scale_out: list[Creator[RoutingRow]] = []
         all_scale_in_ids: list[UUID] = []
-        all_promote_ids: list[UUID] = []
 
         for deployment in deployments:
             policy = policy_map.get(deployment.id)
@@ -90,11 +89,11 @@ class DeploymentStrategyEvaluator:
             changes = cycle_result.route_changes
             all_scale_out.extend(changes.scale_out_specs)
             all_scale_in_ids.extend(changes.scale_in_route_ids)
-            all_promote_ids.extend(changes.promote_route_ids)
 
             # Group by sub-step
             if cycle_result.completed:
                 result.completed.append(deployment)
+                result.completed_strategies[deployment.id] = policy.strategy
             else:
                 group = result.groups.setdefault(
                     cycle_result.sub_step,
@@ -103,7 +102,7 @@ class DeploymentStrategyEvaluator:
                 group.deployments.append(deployment)
 
         # ── 3. Apply route mutations in batch ──
-        await self._apply_route_changes(all_scale_out, all_scale_in_ids, all_promote_ids)
+        await self._apply_route_changes(all_scale_out, all_scale_in_ids)
 
         return result
 
@@ -137,10 +136,9 @@ class DeploymentStrategyEvaluator:
         self,
         scale_out: list[Creator[RoutingRow]],
         scale_in_ids: list[UUID],
-        promote_ids: list[UUID] | None = None,
     ) -> None:
         """Apply aggregated route mutations in a single DB transaction."""
-        if not scale_out and not scale_in_ids and not promote_ids:
+        if not scale_out and not scale_in_ids:
             return
 
         scale_in_updater: BatchUpdater[RoutingRow] | None = None
@@ -154,20 +152,9 @@ class DeploymentStrategyEvaluator:
                 conditions=[RouteConditions.by_ids(scale_in_ids)],
             )
 
-        promote_updater: BatchUpdater[RoutingRow] | None = None
-        if promote_ids:
-            promote_updater = BatchUpdater(
-                spec=RouteBatchUpdaterSpec(
-                    traffic_status=RouteTrafficStatus.ACTIVE,
-                    traffic_ratio=1.0,
-                ),
-                conditions=[RouteConditions.by_ids(promote_ids)],
-            )
-
-        await self._deployment_repo.scale_routes(scale_out, scale_in_updater, promote_updater)
+        await self._deployment_repo.scale_routes(scale_out, scale_in_updater)
         log.debug(
-            "Applied route changes: {} created, {} terminated, {} promoted",
+            "Applied route changes: {} created, {} terminated",
             len(scale_out),
             len(scale_in_ids),
-            len(promote_ids) if promote_ids else 0,
         )

@@ -551,21 +551,12 @@ class DeploymentRepository:
         return await self._db_source.fetch_active_routes_by_endpoint_ids(endpoint_ids)
 
     @deployment_repository_resilience.apply()
-    async def fetch_routes_by_endpoint_ids(
-        self,
-        endpoint_ids: set[uuid.UUID],
-    ) -> Mapping[uuid.UUID, list[RouteInfo]]:
-        """Fetch all routes for multiple endpoints (no status filter)."""
-        return await self._db_source.fetch_routes_by_endpoint_ids(endpoint_ids)
-
-    @deployment_repository_resilience.apply()
     async def scale_routes(
         self,
         scale_out_creators: Sequence[Creator[RoutingRow]],
         scale_in_updater: BatchUpdater[RoutingRow] | None,
-        promote_updater: BatchUpdater[RoutingRow] | None = None,
     ) -> None:
-        await self._db_source.scale_routes(scale_out_creators, scale_in_updater, promote_updater)
+        await self._db_source.scale_routes(scale_out_creators, scale_in_updater)
 
     # Route operations
 
@@ -1242,6 +1233,18 @@ class DeploymentRepository:
     ) -> None:
         """Swap deploying_revision to current_revision for completed deployments."""
         await self._db_source.complete_deployment_revision_swap(endpoint_ids)
+
+    @deployment_repository_resilience.apply()
+    async def complete_deployment_and_transition_to_ready(
+        self,
+        endpoint_ids: set[uuid.UUID],
+        batch_updaters: list[BatchUpdater[EndpointRow]],
+        bulk_creator: BulkCreator[DeploymentHistoryRow],
+    ) -> None:
+        """Atomically swap revisions, update lifecycle, and record history."""
+        await self._db_source.complete_deployment_and_transition_to_ready(
+            endpoint_ids, batch_updaters, bulk_creator
+        )
 
     @deployment_repository_resilience.apply()
     async def clear_deploying_revision(
