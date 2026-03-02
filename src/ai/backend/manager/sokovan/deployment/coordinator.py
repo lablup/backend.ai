@@ -65,7 +65,9 @@ from .strategy.evaluator import DeploymentStrategyEvaluator
 from .types import DeploymentExecutionResult, DeploymentLifecycleType
 
 # Handler key: either a simple lifecycle type or a (lifecycle, sub-step) tuple
-HandlerKey = DeploymentLifecycleType | tuple[DeploymentLifecycleType, DeploymentSubStep]
+type DeploymentHandlerKey = (
+    DeploymentLifecycleType | tuple[DeploymentLifecycleType, DeploymentSubStep]
+)
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -104,7 +106,7 @@ class DeploymentCoordinator:
     _valkey_schedule: ValkeyScheduleClient
     _deployment_controller: DeploymentController
     _deployment_repository: DeploymentRepository
-    _deployment_handlers: Mapping[HandlerKey, DeploymentHandler]
+    _deployment_handlers: Mapping[DeploymentHandlerKey, DeploymentHandler]
     _deployment_evaluators: Mapping[DeploymentLifecycleType, DeploymentStrategyEvaluator]
     _lock_factory: DistributedLockFactory
     _config_provider: ManagerConfigProvider
@@ -149,9 +151,9 @@ class DeploymentCoordinator:
 
     def _init_handlers(
         self, executor: DeploymentExecutor
-    ) -> Mapping[HandlerKey, DeploymentHandler]:
+    ) -> Mapping[DeploymentHandlerKey, DeploymentHandler]:
         """Initialize and return the mapping of handler keys to their handlers."""
-        handlers: dict[HandlerKey, DeploymentHandler] = {
+        handlers: dict[DeploymentHandlerKey, DeploymentHandler] = {
             DeploymentLifecycleType.CHECK_PENDING: CheckPendingDeploymentHandler(
                 deployment_executor=executor,
                 deployment_controller=self._deployment_controller,
@@ -388,7 +390,7 @@ class DeploymentCoordinator:
 
                 # Process each sub-step group with its handler
                 for sub_step, group in eval_result.groups.items():
-                    handler_key: HandlerKey = (lifecycle_type, sub_step)
+                    handler_key: DeploymentHandlerKey = (lifecycle_type, sub_step)
                     handler = self._deployment_handlers.get(handler_key)
                     if handler is None:
                         log.warning(
