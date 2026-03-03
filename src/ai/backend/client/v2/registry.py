@@ -4,7 +4,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING
 
 from .auth import AuthStrategy
-from .base_client import BackendAIClient
+from .base_client import BackendAIAuthClient
 from .config import ClientConfig
 
 if TYPE_CHECKING:
@@ -45,9 +45,9 @@ if TYPE_CHECKING:
 
 
 class BackendAIClientRegistry:
-    _client: BackendAIClient
+    _client: BackendAIAuthClient
 
-    def __init__(self, client: BackendAIClient) -> None:
+    def __init__(self, client: BackendAIAuthClient) -> None:
         self._client = client
 
     @classmethod
@@ -56,7 +56,7 @@ class BackendAIClientRegistry:
         config: ClientConfig,
         auth: AuthStrategy,
     ) -> BackendAIClientRegistry:
-        client = await BackendAIClient.create(config, auth)
+        client = await BackendAIAuthClient.create(config, auth)
         return cls(client)
 
     async def close(self) -> None:

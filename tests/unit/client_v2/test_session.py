@@ -9,7 +9,7 @@ from uuid import uuid4
 import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.session import SessionClient
 from ai.backend.common.dto.manager.session.request import (
@@ -82,7 +82,7 @@ def _no_content_response() -> AsyncMock:
 
 
 def _make_session_client(mock_session: MagicMock) -> SessionClient:
-    client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
+    client = BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
     return SessionClient(client)
 
 
@@ -506,7 +506,7 @@ class TestBinaryOperations:
         test_file = tmp_path / "hello.txt"
         test_file.write_bytes(b"hello world")
 
-        mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
+        mock_client = BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
         sc = SessionClient(mock_client)
         mock_upload = AsyncMock(return_value={"uploaded": True})
 
@@ -520,7 +520,7 @@ class TestBinaryOperations:
 
     @pytest.mark.asyncio
     async def test_download_files(self) -> None:
-        mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
+        mock_client = BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
         sc = SessionClient(mock_client)
         mock_download = AsyncMock(return_value=b"zip-content")
 
@@ -537,7 +537,7 @@ class TestBinaryOperations:
 
     @pytest.mark.asyncio
     async def test_download_single(self) -> None:
-        mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
+        mock_client = BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
         sc = SessionClient(mock_client)
         mock_download = AsyncMock(return_value=b"file-bytes")
 
@@ -553,7 +553,7 @@ class TestBinaryOperations:
     @pytest.mark.asyncio
     async def test_get_task_logs(self) -> None:
         kernel_id = uuid4()
-        mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
+        mock_client = BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
         sc = SessionClient(mock_client)
         mock_download = AsyncMock(return_value=b"log-output")
 

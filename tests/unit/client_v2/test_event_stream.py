@@ -7,7 +7,7 @@ import aiohttp
 import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.event_stream import EventStreamClient
 from ai.backend.client.v2.registry import BackendAIClientRegistry
@@ -29,8 +29,8 @@ _DEFAULT_CONFIG = ClientConfig(endpoint=URL("https://api.example.com"))
 # ---------------------------------------------------------------------------
 
 
-def _make_client(mock_session: MagicMock) -> BackendAIClient:
-    return BackendAIClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
+def _make_client(mock_session: MagicMock) -> BackendAIAuthClient:
+    return BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
 
 
 def _make_event_stream_client(mock_session: MagicMock) -> EventStreamClient:

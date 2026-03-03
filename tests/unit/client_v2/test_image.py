@@ -6,7 +6,7 @@ from uuid import UUID
 import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.image import ImageClient
 from ai.backend.common.dto.manager.image.request import (
@@ -71,8 +71,8 @@ def _make_request_session(resp: AsyncMock) -> MagicMock:
     return mock_session
 
 
-def _make_client(mock_session: MagicMock) -> BackendAIClient:
-    return BackendAIClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
+def _make_client(mock_session: MagicMock) -> BackendAIAuthClient:
+    return BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
 
 
 def _make_image_client(mock_session: MagicMock) -> ImageClient:

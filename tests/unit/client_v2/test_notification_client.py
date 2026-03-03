@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.notification import NotificationClient
 from ai.backend.common.data.notification.types import (
@@ -46,8 +46,8 @@ _RULE_ID = uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 _USER_ID = uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
 
 
-def _make_client(mock_session: MagicMock | None = None) -> BackendAIClient:
-    return BackendAIClient(
+def _make_client(mock_session: MagicMock | None = None) -> BackendAIAuthClient:
+    return BackendAIAuthClient(
         _DEFAULT_CONFIG,
         MockAuth(),
         mock_session or MagicMock(),

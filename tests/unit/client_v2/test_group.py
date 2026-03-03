@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.group import GroupClient
 from ai.backend.common.dto.manager.group import (
@@ -64,7 +64,7 @@ def _no_content_response() -> AsyncMock:
 
 
 def _make_group_client(mock_session: MagicMock) -> GroupClient:
-    client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
+    client = BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
     return GroupClient(client)
 
 

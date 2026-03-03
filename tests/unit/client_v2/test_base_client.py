@@ -6,7 +6,7 @@ import pytest
 from yarl import URL
 
 from ai.backend.client.exceptions import BackendAPIError
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import (
     AuthenticationError,
@@ -36,8 +36,8 @@ _DEFAULT_CONFIG = ClientConfig(endpoint=URL("https://api.example.com"))
 def _make_client(
     mock_session: MagicMock | None = None,
     config: ClientConfig | None = None,
-) -> BackendAIClient:
-    return BackendAIClient(
+) -> BackendAIAuthClient:
+    return BackendAIAuthClient(
         config or _DEFAULT_CONFIG,
         MockAuth(),
         mock_session or MagicMock(),
@@ -76,7 +76,7 @@ class TestBackendAIClient:
         assert headers["Content-Type"] == "application/json"
 
     def test_docstring_mentions_pydantic(self) -> None:
-        assert "Pydantic" in (BackendAIClient.__doc__ or "")
+        assert "Pydantic" in (BackendAIAuthClient.__doc__ or "")
 
     @pytest.mark.asyncio
     async def test_create_factory(self) -> None:
@@ -84,7 +84,7 @@ class TestBackendAIClient:
         with patch("ai.backend.client.v2.base_client.aiohttp.ClientSession") as mock_cls:
             mock_session = MagicMock()
             mock_cls.return_value = mock_session
-            client = await BackendAIClient.create(config, MockAuth())
+            client = await BackendAIAuthClient.create(config, MockAuth())
             assert client._session is mock_session
             mock_cls.assert_called_once()
 

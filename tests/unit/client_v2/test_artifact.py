@@ -9,7 +9,7 @@ from uuid import uuid4
 import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.artifact import ArtifactClient
 from ai.backend.common.dto.manager.artifact import (
@@ -52,7 +52,7 @@ def _json_response(data: dict[str, Any], *, status: int = 200) -> AsyncMock:
 
 
 def _make_artifact_client(mock_session: MagicMock) -> ArtifactClient:
-    client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
+    client = BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
     return ArtifactClient(client)
 
 

@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.quota_scope import QuotaScopeClient
 from ai.backend.common.dto.manager.quota_scope.request import (
@@ -34,8 +34,8 @@ _QUOTA_SCOPE_PAYLOAD = {
 def _make_client(
     mock_session: MagicMock | None = None,
     config: ClientConfig | None = None,
-) -> BackendAIClient:
-    return BackendAIClient(
+) -> BackendAIAuthClient:
+    return BackendAIAuthClient(
         config or _DEFAULT_CONFIG,
         MockAuth(),
         mock_session or MagicMock(),

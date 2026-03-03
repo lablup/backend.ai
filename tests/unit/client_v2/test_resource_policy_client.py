@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.resource_policy import ResourcePolicyClient
 from ai.backend.common.dto.manager.resource_policy.request import (
@@ -79,8 +79,8 @@ _PROJECT_POLICY_PAYLOAD = {
 def _make_client(
     mock_session: MagicMock | None = None,
     config: ClientConfig | None = None,
-) -> BackendAIClient:
-    return BackendAIClient(
+) -> BackendAIAuthClient:
+    return BackendAIAuthClient(
         config or _DEFAULT_CONFIG,
         MockAuth(),
         mock_session or MagicMock(),
