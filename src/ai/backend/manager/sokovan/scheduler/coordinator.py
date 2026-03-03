@@ -1273,20 +1273,20 @@ class ScheduleCoordinator:
         agent_ids_by_session = await self._repository.get_kernel_agent_ids_for_sessions(session_ids)
         record_sessions: list[SessionId] = []
         record_tasks: list[Awaitable[None]] = []
-        for sid, agent_ids in agent_ids_by_session.items():
+        for session_id, agent_ids in agent_ids_by_session.items():
             if agent_ids:
-                record_sessions.append(sid)
+                record_sessions.append(session_id)
                 record_tasks.append(
-                    self._valkey_schedule.record_session_failed_agents(sid, agent_ids)
+                    self._valkey_schedule.record_session_failed_agents(session_id, agent_ids)
                 )
         if record_tasks:
             results = await asyncio.gather(*record_tasks, return_exceptions=True)
-            for sid, result in zip(record_sessions, results, strict=True):
+            for session_id, result in zip(record_sessions, results, strict=True):
                 if isinstance(result, Exception):
                     log.warning(
                         "{}: Failed to record failed agents for session {}: {}",
                         handler_name,
-                        sid,
+                        session_id,
                         result,
                     )
 

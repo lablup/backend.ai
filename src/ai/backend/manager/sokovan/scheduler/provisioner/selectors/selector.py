@@ -443,9 +443,9 @@ class AgentSelector:
         # Third pass: deprioritize agents that previously failed for this session
         if criteria.failed_agent_ids:
             non_failed = [
-                t
-                for t in compatible_trackers
-                if t.original_agent.agent_id not in criteria.failed_agent_ids
+                tracker
+                for tracker in compatible_trackers
+                if tracker.original_agent.agent_id not in criteria.failed_agent_ids
             ]
             if non_failed:
                 compatible_trackers = non_failed

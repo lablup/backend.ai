@@ -185,11 +185,11 @@ class SessionProvisioner:
 
         # Load per-session failed agents from Valkey for retry deprioritization
         failed_agents_list = await asyncio.gather(*[
-            self._valkey_schedule.get_session_failed_agents(wl.session_id) for wl in base_workloads
+            self._valkey_schedule.get_session_failed_agents(workload.session_id) for workload in base_workloads
         ])
         workloads = [
-            dataclasses.replace(wl, failed_agent_ids=fa) if fa else wl
-            for wl, fa in zip(base_workloads, failed_agents_list, strict=True)
+            dataclasses.replace(workload, failed_agent_ids=failed_agents) if failed_agents else workload
+            for workload, failed_agents in zip(base_workloads, failed_agents_list, strict=True)
         ]
 
         # Convert snapshot data to SystemSnapshot
