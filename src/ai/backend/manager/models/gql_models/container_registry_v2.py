@@ -21,6 +21,7 @@ from .container_registry import (
     AllowedGroups,
     ContainerRegistryNode,
     ContainerRegistryTypeField,
+    clear_all_allowed_groups,
     handle_allowed_groups_update,
 )
 
@@ -185,7 +186,9 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):
                 for field, val in input_config.items():
                     setattr(reg_row, field, val)
 
-            if props.allowed_groups:
+            if props.is_global is True:
+                await clear_all_allowed_groups(ctx.db, reg_id)
+            elif props.allowed_groups:
                 await handle_allowed_groups_update(ctx.db, reg_row.id, props.allowed_groups)
 
             return cls(container_registry=ContainerRegistryNode.from_row(ctx, reg_row))
