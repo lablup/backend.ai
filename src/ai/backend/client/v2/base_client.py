@@ -356,12 +356,12 @@ class BackendAIAnonymousClient:
         path = path.lstrip("/")
         return f"{base}/{path}"
 
-    def _build_headers(self, method: str, rel_url: str, content_type: str) -> Mapping[str, str]:
-        return {
+    def _build_headers(self, method: str, rel_url: str, content_type: str) -> CIMultiDict[str]:
+        return CIMultiDict({
             "Date": datetime.now(UTC).isoformat(),
             "Content-Type": content_type,
             "X-BackendAI-Version": self._config.api_version,
-        }
+        })
 
     async def _request(
         self,
@@ -374,7 +374,7 @@ class BackendAIAnonymousClient:
     ) -> dict[str, Any] | list[Any] | None:
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
-        headers = CIMultiDict(self._build_headers(method, rel_url, content_type))
+        headers = self._build_headers(method, rel_url, content_type)
         if extra_headers:
             headers.update(extra_headers)
         url = self._build_url(path)
