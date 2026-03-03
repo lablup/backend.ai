@@ -72,7 +72,6 @@ from ai.backend.manager.models.user import users
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.server import (
     build_root_app,
-    global_subapp_pkgs,
     webapp_plugin_ctx,
 )
 from ai.backend.testutils.pants import get_parallel_slot
@@ -784,7 +783,6 @@ async def server_factory(
         0,
         bootstrap_config,
         cleanup_contexts=None,
-        subapp_pkgs=global_subapp_pkgs,
     )
     root_ctx: RootContext = root_app["_root.context"]
 

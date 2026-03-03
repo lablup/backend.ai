@@ -218,7 +218,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.reporters.base import AbstractReporter
 
     from .api.types import (
-        AppCreator,
         CleanupContext,
         WebRequestHandler,
     )
@@ -310,10 +309,6 @@ PUBLIC_INTERFACES: Final = [
 ]
 
 public_interface_objs: MutableMapping[str, Any] = {}
-
-global_subapp_pkgs: Final[list[str]] = [
-    # All modules migrated to new-style via _register_newstyle_modules().
-]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
 
@@ -1336,12 +1331,6 @@ def _init_subapp(
     root_app.middlewares.extend(global_middlewares)
 
 
-def init_subapp(pkg_name: str, root_app: web.Application, create_subapp: AppCreator) -> None:
-    root_ctx: RootContext = root_app["_root.context"]
-    subapp, global_middlewares = create_subapp(root_ctx.cors_options)
-    _init_subapp(pkg_name, root_app, subapp, global_middlewares)
-
-
 def _mount_registry_tree(
     root_app: web.Application,
     root_registry: RouteRegistry,
@@ -1487,7 +1476,6 @@ def build_root_app(
     bootstrap_config: BootstrapConfig,
     *,
     cleanup_contexts: Sequence[CleanupContext] | None = None,
-    subapp_pkgs: Sequence[str] | None = None,
     scheduler_opts: Mapping[str, Any] | None = None,
 ) -> web.Application:
     public_interface_objs.clear()
@@ -1590,15 +1578,6 @@ def build_root_app(
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
 
-    # --- Legacy subapp modules (create_app pattern) ---
-    if subapp_pkgs is None:
-        subapp_pkgs = []
-    for pkg_name in subapp_pkgs:
-        if pidx == 0:
-            log.info("Loading module: {0}", pkg_name[1:])
-        subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.api")
-        init_subapp(pkg_name, app, subapp_mod.create_app)
-
     vendor_path = importlib.resources.files("ai.backend.manager.vendor")
     if not isinstance(vendor_path, Path):
         raise ServerMisconfiguredError("vendor_path must be a Path instance")
@@ -1657,7 +1636,8 @@ def build_public_app(
         if root_ctx.pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.public_api")
-        init_subapp(pkg_name, app, subapp_mod.create_app)
+        subapp, global_middlewares = subapp_mod.create_app(root_ctx.cors_options)
+        _init_subapp(pkg_name, app, subapp, global_middlewares)
     return app
 
 

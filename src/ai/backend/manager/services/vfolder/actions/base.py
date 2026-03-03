@@ -11,6 +11,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.actions.action import BaseAction
+from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
 from ai.backend.manager.actions.action.single_entity import (
     BaseSingleEntityAction,
@@ -25,7 +26,9 @@ from ai.backend.manager.models.vfolder import (
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
+    VFolderPermissionSetAlias,
     VFolderRow,
+    VFolderStatusSet,
 )
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.repositories.base.updater import Updater
@@ -599,3 +602,35 @@ class GetTaskLogsActionResult(VFolderSingleEntityActionResult):
     @override
     def target_entity_id(self) -> str:
         return str(self.vfolder_data.id)
+
+
+@dataclass
+class GetAccessibleVFolderAction(VFolderAction):
+    """Resolve and validate a single accessible vfolder by ID or name."""
+
+    user_uuid: uuid.UUID
+    user_role: UserRole
+    domain_name: str
+    is_admin: bool
+    perm: VFolderPermissionSetAlias | VFolderPermission
+    folder_id_or_name: str | uuid.UUID
+    required_status: VFolderStatusSet | None = None
+    allow_privileged_access: bool = False
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.folder_id_or_name)
+
+
+@dataclass
+class GetAccessibleVFolderActionResult(BaseActionResult):
+    row: Mapping[str, Any]
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.row.get("id")) if self.row else None

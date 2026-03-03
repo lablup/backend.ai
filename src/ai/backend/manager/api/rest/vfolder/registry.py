@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import functools
 import uuid
-from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from aiohttp import web
 
+from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.rest.middleware.auth import (
     admin_required,
     auth_required,
@@ -21,16 +21,12 @@ from ai.backend.manager.api.rest.server_status import (
     server_status_required,
 )
 from ai.backend.manager.api.rest.types import RouteMiddleware, WebRequestHandler
-from ai.backend.manager.api.vfolder import (
-    check_vfolder_status,
-    resolve_vfolder_rows,
-)
-from ai.backend.manager.errors.storage import TooManyVFoldersFound, VFolderNotFound
 from ai.backend.manager.models.vfolder import (
     VFolderPermission,
     VFolderPermissionSetAlias,
     VFolderStatusSet,
 )
+from ai.backend.manager.services.vfolder.actions.base import GetAccessibleVFolderAction
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
@@ -44,9 +40,8 @@ def _vfolder_resolver(
 ) -> RouteMiddleware:
     """Route middleware that resolves vfolder rows and checks status.
 
-    Combines the logic of ``with_vfolder_rows_resolved`` and
-    ``with_vfolder_status_checked`` into a single middleware compatible
-    with RouteRegistry.
+    Uses the ``get_accessible_vfolder`` processor to resolve, validate
+    count (0 → NotFound, >1 → TooMany), and check status in a single call.
 
     Sets ``request["vfolder_row"]`` so that ``VFolderAuthContext`` can
     extract the row in handler methods.
@@ -61,19 +56,20 @@ def _vfolder_resolver(
                 folder_name_or_id = uuid.UUID(piece)
             except ValueError:
                 folder_name_or_id = piece
-            vfolder_rows: Sequence[Mapping[str, Any]] = await resolve_vfolder_rows(
-                request,
-                perm,
-                folder_name_or_id,
-                allow_privileged_access=allow_privileged_access,
+            root_ctx: RootContext = request.app["_root.context"]
+            result = await root_ctx.processors.vfolder.get_accessible_vfolder.wait_for_complete(
+                GetAccessibleVFolderAction(
+                    user_uuid=request["user"]["uuid"],
+                    user_role=request["user"]["role"],
+                    domain_name=request["user"]["domain_name"],
+                    is_admin=request["is_admin"],
+                    perm=perm,
+                    folder_id_or_name=folder_name_or_id,
+                    required_status=status,
+                    allow_privileged_access=allow_privileged_access,
+                )
             )
-            if len(vfolder_rows) > 1:
-                raise TooManyVFoldersFound(vfolder_rows)
-            if len(vfolder_rows) == 0:
-                raise VFolderNotFound()
-            row = vfolder_rows[0]
-            await check_vfolder_status(row, status)
-            request["vfolder_row"] = row
+            request["vfolder_row"] = result.row
             return await handler(request)
 
         return wrapper
@@ -83,17 +79,10 @@ def _vfolder_resolver(
 
 def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the vfolder sub-application."""
-    from ai.backend.manager.api.vfolder import (
-        PrivateContext as VfolderPrivateContext,
-    )
-    from ai.backend.manager.api.vfolder import (
-        init as vfolder_init,
-    )
-    from ai.backend.manager.api.vfolder import (
-        shutdown as vfolder_shutdown,
-    )
-
     from .handler import VFolderHandler
+    from .lifecycle import PrivateContext as VfolderPrivateContext
+    from .lifecycle import init as vfolder_init
+    from .lifecycle import shutdown as vfolder_shutdown
 
     reg = RouteRegistry.create("folders", deps.cors_options)
     ctx = VfolderPrivateContext()

@@ -24,7 +24,6 @@ from ai.backend.common.types import (
 # which Pants cannot trace statically.
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import vfolder as _vfolder_api
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
@@ -56,7 +55,7 @@ from ai.backend.manager.server import (
 )
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
 
-_VFOLDER_SERVER_SUBAPP_MODULES = (_auth_api, _vfolder_api)
+_VFOLDER_SERVER_SUBAPP_MODULES = (_auth_api,)
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]

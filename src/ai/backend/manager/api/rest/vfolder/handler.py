@@ -101,11 +101,8 @@ from ai.backend.common.types import (
     VFolderID,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.utils import get_user_scopes
-from ai.backend.manager.api.vfolder import (
-    check_vfolder_status,
-    resolve_vfolder_rows,
-)
 from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.dto.context import (
     ProcessorsCtx,
@@ -140,6 +137,7 @@ from ai.backend.manager.services.vfolder.actions.base import (
     CreateVFolderAction,
     DeleteForeverVFolderAction,
     ForceDeleteVFolderAction,
+    GetAccessibleVFolderAction,
     GetVFolderAction,
     ListVFolderAction,
     MoveToTrashVFolderAction,
@@ -520,10 +518,18 @@ class VFolderHandler:
         procs: ProcessorsCtx,
     ) -> APIResponse:
         params = query.parsed
-        vfolder_row = (
-            await resolve_vfolder_rows(req.request, VFolderPermissionSetAlias.READABLE, params.id)
-        )[0]
-        await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
+        resolved = await procs.processors.vfolder.get_accessible_vfolder.wait_for_complete(
+            GetAccessibleVFolderAction(
+                user_uuid=ctx.user_uuid,
+                user_role=req.request["user"]["role"],
+                domain_name=ctx.user_domain,
+                is_admin=req.request["is_admin"],
+                perm=VFolderPermissionSetAlias.READABLE,
+                folder_id_or_name=params.id,
+                required_status=VFolderStatusSet.READABLE,
+            )
+        )
+        vfolder_row = resolved.row
         log.info(
             "VFOLDER.GET_QUOTA (email:{}, vf:{})",
             ctx.user_email,
@@ -559,10 +565,18 @@ class VFolderHandler:
         procs: ProcessorsCtx,
     ) -> APIResponse:
         params = body.parsed
-        vfolder_row = (
-            await resolve_vfolder_rows(req.request, VFolderPermissionSetAlias.READABLE, params.id)
-        )[0]
-        await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
+        resolved = await procs.processors.vfolder.get_accessible_vfolder.wait_for_complete(
+            GetAccessibleVFolderAction(
+                user_uuid=ctx.user_uuid,
+                user_role=req.request["user"]["role"],
+                domain_name=ctx.user_domain,
+                is_admin=req.request["is_admin"],
+                perm=VFolderPermissionSetAlias.READABLE,
+                folder_id_or_name=params.id,
+                required_status=VFolderStatusSet.READABLE,
+            )
+        )
+        vfolder_row = resolved.row
         quota = int(params.input["size_bytes"])
         log.info(
             "VFOLDER.UPDATE_QUOTA (email:{}, quota:{}, vf:{})",
@@ -603,10 +617,18 @@ class VFolderHandler:
         procs: ProcessorsCtx,
     ) -> APIResponse:
         params = query.parsed
-        vfolder_row = (
-            await resolve_vfolder_rows(req.request, VFolderPermissionSetAlias.READABLE, params.id)
-        )[0]
-        await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
+        resolved = await procs.processors.vfolder.get_accessible_vfolder.wait_for_complete(
+            GetAccessibleVFolderAction(
+                user_uuid=ctx.user_uuid,
+                user_role=req.request["user"]["role"],
+                domain_name=ctx.user_domain,
+                is_admin=req.request["is_admin"],
+                perm=VFolderPermissionSetAlias.READABLE,
+                folder_id_or_name=params.id,
+                required_status=VFolderStatusSet.READABLE,
+            )
+        )
+        vfolder_row = resolved.row
         log.info(
             "VFOLDER.GET_USAGE (email:{}, vf:{})",
             ctx.user_email,
@@ -634,10 +656,18 @@ class VFolderHandler:
         procs: ProcessorsCtx,
     ) -> APIResponse:
         params = query.parsed
-        vfolder_row = (
-            await resolve_vfolder_rows(req.request, VFolderPermissionSetAlias.READABLE, params.id)
-        )[0]
-        await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
+        resolved = await procs.processors.vfolder.get_accessible_vfolder.wait_for_complete(
+            GetAccessibleVFolderAction(
+                user_uuid=ctx.user_uuid,
+                user_role=req.request["user"]["role"],
+                domain_name=ctx.user_domain,
+                is_admin=req.request["is_admin"],
+                perm=VFolderPermissionSetAlias.READABLE,
+                folder_id_or_name=params.id,
+                required_status=VFolderStatusSet.READABLE,
+            )
+        )
+        vfolder_row = resolved.row
         log.info("VFOLDER.GET_USED_BYTES (vf:{})", params.id)
         result = await procs.processors.vfolder.get_used_bytes.wait_for_complete(
             GetVFolderUsedBytesAction(
@@ -1339,15 +1369,19 @@ class VFolderHandler:
         resource_policy = req.request["keypair"]["resource_policy"]
         folder_name = req.request.match_info["name"]
 
-        rows = await resolve_vfolder_rows(
-            req.request,
-            VFolderPermissionSetAlias.READABLE,
-            folder_name,
-            allow_privileged_access=True,
+        root_ctx: RootContext = req.request.app["_root.context"]
+        resolved = await root_ctx.processors.vfolder.get_accessible_vfolder.wait_for_complete(
+            GetAccessibleVFolderAction(
+                user_uuid=ctx.user_uuid,
+                user_role=req.request["user"]["role"],
+                domain_name=ctx.user_domain,
+                is_admin=req.request["is_admin"],
+                perm=VFolderPermissionSetAlias.READABLE,
+                folder_id_or_name=folder_name,
+                allow_privileged_access=True,
+            )
         )
-        if len(rows) > 1:
-            raise TooManyVFoldersFound(rows)
-        row = rows[0]
+        row = resolved.row
         log.info(
             "VFOLDER.DELETE_BY_NAME (email:{}, ak:{}, vf:{} (resolved-from:{!r}))",
             ctx.user_email,
@@ -1376,18 +1410,22 @@ class VFolderHandler:
         query: QueryParam[GetVFolderIDReq],
         ctx: UserContext,
         req: RequestCtx,
+        procs: ProcessorsCtx,
     ) -> APIResponse:
         params = query.parsed
         folder_name = params.name
-        rows = await resolve_vfolder_rows(
-            req.request,
-            VFolderPermissionSetAlias.READABLE,
-            folder_name,
-            allow_privileged_access=True,
+        resolved = await procs.processors.vfolder.get_accessible_vfolder.wait_for_complete(
+            GetAccessibleVFolderAction(
+                user_uuid=ctx.user_uuid,
+                user_role=req.request["user"]["role"],
+                domain_name=ctx.user_domain,
+                is_admin=req.request["is_admin"],
+                perm=VFolderPermissionSetAlias.READABLE,
+                folder_id_or_name=folder_name,
+                allow_privileged_access=True,
+            )
         )
-        if len(rows) > 1:
-            raise TooManyVFoldersFound(rows)
-        row = rows[0]
+        row = resolved.row
         log.info(
             "VFOLDER.GET_ID (email:{}, ak:{}, vf:{} (resolved-from:{!r}))",
             ctx.user_email,

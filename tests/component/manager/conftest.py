@@ -809,7 +809,6 @@ async def app(bootstrap_config: BootstrapConfig) -> web.Application:
         0,
         bootstrap_config,
         cleanup_contexts=[],
-        subapp_pkgs=[],
     )
 
 
@@ -851,7 +850,6 @@ async def create_app_and_client(
             0,
             bootstrap_config,
             cleanup_contexts=[],
-            subapp_pkgs=[],
             scheduler_opts={
                 "close_timeout": 10,
                 **scheduler_opts,

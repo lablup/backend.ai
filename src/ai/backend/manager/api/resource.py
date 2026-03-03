@@ -1,26 +1,25 @@
 """Backward-compatibility shim for the resource module.
 
 Handler logic has been migrated to ``api.rest.resource.handler.ResourceHandler``.
-This module keeps ``create_app()`` functional so that ``server.py`` can still
-load it as a legacy subapp.  ``get_watcher_info()`` is preserved as a utility
-used by the vfolder module.
+``get_watcher_info()`` is preserved as a utility used by the vfolder module.
+``get_container_registries`` is preserved as it is used by the etcd handler.
+
+The ``create_app()`` shim has been removed because
+``global_subapp_pkgs`` is no longer used by the server bootstrap.
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
-import aiohttp_cors
 import yarl
 from aiohttp import web
 
 from ai.backend.logging import BraceStyleAdapter
 
-from .auth import auth_required, superadmin_required
-from .manager import READ_ALLOWED, server_status_required
-from .types import CORSOptions, WebMiddleware, WebRequestHandler
+from .auth import superadmin_required
+from .types import WebRequestHandler
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -57,7 +56,7 @@ async def get_watcher_info(request: web.Request, agent_id: str) -> dict[str, Any
 
 
 # ------------------------------------------------------------------
-# Lazy handler initialization helpers
+# Lazy handler initialization helpers (kept for get_container_registries)
 # ------------------------------------------------------------------
 
 _HANDLER_APP_KEY = "_resource_handler_wrapped"
@@ -73,20 +72,7 @@ def _ensure_handler(app: web.Application) -> dict[str, WebRequestHandler]:
         handler = ResourceHandler(processors=root_ctx.processors)
         app[_HANDLER_APP_KEY] = {
             name: _wrap_api_handler(getattr(handler, name))
-            for name in (
-                "list_presets",
-                "check_presets",
-                "recalculate_usage",
-                "usage_per_month",
-                "usage_per_period",
-                "user_month_stats",
-                "admin_month_stats",
-                "get_watcher_status",
-                "watcher_agent_start",
-                "watcher_agent_stop",
-                "watcher_agent_restart",
-                "get_container_registries",
-            )
+            for name in ("get_container_registries",)
         }
     result: dict[str, WebRequestHandler] = app[_HANDLER_APP_KEY]
     return result
@@ -105,147 +91,7 @@ def _delegate(method_name: str) -> WebRequestHandler:
 
 
 # ------------------------------------------------------------------
-# Backward-compatible re-exports
+# Backward-compatible re-export (used by rest/etcd/handler.py)
 # ------------------------------------------------------------------
-# These module-level names preserve the original API surface so that
-# existing consumers (tests, etcd.py) can import them by name.
-# Decorator stacking mirrors the original module-level definitions.
 
-list_presets = auth_required(_delegate("list_presets"))
-check_presets = server_status_required(READ_ALLOWED)(auth_required(_delegate("check_presets")))
-recalculate_usage = server_status_required(READ_ALLOWED)(
-    superadmin_required(_delegate("recalculate_usage"))
-)
-usage_per_month = server_status_required(READ_ALLOWED)(
-    superadmin_required(_delegate("usage_per_month"))
-)
-usage_per_period = server_status_required(READ_ALLOWED)(
-    superadmin_required(_delegate("usage_per_period"))
-)
-user_month_stats = server_status_required(READ_ALLOWED)(
-    auth_required(_delegate("user_month_stats"))
-)
-admin_month_stats = server_status_required(READ_ALLOWED)(
-    superadmin_required(_delegate("admin_month_stats"))
-)
-get_watcher_status = server_status_required(READ_ALLOWED)(
-    superadmin_required(_delegate("get_watcher_status"))
-)
-watcher_agent_start = server_status_required(READ_ALLOWED)(
-    superadmin_required(_delegate("watcher_agent_start"))
-)
-watcher_agent_stop = server_status_required(READ_ALLOWED)(
-    superadmin_required(_delegate("watcher_agent_stop"))
-)
-watcher_agent_restart = server_status_required(READ_ALLOWED)(
-    superadmin_required(_delegate("watcher_agent_restart"))
-)
 get_container_registries = superadmin_required(_delegate("get_container_registries"))
-
-
-# ------------------------------------------------------------------
-# Legacy create_app() entry point
-# ------------------------------------------------------------------
-
-
-def create_app(
-    default_cors_options: CORSOptions,
-) -> tuple[web.Application, Iterable[WebMiddleware]]:
-    app = web.Application()
-    app["api_versions"] = (4,)
-    app["prefix"] = "resource"
-    cors = aiohttp_cors.setup(app, defaults=default_cors_options)
-    add_route = app.router.add_route
-    cors.add(add_route("GET", "/presets", auth_required(_delegate("list_presets"))))
-    cors.add(
-        add_route(
-            "GET",
-            "/container-registries",
-            superadmin_required(_delegate("get_container_registries")),
-        )
-    )
-    cors.add(
-        add_route(
-            "POST",
-            "/check-presets",
-            server_status_required(READ_ALLOWED)(auth_required(_delegate("check_presets"))),
-        )
-    )
-    cors.add(
-        add_route(
-            "POST",
-            "/recalculate-usage",
-            server_status_required(READ_ALLOWED)(
-                superadmin_required(_delegate("recalculate_usage"))
-            ),
-        )
-    )
-    cors.add(
-        add_route(
-            "GET",
-            "/usage/month",
-            server_status_required(READ_ALLOWED)(superadmin_required(_delegate("usage_per_month"))),
-        )
-    )
-    cors.add(
-        add_route(
-            "GET",
-            "/usage/period",
-            server_status_required(READ_ALLOWED)(
-                superadmin_required(_delegate("usage_per_period"))
-            ),
-        )
-    )
-    cors.add(
-        add_route(
-            "GET",
-            "/stats/user/month",
-            server_status_required(READ_ALLOWED)(auth_required(_delegate("user_month_stats"))),
-        )
-    )
-    cors.add(
-        add_route(
-            "GET",
-            "/stats/admin/month",
-            server_status_required(READ_ALLOWED)(
-                superadmin_required(_delegate("admin_month_stats"))
-            ),
-        )
-    )
-    cors.add(
-        add_route(
-            "GET",
-            "/watcher",
-            server_status_required(READ_ALLOWED)(
-                superadmin_required(_delegate("get_watcher_status"))
-            ),
-        )
-    )
-    cors.add(
-        add_route(
-            "POST",
-            "/watcher/agent/start",
-            server_status_required(READ_ALLOWED)(
-                superadmin_required(_delegate("watcher_agent_start"))
-            ),
-        )
-    )
-    cors.add(
-        add_route(
-            "POST",
-            "/watcher/agent/stop",
-            server_status_required(READ_ALLOWED)(
-                superadmin_required(_delegate("watcher_agent_stop"))
-            ),
-        )
-    )
-    cors.add(
-        add_route(
-            "POST",
-            "/watcher/agent/restart",
-            server_status_required(READ_ALLOWED)(
-                superadmin_required(_delegate("watcher_agent_restart"))
-            ),
-        )
-    )
-    return app, []

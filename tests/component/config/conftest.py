@@ -20,15 +20,7 @@ from ai.backend.common.dto.manager.config import (
     DeleteGroupDotfileRequest,
     DeleteUserDotfileRequest,
 )
-
-# Statically imported so that Pants includes these modules in the test PEX.
-# build_root_app() loads them at runtime via importlib.import_module(),
-# which Pants cannot trace statically.
 from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import domainconfig as _domainconfig_api
-from ai.backend.manager.api import groupconfig as _groupconfig_api
-from ai.backend.manager.api import userconfig as _userconfig_api
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.domainconfig.registry import register_domainconfig_routes
@@ -49,13 +41,6 @@ from ai.backend.manager.server import (
     storage_manager_ctx,
 )
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
-
-_CONFIG_SERVER_SUBAPP_MODULES = (
-    _auth_api,
-    _userconfig_api,
-    _groupconfig_api,
-    _domainconfig_api,
-)
 
 UserDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
 GroupDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]

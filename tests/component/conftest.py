@@ -904,7 +904,6 @@ async def server(
         0,
         bootstrap_config,
         cleanup_contexts=[],
-        subapp_pkgs=[],
     )
     root_ctx: RootContext = app["_root.context"]
 

@@ -1,8 +1,6 @@
 """Backward-compatibility shim for the manager module.
 
 Handler logic has been migrated to ``api.rest.manager.handler.ManagerHandler``.
-This module keeps ``create_app()`` functional so that ``server.py`` can still
-load it as a legacy subapp.
 
 Exported symbols used by other modules are preserved:
 - ``server_status_required``, ``READ_ALLOWED``, ``ALL_ALLOWED``
@@ -10,6 +8,9 @@ Exported symbols used by other modules are preserved:
 - ``SchedulerOps``
 - ``PrivateContext``, ``init``, ``shutdown``
 - ``detect_status_update``, ``report_status_bgtask``
+
+The ``create_app()`` shim has been removed because
+``global_subapp_pkgs`` is no longer used by the server bootstrap.
 """
 
 from __future__ import annotations
@@ -18,10 +19,9 @@ import asyncio
 import enum
 import functools
 import logging
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-import aiohttp_cors
 import attrs
 import graphene
 from aiohttp import web
@@ -38,8 +38,6 @@ from ai.backend.manager.api.rest.server_status import (
 from ai.backend.manager.errors.common import ServerFrozen, ServiceUnavailable
 from ai.backend.manager.models.health import report_manager_status
 
-from .auth import superadmin_required
-from .types import CORSOptions, WebMiddleware, WebRequestHandler
 from .utils import set_handler_attr
 
 if TYPE_CHECKING:
@@ -190,100 +188,3 @@ async def shutdown(app: web.Application) -> None:
         await asyncio.sleep(0)
         if not app_ctx.db_status_report_task.done():
             await app_ctx.db_status_report_task
-
-
-# ------------------------------------------------------------------
-# Lazy handler initialization helpers
-# ------------------------------------------------------------------
-
-_HANDLER_APP_KEY = "_manager_handler_wrapped"
-
-
-def _ensure_handler(app: web.Application) -> dict[str, WebRequestHandler]:
-    """Lazily create ManagerHandler and wrap its methods on first request."""
-    if _HANDLER_APP_KEY not in app:
-        from ai.backend.manager.api.rest.manager.handler import ManagerHandler
-        from ai.backend.manager.api.rest.routing import _wrap_api_handler
-
-        root_ctx: RootContext = app["_root.context"]
-        handler = ManagerHandler(processors=root_ctx.processors)
-        app[_HANDLER_APP_KEY] = {
-            name: _wrap_api_handler(getattr(handler, name))
-            for name in (
-                "fetch_manager_status",
-                "update_manager_status",
-                "get_announcement",
-                "update_announcement",
-                "perform_scheduler_ops",
-                "scheduler_trigger",
-                "scheduler_healthcheck",
-                "get_manager_status_for_prom",
-            )
-        }
-    result: dict[str, WebRequestHandler] = app[_HANDLER_APP_KEY]
-    return result
-
-
-def _delegate(method_name: str) -> WebRequestHandler:
-    """Return a handler function that delegates to the new-style ManagerHandler."""
-
-    async def _handler(request: web.Request) -> web.StreamResponse:
-        wrapped = _ensure_handler(request.app)
-        return await wrapped[method_name](request)
-
-    _handler.__name__ = method_name
-    _handler.__qualname__ = f"manager._delegate.<{method_name}>"
-    return _handler
-
-
-# ------------------------------------------------------------------
-# Legacy create_app() entry point
-# ------------------------------------------------------------------
-
-
-def create_app(
-    default_cors_options: CORSOptions,
-) -> tuple[web.Application, Iterable[WebMiddleware]]:
-    app = web.Application()
-    app["api_versions"] = (2, 3, 4)
-    app["manager.context"] = PrivateContext()
-    app["prefix"] = "manager"
-    cors = aiohttp_cors.setup(app, defaults=default_cors_options)
-    status_resource = cors.add(app.router.add_resource("/status"))
-    cors.add(status_resource.add_route("GET", _delegate("fetch_manager_status")))
-    cors.add(
-        status_resource.add_route("PUT", superadmin_required(_delegate("update_manager_status")))
-    )
-    announcement_resource = cors.add(app.router.add_resource("/announcement"))
-    cors.add(announcement_resource.add_route("GET", _delegate("get_announcement")))
-    cors.add(
-        announcement_resource.add_route(
-            "POST", superadmin_required(_delegate("update_announcement"))
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "POST",
-            "/scheduler/operation",
-            superadmin_required(_delegate("perform_scheduler_ops")),
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "POST",
-            "/scheduler/trigger",
-            superadmin_required(_delegate("scheduler_trigger")),
-        )
-    )
-    cors.add(
-        app.router.add_route(
-            "GET",
-            "/scheduler/status",
-            superadmin_required(_delegate("scheduler_healthcheck")),
-        )
-    )
-    prom_resource = cors.add(app.router.add_resource("/prom"))
-    cors.add(prom_resource.add_route("GET", _delegate("get_manager_status_for_prom")))
-    app.on_startup.append(init)
-    app.on_shutdown.append(shutdown)
-    return app, []

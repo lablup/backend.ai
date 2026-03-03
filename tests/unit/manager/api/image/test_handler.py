@@ -24,7 +24,7 @@ from ai.backend.common.dto.manager.image.response import (
 from ai.backend.common.dto.manager.image.types import ImageOrderField, OrderDirection
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.types import ImageCanonical, ImageID
-from ai.backend.manager.api.image.adapter import ImageAdapter
+from ai.backend.manager.api.rest.image.adapter import ImageAdapter
 from ai.backend.manager.data.image.types import (
     ImageData,
     ImageDataWithDetails,

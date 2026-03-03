@@ -7,7 +7,6 @@ import pytest
 from aioresponses import aioresponses
 
 # Explicitly import to ensure Pants includes this module in the test build
-import ai.backend.manager.api.group  # noqa: F401
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.group.registry import register_group_routes
 from ai.backend.manager.server import (

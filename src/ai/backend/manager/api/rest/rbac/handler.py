@@ -44,10 +44,6 @@ from ai.backend.common.dto.manager.rbac.response import (
     SearchEntitiesResponse,
     SearchScopesResponse,
 )
-from ai.backend.manager.api.rbac.assigned_user_adapter import AssignedUserAdapter
-from ai.backend.manager.api.rbac.entity_adapter import EntityAdapter
-from ai.backend.manager.api.rbac.role_adapter import RoleAdapter
-from ai.backend.manager.api.rbac.scope_adapter import ScopeAdapter
 from ai.backend.manager.data.permission.role import UserRoleAssignmentInput, UserRoleRevocationInput
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -78,6 +74,11 @@ from ai.backend.manager.services.permission_contoller.actions.search_scopes impo
     SearchScopesAction,
 )
 from ai.backend.manager.services.processors import Processors
+
+from .assigned_user_adapter import AssignedUserAdapter
+from .entity_adapter import EntityAdapter
+from .role_adapter import RoleAdapter
+from .scope_adapter import ScopeAdapter
 
 
 class RBACHandler:
