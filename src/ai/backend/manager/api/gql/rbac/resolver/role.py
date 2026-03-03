@@ -7,6 +7,7 @@ import uuid
 import strawberry
 from strawberry import ID, Info
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.permission.types import RoleStatus
 from ai.backend.manager.api.gql.rbac.fetcher.role import (
     fetch_role,
@@ -24,6 +25,7 @@ from ai.backend.manager.api.gql.rbac.types import (
     RoleAssignmentConnection,
     RoleAssignmentFilter,
     RoleAssignmentGQL,
+    RoleAssignmentOrderBy,
     RoleConnection,
     RoleFilter,
     RoleGQL,
@@ -34,6 +36,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.permission_controller.options import AssignedUserConditions
 from ai.backend.manager.repositories.permission_controller.updaters import RoleUpdaterSpec
 from ai.backend.manager.services.permission_contoller.actions.assign_role import (
     AssignRoleAction,
@@ -99,6 +102,7 @@ async def admin_roles(
 async def admin_role_assignments(
     info: Info[StrawberryGQLContext],
     filter: RoleAssignmentFilter | None = None,
+    order_by: list[RoleAssignmentOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -109,12 +113,47 @@ async def admin_role_assignments(
     return await fetch_role_assignments(
         info,
         filter=filter,
+        order_by=order_by,
         before=before,
         after=after,
         first=first,
         last=last,
         limit=limit,
         offset=offset,
+    )
+
+
+@strawberry.field(
+    description="Added in 26.3.0. List roles assigned to the current authenticated user.",
+)  # type: ignore[misc]
+async def my_roles(
+    info: Info[StrawberryGQLContext],
+    filter: RoleAssignmentFilter | None = None,
+    order_by: list[RoleAssignmentOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> RoleAssignmentConnection:
+    me = current_user()
+    if me is None:
+        from ai.backend.manager.errors.auth import InsufficientPrivilege
+
+        raise InsufficientPrivilege("Authentication required")
+
+    return await fetch_role_assignments(
+        info,
+        filter=filter,
+        order_by=order_by,
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
+        base_conditions=[AssignedUserConditions.by_user_id(me.user_id)],
     )
 
 
