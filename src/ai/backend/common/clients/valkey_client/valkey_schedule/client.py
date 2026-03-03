@@ -387,6 +387,9 @@ class ValkeyScheduleClient:
         for session_id in session_ids:
             batch.smembers(self._get_session_failed_agents_key(session_id))
         batch_result = await self._client.client.exec(batch, raise_on_error=True)
+        # batch_result is None only for atomic batches (transactions) when a WATCH-guarded key
+        # was modified before EXEC — non-atomic pipelines (is_atomic=False) never return None.
+        # This guard is kept for defensive typing since exec() is annotated Optional[List[...]].
         if batch_result is None:
             return [frozenset() for _ in session_ids]
         return [

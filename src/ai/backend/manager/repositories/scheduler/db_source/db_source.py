@@ -2286,7 +2286,7 @@ class ScheduleDBSource:
             result = await db_sess.execute(stmt)
             return cast(CursorResult[Any], result).rowcount
 
-    async def get_kernel_agent_ids_for_sessions(
+    async def get_agent_ids_for_sessions(
         self, session_ids: list[SessionId]
     ) -> dict[SessionId, list[AgentId]]:
         """

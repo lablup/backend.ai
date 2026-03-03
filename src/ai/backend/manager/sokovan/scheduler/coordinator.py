@@ -1270,7 +1270,7 @@ class ScheduleCoordinator:
 
         # Record current agent assignments before they are cleared by the reset.
         # This is best-effort: Valkey issues must not block kernel resets.
-        agent_ids_by_session = await self._repository.get_kernel_agent_ids_for_sessions(session_ids)
+        agent_ids_by_session = await self._repository.get_agent_ids_for_sessions(session_ids)
         record_sessions: list[SessionId] = []
         record_tasks: list[Awaitable[None]] = []
         for session_id, agent_ids in agent_ids_by_session.items():

@@ -7,6 +7,7 @@ the row-based implementation details of the legacy selectors.
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
@@ -22,6 +23,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
+from ai.backend.logging.utils import BraceStyleAdapter
 
 from .exceptions import (
     ContainerLimitExceededError,
@@ -33,6 +35,8 @@ from .exceptions import (
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
     from ai.backend.manager.sokovan.data import AgentOccupancy
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -449,7 +453,25 @@ class AgentSelector:
                 if tracker.original_agent.agent_id not in criteria.failed_agent_ids
             ]
             if non_failed:
+                excluded = [
+                    tracker.original_agent.agent_id
+                    for tracker in compatible_trackers
+                    if tracker.original_agent.agent_id in criteria.failed_agent_ids
+                ]
+                log.debug(
+                    "failed-agent filter(session:{}): excluding {} → candidates: {}",
+                    criteria.session_metadata.session_id,
+                    excluded,
+                    [tracker.original_agent.agent_id for tracker in non_failed],
+                )
                 candidate_trackers = non_failed
+            else:
+                log.debug(
+                    "failed-agent filter(session:{}): all {} compatible agents have failed, "
+                    "skipping filter to avoid blocking",
+                    criteria.session_metadata.session_id,
+                    len(compatible_trackers),
+                )
             # If ALL compatible agents have failed, keep all of them to avoid blocking
 
         # Use strategy to select from candidates
