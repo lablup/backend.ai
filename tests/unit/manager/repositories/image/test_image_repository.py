@@ -370,12 +370,12 @@ class TestImageRepositorySearch:
 
         yield image_ids
 
-    async def test_filter_by_alias_contains(
+    async def test_filter_by_single_alias_condition(
         self,
         image_repository: ImageRepository,
         images_with_aliases: list[UUID],
     ) -> None:
-        """Test by_alias_contains matches images whose alias contains the substring."""
+        """Test filtering images with a single alias condition."""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
@@ -389,21 +389,24 @@ class TestImageRepositorySearch:
         assert result.total_count == 1
         assert "python" in str(result.items[0].name)
 
-    async def test_filter_by_alias_equals(
+    async def test_filter_by_combined_alias_conditions(
         self,
         image_repository: ImageRepository,
         images_with_aliases: list[UUID],
     ) -> None:
-        """Test by_alias_equals matches exact alias."""
+        """Test filtering images with two alias conditions combined."""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
-                ImageConditions.by_alias_equals(
-                    StringMatchSpec(value="webserver", case_insensitive=False, negated=False)
+                ImageConditions.by_alias_contains(
+                    StringMatchSpec(value="py", case_insensitive=False, negated=False)
+                ),
+                ImageConditions.by_alias_ends_with(
+                    StringMatchSpec(value="39", case_insensitive=False, negated=False)
                 ),
             ],
             orders=[],
         )
         result = await image_repository.search_images(querier)
         assert result.total_count == 1
-        assert "nginx" in str(result.items[0].name)
+        assert "python:3.9" in str(result.items[0].name)
