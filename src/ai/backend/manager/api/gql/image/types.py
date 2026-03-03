@@ -516,7 +516,7 @@ class ImageV2ScopeGQL:
     Added in 26.2.0.
 
     Filter options for images based on various criteria such as status,
-    name, architecture, and alias.
+    name, and architecture.
 
     Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
     """)
