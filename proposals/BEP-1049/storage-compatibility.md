@@ -44,7 +44,7 @@ This is zero-overhead because Docker containers share the host kernel's VFS. The
 
 Key files:
 - `VFolderMount` type: `src/ai/backend/common/types.py:1299`
-- `mount_vfolders()`: `src/ai/backend/agent/docker/agent.py:557`
+- `mount_vfolders()`: `src/ai/backend/agent/agent.py:557` (inherited from `AbstractKernelCreationContext`)
 - `get_intrinsic_mounts()`: `src/ai/backend/agent/docker/agent.py:512`
 - `process_mounts()`: `src/ai/backend/agent/docker/agent.py:764`
 
@@ -252,18 +252,18 @@ DAX maps host page cache directly into guest memory, providing near-native read 
 
 #### Host-Side Overhead
 
-Each virtio-fs share runs a separate `virtiofsd` process on the host:
+Kata runs **one `virtiofsd` process per sandbox** (per VM), not one per bind mount. The virtiofsd serves a shared top-level directory (`/run/kata-containers/shared/sandboxes/<SANDBOX>/`) that contains all container mounts underneath it. Individual bind mounts are subdirectories within this shared tree:
 
-| Resource | Per virtiofsd Process | 20 Shares (1 VM) |
-|----------|----------------------|-------------------|
-| Memory (RSS) | ~15 MB idle | ~300 MB |
-| Heap under load | 5-6 MB | ~100-120 MB |
+| Resource | Per virtiofsd (1 VM) | 10 VMs |
+|----------|---------------------|--------|
+| Memory (RSS) | ~15 MB idle | ~150 MB |
+| Heap under load | 5-6 MB | ~50-60 MB |
 | File descriptors | Up to 80k under heavy load | Cumulative FD pressure |
-| Shared memory | VM RAM size (shared with QEMU, not double-counted) | Same (shared) |
+| Shared memory | VM RAM size (shared with hypervisor, not double-counted) | Per-VM |
 
 The `virtiofsd` Rust implementation is recommended over the legacy C version for better CPU efficiency. Use `--thread-pool-size=1` for most workloads — the default 64 threads causes lock contention that reduces IOPS by ~27%.
 
-**Mount count impact**: KataAgent should consolidate the 15+ individual krunner binary mounts into a single directory mount to reduce the virtiofsd process count per VM. Each eliminated share saves ~15 MB RSS and reduces host scheduling overhead.
+**Mount count impact**: Since virtiofsd is shared per sandbox, the 15+ individual krunner binary mounts do not create additional processes. However, consolidating them into a single directory mount simplifies the OCI mount spec and reduces the kata-agent's mount setup time inside the guest.
 
 #### AI/ML Workload Impact Assessment
 
@@ -284,7 +284,8 @@ No new storage interfaces are introduced. The existing abstractions are reused:
 | Abstraction | Location | Change for Kata |
 |-------------|----------|-----------------|
 | `VFolderMount` | `src/ai/backend/common/types.py:1299` | None |
-| `Mount` / `MountTypes` | `src/ai/backend/common/types.py:612` | None |
+| `MountTypes` | `src/ai/backend/common/types.py:612` | None |
+| `Mount` | `src/ai/backend/agent/resources.py:843` | None |
 | `MountPermission` | `src/ai/backend/common/types.py:603` | None |
 | `mount_vfolders()` | Agent method | Reuse as-is |
 | `get_intrinsic_mounts()` | Agent method | Override: skip lxcfs, agent socket, domain socket proxies, deep learning samples; use guest-side tmpfs |
@@ -298,7 +299,7 @@ No new storage interfaces are introduced. The existing abstractions are reused:
 - File ownership (UID/GID) is preserved across the virtio-fs boundary. The `kernel_uid`/`kernel_gid` settings work as expected.
 - Symbolic links within mounted directories work correctly with virtio-fs.
 - File locking (flock, fcntl) works with virtio-fs but may have different semantics for distributed filesystems (CephFS, NFS) that are already mounted on the host.
-- `KataKernelCreationContext.mount_krunner()` should consolidate the 15+ individual krunner binary mounts into a single directory mount (e.g., bind-mount the entire `runner/` directory to `/opt/kernel/`) to reduce the number of virtio-fs shares. Docker uses individual file mounts to overlay binaries into an existing container filesystem; Kata can use a directory mount since the guest rootfs is purpose-built.
+- `KataKernelCreationContext.mount_krunner()` should consolidate the 15+ individual krunner binary mounts into a single directory mount (e.g., bind-mount the entire `runner/` directory to `/opt/kernel/`) to simplify the OCI mount spec and reduce kata-agent's mount setup time inside the guest. While virtiofsd is shared per sandbox (not per mount), fewer mount entries reduce guest-side setup overhead. Docker uses individual file mounts to overlay binaries into an existing container filesystem; Kata can use a directory mount since the guest rootfs is purpose-built.
 - The `ContainerSandboxType` config option is irrelevant for Kata — always use `DOCKER` (no-op sandbox) or introduce a `VM` type. Never use `JAIL` with Kata.
 - For confidential computing (Phase 4), bind mounts are **NOT sync'd back** — files are copied into the guest at mount time and changes are lost. This is a fundamental CoCo limitation documented in [TR-2026-001](../../docs/reports/kata-containers-feature-parity-analysis.md). Non-confidential Kata mode does not have this limitation.
 
@@ -392,7 +393,7 @@ This is **not proposed for the initial implementation**.
 
 ### Motivation
 
-The default virtio-fs-for-everything model creates 20-30+ `virtiofsd` processes per VM (one per shared directory/file). Each process consumes ~15 MB RSS, producing 300-450 MB of host memory overhead per VM just for filesystem translation. For a host running 10 concurrent sessions, this totals 3-4.5 GB of overhead — comparable to a full extra VM's worth of RAM.
+While virtiofsd runs as a single process per sandbox (not per mount), the virtio-fs-for-everything model has I/O performance implications: every file operation on read-only infrastructure mounts (krunner binaries, Python libraries, timezone files) crosses the VM boundary via the FUSE protocol, even though these files never change at runtime. Block devices (virtio-blk) provide near-native I/O for read-only content because the guest kernel accesses them directly without FUSE overhead.
 
 Conventional VM hypervisors (VMware, Proxmox, OpenStack) solve this differently: they clone a template disk image for each VM and the guest mounts it as a local block device. Kata Containers supports a similar model via **qcow2 CoW (Copy-on-Write) cloning** and **virtio-blk device passthrough**.
 
@@ -411,14 +412,13 @@ Conventional VM hypervisors (VMware, Proxmox, OpenStack) solve this differently:
 ```
 Host                                     Guest VM
 ┌──────────────────────┐                ┌────────────────────────┐
-│ virtiofsd (scratch)  │──virtio-fs───→ │ /home/config, /home/work│
-│ virtiofsd (tz)       │──virtio-fs───→ │ /etc/localtime          │
-│ virtiofsd (krunner)  │──virtio-fs───→ │ /opt/kernel/*           │
-│ virtiofsd (pylib)    │──virtio-fs───→ │ /opt/backend.ai/...     │
-│ virtiofsd (vfolder1) │──virtio-fs───→ │ /home/work/data         │
-│ virtiofsd (vfolder2) │──virtio-fs───→ │ /home/work/models       │
-│ ...                  │                │                          │
-│ (20-30 virtiofsd)    │                │                          │
+│  virtiofsd           │                │                          │
+│  (1 process per VM,  │──virtio-fs───→ │ /home/config, /home/work│
+│   serves all mounts  │                │ /etc/localtime          │
+│   via shared dir     │                │ /opt/kernel/*           │
+│   tree)              │                │ /opt/backend.ai/...     │
+│                      │                │ /home/work/data         │
+│                      │                │ /home/work/models       │
 └──────────────────────┘                └────────────────────────┘
 ```
 
@@ -442,8 +442,8 @@ Host                                     Guest VM
 
 | Dimension | Model A (virtio-fs only) | Model B (hybrid) |
 |-----------|-------------------------|-------------------|
-| Host memory overhead | ~300-450 MB per VM (20-30 virtiofsd) | ~30-75 MB per VM (2 + N_vfolders virtiofsd) |
-| Sequential read perf | 85-95% native (no DAX) | Near-native (virtio-blk, host page cache) |
+| Host memory overhead | ~15 MB per VM (1 virtiofsd) | ~15 MB per VM (same — 1 virtiofsd for remaining shares) |
+| Read-only I/O perf | 85-95% native via FUSE path | Near-native (virtio-blk, direct block I/O) |
 | Random 4K IOPS | ~85% native (tuned) | Near-native for rootfs; ~85% for vfolders |
 | Bidirectional sharing | Native (inherent to virtio-fs) | Only for virtio-fs mounts (scratch, vfolders) |
 | Config injection | Write to host path → visible in guest | Write to host path → visible only for virtio-fs mounts |
@@ -475,7 +475,7 @@ Use block devices for **read-only infrastructure** (VM rootfs, container image, 
 | Scratch dirs (`/home/config`, `/home/work`) | virtio-fs | Bidirectional sharing required |
 | VFolders | virtio-fs | Bidirectional sharing required |
 
-This reduces the virtiofsd process count from **20-30+** to **2 + N_vfolders** (scratch + one per vfolder), saving ~270-375 MB RSS per VM.
+Since virtiofsd is already one process per sandbox, the hybrid model does not reduce process count. Its benefit is **I/O performance**: read-only infrastructure content (krunner, Python libs, timezone) is served via direct block I/O instead of the FUSE protocol, eliminating per-operation VM boundary crossings for static files.
 
 ### Implementation Considerations
 

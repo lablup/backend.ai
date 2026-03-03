@@ -56,39 +56,45 @@ Backend.AI runs three software layers inside every container:
 ```
 Agent (host)                           Container (guest in Kata)
 ─────────────────────────────────────────────────────────────────
-1. Create scratch dirs on host
-2. Write environ.txt, resource.txt,
+1. get_intrinsic_mounts() — build
+   initial mount list
+2. Resource allocation
+3. prepare_scratch() — create dirs
+4. Write environ.txt, resource.txt,
    intrinsic-ports.json, SSH keys
    to scratch_dir/config/
-3. Create container with mounts        ──→ Container starts
+5. apply_network(), prepare_ssh(),
+   mount_vfolders(), mount_krunner(),
+   process_mounts()
+6. Create container with mounts        ──→ Container starts
                                             │
-                                        4. entrypoint.sh runs:
+                                        7. entrypoint.sh runs:
                                            - Create user/group (LOCAL_USER_ID)
                                            - Set up LD_PRELOAD (Docker only)
                                            - Symlink scp, extract dotfiles
                                            - Generate random password
                                            - exec su-exec → bai-krunner
                                             │
-                                        5. BaseRunner.__init__():
+                                        8. BaseRunner.__init__():
                                            - Read /home/config/environ.txt
                                              → populate child_env + os.environ
                                             │
-                                        6. BaseRunner._init():
+                                        9. BaseRunner._init():
                                            - Read /home/config/intrinsic-ports.json
                                              → determine ZMQ socket ports
                                            - Bind ZMQ PULL on tcp://*:{insock_port}
                                            - Bind ZMQ PUSH on tcp://*:{outsock_port}
                                            - Parse service definitions
                                             │
-                                        7. main_loop():
+                                       10. main_loop():
                                            - Start sshd (dropbear) + ttyd
                                            - Run user bootstrap.sh if present
                                            - Enter ZMQ command loop
                                             │
-8. Connect ZMQ PUSH to                 ←── Kernel runner ready
-   tcp://{guest_ip}:{repl_in_port}
-9. Connect ZMQ PULL to
-   tcp://{guest_ip}:{repl_out_port}
+11. Connect ZMQ PUSH to                ←── Kernel runner ready
+    tcp://{guest_ip}:{repl_in_port}
+12. Connect ZMQ PULL to
+    tcp://{guest_ip}:{repl_out_port}
 ```
 
 ### Config Files in /home/config
@@ -420,7 +426,7 @@ The `DockerCodeRunner` class (or a renamed `CodeRunner` base) is reusable becaus
 
 ### ContainerdClient
 
-Async wrapper around containerd's gRPC API:
+Async wrapper around containerd's gRPC API. For **single-container sessions**, each container gets its own Kata sandbox (VM) via the standard `containers.v1` / `tasks.v1` APIs. For **multi-container sessions** (clusters on a single host), the containerd Sandbox API (`sandbox.v1`, available in containerd v2+) is used to create a shared sandbox first, then add containers into it:
 
 ```python
 class ContainerdClient:
@@ -434,8 +440,17 @@ class ContainerdClient:
     async def list_images(self) -> list[ImageInfo]: ...
     async def pull_image(self, ref: str, auth: dict | None = None): ...
 
+    # Sandbox operations (containerd v2+ Sandbox API)
+    # Required for multi-container sessions sharing a single Kata VM.
+    # Without the Sandbox API, each container creates a separate VM.
+    async def create_sandbox(self, sandbox_id: str, runtime: str,
+                             config: dict) -> SandboxInfo: ...
+    async def stop_sandbox(self, sandbox_id: str): ...
+    async def delete_sandbox(self, sandbox_id: str): ...
+
     # Container operations
-    async def create_container(self, container_id: str, config: dict) -> ContainerInfo: ...
+    async def create_container(self, container_id: str, config: dict,
+                               sandbox_id: str | None = None) -> ContainerInfo: ...
     async def delete_container(self, container_id: str): ...
 
     # Task operations (a "task" is a running process in containerd)
@@ -445,6 +460,10 @@ class ContainerdClient:
     async def delete_task(self, container_id: str): ...
     async def get_task_status(self, container_id: str) -> str: ...
 
+    # Exec (run command inside running container)
+    async def exec_in_container(self, container_id: str,
+                                command: list[str]) -> ExecResult: ...
+
     # Events
     async def subscribe_events(self) -> AsyncIterator[Event]: ...
 
@@ -452,7 +471,9 @@ class ContainerdClient:
     async def get_runtime_info(self, runtime_class: str) -> dict | None: ...
 ```
 
-This client uses `grpcio` (or `grpclib` for async) to communicate with containerd's Unix socket. The proto definitions come from the containerd API (`containerd.services.containers.v1`, `containerd.services.tasks.v1`).
+This client uses `grpcio` (or `grpclib` for async) to communicate with containerd's Unix socket. The proto definitions come from the containerd API (`containerd.services.containers.v1`, `containerd.services.tasks.v1`, `containerd.services.sandbox.v1`).
+
+**API choice rationale:** The containerd client API (`containers.v1`, `tasks.v1`, `sandbox.v1`) is the correct programmatic interface for a non-Kubernetes service. CRI `RuntimeService` is the Kubernetes kubelet's API and should not be used directly. The Kata shim v2 API (`containerd.runtime.v2.Task`) is internal to containerd and not called by external clients.
 
 ## Interface / API
 

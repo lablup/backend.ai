@@ -63,7 +63,7 @@ The flow for multi-container sandboxes:
 3. Additional `CreateContainer` calls → more containers in the same VM, sharing network
 
 For Backend.AI's **multi-container sessions** (cluster mode), the mapping depends on deployment model:
-- **Single-host cluster**: All containers in the session can share one Kata sandbox (one VM). They share `localhost` and the VM's network namespace. This is efficient but limits the cluster to one host.
+- **Single-host cluster**: All containers in the session can share one Kata sandbox (one VM) using the containerd Sandbox API (`sandbox.v1`, containerd v2+). The agent calls `create_sandbox()` first, then adds containers into it via `create_container(sandbox_id=...)`. Containers share `localhost` and the VM's network namespace. Note: the standard `containers.v1` / `tasks.v1` APIs create one VM per container — the Sandbox API is required for sharing.
 - **Multi-host cluster**: Each host runs a separate Kata sandbox (separate VM). Containers across VMs communicate via Calico CNI — each VM gets its own IP, and inter-VM traffic flows through BGP/VXLAN routing. This is the expected model for distributed training workloads.
 
 ### What Kata Provides Built-In
@@ -163,9 +163,7 @@ Calico runs in standalone mode with etcd as the datastore:
         "type": "calico-ipam",
         "assign_ipv4": "true"
       },
-      "policy": {
-        "type": "k8s"
-      },
+      "policy_type": "calico",
       "log_level": "info"
     },
     {
@@ -241,6 +239,8 @@ spec:
     source:
       selector: ai.backend.session-id == "{{session_id}}"
 ```
+
+Note: The `{{session_id}}` placeholders above are **templates** — Calico does not support variable substitution in policy YAML. The agent generates per-session policies with actual session IDs substituted programmatically before applying via `calicoctl apply`.
 
 KataAgent applies these labels when creating containers via containerd, and Calico's Felix agent enforces the rules in real-time on the host's iptables.
 

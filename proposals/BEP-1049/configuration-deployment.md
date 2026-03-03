@@ -51,7 +51,7 @@ hypervisor = "cloud-hypervisor"  # "cloud-hypervisor" | "qemu" | "dragonball"
 # --- VM Defaults ---
 default-vcpus = 2               # Initial vCPUs per VM (hot-plugged as needed)
 default-memory-mb = 2048        # Initial memory per VM in MB
-vm-overhead-mb = 64             # Per-VM memory overhead deducted from host capacity
+vm-overhead-mb = 64             # Per-VM VMM process + guest kernel + kata-agent overhead (MB), deducted from host capacity
 
 # --- Guest VM Image (NOT the container image — see note below) ---
 kernel-path = "/opt/kata/share/kata-containers/vmlinux.container"
@@ -112,7 +112,7 @@ class KataConfig(BaseConfigSchema):
     # VM defaults
     default_vcpus: int = 2
     default_memory_mb: int = 2048
-    vm_overhead_mb: int = 64
+    vm_overhead_mb: int = 64  # VMM process + guest kernel + kata-agent (on top of guest memory)
 
     # Guest image
     kernel_path: Path = Path("/opt/kata/share/kata-containers/vmlinux.container")
@@ -166,7 +166,7 @@ Fail fast with descriptive error messages on any validation failure.
 
 | Feature | Cloud Hypervisor | QEMU | Dragonball |
 |---------|-----------------|------|------------|
-| Boot time | ~125ms | ~300ms | ~100ms |
+| Boot time | ~125-200ms | ~300-500ms | ~100ms (est., no published benchmark) |
 | Memory overhead | ~15MB | ~60MB | ~10MB |
 | VFIO passthrough | Yes | Yes | Yes |
 | virtio-fs | Yes | Yes | Yes |
