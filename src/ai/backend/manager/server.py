@@ -148,7 +148,6 @@ from .actions.monitors.reporter import ReporterMonitor
 from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
 from .api.context import RootContext
-from .api.ratelimit import rlim_middleware
 from .api.rest import build_api_routes
 from .api.rest.middleware import (
     build_api_metric_middleware,
@@ -156,6 +155,7 @@ from .api.rest.middleware import (
     request_id_middleware,
 )
 from .api.rest.middleware.auth import auth_middleware
+from .api.rest.ratelimit.handler import rlim_middleware
 from .api.rest.routing import RouteRegistry
 from .api.rest.types import GQLContextDeps, ModuleDeps, ModuleRegistrar
 from .clients.agent import AgentClientPool, AgentPoolSpec

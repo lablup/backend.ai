@@ -7,11 +7,12 @@ auto-scaling-rules.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import logging
+from typing import TYPE_CHECKING, Final
 
-from ai.backend.manager.api.admin import PrivateContext as AdminPrivateContext
-from ai.backend.manager.api.admin import init as admin_init
-from ai.backend.manager.api.admin import shutdown as admin_shutdown
+from aiohttp import web
+
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql_legacy.schema import graphene_schema
 from ai.backend.manager.api.rest.auto_scaling_rule.registry import register_auto_scaling_rule_routes
 from ai.backend.manager.api.rest.domain.registry import register_domain_routes
@@ -25,18 +26,28 @@ from ai.backend.manager.api.rest.user.registry import register_user_routes
 from .handler import AdminHandler
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.context import RootContext
     from ai.backend.manager.api.rest.types import ModuleDeps
+
+log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+async def _admin_startup(app: web.Application) -> None:
+    """Log a warning when GraphQL schema introspection is enabled."""
+    root_ctx: RootContext = app["_root.context"]
+    if root_ctx.config_provider.config.api.allow_graphql_schema_introspection:
+        log.warning(
+            "GraphQL schema introspection is enabled. "
+            "It is strongly advised to disable this in production setups."
+        )
 
 
 def register_admin_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the admin tree: admin's own routes + six sub-registries."""
     reg = RouteRegistry.create("admin", deps.cors_options)
 
-    # Admin private context + lifecycle hooks
-    ctx = AdminPrivateContext()
-    reg.app["admin.context"] = ctx
-    reg.app.on_startup.append(admin_init)
-    reg.app.on_shutdown.append(admin_shutdown)
+    # Lifecycle: warn about introspection at startup
+    reg.app.on_startup.append(_admin_startup)
 
     # Admin's own routes (GraphQL)
     if deps.gql_context_deps is None:
