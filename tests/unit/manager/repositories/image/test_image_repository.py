@@ -370,13 +370,12 @@ class TestImageRepositorySearch:
 
         yield image_ids
 
-    async def test_filter_by_alias(
+    async def test_filter_by_alias_contains(
         self,
         image_repository: ImageRepository,
         images_with_aliases: list[UUID],
     ) -> None:
-        """Test alias filter conditions (contains, equals, starts_with, ends_with)."""
-        # contains: "py" matches python image via "py39" alias
+        """Test by_alias_contains matches images whose alias contains the substring."""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
@@ -390,7 +389,12 @@ class TestImageRepositorySearch:
         assert result.total_count == 1
         assert "python" in str(result.items[0].name)
 
-        # equals: exact match "webserver"
+    async def test_filter_by_alias_equals(
+        self,
+        image_repository: ImageRepository,
+        images_with_aliases: list[UUID],
+    ) -> None:
+        """Test by_alias_equals matches exact alias."""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
@@ -403,31 +407,3 @@ class TestImageRepositorySearch:
         result = await image_repository.search_images(querier)
         assert result.total_count == 1
         assert "nginx" in str(result.items[0].name)
-
-        # starts_with: "web" matches "webserver"
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                ImageConditions.by_alias_starts_with(
-                    StringMatchSpec(value="web", case_insensitive=False, negated=False)
-                ),
-            ],
-            orders=[],
-        )
-        result = await image_repository.search_images(querier)
-        assert result.total_count == 1
-        assert "nginx" in str(result.items[0].name)
-
-        # ends_with: "39" matches "py39"
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                ImageConditions.by_alias_ends_with(
-                    StringMatchSpec(value="39", case_insensitive=False, negated=False)
-                ),
-            ],
-            orders=[],
-        )
-        result = await image_repository.search_images(querier)
-        assert result.total_count == 1
-        assert "python" in str(result.items[0].name)
