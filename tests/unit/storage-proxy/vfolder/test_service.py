@@ -35,7 +35,6 @@ def mock_service(mock_volume_pool: MagicMock) -> VolumeService:
     return service
 
 
-@pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
 async def test_get_volume(
     mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
@@ -63,7 +62,6 @@ async def test_get_volume(
     assert result.capabilities == ["capability1", "capability2"]
 
 
-@pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
 async def test_get_volumes(
     mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
@@ -99,7 +97,6 @@ async def test_get_volumes(
     assert result[1].capabilities == ["capability3"]
 
 
-@pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
 async def test_create_quota_scope(
     mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
@@ -124,7 +121,6 @@ async def test_create_quota_scope(
     )
 
 
-@pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
 async def test_get_quota_scope(
     mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
@@ -147,7 +143,6 @@ async def test_get_quota_scope(
     assert result.limit_bytes == 1000
 
 
-@pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
 async def test_update_quota_scope(
     mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
@@ -172,7 +167,6 @@ async def test_update_quota_scope(
     )
 
 
-@pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
 async def test_delete_quota_scope(
     mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
@@ -195,7 +189,6 @@ async def test_delete_quota_scope(
     mock_volume.quota_model.unset_quota.assert_called_once_with(quota_scope_id)
 
 
-@pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
 async def test_create_vfolder(
     mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
@@ -218,7 +211,6 @@ async def test_create_vfolder(
     mock_volume.create_vfolder.assert_called_once_with(vfolder_id)
 
 
-@pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
 async def test_clone_vfolder(
     mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
@@ -244,7 +236,6 @@ async def test_clone_vfolder(
     mock_volume.clone_vfolder.assert_called_once_with(src_vfolder_id, dst_vfolder_id)
 
 
-@pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
 async def test_get_vfolder_info(
     mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
@@ -287,7 +278,6 @@ async def test_get_vfolder_info(
     assert result.fs_used_bytes == 20000
 
 
-@pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
 async def test_delete_vfolder(
     mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock

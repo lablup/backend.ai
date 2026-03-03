@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import aiohttp
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIClient
@@ -61,7 +60,6 @@ def _make_sse_response(lines: list[bytes]) -> AsyncMock:
 
 
 class TestSubscribeSessionEvents:
-    @pytest.mark.asyncio
     async def test_opens_sse_with_default_params(self) -> None:
         mock_resp = _make_sse_response([
             b"event: session_started\n",
@@ -87,7 +85,6 @@ class TestSubscribeSessionEvents:
         assert call_kwargs["params"]["group"] == "*"
         assert call_kwargs["params"]["scope"] == "*"
 
-    @pytest.mark.asyncio
     async def test_passes_custom_params(self) -> None:
         mock_resp = _make_sse_response([b""])
         mock_session = MagicMock()
@@ -112,7 +109,6 @@ class TestSubscribeSessionEvents:
         assert call_kwargs["params"]["group"] == "research"
         assert call_kwargs["params"]["scope"] == "session,kernel"
 
-    @pytest.mark.asyncio
     async def test_iterates_multiple_events(self) -> None:
         mock_resp = _make_sse_response([
             b"event: session_enqueued\n",
@@ -136,7 +132,6 @@ class TestSubscribeSessionEvents:
         assert events[0].event == "session_enqueued"
         assert events[1].event == "session_started"
 
-    @pytest.mark.asyncio
     async def test_omits_optional_params_when_none(self) -> None:
         mock_resp = _make_sse_response([b""])
         mock_session = MagicMock()
@@ -158,7 +153,6 @@ class TestSubscribeSessionEvents:
 
 
 class TestSubscribeBackgroundTaskEvents:
-    @pytest.mark.asyncio
     async def test_opens_sse_with_task_id(self) -> None:
         mock_resp = _make_sse_response([
             b"event: bgtask_updated\n",
@@ -183,7 +177,6 @@ class TestSubscribeBackgroundTaskEvents:
         call_kwargs = mock_session.get.call_args.kwargs
         assert call_kwargs["params"]["taskId"] == str(task_id)
 
-    @pytest.mark.asyncio
     async def test_stops_on_server_close(self) -> None:
         mock_resp = _make_sse_response([
             b"event: bgtask_done\n",

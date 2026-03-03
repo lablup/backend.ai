@@ -225,7 +225,6 @@ class TestExecuteStreamingExport:
             fields=TEST_EXPORT_FIELDS,
         )
 
-    @pytest.mark.asyncio
     async def test_basic_streaming_export(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
@@ -253,7 +252,6 @@ class TestExecuteStreamingExport:
         for row in rows:
             assert len(row) == 3  # id, name, value
 
-    @pytest.mark.asyncio
     async def test_streaming_export_with_condition(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
@@ -282,7 +280,6 @@ class TestExecuteStreamingExport:
         for row in rows:
             assert row[2] == "active"
 
-    @pytest.mark.asyncio
     async def test_streaming_export_with_order(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
@@ -311,7 +308,6 @@ class TestExecuteStreamingExport:
         assert rows[0][1] == 1000
         assert rows[9][1] == 100
 
-    @pytest.mark.asyncio
     async def test_streaming_export_max_rows_limit(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
@@ -337,7 +333,6 @@ class TestExecuteStreamingExport:
 
         assert len(rows) == 3
 
-    @pytest.mark.asyncio
     async def test_streaming_export_partition_size(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
@@ -427,7 +422,6 @@ class TestExecuteStreamingExport:
             ],
         )
 
-    @pytest.mark.asyncio
     async def test_streaming_export_with_join(
         self,
         db_with_join_tables: ExtendedAsyncSAEngine,

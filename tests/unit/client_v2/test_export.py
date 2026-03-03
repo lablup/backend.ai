@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIClient
@@ -76,7 +75,6 @@ _SAMPLE_REPORT_INFO = {
 
 
 class TestReportEndpoints:
-    @pytest.mark.asyncio
     async def test_list_reports(self) -> None:
         resp = _json_response({"reports": [_SAMPLE_REPORT_INFO]})
         mock_session = _make_request_session(resp)
@@ -92,7 +90,6 @@ class TestReportEndpoints:
         assert url.endswith("/export/reports")
         assert body is None
 
-    @pytest.mark.asyncio
     async def test_get_report(self) -> None:
         resp = _json_response({"report": _SAMPLE_REPORT_INFO})
         mock_session = _make_request_session(resp)
@@ -114,7 +111,6 @@ class TestReportEndpoints:
 
 
 class TestCSVDownloadEndpoints:
-    @pytest.mark.asyncio
     async def test_download_users_csv(self) -> None:
         mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
         ec = ExportClient(mock_client)
@@ -129,7 +125,6 @@ class TestCSVDownloadEndpoints:
         assert "/export/users/csv" in call_args.args[0]
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_download_sessions_csv(self) -> None:
         mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
         ec = ExportClient(mock_client)
@@ -144,7 +139,6 @@ class TestCSVDownloadEndpoints:
         assert "/export/sessions/csv" in call_args.args[0]
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_download_projects_csv(self) -> None:
         mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
         ec = ExportClient(mock_client)
@@ -159,7 +153,6 @@ class TestCSVDownloadEndpoints:
         assert "/export/projects/csv" in call_args.args[0]
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_download_keypairs_csv(self) -> None:
         mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
         ec = ExportClient(mock_client)
@@ -174,7 +167,6 @@ class TestCSVDownloadEndpoints:
         assert "/export/keypairs/csv" in call_args.args[0]
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_download_audit_logs_csv(self) -> None:
         mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
         ec = ExportClient(mock_client)
@@ -196,7 +188,6 @@ class TestCSVDownloadEndpoints:
 
 
 class TestRequestBodyHandling:
-    @pytest.mark.asyncio
     async def test_download_users_csv_with_request_body(self) -> None:
         mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
         ec = ExportClient(mock_client)
@@ -217,7 +208,6 @@ class TestRequestBodyHandling:
         assert json_body["fields"] == ["username", "email"]
         assert json_body["encoding"] == "utf-8"
 
-    @pytest.mark.asyncio
     async def test_download_users_csv_without_request(self) -> None:
         mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
         ec = ExportClient(mock_client)

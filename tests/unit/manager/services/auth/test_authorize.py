@@ -81,7 +81,6 @@ def setup_successful_auth(
     mock_auth_repository.get_user_row_by_uuid.return_value = mock_user_row
 
 
-@pytest.mark.asyncio
 async def test_authorize_success(
     auth_service: AuthService,
     setup_successful_auth: None,
@@ -101,7 +100,6 @@ async def test_authorize_success(
     assert result.authorization_result.access_key == "test_access_key"
 
 
-@pytest.mark.asyncio
 async def test_authorize_invalid_token_type(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,
@@ -123,7 +121,6 @@ async def test_authorize_invalid_token_type(
         await auth_service.authorize(action)
 
 
-@pytest.mark.asyncio
 async def test_authorize_invalid_credentials(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,
@@ -149,7 +146,6 @@ async def test_authorize_invalid_credentials(
         await auth_service.authorize(action)
 
 
-@pytest.mark.asyncio
 async def test_authorize_with_hook_authorization(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,
@@ -197,7 +193,6 @@ async def test_authorize_with_hook_authorization(
     assert result.authorization_result.role == UserRole.ADMIN
 
 
-@pytest.mark.asyncio
 async def test_authorize_with_password_expiry(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,
@@ -237,7 +232,6 @@ async def test_authorize_with_password_expiry(
         await auth_service.authorize(action)
 
 
-@pytest.mark.asyncio
 async def test_authorize_with_post_hook_response(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,

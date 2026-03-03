@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIClient
@@ -51,7 +50,6 @@ def _make_scheduling_history_client(mock_session: MagicMock) -> SchedulingHistor
 
 
 class TestSearchSessionHistory:
-    @pytest.mark.asyncio
     async def test_happy_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -90,7 +88,6 @@ class TestSearchSessionHistory:
         assert result.items[0].result == "SUCCESS"
         assert result.pagination.total == 1
 
-    @pytest.mark.asyncio
     async def test_with_filters(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -118,7 +115,6 @@ class TestSearchSessionHistory:
         assert body["limit"] == 10
         assert isinstance(result, ListSessionHistoryResponse)
 
-    @pytest.mark.asyncio
     async def test_with_ordering(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -149,7 +145,6 @@ class TestSearchSessionHistory:
 
 
 class TestSearchDeploymentHistory:
-    @pytest.mark.asyncio
     async def test_happy_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -187,7 +182,6 @@ class TestSearchDeploymentHistory:
         assert len(result.items) == 1
         assert result.items[0].attempts == 2
 
-    @pytest.mark.asyncio
     async def test_with_filters(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -220,7 +214,6 @@ class TestSearchDeploymentHistory:
 
 
 class TestSearchRouteHistory:
-    @pytest.mark.asyncio
     async def test_happy_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -259,7 +252,6 @@ class TestSearchRouteHistory:
         assert len(result.items) == 1
         assert str(result.items[0].route_id) == "66666666-6666-6666-6666-666666666666"
 
-    @pytest.mark.asyncio
     async def test_with_filters(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200

@@ -46,7 +46,6 @@ _GET_JSON_BODY_XFAIL_REASON = (
 class TestEtcdConfigRead:
     """Tests for read-only etcd config endpoints (no auth required)."""
 
-    @pytest.mark.asyncio
     async def test_admin_gets_resource_slots(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -58,7 +57,6 @@ class TestEtcdConfigRead:
         assert "cpu" in result.root
         assert "mem" in result.root
 
-    @pytest.mark.asyncio
     async def test_admin_gets_resource_metadata(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -68,7 +66,6 @@ class TestEtcdConfigRead:
         assert isinstance(result, GetResourceMetadataResponse)
         assert isinstance(result.root, dict)
 
-    @pytest.mark.asyncio
     async def test_admin_gets_vfolder_types(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -83,7 +80,6 @@ class TestEtcdConfigRead:
 class TestEtcdConfigCRUD:
     """Tests for etcd config CRUD endpoints (superadmin only)."""
 
-    @pytest.mark.asyncio
     async def test_admin_sets_and_gets_config(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -103,7 +99,6 @@ class TestEtcdConfigCRUD:
         finally:
             await admin_registry.infra.delete_config(DeleteConfigRequest(key=test_key))
 
-    @pytest.mark.asyncio
     async def test_admin_sets_and_deletes_config(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -119,7 +114,6 @@ class TestEtcdConfigCRUD:
         get_result = await admin_registry.infra.get_config(GetConfigRequest(key=test_key))
         assert get_result.result is None
 
-    @pytest.mark.asyncio
     async def test_admin_gets_config_with_prefix(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -144,7 +138,6 @@ class TestEtcdConfigCRUD:
         finally:
             await admin_registry.infra.delete_config(DeleteConfigRequest(key=prefix, prefix=True))
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_get_config(
         self,
         user_registry: BackendAIClientRegistry,
@@ -153,7 +146,6 @@ class TestEtcdConfigCRUD:
         with pytest.raises(PermissionDeniedError):
             await user_registry.infra.get_config(GetConfigRequest(key="test/any-key"))
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_set_config(
         self,
         user_registry: BackendAIClientRegistry,
@@ -164,7 +156,6 @@ class TestEtcdConfigCRUD:
                 SetConfigRequest(key="test/any-key", value="any-value")
             )
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_delete_config(
         self,
         user_registry: BackendAIClientRegistry,
@@ -177,7 +168,6 @@ class TestEtcdConfigCRUD:
 class TestContainerRegistries:
     """Tests for container registry listing endpoint (superadmin only)."""
 
-    @pytest.mark.asyncio
     async def test_admin_gets_container_registries(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -187,7 +177,6 @@ class TestContainerRegistries:
         assert isinstance(result, GetContainerRegistriesResponse)
         assert isinstance(result.root, dict)
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_get_container_registries(
         self,
         user_registry: BackendAIClientRegistry,
@@ -200,7 +189,6 @@ class TestContainerRegistries:
 class TestResourcePresets:
     """Tests for resource preset endpoints."""
 
-    @pytest.mark.asyncio
     async def test_admin_lists_presets(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -213,7 +201,6 @@ class TestResourcePresets:
         preset_names = [p["name"] for p in result.presets]
         assert resource_preset_fixture["name"] in preset_names
 
-    @pytest.mark.asyncio
     async def test_admin_lists_presets_without_any(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -230,7 +217,6 @@ class TestResourcePresets:
             " for resource slot fields - tracked separately"
         ),
     )
-    @pytest.mark.asyncio
     async def test_admin_checks_presets(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -252,7 +238,6 @@ class TestResourcePresets:
         assert isinstance(result.scaling_group_remaining, dict)
         assert isinstance(result.scaling_groups, dict)
 
-    @pytest.mark.asyncio
     @pytest.mark.xfail(reason=_HMAC_XFAIL_REASON, strict=True)
     async def test_list_presets_with_scaling_group_filter(
         self,
@@ -268,7 +253,6 @@ class TestResourcePresets:
 class TestUsageStats:
     """Tests for usage statistics endpoints."""
 
-    @pytest.mark.asyncio
     @pytest.mark.xfail(reason=_GET_JSON_BODY_XFAIL_REASON, strict=True)
     async def test_admin_gets_usage_per_month(
         self,
@@ -281,7 +265,6 @@ class TestUsageStats:
         assert isinstance(result, UsagePerMonthResponse)
         assert isinstance(result.root, list)
 
-    @pytest.mark.asyncio
     @pytest.mark.xfail(reason=_GET_JSON_BODY_XFAIL_REASON, strict=True)
     async def test_admin_gets_usage_per_period(
         self,
@@ -294,7 +277,6 @@ class TestUsageStats:
         assert isinstance(result, UsagePerPeriodResponse)
         assert isinstance(result.root, list)
 
-    @pytest.mark.asyncio
     async def test_admin_recalculates_usage(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -303,7 +285,6 @@ class TestUsageStats:
         result = await admin_registry.infra.recalculate_usage()
         assert isinstance(result, RecalculateUsageResponse)
 
-    @pytest.mark.asyncio
     async def test_admin_gets_admin_month_stats(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -313,7 +294,6 @@ class TestUsageStats:
         assert isinstance(result, MonthStatsResponse)
         assert isinstance(result.root, list)
 
-    @pytest.mark.asyncio
     async def test_user_gets_user_month_stats(
         self,
         user_registry: BackendAIClientRegistry,
@@ -323,7 +303,6 @@ class TestUsageStats:
         assert isinstance(result, MonthStatsResponse)
         assert isinstance(result.root, list)
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_get_usage_per_month(
         self,
         user_registry: BackendAIClientRegistry,
@@ -334,7 +313,6 @@ class TestUsageStats:
                 UsagePerMonthRequest(group_ids=[], month="202601")
             )
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_recalculate_usage(
         self,
         user_registry: BackendAIClientRegistry,
@@ -347,7 +325,6 @@ class TestUsageStats:
 class TestScalingGroupsViaInfra:
     """Tests for scaling group endpoints accessed via InfraClient."""
 
-    @pytest.mark.asyncio
     @pytest.mark.xfail(reason=_HMAC_XFAIL_REASON, strict=True)
     async def test_admin_lists_scaling_groups_via_infra(
         self,

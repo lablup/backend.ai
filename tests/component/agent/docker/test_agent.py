@@ -51,7 +51,6 @@ async def agent(local_config: Any, test_id: str, mocker: Any, socket_relay_image
         await agent.shutdown(signal.SIGTERM)
 
 
-@pytest.mark.asyncio
 async def test_init(agent: DockerAgent, mocker: Any) -> None:
     print(agent)
 
@@ -79,7 +78,6 @@ digest_mismatching_image_info = {
 }
 
 
-@pytest.mark.asyncio
 async def test_auto_pull_digest_when_digest_matching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.DIGEST
     docker_mock = MagicMock()
@@ -93,7 +91,6 @@ async def test_auto_pull_digest_when_digest_matching(agent: DockerAgent, mocker:
     inspect_mock.assert_awaited_with(imgref.canonical)
 
 
-@pytest.mark.asyncio
 async def test_auto_pull_digest_when_digest_mismatching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.DIGEST
     docker_mock = MagicMock()
@@ -107,7 +104,6 @@ async def test_auto_pull_digest_when_digest_mismatching(agent: DockerAgent, mock
     inspect_mock.assert_awaited_with(imgref.canonical)
 
 
-@pytest.mark.asyncio
 async def test_auto_pull_digest_when_missing(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.DIGEST
     docker_mock = MagicMock()
@@ -126,7 +122,6 @@ async def test_auto_pull_digest_when_missing(agent: DockerAgent, mocker: Any) ->
     inspect_mock.assert_called_with(imgref.canonical)
 
 
-@pytest.mark.asyncio
 async def test_auto_pull_tag_when_digest_matching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.TAG
     docker_mock = MagicMock()
@@ -140,7 +135,6 @@ async def test_auto_pull_tag_when_digest_matching(agent: DockerAgent, mocker: An
     inspect_mock.assert_awaited_with(imgref.canonical)
 
 
-@pytest.mark.asyncio
 async def test_auto_pull_tag_when_digest_mismatching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.TAG
     docker_mock = MagicMock()
@@ -154,7 +148,6 @@ async def test_auto_pull_tag_when_digest_mismatching(agent: DockerAgent, mocker:
     inspect_mock.assert_awaited_with(imgref.canonical)
 
 
-@pytest.mark.asyncio
 async def test_auto_pull_tag_when_missing(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.TAG
     docker_mock = MagicMock()
@@ -173,7 +166,6 @@ async def test_auto_pull_tag_when_missing(agent: DockerAgent, mocker: Any) -> No
     inspect_mock.assert_called_with(imgref.canonical)
 
 
-@pytest.mark.asyncio
 async def test_auto_pull_none_when_digest_matching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.NONE
     docker_mock = MagicMock()
@@ -187,7 +179,6 @@ async def test_auto_pull_none_when_digest_matching(agent: DockerAgent, mocker: A
     inspect_mock.assert_awaited_with(imgref.canonical)
 
 
-@pytest.mark.asyncio
 async def test_auto_pull_none_when_digest_mismatching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.NONE
     docker_mock = MagicMock()
@@ -201,7 +192,6 @@ async def test_auto_pull_none_when_digest_mismatching(agent: DockerAgent, mocker
     inspect_mock.assert_awaited_with(imgref.canonical)
 
 
-@pytest.mark.asyncio
 async def test_auto_pull_none_when_missing(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.NONE
     docker_mock = MagicMock()
@@ -221,7 +211,6 @@ async def test_auto_pull_none_when_missing(agent: DockerAgent, mocker: Any) -> N
     inspect_mock.assert_called_with(imgref.canonical)
 
 
-@pytest.mark.asyncio
 async def test_save_last_registry_exception(agent: DockerAgent, mocker: Any) -> None:
     agent.latest_registry_written_time = MagicMock(return_value=0)  # type: ignore[attr-defined]
     mocker.patch("ai.backend.agent.agent.pickle.dump", side_effect=PickleError)

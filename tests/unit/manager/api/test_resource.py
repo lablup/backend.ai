@@ -147,7 +147,6 @@ def superadmin_request(mock_root_ctx: MagicMock) -> MagicMock:
 class TestRecalculateUsage:
     """Tests for recalculate_usage handler."""
 
-    @pytest.mark.asyncio
     async def test_calls_processor(
         self,
         superadmin_request: MagicMock,
@@ -165,7 +164,6 @@ class TestRecalculateUsage:
         response_body = json.loads(cast(bytes, response._body))
         assert response_body == {}
 
-    @pytest.mark.asyncio
     async def test_rejects_non_superadmin_request(
         self,
         authorized_request: MagicMock,
@@ -178,7 +176,6 @@ class TestRecalculateUsage:
 class TestAdminMonthStats:
     """Tests for admin_month_stats handler."""
 
-    @pytest.mark.asyncio
     async def test_calls_processor_and_returns_stats(
         self,
         superadmin_request: MagicMock,
@@ -201,7 +198,6 @@ class TestAdminMonthStats:
         response_body = json.loads(cast(bytes, response._body))
         assert response_body == expected_stats
 
-    @pytest.mark.asyncio
     async def test_rejects_non_superadmin_request(
         self,
         authorized_request: MagicMock,
@@ -214,7 +210,6 @@ class TestAdminMonthStats:
 class TestGetContainerRegistries:
     """Tests for get_container_registries handler."""
 
-    @pytest.mark.asyncio
     async def test_returns_registries_from_result(
         self,
         superadmin_request: MagicMock,
@@ -238,7 +233,6 @@ class TestGetContainerRegistries:
         response_body = json.loads(cast(bytes, json_response._body))
         assert response_body == expected_registries
 
-    @pytest.mark.asyncio
     async def test_rejects_non_superadmin_request(
         self,
         authorized_request: MagicMock,
@@ -251,7 +245,6 @@ class TestGetContainerRegistries:
 class TestListPresets:
     """Tests for list_presets handler."""
 
-    @pytest.mark.asyncio
     async def test_returns_presets_from_processor(
         self,
         authorized_request: MagicMock,
@@ -277,7 +270,6 @@ class TestListPresets:
         response_body = json.loads(cast(bytes, json_response._body))
         assert response_body == {"presets": expected_presets}
 
-    @pytest.mark.asyncio
     async def test_passes_scaling_group_from_query(
         self,
         authorized_request: MagicMock,
@@ -300,7 +292,6 @@ class TestListPresets:
         action = call_args[0][0]
         assert action.scaling_group == "sg-test"
 
-    @pytest.mark.asyncio
     async def test_rejects_unauthorized_request(
         self,
         unauthorized_request: MagicMock,
@@ -313,7 +304,6 @@ class TestListPresets:
 class TestUserMonthStats:
     """Tests for user_month_stats handler."""
 
-    @pytest.mark.asyncio
     async def test_passes_user_uuid_to_action_and_returns_stats(
         self,
         authorized_request: MagicMock,
@@ -344,7 +334,6 @@ class TestUserMonthStats:
         response_body = json.loads(cast(bytes, response._body))
         assert response_body == expected_stats
 
-    @pytest.mark.asyncio
     async def test_rejects_unauthorized_request(
         self,
         unauthorized_request: MagicMock,
@@ -377,7 +366,6 @@ class TestGetWatcherStatus:
         req.method = "GET"
         return req
 
-    @pytest.mark.asyncio
     async def test_passes_agent_id_to_action_and_returns_data(
         self,
         mock_request: MagicMock,
@@ -403,7 +391,6 @@ class TestGetWatcherStatus:
         response_body = json.loads(cast(bytes, response._body))
         assert response_body == expected_data
 
-    @pytest.mark.asyncio
     async def test_rejects_non_superadmin_request(
         self,
         authorized_request: MagicMock,
@@ -416,7 +403,6 @@ class TestGetWatcherStatus:
 class TestWatcherAgentStart:
     """Tests for watcher_agent_start handler."""
 
-    @pytest.mark.asyncio
     async def test_calls_processor_with_agent_id_and_returns_data(
         self,
         handler: ResourceHandler,
@@ -441,7 +427,6 @@ class TestWatcherAgentStart:
         assert response.status_code == HTTPStatus.OK
         assert response.to_json == expected_data
 
-    @pytest.mark.asyncio
     async def test_rejects_non_superadmin_request(
         self,
         authorized_request: MagicMock,
@@ -454,7 +439,6 @@ class TestWatcherAgentStart:
 class TestWatcherAgentStop:
     """Tests for watcher_agent_stop handler."""
 
-    @pytest.mark.asyncio
     async def test_calls_processor_with_agent_id_and_returns_data(
         self,
         handler: ResourceHandler,
@@ -479,7 +463,6 @@ class TestWatcherAgentStop:
         assert response.status_code == HTTPStatus.OK
         assert response.to_json == expected_data
 
-    @pytest.mark.asyncio
     async def test_rejects_non_superadmin_request(
         self,
         authorized_request: MagicMock,
@@ -492,7 +475,6 @@ class TestWatcherAgentStop:
 class TestWatcherAgentRestart:
     """Tests for watcher_agent_restart handler."""
 
-    @pytest.mark.asyncio
     async def test_calls_processor_with_agent_id_and_returns_data(
         self,
         handler: ResourceHandler,
@@ -517,7 +499,6 @@ class TestWatcherAgentRestart:
         assert response.status_code == HTTPStatus.OK
         assert response.to_json == expected_data
 
-    @pytest.mark.asyncio
     async def test_rejects_non_superadmin_request(
         self,
         authorized_request: MagicMock,
@@ -550,7 +531,6 @@ class TestUsagePerMonth:
         req.method = "GET"
         return req
 
-    @pytest.mark.asyncio
     async def test_passes_group_ids_and_month_to_action_and_returns_result(
         self,
         mock_request: MagicMock,
@@ -579,7 +559,6 @@ class TestUsagePerMonth:
         response_body = json.loads(cast(bytes, response._body))
         assert response_body == expected_result
 
-    @pytest.mark.asyncio
     async def test_rejects_non_superadmin_request(
         self,
         authorized_request: MagicMock,
@@ -612,7 +591,6 @@ class TestUsagePerPeriod:
         req.method = "GET"
         return req
 
-    @pytest.mark.asyncio
     async def test_passes_dates_to_action_and_returns_result(
         self,
         mock_request: MagicMock,
@@ -645,7 +623,6 @@ class TestUsagePerPeriod:
         response_body = json.loads(cast(bytes, response._body))
         assert response_body == expected_result
 
-    @pytest.mark.asyncio
     async def test_project_id_default_is_none(
         self,
         handler: ResourceHandler,
@@ -670,7 +647,6 @@ class TestUsagePerPeriod:
         action = call_args[0][0]
         assert action.project_id is None
 
-    @pytest.mark.asyncio
     async def test_rejects_non_superadmin_request(
         self,
         authorized_request: MagicMock,
@@ -706,7 +682,6 @@ class TestCheckPresets:
         }
         return mock_result, slot_quantities
 
-    @pytest.mark.asyncio
     async def test_passes_params_to_action_and_returns_response(
         self,
         handler: ResourceHandler,
@@ -759,7 +734,6 @@ class TestCheckPresets:
         assert response_body["group_remaining"] == expected_json
         assert response_body["scaling_group_remaining"] == expected_json
 
-    @pytest.mark.asyncio
     async def test_converts_resource_slots_to_json(
         self,
         handler: ResourceHandler,
@@ -807,7 +781,6 @@ class TestCheckPresets:
             parsed = json.loads(response_body[field])
             assert isinstance(parsed, dict)
 
-    @pytest.mark.asyncio
     async def test_rejects_unauthorized_request(
         self,
         unauthorized_request: MagicMock,

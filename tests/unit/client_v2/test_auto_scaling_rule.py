@@ -7,7 +7,6 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIClient
@@ -89,7 +88,6 @@ _SAMPLE_RULE_DTO: dict[str, Any] = {
 
 
 class TestAutoScalingRuleCRUD:
-    @pytest.mark.asyncio
     async def test_create(self) -> None:
         resp = _json_response({"auto_scaling_rule": _SAMPLE_RULE_DTO})
         mock_session = _make_request_session(resp)
@@ -117,7 +115,6 @@ class TestAutoScalingRuleCRUD:
         assert body is not None
         assert body["metric_name"] == "cpu_util"
 
-    @pytest.mark.asyncio
     async def test_get(self) -> None:
         resp = _json_response({"auto_scaling_rule": _SAMPLE_RULE_DTO})
         mock_session = _make_request_session(resp)
@@ -131,7 +128,6 @@ class TestAutoScalingRuleCRUD:
         assert method == "GET"
         assert str(_SAMPLE_RULE_ID) in url
 
-    @pytest.mark.asyncio
     async def test_search(self) -> None:
         resp = _json_response({
             "auto_scaling_rules": [_SAMPLE_RULE_DTO],
@@ -150,7 +146,6 @@ class TestAutoScalingRuleCRUD:
         assert url.endswith("/admin/auto-scaling-rules/search")
         assert body is not None
 
-    @pytest.mark.asyncio
     async def test_update(self) -> None:
         updated_dto = {**_SAMPLE_RULE_DTO, "step_size": 2}
         resp = _json_response({"auto_scaling_rule": updated_dto})
@@ -170,7 +165,6 @@ class TestAutoScalingRuleCRUD:
         assert body is not None
         assert body["step_size"] == 2
 
-    @pytest.mark.asyncio
     async def test_delete(self) -> None:
         resp = _json_response({"deleted": True})
         mock_session = _make_request_session(resp)

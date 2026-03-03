@@ -28,7 +28,6 @@ class TestStorageManagerDependency:
     Test StorageManagerDependency lifecycle.
     """
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.components.storage.StorageSessionManager")
     async def test_provide_storage_manager(self, mock_storage_class: MagicMock) -> None:
         """
@@ -49,7 +48,6 @@ class TestStorageManagerDependency:
         # Storage manager should be closed after context exit
         mock_storage.aclose.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.components.storage.StorageSessionManager")
     async def test_cleanup_on_exception(self, mock_storage_class: MagicMock) -> None:
         """

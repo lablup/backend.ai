@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock
 from uuid import UUID
 
 import aiohttp
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIClient
@@ -81,7 +80,6 @@ def _make_sse_response(lines: list[bytes]) -> AsyncMock:
 
 
 class TestConnectTerminal:
-    @pytest.mark.asyncio
     async def test_opens_pty_websocket(self) -> None:
         mock_ws = _make_mock_ws()
         mock_session = MagicMock()
@@ -96,7 +94,6 @@ class TestConnectTerminal:
         url = str(call_args[0][0])
         assert "/stream/session/my-session/pty" in url
 
-    @pytest.mark.asyncio
     async def test_send_receive(self) -> None:
         mock_ws = _make_mock_ws()
         mock_session = MagicMock()
@@ -110,7 +107,6 @@ class TestConnectTerminal:
 
         mock_ws.send_str.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_async_iteration(self) -> None:
         mock_ws = _make_mock_ws()
         msg1 = MagicMock(spec=aiohttp.WSMessage)
@@ -141,7 +137,6 @@ class TestConnectTerminal:
 
 
 class TestConnectExecute:
-    @pytest.mark.asyncio
     async def test_opens_execute_websocket(self) -> None:
         mock_ws = _make_mock_ws()
         mock_session = MagicMock()
@@ -154,7 +149,6 @@ class TestConnectExecute:
         url = str(mock_session.ws_connect.call_args[0][0])
         assert "/stream/session/my-session/execute" in url
 
-    @pytest.mark.asyncio
     async def test_send_execute_request(self) -> None:
         mock_ws = _make_mock_ws()
         mock_session = MagicMock()
@@ -173,7 +167,6 @@ class TestConnectExecute:
 
 
 class TestConnectHttpProxy:
-    @pytest.mark.asyncio
     async def test_opens_httpproxy_websocket_with_params(self) -> None:
         mock_ws = _make_mock_ws()
         mock_session = MagicMock()
@@ -190,7 +183,6 @@ class TestConnectHttpProxy:
         assert call_kwargs["params"]["app"] == "jupyter"
         assert call_kwargs["params"]["port"] == "8080"
 
-    @pytest.mark.asyncio
     async def test_excludes_none_params(self) -> None:
         mock_ws = _make_mock_ws()
         mock_session = MagicMock()
@@ -212,7 +204,6 @@ class TestConnectHttpProxy:
 
 
 class TestConnectTcpProxy:
-    @pytest.mark.asyncio
     async def test_opens_tcpproxy_websocket(self) -> None:
         mock_ws = _make_mock_ws()
         mock_session = MagicMock()
@@ -233,7 +224,6 @@ class TestConnectTcpProxy:
 
 
 class TestSubscribeSessionEvents:
-    @pytest.mark.asyncio
     async def test_opens_sse_with_default_params(self) -> None:
         mock_resp = _make_sse_response([
             b"event: session_started\n",
@@ -259,7 +249,6 @@ class TestSubscribeSessionEvents:
         assert call_kwargs["params"]["group"] == "*"
         assert call_kwargs["params"]["scope"] == "*"
 
-    @pytest.mark.asyncio
     async def test_passes_custom_params(self) -> None:
         mock_resp = _make_sse_response([b""])
         mock_session = MagicMock()
@@ -284,7 +273,6 @@ class TestSubscribeSessionEvents:
         assert call_kwargs["params"]["group"] == "research"
         assert call_kwargs["params"]["scope"] == "session,kernel"
 
-    @pytest.mark.asyncio
     async def test_iterates_multiple_events(self) -> None:
         mock_resp = _make_sse_response([
             b"event: session_enqueued\n",
@@ -315,7 +303,6 @@ class TestSubscribeSessionEvents:
 
 
 class TestSubscribeBackgroundTaskEvents:
-    @pytest.mark.asyncio
     async def test_opens_sse_with_task_id(self) -> None:
         mock_resp = _make_sse_response([
             b"event: bgtask_updated\n",
@@ -340,7 +327,6 @@ class TestSubscribeBackgroundTaskEvents:
         call_kwargs = mock_session.get.call_args.kwargs
         assert call_kwargs["params"]["taskId"] == str(task_id)
 
-    @pytest.mark.asyncio
     async def test_stops_on_server_close(self) -> None:
         mock_resp = _make_sse_response([
             b"event: bgtask_done\n",
@@ -375,7 +361,6 @@ class TestSubscribeBackgroundTaskEvents:
 
 
 class TestGetStreamApps:
-    @pytest.mark.asyncio
     async def test_sends_get_and_deserializes(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -409,7 +394,6 @@ class TestGetStreamApps:
         assert result.root[0].ports == [8080]
         assert result.root[1].name == "ttyd"
 
-    @pytest.mark.asyncio
     async def test_empty_apps_list(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200

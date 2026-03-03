@@ -12,7 +12,6 @@ from ai.backend.manager.models.container_registry import (
 
 
 class TestContainerRegistryValidator:
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "valid_url",
         [
@@ -51,7 +50,6 @@ class TestContainerRegistryValidator:
         # Should not raise any exception
         validator.validate()
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "invalid_url",
         [
@@ -72,7 +70,6 @@ class TestContainerRegistryValidator:
         with pytest.raises(InvalidContainerRegistryURL, match=f"Invalid URL format: {invalid_url}"):
             validator.validate()
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "registry_type, registry_url",
         [
@@ -91,7 +88,6 @@ class TestContainerRegistryValidator:
         ):
             validator.validate()
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "project_name",
         [
@@ -111,7 +107,6 @@ class TestContainerRegistryValidator:
         with pytest.raises(InvalidContainerRegistryProject, match=r"Invalid project name length\."):
             validator.validate()
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "invalid_project_name",
         [
@@ -152,7 +147,6 @@ class TestContainerRegistryValidator:
         with pytest.raises(InvalidContainerRegistryProject, match=r"Invalid project name format\."):
             validator.validate()
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "valid_project_name",
         [

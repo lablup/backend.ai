@@ -1,7 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIClient
@@ -60,7 +59,6 @@ def _make_request_session(resp: AsyncMock) -> MagicMock:
 
 
 class TestAuthClient:
-    @pytest.mark.asyncio
     async def test_authorize(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -100,7 +98,6 @@ class TestAuthClient:
         assert call_args.kwargs["json"]["type"] == "keypair"
         assert call_args.kwargs["json"]["domain"] == "default"
 
-    @pytest.mark.asyncio
     async def test_signup(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -132,7 +129,6 @@ class TestAuthClient:
         assert "/auth/signup" in str(call_args.args[1])
         assert call_args.kwargs["json"]["email"] == "new@example.com"
 
-    @pytest.mark.asyncio
     async def test_signout(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -152,7 +148,6 @@ class TestAuthClient:
         assert "/auth/signout" in str(call_args.args[1])
         assert call_args.kwargs["json"]["email"] == "user@example.com"
 
-    @pytest.mark.asyncio
     async def test_get_role(self) -> None:
         group_id = UUID("12345678-1234-1234-1234-123456789abc")
         mock_resp = AsyncMock()
@@ -183,7 +178,6 @@ class TestAuthClient:
         assert call_args.kwargs["params"] == {"group": str(group_id)}
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_get_role_without_group(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -209,7 +203,6 @@ class TestAuthClient:
         call_args = mock_session.request.call_args
         assert call_args.kwargs["params"] == {}
 
-    @pytest.mark.asyncio
     async def test_update_password(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -233,7 +226,6 @@ class TestAuthClient:
         assert call_args.args[0] == "POST"
         assert "/auth/update-password" in str(call_args.args[1])
 
-    @pytest.mark.asyncio
     async def test_update_password_no_auth(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -260,7 +252,6 @@ class TestAuthClient:
         assert call_args.args[0] == "POST"
         assert "/auth/update-password-no-auth" in str(call_args.args[1])
 
-    @pytest.mark.asyncio
     async def test_update_full_name(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -283,7 +274,6 @@ class TestAuthClient:
         assert "/auth/update-full-name" in str(call_args.args[1])
         assert call_args.kwargs["json"]["full_name"] == "New Name"
 
-    @pytest.mark.asyncio
     async def test_get_ssh_keypair(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -303,7 +293,6 @@ class TestAuthClient:
         assert "/auth/ssh-keypair" in str(call_args.args[1])
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_generate_ssh_keypair(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -329,7 +318,6 @@ class TestAuthClient:
         assert "/auth/ssh-keypair" in str(call_args.args[1])
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_upload_ssh_keypair(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -358,7 +346,6 @@ class TestAuthClient:
         assert "/auth/ssh-keypair" in str(call_args.args[1])
         assert call_args.kwargs["json"]["pubkey"] == "ssh-rsa AAAA... uploaded"
 
-    @pytest.mark.asyncio
     async def test_verify_auth(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200

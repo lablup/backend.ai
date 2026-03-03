@@ -27,7 +27,6 @@ from ai.backend.common.dto.manager.fair_share import (
 class TestFairShareWeightLifecycle:
     """Upsert domain weight → get domain fair share → search → verify weight present."""
 
-    @pytest.mark.asyncio
     async def test_upsert_then_get_and_search(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -72,7 +71,6 @@ class TestFairShareWeightLifecycle:
 class TestFairShareBulkUpsertLifecycle:
     """Bulk upsert domain weights → search → verify all present."""
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_then_search(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -109,7 +107,6 @@ class TestFairShareBulkUpsertLifecycle:
 class TestResourceGroupSpecLifecycle:
     """Get RG spec → update spec → get again → verify updated."""
 
-    @pytest.mark.asyncio
     async def test_get_update_get(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -146,7 +143,6 @@ class TestResourceGroupSpecLifecycle:
 class TestRGScopedFairShareAccess:
     """RG-scoped get/search for domain/project/user (auth-only access)."""
 
-    @pytest.mark.asyncio
     async def test_rg_scoped_domain_get_and_search(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -168,7 +164,6 @@ class TestRGScopedFairShareAccess:
             )
             assert isinstance(search_result, SearchDomainFairSharesResponse)
 
-    @pytest.mark.asyncio
     async def test_rg_scoped_user_search(
         self,
         admin_registry: BackendAIClientRegistry,

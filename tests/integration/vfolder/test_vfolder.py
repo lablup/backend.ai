@@ -29,7 +29,6 @@ VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
 
 @pytest.mark.integration
 class TestVFolderLifecycle:
-    @pytest.mark.asyncio
     async def test_vfolder_list_and_get_lifecycle(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -87,7 +86,6 @@ class TestVFolderLifecycle:
         after_names = [item.name for item in after_delete.items]
         assert new_name not in after_names
 
-    @pytest.mark.asyncio
     async def test_vfolder_invitation_lifecycle(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -143,7 +141,6 @@ class TestVFolderLifecycle:
 
 @pytest.mark.integration
 class TestVFolderPermissionBoundary:
-    @pytest.mark.asyncio
     async def test_regular_user_denied_admin_endpoints(
         self,
         admin_registry: BackendAIClientRegistry,

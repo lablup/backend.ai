@@ -316,7 +316,6 @@ class TestDryRunModelService:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_dry_run_model_service(
         self,
         scenario: ScenarioBase[DryRunModelServiceAction, DryRunModelServiceActionResult],
@@ -427,7 +426,6 @@ class TestDryRunModelServiceActionWithRevision:
             ),
         )
 
-    @pytest.mark.asyncio
     async def test_with_revision_overrides(
         self,
         base_action: DryRunModelServiceAction,
@@ -440,7 +438,6 @@ class TestDryRunModelServiceActionWithRevision:
         assert result.config.resources == dict(revision_spec.resource_spec.resource_slots)
         assert result.config.environ == revision_spec.execution.environ
 
-    @pytest.mark.asyncio
     async def test_with_revision_returns_new_instance(
         self,
         base_action: DryRunModelServiceAction,
@@ -451,7 +448,6 @@ class TestDryRunModelServiceActionWithRevision:
         assert result is not base_action
         assert result.config is not base_action.config
 
-    @pytest.mark.asyncio
     async def test_with_revision_does_not_modify_original(
         self,
         base_action: DryRunModelServiceAction,
@@ -469,7 +465,6 @@ class TestDryRunModelServiceActionWithRevision:
         assert base_action.config.resources == original_resources
         assert base_action.config.environ == original_environ
 
-    @pytest.mark.asyncio
     async def test_with_revision_preserves_action_fields(
         self,
         base_action: DryRunModelServiceAction,
@@ -494,7 +489,6 @@ class TestDryRunModelServiceActionWithRevision:
         assert result.owner_access_key == base_action.owner_access_key
         assert result.request_user_id == base_action.request_user_id
 
-    @pytest.mark.asyncio
     async def test_with_revision_preserves_config_fields(
         self,
         base_action: DryRunModelServiceAction,
@@ -534,7 +528,6 @@ class TestDryRunModelServiceActionWithRevision:
             ),
         )
 
-    @pytest.mark.asyncio
     async def test_with_revision_handles_none_environ(
         self,
         base_action: DryRunModelServiceAction,
@@ -806,7 +799,6 @@ class TestDryRunWithServiceDefinitionOverrides:
             ),
         )
 
-    @pytest.mark.asyncio
     async def test_service_definition_overrides_applied(
         self,
         model_serving_processors: ModelServingProcessors,
@@ -1122,7 +1114,6 @@ class TestDryRunExtraMountsHandling:
             ),
         )
 
-    @pytest.mark.asyncio
     async def test_extra_mounts_uses_folder_id_not_vfolder_id(
         self,
         model_serving_processors: ModelServingProcessors,

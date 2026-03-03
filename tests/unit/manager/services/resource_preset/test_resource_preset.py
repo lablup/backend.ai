@@ -103,7 +103,6 @@ class TestResourcePresetServiceCompatibility:
             resource_preset_repository=mock_dependencies["resource_preset_repository"],
         )
 
-    @pytest.mark.asyncio
     async def test_create_preset_action_structure(
         self,
         resource_preset_service: ResourcePresetService,
@@ -142,7 +141,6 @@ class TestResourcePresetServiceCompatibility:
         assert result.resource_preset.name == "cpu-small"
         mock_dependencies["resource_preset_repository"].create_preset_validated.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_create_gpu_preset_with_scaling_group(
         self,
         resource_preset_service: ResourcePresetService,
@@ -187,7 +185,6 @@ class TestResourcePresetServiceCompatibility:
         assert isinstance(result, CreateResourcePresetActionResult)
         assert result.resource_preset.scaling_group_name == "gpu-cluster"
 
-    @pytest.mark.asyncio
     async def test_create_preset_missing_intrinsic_slots(
         self, resource_preset_service: ResourcePresetService
     ) -> None:
@@ -206,7 +203,6 @@ class TestResourcePresetServiceCompatibility:
         with pytest.raises(InvalidAPIParameters):
             await resource_preset_service.create_preset(action)
 
-    @pytest.mark.asyncio
     async def test_create_duplicate_preset(
         self,
         resource_preset_service: ResourcePresetService,
@@ -232,7 +228,6 @@ class TestResourcePresetServiceCompatibility:
         with pytest.raises(ResourcePresetConflict):
             await resource_preset_service.create_preset(action)
 
-    @pytest.mark.asyncio
     async def test_modify_preset_action_structure(
         self,
         resource_preset_service: ResourcePresetService,
@@ -269,7 +264,6 @@ class TestResourcePresetServiceCompatibility:
         assert result.resource_preset is not None
         mock_dependencies["resource_preset_repository"].modify_preset_validated.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_modify_preset_name_change(
         self,
         resource_preset_service: ResourcePresetService,
@@ -302,7 +296,6 @@ class TestResourcePresetServiceCompatibility:
 
         assert result.resource_preset.name == "cpu-medium"
 
-    @pytest.mark.asyncio
     async def test_modify_preset_missing_identifiers(
         self, resource_preset_service: ResourcePresetService
     ) -> None:
@@ -319,7 +312,6 @@ class TestResourcePresetServiceCompatibility:
         with pytest.raises(InvalidAPIParameters):
             await resource_preset_service.modify_preset(action)
 
-    @pytest.mark.asyncio
     async def test_delete_preset_action_structure(
         self,
         resource_preset_service: ResourcePresetService,
@@ -346,7 +338,6 @@ class TestResourcePresetServiceCompatibility:
         assert result.resource_preset is not None
         mock_dependencies["resource_preset_repository"].delete_preset_validated.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_delete_nonexistent_preset(
         self,
         resource_preset_service: ResourcePresetService,
@@ -362,7 +353,6 @@ class TestResourcePresetServiceCompatibility:
         with pytest.raises(ObjectNotFound):
             await resource_preset_service.delete_preset(action)
 
-    @pytest.mark.asyncio
     async def test_list_presets_action_structure(
         self,
         resource_preset_service: ResourcePresetService,
@@ -410,7 +400,6 @@ class TestResourcePresetServiceCompatibility:
         assert "memory" in result.presets[0]["resource_slots"]  # Normalized slot
         assert "gpu" in result.presets[0]["resource_slots"]  # Default value
 
-    @pytest.mark.asyncio
     async def test_check_presets_with_sufficient_resources(
         self,
         resource_preset_service: ResourcePresetService,
@@ -517,7 +506,6 @@ class TestResourcePresetServiceCompatibility:
         # Mock the repository's check_presets method directly
         deps["resource_preset_repository"].check_presets = AsyncMock(return_value=mock_check_result)
 
-    @pytest.mark.asyncio
     async def test_custom_resource_types_support(
         self,
         resource_preset_service: ResourcePresetService,
@@ -557,7 +545,6 @@ class TestResourcePresetServiceCompatibility:
         assert result.resource_preset.resource_slots.data["npu"] == Decimal("2")
         assert result.resource_preset.resource_slots.data["tpu"] == Decimal("1")
 
-    @pytest.mark.asyncio
     async def test_shared_memory_adjustment(
         self,
         resource_preset_service: ResourcePresetService,

@@ -622,7 +622,6 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             valkey_schedule=valkey_schedule,
         )
 
-    @pytest.mark.asyncio
     async def test_fetch_single_route_with_inference_port(
         self,
         deployment_repository: DeploymentRepository,
@@ -644,7 +643,6 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         assert info.runtime_variant == "vllm"
         assert "test-endpoint" in info.endpoint_name
 
-    @pytest.mark.asyncio
     async def test_fetch_route_without_inference_port(
         self,
         deployment_repository: DeploymentRepository,
@@ -677,7 +675,6 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         # Should return empty list because kernel has no inference port
         assert len(result) == 0
 
-    @pytest.mark.asyncio
     async def test_fetch_empty_route_ids(
         self,
         deployment_repository: DeploymentRepository,
@@ -687,7 +684,6 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
 
         assert len(result) == 0
 
-    @pytest.mark.asyncio
     async def test_fetch_nonexistent_route_ids(
         self,
         deployment_repository: DeploymentRepository,
@@ -699,7 +695,6 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
 
         assert len(result) == 0
 
-    @pytest.mark.asyncio
     async def test_fetch_multiple_routes(
         self,
         deployment_repository: DeploymentRepository,
@@ -1082,7 +1077,6 @@ class TestGetDefaultArchitectureFromScalingGroup:
 
         return agent_ids
 
-    @pytest.mark.asyncio
     async def test_returns_most_common_architecture(
         self,
         deployment_repository: DeploymentRepository,
@@ -1097,7 +1091,6 @@ class TestGetDefaultArchitectureFromScalingGroup:
         # x86_64 is most common (3 vs 2)
         assert result == "x86_64"
 
-    @pytest.mark.asyncio
     async def test_returns_none_when_no_agents(
         self,
         deployment_repository: DeploymentRepository,
@@ -1110,7 +1103,6 @@ class TestGetDefaultArchitectureFromScalingGroup:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_returns_single_architecture(
         self,
         deployment_repository: DeploymentRepository,
@@ -1124,7 +1116,6 @@ class TestGetDefaultArchitectureFromScalingGroup:
 
         assert result == "aarch64"
 
-    @pytest.mark.asyncio
     async def test_excludes_non_alive_agents(
         self,
         deployment_repository: DeploymentRepository,
@@ -1139,7 +1130,6 @@ class TestGetDefaultArchitectureFromScalingGroup:
         # Only ALIVE agent's architecture should be considered
         assert result == "x86_64"
 
-    @pytest.mark.asyncio
     async def test_excludes_non_schedulable_agents(
         self,
         deployment_repository: DeploymentRepository,
@@ -1154,7 +1144,6 @@ class TestGetDefaultArchitectureFromScalingGroup:
         # Only schedulable agent's architecture should be considered
         assert result == "x86_64"
 
-    @pytest.mark.asyncio
     async def test_excludes_agents_from_other_scaling_groups(
         self,
         deployment_repository: DeploymentRepository,
@@ -1169,7 +1158,6 @@ class TestGetDefaultArchitectureFromScalingGroup:
         # Only target scaling group's agent architecture should be considered
         assert result == "x86_64"
 
-    @pytest.mark.asyncio
     async def test_returns_none_for_nonexistent_scaling_group(
         self,
         deployment_repository: DeploymentRepository,
@@ -1534,7 +1522,6 @@ class TestDeploymentRevisionOperations:
             revisions.append(revision)
         return revisions
 
-    @pytest.mark.asyncio
     async def test_create_revision(
         self,
         deployment_repository: DeploymentRepository,
@@ -1574,7 +1561,6 @@ class TestDeploymentRevisionOperations:
         assert result.model_runtime_config.runtime_variant == RuntimeVariant.CUSTOM
         assert result.name == "revision-1"
 
-    @pytest.mark.asyncio
     async def test_get_revision(
         self,
         deployment_repository: DeploymentRepository,
@@ -1587,7 +1573,6 @@ class TestDeploymentRevisionOperations:
         assert result.name == "revision-1"
         assert result.cluster_config.mode == ClusterMode.SINGLE_NODE
 
-    @pytest.mark.asyncio
     async def test_get_revision_not_found(
         self,
         deployment_repository: DeploymentRepository,
@@ -1598,7 +1583,6 @@ class TestDeploymentRevisionOperations:
         with pytest.raises(DeploymentRevisionNotFound):
             await deployment_repository.get_revision(nonexistent_id)
 
-    @pytest.mark.asyncio
     async def test_get_latest_revision_number_no_revisions(
         self,
         deployment_repository: DeploymentRepository,
@@ -1609,7 +1593,6 @@ class TestDeploymentRevisionOperations:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_get_latest_revision_number_with_revisions(
         self,
         deployment_repository: DeploymentRepository,
@@ -1621,7 +1604,6 @@ class TestDeploymentRevisionOperations:
 
         assert result == 3
 
-    @pytest.mark.asyncio
     async def test_search_revisions_empty(
         self,
         deployment_repository: DeploymentRepository,
@@ -1640,7 +1622,6 @@ class TestDeploymentRevisionOperations:
         assert result.has_next_page is False
         assert result.has_previous_page is False
 
-    @pytest.mark.asyncio
     async def test_search_revisions_with_results(
         self,
         deployment_repository: DeploymentRepository,
@@ -1660,7 +1641,6 @@ class TestDeploymentRevisionOperations:
         assert result.has_next_page is False
         assert result.has_previous_page is False
 
-    @pytest.mark.asyncio
     async def test_search_revisions_with_pagination(
         self,
         deployment_repository: DeploymentRepository,
@@ -1692,7 +1672,6 @@ class TestDeploymentRevisionOperations:
         assert result.has_next_page is True
         assert result.has_previous_page is True
 
-    @pytest.mark.asyncio
     async def test_update_endpoint_deploying_revision(
         self,
         deployment_repository: DeploymentRepository,
@@ -1719,7 +1698,6 @@ class TestDeploymentRevisionOperations:
             endpoint = result.scalar_one()
             assert endpoint.deploying_revision == test_revision_data.id
 
-    @pytest.mark.asyncio
     async def test_update_endpoint_current_revision(
         self,
         deployment_repository: DeploymentRepository,
@@ -1747,7 +1725,6 @@ class TestDeploymentRevisionOperations:
             endpoint = result.scalar_one()
             assert endpoint.current_revision == test_revision_data.id
 
-    @pytest.mark.asyncio
     async def test_update_endpoint_nullify_deploying_revision(
         self,
         deployment_repository: DeploymentRepository,
@@ -1783,7 +1760,6 @@ class TestDeploymentRevisionOperations:
             endpoint = result.scalar_one()
             assert endpoint.deploying_revision is None
 
-    @pytest.mark.asyncio
     async def test_update_endpoint_returns_updated_deployment_info(
         self,
         deployment_repository: DeploymentRepository,
@@ -2066,7 +2042,6 @@ class TestDeploymentAutoScalingPolicyOperations:
         )
         return await deployment_repository.create_auto_scaling_policy(Creator(spec=spec))
 
-    @pytest.mark.asyncio
     async def test_create_auto_scaling_policy(
         self,
         deployment_repository: DeploymentRepository,
@@ -2103,7 +2078,6 @@ class TestDeploymentAutoScalingPolicyOperations:
         assert result.scale_down_step_size == 2
         assert result.cooldown_seconds == 600
 
-    @pytest.mark.asyncio
     async def test_get_auto_scaling_policy(
         self,
         deployment_repository: DeploymentRepository,
@@ -2120,7 +2094,6 @@ class TestDeploymentAutoScalingPolicyOperations:
         assert result.metric_source == AutoScalingMetricSource.KERNEL
         assert result.metric_name == "cpu_utilization"
 
-    @pytest.mark.asyncio
     async def test_get_auto_scaling_policy_not_found(
         self,
         deployment_repository: DeploymentRepository,
@@ -2130,7 +2103,6 @@ class TestDeploymentAutoScalingPolicyOperations:
         with pytest.raises(AutoScalingPolicyNotFound):
             await deployment_repository.get_auto_scaling_policy(test_endpoint_id)
 
-    @pytest.mark.asyncio
     async def test_update_auto_scaling_policy(
         self,
         deployment_repository: DeploymentRepository,
@@ -2156,7 +2128,6 @@ class TestDeploymentAutoScalingPolicyOperations:
         assert result.scale_down_threshold == Decimal("20")
         assert result.cooldown_seconds == 300
 
-    @pytest.mark.asyncio
     async def test_update_auto_scaling_policy_not_found(
         self,
         deployment_repository: DeploymentRepository,
@@ -2173,7 +2144,6 @@ class TestDeploymentAutoScalingPolicyOperations:
         with pytest.raises(AutoScalingPolicyNotFound):
             await deployment_repository.update_auto_scaling_policy(updater)
 
-    @pytest.mark.asyncio
     async def test_delete_auto_scaling_policy(
         self,
         deployment_repository: DeploymentRepository,
@@ -2195,7 +2165,6 @@ class TestDeploymentAutoScalingPolicyOperations:
         with pytest.raises(AutoScalingPolicyNotFound):
             await deployment_repository.get_auto_scaling_policy(test_endpoint_id)
 
-    @pytest.mark.asyncio
     async def test_delete_auto_scaling_policy_not_found(
         self,
         deployment_repository: DeploymentRepository,
@@ -2444,7 +2413,6 @@ class TestDeploymentPolicyOperations:
         )
         return await deployment_repository.create_deployment_policy(Creator(spec=spec))
 
-    @pytest.mark.asyncio
     async def test_create_deployment_policy(
         self,
         deployment_repository: DeploymentRepository,
@@ -2467,7 +2435,6 @@ class TestDeploymentPolicyOperations:
         assert result.strategy_spec == BlueGreenSpec(auto_promote=True, promote_delay_seconds=60)
         assert result.rollback_on_failure is False
 
-    @pytest.mark.asyncio
     async def test_get_deployment_policy(
         self,
         deployment_repository: DeploymentRepository,
@@ -2482,7 +2449,6 @@ class TestDeploymentPolicyOperations:
         assert result.strategy == DeploymentStrategy.ROLLING
         assert result.strategy_spec == RollingUpdateSpec(max_surge=1, max_unavailable=0)
 
-    @pytest.mark.asyncio
     async def test_get_deployment_policy_not_found(
         self,
         deployment_repository: DeploymentRepository,
@@ -2492,7 +2458,6 @@ class TestDeploymentPolicyOperations:
         with pytest.raises(DeploymentPolicyNotFound):
             await deployment_repository.get_deployment_policy(test_endpoint_id)
 
-    @pytest.mark.asyncio
     async def test_update_deployment_policy(
         self,
         deployment_repository: DeploymentRepository,
@@ -2516,7 +2481,6 @@ class TestDeploymentPolicyOperations:
         assert result.strategy_spec == new_strategy_spec
         assert result.rollback_on_failure is True
 
-    @pytest.mark.asyncio
     async def test_update_deployment_policy_not_found(
         self,
         deployment_repository: DeploymentRepository,
@@ -2533,7 +2497,6 @@ class TestDeploymentPolicyOperations:
         with pytest.raises(DeploymentPolicyNotFound):
             await deployment_repository.update_deployment_policy(updater)
 
-    @pytest.mark.asyncio
     async def test_delete_deployment_policy(
         self,
         deployment_repository: DeploymentRepository,
@@ -2555,7 +2518,6 @@ class TestDeploymentPolicyOperations:
         with pytest.raises(DeploymentPolicyNotFound):
             await deployment_repository.get_deployment_policy(test_endpoint_id)
 
-    @pytest.mark.asyncio
     async def test_delete_deployment_policy_not_found(
         self,
         deployment_repository: DeploymentRepository,
@@ -3157,7 +3119,6 @@ class TestRouteOperations:
             valkey_schedule=valkey_schedule,
         )
 
-    @pytest.mark.asyncio
     async def test_create_route(
         self,
         deployment_repository: DeploymentRepository,
@@ -3183,7 +3144,6 @@ class TestRouteOperations:
         assert route_id is not None
         assert isinstance(route_id, uuid.UUID)
 
-    @pytest.mark.asyncio
     async def test_update_route_status(
         self,
         deployment_repository: DeploymentRepository,
@@ -3223,7 +3183,6 @@ class TestRouteOperations:
             assert route.status == RouteStatus.HEALTHY
             assert route.traffic_status == RouteTrafficStatus.INACTIVE
 
-    @pytest.mark.asyncio
     async def test_update_route_with_unified_spec(
         self,
         deployment_repository: DeploymentRepository,
@@ -3265,7 +3224,6 @@ class TestRouteOperations:
             assert route.traffic_status == RouteTrafficStatus.ACTIVE
             assert route.traffic_ratio == 0.5
 
-    @pytest.mark.asyncio
     async def test_update_route_not_found(
         self,
         deployment_repository: DeploymentRepository,
@@ -3504,7 +3462,6 @@ class TestDeploymentRepositoryDuplicateName:
             ),
         )
 
-    @pytest.mark.asyncio
     async def test_create_endpoint_raises_when_duplicate_name(
         self,
         deployment_repository: DeploymentRepository,
@@ -3536,7 +3493,6 @@ class TestDeploymentRepositoryDuplicateName:
         with pytest.raises(DeploymentNameAlreadyExists):
             await deployment_repository.create_endpoint_legacy(second_creator)
 
-    @pytest.mark.asyncio
     async def test_create_endpoint_succeeds_with_different_name(
         self,
         deployment_repository: DeploymentRepository,
@@ -3570,7 +3526,6 @@ class TestDeploymentRepositoryDuplicateName:
         assert result.metadata.name == "different-endpoint-name"
         assert result.metadata.project == test_group.id
 
-    @pytest.mark.asyncio
     async def test_create_endpoint_succeeds_with_same_name_in_different_project(
         self,
         deployment_repository: DeploymentRepository,
@@ -3605,7 +3560,6 @@ class TestDeploymentRepositoryDuplicateName:
         assert result.metadata.name == "same-name-endpoint"
         assert result.metadata.project == different_group.id
 
-    @pytest.mark.asyncio
     async def test_create_endpoint_succeeds_with_same_name_when_existing_is_destroyed(
         self,
         deployment_repository: DeploymentRepository,

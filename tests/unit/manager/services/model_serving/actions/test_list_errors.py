@@ -255,7 +255,6 @@ class TestListErrors:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_list_errors(
         self,
         scenario: ScenarioBase[ListErrorsAction, ListErrorsActionResult],

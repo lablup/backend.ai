@@ -147,7 +147,6 @@ class TestDeleteAutoScalingRule:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_delete_auto_scaling_rule(
         self,
         scenario: ScenarioBase[

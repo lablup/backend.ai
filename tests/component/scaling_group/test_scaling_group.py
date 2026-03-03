@@ -17,7 +17,6 @@ _HMAC_XFAIL_REASON = (
 
 
 class TestScalingGroupList:
-    @pytest.mark.asyncio
     @pytest.mark.xfail(reason=_HMAC_XFAIL_REASON, strict=True)
     async def test_admin_lists_scaling_groups(
         self,
@@ -33,7 +32,6 @@ class TestScalingGroupList:
         names = [sg.name for sg in result.scaling_groups]
         assert scaling_group_fixture in names
 
-    @pytest.mark.asyncio
     @pytest.mark.xfail(reason=_HMAC_XFAIL_REASON, strict=True)
     async def test_list_scaling_groups_with_group_filter(
         self,
@@ -48,7 +46,6 @@ class TestScalingGroupList:
         assert isinstance(result, ListScalingGroupsResponse)
         assert any(sg.name == scaling_group_fixture for sg in result.scaling_groups)
 
-    @pytest.mark.asyncio
     @pytest.mark.xfail(reason=_HMAC_XFAIL_REASON, strict=True)
     async def test_regular_user_lists_public_scaling_groups(
         self,
@@ -73,7 +70,6 @@ class TestScalingGroupList:
 
 
 class TestScalingGroupWsproxyVersion:
-    @pytest.mark.asyncio
     async def test_admin_gets_wsproxy_version(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -90,7 +86,6 @@ class TestScalingGroupWsproxyVersion:
                 scaling_group=scaling_group_fixture,
             )
 
-    @pytest.mark.asyncio
     async def test_get_wsproxy_version_nonexistent(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -101,7 +96,6 @@ class TestScalingGroupWsproxyVersion:
                 scaling_group="nonexistent-scaling-group-xyz",
             )
 
-    @pytest.mark.asyncio
     async def test_regular_user_gets_wsproxy_version_not_found(
         self,
         user_registry: BackendAIClientRegistry,

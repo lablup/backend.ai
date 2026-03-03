@@ -16,7 +16,6 @@ from ai.backend.common.dto.manager.quota_scope.response import GetQuotaScopeResp
 
 
 class TestQuotaScopeGet:
-    @pytest.mark.asyncio
     @pytest.mark.skip(reason="Requires a running storage proxy service")
     async def test_admin_gets_quota_scope(
         self,
@@ -31,7 +30,6 @@ class TestQuotaScopeGet:
         assert result.quota_scope.storage_host_name == "local:volume1"
         assert result.quota_scope.quota_scope_id == "user:00000000-0000-0000-0000-000000000001"
 
-    @pytest.mark.asyncio
     @pytest.mark.skip(reason="Requires a running storage proxy service")
     async def test_get_nonexistent_quota_scope(
         self,
@@ -44,7 +42,6 @@ class TestQuotaScopeGet:
                 quota_scope_id="user:00000000-0000-0000-0000-000000000000",
             )
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_get_quota_scope(
         self,
         user_registry: BackendAIClientRegistry,
@@ -58,7 +55,6 @@ class TestQuotaScopeGet:
 
 
 class TestQuotaScopeSearch:
-    @pytest.mark.asyncio
     async def test_admin_searches_quota_scopes(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -70,7 +66,6 @@ class TestQuotaScopeSearch:
         assert result.pagination.total >= 0
         assert result.pagination.offset == 0
 
-    @pytest.mark.asyncio
     async def test_search_with_pagination(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -84,7 +79,6 @@ class TestQuotaScopeSearch:
         assert result.pagination.offset == 0
         assert len(result.quota_scopes) <= 10
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_search_quota_scopes(
         self,
         user_registry: BackendAIClientRegistry,
@@ -95,7 +89,6 @@ class TestQuotaScopeSearch:
 
 
 class TestQuotaScopeSetQuota:
-    @pytest.mark.asyncio
     @pytest.mark.skip(reason="Requires a running storage proxy service")
     async def test_admin_sets_quota(
         self,
@@ -114,7 +107,6 @@ class TestQuotaScopeSetQuota:
         assert result.quota_scope.storage_host_name == "local:volume1"
         assert result.quota_scope.quota_scope_id == "user:00000000-0000-0000-0000-000000000001"
 
-    @pytest.mark.asyncio
     @pytest.mark.skip(reason="Requires a running storage proxy service")
     async def test_set_quota_creates_if_not_exists(
         self,
@@ -131,7 +123,6 @@ class TestQuotaScopeSetQuota:
         assert isinstance(result, SetQuotaResponse)
         assert result.quota_scope.hard_limit_bytes == 2_147_483_648
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_set_quota(
         self,
         user_registry: BackendAIClientRegistry,
@@ -148,7 +139,6 @@ class TestQuotaScopeSetQuota:
 
 
 class TestQuotaScopeUnsetQuota:
-    @pytest.mark.asyncio
     @pytest.mark.skip(reason="Requires a running storage proxy service")
     async def test_admin_unsets_quota(
         self,
@@ -164,7 +154,6 @@ class TestQuotaScopeUnsetQuota:
         assert isinstance(result, UnsetQuotaResponse)
         assert result.quota_scope.hard_limit_bytes is None
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_unset_quota(
         self,
         user_registry: BackendAIClientRegistry,

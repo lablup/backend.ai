@@ -56,7 +56,6 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
 
 
 @pytest.mark.dependency()
-@pytest.mark.asyncio
 async def test_create_container_registry(
     client: Client, database_engine: ExtendedAsyncSAEngine
 ) -> None:
@@ -101,7 +100,6 @@ async def test_create_container_registry(
 
 
 @pytest.mark.dependency(depends=["test_create_container_registry"])
-@pytest.mark.asyncio
 async def test_modify_container_registry(
     client: Client, database_engine: ExtendedAsyncSAEngine
 ) -> None:
@@ -155,7 +153,6 @@ async def test_modify_container_registry(
 
 
 @pytest.mark.dependency(depends=["test_modify_container_registry"])
-@pytest.mark.asyncio
 async def test_modify_container_registry_allows_empty_string(
     client: Client, database_engine: ExtendedAsyncSAEngine
 ) -> None:
@@ -192,7 +189,6 @@ async def test_modify_container_registry_allows_empty_string(
 
 
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_empty_string"])
-@pytest.mark.asyncio
 async def test_modify_container_registry_allows_null_for_unset(
     client: Client, database_engine: ExtendedAsyncSAEngine
 ) -> None:
@@ -229,7 +225,6 @@ async def test_modify_container_registry_allows_null_for_unset(
 
 
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_null_for_unset"])
-@pytest.mark.asyncio
 async def test_delete_container_registry(
     client: Client, database_engine: ExtendedAsyncSAEngine
 ) -> None:

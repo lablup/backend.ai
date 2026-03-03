@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from ai.backend.common.dependencies import DependencyBuilderStack
 from ai.backend.manager.dependencies.domain.composer import (
     DomainComposer,
@@ -14,7 +12,6 @@ from ai.backend.manager.dependencies.domain.composer import (
 class TestDomainComposer:
     """Test DomainComposer integration."""
 
-    @pytest.mark.asyncio
     @patch(
         "ai.backend.manager.dependencies.domain.services.PerProjectContainerRegistryQuotaClientPool"
     )

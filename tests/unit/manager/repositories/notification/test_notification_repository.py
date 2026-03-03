@@ -379,7 +379,6 @@ class TestNotificationRepository:
         """Create NotificationRepository instance with database"""
         return NotificationRepository(db=db_with_cleanup)
 
-    @pytest.mark.asyncio
     async def test_create_channel(
         self,
         notification_repository: NotificationRepository,
@@ -418,7 +417,6 @@ class TestNotificationRepository:
         assert channel.enabled is True
         assert channel.description == "Test webhook channel"
 
-    @pytest.mark.asyncio
     async def test_get_channel_by_id(
         self,
         notification_repository: NotificationRepository,
@@ -431,7 +429,6 @@ class TestNotificationRepository:
         assert retrieved_channel.id == sample_channel_id
         assert retrieved_channel.name == "Sample Channel"
 
-    @pytest.mark.asyncio
     async def test_update_channel(
         self,
         notification_repository: NotificationRepository,
@@ -459,7 +456,6 @@ class TestNotificationRepository:
         assert updated_channel.spec.method == "GET"
         assert updated_channel.enabled is False
 
-    @pytest.mark.asyncio
     async def test_delete_channel(
         self,
         notification_repository: NotificationRepository,
@@ -472,7 +468,6 @@ class TestNotificationRepository:
         with pytest.raises(NotificationChannelNotFound):
             await notification_repository.get_channel_by_id(sample_channel_id)
 
-    @pytest.mark.asyncio
     async def test_list_channels(
         self,
         notification_repository: NotificationRepository,
@@ -528,7 +523,6 @@ class TestNotificationRepository:
         enabled_result = await notification_repository.search_channels(querier=enabled_querier)
         assert all(ch.enabled for ch in enabled_result.items)
 
-    @pytest.mark.asyncio
     async def test_create_rule(
         self,
         notification_repository: NotificationRepository,
@@ -572,7 +566,6 @@ class TestNotificationRepository:
         assert rule.channel.id == channel.id
         assert rule.enabled is True
 
-    @pytest.mark.asyncio
     async def test_get_matching_rules(
         self,
         notification_repository: NotificationRepository,
@@ -638,7 +631,6 @@ class TestNotificationRepository:
         assert all(r.rule_type == NotificationRuleType.SESSION_STARTED for r in matching_rules)
         assert all(r.enabled for r in matching_rules)
 
-    @pytest.mark.asyncio
     async def test_update_rule(
         self,
         notification_repository: NotificationRepository,
@@ -659,7 +651,6 @@ class TestNotificationRepository:
         assert updated_rule.message_template == "Updated template: {{ session_id }}"
         assert updated_rule.enabled is False
 
-    @pytest.mark.asyncio
     async def test_delete_rule(
         self,
         notification_repository: NotificationRepository,
@@ -672,7 +663,6 @@ class TestNotificationRepository:
         with pytest.raises(NotificationRuleNotFound):
             await notification_repository.get_rule_by_id(sample_rule_id)
 
-    @pytest.mark.asyncio
     async def test_list_rules(
         self,
         notification_repository: NotificationRepository,
@@ -760,7 +750,6 @@ class TestNotificationRepository:
             r.rule_type == NotificationRuleType.SESSION_STARTED for r in started_result.items
         )
 
-    @pytest.mark.asyncio
     async def test_delete_channel_with_rules(
         self,
         notification_repository: NotificationRepository,
@@ -812,7 +801,6 @@ class TestNotificationRepository:
 
     # Pagination Tests
 
-    @pytest.mark.asyncio
     async def test_list_channels_offset_pagination_first_page(
         self,
         notification_repository: NotificationRepository,
@@ -829,7 +817,6 @@ class TestNotificationRepository:
         assert len(result.items) == 10
         assert result.total_count == 25
 
-    @pytest.mark.asyncio
     async def test_list_channels_offset_pagination_second_page(
         self,
         notification_repository: NotificationRepository,
@@ -846,7 +833,6 @@ class TestNotificationRepository:
         assert len(result.items) == 10
         assert result.total_count == 25
 
-    @pytest.mark.asyncio
     async def test_list_channels_offset_pagination_last_page(
         self,
         notification_repository: NotificationRepository,
@@ -863,7 +849,6 @@ class TestNotificationRepository:
         assert len(result.items) == 5
         assert result.total_count == 25
 
-    @pytest.mark.asyncio
     async def test_list_channels_pagination_limit_exceeds_total(
         self,
         notification_repository: NotificationRepository,
@@ -880,7 +865,6 @@ class TestNotificationRepository:
         assert len(result.items) == 5
         assert result.total_count == 5
 
-    @pytest.mark.asyncio
     async def test_list_channels_pagination_offset_exceeds_total(
         self,
         notification_repository: NotificationRepository,
@@ -897,7 +881,6 @@ class TestNotificationRepository:
         assert len(result.items) == 0
         assert result.total_count == 5
 
-    @pytest.mark.asyncio
     async def test_list_channels_pagination_with_filter_and_order(
         self,
         notification_repository: NotificationRepository,
@@ -918,7 +901,6 @@ class TestNotificationRepository:
         assert result.items[0].name == "Channel 00"
         assert result.items[1].name == "Channel 02"
 
-    @pytest.mark.asyncio
     async def test_list_channels_large_limit(
         self,
         notification_repository: NotificationRepository,

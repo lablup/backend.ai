@@ -132,7 +132,6 @@ def get_graphquery_context(
 
 
 @pytest.mark.dependency()
-@pytest.mark.asyncio
 async def test_create_container_registry(
     client: Client, database_engine: ExtendedAsyncSAEngine, processors: Processors
 ) -> None:
@@ -183,7 +182,6 @@ async def test_create_container_registry(
 
 
 @pytest.mark.dependency(depends=["test_create_container_registry_v2"])
-@pytest.mark.asyncio
 async def test_modify_container_registry(
     client: Client, database_engine: ExtendedAsyncSAEngine, processors: Processors
 ) -> None:
@@ -271,7 +269,6 @@ async def test_modify_container_registry(
 
 
 @pytest.mark.dependency(depends=["test_modify_container_registry"])
-@pytest.mark.asyncio
 async def test_modify_container_registry_allows_empty_string(
     client: Client, database_engine: ExtendedAsyncSAEngine, processors: Processors
 ) -> None:
@@ -338,7 +335,6 @@ async def test_modify_container_registry_allows_empty_string(
 
 
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_empty_string"])
-@pytest.mark.asyncio
 async def test_modify_container_registry_allows_null_for_unset(
     client: Client, database_engine: ExtendedAsyncSAEngine, processors: Processors
 ) -> None:
@@ -405,7 +401,6 @@ async def test_modify_container_registry_allows_null_for_unset(
 
 
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_null_for_unset"])
-@pytest.mark.asyncio
 async def test_delete_container_registry(
     client: Client, database_engine: ExtendedAsyncSAEngine, processors: Processors
 ) -> None:
@@ -479,7 +474,6 @@ async def test_delete_container_registry(
 
 
 @pytest.mark.dependency()
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "extra_fixtures",
     FIXTURES_WITH_NOASSOC + FIXTURES_WITH_ASSOC,
@@ -552,7 +546,6 @@ async def test_associate_container_registry_with_group(
 
 
 @pytest.mark.dependency()
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "extra_fixtures",
     FIXTURES_WITH_ASSOC + FIXTURES_WITH_NOASSOC,

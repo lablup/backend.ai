@@ -230,7 +230,6 @@ class TestGetModelServiceInfo:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_get_model_service_info(
         self,
         scenario: ScenarioBase[GetModelServiceInfoAction, GetModelServiceInfoActionResult],

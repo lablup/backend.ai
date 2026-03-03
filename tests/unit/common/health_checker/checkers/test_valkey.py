@@ -37,7 +37,6 @@ class TestValkeyHealthChecker:
         finally:
             await client.disconnect()
 
-    @pytest.mark.asyncio
     async def test_success(self, valkey_client: ValkeyStandaloneClient) -> None:
         """Test successful health check with real Valkey connection."""
         checker = ValkeyHealthChecker(
@@ -51,7 +50,6 @@ class TestValkeyHealthChecker:
         assert status.is_healthy
         assert status.error_message is None
 
-    @pytest.mark.asyncio
     async def test_timeout_property(
         self,
         valkey_client: ValkeyStandaloneClient,
@@ -65,7 +63,6 @@ class TestValkeyHealthChecker:
 
         assert checker.timeout == timeout_value
 
-    @pytest.mark.asyncio
     async def test_connection_error(self) -> None:
         """Test health check failure with unreachable Valkey server."""
         # Create client pointing to non-existent server
@@ -97,7 +94,6 @@ class TestValkeyHealthChecker:
         finally:
             await client.disconnect()
 
-    @pytest.mark.asyncio
     async def test_multiple_checks(
         self,
         valkey_client: ValkeyStandaloneClient,

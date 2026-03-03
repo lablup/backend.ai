@@ -249,7 +249,6 @@ class TestResourceGroupGQLResourceInfoResolver:
             free=[SlotQuantity("cpu", Decimal("3")), SlotQuantity("mem", Decimal("6442450944"))],
         )
 
-    @pytest.mark.asyncio
     async def test_resolver_calls_processor_with_correct_action(
         self,
         resource_group_gql: ResourceGroupGQL,
@@ -273,7 +272,6 @@ class TestResourceGroupGQLResourceInfoResolver:
         assert action.scaling_group == "test-group"
         assert isinstance(result, ResourceInfoGQL)
 
-    @pytest.mark.asyncio
     async def test_resolver_returns_converted_gql_type(
         self,
         resource_group_gql: ResourceGroupGQL,
@@ -305,7 +303,6 @@ class TestResourceGroupGQLResourceInfoResolver:
         assert free_entries["cpu"] == Decimal("3")
         assert free_entries["mem"] == Decimal("6442450944")
 
-    @pytest.mark.asyncio
     async def test_resolver_propagates_scaling_group_not_found(
         self,
         resource_group_gql: ResourceGroupGQL,

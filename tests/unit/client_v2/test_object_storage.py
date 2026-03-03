@@ -6,7 +6,6 @@ import uuid
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIClient
@@ -73,7 +72,6 @@ _SAMPLE_STORAGE = {
 
 
 class TestListObjectStorages:
-    @pytest.mark.asyncio
     async def test_list_empty(self) -> None:
         resp = _json_response({"storages": []})
         mock_session = _make_request_session(resp)
@@ -88,7 +86,6 @@ class TestListObjectStorages:
         assert "/object-storages/" in url
         assert body is None
 
-    @pytest.mark.asyncio
     async def test_list_with_items(self) -> None:
         resp = _json_response({"storages": [_SAMPLE_STORAGE]})
         mock_session = _make_request_session(resp)
@@ -103,7 +100,6 @@ class TestListObjectStorages:
 
 
 class TestGetBuckets:
-    @pytest.mark.asyncio
     async def test_get_all_buckets(self) -> None:
         storage_id = uuid.uuid4()
         resp = _json_response({"buckets_by_storage": {str(storage_id): ["bucket-a", "bucket-b"]}})
@@ -120,7 +116,6 @@ class TestGetBuckets:
         assert "/object-storages/buckets" in url
         assert body is None
 
-    @pytest.mark.asyncio
     async def test_get_buckets_for_storage(self) -> None:
         storage_id = "storage-123"
         resp = _json_response({"buckets": ["b1", "b2", "b3"]})
@@ -138,7 +133,6 @@ class TestGetBuckets:
 
 
 class TestPresignedURLs:
-    @pytest.mark.asyncio
     async def test_get_presigned_upload_url(self) -> None:
         rev_id = uuid.uuid4()
         resp = _json_response({"presigned_url": "https://s3/upload", "fields": "{}"})
@@ -157,7 +151,6 @@ class TestPresignedURLs:
         assert body["artifact_revision_id"] == str(rev_id)
         assert body["key"] == "model.bin"
 
-    @pytest.mark.asyncio
     async def test_get_presigned_upload_url_with_options(self) -> None:
         rev_id = uuid.uuid4()
         resp = _json_response({"presigned_url": "https://s3/upload", "fields": "{}"})
@@ -180,7 +173,6 @@ class TestPresignedURLs:
         assert body["content_type"] == "application/gzip"
         assert body["expiration"] == 3600
 
-    @pytest.mark.asyncio
     async def test_get_presigned_download_url(self) -> None:
         rev_id = uuid.uuid4()
         resp = _json_response({"presigned_url": "https://s3/download"})
@@ -198,7 +190,6 @@ class TestPresignedURLs:
         assert body is not None
         assert body["artifact_revision_id"] == str(rev_id)
 
-    @pytest.mark.asyncio
     async def test_get_presigned_download_url_with_expiration(self) -> None:
         rev_id = uuid.uuid4()
         resp = _json_response({"presigned_url": "https://s3/download"})

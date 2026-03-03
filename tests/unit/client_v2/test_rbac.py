@@ -6,7 +6,6 @@ import uuid
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIClient
@@ -94,7 +93,6 @@ def _sample_role_dict(role_id: str = _SAMPLE_ROLE_ID) -> dict[str, Any]:
 
 
 class TestRoleCreate:
-    @pytest.mark.asyncio
     async def test_create_role(self) -> None:
         resp = _json_response({"role": _sample_role_dict()})
         mock_session = _make_request_session(resp)
@@ -120,7 +118,6 @@ class TestRoleCreate:
 
 
 class TestRoleSearch:
-    @pytest.mark.asyncio
     async def test_search_roles(self) -> None:
         resp = _json_response({
             "roles": [_sample_role_dict()],
@@ -138,7 +135,6 @@ class TestRoleSearch:
         assert method == "POST"
         assert url.endswith("/admin/rbac/roles/search")
 
-    @pytest.mark.asyncio
     async def test_search_roles_with_filter(self) -> None:
         resp = _json_response({
             "roles": [_sample_role_dict()],
@@ -164,7 +160,6 @@ class TestRoleSearch:
 
 
 class TestRoleGet:
-    @pytest.mark.asyncio
     async def test_get_role(self) -> None:
         role_id = uuid.uuid4()
         resp = _json_response({"role": _sample_role_dict(str(role_id))})
@@ -182,7 +177,6 @@ class TestRoleGet:
 
 
 class TestRoleUpdate:
-    @pytest.mark.asyncio
     async def test_update_role(self) -> None:
         role_id = uuid.uuid4()
         updated = _sample_role_dict(str(role_id))
@@ -203,7 +197,6 @@ class TestRoleUpdate:
 
 
 class TestRoleDelete:
-    @pytest.mark.asyncio
     async def test_delete_role(self) -> None:
         role_id = uuid.uuid4()
         resp = _json_response({"deleted": True})
@@ -222,7 +215,6 @@ class TestRoleDelete:
 
 
 class TestRolePurge:
-    @pytest.mark.asyncio
     async def test_purge_role(self) -> None:
         role_id = uuid.uuid4()
         resp = _json_response({"deleted": True})
@@ -241,7 +233,6 @@ class TestRolePurge:
 
 
 class TestRoleAssign:
-    @pytest.mark.asyncio
     async def test_assign_role(self) -> None:
         role_id = uuid.uuid4()
         user_id = uuid.uuid4()
@@ -267,7 +258,6 @@ class TestRoleAssign:
 
 
 class TestRoleRevoke:
-    @pytest.mark.asyncio
     async def test_revoke_role(self) -> None:
         role_id = uuid.uuid4()
         user_id = uuid.uuid4()
@@ -290,7 +280,6 @@ class TestRoleRevoke:
 
 
 class TestSearchAssignedUsers:
-    @pytest.mark.asyncio
     async def test_search_assigned_users(self) -> None:
         role_id = uuid.uuid4()
         user_id = uuid.uuid4()
@@ -318,7 +307,6 @@ class TestSearchAssignedUsers:
 
 
 class TestScopeTypes:
-    @pytest.mark.asyncio
     async def test_get_scope_types(self) -> None:
         resp = _json_response({"items": ["domain", "project", "user"]})
         mock_session = _make_request_session(resp)
@@ -335,7 +323,6 @@ class TestScopeTypes:
 
 
 class TestSearchScopes:
-    @pytest.mark.asyncio
     async def test_search_scopes(self) -> None:
         resp = _json_response({
             "items": [
@@ -360,7 +347,6 @@ class TestSearchScopes:
 
 
 class TestEntityTypes:
-    @pytest.mark.asyncio
     async def test_get_entity_types(self) -> None:
         resp = _json_response({"items": ["user", "project"]})
         mock_session = _make_request_session(resp)
@@ -377,7 +363,6 @@ class TestEntityTypes:
 
 
 class TestSearchEntities:
-    @pytest.mark.asyncio
     async def test_search_entities(self) -> None:
         resp = _json_response({
             "items": [

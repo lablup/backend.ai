@@ -80,7 +80,6 @@ class TestHuggingFaceClient:
         assert client._endpoint is None
         assert client._api is not None
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_models")
     async def test_scan_models_success(
         self,
@@ -106,7 +105,6 @@ class TestHuggingFaceClient:
             expand=["gated"],
         )
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_models")
     async def test_scan_models_api_error(
         self, mock_list_models: MagicMock, hf_client: HuggingFaceClient
@@ -117,7 +115,6 @@ class TestHuggingFaceClient:
         with pytest.raises(HuggingFaceAPIError):
             await hf_client.scan_models(limit=10, sort=ModelSortKey.DOWNLOADS)
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
     async def test_scan_model_success(
         self,
@@ -136,7 +133,6 @@ class TestHuggingFaceClient:
             "microsoft/DialoGPT-medium", revision="main", token="test_token"
         )
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
     async def test_scan_model_not_found(
         self, mock_model_info: MagicMock, hf_client: HuggingFaceClient
@@ -147,7 +143,6 @@ class TestHuggingFaceClient:
         with pytest.raises(HuggingFaceAPIError):
             await hf_client.scan_model(ModelTarget(model_id="nonexistent/model"))
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
     async def test_scan_model_api_error(
         self, mock_model_info: MagicMock, hf_client: HuggingFaceClient
@@ -158,7 +153,6 @@ class TestHuggingFaceClient:
         with pytest.raises(HuggingFaceAPIError):
             await hf_client.scan_model(ModelTarget(model_id="microsoft/DialoGPT-medium"))
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_repo_files")
     async def test_list_model_filepaths_success(
         self, mock_list_repo_files: MagicMock, hf_client: HuggingFaceClient
@@ -178,7 +172,6 @@ class TestHuggingFaceClient:
             "microsoft/DialoGPT-medium", revision="main", token="test_token"
         )
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_repo_files")
     async def test_list_model_filepaths_error(
         self, mock_list_repo_files: MagicMock, hf_client: HuggingFaceClient
@@ -189,7 +182,6 @@ class TestHuggingFaceClient:
         with pytest.raises(HuggingFaceAPIError):
             await hf_client.list_model_filepaths(ModelTarget(model_id="microsoft/DialoGPT-medium"))
 
-    @pytest.mark.asyncio
     async def test_list_model_files_info_success(
         self, hf_client: HuggingFaceClient, mock_repo_file: MagicMock, mock_repo_folder: MagicMock
     ) -> None:
@@ -211,7 +203,6 @@ class TestHuggingFaceClient:
                 repo_type="model",
             )
 
-    @pytest.mark.asyncio
     async def test_list_model_files_info_error(self, hf_client: HuggingFaceClient) -> None:
         """Test file info listing with error."""
         with patch.object(hf_client._api, "get_paths_info") as mock_get_paths_info:
@@ -263,7 +254,6 @@ class TestHuggingFaceScanner:
         scanner = HuggingFaceScanner(hf_client)
         assert scanner._client == hf_client
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_models")
     async def test_scan_models_success(
         self,
@@ -293,7 +283,6 @@ class TestHuggingFaceScanner:
             expand=["gated"],
         )
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_models")
     async def test_scan_models_with_error_model(
         self, mock_list_models: MagicMock, hf_scanner: HuggingFaceScanner
@@ -318,7 +307,6 @@ class TestHuggingFaceScanner:
         assert len(model_infos) == 1
         assert model_infos[0].id == "microsoft/DialoGPT-medium"
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_models")
     async def test_scan_models_api_error(
         self, mock_list_models: MagicMock, hf_scanner: HuggingFaceScanner
@@ -329,7 +317,6 @@ class TestHuggingFaceScanner:
         with pytest.raises(HuggingFaceAPIError):
             await hf_scanner.scan_models(limit=10, sort=ModelSortKey.DOWNLOADS)
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
     async def test_scan_model_success(
         self,
@@ -351,7 +338,6 @@ class TestHuggingFaceScanner:
             "microsoft/DialoGPT-medium", revision="main", token="test_token"
         )
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
     async def test_scan_model_not_found(
         self, mock_model_info: MagicMock, hf_scanner: HuggingFaceScanner
@@ -362,7 +348,6 @@ class TestHuggingFaceScanner:
         with pytest.raises(HuggingFaceAPIError):
             await hf_scanner.scan_model(ModelTarget(model_id="nonexistent/model"))
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
     async def test_scan_model_api_error(
         self, mock_model_info: MagicMock, hf_scanner: HuggingFaceScanner
@@ -395,7 +380,6 @@ class TestHuggingFaceScanner:
             repo_type="model",
         )
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.hf_hub_url")
     @patch("ai.backend.storage.client.huggingface.list_repo_files")
     async def test_list_model_files_info_success(
@@ -444,7 +428,6 @@ class TestHuggingFaceScanner:
                 == "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/tokenizer"
             )
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.hf_hub_url")
     @patch("ai.backend.storage.client.huggingface.list_repo_files")
     async def test_list_model_files_info_with_error_files(
@@ -479,7 +462,6 @@ class TestHuggingFaceScanner:
             assert len(file_infos) == 1
             assert file_infos[0].path == "config.json"
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_repo_files")
     async def test_list_model_files_info_api_error(
         self, mock_list_repo_files: MagicMock, hf_scanner: HuggingFaceScanner

@@ -1,8 +1,6 @@
 import json
 from typing import Any
 
-import pytest
-
 import ai.backend.manager.api.ratelimit as rlim
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.ratelimit.registry import register_ratelimit_routes
@@ -22,7 +20,6 @@ from ai.backend.manager.server import (
 )
 
 
-@pytest.mark.asyncio
 async def test_check_rlim_for_anonymous_query(
     etcd_fixture: None,
     mock_etcd_ctx: Any,
@@ -56,7 +53,6 @@ async def test_check_rlim_for_anonymous_query(
     assert str(rlim._rlim_window) == ret.headers["X-RateLimit-Window"]
 
 
-@pytest.mark.asyncio
 async def test_check_rlim_for_authorized_query(
     etcd_fixture: None,
     mock_etcd_ctx: Any,

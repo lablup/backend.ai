@@ -13,7 +13,6 @@ from ai.backend.manager.dependencies.processing.event_dispatcher import (
 class TestEventDispatcherDependency:
     """Test EventDispatcherDependency lifecycle."""
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.processing.event_dispatcher.EventDispatcher")
     async def test_provide_event_dispatcher(
         self,
@@ -44,7 +43,6 @@ class TestEventDispatcherDependency:
 
         mock_dispatcher.close.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.processing.event_dispatcher.EventDispatcher")
     async def test_provide_event_dispatcher_none_observer(
         self,
@@ -72,7 +70,6 @@ class TestEventDispatcherDependency:
 
         mock_dispatcher.close.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.processing.event_dispatcher.EventDispatcher")
     async def test_cleanup_on_exception(
         self,

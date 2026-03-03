@@ -145,7 +145,6 @@ async def background_task_manager(
 
 
 @pytest.mark.timeout(60)
-@pytest.mark.asyncio
 async def test_background_task(
     background_task_manager: BackgroundTaskManager,
     event_dispatcher: EventDispatcher,
@@ -221,7 +220,6 @@ async def test_background_task(
 
 
 @pytest.mark.timeout(60)
-@pytest.mark.asyncio
 async def test_background_task_fail(
     background_task_manager: BackgroundTaskManager, event_dispatcher: EventDispatcher
 ) -> None:

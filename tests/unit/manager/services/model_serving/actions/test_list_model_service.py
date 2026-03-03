@@ -238,7 +238,6 @@ class TestListModelService:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_list_model_service(
         self,
         scenario: ScenarioBase[ListModelServiceAction, ListModelServiceActionResult],

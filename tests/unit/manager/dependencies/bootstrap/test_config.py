@@ -3,8 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.dependencies.bootstrap.config import (
     BootstrapConfigDependency,
@@ -18,7 +16,6 @@ class TestBootstrapConfigDependency:
     Test BootstrapConfigDependency lifecycle.
     """
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.config.bootstrap.BootstrapConfig.load_from_file")
     async def test_provide_config(self, mock_load_from_file: AsyncMock) -> None:
         """

@@ -6,7 +6,6 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIClient
@@ -98,7 +97,6 @@ def _last_request_call(mock_session: MagicMock) -> tuple[str, str, dict[str, Any
 
 
 class TestSessionCreation:
-    @pytest.mark.asyncio
     async def test_create_from_params(self) -> None:
         resp = _json_response({"result": {"session_id": "abc"}})
         mock_session = _make_request_session(resp)
@@ -115,7 +113,6 @@ class TestSessionCreation:
         assert body is not None
         assert body["session_name"] == "my-sess"
 
-    @pytest.mark.asyncio
     async def test_create_from_template(self) -> None:
         template_id = uuid4()
         resp = _json_response({"result": {"session_id": "xyz"}})
@@ -129,7 +126,6 @@ class TestSessionCreation:
         assert method == "POST"
         assert url.endswith("/session/_/create-from-template")
 
-    @pytest.mark.asyncio
     async def test_create_cluster(self) -> None:
         template_id = uuid4()
         resp = _json_response({"result": {"session_id": "cls"}})
@@ -152,7 +148,6 @@ class TestSessionCreation:
 
 
 class TestSessionLifecycle:
-    @pytest.mark.asyncio
     async def test_get_info(self) -> None:
         resp = _json_response({"status": "RUNNING", "domainName": "default"})
         mock_session = _make_request_session(resp)
@@ -166,7 +161,6 @@ class TestSessionLifecycle:
         assert method == "GET"
         assert "/session/my-sess" in url
 
-    @pytest.mark.asyncio
     async def test_get_info_with_owner_access_key(self) -> None:
         resp = _json_response({"status": "RUNNING"})
         mock_session = _make_request_session(resp)
@@ -178,7 +172,6 @@ class TestSessionLifecycle:
         call_kwargs = mock_session.request.call_args.kwargs
         assert call_kwargs["params"] == {"owner_access_key": "AKID1234"}
 
-    @pytest.mark.asyncio
     async def test_destroy(self) -> None:
         resp = _json_response({"result": {"status": "TERMINATED"}})
         mock_session = _make_request_session(resp)
@@ -193,7 +186,6 @@ class TestSessionLifecycle:
         assert body is not None
         assert body["forced"] is True
 
-    @pytest.mark.asyncio
     async def test_restart(self) -> None:
         resp = _no_content_response()
         mock_session = _make_request_session(resp)
@@ -205,7 +197,6 @@ class TestSessionLifecycle:
         assert method == "PATCH"
         assert "/session/my-sess" in url
 
-    @pytest.mark.asyncio
     async def test_rename(self) -> None:
         resp = _no_content_response()
         mock_session = _make_request_session(resp)
@@ -219,7 +210,6 @@ class TestSessionLifecycle:
         assert body is not None
         assert body["session_name"] == "new-name"
 
-    @pytest.mark.asyncio
     async def test_interrupt(self) -> None:
         resp = _no_content_response()
         mock_session = _make_request_session(resp)
@@ -231,7 +221,6 @@ class TestSessionLifecycle:
         assert method == "POST"
         assert "/session/my-sess/interrupt" in url
 
-    @pytest.mark.asyncio
     async def test_match_sessions(self) -> None:
         resp = _json_response({"matches": [{"id": "s1"}, {"id": "s2"}]})
         mock_session = _make_request_session(resp)
@@ -252,7 +241,6 @@ class TestSessionLifecycle:
 
 
 class TestCodeExecution:
-    @pytest.mark.asyncio
     async def test_execute(self) -> None:
         resp = _json_response({"result": {"status": "finished", "console": []}})
         mock_session = _make_request_session(resp)
@@ -267,7 +255,6 @@ class TestCodeExecution:
         assert body is not None
         assert body["code"] == "print(1)"
 
-    @pytest.mark.asyncio
     async def test_complete(self) -> None:
         resp = _json_response({"result": {"candidates": ["print"]}})
         mock_session = _make_request_session(resp)
@@ -287,7 +274,6 @@ class TestCodeExecution:
 
 
 class TestServices:
-    @pytest.mark.asyncio
     async def test_start_service(self) -> None:
         resp = _json_response({"token": "tok-123", "wsproxy_addr": "ws://proxy:5050"})
         mock_session = _make_request_session(resp)
@@ -301,7 +287,6 @@ class TestServices:
         assert method == "POST"
         assert "/session/my-sess/start-service" in url
 
-    @pytest.mark.asyncio
     async def test_shutdown_service(self) -> None:
         resp = _no_content_response()
         mock_session = _make_request_session(resp)
@@ -322,7 +307,6 @@ class TestServices:
 
 
 class TestCommitAndImage:
-    @pytest.mark.asyncio
     async def test_commit(self) -> None:
         resp = _json_response({"result": {"task_id": "t-1"}})
         mock_session = _make_request_session(resp)
@@ -335,7 +319,6 @@ class TestCommitAndImage:
         assert method == "POST"
         assert "/session/my-sess/commit" in url
 
-    @pytest.mark.asyncio
     async def test_get_commit_status(self) -> None:
         resp = _json_response({"result": {"status": "ongoing"}})
         mock_session = _make_request_session(resp)
@@ -348,7 +331,6 @@ class TestCommitAndImage:
         assert method == "GET"
         assert "/session/my-sess/commit" in url
 
-    @pytest.mark.asyncio
     async def test_convert_to_image(self) -> None:
         resp = _json_response({"task_id": "task-abc"})
         mock_session = _make_request_session(resp)
@@ -372,7 +354,6 @@ class TestCommitAndImage:
 
 
 class TestFilesAndLogs:
-    @pytest.mark.asyncio
     async def test_list_files(self) -> None:
         resp = _json_response({"result": {"files": []}})
         mock_session = _make_request_session(resp)
@@ -385,7 +366,6 @@ class TestFilesAndLogs:
         assert method == "GET"
         assert "/session/my-sess/files" in url
 
-    @pytest.mark.asyncio
     async def test_get_container_logs(self) -> None:
         resp = _json_response({"result": {"logs": "hello\n"}})
         mock_session = _make_request_session(resp)
@@ -398,7 +378,6 @@ class TestFilesAndLogs:
         assert method == "GET"
         assert "/session/my-sess/logs" in url
 
-    @pytest.mark.asyncio
     async def test_get_status_history(self) -> None:
         resp = _json_response({"result": {"history": []}})
         mock_session = _make_request_session(resp)
@@ -418,7 +397,6 @@ class TestFilesAndLogs:
 
 
 class TestMatchingAndAdmin:
-    @pytest.mark.asyncio
     async def test_sync_agent_registry(self) -> None:
         resp = _json_response({"synced": True})
         mock_session = _make_request_session(resp)
@@ -434,7 +412,6 @@ class TestMatchingAndAdmin:
         assert body is not None
         assert body["agent"] == "agent-001"
 
-    @pytest.mark.asyncio
     async def test_transit_session_status(self) -> None:
         sid = uuid4()
         resp = _json_response({"session_status_map": {str(sid): "RUNNING"}})
@@ -455,7 +432,6 @@ class TestMatchingAndAdmin:
 
 
 class TestOtherEndpoints:
-    @pytest.mark.asyncio
     async def test_get_direct_access_info(self) -> None:
         resp = _json_response({"result": {"host": "10.0.0.1"}})
         mock_session = _make_request_session(resp)
@@ -468,7 +444,6 @@ class TestOtherEndpoints:
         assert method == "GET"
         assert "/session/my-sess/direct-access-info" in url
 
-    @pytest.mark.asyncio
     async def test_get_dependency_graph(self) -> None:
         resp = _json_response({"result": {"nodes": [], "edges": []}})
         mock_session = _make_request_session(resp)
@@ -481,7 +456,6 @@ class TestOtherEndpoints:
         assert method == "GET"
         assert "/session/my-sess/dependency-graph" in url
 
-    @pytest.mark.asyncio
     async def test_get_abusing_report(self) -> None:
         resp = _json_response({"result": {"abuse_count": 0}})
         mock_session = _make_request_session(resp)
@@ -501,7 +475,6 @@ class TestOtherEndpoints:
 
 
 class TestBinaryOperations:
-    @pytest.mark.asyncio
     async def test_upload_files(self, tmp_path: Any) -> None:
         test_file = tmp_path / "hello.txt"
         test_file.write_bytes(b"hello world")
@@ -518,7 +491,6 @@ class TestBinaryOperations:
         call_args = mock_upload.call_args
         assert "/session/my-sess/upload" in call_args.args[0]
 
-    @pytest.mark.asyncio
     async def test_download_files(self) -> None:
         mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
         sc = SessionClient(mock_client)
@@ -535,7 +507,6 @@ class TestBinaryOperations:
         assert "/session/my-sess/download" in call_args.args[0]
         assert call_args.kwargs["json"]["files"] == ["a.txt", "b.txt"]
 
-    @pytest.mark.asyncio
     async def test_download_single(self) -> None:
         mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())
         sc = SessionClient(mock_client)
@@ -550,7 +521,6 @@ class TestBinaryOperations:
         assert "/session/my-sess/download_single" in call_args.args[0]
         assert call_args.kwargs["json"]["file"] == "data.csv"
 
-    @pytest.mark.asyncio
     async def test_get_task_logs(self) -> None:
         kernel_id = uuid4()
         mock_client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())

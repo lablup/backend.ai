@@ -29,7 +29,6 @@ from ai.backend.common.dto.manager.query import StringFilter
 class TestSearchAgents:
     """Tests for ``AgentClient.search_agents``."""
 
-    @pytest.mark.asyncio
     async def test_admin_searches_agents(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -44,7 +43,6 @@ class TestSearchAgents:
         assert agent_fixture in agent_ids
         assert result.pagination.total >= 1
 
-    @pytest.mark.asyncio
     async def test_admin_searches_agents_with_status_filter_alive(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -62,7 +60,6 @@ class TestSearchAgents:
         agent_ids = [item.id for item in result.items]
         assert agent_fixture in agent_ids
 
-    @pytest.mark.asyncio
     async def test_admin_searches_agents_with_status_filter_terminated(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -80,7 +77,6 @@ class TestSearchAgents:
         agent_ids = [item.id for item in result.items]
         assert agent_fixture not in agent_ids
 
-    @pytest.mark.asyncio
     async def test_admin_searches_agents_with_resource_group_filter(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -101,7 +97,6 @@ class TestSearchAgents:
         for item in result.items:
             assert item.resource_group == scaling_group_fixture
 
-    @pytest.mark.asyncio
     async def test_admin_searches_agents_with_ordering(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -122,7 +117,6 @@ class TestSearchAgents:
         ids = [item.id for item in result.items]
         assert ids == sorted(ids)
 
-    @pytest.mark.asyncio
     async def test_admin_searches_agents_with_pagination(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -138,7 +132,6 @@ class TestSearchAgents:
         assert result.pagination.offset == 0
         assert result.pagination.limit == 1
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_search_agents(
         self,
         user_registry: BackendAIClientRegistry,

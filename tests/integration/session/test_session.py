@@ -21,7 +21,6 @@ from .conftest import SessionSeedData
 
 @pytest.mark.integration
 class TestSessionLifecycle:
-    @pytest.mark.asyncio
     async def test_session_read_and_update_lifecycle(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -71,7 +70,6 @@ class TestSessionLifecycle:
 
 @pytest.mark.integration
 class TestSessionPermissions:
-    @pytest.mark.asyncio
     async def test_regular_user_denied_admin_session_operations(
         self,
         admin_registry: BackendAIClientRegistry,

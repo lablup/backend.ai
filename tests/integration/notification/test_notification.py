@@ -30,7 +30,6 @@ RuleFactory = Callable[..., Coroutine[Any, Any, CreateNotificationRuleResponse]]
 
 @pytest.mark.integration
 class TestChannelLifecycle:
-    @pytest.mark.asyncio
     async def test_channel_crud_lifecycle(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -71,7 +70,6 @@ class TestChannelLifecycle:
 
 @pytest.mark.integration
 class TestRuleLifecycle:
-    @pytest.mark.asyncio
     async def test_rule_crud_lifecycle(
         self,
         admin_registry: BackendAIClientRegistry,

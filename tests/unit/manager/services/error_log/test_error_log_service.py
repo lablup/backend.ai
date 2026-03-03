@@ -61,7 +61,6 @@ class TestErrorLogService:
             ),
         )
 
-    @pytest.mark.asyncio
     async def test_create_error_log(
         self,
         error_log_service: ErrorLogService,
@@ -97,7 +96,6 @@ class TestErrorLogService:
     # Tests - Search
     # =========================================================================
 
-    @pytest.mark.asyncio
     async def test_search_error_logs(
         self,
         error_log_service: ErrorLogService,
@@ -128,7 +126,6 @@ class TestErrorLogService:
         assert result.has_previous_page is False
         mock_repository.search.assert_called_once_with(querier)
 
-    @pytest.mark.asyncio
     async def test_search_error_logs_empty_result(
         self,
         error_log_service: ErrorLogService,
@@ -155,7 +152,6 @@ class TestErrorLogService:
         assert result.data == []
         assert result.total_count == 0
 
-    @pytest.mark.asyncio
     async def test_search_error_logs_with_pagination(
         self,
         error_log_service: ErrorLogService,

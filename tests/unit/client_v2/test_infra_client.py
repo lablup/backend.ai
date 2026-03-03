@@ -1,6 +1,5 @@
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIClient
@@ -67,7 +66,6 @@ def _ok_response(data: object) -> AsyncMock:
 
 
 class TestInfraClientEtcdConfig:
-    @pytest.mark.asyncio
     async def test_get_resource_slots(self) -> None:
         raw_data = {"cpu": "count", "mem": "bytes", "cuda.device": "count"}
         mock_resp = _ok_response(raw_data)
@@ -84,7 +82,6 @@ class TestInfraClientEtcdConfig:
         assert call_args[0][0] == "GET"
         assert "/config/resource-slots" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_get_resource_metadata(self) -> None:
         raw_data = {
             "cpu": {
@@ -111,7 +108,6 @@ class TestInfraClientEtcdConfig:
         call_args = mock_session.request.call_args
         assert call_args.kwargs["params"] == {"sgroup": "default"}
 
-    @pytest.mark.asyncio
     async def test_get_resource_metadata_no_filter(self) -> None:
         mock_resp = _ok_response({
             "cpu": {
@@ -133,7 +129,6 @@ class TestInfraClientEtcdConfig:
         call_args = mock_session.request.call_args
         assert call_args.kwargs["params"] is None
 
-    @pytest.mark.asyncio
     async def test_get_vfolder_types(self) -> None:
         raw_data = ["user", "group"]
         mock_resp = _ok_response(raw_data)
@@ -147,7 +142,6 @@ class TestInfraClientEtcdConfig:
         assert result.root == ["user", "group"]
         assert result.model_dump() == raw_data
 
-    @pytest.mark.asyncio
     async def test_get_config(self) -> None:
         mock_resp = _ok_response({"result": "some_value"})
         mock_session = _make_request_session(mock_resp)
@@ -163,7 +157,6 @@ class TestInfraClientEtcdConfig:
         assert call_args[0][0] == "POST"
         assert "/config/get" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_set_config(self) -> None:
         mock_resp = _ok_response({"result": "ok"})
         mock_session = _make_request_session(mock_resp)
@@ -176,7 +169,6 @@ class TestInfraClientEtcdConfig:
         assert isinstance(result, SetConfigResponse)
         assert result.result == "ok"
 
-    @pytest.mark.asyncio
     async def test_delete_config(self) -> None:
         mock_resp = _ok_response({"result": "ok"})
         mock_session = _make_request_session(mock_resp)
@@ -191,7 +183,6 @@ class TestInfraClientEtcdConfig:
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "POST"
 
-    @pytest.mark.asyncio
     async def test_get_container_registries(self) -> None:
         raw_data = {"cr.example.com": {"username": "user", "project": ["proj"]}}
         mock_resp = _ok_response(raw_data)
@@ -207,7 +198,6 @@ class TestInfraClientEtcdConfig:
 
 
 class TestInfraClientScalingGroups:
-    @pytest.mark.asyncio
     async def test_list_scaling_groups(self) -> None:
         mock_resp = _ok_response({"scaling_groups": [{"name": "default"}, {"name": "gpu-cluster"}]})
         mock_session = _make_request_session(mock_resp)
@@ -221,7 +211,6 @@ class TestInfraClientScalingGroups:
         assert len(result.scaling_groups) == 2
         assert result.scaling_groups[0].name == "default"
 
-    @pytest.mark.asyncio
     async def test_get_wsproxy_version(self) -> None:
         mock_resp = _ok_response({"wsproxy_version": 2})
         mock_session = _make_request_session(mock_resp)
@@ -235,7 +224,6 @@ class TestInfraClientScalingGroups:
         call_args = mock_session.request.call_args
         assert "/scaling-groups/default/wsproxy-version" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_get_wsproxy_version_with_request(self) -> None:
         mock_resp = _ok_response({"wsproxy_version": 3})
         mock_session = _make_request_session(mock_resp)
@@ -252,7 +240,6 @@ class TestInfraClientScalingGroups:
 
 
 class TestInfraClientResources:
-    @pytest.mark.asyncio
     async def test_list_presets(self) -> None:
         mock_resp = _ok_response({
             "presets": [{"name": "small", "resource_slots": {"cpu": "1", "mem": "1g"}}]
@@ -266,7 +253,6 @@ class TestInfraClientResources:
         assert isinstance(result, ListPresetsResponse)
         assert len(result.presets) == 1
 
-    @pytest.mark.asyncio
     async def test_list_presets_with_scaling_group(self) -> None:
         mock_resp = _ok_response({"presets": []})
         mock_session = _make_request_session(mock_resp)
@@ -280,7 +266,6 @@ class TestInfraClientResources:
         call_args = mock_session.request.call_args
         assert call_args.kwargs["params"] == {"scaling_group": "default"}
 
-    @pytest.mark.asyncio
     async def test_check_presets(self) -> None:
         mock_resp = _ok_response({
             "presets": [],
@@ -304,7 +289,6 @@ class TestInfraClientResources:
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "POST"
 
-    @pytest.mark.asyncio
     async def test_recalculate_usage(self) -> None:
         mock_resp = _ok_response({})
         mock_session = _make_request_session(mock_resp)
@@ -320,7 +304,6 @@ class TestInfraClientResources:
 
 
 class TestInfraClientUsageStats:
-    @pytest.mark.asyncio
     async def test_get_usage_per_month(self) -> None:
         raw_data = [{"session_id": "abc", "cpu": 2}]
         mock_resp = _ok_response(raw_data)
@@ -338,7 +321,6 @@ class TestInfraClientUsageStats:
         assert call_args[0][0] == "GET"
         assert call_args.kwargs["json"]["month"] == "202506"
 
-    @pytest.mark.asyncio
     async def test_get_usage_per_period(self) -> None:
         raw_data = [{"session_id": "def", "cpu": 4}]
         mock_resp = _ok_response(raw_data)
@@ -353,7 +335,6 @@ class TestInfraClientUsageStats:
         assert len(result.root) == 1
         assert result.model_dump() == raw_data
 
-    @pytest.mark.asyncio
     async def test_get_user_month_stats(self) -> None:
         raw_data = [{"count": 10, "timestamp": "2025-06-01"}]
         mock_resp = _ok_response(raw_data)
@@ -369,7 +350,6 @@ class TestInfraClientUsageStats:
         call_args = mock_session.request.call_args
         assert "/resource/stats/user/month" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_get_admin_month_stats(self) -> None:
         raw_data = [{"count": 100, "timestamp": "2025-06-01"}]
         mock_resp = _ok_response(raw_data)
@@ -386,7 +366,6 @@ class TestInfraClientUsageStats:
 
 
 class TestInfraClientWatcher:
-    @pytest.mark.asyncio
     async def test_get_watcher_status(self) -> None:
         raw_data = {"status": "running", "version": "1.0"}
         mock_resp = _ok_response(raw_data)
@@ -404,7 +383,6 @@ class TestInfraClientWatcher:
         assert call_args[0][0] == "GET"
         assert call_args.kwargs["json"]["agent_id"] == "agent-001"
 
-    @pytest.mark.asyncio
     async def test_start_watcher_agent(self) -> None:
         raw_data = {"status": "started"}
         mock_resp = _ok_response(raw_data)
@@ -422,7 +400,6 @@ class TestInfraClientWatcher:
         assert call_args[0][0] == "POST"
         assert "/resource/watcher/agent/start" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_stop_watcher_agent(self) -> None:
         raw_data = {"status": "stopped"}
         mock_resp = _ok_response(raw_data)
@@ -439,7 +416,6 @@ class TestInfraClientWatcher:
         call_args = mock_session.request.call_args
         assert "/resource/watcher/agent/stop" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_restart_watcher_agent(self) -> None:
         raw_data = {"status": "restarted"}
         mock_resp = _ok_response(raw_data)

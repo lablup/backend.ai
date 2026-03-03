@@ -68,7 +68,6 @@ def service(mock_repository: MagicMock) -> FairShareService:
 
 
 class TestGetDomainFairShare:
-    @pytest.mark.asyncio
     async def test_get_domain_fair_share_calls_repository(
         self,
         service: FairShareService,
@@ -91,7 +90,6 @@ class TestGetDomainFairShare:
         )
         assert result.data == expected_data
 
-    @pytest.mark.asyncio
     async def test_get_domain_fair_share_returns_default_when_not_found_but_exists(
         self,
         service: FairShareService,
@@ -141,7 +139,6 @@ class TestGetDomainFairShare:
         assert result.data.data.spec.weight == Decimal("2.0")  # Repository sets default_weight
         assert result.data.data.use_default is True
 
-    @pytest.mark.asyncio
     async def test_get_domain_fair_share_raises_entity_not_found_when_entity_missing(
         self,
         service: FairShareService,
@@ -161,7 +158,6 @@ class TestGetDomainFairShare:
         with pytest.raises(DomainNotFound):
             await service.get_domain_fair_share(action)
 
-    @pytest.mark.asyncio
     async def test_get_domain_fair_share_uses_scaling_group_spec_for_default(
         self,
         service: FairShareService,
@@ -226,7 +222,6 @@ class TestGetDomainFairShare:
 
 
 class TestSearchDomainFairShares:
-    @pytest.mark.asyncio
     async def test_search_domain_fair_shares_returns_result(
         self,
         service: FairShareService,
@@ -254,7 +249,6 @@ class TestSearchDomainFairShares:
         assert result.items == [mock_fair_share]
         assert result.total_count == 1
 
-    @pytest.mark.asyncio
     async def test_search_domain_fair_shares_passes_querier(
         self,
         service: FairShareService,
@@ -290,7 +284,6 @@ class TestSearchDomainFairShares:
 
 
 class TestGetProjectFairShare:
-    @pytest.mark.asyncio
     async def test_get_project_fair_share_calls_repository(
         self,
         service: FairShareService,
@@ -314,7 +307,6 @@ class TestGetProjectFairShare:
         )
         assert result.data == expected_data
 
-    @pytest.mark.asyncio
     async def test_get_project_fair_share_returns_default_when_not_found_but_exists(
         self,
         service: FairShareService,
@@ -367,7 +359,6 @@ class TestGetProjectFairShare:
         assert result.data.data.use_default is True
         assert result.data.domain_name == "test-domain"
 
-    @pytest.mark.asyncio
     async def test_get_project_fair_share_raises_entity_not_found_when_entity_missing(
         self,
         service: FairShareService,
@@ -388,7 +379,6 @@ class TestGetProjectFairShare:
         with pytest.raises(ProjectNotFound):
             await service.get_project_fair_share(action)
 
-    @pytest.mark.asyncio
     async def test_get_project_fair_share_uses_scaling_group_spec_for_default(
         self,
         service: FairShareService,
@@ -455,7 +445,6 @@ class TestGetProjectFairShare:
 
 
 class TestSearchProjectFairShares:
-    @pytest.mark.asyncio
     async def test_search_project_fair_shares_returns_result(
         self,
         service: FairShareService,
@@ -483,7 +472,6 @@ class TestSearchProjectFairShares:
         assert result.items == [mock_fair_share]
         assert result.total_count == 1
 
-    @pytest.mark.asyncio
     async def test_search_project_fair_shares_passes_querier(
         self,
         service: FairShareService,
@@ -519,7 +507,6 @@ class TestSearchProjectFairShares:
 
 
 class TestGetUserFairShare:
-    @pytest.mark.asyncio
     async def test_get_user_fair_share_calls_repository(
         self,
         service: FairShareService,
@@ -546,7 +533,6 @@ class TestGetUserFairShare:
         )
         assert result.data == expected_data
 
-    @pytest.mark.asyncio
     async def test_get_user_fair_share_returns_default_when_not_found_but_exists(
         self,
         service: FairShareService,
@@ -604,7 +590,6 @@ class TestGetUserFairShare:
         assert result.data.domain_name == "test-domain"
         assert result.data.scheduling_rank is None
 
-    @pytest.mark.asyncio
     async def test_get_user_fair_share_raises_entity_not_found_when_entity_missing(
         self,
         service: FairShareService,
@@ -627,7 +612,6 @@ class TestGetUserFairShare:
         with pytest.raises(UserNotFound):
             await service.get_user_fair_share(action)
 
-    @pytest.mark.asyncio
     async def test_get_user_fair_share_uses_scaling_group_spec_for_default(
         self,
         service: FairShareService,
@@ -698,7 +682,6 @@ class TestGetUserFairShare:
 
 
 class TestSearchUserFairShares:
-    @pytest.mark.asyncio
     async def test_search_user_fair_shares_returns_result(
         self,
         service: FairShareService,
@@ -726,7 +709,6 @@ class TestSearchUserFairShares:
         assert result.items == [mock_fair_share]
         assert result.total_count == 1
 
-    @pytest.mark.asyncio
     async def test_search_user_fair_shares_passes_querier(
         self,
         service: FairShareService,
@@ -762,7 +744,6 @@ class TestSearchUserFairShares:
 
 
 class TestSearchDomainFairShareEntities:
-    @pytest.mark.asyncio
     async def test_includes_entities_with_and_without_records(
         self,
         service: FairShareService,
@@ -834,7 +815,6 @@ class TestSearchDomainFairShareEntities:
         # One with default (use_default=True)
         assert any(item.data.use_default is True for item in result.items)
 
-    @pytest.mark.asyncio
     async def test_default_uses_scaling_group_default_weight(
         self,
         service: FairShareService,
@@ -882,7 +862,6 @@ class TestSearchDomainFairShareEntities:
         assert default.data.spec.weight == Decimal("1.0")
         assert default.data.use_default is True
 
-    @pytest.mark.asyncio
     async def test_default_matches_scaling_group_spec(
         self,
         service: FairShareService,
@@ -946,7 +925,6 @@ class TestSearchDomainFairShareEntities:
 
 
 class TestSearchProjectFairShareEntities:
-    @pytest.mark.asyncio
     async def test_includes_entities_with_and_without_records(
         self,
         service: FairShareService,
@@ -1021,7 +999,6 @@ class TestSearchProjectFairShareEntities:
 
 
 class TestSearchUserFairShareEntities:
-    @pytest.mark.asyncio
     async def test_includes_entities_with_and_without_records(
         self,
         service: FairShareService,
@@ -1110,7 +1087,6 @@ class TestSearchUserFairShareEntities:
 class TestUpsertFairShareWeightWithoutResourceGroup:
     """Regression tests for BA-4683: upsert should succeed without resource group membership."""
 
-    @pytest.mark.asyncio
     async def test_upsert_domain_fair_share_weight_passes_through(
         self,
         service: FairShareService,
@@ -1156,7 +1132,6 @@ class TestUpsertFairShareWeightWithoutResourceGroup:
         assert result.data == expected_data
         assert result.data.data.spec.weight == Decimal("2.5")
 
-    @pytest.mark.asyncio
     async def test_upsert_project_fair_share_weight_passes_through(
         self,
         service: FairShareService,
@@ -1205,7 +1180,6 @@ class TestUpsertFairShareWeightWithoutResourceGroup:
         assert result.data == expected_data
         assert result.data.data.spec.weight == Decimal("3.0")
 
-    @pytest.mark.asyncio
     async def test_upsert_user_fair_share_weight_passes_through(
         self,
         service: FairShareService,

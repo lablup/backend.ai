@@ -3,8 +3,6 @@ from __future__ import annotations
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from ai.backend.common.dependencies.stacks.builder import DependencyBuilderStack
 from ai.backend.manager.dependencies.processing.composer import (
     ProcessingComposer,
@@ -60,7 +58,6 @@ def _make_processing_input() -> ProcessingInput:
 class TestProcessingComposer:
     """Test ProcessingComposer integration."""
 
-    @pytest.mark.asyncio
     @patch(
         "ai.backend.manager.dependencies.processing.bgtask_registry.BackgroundTaskHandlerRegistry"
     )
@@ -118,7 +115,6 @@ class TestProcessingComposer:
                 mock_bgtask_mgr = cast(MagicMock, setup_input.background_task_manager)
                 mock_bgtask_mgr.set_registry.assert_called_once_with(mock_registry)
 
-    @pytest.mark.asyncio
     @patch(
         "ai.backend.manager.dependencies.processing.bgtask_registry.BackgroundTaskHandlerRegistry"
     )

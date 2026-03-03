@@ -25,7 +25,6 @@ def _create_mock_sgroup(name: str, allowed_session_types: list[str]) -> MagicMoc
     return mock
 
 
-@pytest.mark.asyncio
 @mock.patch("ai.backend.manager.registry.query_allowed_sgroups")
 async def test_allowed_session_types_check(mock_query: MagicMock) -> None:
     mock_query.return_value = [

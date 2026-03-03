@@ -110,7 +110,6 @@ class TestCreateLockFactory:
 class TestDistributedLockFactoryDependency:
     """Test DistributedLockFactoryDependency lifecycle."""
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.domain.distributed_lock.create_lock_factory")
     async def test_provide_lock_factory(self, mock_create: MagicMock) -> None:
         """Dependency should create and yield a lock factory."""
