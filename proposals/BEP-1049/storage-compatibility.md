@@ -1,13 +1,21 @@
 <!-- context-for-ai
 type: detail-doc
 parent: BEP-1049 (Kata Containers Agent Backend)
-scope: Volume mount compatibility between host filesystem and Kata guest VM via virtio-fs
+scope: Volume mount compatibility between host filesystem and Kata guest VM via virtio-fs; intrinsic mount evaluation
 depends-on: [kata-agent-backend.md, configuration-deployment.md]
 key-decisions:
   - No new storage interface needed; virtio-fs is the transparent compatibility layer
   - Existing Mount abstraction (BIND, source, target, permission) reused unchanged
   - Kata shim translates bind mounts to virtio-fs shares automatically
-  - Specific mounts require Kata-specific handling (lxcfs, agent socket, tmpfs scratch)
+  - lxcfs mounts skipped (guest kernel provides accurate /proc and /sys natively)
+  - libbaihook.so LD_PRELOAD skipped (guest kernel provides accurate sysconf natively)
+  - jail ptrace sandbox skipped (VM boundary is stronger isolation)
+  - Agent socket replaced with TCP (UDS cannot cross VM boundary)
+  - Domain socket proxies deferred (UDS limitation; niche feature)
+  - /tmp uses guest-side tmpfs (no need to cross VM boundary)
+  - Core dump requires guest-side core_pattern configuration
+  - Docker named volumes (krunner, deeplearning-samples) not available with containerd; use virtio-fs bind mount or guest rootfs
+  - Accelerator plugin mounts differ entirely (VFIO PCI passthrough replaces Docker DeviceRequests)
   - virtio-fs for all storage backends; direct guest mount not proposed (no vendor Kata integration, CephFS benchmarks favor virtio-fs)
 -->
 
@@ -40,21 +48,27 @@ Key files:
 
 ### Mount Inventory (DockerAgent)
 
-| Mount Point | Source | Type | Permission | Count |
-|-------------|--------|------|------------|-------|
-| `/home/config` | `scratch_dir/config` | BIND | RO | 1 |
-| `/home/work` | `scratch_dir/work` | BIND | RW | 1 |
-| `/tmp` | `scratch_dir_tmp` (tmpfs) | BIND | RW | 1 |
-| `/etc/localtime` | Host `/etc/localtime` | BIND | RO | 1 |
-| `/etc/timezone` | Host `/etc/timezone` | BIND | RO | 1 |
-| `/var/lib/lxcfs/proc/*` | Host lxcfs | BIND | RW | 4-6 |
-| `/var/lib/lxcfs/sys/...` | Host lxcfs | BIND | RW | 1-2 |
-| `/opt/kernel/agent.sock` | Agent Unix socket | BIND | RW | 1 |
-| `/home/work/{vfolder}` | NFS/CephFS/local path | BIND | RO/RW | 0-N |
-| Image-defined volumes | Docker named volumes | VOLUME | varies | 0-N |
-| KRunner binaries | Host package path | BIND | RO | 1-3 |
+| Category | Mount Point(s) | Source | Type | Perm |
+|----------|---------------|--------|------|------|
+| Scratch workspace | `/home/config` | `scratch_dir/config` | BIND | RO |
+| | `/home/work` | `scratch_dir/work` | BIND | RW |
+| | `/tmp` | `scratch_dir_tmp` (tmpfs) | BIND | RW |
+| Timezone | `/etc/localtime`, `/etc/timezone` | Host files | BIND | RO |
+| lxcfs | `/proc/{cpuinfo,meminfo,stat,...}` | `/var/lib/lxcfs/proc/*` | BIND | RW |
+| | `/sys/devices/system/cpu{,/online}` | `/var/lib/lxcfs/sys/...` | BIND | RW |
+| Agent IPC | `/opt/kernel/agent.sock` | Agent Unix socket | BIND | RW |
+| Domain socket proxy | `{host_sock_path}` | `ipc_base_path/proxy/*.sock` | BIND | RW |
+| Core dump | `debug.coredump.core_path` | `debug.coredump.path` | BIND | RW |
+| Deep learning samples | `/home/work/samples` | Docker volume `deeplearning-samples` | VOLUME | RO |
+| krunner volume | `/opt/backend.ai` | Docker volume per distro/arch | VOLUME | RO |
+| krunner binaries | `/opt/kernel/{su-exec,entrypoint.sh,...}` | Agent package resources (15+ files) | BIND | RO |
+| LD_PRELOAD hooks | `/opt/kernel/libbaihook.so` | Agent package resources | BIND | RO |
+| Jail sandbox | `/opt/kernel/jail` | Agent package resources | BIND | RO |
+| Python libraries | `/opt/backend.ai/.../ai/backend/{kernel,helpers}` | Agent package resources | BIND | RO |
+| Accelerator hooks | `/opt/kernel/{hook}.so` | Compute plugin paths | BIND | RO |
+| VFolders | `/home/work/{vfolder}` | NFS/CephFS/local path | BIND | RO/RW |
 
-Total: **12-20+ mounts** per container.
+Total: **20-30+ mounts** per container (varies by accelerator and vfolder count).
 
 ## Proposed Design: virtio-fs Compatibility Layer
 
@@ -123,103 +137,81 @@ async def process_mounts(self, mounts: Sequence[Mount]) -> None:
     self._container_mounts.extend(oci_mounts)
 ```
 
-### Mounts Requiring Kata-Specific Handling
+### Intrinsic Mount Evaluation for Kata
 
-While most mounts work transparently via virtio-fs, several require special treatment:
+Each mount is evaluated against the fundamental difference: Docker containers share the host kernel, while Kata VMs run a separate guest kernel inside KVM. This changes which host-side resources are visible, which kernel interfaces are shared, and which IPC mechanisms work across the boundary.
 
-#### 1. lxcfs Mounts — SKIP
+#### Mounts That Work Transparently (KEEP)
 
-lxcfs provides container-aware `/proc` and `/sys` by intercepting reads at the host kernel level. Inside a Kata VM, the guest kernel already provides accurate `/proc` and `/sys` — lxcfs is unnecessary and the host-side lxcfs paths don't exist in the guest.
+**Scratch directories** (`/home/config` RO, `/home/work` RW): The agent creates these on the host and the Kata shim shares them via virtio-fs. Files written by the agent (environ.txt, resource.txt, SSH keys) are immediately visible in the guest. Files written by the container are immediately visible on the host. Bidirectional sync is inherent to virtio-fs.
 
-```python
-async def get_intrinsic_mounts(self) -> Sequence[Mount]:
-    mounts = []
-    # ... scratch dirs, timezone, etc. ...
+**Timezone files** (`/etc/localtime`, `/etc/timezone`): Docker containers need these because they share the host kernel but not its timezone configuration files. Kata VMs also need them — the guest rootfs ships with UTC as default, but the container should match the host's timezone. Sharing via virtio-fs overrides the guest default.
 
-    # SKIP lxcfs mounts — guest kernel provides accurate proc/sys
-    # (Docker mounts /var/lib/lxcfs/proc/cpuinfo, meminfo, etc.)
-    # These are host-kernel features that don't apply inside a VM.
+**VFolder mounts** (`/home/work/{vfolder}`): User storage mounts pass through virtio-fs transparently. Same `Mount(BIND, host_path, target, permission)` spec. See [Direct Storage Access](#direct-storage-access-from-guest-vms) for why virtio-fs is preferred over direct guest mount.
 
-    return mounts
-```
+**krunner binaries** (`/opt/kernel/su-exec`, `entrypoint.sh`, `dropbearmulti`, `sftp-server`, `tmux`, `ttyd`, `yank.sh`, `all-smi`, `bssh`, `extract_dotfiles.py`, `fantompass.py`, `hash_phrase.py`, `words.json`, `DO_NOT_STORE_PERSISTENT_FILES_HERE.md`, `terminfo.*`): These 15+ individual file bind mounts are translated to virtio-fs shares. All are still functionally required inside the guest container — SSH access, terminal multiplexing, GPU monitoring, entrypoint bootstrapping, etc. For Phase 1, share via virtio-fs from the host. For production, consider consolidating into a single directory mount or baking into the guest rootfs to reduce the per-file virtio-fs share count.
 
-#### 2. Agent Socket — VSOCK or TCP Instead of Unix Socket
+**Python library mounts** (`ai.backend.kernel`, `ai.backend.helpers`): The kernel runner Python packages are injected into `/opt/backend.ai/lib/python{ver}/site-packages/`. Still required — the container inside the VM runs the same kernel runner process.
 
-The kernel-to-agent IPC socket (`/opt/kernel/agent.sock`) is a Unix domain socket that the container process uses to communicate with the Backend.AI agent process on the host. Unix sockets cannot cross the VM boundary.
+#### Mounts That Change Mechanism (CHANGE)
 
-**Options:**
+**`/tmp` tmpfs**: In Docker, `/tmp` is backed by a host-side tmpfs bind-mounted into the container. For Kata, sharing host tmpfs across the VM boundary via virtio-fs adds unnecessary overhead for ephemeral data. Use guest-side tmpfs instead: `Mount(TMPFS, None, "/tmp", RW)` — allocated inside guest RAM, never crosses the VM boundary.
 
-**Option A: TCP over virtio-net (simpler)**
-- Agent listens on a TCP port reachable via the guest's virtual network
-- Container connects to `$BACKENDAI_AGENT_HOST:$BACKENDAI_AGENT_PORT`
-- Pros: works with existing code; just change the address
-- Cons: slightly higher latency than Unix socket
+**krunner volume** (`/opt/backend.ai`): This Docker named volume contains the pre-built Python runtime environment (distro-matched libc, interpreter, packages). Docker named volumes are not available with containerd. **Phase 1**: extract krunner to a host directory and share via virtio-fs bind mount (transparent translation). **Production**: bake into the guest rootfs image (faster startup, eliminates one virtio-fs share; requires rebuild on krunner update).
 
-**Option B: VSOCK (lower latency)**
-- Agent listens on a VSOCK socket (`AF_VSOCK`, CID=host, port=N)
-- Container connects to `VMADDR_CID_HOST:port`
-- Pros: purpose-built for host-guest communication, no network stack overhead
-- Cons: requires VSOCK-aware socket code in both agent and kernel runner
+**Core dump mount**: In Docker, the host kernel's `/proc/sys/kernel/core_pattern` governs container processes because they share the host kernel. The agent bind-mounts the host's coredump directory so dumps land on the host filesystem. In Kata, the **guest kernel** has its own `core_pattern` — host-side configuration doesn't affect guest processes. To capture guest core dumps: configure the guest kernel's `core_pattern` to write to a virtio-fs-shared path (e.g., `/home/work/.coredumps`). Low priority for Phase 1.
 
-**Recommendation: Option A (TCP)** for Phase 1 — simpler, proven, sufficient performance. VSOCK optimization can be added later if latency matters.
+**Agent socket** (`/opt/kernel/agent.sock`): Unix domain sockets are host-kernel objects that cannot traverse the KVM boundary. The socket relay sidecar (`backendai-socket-relay`) is Docker-specific. For Kata, the kernel runner connects to the agent via **TCP over virtio-net**. No socket mount; connection info passed via environment variables:
 
 ```python
-# In KataKernelCreationContext.prepare_scratch():
-# Instead of mounting agent.sock, set environment variables for TCP connection
+# KataKernelCreationContext — no agent.sock mount
 environ["BACKENDAI_AGENT_CONNECT"] = "tcp"
-environ["BACKENDAI_AGENT_HOST"] = self._agent_rpc_host  # host IP reachable from guest
+environ["BACKENDAI_AGENT_HOST"] = self._agent_rpc_host
 environ["BACKENDAI_AGENT_PORT"] = str(self._agent_rpc_port)
 ```
 
-#### 3. Scratch Directories — virtio-fs with Shared Lifecycle
+VSOCK (`AF_VSOCK`) is a lower-latency alternative for future optimization — purpose-built for host-guest communication without network stack overhead, but requires socket API changes in both agent and kernel runner.
 
-Scratch directories (`/home/config`, `/home/work`) are created on the host by the agent and shared into the guest via virtio-fs. This works transparently, but note:
+#### Mounts That Are Skipped (SKIP)
 
-- Files written by the agent (environ.txt, resource.txt, SSH keys) on the host side are immediately visible in the guest via virtio-fs
-- Files written by the container in `/home/work` are immediately visible on the host
-- This bidirectional sync is a property of virtio-fs — no additional mechanism needed
+**lxcfs** (`/proc/cpuinfo`, `/proc/meminfo`, `/proc/stat`, `/sys/devices/system/cpu`, etc.): lxcfs exists because Docker containers share the host kernel — `cat /proc/meminfo` shows host RAM, `nproc` shows all host CPUs. lxcfs intercepts these reads via FUSE and returns cgroup-scoped values. In a Kata VM, the guest kernel's `/proc` and `/sys` **already reflect the VM's allocated resources** (vCPU count, memory limit). lxcfs is both unnecessary (native guest kernel does this) and non-functional (host-side FUSE filesystem callbacks cannot cross the VM boundary).
 
-#### 4. tmpfs Scratch (`/tmp`) — Guest-Side tmpfs
+**`libbaihook.so`** (LD_PRELOAD): This shared library hooks `sysconf(_SC_NPROCESSORS_ONLN)` and related calls to return cgroup-scoped values instead of host-wide values. It solves the same problem as lxcfs but at the userspace level — making `os.cpu_count()` in Python and `nproc` in shell return the container's allocated CPU count. In a Kata VM, `sysconf(_SC_NPROCESSORS_ONLN)` **already returns the VM's vCPU count** because the guest kernel only sees allocated vCPUs. The hook is redundant. Skip the mount and do not set `LD_PRELOAD=/opt/kernel/libbaihook.so`.
 
-For Docker, `/tmp` can be backed by a host-side tmpfs mount. For Kata, it's simpler to use a guest-side tmpfs:
+**`jail` sandbox** (`/opt/kernel/jail`): The jail binary is a ptrace-based syscall tracer that filters dangerous syscalls inside Docker containers. It provides an additional security layer on top of namespaces/cgroups. In a Kata VM, the **VM boundary (KVM hypervisor)** is a fundamentally stronger isolation boundary than ptrace sandboxing — guest processes cannot escape the VM regardless of syscalls. The jail sandbox is redundant, adds latency (ptrace overhead), and ptrace inside a guest VM may have complications. Skip unconditionally for Kata.
 
-```python
-# Docker: Mount(BIND, host_tmpfs_path, "/tmp", RW)
-# Kata:   Mount(TMPFS, None, "/tmp", RW)  — allocated inside guest RAM
-```
+**Domain socket proxies**: Used only for special service containers (e.g., image importer) that need host-side Unix socket access. Same UDS-cannot-cross-VM-boundary limitation as the agent socket. Niche feature — defer to a future phase. If needed, a TCP-based proxy through virtio-net can replace it.
 
-This avoids sharing temporary files across the VM boundary unnecessarily.
+**Deep learning samples volume** (`/home/work/samples`): Docker named volume `deeplearning-samples` mounted for TensorFlow/Caffe/Keras/Torch/MXNet/Theano images. Already deprecated in the new provisioner pipeline. Docker named volumes are not available with containerd. Skip.
 
-#### 5. KRunner Binaries — Guest Rootfs or virtio-fs
+#### Mounts That Differ Entirely (DIFFERENT)
 
-KRunner binaries (`/opt/kernel/entrypoint.sh`, `/usr/local/bin/*`) are mounted from the agent's host-side package in Docker. For Kata, two approaches:
-
-**Option A: Include in guest rootfs image** (recommended for production)
-- Bake krunner binaries into the Kata guest rootfs at image build time
-- Pros: no mount needed, faster startup
-- Cons: guest rootfs must be rebuilt when krunner is updated
-
-**Option B: Share via virtio-fs** (simpler for development)
-- Mount krunner host directory into guest via virtio-fs (same as Docker bind mount)
-- Pros: always up-to-date, no image rebuild
-- Cons: adds another virtio-fs share
-
-**Recommendation: Option B** for Phase 1 (development velocity), migrate to Option A for production.
+**Accelerator plugin mounts**: For Docker, the `CUDAPlugin` injects hook `.so` files via bind mount (appended to `LD_PRELOAD`) and generates Docker `DeviceRequests` for the NVIDIA Container Toolkit. For Kata with VFIO passthrough, this is entirely replaced:
+- No `LD_PRELOAD` GPU hooks — the GPU is natively visible inside the VM via VFIO PCI passthrough
+- `CUDAVFIOPlugin` generates VFIO device configuration (PCI addresses, IOMMU groups) passed to the Kata shim, not Docker `DeviceRequests`
+- `nvidia-smi` and CUDA work natively inside the guest with the passthrough GPU
+- See [vfio-accelerator-plugin.md](vfio-accelerator-plugin.md) for details
 
 ### Mount Compatibility Matrix
 
-| Mount | Docker | Kata | Handling |
-|-------|--------|------|----------|
-| `/home/config` (scratch) | Bind mount | virtio-fs (transparent) | Same `Mount` spec |
-| `/home/work` (scratch) | Bind mount | virtio-fs (transparent) | Same `Mount` spec |
-| `/tmp` (tmpfs) | Host tmpfs bind | Guest-side tmpfs | Change to `TMPFS` type |
-| `/etc/localtime` | Bind mount | virtio-fs (transparent) | Same `Mount` spec |
-| `/etc/timezone` | Bind mount | virtio-fs (transparent) | Same `Mount` spec |
-| lxcfs `/proc/*`, `/sys/*` | Bind mount | **Skip** | Not applicable in VM |
-| `/opt/kernel/agent.sock` | Bind mount (Unix socket) | **TCP or VSOCK** | Replace with env vars |
-| VFolders (`/home/work/*`) | Bind mount | virtio-fs (transparent) | Same `Mount` spec |
-| KRunner binaries | Bind mount | virtio-fs or guest rootfs | Phase-dependent |
-| Docker named volumes | Docker volume | **Not applicable** | Skip or convert to bind |
+| Mount | Docker | Kata | Verdict |
+|-------|--------|------|---------|
+| `/home/config` (scratch) | Bind mount | virtio-fs | **KEEP** — same spec |
+| `/home/work` (scratch) | Bind mount | virtio-fs | **KEEP** — same spec |
+| `/tmp` (tmpfs) | Host tmpfs bind | Guest-side tmpfs | **CHANGE** — `TMPFS` type |
+| `/etc/localtime`, `/etc/timezone` | Bind mount | virtio-fs | **KEEP** — same spec |
+| lxcfs `/proc/*`, `/sys/*` | Bind mount | N/A | **SKIP** — guest kernel provides |
+| `libbaihook.so` + `LD_PRELOAD` | Bind mount | N/A | **SKIP** — guest kernel provides |
+| `jail` sandbox | Bind mount | N/A | **SKIP** — VM is stronger isolation |
+| `/opt/kernel/agent.sock` | Unix socket | TCP / VSOCK | **REPLACE** — env vars |
+| Domain socket proxies | Unix socket | N/A | **SKIP** — defer to future phase |
+| Core dump path | Host core_pattern | Guest core_pattern | **CHANGE** — guest-side config |
+| krunner volume (`/opt/backend.ai`) | Docker volume | virtio-fs / rootfs | **CHANGE** — no Docker volumes |
+| Deep learning samples | Docker volume | N/A | **SKIP** — legacy, deprecated |
+| krunner binaries (15+ files) | Bind mount | virtio-fs | **KEEP** — same spec |
+| Python libs (`kernel`, `helpers`) | Bind mount | virtio-fs | **KEEP** — same spec |
+| Accelerator hooks | Plugin `.so` | VFIO PCI config | **DIFFERENT** — new plugin |
+| VFolders | Bind mount | virtio-fs | **KEEP** — same spec |
 
 ### I/O Performance Characteristics
 
@@ -244,7 +236,8 @@ No new storage interfaces are introduced. The existing abstractions are reused:
 | `Mount` / `MountTypes` | `src/ai/backend/common/types.py:612` | None |
 | `MountPermission` | `src/ai/backend/common/types.py:603` | None |
 | `mount_vfolders()` | Agent method | Reuse as-is |
-| `get_intrinsic_mounts()` | Agent method | Override to skip lxcfs, handle agent socket |
+| `get_intrinsic_mounts()` | Agent method | Override: skip lxcfs, domain socket proxies, deep learning samples; replace agent socket with TCP env vars; use guest-side tmpfs |
+| `mount_krunner()` | Agent method | Override: skip libbaihook.so + LD_PRELOAD, skip jail; convert krunner Docker volume to bind mount; skip accelerator LD_PRELOAD hooks |
 | `process_mounts()` | Agent method | Override to produce OCI mount format (vs Docker API format) |
 
 ## Implementation Notes
@@ -254,6 +247,8 @@ No new storage interfaces are introduced. The existing abstractions are reused:
 - File ownership (UID/GID) is preserved across the virtio-fs boundary. The `kernel_uid`/`kernel_gid` settings work as expected.
 - Symbolic links within mounted directories work correctly with virtio-fs.
 - File locking (flock, fcntl) works with virtio-fs but may have different semantics for distributed filesystems (CephFS, NFS) that are already mounted on the host.
+- `KataKernelCreationContext.mount_krunner()` should consolidate the 15+ individual krunner binary mounts into a single directory mount (e.g., bind-mount the entire `runner/` directory to `/opt/kernel/`) to reduce the number of virtio-fs shares. Docker uses individual file mounts to overlay binaries into an existing container filesystem; Kata can use a directory mount since the guest rootfs is purpose-built.
+- The `ContainerSandboxType` config option is irrelevant for Kata — always use `DOCKER` (no-op sandbox) or introduce a `VM` type. Never use `JAIL` with Kata.
 - For confidential computing (Phase 4), bind mounts are **NOT sync'd back** — files are copied into the guest at mount time and changes are lost. This is a fundamental CoCo limitation documented in [TR-2026-001](../../docs/reports/kata-containers-feature-parity-analysis.md). Non-confidential Kata mode does not have this limitation.
 
 ## Direct Storage Access from Guest VMs
