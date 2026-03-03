@@ -53,7 +53,7 @@ default-vcpus = 2               # Initial vCPUs per VM (hot-plugged as needed)
 default-memory-mb = 2048        # Initial memory per VM in MB
 vm-overhead-mb = 64             # Per-VM memory overhead deducted from host capacity
 
-# --- Guest Image ---
+# --- Guest VM Image (NOT the container image — see note below) ---
 kernel-path = "/opt/kata/share/kata-containers/vmlinux.container"
 initrd-path = ""                # Empty = use rootfs image instead of initrd
 rootfs-path = "/opt/kata/share/kata-containers/kata-containers.img"
@@ -78,6 +78,30 @@ kata-runtime-class = "kata"     # RuntimeClass name registered in containerd
 confidential-guest = false
 guest-attestation = ""          # "tdx" | "sev-snp" | ""
 ```
+
+### Guest VM Image vs Container Image
+
+Kata Containers uses **two separate filesystem layers** that must not be confused:
+
+1. **Guest VM rootfs** (`rootfs-path` above): A minimal mini-OS image containing only the kata-agent, systemd, and essential utilities. This is the VM's boot disk — shared across all VMs, read-only, and mounted via DAX on a `/dev/pmem*` device inside the guest. It is **not** the user's container image. This is an infrastructure-level asset analogous to a VM template.
+
+2. **Container image** (e.g., `cr.backend.ai/stable/python-tensorflow:2.15-py312-cuda12.3`): The user-selected OCI image that Backend.AI's image management system resolves. containerd pulls this on the host (same as Docker), and the Kata shim mounts it into the guest via virtio-fs or block device passthrough. The kata-agent inside the guest uses it as the container's root filesystem.
+
+```
+Host: containerd pulls OCI image (e.g., tensorflow:latest)
+  │
+  ├─ Kata shim detects image storage backend:
+  │   ├─ overlayfs snapshotter → share via virtio-fs
+  │   └─ devicemapper snapshotter → attach as virtio-blk block device
+  │
+  └─ Guest VM boots from kata-containers.img (mini-OS)
+       └─ kata-agent mounts container rootfs inside the guest
+           └─ Container process runs on the OCI image filesystem
+```
+
+**No changes to Backend.AI's image management are needed.** The image registry, image selection, and containerd pull flow are identical to Docker. Only the last mile differs — Kata transports the image into the guest VM instead of using a host-kernel bind mount.
+
+For **confidential computing** (Phase 4), images are pulled and decrypted **inside the guest** using `image-rs` (the host is untrusted and must not see image contents). This is not the standard flow and requires additional CoCo components.
 
 ### Pydantic Config Model
 

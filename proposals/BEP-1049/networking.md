@@ -53,6 +53,19 @@ Kata transparently bridges the host-side network namespace into the guest VM usi
 
 This TC filter mechanism is Kata's default and requires no additional configuration. The guest VM's `eth0` gets the same IP address that the CNI assigned to the host-side veth, making the VM transparent to the network infrastructure.
 
+### Sandbox Model: Multiple Containers Per VM
+
+A Kata **sandbox** is a single VM instance. The kata-agent inside the guest can manage multiple containers within the same sandbox — each container gets its own PID namespace (via libcontainer) but **shares the VM's network namespace**. All containers in the same sandbox communicate via `localhost`, consistent with Kubernetes pod semantics.
+
+The flow for multi-container sandboxes:
+1. CRI creates a sandbox → Kata boots the VM, kata-agent starts
+2. CRI calls `CreateContainer` → kata-agent creates a container inside the existing VM (image rootfs shared via virtio-fs or hot-plugged as a block device)
+3. Additional `CreateContainer` calls → more containers in the same VM, sharing network
+
+For Backend.AI's **multi-container sessions** (cluster mode), the mapping depends on deployment model:
+- **Single-host cluster**: All containers in the session can share one Kata sandbox (one VM). They share `localhost` and the VM's network namespace. This is efficient but limits the cluster to one host.
+- **Multi-host cluster**: Each host runs a separate Kata sandbox (separate VM). Containers across VMs communicate via Calico CNI — each VM gets its own IP, and inter-VM traffic flows through BGP/VXLAN routing. This is the expected model for distributed training workloads.
+
 ### What Kata Provides Built-In
 
 | Feature | Support | Notes |
@@ -61,7 +74,7 @@ This TC filter mechanism is Kata's default and requires no additional configurat
 | MACVTAP mode | Built-in (legacy) | Alternative to TC filter, similar performance |
 | virtio-net device | Built-in | Para-virtualized NIC inside guest |
 | CNI plugin compatibility | Full | Works with Calico, Cilium, Flannel, bridge |
-| Multi-container pod (same VM) | Supported | Containers share VM network namespace |
+| Multi-container sandbox | Supported | Containers share VM network namespace via kata-agent |
 | `--net=host` | **Not supported** | VM isolation prevents host network access |
 | `--net=container:<id>` | **Not supported** | Cannot share network namespace across VMs |
 | Docker Compose custom networks | **Limited** | Docker DNS service not fully compatible |

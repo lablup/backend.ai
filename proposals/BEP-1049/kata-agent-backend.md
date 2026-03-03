@@ -165,14 +165,21 @@ Key overrides that differ from `DockerKernelCreationContext`:
 
 **`prepare_scratch()`** — Create directories that will be shared via virtio-fs:
 
+Scratch directories are still required for Kata despite the VM having its own boot disk. The VM boot disk (`kata-containers.img`) is a **read-only, shared mini-OS** that only contains the kata-agent — it is not per-session storage. Scratch directories serve a different purpose:
+
+- `/home/config` (RO): Agent-written config files (`environ.txt`, `resource.txt`, SSH keys, accelerator configs) consumed by the kernel runner at startup
+- `/home/work` (RW): User's persistent workspace directory and vfolder mount point
+
+The `resource.txt` and `environ.txt` files remain necessary even with VM-level resource isolation. The hypervisor enforces resource **limits** (vCPU, memory), but these files communicate resource **metadata** to the kernel runner — what was allocated, environment variables for the session, accelerator device mappings, etc. The kernel runner reads them to configure the user's environment, not to enforce limits.
+
 ```python
 async def prepare_scratch(self):
-    # Same directory structure as Docker, but these will be
-    # mounted into the guest VM via virtio-fs instead of bind mounts
+    # Same directory structure as Docker — these are shared into the
+    # guest VM via virtio-fs (not the VM boot disk, which is read-only)
     scratch_dir = self.scratch_root / str(self.kernel_id)
     scratch_dir.mkdir(parents=True, exist_ok=True)
     # Write environ.txt, resource.txt, etc. into scratch_dir
-    # These become visible inside the guest at the virtio-fs mount point
+    # These become visible inside the guest at /home/config via virtio-fs
 ```
 
 **`apply_accelerator_allocation()`** — Collect VFIO device info from plugins:
