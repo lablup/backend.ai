@@ -16,25 +16,24 @@ from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.context import RootContext
     from ai.backend.manager.api.rest.types import ModuleDeps
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-async def _spec_startup(app: web.Application) -> None:
-    """Log a warning when OpenAPI schema introspection is enabled."""
-    root_ctx: RootContext = app["_root.context"]
-    if root_ctx.config_provider.config.api.allow_openapi_schema_introspection:
-        log.warning(
-            "OpenAPI schema introspection is enabled. "
-            "It is strongly advised to disable this in production setups."
-        )
-
-
 def register_spec_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the spec sub-application."""
     from .handler import SpecHandler
+
+    config_provider = deps.config_provider
+
+    async def _spec_startup(_app: web.Application) -> None:
+        """Log a warning when OpenAPI schema introspection is enabled."""
+        if config_provider.config.api.allow_openapi_schema_introspection:
+            log.warning(
+                "OpenAPI schema introspection is enabled. "
+                "It is strongly advised to disable this in production setups."
+            )
 
     reg = RouteRegistry.create("spec", deps.cors_options)
 
