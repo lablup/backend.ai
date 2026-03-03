@@ -15,7 +15,9 @@ from ai.backend.logging import BraceStyleAdapter
 from .types import ApiHandler, CORSOptions, RouteMiddleware, WebRequestHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.ratelimit import PrivateContext as RatelimitPrivateContext
+    from ai.backend.manager.api.rest.ratelimit.registry import (
+        RatelimitContext as RatelimitPrivateContext,
+    )
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

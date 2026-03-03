@@ -13,6 +13,7 @@ from ai.backend.common.clients.valkey_client.valkey_container_log.client import 
 )
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
@@ -21,6 +22,7 @@ from ai.backend.common.defs import (
     REDIS_CONTAINER_LOG,
     REDIS_IMAGE_DB,
     REDIS_LIVE_DB,
+    REDIS_RATE_LIMIT_DB,
     REDIS_STATISTICS_DB,
     REDIS_STREAM_DB,
     RedisRole,
@@ -54,9 +56,12 @@ class ValkeyClients:
     stream: ValkeyStreamClient
     schedule: ValkeyScheduleClient
     bgtask: ValkeyBgtaskClient
+    rate_limit: ValkeyRateLimitClient
 
     async def close(self) -> None:
         """Close all Valkey client connections."""
+        await self.rate_limit.flush_database()
+        await self.rate_limit.close()
         await self.artifact.close()
         await self.container_log.close()
         await self.image.close()
@@ -68,7 +73,7 @@ class ValkeyClients:
 
 
 class ValkeyDependency(InfrastructureDependency[ValkeyClients]):
-    """Provides lifecycle management for 8 specialized Valkey clients."""
+    """Provides lifecycle management for 9 specialized Valkey clients."""
 
     @property
     def stage_name(self) -> str:
@@ -82,11 +87,11 @@ class ValkeyDependency(InfrastructureDependency[ValkeyClients]):
             setup_input: Configuration containing redis settings
 
         Yields:
-            ValkeyClients instance containing all 8 specialized clients
+            ValkeyClients instance containing all 9 specialized clients
         """
         valkey_profile_target = setup_input.redis.to_valkey_profile_target()
 
-        # Create all 8 specialized clients
+        # Create all 9 specialized clients
         clients = ValkeyClients(
             artifact=await ValkeyArtifactDownloadTrackingClient.create(
                 valkey_profile_target.profile_target(RedisRole.STATISTICS),
@@ -127,6 +132,11 @@ class ValkeyDependency(InfrastructureDependency[ValkeyClients]):
                 valkey_profile_target.profile_target(RedisRole.BGTASK),
                 human_readable_name="bgtask",
                 db_id=REDIS_BGTASK_DB,
+            ),
+            rate_limit=await ValkeyRateLimitClient.create(
+                valkey_profile_target.profile_target(RedisRole.RATE_LIMIT),
+                db_id=REDIS_RATE_LIMIT_DB,
+                human_readable_name="ratelimit",
             ),
         )
 

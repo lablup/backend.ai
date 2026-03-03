@@ -148,7 +148,6 @@ from .actions.monitors.reporter import ReporterMonitor
 from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
 from .api.context import RootContext
-from .api.ratelimit import rlim_middleware
 from .api.rest import build_api_routes
 from .api.rest.middleware import (
     build_api_metric_middleware,
@@ -156,6 +155,7 @@ from .api.rest.middleware import (
     request_id_middleware,
 )
 from .api.rest.middleware.auth import auth_middleware
+from .api.rest.ratelimit.handler import rlim_middleware
 from .api.rest.routing import RouteRegistry
 from .api.rest.types import GQLContextDeps, ModuleDeps, ModuleRegistrar
 from .clients.agent import AgentClientPool, AgentPoolSpec
@@ -835,6 +835,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.event_hub,
             root_ctx.registry,
             root_ctx.db,
+            root_ctx.etcd,
             root_ctx.idle_checker_host,
             root_ctx.event_dispatcher_plugin_ctx,
             root_ctx.repositories,
@@ -1402,6 +1403,7 @@ def _setup_api(
         processors=dep_resources.processing.processors,
         config_provider=root_ctx.config_provider,
         gql_context_deps=gql_context_deps,
+        valkey_rate_limit=dep_resources.infrastructure.valkey.rate_limit,
     )
 
     # 1. Build API module tree
