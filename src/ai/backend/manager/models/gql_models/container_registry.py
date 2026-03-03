@@ -300,6 +300,17 @@ async def handle_allowed_groups_update(
                 )
 
 
+async def clear_all_allowed_groups(
+    db: ExtendedAsyncSAEngine,
+    registry_id: uuid.UUID,
+) -> None:
+    async with db.begin_session() as db_sess:
+        delete_query = sa.delete(AssociationContainerRegistriesGroupsRow).where(
+            AssociationContainerRegistriesGroupsRow.registry_id == registry_id
+        )
+        await db_sess.execute(delete_query)
+
+
 class CreateContainerRegistryNode(graphene.Mutation):
     """
     Deprecated since 25.3.0. use `CreateContainerRegistryNodeV2` instead
