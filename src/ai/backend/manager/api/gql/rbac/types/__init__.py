@@ -36,7 +36,7 @@ from .role import (
     RoleAssignmentGQL,
     RoleAssignmentOrderBy,
     RoleAssignmentOrderField,
-    RoleAssignmentRoleNestedFilter,
+    RoleAssignmentRoleNestedFilterGQL,
     RoleConnection,
     RoleEdge,
     RoleFilter,
@@ -69,7 +69,7 @@ __all__ = [
     "PermissionFilter",
     "RoleFilter",
     "RoleAssignmentFilter",
-    "RoleAssignmentRoleNestedFilter",
+    "RoleAssignmentRoleNestedFilterGQL",
     "EntityFilter",
     # OrderBy
     "PermissionOrderBy",

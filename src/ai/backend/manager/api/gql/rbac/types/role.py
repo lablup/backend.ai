@@ -249,7 +249,7 @@ class RoleFilter(GQLFilter):
         "Filters assignments that have a role matching all specified conditions."
     ),
 )
-class RoleAssignmentRoleNestedFilter:
+class RoleAssignmentRoleNestedFilterGQL:
     name: StringFilter | None = None
     source: list[RoleSourceGQL] | None = None
     status: list[RoleStatusGQL] | None = None
@@ -279,7 +279,7 @@ class RoleAssignmentRoleNestedFilter:
 @strawberry.input(description="Added in 26.3.0. Filter for role assignments")
 class RoleAssignmentFilter(GQLFilter):
     role_id: uuid.UUID | None = None
-    role: RoleAssignmentRoleNestedFilter | None = None
+    role: RoleAssignmentRoleNestedFilterGQL | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
