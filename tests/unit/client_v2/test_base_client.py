@@ -6,7 +6,7 @@ import pytest
 from yarl import URL
 
 from ai.backend.client.exceptions import BackendAPIError
-from ai.backend.client.v2.base_client import BackendAIAuthClient
+from ai.backend.client.v2.base_client import BackendAIAnonymousClient, BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import (
     AuthenticationError,
@@ -53,6 +53,16 @@ def _make_request_session(resp: AsyncMock) -> MagicMock:
     mock_session = MagicMock()
     mock_session.request = MagicMock(return_value=mock_ctx)
     return mock_session
+
+
+def _make_anon_client(
+    mock_session: MagicMock | None = None,
+    config: ClientConfig | None = None,
+) -> BackendAIAnonymousClient:
+    return BackendAIAnonymousClient(
+        config or _DEFAULT_CONFIG,
+        mock_session or MagicMock(),
+    )
 
 
 class TestBackendAIClient:
@@ -582,3 +592,47 @@ class TestSSEConnect:
         assert len(events) == 1
         assert events[0].event == "message"
         assert events[0].data == "hello"
+
+
+class TestBackendAIAnonymousClient:
+    async def test_extra_headers_merged_into_request(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(return_value={"password_changed_at": "2025-01-01T00:00:00"})
+
+        mock_session = _make_request_session(mock_resp)
+        client = _make_anon_client(mock_session)
+
+        extra = {
+            "X-Forwarded-For": "10.0.0.1",
+            "X-Forwarded-Host": "example.com",
+            "X-Forwarded-Proto": "https",
+        }
+        await client._request("POST", "/auth/update-password-no-auth", json={}, extra_headers=extra)
+
+        call_kwargs = mock_session.request.call_args
+        headers = call_kwargs.kwargs["headers"]
+        assert headers["X-Forwarded-For"] == "10.0.0.1"
+        assert headers["X-Forwarded-Host"] == "example.com"
+        assert headers["X-Forwarded-Proto"] == "https"
+        # Default headers should still be present
+        assert "Date" in headers
+        assert "Content-Type" in headers
+        assert "X-BackendAI-Version" in headers
+
+    async def test_request_without_extra_headers(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(return_value={"result": "ok"})
+
+        mock_session = _make_request_session(mock_resp)
+        client = _make_anon_client(mock_session)
+
+        await client._request("GET", "/test")
+
+        call_kwargs = mock_session.request.call_args
+        headers = call_kwargs.kwargs["headers"]
+        assert "Date" in headers
+        assert "Content-Type" in headers
+        assert "X-BackendAI-Version" in headers
+        assert "X-Forwarded-For" not in headers
