@@ -512,6 +512,36 @@ class ImageV2ScopeGQL:
 
 
 @strawberry.input(
+    name="ImageAliasNestedFilterGQL",
+    description=(
+        "Added in 26.3.0. Nested filter for aliases belonging to an image. "
+        "Filters images that have at least one alias matching all specified conditions."
+    ),
+)
+class ImageAliasNestedFilterGQL:
+    """Nested filter for image aliases within an image."""
+
+    alias: StringFilter | None = strawberry.field(
+        default=None,
+        description="Filter by alias string. Supports equals, contains, startsWith, and endsWith.",
+    )
+
+    def build_conditions(self) -> list[QueryCondition]:
+        """Build query conditions for alias nested filter."""
+        raw_conditions: list[QueryCondition] = []
+        if self.alias:
+            condition = self.alias.build_query_condition(
+                contains_factory=ImageAliasConditions.by_alias_contains,
+                equals_factory=ImageAliasConditions.by_alias_equals,
+                starts_with_factory=ImageAliasConditions.by_alias_starts_with,
+                ends_with_factory=ImageAliasConditions.by_alias_ends_with,
+            )
+            if condition:
+                raw_conditions.append(condition)
+        return raw_conditions
+
+
+@strawberry.input(
     description=dedent_strip("""
     Added in 26.2.0.
 
@@ -525,7 +555,10 @@ class ImageV2FilterGQL(GQLFilter):
     status: list[ImageV2StatusGQL] | None = None
     name: StringFilter | None = None
     architecture: StringFilter | None = None
-    alias: StringFilter | None = strawberry.field(default=None, description="Added in 26.3.0.")
+    alias: ImageAliasNestedFilterGQL | None = strawberry.field(
+        default=None,
+        description="Added in 26.3.0. Filter by nested alias conditions.",
+    )
 
     AND: list[ImageV2FilterGQL] | None = None
     OR: list[ImageV2FilterGQL] | None = None
@@ -569,14 +602,7 @@ class ImageV2FilterGQL(GQLFilter):
 
         # Apply alias filter
         if self.alias:
-            alias_condition = self.alias.build_query_condition(
-                contains_factory=ImageAliasConditions.by_alias_contains,
-                equals_factory=ImageAliasConditions.by_alias_equals,
-                starts_with_factory=ImageAliasConditions.by_alias_starts_with,
-                ends_with_factory=ImageAliasConditions.by_alias_ends_with,
-            )
-            if alias_condition:
-                field_conditions.append(alias_condition)
+            field_conditions.extend(self.alias.build_conditions())
 
         # Handle AND logical operator
         if self.AND:
