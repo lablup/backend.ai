@@ -512,7 +512,7 @@ class ImageV2ScopeGQL:
 
 
 @strawberry.input(
-    name="ImageAliasNestedFilterGQL",
+    name="ImageAliasNestedFilter",
     description=(
         "Added in 26.3.0. Nested filter for aliases belonging to an image. "
         "Filters images that have at least one alias matching all specified conditions."
