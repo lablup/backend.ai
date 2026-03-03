@@ -136,7 +136,6 @@ class TestPrometheusQueryPresetOptions:
         preset_ids = await self._seed_presets(case.seeds, db_with_cleanup)
         return SearchContext(preset_ids=preset_ids, case=case)
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "test_case",
         [
@@ -233,7 +232,6 @@ class TestPrometheusQueryPresetOptions:
             db_with_cleanup,
         )
 
-    @pytest.mark.asyncio
     async def test_search_by_ids(
         self,
         preset_repository: PrometheusQueryPresetRepository,
@@ -250,7 +248,6 @@ class TestPrometheusQueryPresetOptions:
         assert len(result.items) == 2
         assert {p.id for p in result.items} == set(target_ids)
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "test_case",
         [

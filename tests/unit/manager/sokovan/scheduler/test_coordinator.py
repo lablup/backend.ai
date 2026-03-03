@@ -13,6 +13,7 @@ Test Scenarios:
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -860,7 +861,7 @@ class TestScheduleCoordinatorStatusTransition:
 
         captured_updater = None
 
-        async def capture_update_with_history(updater, history_creator):
+        async def capture_update_with_history(updater: Any, history_creator: Any) -> int:
             nonlocal captured_updater
             captured_updater = updater
             return 1
