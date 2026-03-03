@@ -27,8 +27,12 @@ from ai.backend.common.events.event_types.schedule.anycast import (
 from ai.backend.common.leader.tasks.event_task import EventTaskSpec
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentSubStep
-from ai.backend.manager.data.session.types import SchedulingResult
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    DeploymentSubStatus,
+    DeploymentSubStep,
+)
+from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
@@ -270,6 +274,7 @@ class DeploymentCoordinator:
         next_lifecycle_status = transitions.success
         if next_lifecycle_status is not None and result.successes:
             next_lifecycle = next_lifecycle_status.lifecycle
+            sub_status = next_lifecycle_status.sub_status
             endpoint_ids = [d.id for d in result.successes]
             success_history_specs = [
                 DeploymentHistoryCreatorSpec(
@@ -279,7 +284,9 @@ class DeploymentCoordinator:
                     message=f"{handler_name} completed successfully",
                     from_status=from_status,
                     to_status=next_lifecycle,
-                    sub_steps=extract_sub_steps_for_entity(d.id, records),
+                    sub_steps=self._build_history_sub_steps(
+                        d.id, records, sub_status, SchedulingResult.SUCCESS
+                    ),
                 )
                 for d in result.successes
             ]
@@ -308,6 +315,7 @@ class DeploymentCoordinator:
         failure_lifecycle_status = transitions.failure
         if failure_lifecycle_status is not None and result.errors:
             failure_lifecycle = failure_lifecycle_status.lifecycle
+            failure_sub_status = failure_lifecycle_status.sub_status
             endpoint_ids = [e.deployment_info.id for e in result.errors]
             failure_history_specs = [
                 DeploymentHistoryCreatorSpec(
@@ -318,7 +326,9 @@ class DeploymentCoordinator:
                     from_status=from_status,
                     to_status=failure_lifecycle,
                     error_code=e.error_code,
-                    sub_steps=extract_sub_steps_for_entity(e.deployment_info.id, records),
+                    sub_steps=self._build_history_sub_steps(
+                        e.deployment_info.id, records, failure_sub_status, SchedulingResult.FAILURE
+                    ),
                 )
                 for e in result.errors
             ]
@@ -535,6 +545,25 @@ class DeploymentCoordinator:
                 await self._event_producer.anycast_event(event)
             except Exception as e:
                 log.warning("Failed to send lifecycle notification: {}", e)
+
+    @staticmethod
+    def _build_history_sub_steps(
+        entity_id: UUID,
+        records: Mapping[UUID, ExecutionRecord],
+        sub_status: DeploymentSubStatus | None,
+        scheduling_result: SchedulingResult,
+    ) -> list[SubStepResult]:
+        """Build sub_steps list, appending sub_status as an entry if present."""
+        sub_steps = extract_sub_steps_for_entity(entity_id, records)
+        if sub_status is not None:
+            now = datetime.now(UTC)
+            sub_steps.append(SubStepResult(
+                step=sub_status.value,
+                result=scheduling_result,
+                started_at=now,
+                ended_at=now,
+            ))
+        return sub_steps
 
     def _build_lifecycle_notification_event(
         self,
