@@ -55,6 +55,16 @@ def _make_request_session(resp: AsyncMock) -> MagicMock:
     return mock_session
 
 
+def _make_anon_client(
+    mock_session: MagicMock | None = None,
+    config: ClientConfig | None = None,
+) -> BackendAIAnonymousClient:
+    return BackendAIAnonymousClient(
+        config or _DEFAULT_CONFIG,
+        mock_session or MagicMock(),
+    )
+
+
 class TestBackendAIClient:
     def test_build_url(self) -> None:
         client = _make_client()
@@ -582,16 +592,6 @@ class TestSSEConnect:
         assert len(events) == 1
         assert events[0].event == "message"
         assert events[0].data == "hello"
-
-
-def _make_anon_client(
-    mock_session: MagicMock | None = None,
-    config: ClientConfig | None = None,
-) -> BackendAIAnonymousClient:
-    return BackendAIAnonymousClient(
-        config or _DEFAULT_CONFIG,
-        mock_session or MagicMock(),
-    )
 
 
 class TestBackendAIAnonymousClient:

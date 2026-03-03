@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any, TypeVar, cast
 
 import aiohttp
+from multidict import CIMultiDict
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.common.api_handlers import (
@@ -373,7 +374,7 @@ class BackendAIAnonymousClient:
     ) -> dict[str, Any] | list[Any] | None:
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
-        headers = {**self._build_headers(method, rel_url, content_type)}
+        headers = CIMultiDict(self._build_headers(method, rel_url, content_type))
         if extra_headers:
             headers.update(extra_headers)
         url = self._build_url(path)
