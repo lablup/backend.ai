@@ -54,10 +54,11 @@ from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
-from ai.backend.manager.types import SMTPTriggerPolicy
+from ai.backend.manager.types import DistributedLockFactory, SMTPTriggerPolicy
 
 from .bgtask_registry import BgtaskRegistryDependency, BgtaskRegistryInput
 from .event_dispatcher import EventDispatcherDependency, EventDispatcherInput
+from .log_cleanup_timer import LogCleanupTimerDependency, LogCleanupTimerInput
 from .processors import ProcessorsDependency, ProcessorsProviderInput
 
 
@@ -110,6 +111,9 @@ class ProcessingInput:
 
     # BgtaskRegistry creation (additional)
     agent_client_pool: AgentClientPool
+
+    # Log cleanup timer
+    distributed_lock_factory: DistributedLockFactory
 
     # Registry quota service (optional, defaults to None)
     registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None = None
@@ -249,6 +253,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 event_hub=setup_input.event_hub,
                 agent_registry=setup_input.agent_registry,
                 db=setup_input.db,
+                etcd=setup_input.etcd,
                 idle_checker_host=setup_input.idle_checker_host,
                 event_dispatcher_plugin_ctx=setup_input.event_dispatcher_plugin_ctx,
                 repositories=setup_input.repositories,
@@ -260,6 +265,15 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         )
         dispatchers.dispatch(event_dispatcher)
         await event_dispatcher.start()
+
+        # Step 3.5: Create and start log cleanup timer
+        await stack.enter_dependency(
+            LogCleanupTimerDependency(),
+            LogCleanupTimerInput(
+                distributed_lock_factory=setup_input.distributed_lock_factory,
+                event_producer=setup_input.event_producer,
+            ),
+        )
 
         # Step 4: Create BgtaskRegistry
         await stack.enter_dependency(

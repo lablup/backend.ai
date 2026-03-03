@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
     from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
     from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+    from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
+        ValkeyRateLimitClient,
+    )
     from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.common.etcd import AsyncEtcd
@@ -89,6 +92,7 @@ class ModuleDeps:
     processors: Processors
     config_provider: ManagerConfigProvider
     gql_context_deps: GQLContextDeps | None = None
+    valkey_rate_limit: ValkeyRateLimitClient | None = None
 
 
 type ModuleRegistrar = Callable[[ModuleDeps], RouteRegistry]

@@ -6,6 +6,7 @@ from ai.backend.common.clients.valkey_client.valkey_container_log.client import 
 )
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
     CoalescingOptions,
     EventDispatcher,
@@ -51,6 +52,7 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     KernelTerminatedAnycastEvent,
     KernelTerminatingAnycastEvent,
 )
+from ai.backend.common.events.event_types.log.anycast import DoLogCleanupEvent
 from ai.backend.common.events.event_types.model_serving.anycast import (
     ModelServiceStatusAnycastEvent,
     RouteCreatedAnycastEvent,
@@ -120,6 +122,7 @@ from .handlers.agent import AgentEventHandler
 from .handlers.idle_check import IdleCheckEventHandler
 from .handlers.image import ImageEventHandler
 from .handlers.kernel import KernelEventHandler
+from .handlers.log_cleanup import LogCleanupEventHandler
 from .handlers.model_serving import ModelServingEventHandler
 from .handlers.notification import NotificationEventHandler
 from .handlers.service_catalog import ServiceCatalogEventHandler
@@ -141,6 +144,7 @@ class DispatcherArgs:
     event_hub: EventHub
     agent_registry: AgentRegistry
     db: ExtendedAsyncSAEngine
+    etcd: AsyncEtcd
     idle_checker_host: IdleCheckerHost
     event_dispatcher_plugin_ctx: EventDispatcherPluginContext
     repositories: Repositories
@@ -165,6 +169,7 @@ class Dispatchers:
     _artifact_event_handler: ArtifactEventHandler
     _artifact_registry_event_handler: ArtifactRegistryEventHandler
     _service_catalog_event_handler: ServiceCatalogEventHandler
+    _log_cleanup_event_handler: LogCleanupEventHandler
 
     def __init__(self, args: DispatcherArgs) -> None:
         """
@@ -224,6 +229,7 @@ class Dispatchers:
             args.config_provider,
         )
         self._service_catalog_event_handler = ServiceCatalogEventHandler(args.db)
+        self._log_cleanup_event_handler = LogCleanupEventHandler(args.etcd, args.db)
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
         """
@@ -242,6 +248,7 @@ class Dispatchers:
         self._dispatch_artifact_events(event_dispatcher)
         self._dispatch_artifact_registry_events(event_dispatcher)
         self._dispatch_service_catalog_events(event_dispatcher)
+        self._dispatch_log_cleanup_events(event_dispatcher)
 
     def _dispatch_bgtask_events(
         self,
@@ -616,4 +623,15 @@ class Dispatchers:
             None,
             self._service_catalog_event_handler.handle_sweep_stale_services,
             name="service-catalog.sweep",
+        )
+
+    def _dispatch_log_cleanup_events(
+        self,
+        event_dispatcher: EventDispatcher,
+    ) -> None:
+        event_dispatcher.consume(
+            DoLogCleanupEvent,
+            None,
+            self._log_cleanup_event_handler.handle_log_cleanup,
+            name="log_cleanup",
         )

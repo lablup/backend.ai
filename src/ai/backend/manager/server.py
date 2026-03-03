@@ -1402,6 +1402,7 @@ def _setup_api(
         processors=dep_resources.processing.processors,
         config_provider=root_ctx.config_provider,
         gql_context_deps=gql_context_deps,
+        valkey_rate_limit=dep_resources.infrastructure.valkey.rate_limit,
     )
 
     # 1. Build API module tree

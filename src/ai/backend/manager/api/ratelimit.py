@@ -3,11 +3,9 @@
 The rate-limit middleware logic has been migrated to:
 
 * ``api.rest.ratelimit.handler`` — ``rlim_middleware``
-* ``api.rest.ratelimit.registry`` — lifecycle management
 
-The ``PrivateContext`` and lifecycle hooks (``init``/``shutdown``) have
-been removed from this module as part of the DependencyComposer migration.
-They now live in ``api.rest.ratelimit.registry``.
+The ValkeyRateLimitClient lifecycle is now managed by the DependencyComposer
+infrastructure layer (``ValkeyDependency``).
 
 Re-exports are kept here for backward compatibility with existing imports.
 """

@@ -40,8 +40,7 @@ class TestRlimMiddleware:
         app = MagicMock(spec=web.Application)
         mock_valkey_client = MagicMock(spec=ValkeyRateLimitClient)
         mock_valkey_client.execute_rate_limit_logic = AsyncMock()
-        app_ctx = RatelimitContext()
-        app_ctx.valkey_rate_limit_client = mock_valkey_client
+        app_ctx = RatelimitContext(valkey_rate_limit_client=mock_valkey_client)
         app["ratelimit.context"] = app_ctx
         return app
 
