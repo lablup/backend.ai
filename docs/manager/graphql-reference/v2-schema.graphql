@@ -2619,7 +2619,7 @@ type HuggingFaceRegistryEdge {
 """
 Added in 26.3.0. Nested filter for aliases belonging to an image. Filters images that have at least one alias matching all specified conditions.
 """
-input ImageAliasNestedFilterGQL {
+input ImageAliasNestedFilter {
   """
   Filter by alias string. Supports equals, contains, startsWith, and endsWith.
   """
@@ -2779,7 +2779,7 @@ input ImageV2FilterGQL {
   architecture: StringFilter = null
 
   """Added in 26.3.0. Filter by nested alias conditions."""
-  alias: ImageAliasNestedFilterGQL = null
+  alias: ImageAliasNestedFilter = null
   AND: [ImageV2FilterGQL!] = null
   OR: [ImageV2FilterGQL!] = null
   NOT: [ImageV2FilterGQL!] = null
