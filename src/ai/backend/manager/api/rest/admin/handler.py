@@ -138,7 +138,7 @@ class AdminHandler:
                 context_value=gql_ctx,
                 middleware=[
                     GQLMutationPrivilegeCheckMiddleware(),
-                    GQLMutationUnfrozenRequiredMiddleware(),
+                    GQLMutationUnfrozenRequiredMiddleware(manager_status),
                     GQLMetricMiddleware(),
                     GQLExceptionMiddleware(),
                     GQLLoggingMiddleware(),

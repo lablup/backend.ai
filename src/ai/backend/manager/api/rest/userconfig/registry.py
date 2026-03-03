@@ -4,14 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.manager import READ_ALLOWED, server_status_required
 from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.server_status import READ_ALLOWED, server_status_required
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
-
-_status_readable = server_status_required(READ_ALLOWED)
 
 
 def register_userconfig_routes(deps: ModuleDeps) -> RouteRegistry:
@@ -21,6 +19,7 @@ def register_userconfig_routes(deps: ModuleDeps) -> RouteRegistry:
 
     reg = RouteRegistry.create("user-config", deps.cors_options)
     handler = UserConfigHandler(processors=deps.processors)
+    _status_readable = server_status_required(READ_ALLOWED, deps.config_provider)
 
     reg.add(
         "POST",
