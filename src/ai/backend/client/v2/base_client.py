@@ -114,6 +114,9 @@ class BackendAIAuthClient:
         session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
+        if params:
+            qs = "&".join(f"{k}={v}" for k, v in params.items())
+            rel_url = f"{rel_url}?{qs}"
         headers = self._sign(method, rel_url, content_type)
         url = self._build_url(path)
         async with session.request(

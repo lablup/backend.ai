@@ -180,11 +180,11 @@ class TestSessionLifecycle:
         result = await sc.destroy("my-sess", DestroySessionRequest(forced=True))
 
         assert isinstance(result, DestroySessionResponse)
-        method, url, body = _last_request_call(mock_session)
+        method, url, _ = _last_request_call(mock_session)
         assert method == "DELETE"
         assert "/session/my-sess" in url
-        assert body is not None
-        assert body["forced"] is True
+        call_kwargs = mock_session.request.call_args.kwargs
+        assert call_kwargs["params"]["forced"] == "True"
 
     async def test_restart(self) -> None:
         resp = _no_content_response()
@@ -204,11 +204,11 @@ class TestSessionLifecycle:
 
         await sc.rename("old-name", RenameSessionRequest(session_name="new-name"))
 
-        method, url, body = _last_request_call(mock_session)
+        method, url, _ = _last_request_call(mock_session)
         assert method == "POST"
         assert "/session/old-name/rename" in url
-        assert body is not None
-        assert body["session_name"] == "new-name"
+        call_kwargs = mock_session.request.call_args.kwargs
+        assert call_kwargs["params"]["session_name"] == "new-name"
 
     async def test_interrupt(self) -> None:
         resp = _no_content_response()

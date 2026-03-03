@@ -8,16 +8,8 @@ from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.scaling_group import ListScalingGroupsResponse
 
-_HMAC_XFAIL_REASON = (
-    "Client SDK v2 HMAC signing omits query params; "
-    "server verifies against request.raw_path (including ?group=...). "
-    "list_scaling_groups passes group as a query param, causing 401. "
-    "Tracked in BA-XXXX (Client SDK v2 HMAC signing bug)."
-)
-
 
 class TestScalingGroupList:
-    @pytest.mark.xfail(reason=_HMAC_XFAIL_REASON, strict=True)
     async def test_admin_lists_scaling_groups(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -32,7 +24,6 @@ class TestScalingGroupList:
         names = [sg.name for sg in result.scaling_groups]
         assert scaling_group_fixture in names
 
-    @pytest.mark.xfail(reason=_HMAC_XFAIL_REASON, strict=True)
     async def test_list_scaling_groups_with_group_filter(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -46,7 +37,6 @@ class TestScalingGroupList:
         assert isinstance(result, ListScalingGroupsResponse)
         assert any(sg.name == scaling_group_fixture for sg in result.scaling_groups)
 
-    @pytest.mark.xfail(reason=_HMAC_XFAIL_REASON, strict=True)
     async def test_regular_user_lists_public_scaling_groups(
         self,
         user_registry: BackendAIClientRegistry,

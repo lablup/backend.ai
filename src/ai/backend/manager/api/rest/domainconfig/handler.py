@@ -112,10 +112,10 @@ class DomainConfigHandler:
 
     async def delete(
         self,
-        body: BodyParam[DeleteDomainDotfileRequest],
+        query: QueryParam[DeleteDomainDotfileRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        params = body.parsed
+        params = query.parsed
         log.info("DOMAINCONFIG.DELETE(domain:{})", params.domain)
         if not ctx.is_superadmin and ctx.user_domain != params.domain:
             raise GenericForbidden("Domain admins cannot delete dotfiles of other domains")

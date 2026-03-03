@@ -30,12 +30,6 @@ from ai.backend.common.dto.manager.infra import (
     UsagePerPeriodResponse,
 )
 
-_HMAC_XFAIL_REASON = (
-    "Client SDK v2 HMAC signing omits query params; "
-    "server verifies against request.raw_path (including ?param=...). "
-    "Endpoints passing query params cause 401."
-)
-
 _GET_JSON_BODY_XFAIL_REASON = (
     "Client SDK v2 sends JSON body on GET requests, but the server's "
     "check_api_params reads from request.query for GET/HEAD methods, "
@@ -238,13 +232,12 @@ class TestResourcePresets:
         assert isinstance(result.scaling_group_remaining, dict)
         assert isinstance(result.scaling_groups, dict)
 
-    @pytest.mark.xfail(reason=_HMAC_XFAIL_REASON, strict=True)
     async def test_list_presets_with_scaling_group_filter(
         self,
         admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
     ) -> None:
-        """Filtering presets by scaling group triggers HMAC bug (query params not signed)."""
+        """Filtering presets by scaling group."""
         await admin_registry.infra.list_presets(
             ListPresetsRequest(scaling_group=scaling_group_fixture)
         )
@@ -325,13 +318,12 @@ class TestUsageStats:
 class TestScalingGroupsViaInfra:
     """Tests for scaling group endpoints accessed via InfraClient."""
 
-    @pytest.mark.xfail(reason=_HMAC_XFAIL_REASON, strict=True)
     async def test_admin_lists_scaling_groups_via_infra(
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
     ) -> None:
-        """InfraClient.list_scaling_groups triggers HMAC bug (query params not signed)."""
+        """InfraClient.list_scaling_groups lists scaling groups for the given group."""
         await admin_registry.infra.list_scaling_groups(
             ListScalingGroupsRequest(group=str(group_fixture))
         )
