@@ -1214,7 +1214,46 @@ class TestContainerRegistryRepository:
                 )
             )
 
-    @pytest.mark.asyncio
+    async def test_modify_registry_set_is_global_clears_allowed_groups(
+        self,
+        repository: ContainerRegistryRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        registry_with_associated_groups: _RegistryWithGroups,
+    ) -> None:
+        """Test that setting is_global=True clears all group associations."""
+        # Given - Registry already has 3 groups associated
+        registry_id = registry_with_associated_groups.registry.id
+
+        # When - Set is_global to True
+        result = await repository.modify_registry(
+            Updater(
+                spec=ContainerRegistryUpdaterSpec(
+                    is_global=TriState.update(True),
+                ),
+                pk_value=registry_id,
+            )
+        )
+
+        # Then - Registry is updated
+        assert result is not None
+        assert result.is_global is True
+
+        # Then - All group associations are cleared
+        async with db_with_cleanup.begin_readonly_session() as session:
+            associations = (
+                (
+                    await session.execute(
+                        sa.select(AssociationContainerRegistriesGroupsRow).where(
+                            AssociationContainerRegistriesGroupsRow.registry_id == registry_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            assert len(associations) == 0
+
     async def test_delete_registry_success(
         self,
         repository: ContainerRegistryRepository,
