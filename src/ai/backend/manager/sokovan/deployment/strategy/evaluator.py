@@ -19,6 +19,10 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
+from ai.backend.manager.errors.deployment import (
+    InvalidDeploymentStrategy,
+    InvalidDeploymentStrategySpec,
+)
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, NoPagination
@@ -125,19 +129,21 @@ class DeploymentStrategyEvaluator:
             case DeploymentStrategy.ROLLING:
                 spec = policy.strategy_spec
                 if not isinstance(spec, RollingUpdateSpec):
-                    raise ValueError(
-                        f"Expected RollingUpdateSpec for ROLLING strategy, got {type(spec).__name__}"
+                    raise InvalidDeploymentStrategySpec(
+                        extra_msg=f"Expected RollingUpdateSpec for ROLLING strategy, got {type(spec).__name__}"
                     )
                 return rolling_update_evaluate(deployment, routes, spec)
             case DeploymentStrategy.BLUE_GREEN:
                 spec = policy.strategy_spec
                 if not isinstance(spec, BlueGreenSpec):
-                    raise ValueError(
-                        f"Expected BlueGreenSpec for BLUE_GREEN strategy, got {type(spec).__name__}"
+                    raise InvalidDeploymentStrategySpec(
+                        extra_msg=f"Expected BlueGreenSpec for BLUE_GREEN strategy, got {type(spec).__name__}"
                     )
                 return blue_green_evaluate(deployment, routes, spec)
             case _:
-                raise ValueError(f"Unsupported deployment strategy: {strategy}")
+                raise InvalidDeploymentStrategy(
+                    extra_msg=f"Unsupported deployment strategy: {strategy}"
+                )
 
     async def _apply_route_changes(
         self,
