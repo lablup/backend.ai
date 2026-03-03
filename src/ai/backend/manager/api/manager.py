@@ -142,7 +142,9 @@ async def report_status_bgtask(root_ctx: RootContext) -> None:
         while True:
             await asyncio.sleep(interval)
             try:
-                await report_manager_status(root_ctx)
+                await report_manager_status(
+                    root_ctx.valkey_stat, root_ctx.db, root_ctx.config_provider
+                )
             except Exception as e:
                 log.exception(f"Failed to report manager health status (e:{e!s})")
     except asyncio.CancelledError:

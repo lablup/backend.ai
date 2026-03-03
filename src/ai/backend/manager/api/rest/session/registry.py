@@ -36,7 +36,7 @@ def register_session_routes(deps: ModuleDeps) -> RouteRegistry:
     # Wire lifecycle hooks
     reg.app.on_startup.append(session_init)
     reg.app.on_shutdown.append(session_shutdown)
-    handler = SessionHandler(processors=deps.processors)
+    handler = SessionHandler(processors=deps.processors, config_provider=deps.config_provider)
 
     # --- Session creation ---
     reg.add(

@@ -77,7 +77,6 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import (
     ACTIVE_USER_STATUSES,
     UserRole,
-    UserRow,
     UserStatus,
     users,
 )
@@ -1481,20 +1480,13 @@ async def invite(request: web.Request, params: Any, row: Mapping[str, Any]) -> w
         request.match_info["name"],
         ",".join(invitee_emails),
     )
-    async with root_ctx.db.begin_readonly_session() as db_session:
-        user_rows = await db_session.scalars(
-            sa.select(UserRow).where(UserRow.email.in_(invitee_emails))
-        )
-        user_uuids = [user_row.uuid for user_row in user_rows]
-    if not user_uuids:
-        raise VFolderNotFound("No users found with the provided emails.")
     result = await root_ctx.processors.vfolder_invite.invite_vfolder.wait_for_complete(
         InviteVFolderAction(
             keypair_resource_policy=request["keypair"]["resource_policy"],
             user_uuid=user_uuid,
             vfolder_uuid=row["id"],
             mount_permission=perm,
-            invitee_user_uuids=user_uuids,
+            invitee_emails=invitee_emails,
         )
     )
     resp = {"invited_ids": result.invitation_ids}

@@ -23,7 +23,7 @@ def register_spec_routes(deps: ModuleDeps) -> RouteRegistry:
     # no PrivateContext needed.
     reg.app.on_startup.append(spec_init)
 
-    handler = SpecHandler()
+    handler = SpecHandler(config_provider=deps.config_provider)
 
     reg.add(
         "GET",

@@ -32,7 +32,9 @@ async def report_status_bgtask(root_ctx: RootContext) -> None:
         while True:
             await asyncio.sleep(interval)
             try:
-                await report_manager_status(root_ctx)
+                await report_manager_status(
+                    root_ctx.valkey_stat, root_ctx.db, root_ctx.config_provider
+                )
             except asyncio.CancelledError:
                 raise
             except Exception as e:
@@ -135,7 +137,9 @@ async def hello(request: web.Request) -> web.Response:
 
 async def get_manager_status_for_prom(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    status = await get_manager_db_cxn_status(root_ctx)
+    status = await get_manager_db_cxn_status(
+        root_ctx.valkey_stat, root_ctx.db, root_ctx.config_provider
+    )
 
     total_cxn_metrics = []
     open_cxn_metrics = []

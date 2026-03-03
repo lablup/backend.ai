@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.fair_share import InvalidResourceWeightError
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
@@ -14,6 +16,9 @@ from ai.backend.manager.repositories.scaling_group.updaters import (
     ResourceGroupFairShareUpdaterSpec,
     ScalingGroupUpdaterSpec,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.services.scaling_group.actions.associate_with_domain import (
     AssociateScalingGroupWithDomainsAction,
     AssociateScalingGroupWithDomainsActionResult,
@@ -46,6 +51,14 @@ from ai.backend.manager.services.scaling_group.actions.get_resource_info import 
     GetResourceInfoAction,
     GetResourceInfoActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.get_wsproxy_version import (
+    GetWsproxyVersionAction,
+    GetWsproxyVersionActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.list_allowed import (
+    ListAllowedScalingGroupsAction,
+    ListAllowedScalingGroupsActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
     SearchScalingGroupsActionResult,
@@ -69,9 +82,54 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class ScalingGroupService:
     _repository: ScalingGroupRepository
+    _appproxy_client_pool: AppProxyClientPool | None
 
-    def __init__(self, repository: ScalingGroupRepository) -> None:
+    def __init__(
+        self,
+        repository: ScalingGroupRepository,
+        appproxy_client_pool: AppProxyClientPool | None = None,
+    ) -> None:
         self._repository = repository
+        self._appproxy_client_pool = appproxy_client_pool
+
+    async def list_allowed_sgroups(
+        self, action: ListAllowedScalingGroupsAction
+    ) -> ListAllowedScalingGroupsActionResult:
+        """List scaling groups allowed for a user, filtered by visibility."""
+        sgroups = await self._repository.list_allowed_sgroups(
+            domain_name=action.domain_name,
+            group=action.group,
+            access_key=action.access_key,
+        )
+        if not action.is_admin:
+            sgroups = [sg for sg in sgroups if sg.status.is_public]
+        return ListAllowedScalingGroupsActionResult(
+            scaling_group_names=[sg.name for sg in sgroups],
+        )
+
+    async def get_wsproxy_version(
+        self, action: GetWsproxyVersionAction
+    ) -> GetWsproxyVersionActionResult:
+        """Get wsproxy version for a specific scaling group."""
+        if self._appproxy_client_pool is None:
+            raise ObjectNotFound(object_name="AppProxy client pool")
+        sgroups = await self._repository.list_allowed_sgroups(
+            domain_name=action.domain_name,
+            group=action.group,
+            access_key=action.access_key,
+        )
+        sgroup_filtered = [sg for sg in sgroups if sg.name == action.scaling_group_name]
+        if not sgroup_filtered:
+            raise ObjectNotFound(object_name="scaling group")
+        sgroup = sgroup_filtered[0]
+
+        if not sgroup.network.wsproxy_addr:
+            raise ObjectNotFound(object_name="AppProxy address")
+        client = self._appproxy_client_pool.load_client(
+            sgroup.network.wsproxy_addr, sgroup.network.wsproxy_api_token or ""
+        )
+        status = await client.fetch_status()
+        return GetWsproxyVersionActionResult(wsproxy_version=status.api_version)
 
     async def search_scaling_groups(
         self, action: SearchScalingGroupsAction

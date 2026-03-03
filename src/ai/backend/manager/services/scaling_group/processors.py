@@ -35,6 +35,14 @@ from ai.backend.manager.services.scaling_group.actions.get_resource_info import 
     GetResourceInfoAction,
     GetResourceInfoActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.get_wsproxy_version import (
+    GetWsproxyVersionAction,
+    GetWsproxyVersionActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.list_allowed import (
+    ListAllowedScalingGroupsAction,
+    ListAllowedScalingGroupsActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
     SearchScalingGroupsActionResult,
@@ -61,6 +69,10 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
     search_scaling_groups: ActionProcessor[
         SearchScalingGroupsAction, SearchScalingGroupsActionResult
     ]
+    list_allowed_sgroups: ActionProcessor[
+        ListAllowedScalingGroupsAction, ListAllowedScalingGroupsActionResult
+    ]
+    get_wsproxy_version: ActionProcessor[GetWsproxyVersionAction, GetWsproxyVersionActionResult]
     get_resource_info: ActionProcessor[GetResourceInfoAction, GetResourceInfoActionResult]
     update_fair_share_spec: ActionProcessor[
         UpdateFairShareSpecAction, UpdateFairShareSpecActionResult
@@ -90,6 +102,8 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         self.purge_scaling_group = ActionProcessor(service.purge_scaling_group, action_monitors)
         self.modify_scaling_group = ActionProcessor(service.modify_scaling_group, action_monitors)
         self.search_scaling_groups = ActionProcessor(service.search_scaling_groups, action_monitors)
+        self.list_allowed_sgroups = ActionProcessor(service.list_allowed_sgroups, action_monitors)
+        self.get_wsproxy_version = ActionProcessor(service.get_wsproxy_version, action_monitors)
         self.get_resource_info = ActionProcessor(service.get_resource_info, action_monitors)
         self.update_fair_share_spec = ActionProcessor(
             service.update_fair_share_spec, action_monitors
@@ -120,6 +134,8 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
             PurgeScalingGroupAction.spec(),
             ModifyScalingGroupAction.spec(),
             SearchScalingGroupsAction.spec(),
+            ListAllowedScalingGroupsAction.spec(),
+            GetWsproxyVersionAction.spec(),
             GetResourceInfoAction.spec(),
             UpdateFairShareSpecAction.spec(),
             AssociateScalingGroupWithDomainsAction.spec(),

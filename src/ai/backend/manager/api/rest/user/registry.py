@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 def register_user_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the user sub-registry (child of admin)."""
     reg = RouteRegistry.create("users", deps.cors_options)
-    handler = UserHandler(processors=deps.processors, auth_config=deps.auth_config)
+    handler = UserHandler(processors=deps.processors, config_provider=deps.config_provider)
 
     reg.add("POST", "", handler.create_user, middlewares=[superadmin_required])
     reg.add(

@@ -35,7 +35,9 @@ def register_service_routes(deps: ModuleDeps) -> RouteRegistry:
     # Wire lifecycle hooks
     reg.app.on_startup.append(service_init)
     reg.app.on_shutdown.append(service_shutdown)
-    handler = ServiceHandler(processors=deps.processors)
+    handler = ServiceHandler(
+        processors=deps.processors,
+    )
 
     # Service list & create (root)
     reg.add("GET", "", handler.list_serve, middlewares=[auth_required])

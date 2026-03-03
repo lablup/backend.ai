@@ -28,6 +28,8 @@ from ai.backend.manager.services.vfolder.actions.file import (
     ListFilesActionResult,
     MkdirAction,
     MkdirActionResult,
+    MoveFileAction,
+    MoveFileActionResult,
     RenameFileAction,
     RenameFileActionResult,
 )
@@ -377,3 +379,29 @@ class VFolderFileService:
             results=results,
             storage_resp_status=200,
         )
+
+    async def move_file(self, action: MoveFileAction) -> MoveFileActionResult:
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
+        if not vfolder_data:
+            raise VFolderInvalidParameter("VFolder not found")
+
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
+        )
+        vfolder_id = VFolderID(
+            quota_scope_id=vfolder_data.quota_scope_id,
+            folder_id=vfolder_data.id,
+        )
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        await manager_client.move_file(
+            volume_name,
+            str(vfolder_id),
+            action.src,
+            action.dst,
+        )
+        return MoveFileActionResult(vfolder_uuid=action.vfolder_uuid)

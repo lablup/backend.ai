@@ -5,7 +5,7 @@ from typing import cast
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.container_registry import AllowedGroupsModel
+from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -202,6 +202,22 @@ class ContainerRegistryRepository:
                         known_registries[f"{project}/{registry_name}"] = url.human_repr()
 
             return known_registries
+
+    @container_registry_repository_resilience.apply()
+    async def get_registry_by_url_and_project(
+        self,
+        registry_url: str,
+        project: str,
+    ) -> ContainerRegistryRow | None:
+        """Find a Harbor2 registry row matching the given URL and project."""
+        async with self._db.begin_readonly_session_read_committed() as session:
+            stmt = sa.select(ContainerRegistryRow).where(
+                (ContainerRegistryRow.type == ContainerRegistryType.HARBOR2)
+                & (ContainerRegistryRow.url.like(f"%{registry_url}%"))
+                & (ContainerRegistryRow.project == project)
+            )
+            result = await session.execute(stmt)
+            return result.scalars().one_or_none()
 
     @container_registry_repository_resilience.apply()
     async def get_registry_row_for_scanner(

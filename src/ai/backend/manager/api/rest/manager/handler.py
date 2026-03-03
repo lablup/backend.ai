@@ -12,12 +12,10 @@ directly because Prometheus exposition format is not JSON.
 from __future__ import annotations
 
 import logging
-import socket
 import textwrap
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final
 
-import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 
@@ -35,18 +33,19 @@ from ai.backend.common.dto.manager.manager_api.response import (
 from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager import __version__
-from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericBadRequest
-from ai.backend.manager.errors.resource import InstanceNotFound
-from ai.backend.manager.models.agent import agents
-from ai.backend.manager.models.health import get_manager_db_cxn_status
-from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+from ai.backend.manager.services.manager_admin import (
+    FetchManagerStatusAction,
+    GetAnnouncementAction,
+    GetDbCxnStatusAction,
+    PerformSchedulerOpsAction,
+    UpdateAnnouncementAction,
+    UpdateManagerStatusAction,
+)
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.context import RootContext
     from ai.backend.manager.services.processors import Processors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -156,43 +155,29 @@ class ManagerHandler:
     # ------------------------------------------------------------------
 
     async def fetch_manager_status(self, req: RequestCtx) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         log.info("MANAGER.FETCH_MANAGER_STATUS ()")
         try:
-            status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
-            configs = root_ctx.config_provider.config.manager
-
-            async with root_ctx.db.begin() as conn:
-                query = (
-                    sa.select(sa.func.count())
-                    .select_from(kernels)
-                    .where(
-                        (kernels.c.cluster_role == DEFAULT_ROLE)
-                        & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
-                    )
-                )
-                active_sessions_num = await conn.scalar(query)
-
-                _id = configs.id if configs.id else socket.gethostname()
-                nodes = [
-                    {
-                        "id": _id,
-                        "num_proc": configs.num_proc,
-                        "service_addr": str(configs.service_addr),
-                        "heartbeat_timeout": configs.heartbeat_timeout,
-                        "ssl_enabled": configs.ssl_enabled,
-                        "active_sessions": active_sessions_num,
-                        "status": status.value,
-                        "version": __version__,
-                        "api_version": req.request["api_version"],
-                    },
-                ]
-                resp = ManagerStatusResponse(
-                    nodes=nodes,
-                    status=status.value,
-                    active_sessions=active_sessions_num,
-                )
-                return APIResponse.build(HTTPStatus.OK, resp)
+            action = FetchManagerStatusAction()
+            result = await self._processors.manager_admin.fetch_status.wait_for_complete(action)
+            nodes = [
+                {
+                    "id": result.manager_id,
+                    "num_proc": result.num_proc,
+                    "service_addr": result.service_addr,
+                    "heartbeat_timeout": result.heartbeat_timeout,
+                    "ssl_enabled": result.ssl_enabled,
+                    "active_sessions": result.active_sessions,
+                    "status": result.status,
+                    "version": __version__,
+                    "api_version": req.request["api_version"],
+                },
+            ]
+            resp = ManagerStatusResponse(
+                nodes=nodes,
+                status=result.status,
+                active_sessions=result.active_sessions,
+            )
+            return APIResponse.build(HTTPStatus.OK, resp)
         except Exception:
             log.exception("GET_MANAGER_STATUS: exception")
             raise
@@ -205,32 +190,28 @@ class ManagerHandler:
         self,
         body: BodyParam[UpdateManagerStatusRequest],
         ctx: UserContext,
-        req: RequestCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         params = body.parsed
         log.info(
             "MANAGER.UPDATE_MANAGER_STATUS (status:{}, force_kill:{})",
             params.status,
             params.force_kill,
         )
-        status = ManagerStatus(params.status)
-        if params.force_kill:
-            pass
-        await root_ctx.config_provider.legacy_etcd_config_loader.update_manager_status(status)
+        action = UpdateManagerStatusAction(
+            status=params.status,
+            force_kill=params.force_kill,
+        )
+        await self._processors.manager_admin.update_status.wait_for_complete(action)
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
     # get_announcement (GET /manager/announcement)
     # ------------------------------------------------------------------
 
-    async def get_announcement(self, req: RequestCtx) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
-        data = await root_ctx.etcd.get("manager/announcement")
-        if data is None:
-            resp = AnnouncementResponse(enabled=False, message="")
-        else:
-            resp = AnnouncementResponse(enabled=True, message=data)
+    async def get_announcement(self) -> APIResponse:
+        action = GetAnnouncementAction()
+        result = await self._processors.manager_admin.get_announcement.wait_for_complete(action)
+        resp = AnnouncementResponse(enabled=result.enabled, message=result.message)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
@@ -241,18 +222,13 @@ class ManagerHandler:
         self,
         body: BodyParam[UpdateAnnouncementRequest],
         ctx: UserContext,
-        req: RequestCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         params = body.parsed
-        if params.enabled:
-            if not params.message:
-                raise InvalidAPIParameters(
-                    extra_msg="Empty message not allowed to enable announcement"
-                )
-            await root_ctx.etcd.put("manager/announcement", params.message)
-        else:
-            await root_ctx.etcd.delete("manager/announcement")
+        action = UpdateAnnouncementAction(
+            enabled=params.enabled,
+            message=params.message,
+        )
+        await self._processors.manager_admin.update_announcement.wait_for_complete(action)
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
@@ -263,9 +239,7 @@ class ManagerHandler:
         self,
         body: BodyParam[SchedulerOpsRequest],
         ctx: UserContext,
-        req: RequestCtx,
     ) -> APIResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
         params = body.parsed
         op = SchedulerOps(params.op)
         try:
@@ -277,11 +251,11 @@ class ManagerHandler:
             ) from e
         if op in (SchedulerOps.INCLUDE_AGENTS, SchedulerOps.EXCLUDE_AGENTS):
             schedulable = op == SchedulerOps.INCLUDE_AGENTS
-            async with root_ctx.db.begin() as conn:
-                query = agents.update().values(schedulable=schedulable).where(agents.c.id.in_(args))
-                result = await conn.execute(query)
-                if result.rowcount < len(args):
-                    raise InstanceNotFound()
+            action = PerformSchedulerOpsAction(
+                agent_ids=args,
+                schedulable=schedulable,
+            )
+            await self._processors.manager_admin.perform_scheduler_ops.wait_for_complete(action)
         else:
             raise GenericBadRequest("Unknown scheduler operation")
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
@@ -304,9 +278,10 @@ class ManagerHandler:
     # get_manager_status_for_prom (GET /manager/prom)
     # ------------------------------------------------------------------
 
-    async def get_manager_status_for_prom(self, req: RequestCtx) -> web.StreamResponse:
-        root_ctx: RootContext = req.request.app["_root.context"]
-        status = await get_manager_db_cxn_status(root_ctx)
+    async def get_manager_status_for_prom(self) -> web.StreamResponse:
+        action = GetDbCxnStatusAction()
+        result = await self._processors.manager_admin.get_db_cxn_status.wait_for_complete(action)
+        status = result.cxn_infos
 
         total_cxn_metrics: list[SQLAlchemyConnectionMetric] = []
         open_cxn_metrics: list[SQLAlchemyConnectionMetric] = []
@@ -342,5 +317,5 @@ class ManagerHandler:
             RedisConnectionMetricGroup(redis_cxn_metrics).metric_string(),
         )
 
-        result = "\n".join(metric_string)
-        return web.Response(text=textwrap.dedent(result))
+        prom_output = "\n".join(metric_string)
+        return web.Response(text=textwrap.dedent(prom_output))
