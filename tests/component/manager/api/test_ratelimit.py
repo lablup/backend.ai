@@ -9,11 +9,11 @@ import pytest
 import ai.backend.manager.api.ratelimit as rlim
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
+from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.ratelimit.registry import register_ratelimit_routes
 from ai.backend.manager.api.rest.types import ModuleDeps
 from ai.backend.manager.server import (
-    RootContext,
     agent_registry_ctx,
     database_ctx,
     event_dispatcher_plugin_ctx,
