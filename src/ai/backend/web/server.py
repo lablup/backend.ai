@@ -36,10 +36,13 @@ import tomli
 import uvloop
 from aiohttp import web
 from setproctitle import setproctitle
+from yarl import URL
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
+from ai.backend.client.v2.base_client import BackendAIAnonymousClient
+from ai.backend.client.v2.config import ClientConfig as V2ClientConfig
 from ai.backend.common import config
 from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
@@ -765,6 +768,21 @@ async def client_ctx(
 
 
 @asynccontextmanager
+async def anon_client_ctx(
+    config: WebServerUnifiedConfig,
+) -> AsyncGenerator[BackendAIAnonymousClient]:
+    v2_config = V2ClientConfig(
+        endpoint=URL(str(config.api.endpoint[0])),
+        skip_ssl_verification=not config.api.ssl_verify,
+    )
+    client = await BackendAIAnonymousClient.create(v2_config)
+    try:
+        yield client
+    finally:
+        await client.close()
+
+
+@asynccontextmanager
 async def webapp_ctx(
     config: WebServerUnifiedConfig,
     app: web.Application,
@@ -945,6 +963,7 @@ async def server_main(
         app["config"] = config
         app["stats"] = WebStats()
         app["client_pool"] = await web_init_stack.enter_async_context(client_ctx(config, app))
+        app["anon_client"] = await web_init_stack.enter_async_context(anon_client_ctx(config))
         await web_init_stack.enter_async_context(redis_ctx(config, app, pidx))
 
         # Initialize health probe

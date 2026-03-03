@@ -109,17 +109,28 @@ def get_client_ip(request: web.Request) -> str | None:
     return client_ip
 
 
-def fill_forwarding_hdrs_to_api_session(
-    request: web.Request,
-    api_session: APISession,
-) -> None:
-    _headers = {
+def build_forwarding_headers(request: web.Request) -> dict[str, str]:
+    """Build forwarding headers from the incoming request.
+
+    Returns a plain dict suitable for passing as ``extra_headers``
+    to the v2 anonymous client or similar HTTP callers.
+    """
+    headers: dict[str, str] = {
         "X-Forwarded-Host": request.headers.get("X-Forwarded-Host", request.host),
         "X-Forwarded-Proto": request.headers.get("X-Forwarded-Proto", request.scheme),
     }
     client_ip = get_client_ip(request)
     if client_ip:
-        _headers["X-Forwarded-For"] = client_ip
+        headers["X-Forwarded-For"] = client_ip
+    return headers
+
+
+def fill_forwarding_hdrs_to_api_session(
+    request: web.Request,
+    api_session: APISession,
+) -> None:
+    _headers = build_forwarding_headers(request)
+    if _headers:
         api_session.aiohttp_session.headers.update(_headers)
 
 
