@@ -6,11 +6,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-import ai.backend.manager.api.ratelimit as rlim
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.ratelimit.handler import _rlim_window
 from ai.backend.manager.api.rest.ratelimit.registry import register_ratelimit_routes
 from ai.backend.manager.api.rest.types import ModuleDeps
 from ai.backend.manager.server import (
@@ -92,7 +92,7 @@ async def test_check_rlim_for_anonymous_query(
     assert ret.status == 200
     assert ret.headers["X-RateLimit-Limit"] == "1000"
     assert ret.headers["X-RateLimit-Remaining"] == "1000"
-    assert str(rlim._rlim_window) == ret.headers["X-RateLimit-Window"]
+    assert str(_rlim_window) == ret.headers["X-RateLimit-Window"]
 
 
 async def test_check_rlim_for_authorized_query(
@@ -132,4 +132,4 @@ async def test_check_rlim_for_authorized_query(
     # The default example keypair's ratelimit is 30000.
     assert ret.headers["X-RateLimit-Limit"] == "30000"
     assert ret.headers["X-RateLimit-Remaining"] == "29999"
-    assert str(rlim._rlim_window) == ret.headers["X-RateLimit-Window"]
+    assert str(_rlim_window) == ret.headers["X-RateLimit-Window"]

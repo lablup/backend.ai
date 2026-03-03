@@ -10,13 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
-
-# Statically imported so that Pants includes these modules in the test PEX.
-# build_root_app() loads them at runtime via importlib.import_module(),
-# which Pants cannot trace statically.
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import container_registry as _container_registry_api
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.container_registry.registry import (
@@ -39,7 +34,7 @@ from ai.backend.manager.server import (
 )
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
 
-_CONTAINER_REGISTRY_SERVER_SUBAPP_MODULES = (_auth_api, _container_registry_api)
+_CONTAINER_REGISTRY_SERVER_SUBAPP_MODULES = (_auth_api,)
 
 
 @asynccontextmanager

@@ -9,7 +9,6 @@ import sqlalchemy as sa
 
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import logs as _logs_api
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.rest import error_log as _error_log_rest
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
@@ -31,10 +30,7 @@ from ai.backend.manager.server import (
 )
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
 
-# Statically imported so that Pants includes these modules in the test PEX.
-# _logs_api is kept as legacy subapp (GlobalTimer lifecycle).
-# _error_log_rest provides new-style route registration via parent conftest.
-_ERROR_LOG_SERVER_SUBAPP_MODULES = (_auth_api, _logs_api, _error_log_rest)
+_ERROR_LOG_SERVER_SUBAPP_MODULES = (_auth_api, _error_log_rest)
 
 
 @asynccontextmanager

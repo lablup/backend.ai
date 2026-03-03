@@ -15,13 +15,8 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
-
-# Statically imported so that Pants includes these modules in the test PEX.
-# build_root_app() loads them at runtime via importlib.import_module(),
-# which Pants cannot trace statically.
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import stream as _stream_api
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.stream.registry import register_stream_routes
@@ -45,7 +40,7 @@ from ai.backend.manager.server import (
 )
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
 
-_STREAMING_SERVER_SUBAPP_MODULES = (_auth_api, _stream_api)
+_STREAMING_SERVER_SUBAPP_MODULES = (_auth_api,)
 
 
 @dataclass

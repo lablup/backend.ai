@@ -14,7 +14,6 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import logs as _logs_api
 from ai.backend.manager.api import manager as _manager_api
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
@@ -39,10 +38,7 @@ from ai.backend.manager.server import (
 )
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
 
-# Statically imported so that Pants includes these modules in the test PEX.
-# build_root_app() loads them at runtime via importlib.import_module(),
-# which Pants cannot trace statically.
-_OPERATIONS_SERVER_SUBAPP_MODULES = (_auth_api, _logs_api, _manager_api)
+_OPERATIONS_SERVER_SUBAPP_MODULES = (_auth_api, _manager_api)
 
 
 async def _blocking_watch_manager_status() -> AsyncIterator[Any]:
