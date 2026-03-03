@@ -2616,6 +2616,16 @@ type HuggingFaceRegistryEdge {
   node: HuggingFaceRegistry!
 }
 
+"""
+Added in 26.3.0. Nested filter for aliases belonging to an image. Filters images that have at least one alias matching all specified conditions.
+"""
+input ImageAliasNestedFilter {
+  """
+  Filter by alias string. Supports equals, contains, startsWith, and endsWith.
+  """
+  alias: StringFilter = null
+}
+
 """Added in 25.19.0"""
 input ImageInput {
   id: ID!
@@ -2767,6 +2777,9 @@ input ImageV2FilterGQL {
   status: [ImageV2Status!] = null
   name: StringFilter = null
   architecture: StringFilter = null
+
+  """Added in 26.3.0. Filter by nested alias conditions."""
+  alias: ImageAliasNestedFilter = null
   AND: [ImageV2FilterGQL!] = null
   OR: [ImageV2FilterGQL!] = null
   NOT: [ImageV2FilterGQL!] = null
