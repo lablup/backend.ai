@@ -112,8 +112,9 @@ def get_client_ip(request: web.Request) -> str | None:
 def build_forwarding_headers(request: web.Request) -> dict[str, str]:
     """Build forwarding headers from the incoming request.
 
-    Returns a plain dict suitable for passing as ``extra_headers``
-    to the v2 anonymous client or similar HTTP callers.
+    Returns a plain dict of ``X-Forwarded-*`` HTTP headers that can be
+    applied to outgoing requests via ``extra_headers`` parameters or
+    :func:`fill_forwarding_hdrs_to_api_session`.
     """
     headers: dict[str, str] = {
         "X-Forwarded-Host": request.headers.get("X-Forwarded-Host", request.host),
@@ -130,8 +131,7 @@ def fill_forwarding_hdrs_to_api_session(
     api_session: APISession,
 ) -> None:
     _headers = build_forwarding_headers(request)
-    if _headers:
-        api_session.aiohttp_session.headers.update(_headers)
+    api_session.aiohttp_session.headers.update(_headers)
 
 
 async def generate_jwt_token_for_session(

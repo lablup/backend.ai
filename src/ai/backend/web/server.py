@@ -775,7 +775,14 @@ async def anon_client_ctx(
         endpoint=URL(str(config.api.endpoint[0])),
         skip_ssl_verification=not config.api.ssl_verify,
     )
-    client = await BackendAIAnonymousClient.create(v2_config)
+    session = aiohttp.ClientSession(
+        connector=aiohttp.TCPConnector(
+            ssl=config.api.ssl_verify,
+            limit=config.api.connection_limit,
+        ),
+        auto_decompress=False,
+    )
+    client = BackendAIAnonymousClient(v2_config, session)
     try:
         yield client
     finally:
