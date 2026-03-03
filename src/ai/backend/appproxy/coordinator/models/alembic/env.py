@@ -8,7 +8,6 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from ai.backend.appproxy.coordinator.models.alembic import invoked_programmatically
 from ai.backend.appproxy.coordinator.models.base import metadata_obj as metadata
 from ai.backend.logging import is_active as logging_active
 
@@ -86,8 +85,7 @@ def run_migrations_online() -> None:
         do_run_migrations(connection)
 
 
-if not invoked_programmatically.get():  # when executed via `alembic` commands
-    if context.is_offline_mode():
-        run_migrations_offline()
-    else:
-        run_migrations_online()
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
