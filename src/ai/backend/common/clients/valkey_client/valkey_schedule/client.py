@@ -182,6 +182,15 @@ class ValkeyScheduleClient:
         """
         return f"agent:last_check:{agent_id}"
 
+    def _get_session_failed_agents_key(self, session_id: SessionId) -> str:
+        """
+        Generate the Redis key for session-scoped failed agent tracking.
+
+        :param session_id: The session ID
+        :return: The formatted key string
+        """
+        return f"session:failed_agents:{session_id}"
+
     async def _get_redis_time(self) -> int:
         """
         Get current Unix timestamp from Redis server using TIME command.
@@ -334,17 +343,6 @@ class ValkeyScheduleClient:
                 except ValueError:
                     result.append(None)
         return result
-
-    # ==================== Session Failed Agents Methods ====================
-
-    def _get_session_failed_agents_key(self, session_id: SessionId) -> str:
-        """
-        Generate the Redis key for session-scoped failed agent tracking.
-
-        :param session_id: The session ID
-        :return: The formatted key string
-        """
-        return f"session:failed_agents:{session_id}"
 
     @valkey_schedule_resilience.apply()
     async def record_session_failed_agents(
