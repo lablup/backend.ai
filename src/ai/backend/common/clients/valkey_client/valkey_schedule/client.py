@@ -371,18 +371,30 @@ class ValkeyScheduleClient:
         await self._client.client.exec(batch, raise_on_error=True)
 
     @valkey_schedule_resilience.apply()
-    async def get_session_failed_agents(self, session_id: SessionId) -> frozenset[AgentId]:
+    async def get_multiple_session_failed_agents(
+        self,
+        session_ids: Sequence[SessionId],
+    ) -> list[frozenset[AgentId]]:
         """
-        Get the set of agents that previously failed for a specific session.
+        Get the sets of agents that previously failed for multiple sessions in one round-trip.
 
-        :param session_id: The session to look up
-        :return: Frozenset of failed agent IDs (empty if none)
+        Uses a non-atomic Batch to pipeline all SMEMBERS commands, reducing N round-trips to 1.
+
+        :param session_ids: The sessions to look up
+        :return: List of frozensets of failed agent IDs, in the same order as session_ids
         """
-        key = self._get_session_failed_agents_key(session_id)
-        result = await self._client.client.smembers(key)
-        if not result:
-            return frozenset()
-        return frozenset(AgentId(member.decode()) for member in result)
+        if not session_ids:
+            return []
+        batch = Batch(is_atomic=False)
+        for session_id in session_ids:
+            batch.smembers(self._get_session_failed_agents_key(session_id))
+        batch_result = await self._client.client.exec(batch, raise_on_error=True)
+        if batch_result is None:
+            return [frozenset() for _ in session_ids]
+        return [
+            frozenset(AgentId(member.decode()) for member in members) if members else frozenset()
+            for members in batch_result
+        ]
 
     @valkey_schedule_resilience.apply()
     async def mark_deployment_needed(self, lifecycle_type: str) -> None:
