@@ -7,7 +7,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.container_registry import AllowedGroupsModel
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import BackendAIError, ContainerRegistryGroupsAlreadyAssociated
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -29,18 +29,10 @@ from ai.backend.manager.models.container_registry import (
 )
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import (
-    BulkCreator,
-    Creator,
-    execute_bulk_creator,
-    execute_creator,
-)
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.purger import Purger, execute_purger
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
-from ai.backend.manager.repositories.container_registry.creators import (
-    ContainerRegistryCreatorSpec,
-    ContainerRegistryGroupCreatorSpec,
-)
+from ai.backend.manager.repositories.container_registry.creators import ContainerRegistryCreatorSpec
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
 )
@@ -239,35 +231,6 @@ class ContainerRegistryRepository:
                 raise ContainerRegistryNotFound()
             return row
 
-    @container_registry_repository_resilience.apply()
-    async def search_container_registries(
-        self,
-        querier: BatchQuerier,
-    ) -> ContainerRegistrySearchResult:
-        """Search container registries with pagination and filtering.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            ContainerRegistrySearchResult with items, total_count, and pagination info.
-        """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(ContainerRegistryRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            return ContainerRegistrySearchResult(
-                items=[row.ContainerRegistryRow.to_dataclass() for row in result.rows],
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
     async def _handle_allowed_groups_update(
         self,
         session: SASession,
@@ -287,15 +250,20 @@ class ContainerRegistryRepository:
             ContainerRegistryGroupsAssociationNotFound: If trying to remove non-existing associations
         """
         if allowed_group_updates.add:
-            specs = [
-                ContainerRegistryGroupCreatorSpec(
-                    registry_id=registry_id,
-                    group_id=uuid.UUID(group_id),
-                )
+            insert_values = [
+                {"registry_id": registry_id, "group_id": group_id}
                 for group_id in allowed_group_updates.add
             ]
-            bulk_creator = BulkCreator(specs=specs)
-            await execute_bulk_creator(session, bulk_creator)
+
+            try:
+                insert_query = sa.insert(AssociationContainerRegistriesGroupsRow).values(
+                    insert_values
+                )
+                await session.execute(insert_query)
+            except sa.exc.IntegrityError as e:
+                raise ContainerRegistryGroupsAlreadyAssociated(
+                    f"Already associated groups for registry_id: {registry_id}, group_ids: {allowed_group_updates.add}"
+                ) from e
 
         if allowed_group_updates.remove:
             delete_query = (

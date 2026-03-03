@@ -11,9 +11,6 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
-if TYPE_CHECKING:
-    pass
-
 
 @dataclass
 class ContainerRegistryUpdaterSpec(UpdaterSpec[ContainerRegistryRow]):
