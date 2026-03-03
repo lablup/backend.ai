@@ -26,7 +26,7 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.data.deployment.creator import DeploymentPolicyCreator
+from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingRule,
     AutoScalingRuleCreator,
@@ -221,7 +221,7 @@ class DeploymentDBSource:
     async def create_endpoint(
         self,
         creator: RBACEntityCreator[EndpointRow],
-        policy_config: DeploymentPolicyCreator | None = None,
+        policy_config: DeploymentPolicyConfig | None = None,
     ) -> DeploymentInfo:
         """Create a new endpoint in the database and return DeploymentInfo.
 

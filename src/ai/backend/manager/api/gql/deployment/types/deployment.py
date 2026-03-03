@@ -59,7 +59,7 @@ from ai.backend.manager.api.gql.user_federation import User
 from ai.backend.manager.api.gql_legacy.domain import DomainNode
 from ai.backend.manager.api.gql_legacy.group import GroupNode
 from ai.backend.manager.api.gql_legacy.user import UserNode
-from ai.backend.manager.data.deployment.creator import DeploymentPolicyCreator, NewDeploymentCreator
+from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig, NewDeploymentCreator
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
@@ -617,15 +617,15 @@ class DeploymentStrategyInputGQL:
         if self.type == DeploymentStrategy.BLUE_GREEN and not self.blue_green:
             raise InvalidAPIParameters("blue_green config required for BLUE_GREEN strategy")
 
-    def to_creator(self) -> DeploymentPolicyCreator:
-        """Convert to DeploymentPolicyCreator for service layer."""
+    def to_policy_config(self) -> DeploymentPolicyConfig:
+        """Convert to DeploymentPolicyConfig for service layer."""
         self.validate()
         strategy = DeploymentStrategy(self.type.value)
         match strategy:
             case DeploymentStrategy.ROLLING:
                 if self.rolling_update is None:
                     raise InvalidAPIParameters("rolling_update config required but not provided")
-                return DeploymentPolicyCreator(
+                return DeploymentPolicyConfig(
                     strategy=strategy,
                     strategy_spec=self.rolling_update.to_spec(),
                     rollback_on_failure=self.rollback_on_failure,
@@ -633,7 +633,7 @@ class DeploymentStrategyInputGQL:
             case DeploymentStrategy.BLUE_GREEN:
                 if self.blue_green is None:
                     raise InvalidAPIParameters("blue_green config required but not provided")
-                return DeploymentPolicyCreator(
+                return DeploymentPolicyConfig(
                     strategy=strategy,
                     strategy_spec=self.blue_green.to_spec(),
                     rollback_on_failure=self.rollback_on_failure,
@@ -670,7 +670,7 @@ class CreateDeploymentInput:
             replica_spec=ReplicaSpec(replica_count=self.desired_replica_count),
             network=self.network_access.to_network_spec(),
             model_revision=self.initial_revision.to_model_revision_creator(),
-            policy=self.default_deployment_strategy.to_creator(),
+            policy=self.default_deployment_strategy.to_policy_config(),
         )
 
 
@@ -738,7 +738,7 @@ class UpdateDeploymentInput:
             return None
 
         # Validate and convert
-        creator = self.default_deployment_strategy.to_creator()
+        creator = self.default_deployment_strategy.to_policy_config()
         return DeploymentPolicyUpdaterSpec(
             strategy=OptionalState.update(creator.strategy),
             strategy_spec=OptionalState.update(creator.strategy_spec),

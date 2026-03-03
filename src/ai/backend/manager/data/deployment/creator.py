@@ -47,7 +47,7 @@ class DeploymentCreator:
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
     model_revision: ModelRevisionSpec
-    policy: DeploymentPolicyCreator | None = None
+    policy: DeploymentPolicyConfig | None = None
 
     # Accessor properties for backward compatibility
     @property
@@ -112,18 +112,22 @@ class DeploymentCreationDraft:
 
 
 @dataclass
-class DeploymentPolicyCreator:
-    """Creator for deployment policy.
-
-    Passed from API/GQL layer to service layer for policy creation.
-    deployment_id is optional because it may not be known when creating
-    a policy alongside a new deployment.
-    """
+class DeploymentPolicyConfig:
+    """Policy configuration without a target deployment."""
 
     strategy: DeploymentStrategy
     strategy_spec: RollingUpdateSpec | BlueGreenSpec
     rollback_on_failure: bool = False
-    deployment_id: UUID | None = None
+
+
+@dataclass
+class DeploymentPolicyCreator:
+    """Creator for deployment policy bound to an existing deployment."""
+
+    deployment_id: UUID
+    strategy: DeploymentStrategy
+    strategy_spec: RollingUpdateSpec | BlueGreenSpec
+    rollback_on_failure: bool = False
 
 
 @dataclass
@@ -132,4 +136,4 @@ class NewDeploymentCreator:
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
     model_revision: ModelRevisionCreator
-    policy: DeploymentPolicyCreator | None = None
+    policy: DeploymentPolicyConfig | None = None

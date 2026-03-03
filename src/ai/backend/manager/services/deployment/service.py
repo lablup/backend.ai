@@ -32,7 +32,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteInfo,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
@@ -496,13 +495,8 @@ class DeploymentService:
             CreateDeploymentPolicyActionResult: Result containing the created policy data
         """
         creator = action.creator
-        deployment_id = creator.deployment_id
-        if deployment_id is None:
-            raise ServerMisconfiguredError(
-                "deployment_id must be set in the creator when creating a deployment policy"
-            )
         spec = DeploymentPolicyCreatorSpec(
-            endpoint_id=deployment_id,
+            endpoint_id=creator.deployment_id,
             strategy=creator.strategy,
             strategy_spec=creator.strategy_spec,
             rollback_on_failure=creator.rollback_on_failure,
