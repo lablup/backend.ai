@@ -1,9 +1,8 @@
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.config import ConfigClient
 from ai.backend.common.dto.manager.config import (
@@ -34,8 +33,8 @@ from .conftest import MockAuth
 _DEFAULT_CONFIG = ClientConfig(endpoint=URL("https://api.example.com"))
 
 
-def _make_client(mock_session: MagicMock | None = None) -> BackendAIClient:
-    return BackendAIClient(
+def _make_client(mock_session: MagicMock | None = None) -> BackendAIAuthClient:
+    return BackendAIAuthClient(
         _DEFAULT_CONFIG,
         MockAuth(),
         mock_session or MagicMock(),
@@ -59,7 +58,6 @@ def _ok_response(data: dict[str, object]) -> AsyncMock:
 
 
 class TestConfigClientUserDotfiles:
-    @pytest.mark.asyncio
     async def test_create_user_dotfile(self) -> None:
         mock_resp = _ok_response({})
         mock_session = _make_request_session(mock_resp)
@@ -77,7 +75,6 @@ class TestConfigClientUserDotfiles:
         assert "/user-config/dotfiles" in str(call_args[0][1])
         assert call_args.kwargs["json"]["path"] == ".bashrc"
 
-    @pytest.mark.asyncio
     async def test_get_user_dotfile(self) -> None:
         mock_resp = _ok_response({"path": ".bashrc", "perm": "644", "data": "alias ll='ls -la'"})
         mock_session = _make_request_session(mock_resp)
@@ -92,7 +89,6 @@ class TestConfigClientUserDotfiles:
         assert result.perm == "644"
         assert result.data == "alias ll='ls -la'"
 
-    @pytest.mark.asyncio
     async def test_list_user_dotfiles(self) -> None:
         mock_resp = _ok_response({
             "items": [
@@ -113,7 +109,6 @@ class TestConfigClientUserDotfiles:
         assert call_args[0][0] == "GET"
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_update_user_dotfile(self) -> None:
         mock_resp = _ok_response({})
         mock_session = _make_request_session(mock_resp)
@@ -127,7 +122,6 @@ class TestConfigClientUserDotfiles:
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "PATCH"
 
-    @pytest.mark.asyncio
     async def test_delete_user_dotfile(self) -> None:
         mock_resp = _ok_response({"success": True})
         mock_session = _make_request_session(mock_resp)
@@ -144,7 +138,6 @@ class TestConfigClientUserDotfiles:
 
 
 class TestConfigClientBootstrap:
-    @pytest.mark.asyncio
     async def test_get_bootstrap_script(self) -> None:
         resp = _ok_response({"script": "#!/bin/bash\necho hello"})
         mock_session = _make_request_session(resp)
@@ -159,7 +152,6 @@ class TestConfigClientBootstrap:
         assert call_args[0][0] == "GET"
         assert "/user-config/bootstrap-script" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_update_bootstrap_script(self) -> None:
         mock_resp = _ok_response({})
         mock_session = _make_request_session(mock_resp)
@@ -176,7 +168,6 @@ class TestConfigClientBootstrap:
 
 
 class TestConfigClientGroupDotfiles:
-    @pytest.mark.asyncio
     async def test_create_group_dotfile(self) -> None:
         mock_resp = _ok_response({})
         mock_session = _make_request_session(mock_resp)
@@ -194,7 +185,6 @@ class TestConfigClientGroupDotfiles:
         assert "/group-config/dotfiles" in str(call_args[0][1])
         assert call_args.kwargs["json"]["group"] == "my-group"
 
-    @pytest.mark.asyncio
     async def test_get_group_dotfile(self) -> None:
         mock_resp = _ok_response({"path": ".bashrc", "perm": "644", "data": "group content"})
         mock_session = _make_request_session(mock_resp)
@@ -207,7 +197,6 @@ class TestConfigClientGroupDotfiles:
         assert isinstance(result, GetDotfileResponse)
         assert result.path == ".bashrc"
 
-    @pytest.mark.asyncio
     async def test_list_group_dotfiles(self) -> None:
         mock_resp = _ok_response({"items": [{"path": ".bashrc", "perm": "644", "data": "content"}]})
         mock_session = _make_request_session(mock_resp)
@@ -220,7 +209,6 @@ class TestConfigClientGroupDotfiles:
         assert isinstance(result, ListDotfilesResponse)
         assert len(result.items) == 1
 
-    @pytest.mark.asyncio
     async def test_update_group_dotfile(self) -> None:
         mock_resp = _ok_response({})
         mock_session = _make_request_session(mock_resp)
@@ -236,7 +224,6 @@ class TestConfigClientGroupDotfiles:
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "PATCH"
 
-    @pytest.mark.asyncio
     async def test_delete_group_dotfile(self) -> None:
         mock_resp = _ok_response({"success": True})
         mock_session = _make_request_session(mock_resp)
@@ -251,7 +238,6 @@ class TestConfigClientGroupDotfiles:
 
 
 class TestConfigClientDomainDotfiles:
-    @pytest.mark.asyncio
     async def test_create_domain_dotfile(self) -> None:
         mock_resp = _ok_response({})
         mock_session = _make_request_session(mock_resp)
@@ -268,7 +254,6 @@ class TestConfigClientDomainDotfiles:
         assert call_args[0][0] == "POST"
         assert "/domain-config/dotfiles" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_get_domain_dotfile(self) -> None:
         mock_resp = _ok_response({"path": ".bashrc", "perm": "644", "data": "domain content"})
         mock_session = _make_request_session(mock_resp)
@@ -281,7 +266,6 @@ class TestConfigClientDomainDotfiles:
         assert isinstance(result, GetDotfileResponse)
         assert result.data == "domain content"
 
-    @pytest.mark.asyncio
     async def test_list_domain_dotfiles(self) -> None:
         mock_resp = _ok_response({"items": [{"path": ".bashrc", "perm": "644", "data": "content"}]})
         mock_session = _make_request_session(mock_resp)
@@ -294,7 +278,6 @@ class TestConfigClientDomainDotfiles:
         assert isinstance(result, ListDotfilesResponse)
         assert len(result.items) == 1
 
-    @pytest.mark.asyncio
     async def test_update_domain_dotfile(self) -> None:
         mock_resp = _ok_response({})
         mock_session = _make_request_session(mock_resp)
@@ -308,7 +291,6 @@ class TestConfigClientDomainDotfiles:
 
         assert isinstance(result, UpdateDotfileResponse)
 
-    @pytest.mark.asyncio
     async def test_delete_domain_dotfile(self) -> None:
         mock_resp = _ok_response({"success": True})
         mock_session = _make_request_session(mock_resp)
@@ -323,7 +305,6 @@ class TestConfigClientDomainDotfiles:
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "DELETE"
 
-    @pytest.mark.asyncio
     async def test_create_group_dotfile_with_domain(self) -> None:
         mock_resp = _ok_response({})
         mock_session = _make_request_session(mock_resp)
@@ -343,7 +324,6 @@ class TestConfigClientDomainDotfiles:
         call_args = mock_session.request.call_args
         assert call_args.kwargs["json"]["domain"] == "default"
 
-    @pytest.mark.asyncio
     async def test_create_user_dotfile_with_owner_access_key(self) -> None:
         mock_resp = _ok_response({})
         mock_session = _make_request_session(mock_resp)

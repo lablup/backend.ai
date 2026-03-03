@@ -288,7 +288,6 @@ class TestEnqueueSessionSchedulingHistory:
 
         yield group_id
 
-    @pytest.mark.asyncio
     async def test_enqueue_session_creates_scheduling_history(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -721,7 +720,6 @@ class TestMarkTerminatingSchedulingHistory:
 
         return session_id
 
-    @pytest.mark.asyncio
     async def test_mark_sessions_as_terminating_creates_scheduling_history(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -763,7 +761,6 @@ class TestMarkTerminatingSchedulingHistory:
             assert history_record.to_status == str(SessionStatus.TERMINATING)
             assert history_record.message == "mark_terminating success"
 
-    @pytest.mark.asyncio
     async def test_force_terminate_creates_scheduling_history(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -804,7 +801,6 @@ class TestMarkTerminatingSchedulingHistory:
             assert history_record.to_status == str(SessionStatus.TERMINATED)
             assert history_record.message == "force_terminate success"
 
-    @pytest.mark.asyncio
     async def test_mark_sessions_as_terminating_captures_correct_from_status(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,

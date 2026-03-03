@@ -3,10 +3,9 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
-import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.fair_share import FairShareClient
 from ai.backend.common.dto.manager.fair_share import (
@@ -55,8 +54,8 @@ _SAMPLE_UUID_2 = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 _SAMPLE_UUID_3 = "cccccccc-cccc-cccc-cccc-cccccccccccc"
 
 
-def _make_client(mock_session: MagicMock | None = None) -> BackendAIClient:
-    return BackendAIClient(
+def _make_client(mock_session: MagicMock | None = None) -> BackendAIAuthClient:
+    return BackendAIAuthClient(
         _DEFAULT_CONFIG,
         MockAuth(),
         mock_session or MagicMock(),
@@ -174,7 +173,6 @@ def _pagination_data(total: int = 1, offset: int = 0, limit: int = 50) -> dict[s
 
 
 class TestFairShareClientDomainFairShare:
-    @pytest.mark.asyncio
     async def test_get_domain_fair_share(self) -> None:
         raw = {"item": _domain_fair_share_data()}
         mock_session = _make_request_session(_ok_response(raw))
@@ -191,7 +189,6 @@ class TestFairShareClientDomainFairShare:
         assert call_args[0][0] == "GET"
         assert "/fair-share/domains/default/test-domain" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_get_domain_fair_share_none(self) -> None:
         raw = {"item": None}
         mock_session = _make_request_session(_ok_response(raw))
@@ -203,7 +200,6 @@ class TestFairShareClientDomainFairShare:
         assert isinstance(result, GetDomainFairShareResponse)
         assert result.item is None
 
-    @pytest.mark.asyncio
     async def test_search_domain_fair_shares(self) -> None:
         raw = {
             "items": [_domain_fair_share_data()],
@@ -223,7 +219,6 @@ class TestFairShareClientDomainFairShare:
         assert call_args[0][0] == "POST"
         assert "/fair-share/domains/search" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_rg_get_domain_fair_share(self) -> None:
         raw = {"item": _domain_fair_share_data()}
         mock_session = _make_request_session(_ok_response(raw))
@@ -238,7 +233,6 @@ class TestFairShareClientDomainFairShare:
         assert call_args[0][0] == "GET"
         assert "/fair-share/rg/default/domains/test-domain" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_rg_search_domain_fair_shares(self) -> None:
         raw = {
             "items": [_domain_fair_share_data()],
@@ -258,7 +252,6 @@ class TestFairShareClientDomainFairShare:
 
 
 class TestFairShareClientProjectFairShare:
-    @pytest.mark.asyncio
     async def test_get_project_fair_share(self) -> None:
         raw = {"item": _project_fair_share_data()}
         mock_session = _make_request_session(_ok_response(raw))
@@ -274,7 +267,6 @@ class TestFairShareClientProjectFairShare:
         assert call_args[0][0] == "GET"
         assert f"/fair-share/projects/default/{_SAMPLE_UUID_2}" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_get_project_fair_share_none(self) -> None:
         raw = {"item": None}
         mock_session = _make_request_session(_ok_response(raw))
@@ -286,7 +278,6 @@ class TestFairShareClientProjectFairShare:
         assert isinstance(result, GetProjectFairShareResponse)
         assert result.item is None
 
-    @pytest.mark.asyncio
     async def test_search_project_fair_shares(self) -> None:
         raw = {
             "items": [_project_fair_share_data()],
@@ -305,7 +296,6 @@ class TestFairShareClientProjectFairShare:
         assert call_args[0][0] == "POST"
         assert "/fair-share/projects/search" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_rg_get_project_fair_share(self) -> None:
         raw = {"item": _project_fair_share_data()}
         mock_session = _make_request_session(_ok_response(raw))
@@ -321,7 +311,6 @@ class TestFairShareClientProjectFairShare:
             call_args[0][1]
         )
 
-    @pytest.mark.asyncio
     async def test_rg_search_project_fair_shares(self) -> None:
         raw = {
             "items": [_project_fair_share_data()],
@@ -341,7 +330,6 @@ class TestFairShareClientProjectFairShare:
 
 
 class TestFairShareClientUserFairShare:
-    @pytest.mark.asyncio
     async def test_get_user_fair_share(self) -> None:
         raw = {"item": _user_fair_share_data()}
         mock_session = _make_request_session(_ok_response(raw))
@@ -359,7 +347,6 @@ class TestFairShareClientUserFairShare:
             call_args[0][1]
         )
 
-    @pytest.mark.asyncio
     async def test_get_user_fair_share_none(self) -> None:
         raw = {"item": None}
         mock_session = _make_request_session(_ok_response(raw))
@@ -371,7 +358,6 @@ class TestFairShareClientUserFairShare:
         assert isinstance(result, GetUserFairShareResponse)
         assert result.item is None
 
-    @pytest.mark.asyncio
     async def test_search_user_fair_shares(self) -> None:
         raw = {
             "items": [_user_fair_share_data()],
@@ -390,7 +376,6 @@ class TestFairShareClientUserFairShare:
         assert call_args[0][0] == "POST"
         assert "/fair-share/users/search" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_rg_get_user_fair_share(self) -> None:
         raw = {"item": _user_fair_share_data()}
         mock_session = _make_request_session(_ok_response(raw))
@@ -409,7 +394,6 @@ class TestFairShareClientUserFairShare:
             in str(call_args[0][1])
         )
 
-    @pytest.mark.asyncio
     async def test_rg_search_user_fair_shares(self) -> None:
         raw = {
             "items": [_user_fair_share_data()],
@@ -434,7 +418,6 @@ class TestFairShareClientUserFairShare:
 
 
 class TestFairShareClientUsageBuckets:
-    @pytest.mark.asyncio
     async def test_search_domain_usage_buckets(self) -> None:
         raw = {
             "items": [
@@ -464,7 +447,6 @@ class TestFairShareClientUsageBuckets:
         assert call_args[0][0] == "POST"
         assert "/fair-share/usage-buckets/domains/search" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_search_project_usage_buckets(self) -> None:
         raw = {
             "items": [
@@ -495,7 +477,6 @@ class TestFairShareClientUsageBuckets:
         assert call_args[0][0] == "POST"
         assert "/fair-share/usage-buckets/projects/search" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_search_user_usage_buckets(self) -> None:
         raw = {
             "items": [
@@ -529,7 +510,6 @@ class TestFairShareClientUsageBuckets:
 
 
 class TestFairShareClientRGScopedUsageBuckets:
-    @pytest.mark.asyncio
     async def test_rg_search_domain_usage_buckets(self) -> None:
         raw = {"items": [], "pagination": _pagination_data(total=0)}
         mock_session = _make_request_session(_ok_response(raw))
@@ -544,7 +524,6 @@ class TestFairShareClientRGScopedUsageBuckets:
         assert call_args[0][0] == "POST"
         assert "/fair-share/rg/default/usage-buckets/domains/search" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_rg_search_project_usage_buckets(self) -> None:
         raw = {"items": [], "pagination": _pagination_data(total=0)}
         mock_session = _make_request_session(_ok_response(raw))
@@ -561,7 +540,6 @@ class TestFairShareClientRGScopedUsageBuckets:
             call_args[0][1]
         )
 
-    @pytest.mark.asyncio
     async def test_rg_search_user_usage_buckets(self) -> None:
         raw = {"items": [], "pagination": _pagination_data(total=0)}
         mock_session = _make_request_session(_ok_response(raw))
@@ -583,7 +561,6 @@ class TestFairShareClientRGScopedUsageBuckets:
 
 
 class TestFairShareClientWeights:
-    @pytest.mark.asyncio
     async def test_upsert_domain_fair_share_weight(self) -> None:
         raw = {"item": _domain_fair_share_data()}
         mock_session = _make_request_session(_ok_response(raw))
@@ -599,7 +576,6 @@ class TestFairShareClientWeights:
         assert call_args[0][0] == "PUT"
         assert "/fair-share/domains/default/test-domain/weight" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_upsert_project_fair_share_weight(self) -> None:
         raw = {"item": _project_fair_share_data()}
         mock_session = _make_request_session(_ok_response(raw))
@@ -616,7 +592,6 @@ class TestFairShareClientWeights:
         assert call_args[0][0] == "PUT"
         assert f"/fair-share/projects/default/{_SAMPLE_UUID_2}/weight" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_upsert_user_fair_share_weight(self) -> None:
         raw = {"item": _user_fair_share_data()}
         mock_session = _make_request_session(_ok_response(raw))
@@ -637,7 +612,6 @@ class TestFairShareClientWeights:
 
 
 class TestFairShareClientBulkWeights:
-    @pytest.mark.asyncio
     async def test_bulk_upsert_domain_fair_share_weight(self) -> None:
         raw = {"upserted_count": 2}
         mock_session = _make_request_session(_ok_response(raw))
@@ -659,7 +633,6 @@ class TestFairShareClientBulkWeights:
         assert call_args[0][0] == "POST"
         assert "/fair-share/domains/bulk-upsert-weight" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_project_fair_share_weight(self) -> None:
         raw = {"upserted_count": 1}
         mock_session = _make_request_session(_ok_response(raw))
@@ -684,7 +657,6 @@ class TestFairShareClientBulkWeights:
         assert call_args[0][0] == "POST"
         assert "/fair-share/projects/bulk-upsert-weight" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_user_fair_share_weight(self) -> None:
         raw = {"upserted_count": 3}
         mock_session = _make_request_session(_ok_response(raw))
@@ -712,7 +684,6 @@ class TestFairShareClientBulkWeights:
 
 
 class TestFairShareClientResourceGroupSpec:
-    @pytest.mark.asyncio
     async def test_get_resource_group_fair_share_spec(self) -> None:
         raw = {
             "resource_group": "default",
@@ -737,7 +708,6 @@ class TestFairShareClientResourceGroupSpec:
         assert call_args[0][0] == "GET"
         assert "/fair-share/resource-groups/default/spec" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_search_resource_group_fair_share_specs(self) -> None:
         raw = {
             "items": [
@@ -769,7 +739,6 @@ class TestFairShareClientResourceGroupSpec:
         assert call_args[0][0] == "GET"
         assert "/fair-share/resource-groups/specs" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_update_resource_group_fair_share_spec(self) -> None:
         raw = {
             "resource_group": "default",

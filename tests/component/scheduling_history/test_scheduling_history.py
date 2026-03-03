@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.scheduling_history import (
 
 
 class TestSessionSchedulingHistory:
-    @pytest.mark.asyncio
     async def test_admin_searches_session_history(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -33,7 +32,6 @@ class TestSessionSchedulingHistory:
         assert result.pagination.total >= 0
         assert result.pagination.offset == 0
 
-    @pytest.mark.asyncio
     async def test_search_session_history_with_pagination(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -47,7 +45,6 @@ class TestSessionSchedulingHistory:
         assert result.pagination.offset == 0
         assert len(result.items) <= 10
 
-    @pytest.mark.asyncio
     async def test_search_session_history_with_filters(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -66,7 +63,6 @@ class TestSessionSchedulingHistory:
         for item in result.items:
             assert item.result == SchedulingResultType.SUCCESS
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_search_session_history(
         self,
         user_registry: BackendAIClientRegistry,
@@ -79,7 +75,6 @@ class TestSessionSchedulingHistory:
 
 
 class TestDeploymentSchedulingHistory:
-    @pytest.mark.asyncio
     async def test_admin_searches_deployment_history(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -93,7 +88,6 @@ class TestDeploymentSchedulingHistory:
         assert result.pagination.total >= 0
         assert result.pagination.offset == 0
 
-    @pytest.mark.asyncio
     async def test_search_deployment_history_with_pagination(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -107,7 +101,6 @@ class TestDeploymentSchedulingHistory:
         assert result.pagination.offset == 0
         assert len(result.items) <= 5
 
-    @pytest.mark.asyncio
     async def test_search_deployment_history_with_filters(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -125,7 +118,6 @@ class TestDeploymentSchedulingHistory:
         for item in result.items:
             assert item.result == SchedulingResultType.FAILURE
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_search_deployment_history(
         self,
         user_registry: BackendAIClientRegistry,
@@ -138,7 +130,6 @@ class TestDeploymentSchedulingHistory:
 
 
 class TestRouteSchedulingHistory:
-    @pytest.mark.asyncio
     async def test_admin_searches_route_history(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -152,7 +143,6 @@ class TestRouteSchedulingHistory:
         assert result.pagination.total >= 0
         assert result.pagination.offset == 0
 
-    @pytest.mark.asyncio
     async def test_search_route_history_with_pagination(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -166,7 +156,6 @@ class TestRouteSchedulingHistory:
         assert result.pagination.offset == 0
         assert len(result.items) <= 20
 
-    @pytest.mark.asyncio
     async def test_search_route_history_with_filters(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -184,7 +173,6 @@ class TestRouteSchedulingHistory:
         for item in result.items:
             assert item.result == SchedulingResultType.SUCCESS
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_search_route_history(
         self,
         user_registry: BackendAIClientRegistry,

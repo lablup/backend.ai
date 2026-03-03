@@ -47,7 +47,7 @@ from ai.backend.manager.types import OptionalState
 from .adapter import UserAdapter
 
 if TYPE_CHECKING:
-    from ai.backend.manager.config.unified import AuthConfig
+    from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.services.processors import Processors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -56,9 +56,9 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class UserHandler:
     """User admin API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors, auth_config: AuthConfig) -> None:
+    def __init__(self, *, processors: Processors, config_provider: ManagerConfigProvider) -> None:
         self._processors = processors
-        self._auth_config = auth_config
+        self._config_provider = config_provider
         self._adapter = UserAdapter()
 
     # ------------------------------------------------------------------
@@ -73,9 +73,9 @@ class UserHandler:
         log.info("CREATE_USER (ak:{})", ctx.access_key)
         password_info = PasswordInfo(
             password=body.parsed.password,
-            algorithm=self._auth_config.password_hash_algorithm,
-            rounds=self._auth_config.password_hash_rounds,
-            salt_size=self._auth_config.password_hash_salt_size,
+            algorithm=self._config_provider.config.auth.password_hash_algorithm,
+            rounds=self._config_provider.config.auth.password_hash_rounds,
+            salt_size=self._config_provider.config.auth.password_hash_salt_size,
         )
 
         creator = Creator(
@@ -174,9 +174,9 @@ class UserHandler:
         if body.parsed.password is not None:
             password_info = PasswordInfo(
                 password=body.parsed.password,
-                algorithm=self._auth_config.password_hash_algorithm,
-                rounds=self._auth_config.password_hash_rounds,
-                salt_size=self._auth_config.password_hash_salt_size,
+                algorithm=self._config_provider.config.auth.password_hash_algorithm,
+                rounds=self._config_provider.config.auth.password_hash_rounds,
+                salt_size=self._config_provider.config.auth.password_hash_salt_size,
             )
 
         updater = self._adapter.build_updater(body.parsed, email, password_info)

@@ -10,12 +10,9 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Sequence
-from dataclasses import dataclass
 from http import HTTPStatus
 from typing import Any, Final
 
-import sqlalchemy as sa
 import yarl
 from aiohttp import web
 from pydantic import HttpUrl
@@ -59,13 +56,8 @@ from ai.backend.common.types import (
     MountPermission,
     MountTypes,
     RuntimeVariant,
-    VFolderID,
-    VFolderMount,
-    VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.session import query_userinfo
 from ai.backend.manager.api.utils import get_access_key_scopes
 from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.types import (
@@ -86,12 +78,6 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceInfo,
 )
 from ai.backend.manager.dto.context import RequestCtx, UserContext
-from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.auth import InvalidAuthParameters
-from ai.backend.manager.errors.storage import VFolderNotFound
-from ai.backend.manager.models.endpoint import ModelServiceHelper
-from ai.backend.manager.models.user import UserRole, UserRow
-from ai.backend.manager.models.vfolder import query_accessible_vfolders, vfolders
 from ai.backend.manager.services.deployment.actions.create_legacy_deployment import (
     CreateLegacyDeploymentAction,
     CreateLegacyDeploymentActionResult,
@@ -124,25 +110,14 @@ from ai.backend.manager.services.model_serving.actions.search_services import (
     SearchServicesActionResult,
 )
 from ai.backend.manager.services.model_serving.actions.update_route import UpdateRouteAction
+from ai.backend.manager.services.model_serving.actions.validate_model_service import (
+    ValidateModelServiceAction,
+    ValidateModelServiceActionResult,
+)
 from ai.backend.manager.services.model_serving.adapter import ServiceSearchAdapter
 from ai.backend.manager.services.processors import Processors
-from ai.backend.manager.types import MountOptionModel, UserScope
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-@dataclass
-class ValidationResult:
-    model_id: uuid.UUID
-    model_definition_path: str | None
-    requester_access_key: AccessKey
-    owner_access_key: AccessKey
-    owner_uuid: uuid.UUID
-    owner_role: UserRole
-    group_id: uuid.UUID
-    resource_policy: dict[str, Any]
-    scaling_group: str
-    extra_mounts: Sequence[VFolderMount]
 
 
 def _serve_info_from_dto(dto: ServiceInfo) -> ServeInfoModel:
@@ -198,7 +173,11 @@ def _serve_info_from_deployment_info(deployment_info: DeploymentInfo) -> ServeIn
 class ServiceHandler:
     """Service (model serving) API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
+    def __init__(
+        self,
+        *,
+        processors: Processors,
+    ) -> None:
         self._processors = processors
 
     # ------------------------------------------------------------------
@@ -307,7 +286,7 @@ class ServiceHandler:
     async def create(self, body: BodyParam[NewServiceRequestModel], req: RequestCtx) -> APIResponse:
         params = body.parsed
         request = req.request
-        validation_result = await self._validate(request, params)
+        validation_result = await self._run_validation(request, params)
 
         deployment_action = CreateLegacyDeploymentAction(
             draft=DeploymentCreationDraft(
@@ -348,7 +327,7 @@ class ServiceHandler:
     ) -> APIResponse:
         params = body.parsed
         request = req.request
-        validation_result = await self._validate(request, params)
+        validation_result = await self._run_validation(request, params)
 
         action = self._to_start_action(params, validation_result, request)
         result = await self._processors.model_serving.dry_run_model_service.wait_for_complete(
@@ -591,141 +570,58 @@ class ServiceHandler:
     # Private helpers
     # ------------------------------------------------------------------
 
-    async def _validate(
+    async def _run_validation(
         self,
         request: Any,
         params: NewServiceRequestModel,
-    ) -> ValidationResult:
-        root_ctx: RootContext = request.app["_root.context"]
-        scopes_param = {
-            "owner_access_key": params.owner_access_key,
-        }
-
-        requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
-        if params.replicas > (
-            _m := request["user"]["resource_policy"]["max_session_count_per_model_session"]
-        ):
-            raise InvalidAPIParameters(f"Cannot spawn more than {_m} sessions for a single service")
-
-        async with root_ctx.db.begin_readonly() as conn:
-            checked_scaling_group = await ModelServiceHelper.check_scaling_group(
-                conn,
-                params.config.scaling_group,
-                owner_access_key,
-                params.domain_name,
-                params.group_name,
-            )
-
-            params.config.scaling_group = checked_scaling_group
-
-            owner_uuid, group_id, resource_policy = await query_userinfo(
-                request, params.model_dump(by_alias=True), conn
-            )
-            query = sa.select(UserRow.role).where(UserRow.uuid == owner_uuid)
-            owner_role = (await conn.execute(query)).scalar()
-            if not owner_role:
-                raise InvalidAuthParameters("Owner role is required to create a model service")
-
-            allowed_vfolder_types = (
-                await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
-            )
-            try:
-                extra_vf_conds = vfolders.c.id == uuid.UUID(params.config.model)
-                matched_vfolders = await query_accessible_vfolders(
-                    conn,
-                    owner_uuid,
-                    user_role=owner_role,
-                    domain_name=params.domain_name,
-                    allowed_vfolder_types=allowed_vfolder_types,
-                    extra_vf_conds=extra_vf_conds,
-                )
-            except Exception as e:
-                if isinstance(e, (ValueError, VFolderNotFound)):
-                    try:
-                        extra_vf_conds = (vfolders.c.name == params.config.model) & (
-                            vfolders.c.usage_mode == VFolderUsageMode.MODEL
-                        )
-                        matched_vfolders = await query_accessible_vfolders(
-                            conn,
-                            owner_uuid,
-                            user_role=owner_role,
-                            domain_name=params.domain_name,
-                            allowed_vfolder_types=allowed_vfolder_types,
-                            extra_vf_conds=extra_vf_conds,
-                        )
-                    except VFolderNotFound as e:
-                        raise VFolderNotFound("Cannot find model folder") from e
-                else:
-                    raise
-            if len(matched_vfolders) == 0:
-                raise VFolderNotFound
-            folder_row = matched_vfolders[0]
-            if folder_row["usage_mode"] != VFolderUsageMode.MODEL:
-                raise InvalidAPIParameters("Selected VFolder is not a model folder")
-
-            model_id = folder_row["id"]
-
-            extra_mounts_typed: dict[uuid.UUID, MountOptionModel] = {
-                k: MountOptionModel(**v) if isinstance(v, dict) else v
-                for k, v in params.config.extra_mounts.items()
-            }
-            vfolder_mounts = await ModelServiceHelper.check_extra_mounts(
-                conn,
-                root_ctx.config_provider.legacy_etcd_config_loader,
-                root_ctx.storage_manager,
-                model_id,
-                params.config.model_mount_destination,
-                extra_mounts_typed,
-                UserScope(
-                    domain_name=params.domain_name,
-                    group_id=group_id,
-                    user_uuid=owner_uuid,
-                    user_role=owner_role,
-                ),
-                resource_policy,
-            )
-
-        if params.runtime_variant == RuntimeVariant.CUSTOM:
-            vfid = VFolderID(folder_row["quota_scope_id"], folder_row["id"])
-            yaml_path = await ModelServiceHelper.validate_model_definition_file_exists(
-                root_ctx.storage_manager,
-                folder_row["host"],
-                vfid,
-                params.config.model_definition_path,
-            )
-            await ModelServiceHelper.validate_model_definition(
-                root_ctx.storage_manager,
-                folder_row["host"],
-                vfid,
-                yaml_path,
-            )
-        else:
-            if (
-                params.runtime_variant != RuntimeVariant.CMD
-                and params.config.model_mount_destination != "/models"
-            ):
-                raise InvalidAPIParameters(
-                    "Model mount destination must be /models for non-custom runtimes"
-                )
-            yaml_path = "model-definition.yaml"
-
-        return ValidationResult(
-            model_id,
-            yaml_path,
-            requester_access_key,
-            owner_access_key,
-            owner_uuid,
-            owner_role,
-            group_id,
-            resource_policy,
-            checked_scaling_group,
-            vfolder_mounts,
+    ) -> ValidateModelServiceActionResult:
+        requester_access_key, owner_access_key = await get_access_key_scopes(
+            request, {"owner_access_key": params.owner_access_key}
         )
+        action = ValidateModelServiceAction(
+            requester_access_key=requester_access_key,
+            owner_access_key=owner_access_key,
+            requester_uuid=request["user"]["uuid"],
+            requester_role=request["user"]["role"],
+            requester_domain=request["user"]["domain_name"],
+            keypair_resource_policy=request["user"]["resource_policy"],
+            domain_name=params.domain_name,
+            group_name=params.group_name,
+            config=ServiceConfig(
+                model=params.config.model,
+                model_definition_path=params.config.model_definition_path,
+                model_version=params.config.model_version,
+                model_mount_destination=params.config.model_mount_destination,
+                extra_mounts={
+                    k: MountOption(
+                        mount_destination=v.get("mount_destination"),
+                        type=MountTypes(v["type"]) if v.get("type") else MountTypes.BIND,
+                        permission=MountPermission(v["permission"])
+                        if v.get("permission")
+                        else None,
+                    )
+                    for k, v in params.config.extra_mounts.items()
+                },
+                environ=params.config.environ,
+                scaling_group=params.config.scaling_group,
+                resources=params.config.resources,
+                resource_opts=params.config.resource_opts,
+            ),
+            replicas=params.replicas,
+            runtime_variant=params.runtime_variant,
+            max_session_count_per_model_session=request["user"]["resource_policy"][
+                "max_session_count_per_model_session"
+            ],
+            owner_access_key_override=AccessKey(params.owner_access_key)
+            if params.owner_access_key
+            else None,
+        )
+        return await self._processors.model_serving.validate_model_service.wait_for_complete(action)
 
     @staticmethod
     def _to_model_revision(
         params: NewServiceRequestModel,
-        validation_result: ValidationResult,
+        validation_result: ValidateModelServiceActionResult,
     ) -> ModelRevisionSpecDraft:
         return ModelRevisionSpecDraft(
             image_identifier=ImageIdentifierDraft(
@@ -756,7 +652,7 @@ class ServiceHandler:
     @staticmethod
     def _to_start_action(
         params: NewServiceRequestModel,
-        validation_result: ValidationResult,
+        validation_result: ValidateModelServiceActionResult,
         request: Any,
     ) -> DryRunModelServiceAction:
         return DryRunModelServiceAction(

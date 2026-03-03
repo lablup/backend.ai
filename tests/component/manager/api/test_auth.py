@@ -98,7 +98,6 @@ def test_check_date() -> None:
     assert check_date(request)
 
 
-@pytest.mark.asyncio
 async def test_authorize(
     mock_etcd_ctx: Any,
     mock_config_provider_ctx: Any,
@@ -152,7 +151,6 @@ async def test_authorize(
 
 
 # TODO: restore later. because migratation user schema and injection fixture keep failing.
-# @pytest.mark.asyncio
 # async def test_allowed_ip_authorize(
 #     etcd_fixture, database_fixture, create_app_and_client, get_headers
 # ):

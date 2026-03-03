@@ -30,7 +30,6 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import 
 class TestAgentSelectionWithResources:
     """Test agent selection using ResourceRequirements."""
 
-    @pytest.mark.asyncio
     async def test_single_node_selection_with_aggregated_resources(
         self,
         agents_for_resource_requirements_test: list[AgentInfo],
@@ -97,7 +96,6 @@ class TestAgentSelectionWithResources:
         # Only agent-high has enough resources for aggregated requirements
         assert selected_agent.agent_id == AgentId("agent-high")
 
-    @pytest.mark.asyncio
     async def test_multi_node_selection_individual_resources(
         self,
         agents_for_resource_requirements_test: list[AgentInfo],
@@ -158,7 +156,6 @@ class TestAgentSelectionWithResources:
         selected_agents = [sel.selected_agent.agent_id for sel in selections]
         assert all(agent_id is not None for agent_id in selected_agents)
 
-    @pytest.mark.asyncio
     async def test_designated_agent_with_resource_requirements(
         self,
         agents_for_designated_agent_test: list[AgentInfo],
@@ -204,7 +201,6 @@ class TestAgentSelectionWithResources:
         assert "Designated agent '['designated']' is not compatible" in str(exc_info.value)
         assert "insufficient resources" in str(exc_info.value)
 
-    @pytest.mark.asyncio
     async def test_container_limit_with_resource_requirements(
         self,
         agents_for_container_limit_test: list[AgentInfo],
@@ -250,7 +246,6 @@ class TestAgentSelectionWithResources:
         assert len(selections) == 1
         assert selections[0].selected_agent.agent_id == AgentId("available")
 
-    @pytest.mark.asyncio
     async def test_architecture_mismatch_with_resource_requirements(
         self,
         agents_for_architecture_test: list[AgentInfo],

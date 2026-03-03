@@ -15,7 +15,9 @@ from ai.backend.common import msgpack
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.context import RootContext
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+    from ai.backend.manager.config.provider import ManagerConfigProvider
+    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -23,7 +25,6 @@ __all__: tuple[str, ...] = (
     "RedisObjectConnectionInfo",
     "SQLAlchemyConnectionInfo",
     "_get_connnection_info",
-    "get_redis_object_info_list",
     "get_sqlalchemy_connection_info",
     "report_manager_status",
 )
@@ -81,8 +82,8 @@ class ConnectionInfoOfProcess(BaseModel):
     redis_connection_info: list[RedisObjectConnectionInfo]
 
 
-async def get_sqlalchemy_connection_info(root_ctx: RootContext) -> SQLAlchemyConnectionInfo:
-    pool = root_ctx.db.pool
+async def get_sqlalchemy_connection_info(db: ExtendedAsyncSAEngine) -> SQLAlchemyConnectionInfo:
+    pool = db.pool
     return SQLAlchemyConnectionInfo(
         pool_type=type(pool).__name__,
         status_description=pool.status(),
@@ -91,29 +92,33 @@ async def get_sqlalchemy_connection_info(root_ctx: RootContext) -> SQLAlchemyCon
     )
 
 
-async def get_redis_object_info_list(_root_ctx: RootContext) -> list[RedisObjectConnectionInfo]:
-    log.warning("get_redis_object_info_list is deprecated.")
-    return []
-
-
-async def _get_connnection_info(root_ctx: RootContext) -> ConnectionInfoOfProcess:
-    node_id = root_ctx.config_provider.config.manager.id or socket.gethostname()
+async def _get_connnection_info(
+    db: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> ConnectionInfoOfProcess:
+    node_id = config_provider.config.manager.id or socket.gethostname()
     pid = os.getpid()
 
-    sqlalchemy_info = await get_sqlalchemy_connection_info(root_ctx)
-    redis_infos = await get_redis_object_info_list(root_ctx)
+    sqlalchemy_info = await get_sqlalchemy_connection_info(db)
     return ConnectionInfoOfProcess(
-        node_id=node_id, pid=pid, sqlalchemy_info=sqlalchemy_info, redis_connection_info=redis_infos
+        node_id=node_id,
+        pid=pid,
+        sqlalchemy_info=sqlalchemy_info,
+        redis_connection_info=[],
     )
 
 
-async def report_manager_status(root_ctx: RootContext) -> None:
-    lifetime = root_ctx.config_provider.config.manager.status_lifetime
-    cxn_info = await _get_connnection_info(root_ctx)
+async def report_manager_status(
+    valkey_stat: ValkeyStatClient,
+    db: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> None:
+    lifetime = config_provider.config.manager.status_lifetime
+    cxn_info = await _get_connnection_info(db, config_provider)
     _data = msgpack.packb(cxn_info.model_dump(mode="json"))
 
     if lifetime is not None:
-        await root_ctx.valkey_stat.set_manager_status(
+        await valkey_stat.set_manager_status(
             node_id=cxn_info.node_id,
             pid=cxn_info.pid,
             status_data=_data,
@@ -121,24 +126,28 @@ async def report_manager_status(root_ctx: RootContext) -> None:
         )
 
 
-async def get_manager_db_cxn_status(root_ctx: RootContext) -> list[ConnectionInfoOfProcess]:
+async def get_manager_db_cxn_status(
+    valkey_stat: ValkeyStatClient,
+    db: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> list[ConnectionInfoOfProcess]:
     cxn_infos: list[ConnectionInfoOfProcess] = []
 
     try:
         _raw_value = cast(
             list[bytes] | None,
-            await root_ctx.valkey_stat.scan_and_get_manager_status(
+            await valkey_stat.scan_and_get_manager_status(
                 f"{MANAGER_STATUS_KEY}*",
             ),
         )
     except (TimeoutError, glide.ConnectionError, glide.TimeoutError):
         # Cannot get data from redis. Return process's own info.
-        cxn_infos = [(await _get_connnection_info(root_ctx))]
+        cxn_infos = [await _get_connnection_info(db, config_provider)]
     else:
         if _raw_value is not None:
             cxn_infos = [
                 ConnectionInfoOfProcess.model_validate(msgpack.unpackb(val)) for val in _raw_value
             ]
         else:
-            cxn_infos = [(await _get_connnection_info(root_ctx))]
+            cxn_infos = [await _get_connnection_info(db, config_provider)]
     return cxn_infos

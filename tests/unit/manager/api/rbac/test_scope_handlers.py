@@ -73,7 +73,6 @@ class TestGetScopeTypesHandler:
         processors.permission_controller.get_scope_types.wait_for_complete = AsyncMock()
         return processors
 
-    @pytest.mark.asyncio
     async def test_get_scope_types_returns_scope_types(
         self,
         mock_processors: MagicMock,
@@ -94,7 +93,6 @@ class TestGetScopeTypesHandler:
         assert "items" in response_json
         assert len(response_json["items"]) == self.EXPECTED_SCOPE_TYPES_COUNT
 
-    @pytest.mark.asyncio
     async def test_get_scope_types_rejects_non_superadmin(
         self,
         mock_processors: MagicMock,
@@ -191,7 +189,6 @@ class TestSearchScopesHandler:
             ),
         )
 
-    @pytest.mark.asyncio
     async def test_search_scopes_returns_results(
         self,
         mock_processors: MagicMock,
@@ -216,7 +213,6 @@ class TestSearchScopesHandler:
         assert response_json["items"][0]["scope_type"] == self.TEST_SCOPE_TYPE.value
         assert response_json["items"][0]["name"] == self.TEST_DOMAIN_NAME
 
-    @pytest.mark.asyncio
     async def test_search_scopes_with_pagination(
         self,
         mock_processors: MagicMock,
@@ -240,7 +236,6 @@ class TestSearchScopesHandler:
         assert pagination["offset"] == self.DEFAULT_OFFSET
         assert pagination["limit"] == self.PAGINATION_LIMIT
 
-    @pytest.mark.asyncio
     async def test_search_scopes_calls_processor_with_action(
         self,
         mock_processors: MagicMock,
@@ -262,7 +257,6 @@ class TestSearchScopesHandler:
         action = call_args[0][0]
         assert action.scope_type == self.TEST_SCOPE_TYPE
 
-    @pytest.mark.asyncio
     async def test_search_scopes_rejects_non_superadmin(
         self,
         mock_processors: MagicMock,

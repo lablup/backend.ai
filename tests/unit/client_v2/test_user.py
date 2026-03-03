@@ -4,10 +4,9 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
-import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.user import UserClient
 from ai.backend.common.dto.manager.query import StringFilter
@@ -50,7 +49,7 @@ def _json_response(data: dict[str, Any], *, status: int = 200) -> AsyncMock:
 
 
 def _make_user_client(mock_session: MagicMock) -> UserClient:
-    client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
+    client = BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
     return UserClient(client)
 
 
@@ -95,7 +94,6 @@ _SAMPLE_USER_DTO: dict[str, Any] = {
 
 
 class TestUserCRUD:
-    @pytest.mark.asyncio
     async def test_create_user(self) -> None:
         resp = _json_response({"user": _SAMPLE_USER_DTO})
         mock_session = _make_request_session(resp)
@@ -120,7 +118,6 @@ class TestUserCRUD:
         assert body["username"] == "testuser"
         assert body["domain_name"] == "default"
 
-    @pytest.mark.asyncio
     async def test_get_user(self) -> None:
         resp = _json_response({"user": _SAMPLE_USER_DTO})
         mock_session = _make_request_session(resp)
@@ -135,7 +132,6 @@ class TestUserCRUD:
         assert method == "GET"
         assert str(_SAMPLE_USER_ID) in url
 
-    @pytest.mark.asyncio
     async def test_search_users(self) -> None:
         resp = _json_response({
             "items": [_SAMPLE_USER_DTO],
@@ -154,7 +150,6 @@ class TestUserCRUD:
         assert url.endswith("/admin/users/search")
         assert body is not None
 
-    @pytest.mark.asyncio
     async def test_search_users_with_filter(self) -> None:
         resp = _json_response({
             "items": [_SAMPLE_USER_DTO],
@@ -183,7 +178,6 @@ class TestUserCRUD:
         assert body["filter"]["role"] == ["user"]
         assert body["limit"] == 10
 
-    @pytest.mark.asyncio
     async def test_update_user(self) -> None:
         updated_dto = {**_SAMPLE_USER_DTO, "full_name": "Updated Name"}
         resp = _json_response({"user": updated_dto})
@@ -203,7 +197,6 @@ class TestUserCRUD:
         assert body is not None
         assert body["full_name"] == "Updated Name"
 
-    @pytest.mark.asyncio
     async def test_delete_user(self) -> None:
         resp = _json_response({"success": True})
         mock_session = _make_request_session(resp)
@@ -220,7 +213,6 @@ class TestUserCRUD:
         assert body is not None
         assert body["user_id"] == str(_SAMPLE_USER_ID)
 
-    @pytest.mark.asyncio
     async def test_purge_user(self) -> None:
         resp = _json_response({"success": True})
         mock_session = _make_request_session(resp)

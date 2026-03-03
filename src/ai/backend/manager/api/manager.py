@@ -19,7 +19,7 @@ import enum
 import functools
 import logging
 from collections.abc import Callable, Iterable
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any
 
 import aiohttp_cors
 import attrs
@@ -31,6 +31,10 @@ from aiotools import aclosing
 from ai.backend.common.types import QueueSentinel
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api import ManagerStatus
+from ai.backend.manager.api.rest.server_status import (
+    ALL_ALLOWED,
+    READ_ALLOWED,
+)
 from ai.backend.manager.errors.common import ServerFrozen, ServiceUnavailable
 from ai.backend.manager.models.health import report_manager_status
 
@@ -39,11 +43,17 @@ from .types import CORSOptions, WebMiddleware, WebRequestHandler
 from .utils import set_handler_attr
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext
-
     from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+__all__ = (
+    "server_status_required",
+    "READ_ALLOWED",
+    "ALL_ALLOWED",
+    "GQLMutationUnfrozenRequiredMiddleware",
+    "SchedulerOps",
+)
 
 
 # ------------------------------------------------------------------
@@ -57,13 +67,19 @@ class SchedulerOps(enum.Enum):
 
 
 # ------------------------------------------------------------------
-# server_status_required — used by 15+ modules
+# server_status_required — backward-compat wrapper for legacy shims
 # ------------------------------------------------------------------
 
 
 def server_status_required(
     allowed_status: frozenset[ManagerStatus],
 ) -> Callable[[Handler], Handler]:
+    """Legacy wrapper that reads ``config_provider`` from ``root_ctx``.
+
+    New code should use :func:`ai.backend.manager.api.rest.server_status.server_status_required`
+    which receives ``config_provider`` via constructor DI.
+    """
+
     def decorator(handler: Handler) -> Handler:
         @functools.wraps(handler)
         async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
@@ -84,27 +100,25 @@ def server_status_required(
     return decorator
 
 
-READ_ALLOWED: Final[frozenset[ManagerStatus]] = frozenset({
-    ManagerStatus.RUNNING,
-    ManagerStatus.FROZEN,
-})
-ALL_ALLOWED: Final[frozenset[ManagerStatus]] = frozenset({ManagerStatus.RUNNING})
-
-
 # ------------------------------------------------------------------
-# GQL middleware — used by admin.py
+# GQL middleware — used by admin handler
 # ------------------------------------------------------------------
 
 
 class GQLMutationUnfrozenRequiredMiddleware:
+    """GraphQL middleware that blocks mutations when the manager is frozen.
+
+    Receives ``manager_status`` via constructor DI instead of reading
+    from the GraphQL context.
+    """
+
+    def __init__(self, manager_status: ManagerStatus) -> None:
+        self._manager_status = manager_status
+
     def resolve(
         self, next: Callable[..., Any], root: Any, info: graphene.ResolveInfo, **args: Any
     ) -> Any:
-        graph_ctx: GraphQueryContext = info.context
-        if (
-            info.operation.operation == "mutation"
-            and graph_ctx.manager_status == ManagerStatus.FROZEN
-        ):
+        if info.operation.operation == "mutation" and self._manager_status == ManagerStatus.FROZEN:
             raise ServerFrozen
         return next(root, info, **args)
 
@@ -142,7 +156,9 @@ async def report_status_bgtask(root_ctx: RootContext) -> None:
         while True:
             await asyncio.sleep(interval)
             try:
-                await report_manager_status(root_ctx)
+                await report_manager_status(
+                    root_ctx.valkey_stat, root_ctx.db, root_ctx.config_provider
+                )
             except Exception as e:
                 log.exception(f"Failed to report manager health status (e:{e!s})")
     except asyncio.CancelledError:

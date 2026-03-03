@@ -3,10 +3,9 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.domain import DomainClient
 from ai.backend.common.dto.manager.domain import (
@@ -47,7 +46,7 @@ def _json_response(data: dict[str, Any], *, status: int = 200) -> AsyncMock:
 
 
 def _make_domain_client(mock_session: MagicMock) -> DomainClient:
-    client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
+    client = BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
     return DomainClient(client)
 
 
@@ -79,7 +78,6 @@ _SAMPLE_DOMAIN_DTO: dict[str, Any] = {
 
 
 class TestDomainCreate:
-    @pytest.mark.asyncio
     async def test_create_domain(self) -> None:
         resp = _json_response({"domain": _SAMPLE_DOMAIN_DTO})
         mock_session = _make_request_session(resp)
@@ -102,7 +100,6 @@ class TestDomainCreate:
 
 
 class TestDomainGet:
-    @pytest.mark.asyncio
     async def test_get_domain(self) -> None:
         resp = _json_response({"domain": _SAMPLE_DOMAIN_DTO})
         mock_session = _make_request_session(resp)
@@ -118,7 +115,6 @@ class TestDomainGet:
 
 
 class TestDomainSearch:
-    @pytest.mark.asyncio
     async def test_search_domains(self) -> None:
         resp = _json_response({
             "domains": [_SAMPLE_DOMAIN_DTO],
@@ -137,7 +133,6 @@ class TestDomainSearch:
         assert url.endswith("/admin/domains/search")
         assert body is not None
 
-    @pytest.mark.asyncio
     async def test_search_domains_with_filter(self) -> None:
         resp = _json_response({
             "domains": [_SAMPLE_DOMAIN_DTO],
@@ -166,7 +161,6 @@ class TestDomainSearch:
 
 
 class TestDomainUpdate:
-    @pytest.mark.asyncio
     async def test_update_domain(self) -> None:
         updated_dto = {**_SAMPLE_DOMAIN_DTO, "description": "Updated description"}
         resp = _json_response({"domain": updated_dto})
@@ -188,7 +182,6 @@ class TestDomainUpdate:
 
 
 class TestDomainDelete:
-    @pytest.mark.asyncio
     async def test_delete_domain(self) -> None:
         resp = _json_response({"deleted": True})
         mock_session = _make_request_session(resp)
@@ -206,7 +199,6 @@ class TestDomainDelete:
 
 
 class TestDomainPurge:
-    @pytest.mark.asyncio
     async def test_purge_domain(self) -> None:
         resp = _json_response({"purged": True})
         mock_session = _make_request_session(resp)

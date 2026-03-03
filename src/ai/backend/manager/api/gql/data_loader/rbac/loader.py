@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections import defaultdict
 from collections.abc import Sequence
 
 from ai.backend.manager.data.permission.association_scopes_entities import (
@@ -75,6 +76,37 @@ async def load_permissions_by_ids(
 
     permission_map = {p.id: p for p in action_result.result.items}
     return [permission_map.get(pid) for pid in permission_ids]
+
+
+async def load_permissions_by_role_ids(
+    processor: PermissionControllerProcessors,
+    role_ids: Sequence[uuid.UUID],
+) -> list[list[PermissionData]]:
+    """
+    Batch load permissions by role_ids.
+
+    Returns a list of permission lists, one for each role_id.
+    Each inner list contains all permissions for that role.
+    """
+    if not role_ids:
+        return []
+
+    querier = BatchQuerier(
+        pagination=NoPagination(),
+        conditions=[ScopedPermissionConditions.by_role_ids(role_ids)],
+    )
+
+    action_result = await processor.search_permissions.wait_for_complete(
+        SearchPermissionsAction(querier=querier)
+    )
+
+    # Group permissions by role_id
+    permission_map: dict[uuid.UUID, list[PermissionData]] = defaultdict(list)
+    for permission in action_result.result.items:
+        permission_map[permission.role_id].append(permission)
+
+    # Return in the same order as role_ids, with empty lists for roles with no permissions
+    return [permission_map.get(role_id, []) for role_id in role_ids]
 
 
 async def load_role_assignments_by_ids(

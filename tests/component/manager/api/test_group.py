@@ -20,7 +20,6 @@ from ai.backend.manager.server import (
 from ai.backend.testutils.extra_fixtures import FIXTURES_FOR_HARBOR_CRUD_TEST
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST, indirect=True)
 @pytest.mark.parametrize(
     "test_case",
@@ -108,7 +107,6 @@ async def test_harbor_create_project_quota(
         assert resp.status == test_case["expected_code"]
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST, indirect=True)
 @pytest.mark.parametrize(
     "test_case",
@@ -189,7 +187,6 @@ async def test_harbor_read_project_quota(
         assert resp.status == test_case["expected_code"]
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST, indirect=True)
 @pytest.mark.parametrize(
     "test_case",
@@ -277,7 +274,6 @@ async def test_harbor_update_project_quota(
         assert resp.status == test_case["expected_code"]
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST, indirect=True)
 @pytest.mark.parametrize(
     "test_case",

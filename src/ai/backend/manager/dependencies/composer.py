@@ -302,8 +302,12 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 notification_center=domain.notification_center,
                 appproxy_client_pool=agents.appproxy_client_pool,
                 prometheus_client=system.prometheus_client,
+                # Registry quota service
+                registry_quota_service=domain.services_ctx.per_project_container_registries_quota,
                 # BgtaskRegistry creation
                 agent_client_pool=agents.agent_client_pool,
+                # Log cleanup timer
+                distributed_lock_factory=domain.distributed_lock_factory,
             ),
         )
 

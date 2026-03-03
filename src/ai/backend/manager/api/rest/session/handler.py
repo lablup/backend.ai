@@ -176,7 +176,7 @@ from ai.backend.manager.services.session.actions.upload_files import (
 from ai.backend.manager.services.vfolder.actions.base import GetTaskLogsAction
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.context import RootContext
+    from ai.backend.manager.config.provider import ManagerConfigProvider
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -232,8 +232,14 @@ def _validate_creation_config(
 class SessionHandler:
     """Session API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
+    def __init__(
+        self,
+        *,
+        processors: Processors,
+        config_provider: ManagerConfigProvider,
+    ) -> None:
         self._processors = processors
+        self._config_provider = config_provider
 
     # ------------------------------------------------------------------
     # create_from_template (POST /_/create-from-template)
@@ -360,10 +366,9 @@ class SessionHandler:
 
         agent_list = cast(list[str] | None, validated_config.get("agent_list"))
         if agent_list is not None:
-            root_ctx: RootContext = request.app["_root.context"]
             if (
                 request["user"]["role"] != UserRole.SUPERADMIN
-                and root_ctx.config_provider.config.manager.hide_agents
+                and self._config_provider.config.manager.hide_agents
             ):
                 raise InsufficientPrivilege(
                     "You are not allowed to manually assign agents for your session."
@@ -597,11 +602,11 @@ class SessionHandler:
 
     async def restart(
         self,
-        body: BodyParam[RestartSessionRequest],
+        query: QueryParam[RestartSessionRequest],
         ctx: RequestCtx,
     ) -> web.Response:
         request = ctx.request
-        params = body.parsed
+        params = query.parsed
         session_name = request.match_info["session_name"]
         scopes_param = {"owner_access_key": params.owner_access_key}
         requester_access_key, owner_access_key = await get_access_key_scopes(
@@ -632,11 +637,11 @@ class SessionHandler:
 
     async def destroy(
         self,
-        body: BodyParam[DestroySessionRequest],
+        query: QueryParam[DestroySessionRequest],
         ctx: RequestCtx,
     ) -> APIResponse:
         request = ctx.request
-        params = body.parsed
+        params = query.parsed
         session_name = request.match_info["session_name"]
         user_role = cast(UserRole, request["user"]["role"])
         scopes_param = {"owner_access_key": params.owner_access_key}
@@ -922,11 +927,11 @@ class SessionHandler:
 
     async def list_files(
         self,
-        body: BodyParam[ListFilesRequest],
+        query: QueryParam[ListFilesRequest],
         ctx: RequestCtx,
     ) -> APIResponse:
         request = ctx.request
-        params = body.parsed
+        params = query.parsed
         session_name = request.match_info["session_name"]
         requester_access_key, owner_access_key = await get_access_key_scopes(request)
         log.info(
@@ -952,11 +957,11 @@ class SessionHandler:
 
     async def rename_session(
         self,
-        body: BodyParam[RenameSessionRequest],
+        query: QueryParam[RenameSessionRequest],
         ctx: RequestCtx,
     ) -> web.Response:
         request = ctx.request
-        params = body.parsed
+        params = query.parsed
         session_name = request.match_info["session_name"]
         new_name = params.session_name
         requester_access_key, owner_access_key = await get_access_key_scopes(request)
@@ -982,11 +987,11 @@ class SessionHandler:
 
     async def commit_session(
         self,
-        body: BodyParam[CommitSessionRequest],
+        query: QueryParam[CommitSessionRequest],
         ctx: RequestCtx,
     ) -> APIResponse:
         request = ctx.request
-        params = body.parsed
+        params = query.parsed
         session_name: str = request.match_info["session_name"]
         requester_access_key, owner_access_key = await get_access_key_scopes(request)
         log.info(
@@ -1013,11 +1018,11 @@ class SessionHandler:
 
     async def convert_session_to_image(
         self,
-        body: BodyParam[ConvertSessionToImageRequest],
+        query: QueryParam[ConvertSessionToImageRequest],
         ctx: RequestCtx,
     ) -> APIResponse:
         request = ctx.request
-        params = body.parsed
+        params = query.parsed
         session_name: str = request.match_info["session_name"]
         requester_access_key, owner_access_key = await get_access_key_scopes(request)
         log.info(

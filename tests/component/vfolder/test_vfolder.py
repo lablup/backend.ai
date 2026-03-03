@@ -37,7 +37,6 @@ VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
 
 
 class TestVFolderCreate:
-    @pytest.mark.asyncio
     @pytest.mark.xfail(strict=True, reason="Requires live storage-proxy")
     async def test_create_requires_storage_proxy(
         self,
@@ -48,7 +47,6 @@ class TestVFolderCreate:
             VFolderCreateReq(name="test-create-proxy", folder_host="local"),
         )
 
-    @pytest.mark.asyncio
     @pytest.mark.xfail(strict=True, reason="Requires live storage-proxy")
     async def test_regular_user_create_requires_storage_proxy(
         self,
@@ -61,7 +59,6 @@ class TestVFolderCreate:
 
 
 class TestVFolderList:
-    @pytest.mark.asyncio
     async def test_admin_lists_vfolders(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -73,7 +70,6 @@ class TestVFolderList:
         names = [item.name for item in result.items]
         assert target_vfolder["name"] in names
 
-    @pytest.mark.asyncio
     async def test_user_lists_own_vfolders(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -95,7 +91,6 @@ class TestVFolderList:
 
 
 class TestVFolderGetInfo:
-    @pytest.mark.asyncio
     @pytest.mark.xfail(
         strict=False,
         reason="get_info requires storage-proxy connection not available in component test",
@@ -111,7 +106,6 @@ class TestVFolderGetInfo:
         assert result.item.name == target_vfolder["name"]
         assert result.item.id == target_vfolder["id"].hex
 
-    @pytest.mark.asyncio
     async def test_get_nonexistent_vfolder_returns_error(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -123,7 +117,6 @@ class TestVFolderGetInfo:
 
 
 class TestVFolderGetID:
-    @pytest.mark.asyncio
     @pytest.mark.xfail(
         strict=False, reason="HMAC mismatch on GET with query params — SDK signing issue"
     )
@@ -141,7 +134,6 @@ class TestVFolderGetID:
 
 
 class TestVFolderRename:
-    @pytest.mark.asyncio
     @pytest.mark.xfail(
         strict=False,
         reason="get_info requires storage-proxy connection not available in component test",
@@ -162,7 +154,6 @@ class TestVFolderRename:
         info = await admin_registry.vfolder.get_info(new_name)
         assert info.item.name == new_name
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_rename_others_vfolder(
         self,
         user_registry: BackendAIClientRegistry,
@@ -177,7 +168,6 @@ class TestVFolderRename:
 
 
 class TestVFolderUpdateOptions:
-    @pytest.mark.asyncio
     @pytest.mark.xfail(
         strict=False,
         reason=(
@@ -202,7 +192,6 @@ class TestVFolderUpdateOptions:
 
 
 class TestVFolderDelete:
-    @pytest.mark.asyncio
     @pytest.mark.xfail(
         strict=False,
         reason="get_info requires storage-proxy connection not available in component test",
@@ -219,7 +208,6 @@ class TestVFolderDelete:
         )
         assert isinstance(result, MessageResponse)
 
-    @pytest.mark.asyncio
     @pytest.mark.xfail(
         strict=False,
         reason="get_info requires storage-proxy connection not available in component test",
@@ -234,7 +222,6 @@ class TestVFolderDelete:
         result = await admin_registry.vfolder.delete_by_name(vf["name"])
         assert isinstance(result, MessageResponse)
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_delete_others_vfolder(
         self,
         user_registry: BackendAIClientRegistry,
@@ -248,7 +235,6 @@ class TestVFolderDelete:
 
 
 class TestVFolderHosts:
-    @pytest.mark.asyncio
     async def test_list_hosts(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -259,7 +245,6 @@ class TestVFolderHosts:
         assert isinstance(result, ListHostsResponse)
         assert isinstance(result.allowed, list)
 
-    @pytest.mark.asyncio
     async def test_list_all_hosts(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -270,7 +255,6 @@ class TestVFolderHosts:
         assert isinstance(result, ListAllHostsResponse)
         assert isinstance(result.allowed, list)
 
-    @pytest.mark.asyncio
     @pytest.mark.xfail(strict=False, reason="May require live storage-proxy for host discovery")
     async def test_list_allowed_types(
         self,
@@ -284,7 +268,6 @@ class TestVFolderHosts:
 
 
 class TestVFolderInvitation:
-    @pytest.mark.asyncio
     async def test_invite_user_to_vfolder(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -302,7 +285,6 @@ class TestVFolderInvitation:
         assert isinstance(result, InviteVFolderResponse)
         assert isinstance(result.invited_ids, list)
 
-    @pytest.mark.asyncio
     async def test_list_invitations(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -313,7 +295,6 @@ class TestVFolderInvitation:
         assert isinstance(result, ListInvitationsResponse)
         assert isinstance(result.invitations, list)
 
-    @pytest.mark.asyncio
     @pytest.mark.xfail(
         strict=False,
         reason="delete_invitation returns 204 No Content, SDK expects MessageResponse",

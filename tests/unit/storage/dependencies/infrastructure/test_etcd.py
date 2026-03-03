@@ -35,7 +35,6 @@ class TestEtcdProvider:
         return config
 
     @pytest.mark.integration
-    @pytest.mark.asyncio
     async def test_provide_etcd_client(
         self,
         storage_config: StorageProxyUnifiedConfig,
@@ -51,7 +50,6 @@ class TestEtcdProvider:
             assert value == "test_value"
 
     @pytest.mark.integration
-    @pytest.mark.asyncio
     async def test_cleanup_on_exception(
         self,
         storage_config: StorageProxyUnifiedConfig,

@@ -19,7 +19,6 @@ from ai.backend.common.types import AutoScalingMetricSource
 
 @pytest.mark.integration
 class TestAutoScalingRuleLifecycle:
-    @pytest.mark.asyncio
     async def test_full_lifecycle(
         self,
         admin_registry: BackendAIClientRegistry,

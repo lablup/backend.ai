@@ -41,7 +41,6 @@ RoleFactory = Callable[..., Coroutine[Any, Any, CreateRoleResponse]]
 
 
 class TestRoleCreate:
-    @pytest.mark.asyncio
     async def test_admin_creates_role(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -58,7 +57,6 @@ class TestRoleCreate:
         assert result.role.source == RoleSource.CUSTOM
         assert result.role.status == RoleStatus.ACTIVE
 
-    @pytest.mark.asyncio
     async def test_admin_creates_role_with_description(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -71,7 +69,6 @@ class TestRoleCreate:
         )
         assert result.role.description == "A role with a description"
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_create_role(
         self,
         user_registry: BackendAIClientRegistry,
@@ -87,7 +84,6 @@ class TestRoleCreate:
 
 
 class TestRoleGet:
-    @pytest.mark.asyncio
     async def test_admin_gets_role_by_id(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -99,7 +95,6 @@ class TestRoleGet:
         assert get_result.role.name == target_role.role.name
         assert get_result.role.description == target_role.role.description
 
-    @pytest.mark.asyncio
     async def test_get_nonexistent_role_returns_not_found(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -109,7 +104,6 @@ class TestRoleGet:
 
 
 class TestRoleSearch:
-    @pytest.mark.asyncio
     async def test_admin_searches_roles(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -121,7 +115,6 @@ class TestRoleSearch:
         assert result.pagination.total >= 1
         assert len(result.roles) >= 1
 
-    @pytest.mark.asyncio
     async def test_search_with_name_filter(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -138,7 +131,6 @@ class TestRoleSearch:
         assert result.pagination.total >= 1
         assert any(r.name == marker for r in result.roles)
 
-    @pytest.mark.asyncio
     async def test_search_with_pagination(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -149,7 +141,6 @@ class TestRoleSearch:
         assert result.pagination.limit == 1
         assert len(result.roles) <= 1
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_search_roles(
         self,
         user_registry: BackendAIClientRegistry,
@@ -159,7 +150,6 @@ class TestRoleSearch:
 
 
 class TestRoleUpdate:
-    @pytest.mark.asyncio
     async def test_admin_updates_role_name(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -174,7 +164,6 @@ class TestRoleUpdate:
         assert update_result.role.name == f"updated-role-{unique}"
         assert update_result.role.id == target_role.role.id
 
-    @pytest.mark.asyncio
     async def test_admin_updates_role_description(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -188,7 +177,6 @@ class TestRoleUpdate:
         assert isinstance(update_result, UpdateRoleResponse)
         assert update_result.role.description == f"Updated description {unique}"
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_update_role(
         self,
         user_registry: BackendAIClientRegistry,
@@ -202,7 +190,6 @@ class TestRoleUpdate:
 
 
 class TestRoleDelete:
-    @pytest.mark.asyncio
     async def test_admin_soft_deletes_role(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -214,7 +201,6 @@ class TestRoleDelete:
         assert isinstance(delete_result, DeleteRoleResponse)
         assert delete_result.deleted is True
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_delete_role(
         self,
         user_registry: BackendAIClientRegistry,
@@ -225,7 +211,6 @@ class TestRoleDelete:
 
 
 class TestRolePurge:
-    @pytest.mark.asyncio
     async def test_admin_purges_role(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -238,7 +223,6 @@ class TestRolePurge:
         with pytest.raises(NotFoundError):
             await admin_registry.rbac.get_role(r.role.id)
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_purge_role(
         self,
         user_registry: BackendAIClientRegistry,
@@ -249,7 +233,6 @@ class TestRolePurge:
 
 
 class TestRoleAssignment:
-    @pytest.mark.asyncio
     async def test_admin_assigns_role_to_user(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -274,7 +257,6 @@ class TestRoleAssignment:
             )
         )
 
-    @pytest.mark.asyncio
     async def test_admin_revokes_role_from_user(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -299,7 +281,6 @@ class TestRoleAssignment:
         assert revoke_result.user_id == admin_user_fixture.user_uuid
         assert revoke_result.role_id == target_role.role.id
 
-    @pytest.mark.asyncio
     async def test_admin_searches_assigned_users(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -330,7 +311,6 @@ class TestRoleAssignment:
             )
         )
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_assign_role(
         self,
         user_registry: BackendAIClientRegistry,
@@ -345,7 +325,6 @@ class TestRoleAssignment:
                 )
             )
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_revoke_role(
         self,
         user_registry: BackendAIClientRegistry,
@@ -362,7 +341,6 @@ class TestRoleAssignment:
 
 
 class TestScopeManagement:
-    @pytest.mark.asyncio
     async def test_admin_gets_scope_types(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -371,7 +349,6 @@ class TestScopeManagement:
         assert isinstance(result, GetScopeTypesResponse)
         assert len(result.items) > 0
 
-    @pytest.mark.asyncio
     async def test_admin_searches_scopes(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -381,7 +358,6 @@ class TestScopeManagement:
         assert result.pagination.total >= 1
         assert len(result.items) >= 1
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_get_scope_types(
         self,
         user_registry: BackendAIClientRegistry,
@@ -391,7 +367,6 @@ class TestScopeManagement:
 
 
 class TestEntityManagement:
-    @pytest.mark.asyncio
     async def test_admin_gets_entity_types(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -400,7 +375,6 @@ class TestEntityManagement:
         assert isinstance(result, GetEntityTypesResponse)
         assert len(result.items) > 0
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_get_entity_types(
         self,
         user_registry: BackendAIClientRegistry,

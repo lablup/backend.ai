@@ -49,7 +49,6 @@ from ai.backend.common.dto.manager.fair_share import (
 
 
 class TestGetDomainFairShare:
-    @pytest.mark.asyncio
     async def test_admin_get_domain_fair_share(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -62,7 +61,6 @@ class TestGetDomainFairShare:
         )
         assert isinstance(result, GetDomainFairShareResponse)
 
-    @pytest.mark.asyncio
     async def test_user_get_domain_fair_share_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
@@ -77,7 +75,6 @@ class TestGetDomainFairShare:
 
 
 class TestSearchDomainFairShares:
-    @pytest.mark.asyncio
     async def test_admin_search_domain_fair_shares(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -88,7 +85,6 @@ class TestSearchDomainFairShares:
         assert isinstance(result, SearchDomainFairSharesResponse)
         assert isinstance(result.items, list)
 
-    @pytest.mark.asyncio
     async def test_user_search_domain_fair_shares_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
@@ -103,7 +99,6 @@ class TestSearchDomainFairShares:
 
 
 class TestGetProjectFairShare:
-    @pytest.mark.asyncio
     async def test_admin_get_project_fair_share(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -116,7 +111,6 @@ class TestGetProjectFairShare:
         )
         assert isinstance(result, GetProjectFairShareResponse)
 
-    @pytest.mark.asyncio
     async def test_user_get_project_fair_share_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
@@ -131,7 +125,6 @@ class TestGetProjectFairShare:
 
 
 class TestSearchProjectFairShares:
-    @pytest.mark.asyncio
     async def test_admin_search_project_fair_shares(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -147,7 +140,6 @@ class TestSearchProjectFairShares:
 
 
 class TestGetUserFairShare:
-    @pytest.mark.asyncio
     async def test_admin_get_user_fair_share(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -162,7 +154,6 @@ class TestGetUserFairShare:
         )
         assert isinstance(result, GetUserFairShareResponse)
 
-    @pytest.mark.asyncio
     async def test_user_get_user_fair_share_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
@@ -179,7 +170,6 @@ class TestGetUserFairShare:
 
 
 class TestSearchUserFairShares:
-    @pytest.mark.asyncio
     async def test_admin_search_user_fair_shares(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -195,7 +185,6 @@ class TestSearchUserFairShares:
 
 
 class TestSearchDomainUsageBuckets:
-    @pytest.mark.asyncio
     async def test_admin_search_domain_usage_buckets(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -208,7 +197,6 @@ class TestSearchDomainUsageBuckets:
 
 
 class TestSearchProjectUsageBuckets:
-    @pytest.mark.asyncio
     async def test_admin_search_project_usage_buckets(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -221,7 +209,6 @@ class TestSearchProjectUsageBuckets:
 
 
 class TestSearchUserUsageBuckets:
-    @pytest.mark.asyncio
     async def test_admin_search_user_usage_buckets(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -237,7 +224,6 @@ class TestSearchUserUsageBuckets:
 
 
 class TestRGGetDomainFairShare:
-    @pytest.mark.asyncio
     async def test_admin_rg_get_domain_fair_share(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -250,7 +236,6 @@ class TestRGGetDomainFairShare:
         )
         assert isinstance(result, GetDomainFairShareResponse)
 
-    @pytest.mark.asyncio
     async def test_user_rg_get_domain_fair_share(
         self,
         user_registry: BackendAIClientRegistry,
@@ -265,7 +250,6 @@ class TestRGGetDomainFairShare:
 
 
 class TestRGSearchDomainFairShares:
-    @pytest.mark.asyncio
     async def test_admin_rg_search_domain_fair_shares(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -283,7 +267,6 @@ class TestRGSearchDomainFairShares:
 
 
 class TestRGGetProjectFairShare:
-    @pytest.mark.asyncio
     async def test_admin_rg_get_project_fair_share(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -300,7 +283,6 @@ class TestRGGetProjectFairShare:
 
 
 class TestRGSearchProjectFairShares:
-    @pytest.mark.asyncio
     async def test_admin_rg_search_project_fair_shares(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -320,7 +302,6 @@ class TestRGSearchProjectFairShares:
 
 
 class TestRGGetUserFairShare:
-    @pytest.mark.asyncio
     async def test_admin_rg_get_user_fair_share(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -339,7 +320,6 @@ class TestRGGetUserFairShare:
 
 
 class TestRGSearchUserFairShares:
-    @pytest.mark.asyncio
     async def test_admin_rg_search_user_fair_shares(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -361,7 +341,6 @@ class TestRGSearchUserFairShares:
 
 
 class TestRGSearchDomainUsageBuckets:
-    @pytest.mark.asyncio
     async def test_admin_rg_search_domain_usage_buckets(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -376,7 +355,6 @@ class TestRGSearchDomainUsageBuckets:
 
 
 class TestRGSearchProjectUsageBuckets:
-    @pytest.mark.asyncio
     async def test_admin_rg_search_project_usage_buckets(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -393,7 +371,6 @@ class TestRGSearchProjectUsageBuckets:
 
 
 class TestRGSearchUserUsageBuckets:
-    @pytest.mark.asyncio
     async def test_admin_rg_search_user_usage_buckets(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -415,7 +392,6 @@ class TestRGSearchUserUsageBuckets:
 
 
 class TestUpsertDomainFairShareWeight:
-    @pytest.mark.asyncio
     async def test_admin_upsert_domain_weight(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -431,7 +407,6 @@ class TestUpsertDomainFairShareWeight:
         assert result.item.domain_name == domain_fixture
         assert result.item.resource_group == scaling_group_fixture
 
-    @pytest.mark.asyncio
     async def test_user_upsert_domain_weight_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
@@ -447,7 +422,6 @@ class TestUpsertDomainFairShareWeight:
 
 
 class TestUpsertProjectFairShareWeight:
-    @pytest.mark.asyncio
     async def test_admin_upsert_project_weight(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -469,7 +443,6 @@ class TestUpsertProjectFairShareWeight:
 
 
 class TestUpsertUserFairShareWeight:
-    @pytest.mark.asyncio
     async def test_admin_upsert_user_weight(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -496,7 +469,6 @@ class TestUpsertUserFairShareWeight:
 
 
 class TestBulkUpsertDomainFairShareWeight:
-    @pytest.mark.asyncio
     async def test_admin_bulk_upsert_domain_weight(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -519,7 +491,6 @@ class TestBulkUpsertDomainFairShareWeight:
 
 
 class TestBulkUpsertProjectFairShareWeight:
-    @pytest.mark.asyncio
     async def test_admin_bulk_upsert_project_weight(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -544,7 +515,6 @@ class TestBulkUpsertProjectFairShareWeight:
 
 
 class TestBulkUpsertUserFairShareWeight:
-    @pytest.mark.asyncio
     async def test_admin_bulk_upsert_user_weight(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -574,7 +544,6 @@ class TestBulkUpsertUserFairShareWeight:
 
 
 class TestGetResourceGroupFairShareSpec:
-    @pytest.mark.asyncio
     async def test_admin_get_rg_spec(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -586,7 +555,6 @@ class TestGetResourceGroupFairShareSpec:
         assert isinstance(result, GetResourceGroupFairShareSpecResponse)
         assert result.resource_group == scaling_group_fixture
 
-    @pytest.mark.asyncio
     async def test_user_get_rg_spec_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
@@ -599,7 +567,6 @@ class TestGetResourceGroupFairShareSpec:
 
 
 class TestSearchResourceGroupFairShareSpecs:
-    @pytest.mark.asyncio
     async def test_admin_search_rg_specs(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -610,7 +577,6 @@ class TestSearchResourceGroupFairShareSpecs:
 
 
 class TestUpdateResourceGroupFairShareSpec:
-    @pytest.mark.asyncio
     async def test_admin_update_rg_spec(
         self,
         admin_registry: BackendAIClientRegistry,

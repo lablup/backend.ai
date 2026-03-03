@@ -17,7 +17,7 @@ def register_group_routes(deps: ModuleDeps) -> RouteRegistry:
     from .handler import GroupHandler
 
     reg = RouteRegistry.create("group", deps.cors_options)
-    handler = GroupHandler(services_ctx=deps.services_ctx)
+    handler = GroupHandler(processors=deps.processors)
 
     reg.add(
         "POST",

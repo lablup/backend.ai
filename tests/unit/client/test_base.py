@@ -77,7 +77,6 @@ def test_api_function_metaclass() -> None:
         assert Dummy().calculate() == "done"
 
 
-@pytest.mark.asyncio
 async def test_api_function_metaclass_async() -> None:
     async with AsyncSession() as session:
         Dummy = type(

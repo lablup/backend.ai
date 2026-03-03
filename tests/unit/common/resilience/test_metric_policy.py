@@ -12,7 +12,6 @@ from ai.backend.common.resilience.resilience import Resilience
 
 
 class TestMetricPolicy:
-    @pytest.mark.asyncio
     async def test_successful_operation_metrics(self, mocker: MockerFixture) -> None:
         """Test that successful operations record correct metrics."""
         mock_observer = MagicMock()
@@ -44,7 +43,6 @@ class TestMetricPolicy:
         assert call_kwargs["exception"] is None
         assert call_kwargs["duration"] > 0
 
-    @pytest.mark.asyncio
     async def test_failed_operation_metrics(self, mocker: MockerFixture) -> None:
         """Test that failed operations record failure metrics."""
         mock_observer = MagicMock()
@@ -76,7 +74,6 @@ class TestMetricPolicy:
         assert call_kwargs["exception"] is not None
         assert call_kwargs["duration"] > 0
 
-    @pytest.mark.asyncio
     async def test_metric_duration_tracking(self, mocker: MockerFixture) -> None:
         """Test that metric policy correctly tracks operation duration."""
         mock_observer = MagicMock()
@@ -101,7 +98,6 @@ class TestMetricPolicy:
         # Duration should be at least 0.1s
         assert call_kwargs["duration"] >= 0.1
 
-    @pytest.mark.asyncio
     async def test_auto_operation_name_from_context(self, mocker: MockerFixture) -> None:
         """Test that operation name is automatically extracted from function name via context."""
         mock_observer = MagicMock()

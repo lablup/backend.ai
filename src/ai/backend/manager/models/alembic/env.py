@@ -9,7 +9,6 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from ai.backend.logging import is_active as logging_active
-from ai.backend.manager.models.alembic import invoked_programmatically
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -104,8 +103,7 @@ def run_migrations_online() -> None:
         do_run_migrations(connectable)
 
 
-if not invoked_programmatically.get():  # when executed via `alembic` commands
-    if context.is_offline_mode():
-        run_migrations_offline()
-    else:
-        run_migrations_online()
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()

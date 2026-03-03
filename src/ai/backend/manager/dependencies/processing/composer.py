@@ -42,6 +42,9 @@ from ai.backend.manager.reporters.hub import ReporterHub, ReporterHubArgs
 from ai.backend.manager.reporters.smtp import SMTPReporter, SMTPSenderArgs
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.service.container_registry.harbor import (
+    AbstractPerProjectContainerRegistryQuotaService,
+)
 from ai.backend.manager.services.processors import Processors, ServiceArgs
 from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
@@ -51,10 +54,11 @@ from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
-from ai.backend.manager.types import SMTPTriggerPolicy
+from ai.backend.manager.types import DistributedLockFactory, SMTPTriggerPolicy
 
 from .bgtask_registry import BgtaskRegistryDependency, BgtaskRegistryInput
 from .event_dispatcher import EventDispatcherDependency, EventDispatcherInput
+from .log_cleanup_timer import LogCleanupTimerDependency, LogCleanupTimerInput
 from .processors import ProcessorsDependency, ProcessorsProviderInput
 
 
@@ -107,6 +111,12 @@ class ProcessingInput:
 
     # BgtaskRegistry creation (additional)
     agent_client_pool: AgentClientPool
+
+    # Log cleanup timer
+    distributed_lock_factory: DistributedLockFactory
+
+    # Registry quota service (optional, defaults to None)
+    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None = None
 
 
 @dataclass
@@ -218,6 +228,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             notification_center=setup_input.notification_center,
             appproxy_client_pool=setup_input.appproxy_client_pool,
             prometheus_client=setup_input.prometheus_client,
+            registry_quota_service=setup_input.registry_quota_service,
         )
 
         processors = await stack.enter_dependency(
@@ -242,6 +253,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 event_hub=setup_input.event_hub,
                 agent_registry=setup_input.agent_registry,
                 db=setup_input.db,
+                etcd=setup_input.etcd,
                 idle_checker_host=setup_input.idle_checker_host,
                 event_dispatcher_plugin_ctx=setup_input.event_dispatcher_plugin_ctx,
                 repositories=setup_input.repositories,
@@ -253,6 +265,15 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         )
         dispatchers.dispatch(event_dispatcher)
         await event_dispatcher.start()
+
+        # Step 3.5: Create and start log cleanup timer
+        await stack.enter_dependency(
+            LogCleanupTimerDependency(),
+            LogCleanupTimerInput(
+                distributed_lock_factory=setup_input.distributed_lock_factory,
+                event_producer=setup_input.event_producer,
+            ),
+        )
 
         # Step 4: Create BgtaskRegistry
         await stack.enter_dependency(

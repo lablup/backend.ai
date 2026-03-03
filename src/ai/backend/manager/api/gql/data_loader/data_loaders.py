@@ -66,6 +66,7 @@ from .rbac import (
     load_element_associations_by_ids,
     load_entities_by_type_and_ids,
     load_permissions_by_ids,
+    load_permissions_by_role_ids,
     load_role_assignments_by_ids,
     load_role_assignments_by_role_and_user_ids,
     load_roles_by_ids,
@@ -316,6 +317,14 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, PermissionData | None]:
         return DataLoader(
             load_fn=partial(load_permissions_by_ids, self._processors.permission_controller)
+        )
+
+    @cached_property
+    def permissions_by_role_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, list[PermissionData]]:
+        return DataLoader(
+            load_fn=partial(load_permissions_by_role_ids, self._processors.permission_controller)
         )
 
     @cached_property

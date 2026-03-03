@@ -36,7 +36,6 @@ def auth_service(
 
 
 # Test Get SSH Keypair
-@pytest.mark.asyncio
 async def test_get_ssh_keypair_existing_key(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
@@ -57,7 +56,6 @@ async def test_get_ssh_keypair_existing_key(
     mock_auth_repository.get_ssh_public_key.assert_called_once_with(action.access_key)
 
 
-@pytest.mark.asyncio
 async def test_get_ssh_keypair_nonexistent_key(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
@@ -77,7 +75,6 @@ async def test_get_ssh_keypair_nonexistent_key(
 
 
 # Test Generate SSH Keypair
-@pytest.mark.asyncio
 async def test_generate_ssh_keypair(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
@@ -110,7 +107,6 @@ async def test_generate_ssh_keypair(
 
 
 # Test Upload SSH Keypair
-@pytest.mark.asyncio
 async def test_upload_ssh_keypair_valid_keys(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
@@ -141,7 +137,6 @@ async def test_upload_ssh_keypair_valid_keys(
     assert result.ssh_keypair.ssh_private_key == action.private_key
 
 
-@pytest.mark.asyncio
 async def test_upload_ssh_keypair_invalid_keys(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
@@ -168,7 +163,6 @@ async def test_upload_ssh_keypair_invalid_keys(
     mock_auth_repository.update_ssh_keypair.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_upload_ssh_keypair_validation_message(
     auth_service: AuthService,
 ) -> None:

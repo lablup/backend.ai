@@ -422,7 +422,6 @@ class TestImageAPIHandler:
         )
         return processors
 
-    @pytest.mark.asyncio
     async def test_search_images_calls_processor(
         self,
         mock_processors: MagicMock,
@@ -433,7 +432,6 @@ class TestImageAPIHandler:
         )
         mock_processors.image.search_images.wait_for_complete.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_search_images_returns_correct_count(
         self,
         mock_processors: MagicMock,
@@ -445,7 +443,6 @@ class TestImageAPIHandler:
         assert result.total_count == 2
         assert len(result.data) == 2
 
-    @pytest.mark.asyncio
     async def test_search_images_converts_to_dto(
         self,
         mock_processors: MagicMock,
@@ -462,7 +459,6 @@ class TestImageAPIHandler:
         assert items[0].id == UUID("11111111-1111-1111-1111-111111111111")
         assert items[1].id == UUID("22222222-2222-2222-2222-222222222222")
 
-    @pytest.mark.asyncio
     async def test_get_image_calls_processor(
         self,
         mock_processors: MagicMock,
@@ -474,7 +470,6 @@ class TestImageAPIHandler:
         )
         mock_processors.image.get_image_by_id.wait_for_complete.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_get_image_converts_detailed_dto(
         self,
         mock_processors: MagicMock,
@@ -490,7 +485,6 @@ class TestImageAPIHandler:
         assert isinstance(dto, ImageDTO)
         assert dto.id == UUID("11111111-1111-1111-1111-111111111111")
 
-    @pytest.mark.asyncio
     async def test_scan_image_calls_processor(
         self,
         mock_processors: MagicMock,
@@ -501,7 +495,6 @@ class TestImageAPIHandler:
         )
         mock_processors.image.scan_image.wait_for_complete.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_scan_image_result_has_image_and_errors(
         self,
         mock_processors: MagicMock,
@@ -516,7 +509,6 @@ class TestImageAPIHandler:
         assert isinstance(dto, ImageDTO)
         assert result.errors == []
 
-    @pytest.mark.asyncio
     async def test_alias_image_calls_processor(
         self,
         mock_processors: MagicMock,
@@ -530,7 +522,6 @@ class TestImageAPIHandler:
         )
         mock_processors.image.alias_image_by_id.wait_for_complete.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_alias_result_has_correct_fields(
         self,
         mock_processors: MagicMock,
@@ -545,7 +536,6 @@ class TestImageAPIHandler:
         assert result.image_alias.alias == "python3"
         assert result.image_id == ImageID(UUID("11111111-1111-1111-1111-111111111111"))
 
-    @pytest.mark.asyncio
     async def test_dealias_image_calls_processor(
         self,
         mock_processors: MagicMock,
@@ -556,7 +546,6 @@ class TestImageAPIHandler:
         )
         mock_processors.image.dealias_image.wait_for_complete.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_forget_image_calls_processor(
         self,
         mock_processors: MagicMock,
@@ -568,7 +557,6 @@ class TestImageAPIHandler:
         )
         mock_processors.image.forget_image_by_id.wait_for_complete.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_forget_result_image_status(
         self,
         mock_processors: MagicMock,
@@ -583,7 +571,6 @@ class TestImageAPIHandler:
 
         assert dto.status == "DELETED"
 
-    @pytest.mark.asyncio
     async def test_purge_image_calls_processor(
         self,
         mock_processors: MagicMock,
@@ -595,7 +582,6 @@ class TestImageAPIHandler:
         )
         mock_processors.image.purge_image_by_id.wait_for_complete.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_search_empty_result(self) -> None:
         """Search with empty result should return empty data."""
         processors = MagicMock()

@@ -290,7 +290,6 @@ class TestGenerateToken:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_generate_token(
         self,
         scenario: ScenarioBase[GenerateTokenAction, GenerateTokenActionResult],

@@ -12,10 +12,12 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.image.options import ImageConditions
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.testutils.db import with_tables
 
@@ -314,3 +316,97 @@ class TestImageRepositorySearch:
 
         assert len(result.items) == 0
         assert result.total_count == 0
+
+    # =========================================================================
+    # Tests - Alias filter conditions
+    # =========================================================================
+
+    @pytest.fixture
+    async def images_with_aliases(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_registry_id: UUID,
+    ) -> AsyncGenerator[list[UUID], None]:
+        """Create images with aliases for alias filter testing."""
+        images_data = [
+            ("python:3.9", "x86_64", ImageType.COMPUTE, ["py39"]),
+            ("nginx:latest", "x86_64", ImageType.SERVICE, ["webserver"]),
+            ("ubuntu:22.04", "arm64", ImageType.SYSTEM, []),
+        ]
+
+        image_rows: list[ImageRow] = []
+        async with db_with_cleanup.begin_session() as db_sess:
+            for name, arch, img_type, aliases in images_data:
+                image = ImageRow(
+                    name=f"registry.example.com/test_project/{name}",
+                    image=name.split(":")[0],
+                    tag=name.split(":")[1],
+                    registry="registry.example.com",
+                    registry_id=test_registry_id,
+                    project="test_project",
+                    architecture=arch,
+                    config_digest=f"sha256:{uuid4().hex}",
+                    size_bytes=1000000,
+                    type=img_type,
+                    status=ImageStatus.ALIVE,
+                    accelerators=None,
+                    labels={},
+                    resources={},
+                )
+                db_sess.add(image)
+                image_rows.append(image)
+            await db_sess.flush()
+
+            for image_row, (_, _, _, aliases) in zip(image_rows, images_data, strict=False):
+                for alias_name in aliases:
+                    alias = ImageAliasRow(
+                        alias=alias_name,
+                        image_id=image_row.id,
+                    )
+                    db_sess.add(alias)
+
+            image_ids = [row.id for row in image_rows]
+            await db_sess.commit()
+
+        yield image_ids
+
+    async def test_filter_by_single_alias_condition(
+        self,
+        image_repository: ImageRepository,
+        images_with_aliases: list[UUID],
+    ) -> None:
+        """Test filtering images with a single alias condition."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                ImageConditions.by_alias_contains(
+                    StringMatchSpec(value="py", case_insensitive=False, negated=False)
+                ),
+            ],
+            orders=[],
+        )
+        result = await image_repository.search_images(querier)
+        assert result.total_count == 1
+        assert "python" in str(result.items[0].name)
+
+    async def test_filter_by_combined_alias_conditions(
+        self,
+        image_repository: ImageRepository,
+        images_with_aliases: list[UUID],
+    ) -> None:
+        """Test filtering images with two alias conditions combined."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                ImageConditions.by_alias_contains(
+                    StringMatchSpec(value="py", case_insensitive=False, negated=False)
+                ),
+                ImageConditions.by_alias_ends_with(
+                    StringMatchSpec(value="39", case_insensitive=False, negated=False)
+                ),
+            ],
+            orders=[],
+        )
+        result = await image_repository.search_images(querier)
+        assert result.total_count == 1
+        assert "python:3.9" in str(result.items[0].name)

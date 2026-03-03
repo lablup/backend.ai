@@ -13,7 +13,6 @@ R = TypeVar("R")
 
 
 class TestPolicyComposition:
-    @pytest.mark.asyncio
     async def test_single_policy_execution(self) -> None:
         """Test that a single policy's execute is called correctly."""
         execute_called = False
@@ -40,7 +39,6 @@ class TestPolicyComposition:
         assert result == "success"
         assert execute_called
 
-    @pytest.mark.asyncio
     async def test_multiple_policies_execution_order(self) -> None:
         """Test that multiple policies are executed in correct order."""
         execution_order: list[str] = []
@@ -100,7 +98,6 @@ class TestPolicyComposition:
             "policy1_after",
         ]
 
-    @pytest.mark.asyncio
     async def test_exception_propagation_through_policies(self) -> None:
         """Test that exceptions propagate correctly through nested policies."""
         execution_order: list[str] = []
@@ -148,7 +145,6 @@ class TestPolicyComposition:
             "policy1_after",
         ]
 
-    @pytest.mark.asyncio
     async def test_empty_policy_list(self) -> None:
         """Test that operations work with no policies applied."""
 
@@ -159,7 +155,6 @@ class TestPolicyComposition:
         result = await operation()
         assert result == "success"
 
-    @pytest.mark.asyncio
     async def test_policy_exception_handling(self) -> None:
         """Test that exceptions from policies themselves are propagated."""
 

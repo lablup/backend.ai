@@ -107,7 +107,6 @@ class TestUserResourcePolicyRepository:
 
         yield policy_row.to_dataclass()
 
-    @pytest.mark.asyncio
     async def test_create_policy(self, repository: UserResourcePolicyRepository) -> None:
         """Test creating a new user resource policy"""
         policy_name = "test-policy-create"
@@ -132,7 +131,6 @@ class TestUserResourcePolicyRepository:
         assert result.max_session_count_per_model_session == max_session_count_per_model_session
         assert result.max_customized_image_count == max_customized_image_count
 
-    @pytest.mark.asyncio
     async def test_get_by_name_success(
         self, repository: UserResourcePolicyRepository, sample_policy: UserResourcePolicyData
     ) -> None:
@@ -144,13 +142,11 @@ class TestUserResourcePolicyRepository:
         assert result.max_vfolder_count == sample_policy.max_vfolder_count
         assert result.max_quota_scope_size == sample_policy.max_quota_scope_size
 
-    @pytest.mark.asyncio
     async def test_get_by_name_not_found(self, repository: UserResourcePolicyRepository) -> None:
         """Test getting a policy by name when it doesn't exist"""
         with pytest.raises(UserResourcePolicyNotFound):
             await repository.get_by_name("non-existing")
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "updater_spec,expected_updates",
         [
@@ -237,7 +233,6 @@ class TestUserResourcePolicyRepository:
         )
         assert result.max_customized_image_count == expected_updates.max_customized_image_count
 
-    @pytest.mark.asyncio
     async def test_update_policy_not_found(self, repository: UserResourcePolicyRepository) -> None:
         """Test updating a policy that doesn't exist"""
         updater = Updater(
@@ -247,7 +242,6 @@ class TestUserResourcePolicyRepository:
         with pytest.raises(UserResourcePolicyNotFound):
             await repository.update(updater)
 
-    @pytest.mark.asyncio
     async def test_delete_policy_success(
         self, repository: UserResourcePolicyRepository, sample_policy: UserResourcePolicyData
     ) -> None:
@@ -261,13 +255,11 @@ class TestUserResourcePolicyRepository:
         with pytest.raises(UserResourcePolicyNotFound):
             await repository.get_by_name(sample_policy.name)
 
-    @pytest.mark.asyncio
     async def test_delete_policy_not_found(self, repository: UserResourcePolicyRepository) -> None:
         """Test deleting a policy that doesn't exist"""
         with pytest.raises(UserResourcePolicyNotFound):
             await repository.delete("non-existing")
 
-    @pytest.mark.asyncio
     async def test_create_and_get_roundtrip(self, repository: UserResourcePolicyRepository) -> None:
         """Test creating a policy and retrieving it"""
         policy_name = "test-policy-roundtrip"

@@ -84,7 +84,6 @@ class _RemainingTimeCalculationTestConfig:
         ),
     ],
 )
-@pytest.mark.asyncio
 async def test_remaining_time_calculation(
     remaining_time_config: _RemainingTimeCalculationTestConfig,
 ) -> None:
@@ -135,7 +134,6 @@ class TestNewUserGracePeriodChecker:
         """Mock kernel table - user table joined data as mock row"""
         return mock_row(user_created_at=base_time)
 
-    @pytest.mark.asyncio
     async def test_new_user_grace_period(
         self,
         grace_period_checker: NewUserGracePeriodChecker,
@@ -262,7 +260,6 @@ class TestNetworkTimeoutIdleChecker:
         ],
         ids=["positive", "negative"],
     )
-    @pytest.mark.asyncio
     async def test_network_timeout_without_grace(
         self,
         scenario: _NetworkTimeoutScenario,
@@ -355,7 +352,6 @@ class TestNetworkTimeoutIdleChecker:
         ],
         ids=["positive", "negative"],
     )
-    @pytest.mark.asyncio
     async def test_network_timeout_with_grace(
         self,
         scenario: _NetworkTimeoutWithGraceScenario,
@@ -518,7 +514,6 @@ class TestSessionLifetimeChecker:
         ],
         ids=["positive_20s_remaining", "negative_timeout_exceeded"],
     )
-    @pytest.mark.asyncio
     async def test_session_lifetime_without_grace(
         self,
         test_config: _SessionLifetimeTestConfig,
@@ -571,7 +566,6 @@ class TestSessionLifetimeChecker:
         ],
         ids=["grace_positive_15s_remaining", "grace_negative_exceeded"],
     )
-    @pytest.mark.asyncio
     async def test_session_lifetime_with_grace(
         self,
         test_config: _SessionLifetimeTestConfig,
@@ -798,7 +792,6 @@ class TestUtilizationIdleChecker:
         ],
         ids=["mem_70pct_cpu_10pct", "mem_25pct_cpu_85pct"],
     )
-    @pytest.mark.asyncio
     async def test_utilization_current(
         self,
         current_test_config: _UtilizationCurrentTestConfig,
@@ -961,7 +954,6 @@ class TestUtilizationIdleChecker:
             "within_grace_low_util",
         ],
     )
-    @pytest.mark.asyncio
     async def test_utilization_checker_with_grace_period(
         self,
         grace_test_config: _UtilizationGracePeriodTestConfig,
@@ -1066,7 +1058,6 @@ class TestUtilizationIdleChecker:
         ],
         ids=["positive_10s", "negative_alive_utilization"],
     )
-    @pytest.mark.asyncio
     async def test_utilization_sufficient_without_grace_period(
         self,
         test_config: _UtilizationIdleTestConfig,
@@ -1193,7 +1184,6 @@ class TestUtilizationIdleChecker:
         ],
         ids=["low_util_5pct_threshold_50pct"],
     )
-    @pytest.mark.asyncio
     async def test_utilization_insufficient_without_grace_period(
         self,
         insufficient_test_config: _UtilizationInsufficientTestConfig,

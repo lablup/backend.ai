@@ -293,7 +293,6 @@ class TestGroupNestedSearchIntegration:
 
         return result
 
-    @pytest.mark.asyncio
     async def test_search_projects_with_domain_is_active_filter(
         self,
         group_db_source: GroupDBSource,
@@ -311,7 +310,6 @@ class TestGroupNestedSearchIntegration:
         active_domain = [d for d, _ in two_domains_with_projects.items() if "active-dom" in d][0]
         assert result.items[0].id == two_domains_with_projects[active_domain][0]
 
-    @pytest.mark.asyncio
     async def test_search_projects_with_domain_description_contains_filter(
         self,
         group_db_source: GroupDBSource,
@@ -328,7 +326,6 @@ class TestGroupNestedSearchIntegration:
 
         assert result.total_count == 1
 
-    @pytest.mark.asyncio
     async def test_search_projects_with_domain_description_negated_filter(
         self,
         group_db_source: GroupDBSource,
@@ -345,7 +342,6 @@ class TestGroupNestedSearchIntegration:
 
         assert result.total_count == 1
 
-    @pytest.mark.asyncio
     async def test_search_projects_ordered_by_domain_name(
         self,
         group_db_source: GroupDBSource,
@@ -364,7 +360,6 @@ class TestGroupNestedSearchIntegration:
         assert result.items[0].id == two_domains_with_projects[domain_names[0]][0]
         assert result.items[1].id == two_domains_with_projects[domain_names[1]][0]
 
-    @pytest.mark.asyncio
     async def test_search_projects_combined_domain_filter_and_order(
         self,
         group_db_source: GroupDBSource,
@@ -682,7 +677,6 @@ class TestGroupUserNestedSearchIntegration:
         }
         return result
 
-    @pytest.mark.asyncio
     async def test_search_with_user_username_filter(
         self,
         group_db_source: GroupDBSource,
@@ -700,7 +694,6 @@ class TestGroupUserNestedSearchIntegration:
         assert result.total_count == 1
         assert result.items[0].id == projects_with_users["proj_alpha"]["project_id"]
 
-    @pytest.mark.asyncio
     async def test_search_with_user_email_filter(
         self,
         group_db_source: GroupDBSource,
@@ -718,7 +711,6 @@ class TestGroupUserNestedSearchIntegration:
         assert result.total_count == 1
         assert result.items[0].id == projects_with_users["proj_beta"]["project_id"]
 
-    @pytest.mark.asyncio
     async def test_search_with_user_is_active_filter(
         self,
         group_db_source: GroupDBSource,
@@ -735,7 +727,6 @@ class TestGroupUserNestedSearchIntegration:
         assert result.total_count == 1
         assert result.items[0].id == projects_with_users["proj_alpha"]["project_id"]
 
-    @pytest.mark.asyncio
     async def test_search_ordered_by_user_username(
         self,
         group_db_source: GroupDBSource,
@@ -754,7 +745,6 @@ class TestGroupUserNestedSearchIntegration:
         assert result.items[0].id == projects_with_users["proj_alpha"]["project_id"]
         assert result.items[1].id == projects_with_users["proj_beta"]["project_id"]
 
-    @pytest.mark.asyncio
     async def test_search_ordered_by_user_email(
         self,
         group_db_source: GroupDBSource,

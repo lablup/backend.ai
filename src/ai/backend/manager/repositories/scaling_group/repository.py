@@ -196,6 +196,21 @@ class ScalingGroupRepository:
             user_group=user_group,
         )
 
+    @scaling_group_repository_resilience.apply()
+    async def list_allowed_sgroups(
+        self,
+        *,
+        domain_name: str,
+        group: str,
+        access_key: str,
+    ) -> list[ScalingGroupData]:
+        """List scaling groups allowed for a user."""
+        return await self._db_source.list_allowed_sgroups(
+            domain_name=domain_name,
+            group=group,
+            access_key=access_key,
+        )
+
     async def get_resource_info(
         self,
         scaling_group: str,

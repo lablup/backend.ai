@@ -56,7 +56,6 @@ class TestVisualizingDependencyStack:
     Test VisualizingDependencyStack implementation.
     """
 
-    @pytest.mark.asyncio
     async def test_single_dependency_visualization(self) -> None:
         """
         Stack should visualize single dependency lifecycle.
@@ -82,7 +81,6 @@ class TestVisualizingDependencyStack:
         # Verify cleanup
         assert cleanup_tracker == ["test-dep"]
 
-    @pytest.mark.asyncio
     async def test_composer_visualization(self) -> None:
         """
         Stack should visualize composer with starting indicator.
@@ -134,7 +132,6 @@ class TestVisualizingDependencyStack:
         # Verify cleanup order (LIFO)
         assert cleanup_tracker == ["dep2", "dep1"]
 
-    @pytest.mark.asyncio
     async def test_nested_composer_indentation(self) -> None:
         """
         Stack should properly indent nested composers.
@@ -179,7 +176,6 @@ class TestVisualizingDependencyStack:
         assert inner_line.startswith("  ")  # 1 level indent
         assert dep_line.startswith("    ")  # 2 level indent
 
-    @pytest.mark.asyncio
     async def test_failure_visualization(self) -> None:
         """
         Stack should visualize failed dependencies.
@@ -206,7 +202,6 @@ class TestVisualizingDependencyStack:
         # Verify cleanup
         assert cleanup_tracker == ["dep1"]
 
-    @pytest.mark.asyncio
     async def test_timestamps_option(self) -> None:
         """
         Stack should respect show_timestamps option.
@@ -233,7 +228,6 @@ class TestVisualizingDependencyStack:
         assert "]" in output_with_ts.getvalue()
         assert "[" not in output_without_ts.getvalue()
 
-    @pytest.mark.asyncio
     async def test_summary_output(self) -> None:
         """
         Stack should print summary with correct counts.
@@ -255,7 +249,6 @@ class TestVisualizingDependencyStack:
         assert "Completed: 2" in summary
         assert "Failed: 0" in summary
 
-    @pytest.mark.asyncio
     async def test_composer_failure_visualization(self) -> None:
         """
         Stack should visualize composer failures.

@@ -171,6 +171,13 @@ class AssignedUserConditions:
     """Query conditions for assigned users."""
 
     @staticmethod
+    def by_user_id(user_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRoleRow.user_id == user_id
+
+        return inner
+
+    @staticmethod
     def by_role_id(role_id: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return UserRoleRow.role_id == role_id
@@ -321,6 +328,18 @@ class AssignedUserConditions:
     ) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.tuple_(UserRoleRow.role_id, UserRoleRow.user_id).in_(pairs)
+
+        return inner
+
+    @staticmethod
+    def exists_role_combined(role_conditions: list[QueryCondition]) -> QueryCondition:
+        """Combine multiple role conditions into single EXISTS subquery."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(RoleRow.id == UserRoleRow.role_id)
+            for cond in role_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
 
         return inner
 
@@ -811,6 +830,13 @@ class ScopedPermissionConditions:
     def by_ids(permission_ids: Collection[uuid.UUID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return PermissionRow.id.in_(permission_ids)
+
+        return inner
+
+    @staticmethod
+    def by_role_ids(role_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.role_id.in_(role_ids)
 
         return inner
 

@@ -309,7 +309,6 @@ class TestSearchDomainFairSharesEntityBased:
 
     # ==================== Scope Validation Tests ====================
 
-    @pytest.mark.asyncio
     async def test_raises_error_for_nonexistent_resource_group(
         self,
         fair_share_repository: FairShareRepository,
@@ -327,7 +326,6 @@ class TestSearchDomainFairSharesEntityBased:
 
     # ==================== Empty Result Tests ====================
 
-    @pytest.mark.asyncio
     async def test_returns_empty_for_resource_group_without_domains(
         self,
         fair_share_repository: FairShareRepository,
@@ -348,7 +346,6 @@ class TestSearchDomainFairSharesEntityBased:
 
     # ==================== Success Cases ====================
 
-    @pytest.mark.asyncio
     async def test_returns_domain_with_record(
         self,
         fair_share_repository: FairShareRepository,
@@ -375,7 +372,6 @@ class TestSearchDomainFairSharesEntityBased:
         # Has metadata from DB
         assert result.items[0].data.metadata is not None
 
-    @pytest.mark.asyncio
     async def test_returns_domain_without_record(
         self,
         fair_share_repository: FairShareRepository,
@@ -402,7 +398,6 @@ class TestSearchDomainFairSharesEntityBased:
         # No metadata (not from DB)
         assert result.items[0].data.metadata is None
 
-    @pytest.mark.asyncio
     async def test_mixed_domains_with_and_without_records(
         self,
         fair_share_repository: FairShareRepository,
@@ -437,7 +432,6 @@ class TestSearchDomainFairSharesEntityBased:
         assert result_domains[domain_with_record].data.metadata is not None
         assert result_domains[domain_without_record].data.metadata is None
 
-    @pytest.mark.asyncio
     async def test_returns_all_domains_regardless_of_rg_membership(
         self,
         fair_share_repository: FairShareRepository,
@@ -466,7 +460,6 @@ class TestSearchDomainFairSharesEntityBased:
         assert result_domains[fixture.domain_in_rg1].data.use_default is True
         assert result_domains[fixture.domain_in_rg2].data.use_default is True
 
-    @pytest.mark.asyncio
     async def test_pagination_includes_all_entities(
         self,
         fair_share_repository: FairShareRepository,
@@ -489,7 +482,6 @@ class TestSearchDomainFairSharesEntityBased:
 
     # ==================== RG-Context Filter Regression Tests ====================
 
-    @pytest.mark.asyncio
     async def test_rg_filter_by_domain_name_includes_entity_without_record(
         self,
         fair_share_repository: FairShareRepository,
@@ -520,7 +512,6 @@ class TestSearchDomainFairSharesEntityBased:
         assert result.items[0].domain_name == domain_without_record
         assert result.items[0].data.use_default is True
 
-    @pytest.mark.asyncio
     async def test_rg_filter_by_domain_name_with_mixed_records(
         self,
         fair_share_repository: FairShareRepository,
@@ -586,7 +577,6 @@ class TestSearchDomainFairSharesEntityBased:
             await db_sess.commit()
         return domain_name
 
-    @pytest.mark.asyncio
     async def test_search_includes_domain_not_in_rg(
         self,
         fair_share_repository: FairShareRepository,
@@ -785,7 +775,6 @@ class TestSearchProjectFairSharesEntityBased:
 
     # ==================== Scope Validation Tests ====================
 
-    @pytest.mark.asyncio
     async def test_raises_error_for_nonexistent_resource_group(
         self,
         fair_share_repository: FairShareRepository,
@@ -807,7 +796,6 @@ class TestSearchProjectFairSharesEntityBased:
 
     # ==================== Success Cases ====================
 
-    @pytest.mark.asyncio
     async def test_returns_project_with_record(
         self,
         fair_share_repository: FairShareRepository,
@@ -833,7 +821,6 @@ class TestSearchProjectFairSharesEntityBased:
         assert result.items[0].project_id == project_with_record
         assert result.items[0].resource_group == scaling_group
 
-    @pytest.mark.asyncio
     async def test_returns_project_without_record(
         self,
         fair_share_repository: FairShareRepository,
@@ -864,7 +851,6 @@ class TestSearchProjectFairSharesEntityBased:
         # No metadata (not from DB)
         assert result.items[0].data.metadata is None
 
-    @pytest.mark.asyncio
     async def test_mixed_projects_with_and_without_records(
         self,
         fair_share_repository: FairShareRepository,
@@ -899,7 +885,6 @@ class TestSearchProjectFairSharesEntityBased:
 
     # ==================== RG-Context Filter Regression Tests ====================
 
-    @pytest.mark.asyncio
     async def test_rg_filter_by_project_id_includes_entity_without_record(
         self,
         fair_share_repository: FairShareRepository,
@@ -968,7 +953,6 @@ class TestSearchProjectFairSharesEntityBased:
             await db_sess.commit()
         return project_id
 
-    @pytest.mark.asyncio
     async def test_search_includes_project_not_in_rg(
         self,
         fair_share_repository: FairShareRepository,
@@ -1227,7 +1211,6 @@ class TestSearchUserFairSharesEntityBased:
 
     # ==================== Scope Validation Tests ====================
 
-    @pytest.mark.asyncio
     async def test_raises_error_for_nonexistent_resource_group(
         self,
         fair_share_repository: FairShareRepository,
@@ -1252,7 +1235,6 @@ class TestSearchUserFairSharesEntityBased:
 
     # ==================== Success Cases ====================
 
-    @pytest.mark.asyncio
     async def test_returns_user_with_record(
         self,
         fair_share_repository: FairShareRepository,
@@ -1282,7 +1264,6 @@ class TestSearchUserFairSharesEntityBased:
         assert result.items[0].resource_group == scaling_group
         assert result.items[0].project_id == project_id
 
-    @pytest.mark.asyncio
     async def test_returns_user_without_record(
         self,
         fair_share_repository: FairShareRepository,
@@ -1317,7 +1298,6 @@ class TestSearchUserFairSharesEntityBased:
         # No metadata (not from DB)
         assert result.items[0].data.metadata is None
 
-    @pytest.mark.asyncio
     async def test_mixed_users_with_and_without_records(
         self,
         fair_share_repository: FairShareRepository,
@@ -1355,7 +1335,6 @@ class TestSearchUserFairSharesEntityBased:
 
     # ==================== RG-Context Filter Regression Tests ====================
 
-    @pytest.mark.asyncio
     async def test_rg_filter_by_user_uuid_includes_entity_without_record(
         self,
         fair_share_repository: FairShareRepository,

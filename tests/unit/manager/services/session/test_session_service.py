@@ -279,7 +279,6 @@ def sample_session_data(
 # ==================== MatchSessions Tests ====================
 
 
-@pytest.mark.asyncio
 class TestMatchSessions:
     """Test cases for SessionService.match_sessions"""
 
@@ -392,7 +391,6 @@ class TestMatchSessions:
 # ==================== GetStatusHistory Tests ====================
 
 
-@pytest.mark.asyncio
 class TestGetStatusHistory:
     """Test cases for SessionService.get_status_history"""
 
@@ -470,7 +468,6 @@ class TestGetStatusHistory:
 # ==================== DestroySession Tests ====================
 
 
-@pytest.mark.asyncio
 class TestDestroySession:
     """Test cases for SessionService.destroy_session"""
 
@@ -644,7 +641,6 @@ class TestDestroySession:
 # ==================== Complete Tests ====================
 
 
-@pytest.mark.asyncio
 class TestComplete:
     """Test cases for SessionService.complete"""
 
@@ -710,7 +706,6 @@ class TestComplete:
 # ==================== GetSessionInfo Tests ====================
 
 
-@pytest.mark.asyncio
 class TestGetSessionInfo:
     """Test cases for SessionService.get_session_info"""
 
@@ -796,7 +791,6 @@ class TestGetSessionInfo:
 # ==================== DownloadFiles Tests ====================
 
 
-@pytest.mark.asyncio
 class TestDownloadFiles:
     """Test cases for SessionService.download_files"""
 
@@ -879,7 +873,6 @@ class TestDownloadFiles:
 # ==================== GetDirectAccessInfo Tests ====================
 
 
-@pytest.mark.asyncio
 class TestGetDirectAccessInfo:
     """Test cases for SessionService.get_direct_access_info"""
 
@@ -932,7 +925,6 @@ class TestGetDirectAccessInfo:
 # ==================== RenameSession Tests ====================
 
 
-@pytest.mark.asyncio
 class TestRenameSession:
     """Test cases for SessionService.rename_session"""
 
@@ -987,7 +979,6 @@ class TestRenameSession:
 # ==================== RestartSession Tests ====================
 
 
-@pytest.mark.asyncio
 class TestRestartSession:
     """Test cases for SessionService.restart_session"""
 
@@ -1041,7 +1032,6 @@ class TestRestartSession:
 # ==================== ShutdownService Tests ====================
 
 
-@pytest.mark.asyncio
 class TestShutdownService:
     """Test cases for SessionService.shutdown_service"""
 
@@ -1096,7 +1086,6 @@ class TestShutdownService:
 # ==================== UploadFiles Tests ====================
 
 
-@pytest.mark.asyncio
 class TestUploadFiles:
     """Test cases for SessionService.upload_files"""
 
@@ -1169,7 +1158,6 @@ class TestUploadFiles:
 # ==================== Execute Tests ====================
 
 
-@pytest.mark.asyncio
 class TestExecute:
     """Test cases for SessionService.execute"""
 
@@ -1249,7 +1237,6 @@ class TestExecute:
 # ==================== Interrupt Tests ====================
 
 
-@pytest.mark.asyncio
 class TestInterrupt:
     """Test cases for SessionService.interrupt"""
 
@@ -1302,7 +1289,6 @@ class TestInterrupt:
 # ==================== ListFiles Tests ====================
 
 
-@pytest.mark.asyncio
 class TestListFiles:
     """Test cases for SessionService.list_files"""
 
@@ -1363,7 +1349,6 @@ class TestListFiles:
 # ==================== GetContainerLogs Tests ====================
 
 
-@pytest.mark.asyncio
 class TestGetContainerLogs:
     """Test cases for SessionService.get_container_logs"""
 
@@ -1423,7 +1408,6 @@ class TestGetContainerLogs:
 # ==================== CheckAndTransitStatus Tests ====================
 
 
-@pytest.mark.asyncio
 class TestCheckAndTransitStatus:
     """Test cases for SessionService.check_and_transit_status"""
 
@@ -1579,7 +1563,6 @@ class TestCheckAndTransitStatus:
 # ==================== Search Tests ====================
 
 
-@pytest.mark.asyncio
 class TestSearch:
     """Test cases for SessionService.search"""
 
@@ -1671,7 +1654,6 @@ class TestSearch:
 # ==================== SearchKernels Tests ====================
 
 
-@pytest.mark.asyncio
 class TestSearchKernels:
     """Test cases for SessionService.search_kernels"""
 

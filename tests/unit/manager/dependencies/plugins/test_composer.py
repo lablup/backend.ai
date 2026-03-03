@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from ai.backend.manager.dependencies.plugins.base import PluginsInput
 from ai.backend.manager.dependencies.plugins.composer import PluginsComposer, PluginsResources
 
@@ -23,7 +21,6 @@ class TestPluginsComposer:
         composer = PluginsComposer()
         assert composer.stage_name == "plugins"
 
-    @pytest.mark.asyncio
     async def test_compose_all_plugins(self) -> None:
         plugins_input = _make_plugins_input()
         mock_network = MagicMock(name="network_ctx")
@@ -43,7 +40,6 @@ class TestPluginsComposer:
 
         assert mock_stack.enter_dependency.call_count == 3
 
-    @pytest.mark.asyncio
     async def test_compose_preserves_initialization_order(self) -> None:
         """Verify plugins are initialized in the correct order."""
         plugins_input = _make_plugins_input()

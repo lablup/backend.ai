@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.dependencies.processing.processors import (
     ProcessorsDependency,
@@ -14,7 +12,6 @@ from ai.backend.manager.dependencies.processing.processors import (
 class TestProcessorsDependency:
     """Test ProcessorsDependency lifecycle."""
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.processing.processors.Processors")
     async def test_provide_processors(
         self,

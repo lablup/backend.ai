@@ -6,10 +6,9 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
-import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.artifact import ArtifactClient
 from ai.backend.common.dto.manager.artifact import (
@@ -52,7 +51,7 @@ def _json_response(data: dict[str, Any], *, status: int = 200) -> AsyncMock:
 
 
 def _make_artifact_client(mock_session: MagicMock) -> ArtifactClient:
-    client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
+    client = BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
     return ArtifactClient(client)
 
 
@@ -108,7 +107,6 @@ _SAMPLE_ARTIFACT_DTO: dict[str, Any] = {
 
 
 class TestArtifactOperations:
-    @pytest.mark.asyncio
     async def test_import_artifacts(self) -> None:
         resp = _json_response({
             "tasks": [
@@ -137,7 +135,6 @@ class TestArtifactOperations:
         assert body is not None
         assert len(body["artifact_revision_ids"]) == 1
 
-    @pytest.mark.asyncio
     async def test_update_artifact(self) -> None:
         resp = _json_response({"artifact": _SAMPLE_ARTIFACT_DTO})
         mock_session = _make_request_session(resp)
@@ -156,7 +153,6 @@ class TestArtifactOperations:
         assert body["readonly"] is True
         assert body["description"] == "Updated"
 
-    @pytest.mark.asyncio
     async def test_cancel_import_task(self) -> None:
         resp = _json_response({"artifact_revision": _SAMPLE_ARTIFACT_REVISION_DTO})
         mock_session = _make_request_session(resp)
@@ -180,7 +176,6 @@ class TestArtifactOperations:
 
 
 class TestRevisionOperations:
-    @pytest.mark.asyncio
     async def test_cleanup_revisions(self) -> None:
         resp = _json_response({
             "artifact_revisions": [_SAMPLE_ARTIFACT_REVISION_DTO],
@@ -199,7 +194,6 @@ class TestRevisionOperations:
         assert url.endswith("/artifacts/revisions/cleanup")
         assert body is not None
 
-    @pytest.mark.asyncio
     async def test_approve_revision(self) -> None:
         resp = _json_response({"artifact_revision": _SAMPLE_ARTIFACT_REVISION_DTO})
         mock_session = _make_request_session(resp)
@@ -212,7 +206,6 @@ class TestRevisionOperations:
         assert method == "POST"
         assert f"/artifacts/revisions/{_SAMPLE_ARTIFACT_REVISION_ID}/approval" in url
 
-    @pytest.mark.asyncio
     async def test_reject_revision(self) -> None:
         resp = _json_response({"artifact_revision": _SAMPLE_ARTIFACT_REVISION_DTO})
         mock_session = _make_request_session(resp)
@@ -232,7 +225,6 @@ class TestRevisionOperations:
 
 
 class TestRevisionQueries:
-    @pytest.mark.asyncio
     async def test_get_revision_readme(self) -> None:
         resp = _json_response({"readme": "# My Model\nA great model."})
         mock_session = _make_request_session(resp)
@@ -246,7 +238,6 @@ class TestRevisionQueries:
         assert method == "GET"
         assert f"/artifacts/revisions/{_SAMPLE_ARTIFACT_REVISION_ID}/readme" in url
 
-    @pytest.mark.asyncio
     async def test_get_revision_verification_result(self) -> None:
         resp = _json_response({
             "verification_result": {
@@ -275,7 +266,6 @@ class TestRevisionQueries:
         assert method == "GET"
         assert f"/artifacts/revisions/{_SAMPLE_ARTIFACT_REVISION_ID}/verification-result" in url
 
-    @pytest.mark.asyncio
     async def test_get_revision_download_progress(self) -> None:
         resp = _json_response({
             "download_progress": {

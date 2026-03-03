@@ -37,7 +37,6 @@ def api_version_mock() -> mock.AsyncMock:
 class TestResourceUsageSearch:
     """Usage bucket search tests."""
 
-    @pytest.mark.asyncio
     async def test_search_domain_usage_buckets_no_filter(self, dummy_endpoint: str) -> None:
         """Should search with default pagination."""
         with aioresponses() as m, Session():
@@ -80,7 +79,6 @@ class TestResourceUsageSearch:
             assert len(result.items) == 1
             assert result.pagination.total == 1
 
-    @pytest.mark.asyncio
     async def test_search_project_usage_buckets_no_filter(self, dummy_endpoint: str) -> None:
         """Should search with default pagination."""
         with aioresponses() as m, Session():
@@ -124,7 +122,6 @@ class TestResourceUsageSearch:
             assert len(result.items) == 1
             assert result.pagination.total == 1
 
-    @pytest.mark.asyncio
     async def test_search_user_usage_buckets_no_filter(self, dummy_endpoint: str) -> None:
         """Should search with default pagination."""
         with aioresponses() as m, Session():
@@ -173,7 +170,6 @@ class TestResourceUsageSearch:
 class TestResourceUsageRGScoped:
     """RG-scoped usage bucket search tests."""
 
-    @pytest.mark.asyncio
     async def test_rg_search_domain_usage_buckets_success(self, dummy_endpoint: str) -> None:
         """Should search domain usage buckets within RG scope."""
         with aioresponses() as m, Session():
@@ -218,7 +214,6 @@ class TestResourceUsageRGScoped:
             assert result.items[0].resource_group == "default"
             assert result.pagination.total == 1
 
-    @pytest.mark.asyncio
     async def test_rg_search_project_usage_buckets_success(self, dummy_endpoint: str) -> None:
         """Should search project usage buckets within RG and domain scope."""
         with aioresponses() as m, Session():
@@ -267,7 +262,6 @@ class TestResourceUsageRGScoped:
             assert result.items[0].domain_name == "domain1"
             assert result.pagination.total == 1
 
-    @pytest.mark.asyncio
     async def test_rg_search_user_usage_buckets_success(self, dummy_endpoint: str) -> None:
         """Should search user usage buckets within RG, domain, and project scope."""
         with aioresponses() as m, Session():
@@ -320,7 +314,6 @@ class TestResourceUsageRGScoped:
             assert result.items[0].project_id == project_id
             assert result.pagination.total == 1
 
-    @pytest.mark.asyncio
     async def test_rg_search_domain_usage_buckets_with_filter(self, dummy_endpoint: str) -> None:
         """Should apply filter in RG-scoped domain search."""
         with aioresponses() as m, Session():

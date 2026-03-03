@@ -180,7 +180,6 @@ class TestScaleServiceReplicas:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_scale_service_replicas(
         self,
         scenario: ScenarioBase[ScaleServiceReplicasAction, ScaleServiceReplicasActionResult],

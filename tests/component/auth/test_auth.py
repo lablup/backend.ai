@@ -37,7 +37,6 @@ from .conftest import AuthUserFixtureData
 
 
 class TestVerifyAuth:
-    @pytest.mark.asyncio
     async def test_admin_verifies_auth(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -49,7 +48,6 @@ class TestVerifyAuth:
         assert result.authorized == "yes"
         assert result.echo == "hello-from-admin"
 
-    @pytest.mark.asyncio
     async def test_regular_user_verifies_auth(
         self,
         user_registry: BackendAIClientRegistry,
@@ -63,7 +61,6 @@ class TestVerifyAuth:
 
 
 class TestGetRole:
-    @pytest.mark.asyncio
     async def test_admin_gets_superadmin_role(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -73,7 +70,6 @@ class TestGetRole:
         assert result.global_role == "superadmin"
         assert result.domain_role == "admin"
 
-    @pytest.mark.asyncio
     async def test_regular_user_gets_user_role(
         self,
         user_registry: BackendAIClientRegistry,
@@ -83,15 +79,7 @@ class TestGetRole:
         assert result.global_role == "user"
         assert result.domain_role == "user"
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 HMAC signing omits query params from the signature, "
-            "but the server verifies against request.raw_path which includes ?group=..."
-        ),
-    )
-    @pytest.mark.asyncio
-    async def test_get_role_with_group_xfail(
+    async def test_get_role_with_group(
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
@@ -103,7 +91,6 @@ class TestGetRole:
 
 
 class TestSSHKeypair:
-    @pytest.mark.asyncio
     async def test_get_ssh_keypair_initially_empty(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -112,7 +99,6 @@ class TestSSHKeypair:
         assert isinstance(result, GetSSHKeypairResponse)
         assert result.ssh_public_key == ""
 
-    @pytest.mark.asyncio
     async def test_generate_ssh_keypair(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -122,7 +108,6 @@ class TestSSHKeypair:
         assert result.ssh_public_key != ""
         assert result.ssh_private_key != ""
 
-    @pytest.mark.asyncio
     async def test_upload_ssh_keypair(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -158,7 +143,6 @@ class TestSSHKeypair:
 
 
 class TestUpdateFullName:
-    @pytest.mark.asyncio
     async def test_admin_updates_full_name(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -173,7 +157,6 @@ class TestUpdateFullName:
 
 
 class TestUpdatePassword:
-    @pytest.mark.asyncio
     async def test_update_password_succeeds(
         self,
         auth_user_registry: BackendAIClientRegistry,
@@ -190,7 +173,6 @@ class TestUpdatePassword:
         assert isinstance(result, UpdatePasswordResponse)
         assert result.error_msg is None
 
-    @pytest.mark.asyncio
     async def test_update_password_mismatch(
         self,
         auth_user_registry: BackendAIClientRegistry,
@@ -207,7 +189,6 @@ class TestUpdatePassword:
 
 
 class TestAuthorize:
-    @pytest.mark.asyncio
     async def test_authorize_with_keypair_type(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -226,7 +207,6 @@ class TestAuthorize:
         assert result.data.secret_key != ""
         assert result.data.role == "user"
 
-    @pytest.mark.asyncio
     async def test_authorize_with_wrong_password(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -244,7 +224,6 @@ class TestAuthorize:
 
 
 class TestSignup:
-    @pytest.mark.asyncio
     async def test_signup_creates_user_with_keypair(
         self,
         admin_registry: BackendAIClientRegistry,

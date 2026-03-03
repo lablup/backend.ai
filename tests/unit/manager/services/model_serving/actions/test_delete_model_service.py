@@ -232,7 +232,6 @@ class TestDeleteModelService:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_delete_model_service(
         self,
         scenario: ScenarioBase[DeleteModelServiceAction, DeleteModelServiceActionResult],

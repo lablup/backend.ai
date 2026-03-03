@@ -258,7 +258,6 @@ class TestContainerRegistryRepository:
             await session.refresh(registry)
             return registry.to_dataclass()
 
-    @pytest.mark.asyncio
     async def test_get_by_registry_and_project_success(
         self, repository: ContainerRegistryRepository, sample_registry: ContainerRegistryData
     ) -> None:
@@ -275,7 +274,6 @@ class TestContainerRegistryRepository:
         assert result.project == sample_registry.project
         assert result.id == sample_registry.id
 
-    @pytest.mark.asyncio
     async def test_get_by_registry_and_project_not_found(
         self, repository: ContainerRegistryRepository
     ) -> None:
@@ -314,7 +312,6 @@ class TestContainerRegistryRepository:
                 registry2=registry2.to_dataclass(),
             )
 
-    @pytest.mark.asyncio
     async def test_get_by_registry_name(
         self,
         repository: ContainerRegistryRepository,
@@ -363,7 +360,6 @@ class TestContainerRegistryRepository:
                 registry2=registry2.to_dataclass(),
             )
 
-    @pytest.mark.asyncio
     async def test_get_all(
         self,
         repository: ContainerRegistryRepository,
@@ -388,7 +384,6 @@ class TestContainerRegistryRepository:
             )
         )
 
-    @pytest.mark.asyncio
     async def test_create_registry_minimal(
         self,
         repository: ContainerRegistryRepository,
@@ -457,7 +452,6 @@ class TestContainerRegistryRepository:
         )
         return spec, group_ids
 
-    @pytest.mark.asyncio
     async def test_create_registry_with_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
@@ -551,7 +545,6 @@ class TestContainerRegistryRepository:
                 image_ids=[image1.id, image2.id],
             )
 
-    @pytest.mark.asyncio
     async def test_clear_images(
         self,
         repository: ContainerRegistryRepository,
@@ -578,7 +571,6 @@ class TestContainerRegistryRepository:
             )
             assert all(img.status == ImageStatus.DELETED for img in images)
 
-    @pytest.mark.asyncio
     async def test_clear_images_not_found(self, repository: ContainerRegistryRepository) -> None:
         """Test clearing images when registry not found"""
         with pytest.raises(ContainerRegistryNotFound):
@@ -656,7 +648,6 @@ class TestContainerRegistryRepository:
                 image2_id=image2.id,
             )
 
-    @pytest.mark.asyncio
     async def test_clear_images_with_project_filter(
         self,
         repository: ContainerRegistryRepository,
@@ -681,7 +672,6 @@ class TestContainerRegistryRepository:
             assert img_p1.status == ImageStatus.DELETED
             assert img_p2.status == ImageStatus.ALIVE
 
-    @pytest.mark.asyncio
     async def test_get_registry_row_for_scanner_success(
         self, repository: ContainerRegistryRepository, sample_registry: ContainerRegistryData
     ) -> None:
@@ -698,7 +688,6 @@ class TestContainerRegistryRepository:
         assert result.project == sample_registry.project
         assert result.id == sample_registry.id
 
-    @pytest.mark.asyncio
     async def test_get_registry_row_for_scanner_not_found(
         self, repository: ContainerRegistryRepository
     ) -> None:
@@ -731,7 +720,6 @@ class TestContainerRegistryRepository:
             await session.refresh(registry)
             return registry.to_dataclass()
 
-    @pytest.mark.asyncio
     async def test_modify_registry_success(
         self,
         repository: ContainerRegistryRepository,
@@ -774,7 +762,6 @@ class TestContainerRegistryRepository:
         assert result.password == changed_password
         assert result.extra == changed_extra
 
-    @pytest.mark.asyncio
     async def test_modify_registry_not_found(self, repository: ContainerRegistryRepository) -> None:
         """Test modifying a non-existent registry"""
         non_existent_id = UUID("00000000-0000-0000-0000-000000000000")
@@ -830,7 +817,6 @@ class TestContainerRegistryRepository:
                 group_ids=sample_groups,
             )
 
-    @pytest.mark.asyncio
     async def test_modify_registry_add_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
@@ -946,7 +932,6 @@ class TestContainerRegistryRepository:
             await session.refresh(registry)
             return _RegistryWithGroups(registry=registry.to_dataclass(), group_ids=group_ids)
 
-    @pytest.mark.asyncio
     async def test_modify_registry_remove_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
@@ -1080,7 +1065,6 @@ class TestContainerRegistryRepository:
                 available_group_ids=group_ids[2:],
             )
 
-    @pytest.mark.asyncio
     async def test_modify_registry_add_and_remove_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
@@ -1140,7 +1124,6 @@ class TestContainerRegistryRepository:
                 group_ids[3],
             }
 
-    @pytest.mark.asyncio
     async def test_modify_registry_remove_nonexistent_allowed_groups(
         self, repository: ContainerRegistryRepository, sample_registry: ContainerRegistryData
     ) -> None:
@@ -1197,7 +1180,6 @@ class TestContainerRegistryRepository:
             ),
         )
 
-    @pytest.mark.asyncio
     async def test_modify_registry_add_duplicate_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
@@ -1215,7 +1197,46 @@ class TestContainerRegistryRepository:
                 )
             )
 
-    @pytest.mark.asyncio
+    async def test_modify_registry_set_is_global_clears_allowed_groups(
+        self,
+        repository: ContainerRegistryRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        registry_with_associated_groups: _RegistryWithGroups,
+    ) -> None:
+        """Test that setting is_global=True clears all group associations."""
+        # Given - Registry already has 3 groups associated
+        registry_id = registry_with_associated_groups.registry.id
+
+        # When - Set is_global to True
+        result = await repository.modify_registry(
+            Updater(
+                spec=ContainerRegistryUpdaterSpec(
+                    is_global=TriState.update(True),
+                ),
+                pk_value=registry_id,
+            )
+        )
+
+        # Then - Registry is updated
+        assert result is not None
+        assert result.is_global is True
+
+        # Then - All group associations are cleared
+        async with db_with_cleanup.begin_readonly_session() as session:
+            associations = (
+                (
+                    await session.execute(
+                        sa.select(AssociationContainerRegistriesGroupsRow).where(
+                            AssociationContainerRegistriesGroupsRow.registry_id == registry_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            assert len(associations) == 0
+
     async def test_delete_registry_success(
         self,
         repository: ContainerRegistryRepository,
@@ -1239,7 +1260,6 @@ class TestContainerRegistryRepository:
             purger = Purger(row_class=ContainerRegistryRow, pk_value=registry_id)
             await repository.delete_registry(purger)
 
-    @pytest.mark.asyncio
     async def test_delete_registry_not_found(
         self,
         repository: ContainerRegistryRepository,
@@ -1253,7 +1273,6 @@ class TestContainerRegistryRepository:
             purger = Purger(row_class=ContainerRegistryRow, pk_value=non_existent_id)
             await repository.delete_registry(purger)
 
-    @pytest.mark.asyncio
     async def test_delete_registry_returns_data_before_deletion(
         self,
         repository: ContainerRegistryRepository,

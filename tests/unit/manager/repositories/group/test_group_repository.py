@@ -166,7 +166,6 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
         repo._db_source = group_db_source_with_mock_role_manager
         return repo
 
-    @pytest.mark.asyncio
     async def test_create_succeeds_with_existing_project_resource_policy(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -193,7 +192,6 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
         assert result.name == spec.name
         assert result.resource_policy == project_resource_policy
 
-    @pytest.mark.asyncio
     async def test_create_fails_with_nonexistent_project_resource_policy(
         self,
         group_repository_with_mock_role_manager: GroupRepository,

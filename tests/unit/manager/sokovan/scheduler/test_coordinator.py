@@ -6,12 +6,14 @@ Test Scenarios:
 - SC-CO-001 ~ SC-CO-008: FailureClassification
 - SC-CO-009 ~ SC-CO-013: HookExecution
 - SC-CO-014 ~ SC-CO-019: StatusTransition
+- SC-CO-019b: status_info cleared on RUNNING transition (BA-4841 regression)
 - SC-CO-020 ~ SC-CO-025: PostProcessors
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -27,6 +29,7 @@ from ai.backend.manager.data.session.types import (
     TransitionStatus,
 )
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
+from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatchUpdaterSpec
 from ai.backend.manager.sokovan.scheduler.coordinator import (
     FailureClassificationResult,
     ScheduleCoordinator,
@@ -838,6 +841,52 @@ class TestScheduleCoordinatorStatusTransition:
 
         # Assert
         mock_coordinator._apply_kernel_pending_resets.assert_not_awaited()
+
+    async def test_running_transition_clears_status_info(
+        self,
+        mock_coordinator: MagicMock,
+    ) -> None:
+        """SC-CO-019b: Transitioning to RUNNING clears status_info (BA-4841 regression).
+
+        Given: Session transitioning to RUNNING
+        When: Apply transition is called
+        Then: SessionStatusBatchUpdaterSpec is created with reason="" to clear status_info
+        """
+        # Arrange
+        session_info = _create_session_transition_info(session_id=SessionId(uuid4()))
+        transition = TransitionStatus(
+            session=SessionStatus.RUNNING,
+            kernel=None,
+        )
+
+        captured_updater = None
+
+        async def capture_update_with_history(updater: Any, history_creator: Any) -> int:
+            nonlocal captured_updater
+            captured_updater = updater
+            return 1
+
+        mock_coordinator._repository.update_with_history = capture_update_with_history
+        mock_coordinator._apply_kernel_pending_resets = AsyncMock()
+
+        # Act
+        await ScheduleCoordinator._apply_transition(
+            mock_coordinator,
+            handler_name="test_handler",
+            session_infos=[session_info],
+            transition=transition,
+            scheduling_result=SchedulingResult.SUCCESS,
+            records={},
+            status_changed_at=datetime.now(tzutc()),
+        )
+
+        # Assert - spec must have reason="" so status_info is cleared
+        assert captured_updater is not None
+        assert isinstance(captured_updater.spec, SessionStatusBatchUpdaterSpec)
+        assert captured_updater.spec.reason == ""
+        built = captured_updater.spec.build_values()
+        assert "status_info" in built
+        assert built["status_info"] == ""
 
 
 # =============================================================================

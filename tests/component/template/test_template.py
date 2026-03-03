@@ -25,15 +25,6 @@ from ai.backend.common.dto.manager.template import (
     UpdateSessionTemplateResponse,
 )
 
-_HMAC_XFAIL = pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Client SDK v2 HMAC signing omits query params; server verifies against"
-        " request.raw_path (including ?param=...). Endpoints passing query params"
-        " cause 401."
-    ),
-)
-
 
 def _session_template_payload(name: str = "test-template") -> str:
     return json.dumps([
@@ -78,7 +69,6 @@ def _cluster_template_payload(
 
 
 class TestCreateSessionTemplate:
-    @pytest.mark.asyncio
     async def test_admin_creates_session_template(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -98,7 +88,6 @@ class TestCreateSessionTemplate:
         assert items[0].id != ""
         assert items[0].user != ""
 
-    @pytest.mark.asyncio
     async def test_user_creates_session_template(
         self,
         user_registry: BackendAIClientRegistry,
@@ -119,7 +108,6 @@ class TestCreateSessionTemplate:
 
 
 class TestGetSessionTemplate:
-    @pytest.mark.asyncio
     async def test_admin_gets_session_template(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -140,7 +128,6 @@ class TestGetSessionTemplate:
         assert result.name == "get-test"
         assert result.template is not None
 
-    @pytest.mark.asyncio
     async def test_user_gets_session_template(
         self,
         user_registry: BackendAIClientRegistry,
@@ -160,8 +147,6 @@ class TestGetSessionTemplate:
         assert isinstance(result, GetSessionTemplateResponse)
         assert result.name == "user-get-test"
 
-    @_HMAC_XFAIL
-    @pytest.mark.asyncio
     async def test_get_with_format_param(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -185,8 +170,6 @@ class TestGetSessionTemplate:
 
 
 class TestListSessionTemplates:
-    @_HMAC_XFAIL
-    @pytest.mark.asyncio
     async def test_list_session_templates(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -208,7 +191,6 @@ class TestListSessionTemplates:
 
 
 class TestUpdateSessionTemplate:
-    @pytest.mark.asyncio
     async def test_admin_updates_session_template(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -240,7 +222,6 @@ class TestUpdateSessionTemplate:
 
 
 class TestDeleteSessionTemplate:
-    @pytest.mark.asyncio
     async def test_admin_deletes_session_template(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -260,7 +241,6 @@ class TestDeleteSessionTemplate:
         assert isinstance(result, DeleteSessionTemplateResponse)
         assert result.success is True
 
-    @pytest.mark.asyncio
     async def test_get_deleted_template_returns_empty(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -289,7 +269,6 @@ class TestDeleteSessionTemplate:
 
 
 class TestCreateClusterTemplate:
-    @pytest.mark.asyncio
     async def test_admin_creates_cluster_template(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -319,8 +298,6 @@ class TestCreateClusterTemplate:
 
 
 class TestGetClusterTemplate:
-    @_HMAC_XFAIL
-    @pytest.mark.asyncio
     async def test_admin_gets_cluster_template(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -352,8 +329,6 @@ class TestGetClusterTemplate:
         assert isinstance(result, GetClusterTemplateResponse)
         assert result.root is not None
 
-    @_HMAC_XFAIL
-    @pytest.mark.asyncio
     async def test_get_with_format_param(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -386,8 +361,6 @@ class TestGetClusterTemplate:
 
 
 class TestListClusterTemplates:
-    @_HMAC_XFAIL
-    @pytest.mark.asyncio
     async def test_list_cluster_templates(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -418,7 +391,6 @@ class TestListClusterTemplates:
 
 
 class TestUpdateClusterTemplate:
-    @pytest.mark.asyncio
     async def test_admin_updates_cluster_template(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -454,7 +426,6 @@ class TestUpdateClusterTemplate:
 
 
 class TestDeleteClusterTemplate:
-    @pytest.mark.asyncio
     async def test_admin_deletes_cluster_template(
         self,
         admin_registry: BackendAIClientRegistry,

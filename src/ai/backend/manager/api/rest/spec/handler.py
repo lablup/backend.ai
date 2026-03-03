@@ -19,7 +19,7 @@ from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.openapi import generate_openapi
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.context import RootContext
+    from ai.backend.manager.config.provider import ManagerConfigProvider
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -110,8 +110,8 @@ GRAPHIQL_V2_HTML = """
 class SpecHandler:
     """Spec API handler for documentation endpoints."""
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, *, config_provider: ManagerConfigProvider) -> None:
+        self._config_provider = config_provider
 
     # ------------------------------------------------------------------
     # render_graphiql_graphene_html (GET /spec/graphiql)
@@ -121,8 +121,7 @@ class SpecHandler:
         self,
         ctx: RequestCtx,
     ) -> web.StreamResponse:
-        root_ctx: RootContext = ctx.request.app["_root.context"]
-        if not root_ctx.config_provider.config.api.allow_graphql_schema_introspection:
+        if not self._config_provider.config.api.allow_graphql_schema_introspection:
             raise GenericForbidden
         return web.Response(
             body=GRAPHIQL_HTML,
@@ -138,8 +137,7 @@ class SpecHandler:
         self,
         ctx: RequestCtx,
     ) -> web.StreamResponse:
-        root_ctx: RootContext = ctx.request.app["_root.context"]
-        if not root_ctx.config_provider.config.api.allow_graphql_schema_introspection:
+        if not self._config_provider.config.api.allow_graphql_schema_introspection:
             raise GenericForbidden
         return web.Response(
             body=GRAPHIQL_V2_HTML,
@@ -155,8 +153,7 @@ class SpecHandler:
         self,
         ctx: RequestCtx,
     ) -> web.StreamResponse:
-        root_ctx: RootContext = ctx.request.app["_root.context"]
-        if not root_ctx.config_provider.config.api.allow_openapi_schema_introspection:
+        if not self._config_provider.config.api.allow_openapi_schema_introspection:
             raise GenericForbidden
         return web.Response(
             body=OPENAPI_HTML,
@@ -172,7 +169,6 @@ class SpecHandler:
         self,
         ctx: RequestCtx,
     ) -> web.StreamResponse:
-        root_ctx: RootContext = ctx.request.app["_root.context"]
-        if not root_ctx.config_provider.config.api.allow_openapi_schema_introspection:
+        if not self._config_provider.config.api.allow_openapi_schema_introspection:
             raise GenericForbidden
         return web.json_response(generate_openapi(ctx.request.app["_root_app"]._subapps))

@@ -34,6 +34,7 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import RoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.options import (
     AssignedUserConditions,
+    AssignedUserOrders,
     RoleConditions,
     RoleOrders,
 )
@@ -241,9 +242,44 @@ class RoleFilter(GQLFilter):
 # TODO: Add user_id filter (requires AssignedUserConditions.by_user_id)
 
 
+@strawberry.input(
+    name="RoleAssignmentRoleNestedFilter",
+    description=(
+        "Added in 26.3.0. Nested filter for roles within a role assignment. "
+        "Filters assignments that have a role matching all specified conditions."
+    ),
+)
+class RoleAssignmentRoleNestedFilterGQL:
+    name: StringFilter | None = None
+    source: list[RoleSourceGQL] | None = None
+    status: list[RoleStatusGQL] | None = None
+
+    def build_conditions(self) -> list[QueryCondition]:
+        raw_conditions: list[QueryCondition] = []
+        if self.name:
+            condition = self.name.build_query_condition(
+                contains_factory=RoleConditions.by_name_contains,
+                equals_factory=RoleConditions.by_name_equals,
+                starts_with_factory=RoleConditions.by_name_starts_with,
+                ends_with_factory=RoleConditions.by_name_ends_with,
+            )
+            if condition:
+                raw_conditions.append(condition)
+        if self.source is not None and len(self.source) > 0:
+            raw_conditions.append(RoleConditions.by_sources([s.to_internal() for s in self.source]))
+        if self.status is not None and len(self.status) > 0:
+            raw_conditions.append(
+                RoleConditions.by_statuses([s.to_internal() for s in self.status])
+            )
+        if not raw_conditions:
+            return []
+        return [AssignedUserConditions.exists_role_combined(raw_conditions)]
+
+
 @strawberry.input(description="Added in 26.3.0. Filter for role assignments")
 class RoleAssignmentFilter(GQLFilter):
     role_id: uuid.UUID | None = None
+    role: RoleAssignmentRoleNestedFilterGQL | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -251,6 +287,9 @@ class RoleAssignmentFilter(GQLFilter):
 
         if self.role_id is not None:
             conditions.append(AssignedUserConditions.by_role_id(self.role_id))
+
+        if self.role:
+            conditions.extend(self.role.build_conditions())
 
         return conditions
 
@@ -273,6 +312,24 @@ class RoleOrderBy(GQLOrderBy):
                 return RoleOrders.created_at(ascending)
             case RoleOrderField.UPDATED_AT:
                 return RoleOrders.updated_at(ascending)
+
+
+@strawberry.enum(description="Added in 26.3.0. Role assignment ordering field")
+class RoleAssignmentOrderField(StrEnum):
+    GRANTED_AT = "granted_at"
+
+
+@strawberry.input(description="Added in 26.3.0. Order by specification for role assignments")
+class RoleAssignmentOrderBy(GQLOrderBy):
+    field: RoleAssignmentOrderField
+    direction: OrderDirection = OrderDirection.DESC
+
+    @override
+    def to_query_order(self) -> QueryOrder:
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case RoleAssignmentOrderField.GRANTED_AT:
+                return AssignedUserOrders.granted_at(ascending)
 
 
 # ==================== Input Types ====================

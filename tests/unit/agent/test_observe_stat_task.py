@@ -33,7 +33,6 @@ class TestObserveStatTaskDecorator:
         agent.produce_error_event = AsyncMock()
         return agent
 
-    @pytest.mark.asyncio
     async def test_successful_execution_observes_success(
         self,
         mock_agent: AsyncMock,
@@ -49,7 +48,6 @@ class TestObserveStatTaskDecorator:
         mock_stat_task_observer.observe_stat_task_success.assert_called_once()
         mock_stat_task_observer.observe_stat_task_failure.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_emfile_logs_warning_not_exception(
         self,
         mock_agent: AsyncMock,
@@ -68,7 +66,6 @@ class TestObserveStatTaskDecorator:
         mock_stat_task_observer.observe_stat_task_failure.assert_called_once()
         mock_stat_task_observer.observe_stat_task_success.assert_not_called()
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "exception",
         [
@@ -94,7 +91,6 @@ class TestObserveStatTaskDecorator:
         mock_stat_task_observer.observe_stat_task_failure.assert_called_once()
         mock_stat_task_observer.observe_stat_task_success.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_cancelled_error_is_silently_swallowed(
         self,
         mock_agent: AsyncMock,

@@ -57,7 +57,6 @@ def get_graphquery_context(
     )
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST, indirect=True)
 async def test_harbor_read_project_quota(
     client: Client,

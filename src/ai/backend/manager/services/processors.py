@@ -25,6 +25,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.notification import NotificationCenter
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.repositories import Repositories
+from ai.backend.manager.service.container_registry.harbor import (
+    AbstractPerProjectContainerRegistryQuotaService,
+)
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
@@ -45,8 +48,12 @@ from ai.backend.manager.services.deployment.processors import DeploymentProcesso
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.dotfile.processors import DotfileProcessors
+from ai.backend.manager.services.dotfile.service import DotfileService
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.error_log.service import ErrorLogService
+from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
+from ai.backend.manager.services.etcd_config.service import EtcdConfigService
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.export.service import ExportService
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
@@ -59,6 +66,8 @@ from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
 from ai.backend.manager.services.keypair_resource_policy.service import KeypairResourcePolicyService
+from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
+from ai.backend.manager.services.manager_admin.service import ManagerAdminService
 from ai.backend.manager.services.metric.processors.utilization_metric import (
     UtilizationMetricProcessors,
 )
@@ -101,6 +110,8 @@ from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
 from ai.backend.manager.services.storage_namespace.service import StorageNamespaceService
+from ai.backend.manager.services.template.processors import TemplateProcessors
+from ai.backend.manager.services.template.service import TemplateService
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.services.user_resource_policy.processors import UserResourcePolicyProcessors
@@ -109,9 +120,11 @@ from ai.backend.manager.services.vfolder.processors import (
     VFolderFileProcessors,
     VFolderInviteProcessors,
     VFolderProcessors,
+    VFolderSharingProcessors,
 )
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService
+from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
@@ -148,6 +161,7 @@ class ServiceArgs:
     notification_center: NotificationCenter
     appproxy_client_pool: AppProxyClientPool
     prometheus_client: PrometheusClient
+    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None = None
 
 
 @dataclass
@@ -155,7 +169,9 @@ class Services:
     agent: AgentService
     app_config: AppConfigService
     domain: DomainService
+    dotfile: DotfileService
     error_log: ErrorLogService
+    etcd_config: EtcdConfigService
     export: ExportService
     fair_share: FairShareService
     group: GroupService
@@ -165,8 +181,10 @@ class Services:
     vfolder: VFolderService
     vfolder_file: VFolderFileService
     vfolder_invite: VFolderInviteService
+    vfolder_sharing: VFolderSharingService
     session: SessionService
     keypair_resource_policy: KeypairResourcePolicyService
+    manager_admin: ManagerAdminService
     user_resource_policy: UserResourcePolicyService
     project_resource_policy: ProjectResourcePolicyService
     resource_preset: ResourcePresetService
@@ -189,6 +207,7 @@ class Services:
     audit_log: AuditLogService
     scheduling_history: SchedulingHistoryService
     service_catalog: ServiceCatalogService
+    template: TemplateService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -207,8 +226,17 @@ class Services:
             app_config_repository=repositories.app_config.repository,
         )
         domain_service = DomainService(repositories.domain.repository)
+        dotfile_service = DotfileService(
+            repository=repositories.dotfile.repository,
+        )
         error_log_service = ErrorLogService(
             repository=repositories.error_log.repository,
+        )
+        etcd_config_service = EtcdConfigService(
+            repository=repositories.etcd_config.repository,
+            config_provider=args.config_provider,
+            etcd=args.etcd,
+            valkey_stat=args.valkey_stat_client,
         )
         export_service = ExportService(
             repository=repositories.export.repository,
@@ -234,13 +262,16 @@ class Services:
         container_registry_service = ContainerRegistryService(
             args.db,
             repositories.container_registry.repository,
+            quota_service=args.registry_quota_service,
         )
         vfolder_service = VFolderService(
             args.config_provider,
+            args.etcd,
             args.storage_manager,
             args.background_task_manager,
             repositories.vfolder.repository,
             repositories.user.repository,
+            args.valkey_stat_client,
         )
         vfolder_file_service = VFolderFileService(
             args.config_provider,
@@ -249,6 +280,11 @@ class Services:
             repositories.user.repository,
         )
         vfolder_invite_service = VFolderInviteService(
+            args.config_provider,
+            repositories.vfolder.repository,
+            repositories.user.repository,
+        )
+        vfolder_sharing_service = VFolderSharingService(
             args.config_provider,
             repositories.vfolder.repository,
             repositories.user.repository,
@@ -269,6 +305,13 @@ class Services:
         keypair_resource_policy_service = KeypairResourcePolicyService(
             repositories.keypair_resource_policy.repository
         )
+        manager_admin_service = ManagerAdminService(
+            repository=repositories.manager_admin.repository,
+            config_provider=args.config_provider,
+            etcd=args.etcd,
+            db=args.db,
+            valkey_stat=args.valkey_stat_client,
+        )
         user_resource_policy_service = UserResourcePolicyService(
             repositories.user_resource_policy.repository
         )
@@ -284,6 +327,7 @@ class Services:
         )
         scaling_group_service = ScalingGroupService(
             repositories.scaling_group.repository,
+            appproxy_client_pool=args.appproxy_client_pool,
         )
         utilization_metric_service = UtilizationMetricService(
             args.prometheus_client,
@@ -331,6 +375,7 @@ class Services:
         )
         vfs_storage_service = VFSStorageService(
             vfs_storage_repository=repositories.vfs_storage.repository,
+            storage_manager=args.storage_manager,
         )
         artifact_service = ArtifactService(
             artifact_repository=repositories.artifact.repository,
@@ -373,12 +418,17 @@ class Services:
             repositories.scheduling_history.repository
         )
         service_catalog_service = ServiceCatalogService(args.db)
+        template_service = TemplateService(
+            repository=repositories.template.repository,
+        )
 
         return cls(
             agent=agent_service,
             app_config=app_config_service,
             domain=domain_service,
+            dotfile=dotfile_service,
             error_log=error_log_service,
+            etcd_config=etcd_config_service,
             export=export_service,
             fair_share=fair_share_service,
             group=group_service,
@@ -388,8 +438,10 @@ class Services:
             vfolder=vfolder_service,
             vfolder_file=vfolder_file_service,
             vfolder_invite=vfolder_invite_service,
+            vfolder_sharing=vfolder_sharing_service,
             session=session_service,
             keypair_resource_policy=keypair_resource_policy_service,
+            manager_admin=manager_admin_service,
             user_resource_policy=user_resource_policy_service,
             project_resource_policy=project_resource_policy_service,
             resource_preset=resource_preset_service,
@@ -412,6 +464,7 @@ class Services:
             audit_log=audit_log_service,
             scheduling_history=scheduling_history_service,
             service_catalog=service_catalog_service,
+            template=template_service,
         )
 
 
@@ -425,7 +478,9 @@ class Processors(AbstractProcessorPackage):
     agent: AgentProcessors
     app_config: AppConfigProcessors
     domain: DomainProcessors
+    dotfile: DotfileProcessors
     error_log: ErrorLogProcessors
+    etcd_config: EtcdConfigProcessors
     export: ExportProcessors
     fair_share: FairShareProcessors
     group: GroupProcessors
@@ -433,10 +488,12 @@ class Processors(AbstractProcessorPackage):
     image: ImageProcessors
     vfolder: VFolderProcessors
     vfolder_invite: VFolderInviteProcessors
+    vfolder_sharing: VFolderSharingProcessors
     vfolder_file: VFolderFileProcessors
     session: SessionProcessors
     container_registry: ContainerRegistryProcessors
     keypair_resource_policy: KeypairResourcePolicyProcessors
+    manager_admin: ManagerAdminProcessors
     user_resource_policy: UserResourcePolicyProcessors
     project_resource_policy: ProjectResourcePolicyProcessors
     resource_preset: ResourcePresetProcessors
@@ -459,6 +516,7 @@ class Processors(AbstractProcessorPackage):
     audit_log: AuditLogProcessors
     scheduling_history: SchedulingHistoryProcessors
     service_catalog: ServiceCatalogProcessors
+    template: TemplateProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -466,7 +524,9 @@ class Processors(AbstractProcessorPackage):
         agent_processors = AgentProcessors(services.agent, action_monitors)
         app_config_processors = AppConfigProcessors(services.app_config, action_monitors)
         domain_processors = DomainProcessors(services.domain, action_monitors)
+        dotfile_processors = DotfileProcessors(services.dotfile, action_monitors)
         error_log_processors = ErrorLogProcessors(services.error_log, action_monitors)
+        etcd_config_processors = EtcdConfigProcessors(services.etcd_config, action_monitors)
         export_processors = ExportProcessors(services.export, action_monitors)
         fair_share_processors = FairShareProcessors(services.fair_share, action_monitors)
         group_processors = GroupProcessors(services.group, action_monitors)
@@ -480,10 +540,14 @@ class Processors(AbstractProcessorPackage):
         vfolder_invite_processors = VFolderInviteProcessors(
             services.vfolder_invite, action_monitors
         )
+        vfolder_sharing_processors = VFolderSharingProcessors(
+            services.vfolder_sharing, action_monitors
+        )
         session_processors = SessionProcessors(services.session, action_monitors)
         keypair_resource_policy_processors = KeypairResourcePolicyProcessors(
             services.keypair_resource_policy, action_monitors
         )
+        manager_admin_processors = ManagerAdminProcessors(services.manager_admin, action_monitors)
         user_resource_policy_processors = UserResourcePolicyProcessors(
             services.user_resource_policy, action_monitors
         )
@@ -534,12 +598,15 @@ class Processors(AbstractProcessorPackage):
         service_catalog_processors = ServiceCatalogProcessors(
             services.service_catalog, action_monitors
         )
+        template_processors = TemplateProcessors(services.template, action_monitors)
 
         return cls(
             agent=agent_processors,
             app_config=app_config_processors,
             domain=domain_processors,
+            dotfile=dotfile_processors,
             error_log=error_log_processors,
+            etcd_config=etcd_config_processors,
             export=export_processors,
             fair_share=fair_share_processors,
             group=group_processors,
@@ -549,8 +616,10 @@ class Processors(AbstractProcessorPackage):
             vfolder=vfolder_processors,
             vfolder_file=vfolder_file_processors,
             vfolder_invite=vfolder_invite_processors,
+            vfolder_sharing=vfolder_sharing_processors,
             session=session_processors,
             keypair_resource_policy=keypair_resource_policy_processors,
+            manager_admin=manager_admin_processors,
             user_resource_policy=user_resource_policy_processors,
             project_resource_policy=project_resource_policy_processors,
             resource_preset=resource_preset_processors,
@@ -573,6 +642,7 @@ class Processors(AbstractProcessorPackage):
             audit_log=audit_log_processors,
             scheduling_history=scheduling_history_processors,
             service_catalog=service_catalog_processors,
+            template=template_processors,
         )
 
     @override
@@ -581,7 +651,9 @@ class Processors(AbstractProcessorPackage):
             *self.agent.supported_actions(),
             *self.app_config.supported_actions(),
             *self.domain.supported_actions(),
+            *self.dotfile.supported_actions(),
             *self.error_log.supported_actions(),
+            *self.etcd_config.supported_actions(),
             *self.export.supported_actions(),
             *self.fair_share.supported_actions(),
             *self.group.supported_actions(),
@@ -591,8 +663,10 @@ class Processors(AbstractProcessorPackage):
             *self.vfolder.supported_actions(),
             *self.vfolder_file.supported_actions(),
             *self.vfolder_invite.supported_actions(),
+            *self.vfolder_sharing.supported_actions(),
             *self.session.supported_actions(),
             *self.keypair_resource_policy.supported_actions(),
+            *self.manager_admin.supported_actions(),
             *self.user_resource_policy.supported_actions(),
             *self.project_resource_policy.supported_actions(),
             *self.resource_preset.supported_actions(),
@@ -615,4 +689,5 @@ class Processors(AbstractProcessorPackage):
             *self.audit_log.supported_actions(),
             *self.scheduling_history.supported_actions(),
             *self.service_catalog.supported_actions(),
+            *self.template.supported_actions(),
         ]

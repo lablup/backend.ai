@@ -1,9 +1,8 @@
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.quota_scope import QuotaScopeClient
 from ai.backend.common.dto.manager.quota_scope.request import (
@@ -34,8 +33,8 @@ _QUOTA_SCOPE_PAYLOAD = {
 def _make_client(
     mock_session: MagicMock | None = None,
     config: ClientConfig | None = None,
-) -> BackendAIClient:
-    return BackendAIClient(
+) -> BackendAIAuthClient:
+    return BackendAIAuthClient(
         config or _DEFAULT_CONFIG,
         MockAuth(),
         mock_session or MagicMock(),
@@ -54,7 +53,6 @@ def _make_request_session(resp: AsyncMock) -> MagicMock:
 
 
 class TestQuotaScopeClient:
-    @pytest.mark.asyncio
     async def test_get(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -76,7 +74,6 @@ class TestQuotaScopeClient:
         assert "/admin/quota-scopes/local:volume1/user:test-user-uuid" in str(call_args.args[1])
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_search(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -103,7 +100,6 @@ class TestQuotaScopeClient:
         assert call_args.args[0] == "POST"
         assert "/admin/quota-scopes/search" in str(call_args.args[1])
 
-    @pytest.mark.asyncio
     async def test_set_quota(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -130,7 +126,6 @@ class TestQuotaScopeClient:
         assert call_args.kwargs["json"]["quota_scope_id"] == "user:test-user-uuid"
         assert call_args.kwargs["json"]["hard_limit_bytes"] == 10737418240
 
-    @pytest.mark.asyncio
     async def test_unset_quota(self) -> None:
         unset_payload = {
             **_QUOTA_SCOPE_PAYLOAD,
@@ -159,7 +154,6 @@ class TestQuotaScopeClient:
         assert call_args.kwargs["json"]["storage_host_name"] == "local:volume1"
         assert call_args.kwargs["json"]["quota_scope_id"] == "user:test-user-uuid"
 
-    @pytest.mark.asyncio
     async def test_search_with_empty_results(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200

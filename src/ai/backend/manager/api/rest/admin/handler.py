@@ -30,13 +30,12 @@ from ai.backend.manager.api.gql_legacy.schema import (
     GraphQueryContext,
 )
 from ai.backend.manager.api.manager import GQLMutationUnfrozenRequiredMiddleware
+from ai.backend.manager.api.rest.types import GQLContextDeps
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import GraphQLError as BackendGQLError
 
 if TYPE_CHECKING:
     from graphql import FieldNode
-
-    from ai.backend.manager.api.context import RootContext
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -73,24 +72,26 @@ class AdminHandler:
         self,
         *,
         gql_schema: graphene.Schema,
+        gql_deps: GQLContextDeps,
     ) -> None:
         self._gql_schema = gql_schema
+        self._gql_deps = gql_deps
 
     async def _handle_gql_common(
         self, request_ctx: RequestCtx, params: GraphQLRequest
     ) -> ExecutionResult:
         request = request_ctx.request
-        root_ctx: RootContext = request.app["_root.context"]
+        gql_deps = self._gql_deps
         manager_status = (
-            await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
+            await gql_deps.config_provider.legacy_etcd_config_loader.get_manager_status()
         )
         known_slot_types = (
-            await root_ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
+            await gql_deps.config_provider.legacy_etcd_config_loader.get_resource_slots()
         )
         rules: list[type[ValidationRule]] = []
-        if not root_ctx.config_provider.config.api.allow_graphql_schema_introspection:
+        if not gql_deps.config_provider.config.api.allow_graphql_schema_introspection:
             rules.append(CustomIntrospectionRule)
-        max_depth = root_ctx.config_provider.config.api.max_gql_query_depth
+        max_depth = gql_deps.config_provider.config.api.max_gql_query_depth
         if max_depth is not None:
             rules.append(depth_limit_validator(max_depth=max_depth))
         if rules:
@@ -104,28 +105,28 @@ class AdminHandler:
         gql_ctx = GraphQueryContext(
             schema=self._gql_schema,
             dataloader_manager=DataLoaderManager(),
-            config_provider=root_ctx.config_provider,
-            etcd=root_ctx.etcd,
+            config_provider=gql_deps.config_provider,
+            etcd=gql_deps.etcd,
             user=request["user"],
             access_key=request["keypair"]["access_key"],
-            db=root_ctx.db,
-            valkey_stat=root_ctx.valkey_stat,
-            valkey_image=root_ctx.valkey_image,
-            valkey_live=root_ctx.valkey_live,
-            valkey_schedule=root_ctx.valkey_schedule,
-            network_plugin_ctx=root_ctx.network_plugin_ctx,
+            db=gql_deps.db,
+            valkey_stat=gql_deps.valkey_stat,
+            valkey_image=gql_deps.valkey_image,
+            valkey_live=gql_deps.valkey_live,
+            valkey_schedule=gql_deps.valkey_schedule,
+            network_plugin_ctx=gql_deps.network_plugin_ctx,
             manager_status=manager_status,
             known_slot_types=known_slot_types,
-            background_task_manager=root_ctx.background_task_manager,
-            services_ctx=root_ctx.services_ctx,
-            storage_manager=root_ctx.storage_manager,
-            registry=root_ctx.registry,
-            idle_checker_host=root_ctx.idle_checker_host,
-            metric_observer=root_ctx.metrics.gql,
-            processors=root_ctx.processors,
-            scheduler_repository=root_ctx.repositories.scheduler.repository,
-            user_repository=root_ctx.repositories.user.repository,
-            agent_repository=root_ctx.repositories.agent.repository,
+            background_task_manager=gql_deps.background_task_manager,
+            services_ctx=gql_deps.services_ctx,
+            storage_manager=gql_deps.storage_manager,
+            registry=gql_deps.registry,
+            idle_checker_host=gql_deps.idle_checker_host,
+            metric_observer=gql_deps.metric_observer,
+            processors=gql_deps.processors,
+            scheduler_repository=gql_deps.scheduler_repository,
+            user_repository=gql_deps.user_repository,
+            agent_repository=gql_deps.agent_repository,
         )
         result = cast(
             ExecutionResult,
@@ -137,7 +138,7 @@ class AdminHandler:
                 context_value=gql_ctx,
                 middleware=[
                     GQLMutationPrivilegeCheckMiddleware(),
-                    GQLMutationUnfrozenRequiredMiddleware(),
+                    GQLMutationUnfrozenRequiredMiddleware(manager_status),
                     GQLMetricMiddleware(),
                     GQLExceptionMiddleware(),
                     GQLLoggingMiddleware(),

@@ -524,7 +524,6 @@ class TestDomainNestedSearchIntegration:
 
         return result
 
-    @pytest.mark.asyncio
     async def test_search_with_description_filter(
         self,
         domain_db_source: DomainDBSource,
@@ -543,7 +542,6 @@ class TestDomainNestedSearchIntegration:
         alpha_domain = [d for d in two_domains_with_children if "alpha" in d][0]
         assert result.items[0].name == alpha_domain
 
-    @pytest.mark.asyncio
     async def test_search_with_project_name_filter(
         self,
         domain_db_source: DomainDBSource,
@@ -562,7 +560,6 @@ class TestDomainNestedSearchIntegration:
         alpha_domain = [d for d in two_domains_with_children if "alpha" in d][0]
         assert result.items[0].name == alpha_domain
 
-    @pytest.mark.asyncio
     async def test_search_with_project_is_active_filter(
         self,
         domain_db_source: DomainDBSource,
@@ -580,7 +577,6 @@ class TestDomainNestedSearchIntegration:
         alpha_domain = [d for d in two_domains_with_children if "alpha" in d][0]
         assert result.items[0].name == alpha_domain
 
-    @pytest.mark.asyncio
     async def test_search_with_user_username_filter(
         self,
         domain_db_source: DomainDBSource,
@@ -599,7 +595,6 @@ class TestDomainNestedSearchIntegration:
         alpha_domain = [d for d in two_domains_with_children if "alpha" in d][0]
         assert result.items[0].name == alpha_domain
 
-    @pytest.mark.asyncio
     async def test_search_with_user_email_filter(
         self,
         domain_db_source: DomainDBSource,
@@ -618,7 +613,6 @@ class TestDomainNestedSearchIntegration:
         beta_domain = [d for d in two_domains_with_children if "beta" in d][0]
         assert result.items[0].name == beta_domain
 
-    @pytest.mark.asyncio
     async def test_search_ordered_by_project_name(
         self,
         domain_db_source: DomainDBSource,
@@ -639,7 +633,6 @@ class TestDomainNestedSearchIntegration:
         assert result.items[0].name == beta_domain
         assert result.items[1].name == alpha_domain
 
-    @pytest.mark.asyncio
     async def test_search_ordered_by_user_email(
         self,
         domain_db_source: DomainDBSource,
@@ -658,7 +651,6 @@ class TestDomainNestedSearchIntegration:
         alpha_domain = [d for d in two_domains_with_children if "alpha" in d][0]
         assert result.items[0].name == alpha_domain
 
-    @pytest.mark.asyncio
     async def test_search_with_user_is_active_filter(
         self,
         domain_db_source: DomainDBSource,
@@ -675,7 +667,6 @@ class TestDomainNestedSearchIntegration:
         # Both users have status=ACTIVE, so both domains match
         assert result.total_count == 2
 
-    @pytest.mark.asyncio
     async def test_search_combined_filter_and_order(
         self,
         domain_db_source: DomainDBSource,

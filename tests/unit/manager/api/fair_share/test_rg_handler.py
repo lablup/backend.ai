@@ -141,7 +141,6 @@ class TestRGGetDomainFairShare:
         )
         return processors
 
-    @pytest.mark.asyncio
     async def test_calls_action_with_correct_params(
         self,
         mock_processors_with_domain_exists: MagicMock,
@@ -164,7 +163,6 @@ class TestRGGetDomainFairShare:
         assert action.resource_group == "default"
         assert action.domain_name == "test-domain"
 
-    @pytest.mark.asyncio
     async def test_returns_data_when_found(
         self,
         mock_processors_with_domain_exists: MagicMock,
@@ -191,7 +189,6 @@ class TestRGGetDomainFairShare:
         )
         return processors
 
-    @pytest.mark.asyncio
     async def test_raises_domain_not_found_when_domain_does_not_exist(
         self,
         mock_processors_with_domain_not_found: MagicMock,
@@ -222,7 +219,6 @@ class TestRGGetProjectFairShare:
         )
         return processors
 
-    @pytest.mark.asyncio
     async def test_calls_action_with_correct_params(
         self,
         mock_processors_with_project_exists: MagicMock,
@@ -244,7 +240,6 @@ class TestRGGetProjectFairShare:
         assert action.resource_group == "default"
         assert action.project_id == project_id
 
-    @pytest.mark.asyncio
     async def test_returns_data_when_found(
         self,
         mock_processors_with_project_exists: MagicMock,
@@ -270,7 +265,6 @@ class TestRGGetProjectFairShare:
         )
         return processors
 
-    @pytest.mark.asyncio
     async def test_raises_project_not_found_when_project_does_not_exist(
         self,
         mock_processors_with_project_not_found: MagicMock,
@@ -301,7 +295,6 @@ class TestRGGetUserFairShare:
         )
         return processors
 
-    @pytest.mark.asyncio
     async def test_calls_action_with_correct_params(
         self,
         mock_processors_with_user_exists: MagicMock,
@@ -326,7 +319,6 @@ class TestRGGetUserFairShare:
         assert action.project_id == project_id
         assert action.user_uuid == user_uuid
 
-    @pytest.mark.asyncio
     async def test_returns_data_when_found(
         self,
         mock_processors_with_user_exists: MagicMock,
@@ -353,7 +345,6 @@ class TestRGGetUserFairShare:
         )
         return processors
 
-    @pytest.mark.asyncio
     async def test_raises_user_not_found_when_user_does_not_exist(
         self,
         mock_processors_with_user_not_found: MagicMock,

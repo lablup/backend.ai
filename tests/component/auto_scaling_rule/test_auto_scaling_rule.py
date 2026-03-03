@@ -23,7 +23,6 @@ from ai.backend.common.types import AutoScalingMetricSource
 
 
 class TestAutoScalingRuleCreate:
-    @pytest.mark.asyncio
     async def test_admin_creates_rule(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -49,7 +48,6 @@ class TestAutoScalingRuleCreate:
         assert rule.step_size == 1
         assert rule.time_window == 300
 
-    @pytest.mark.asyncio
     async def test_admin_creates_rule_with_min_threshold(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -74,7 +72,6 @@ class TestAutoScalingRuleCreate:
         assert rule.min_replicas == 1
         assert rule.max_replicas == 10
 
-    @pytest.mark.asyncio
     async def test_create_with_nonexistent_deployment(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -94,7 +91,6 @@ class TestAutoScalingRuleCreate:
 
 
 class TestAutoScalingRuleGet:
-    @pytest.mark.asyncio
     async def test_admin_gets_rule(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -118,7 +114,6 @@ class TestAutoScalingRuleGet:
         assert get_result.auto_scaling_rule.id == rule_id
         assert get_result.auto_scaling_rule.metric_name == "memory"
 
-    @pytest.mark.asyncio
     async def test_get_nonexistent_rule(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -129,7 +124,6 @@ class TestAutoScalingRuleGet:
 
 
 class TestAutoScalingRuleSearch:
-    @pytest.mark.asyncio
     async def test_admin_searches_rules(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -152,7 +146,6 @@ class TestAutoScalingRuleSearch:
         assert len(result.auto_scaling_rules) >= 1
         assert result.pagination.total >= 1
 
-    @pytest.mark.asyncio
     async def test_search_with_deployment_filter(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -181,7 +174,6 @@ class TestAutoScalingRuleSearch:
         for rule in result.auto_scaling_rules:
             assert rule.model_deployment_id == model_deployment_fixture
 
-    @pytest.mark.asyncio
     async def test_search_empty_result(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -200,7 +192,6 @@ class TestAutoScalingRuleSearch:
 
 
 class TestAutoScalingRuleUpdate:
-    @pytest.mark.asyncio
     async def test_admin_updates_rule(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -230,7 +221,6 @@ class TestAutoScalingRuleUpdate:
         assert update_result.auto_scaling_rule.metric_name == "memory"
         assert update_result.auto_scaling_rule.step_size == 3
 
-    @pytest.mark.asyncio
     async def test_update_nonexistent_rule(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -244,7 +234,6 @@ class TestAutoScalingRuleUpdate:
 
 
 class TestAutoScalingRuleDelete:
-    @pytest.mark.asyncio
     async def test_admin_deletes_rule(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -273,7 +262,6 @@ class TestAutoScalingRuleDelete:
         with pytest.raises(NotFoundError):
             await admin_registry.auto_scaling_rule.get(rule_id)
 
-    @pytest.mark.asyncio
     async def test_delete_nonexistent_rule(
         self,
         admin_registry: BackendAIClientRegistry,

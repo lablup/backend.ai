@@ -16,6 +16,8 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderID
+from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
@@ -35,6 +37,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderPermissionData,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import ProjectNotFound
@@ -43,14 +46,25 @@ from ai.backend.manager.errors.storage import (
     VFolderFilterStatusFailed,
     VFolderInvalidParameter,
     VFolderNotFound,
+    VFolderOperationFailed,
 )
 from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.group import GroupRow, ProjectType
-from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.group import association_groups_users as agus
+from ai.backend.manager.models.kernel import kernels
+from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user import (
+    ACTIVE_USER_STATUSES,
+    UserRole,
+    UserRow,
+    UserStatus,
+    users,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import (
     HARD_DELETED_VFOLDER_STATUSES,
@@ -66,9 +80,13 @@ from ai.backend.manager.models.vfolder import (
     VFolderStatusSet,
     delete_vfolder_relation_rows,
     ensure_host_permission_allowed,
+    get_allowed_vfolder_hosts_by_group,
+    get_allowed_vfolder_hosts_by_user,
     get_sessions_by_mounted_folder,
     is_unmanaged,
     query_accessible_vfolders,
+    vfolder_invitations,
+    vfolder_permissions,
     vfolder_status_map,
     vfolders,
 )
@@ -1103,6 +1121,49 @@ class VfolderRepository:
             return results
 
     @vfolder_repository_resilience.apply()
+    async def get_sent_invitations_for_user(
+        self, user_email: str
+    ) -> list[tuple[VFolderInvitationData, VFolderData]]:
+        """
+        Get all pending invitations sent by a user (as inviter) with VFolder info.
+        """
+        async with self._db.begin_readonly_session_read_committed() as session:
+            j = sa.join(
+                VFolderInvitationRow, VFolderRow, VFolderInvitationRow.vfolder == VFolderRow.id
+            )
+            query = (
+                sa.select(VFolderInvitationRow)
+                .select_from(j)
+                .where(
+                    sa.and_(
+                        VFolderInvitationRow.inviter == user_email,
+                        VFolderInvitationRow.state == VFolderInvitationState.PENDING,
+                    )
+                )
+                .options(
+                    contains_eager(VFolderInvitationRow.vfolder_row),
+                )
+            )
+            result = await session.scalars(query)
+            invitation_rows = list(result.all())
+
+            results = []
+            for inv_row in invitation_rows:
+                invitation_data = VFolderInvitationData(
+                    id=inv_row.id,
+                    vfolder=inv_row.vfolder,
+                    inviter=inv_row.inviter or "",
+                    invitee=inv_row.invitee,
+                    permission=inv_row.permission or VFolderMountPermission.READ_ONLY,
+                    created_at=inv_row.created_at or datetime.now(UTC),
+                    modified_at=inv_row.modified_at,
+                )
+                vfolder_data = self._vfolder_row_to_data(inv_row.vfolder_row)
+                results.append((invitation_data, vfolder_data))
+
+            return results
+
+    @vfolder_repository_resilience.apply()
     async def ensure_host_permission_allowed(
         self,
         folder_host: str,
@@ -1298,3 +1359,389 @@ class VfolderRepository:
             # Return the first (and should be only) matching .logs vfolder
             vfolder_dict = vfolder_dicts[0]
             return self._vfolder_dict_to_data(dict(vfolder_dict))
+
+    @vfolder_repository_resilience.apply()
+    async def share_vfolder_with_users(
+        self,
+        vfolder_id: uuid.UUID,
+        vfolder_host: str,
+        vfolder_group: uuid.UUID | None,
+        requester_uuid: uuid.UUID,
+        requester_email: str,
+        domain_name: str,
+        resource_policy: Mapping[str, Any],
+        emails: list[str],
+        permission: VFolderPermission,
+        allowed_vfolder_types: Sequence[str],
+    ) -> list[str]:
+        """
+        Share a group vfolder with users by granting permissions directly.
+        Returns list of emails that were shared with.
+        """
+        async with self._db.begin_session() as session:
+            conn = await session.connection()
+            await ensure_host_permission_allowed(
+                conn,
+                vfolder_host,
+                permission=VFolderHostPermission.SET_USER_PERM,
+                allowed_vfolder_types=allowed_vfolder_types,
+                user_uuid=requester_uuid,
+                resource_policy=resource_policy,
+                domain_name=domain_name,
+            )
+
+            users_table = UserRow.__table__
+            j = users_table.join(agus, users_table.c.uuid == agus.c.user_id)
+            db_query = (
+                sa.select(users_table.c.uuid, users_table.c.email)
+                .select_from(j)
+                .where(
+                    (users_table.c.email.in_(emails))
+                    & (users_table.c.email != requester_email)
+                    & (agus.c.group_id == vfolder_group)
+                    & (users_table.c.status.in_(ACTIVE_USER_STATUSES)),
+                )
+            )
+            result = await session.execute(db_query)
+            user_info = result.fetchall()
+            users_to_share = [u.uuid for u in user_info]
+            emails_to_share = [u.email for u in user_info]
+            if len(user_info) < 1:
+                raise ObjectNotFound(object_name="user")
+            if len(user_info) < len(emails):
+                users_not_in_group = list(set(emails) - set(emails_to_share))
+                raise ObjectNotFound(
+                    f"Some users do not belong to folder's group: {','.join(users_not_in_group)}",
+                    object_name="user",
+                )
+
+            existing_query = sa.select(VFolderPermissionRow.user).where(
+                (VFolderPermissionRow.user.in_(users_to_share))
+                & (VFolderPermissionRow.vfolder == vfolder_id),
+            )
+            result = await session.execute(existing_query)
+            users_with_existing_perm = [row.user for row in result.fetchall()]
+            new_users = list(set(users_to_share) - set(users_with_existing_perm))
+
+            for _user in new_users:
+                insert_stmt = sa.insert(VFolderPermissionRow).values(
+                    permission=permission,
+                    vfolder=vfolder_id,
+                    user=_user,
+                )
+                await session.execute(insert_stmt)
+            for _user in users_with_existing_perm:
+                update_stmt = (
+                    sa.update(VFolderPermissionRow)
+                    .values(permission=permission)
+                    .where(VFolderPermissionRow.vfolder == vfolder_id)
+                    .where(VFolderPermissionRow.user == _user)
+                )
+                await session.execute(update_stmt)
+
+            return emails_to_share
+
+    @vfolder_repository_resilience.apply()
+    async def unshare_vfolder_from_users(
+        self,
+        vfolder_id: uuid.UUID,
+        vfolder_host: str,
+        requester_uuid: uuid.UUID,
+        domain_name: str,
+        resource_policy: Mapping[str, Any],
+        emails: list[str],
+        allowed_vfolder_types: Sequence[str],
+    ) -> list[str]:
+        """
+        Revoke direct sharing permissions from users.
+        Returns list of emails that were unshared.
+        """
+        async with self._db.begin_session() as session:
+            conn = await session.connection()
+            await ensure_host_permission_allowed(
+                conn,
+                vfolder_host,
+                permission=VFolderHostPermission.SET_USER_PERM,
+                allowed_vfolder_types=allowed_vfolder_types,
+                user_uuid=requester_uuid,
+                resource_policy=resource_policy,
+                domain_name=domain_name,
+            )
+
+            users_table = UserRow.__table__
+            db_query = (
+                sa.select(users_table.c.uuid)
+                .select_from(users_table)
+                .where(users_table.c.email.in_(emails))
+            )
+            result = await session.execute(db_query)
+            users_to_unshare = [u.uuid for u in result.fetchall()]
+            if len(users_to_unshare) < 1:
+                raise ObjectNotFound(object_name="user(s).")
+
+            delete_stmt = sa.delete(VFolderPermissionRow).where(
+                (VFolderPermissionRow.vfolder == vfolder_id)
+                & (VFolderPermissionRow.user.in_(users_to_unshare)),
+            )
+            await session.execute(delete_stmt)
+
+            return emails
+
+    @vfolder_repository_resilience.apply()
+    async def list_shared_vfolder_permissions(
+        self,
+        vfolder_id: uuid.UUID | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        List all shared vfolder permission entries with vfolder and user info.
+        Returns list of dicts with vfolder/permission/user fields.
+        """
+        async with self._db.begin_readonly_session_read_committed() as session:
+            perm_table = VFolderPermissionRow.__table__
+            vf_table = VFolderRow.__table__
+            users_table = UserRow.__table__
+            j = perm_table.join(vf_table, vf_table.c.id == perm_table.c.vfolder).join(
+                users_table, users_table.c.uuid == perm_table.c.user
+            )
+            db_query = sa.select(
+                perm_table,
+                vf_table.c.id.label("vfolder_id"),
+                vf_table.c.name,
+                vf_table.c.group,
+                vf_table.c.status,
+                vf_table.c.user.label("vfolder_user"),
+                users_table.c.email,
+            ).select_from(j)
+            if vfolder_id is not None:
+                db_query = db_query.where(vf_table.c.id == vfolder_id)
+            result = await session.execute(db_query)
+            return [dict(row._mapping) for row in result.fetchall()]
+
+    @vfolder_repository_resilience.apply()
+    async def update_vfolder_sharing_status(
+        self,
+        vfolder_id: uuid.UUID,
+        to_delete: list[uuid.UUID],
+        to_update: list[tuple[uuid.UUID, VFolderPermission]],
+    ) -> None:
+        """
+        Batch update and/or delete sharing permissions for a vfolder.
+        """
+        async with self._db.begin_session() as session:
+            if to_delete:
+                delete_stmt = (
+                    sa.delete(VFolderPermissionRow)
+                    .where(VFolderPermissionRow.vfolder == vfolder_id)
+                    .where(VFolderPermissionRow.user.in_(to_delete))
+                )
+                await session.execute(delete_stmt)
+
+            for user_id, perm in to_update:
+                update_stmt = (
+                    sa.update(VFolderPermissionRow)
+                    .values(permission=perm)
+                    .where(VFolderPermissionRow.vfolder == vfolder_id)
+                    .where(VFolderPermissionRow.user == user_id)
+                )
+                await session.execute(update_stmt)
+
+    @vfolder_repository_resilience.apply()
+    async def check_vfolder_accessible(
+        self,
+        vfolder_id: uuid.UUID,
+        user_uuid: uuid.UUID,
+        user_role: UserRole,
+        domain_name: str,
+        allowed_vfolder_types: Sequence[str],
+    ) -> bool:
+        """
+        Check if a vfolder is accessible by the user.
+        Returns True if accessible, raises VFolderNotFound if not.
+        """
+        async with self._db.begin_readonly_session() as session:
+            conn = await session.connection()
+            extra_vf_conds = [vfolders.c.id == vfolder_id]
+            entries = await query_accessible_vfolders(
+                conn,
+                user_uuid,
+                user_role=user_role,
+                domain_name=domain_name,
+                allowed_vfolder_types=allowed_vfolder_types,
+                extra_vf_conds=(sa.and_(*extra_vf_conds)),
+            )
+        if len(entries) == 0:
+            raise VFolderNotFound(extra_data=vfolder_id)
+        return True
+
+    @vfolder_repository_resilience.apply()
+    async def update_vfolder_max_size(
+        self,
+        vfolder_id: uuid.UUID,
+        max_size_mib: int,
+    ) -> None:
+        """
+        Update the max_size field of a vfolder in MiB.
+        """
+        async with self._db.begin_session() as session:
+            conn = await session.connection()
+            update_query = (
+                sa.update(vfolders).values(max_size=max_size_mib).where(vfolders.c.id == vfolder_id)
+            )
+            db_result = await conn.execute(update_query)
+            if db_result.rowcount != 1:
+                raise VFolderOperationFailed(
+                    f"Failed to update vfolder quota: expected 1 row, got {db_result.rowcount}"
+                )
+
+    @vfolder_repository_resilience.apply()
+    async def get_allowed_hosts_for_listing(
+        self,
+        user_uuid: uuid.UUID,
+        domain_name: str,
+        group_id: uuid.UUID | None,
+        resource_policy: Mapping[str, Any],
+        allowed_vfolder_types: Sequence[str],
+    ) -> VFolderHostPermissionMap:
+        """
+        Get the combined allowed vfolder hosts for user and group.
+        """
+        async with self._db.begin_readonly_session() as session:
+            conn = await session.connection()
+            allowed_hosts = VFolderHostPermissionMap()
+            if "user" in allowed_vfolder_types:
+                allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
+                    conn, resource_policy, domain_name, user_uuid, group_id
+                )
+                allowed_hosts = cast(
+                    VFolderHostPermissionMap, allowed_hosts | allowed_hosts_by_user
+                )
+            if "group" in allowed_vfolder_types:
+                allowed_hosts_by_group = await get_allowed_vfolder_hosts_by_group(
+                    conn,
+                    resource_policy,
+                    domain_name,
+                    group_id,
+                )
+                allowed_hosts = cast(
+                    VFolderHostPermissionMap, allowed_hosts | allowed_hosts_by_group
+                )
+            return allowed_hosts
+
+    @vfolder_repository_resilience.apply()
+    async def change_vfolder_ownership(
+        self,
+        vfolder_id: uuid.UUID,
+        user_email: str,
+    ) -> None:
+        """
+        Change ownership of a user vfolder to another user.
+        Validates user exists with allowed host access, updates owner,
+        and removes related invitations/permissions for the new owner.
+        """
+        # Step 1: Get target user info and their allowed hosts
+        async with self._db.begin_readonly_session() as session:
+            conn = await session.connection()
+            j = sa.join(users, keypairs, users.c.email == keypairs.c.user_id)
+            db_query = (
+                sa.select(users.c.uuid, users.c.domain_name, keypairs.c.resource_policy)
+                .select_from(j)
+                .where((users.c.email == user_email) & (users.c.status == UserStatus.ACTIVE))
+            )
+            try:
+                result = await conn.execute(db_query)
+            except sa.exc.DataError as e:
+                raise InvalidAPIParameters from e
+            user_info = result.first()
+            if user_info is None:
+                raise ObjectNotFound(object_name="user")
+
+            resource_policy_name = user_info.resource_policy
+            result = await conn.execute(
+                sa.select(keypair_resource_policies.c.allowed_vfolder_hosts).where(
+                    keypair_resource_policies.c.name == resource_policy_name
+                )
+            )
+            resource_policy_row = result.first()
+            allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
+                conn=conn,
+                resource_policy=dict(resource_policy_row._mapping) if resource_policy_row else {},
+                domain_name=user_info.domain_name,
+                user_uuid=user_info.uuid,
+            )
+
+        # Step 2: Check vfolder host is accessible by new owner
+        async with self._db.begin_readonly_session() as session:
+            conn = await session.connection()
+            db_query = (
+                sa.select(vfolders.c.host)
+                .select_from(vfolders)
+                .where(
+                    (vfolders.c.id == vfolder_id)
+                    & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+                )
+            )
+            folder_host = await conn.scalar(db_query)
+        if folder_host not in allowed_hosts_by_user:
+            raise VFolderOperationFailed(
+                "User to migrate vfolder needs an access to the storage host."
+            )
+
+        # Step 3: Update vfolder owner
+        async def _update() -> None:
+            async with self._db.begin_session() as session:
+                conn = await session.connection()
+                update_query = (
+                    sa.update(vfolders)
+                    .values(user=user_info.uuid)
+                    .where(
+                        (vfolders.c.id == vfolder_id)
+                        & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+                    )
+                )
+                await conn.execute(update_query)
+
+        await execute_with_retry(_update)
+
+        # Step 4: Delete related invitations and permissions for new owner
+        async def _delete_related_rows() -> None:
+            async with self._db.begin_session() as session:
+                conn = await session.connection()
+                del_query = sa.delete(vfolder_invitations).where(
+                    (vfolder_invitations.c.invitee == user_email)
+                    & (vfolder_invitations.c.vfolder == vfolder_id)
+                )
+                await conn.execute(del_query)
+                del_query = sa.delete(vfolder_permissions).where(
+                    (vfolder_permissions.c.vfolder == vfolder_id)
+                    & (vfolder_permissions.c.user == user_info.uuid)
+                )
+                await conn.execute(del_query)
+
+        await execute_with_retry(_delete_related_rows)
+
+    @vfolder_repository_resilience.apply()
+    async def get_alive_agent_ids(
+        self,
+        scaling_group: str | None = None,
+    ) -> list[str]:
+        """Get IDs of agents with ALIVE status, optionally filtered by scaling group."""
+        async with self._db.begin_readonly_session() as session:
+            conn = await session.connection()
+            stmt = sa.select(agents.c.id).where(agents.c.status == AgentStatus.ALIVE)
+            if scaling_group is not None:
+                stmt = stmt.where(agents.c.scaling == scaling_group)
+            result = await conn.execute(stmt)
+            return [row.id for row in result.fetchall()]
+
+    @vfolder_repository_resilience.apply()
+    async def get_active_kernel_mount_names(self) -> set[str]:
+        """Get mount names from all non-terminated kernels."""
+        async with self._db.begin_readonly_session() as session:
+            conn = await session.connection()
+            stmt = sa.select(kernels.c.mounts).where(kernels.c.status != KernelStatus.TERMINATED)
+            result = await conn.execute(stmt)
+            mounted: set[str] = set()
+            for row in result.fetchall():
+                if row.mounts:
+                    mounted.update(m[1] for m in row.mounts)
+            return mounted

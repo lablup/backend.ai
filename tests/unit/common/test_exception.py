@@ -18,7 +18,6 @@ from ai.backend.common.exception import (
 
 
 class TestBackendAIErrorCode:
-    @pytest.mark.asyncio
     async def test_error_code_in_body(self) -> None:
         """Test that error_code() is correctly included in the error body."""
         error = UserNotFound(extra_msg="User with ID 123 not found")
@@ -31,7 +30,6 @@ class TestBackendAIErrorCode:
         error_code = error.error_code()
         assert str(error_code) == str(error.error_code())
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "status_code,error_code,error_message,expected_error_code_str",
         [

@@ -6,7 +6,6 @@ from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
-@pytest.mark.asyncio
 async def test_lock(database_connection: ExtendedAsyncSAEngine) -> None:
     enter_count = 0
     done_count = 0
@@ -66,7 +65,6 @@ async def test_lock(database_connection: ExtendedAsyncSAEngine) -> None:
         assert len(rows) == 0
 
 
-@pytest.mark.asyncio
 async def test_lock_timeout(database_connection: ExtendedAsyncSAEngine) -> None:
     lock_connection_timeout = 0.5
     sleep = 1

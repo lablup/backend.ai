@@ -218,7 +218,6 @@ class TestCreateEndpointAutoScalingRule:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_create_auto_scaling_rule(
         self,
         scenario: ScenarioBase[

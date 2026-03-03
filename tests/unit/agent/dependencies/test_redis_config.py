@@ -21,7 +21,6 @@ class TestRedisConfigDependency:
         )
         yield etcd
 
-    @pytest.mark.asyncio
     async def test_redis_config_reads_from_etcd(self, etcd_with_redis_config: AsyncEtcd) -> None:
         """Test that redis config is read from etcd successfully."""
         dependency = RedisConfigDependency()
@@ -30,7 +29,6 @@ class TestRedisConfigDependency:
             assert redis_config is not None
             assert redis_config.addr is not None
 
-    @pytest.mark.asyncio
     async def test_redis_config_converts_host_port_pair(self, etcd: AsyncEtcd) -> None:
         """Test that HostPortPair dict is parsed into HostPortPair model."""
         # Set up redis config in etcd with HostPortPair format

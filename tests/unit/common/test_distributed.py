@@ -321,7 +321,6 @@ class TimerNode(threading.Thread):
         asyncio.run(self.timer_node_async())
 
 
-@pytest.mark.asyncio
 async def test_global_timer_filelock(
     request: pytest.FixtureRequest,
     test_case_ns: str,
@@ -374,7 +373,6 @@ async def test_global_timer_filelock(
     assert target_count - 2 <= num_records <= target_count + 2
 
 
-@pytest.mark.asyncio
 async def test_global_timer_redlock(
     test_case_ns: str,
     redis_container: tuple[Any, HostPortPair],
@@ -427,7 +425,6 @@ async def test_global_timer_redlock(
 
 
 # Tests using Process are failing due to a compatibility issue with valkey-glide.
-# @pytest.mark.asyncio
 # @pytest.mark.parametrize("etcd_client", ["etcd-client-py"])
 # async def test_global_timer_etcdlock(
 #     test_case_ns,
@@ -491,7 +488,6 @@ async def test_global_timer_redlock(
 #     assert target_count - 2 <= num_records <= target_count + 2
 
 
-@pytest.mark.asyncio
 async def test_global_timer_join_leave(
     request: pytest.FixtureRequest,
     test_case_ns: str,
@@ -530,7 +526,6 @@ async def test_global_timer_join_leave(
     await event_dispatcher.close()
 
 
-@pytest.mark.asyncio
 async def test_filelock_watchdog(request: pytest.FixtureRequest, test_case_ns: str) -> None:
     """
     This test case is for verifying
