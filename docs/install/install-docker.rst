@@ -1,7 +1,7 @@
 Install from Docker Containers
 ==============================
 
-This guide explains how to run Backend.AI components (manager, webserver) using Docker containers built from the monorepo.
+This guide explains how to run Backend.AI components (manager, webserver, appproxy) using Docker containers built from the monorepo.
 
 Prerequisites
 -------------
@@ -22,12 +22,12 @@ Prerequisites
 
    .. code-block:: bash
 
-      docker exec backendai-backendai-half-etcd-1 etcdctl put /sorna/local/config/redis/addr "host.docker.internal:8110"
+      docker exec backendai-backendai-half-etcd-1 etcdctl put /sorna/local/config/redis/addr "host.docker.internal:8111"
 
 Building Docker Images
 ----------------------
 
-Build the manager and webserver Docker images:
+Build the Docker images:
 
 .. code-block:: bash
 
@@ -48,6 +48,20 @@ Build the manager and webserver Docker images:
      --build-arg PKGVER=${PKGVER} \
      .
 
+   # Build appproxy coordinator image
+   docker build -f docker/backend.ai-appproxy-coordinator.dockerfile \
+     -t backend.ai/appproxy-coordinator:${PKGVER} \
+     --build-arg PYTHON_VERSION=3.13 \
+     --build-arg PKGVER=${PKGVER} \
+     .
+
+   # Build appproxy worker image
+   docker build -f docker/backend.ai-appproxy-worker.dockerfile \
+     -t backend.ai/appproxy-worker:${PKGVER} \
+     --build-arg PYTHON_VERSION=3.13 \
+     --build-arg PKGVER=${PKGVER} \
+     .
+
 Configuration Files
 -------------------
 
@@ -64,13 +78,13 @@ Create ``manager.toml`` with the following content:
 
    [etcd]
    namespace = "local"
-   addr = { host = "host.docker.internal", port = 8220 }
+   addr = { host = "host.docker.internal", port = 8121 }
    user = ""
    password = ""
 
    [db]
    type = "postgresql"
-   addr = { host = "host.docker.internal", port = 8100 }
+   addr = { host = "host.docker.internal", port = 8101 }
    name = "backend"
    user = "postgres"
    password = "develove"
@@ -209,62 +223,127 @@ Create ``webserver.conf`` with the following content:
    enabled = true
    endpoint = "http://host.docker.internal:4000"
 
+AppProxy Coordinator Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Create ``proxy-coordinator.toml`` with the following content:
+
+.. code-block:: toml
+
+   # Backend.AI AppProxy Coordinator configuration for Docker containers
+
+   [db]
+   type = "postgresql"
+   name = "appproxy"
+   user = "appproxy"
+   password = "develove"
+   pool_size = 8
+   max_overflow = 64
+   addr = { host = "host.docker.internal", port = 8101 }
+
+   [redis]
+   addr = { host = "host.docker.internal", port = 8111 }
+
+   [proxy_coordinator]
+   tls_listen = false
+   tls_advertised = false
+   allow_unauthorized_configure_request = true
+
+   [proxy_coordinator.bind_addr]
+   host = "0.0.0.0"
+   port = 10200
+
+   [proxy_coordinator.advertised_addr]
+   host = "backend-ai-appproxy-coordinator"
+   port = 10200
+
+   [secrets]
+   api_secret = "some_api_secret"
+   jwt_secret = "some_jwt_secret"
+
+   [permit_hash]
+   secret = "some_permit_hash_secret"
+
+   [logging]
+   level = "INFO"
+   drivers = ["console"]
+
+   [logging.console]
+   colored = true
+   format = "verbose"
+
+   [debug]
+   enabled = true
+
+The coordinator requires its own PostgreSQL database. Create it before starting:
+
+.. code-block:: bash
+
+   docker exec backendai-backendai-half-postgres-1 \
+     psql -U postgres -c "CREATE USER appproxy WITH PASSWORD 'develove';"
+   docker exec backendai-backendai-half-postgres-1 \
+     psql -U postgres -c "CREATE DATABASE appproxy OWNER appproxy;"
+
+AppProxy Worker Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Create ``proxy-worker.toml`` with the following content:
+
+.. code-block:: toml
+
+   # Backend.AI AppProxy Worker configuration for Docker containers
+
+   [redis]
+   addr = { host = "host.docker.internal", port = 8111 }
+
+   [proxy_worker]
+   coordinator_endpoint = "http://backend-ai-appproxy-coordinator:10200"
+   authority = "worker-1"
+   tls_listen = false
+   tls_advertised = false
+   frontend_mode = "port"
+   protocol = "http"
+   accepted_traffics = ["inference", "interactive"]
+   api_bind_addr = { host = "0.0.0.0", port = 10201 }
+   api_advertised_addr = { host = "backend-ai-appproxy-worker", port = 10201 }
+
+   [proxy_worker.port_proxy]
+   bind_host = "0.0.0.0"
+   advertised_host = "backend-ai-appproxy-worker"
+   bind_port_range = [10205, 10300]
+
+   [secrets]
+   api_secret = "some_api_secret"
+   jwt_secret = "some_jwt_secret"
+
+   [permit_hash]
+   secret = "some_permit_hash_secret"
+
+   [logging]
+   level = "INFO"
+   drivers = ["console"]
+
+   [logging.console]
+   colored = true
+   format = "verbose"
+
+   [debug]
+   enabled = true
+
 Key configuration points for Docker containers:
 
-- Use ``host.docker.internal`` to access services on the host machine (etcd, PostgreSQL, OTEL)
-- Use container service names for inter-container communication (``backend-ai-manager``, ``backendai-half-redis-node01``)
+- Use ``host.docker.internal`` to access services on the host machine (etcd, PostgreSQL, Redis, OTEL)
+- Use container service names for inter-container communication (``backend-ai-manager``, ``backend-ai-appproxy-coordinator``)
 - The webserver endpoint uses multiple values: first for container-to-container, second for browser access
+- Port numbers (8101, 8111, 8121) correspond to ``docker-compose.halfstack.current.yml``. Adjust if using a different halfstack configuration
 
 Running with Docker Compose
 ----------------------------
 
 The easiest way to run the components is using docker-compose.
 
-The ``docker-compose.monorepo.yml`` file includes both manager and webserver:
-
-.. code-block:: yaml
-
-   version: "3.8"
-
-   services:
-     backend-ai-manager:
-       image: backend.ai/manager:26.1.0rc1
-       container_name: backend-ai-manager
-       networks:
-         - half
-       ports:
-         - "8091:8091"
-       volumes:
-         - ./fixtures:/app/fixtures:ro
-         - ./manager.toml:/etc/backend.ai/manager.toml:ro
-         - ./logs:/var/log/backend.ai
-         - /tmp/backend.ai/ipc:/tmp/backend.ai/ipc
-         - /var/run/docker.sock:/var/run/docker.sock
-       environment:
-         - PYTHONUNBUFFERED=1
-       extra_hosts:
-         - "host.docker.internal:host-gateway"
-       restart: unless-stopped
-
-     backend-ai-webserver:
-       image: backend.ai/webserver:26.1.0rc1
-       container_name: backend-ai-webserver
-       networks:
-         - half
-       ports:
-         - "8090:8090"
-       volumes:
-         - ./webserver.conf:/etc/backend.ai/webserver.conf:ro
-       extra_hosts:
-         - "host.docker.internal:host-gateway"
-       restart: unless-stopped
-       depends_on:
-         - backend-ai-manager
-
-   networks:
-     half:
-       external: true
-       name: backendai_half
+The ``docker-compose.monorepo.yml`` file includes manager, appproxy (coordinator + worker), and webserver.
+Refer to the file in the repository for the latest configuration.
 
 Start the services:
 
@@ -294,6 +373,34 @@ Alternatively, you can run the containers manually:
      -e PYTHONUNBUFFERED=1 \
      --restart unless-stopped \
      backend.ai/manager:26.1.0rc1
+
+**AppProxy Coordinator:**
+
+.. code-block:: bash
+
+   docker run -d \
+     --name backend-ai-appproxy-coordinator \
+     --network backendai_half \
+     --add-host host.docker.internal:host-gateway \
+     -p 10200:10200 \
+     -v $(pwd)/proxy-coordinator.toml:/etc/backend.ai/proxy-coordinator.toml:ro \
+     -e PYTHONUNBUFFERED=1 \
+     --restart unless-stopped \
+     backend.ai/appproxy-coordinator:26.1.0rc1
+
+**AppProxy Worker:**
+
+.. code-block:: bash
+
+   docker run -d \
+     --name backend-ai-appproxy-worker \
+     --network backendai_half \
+     --add-host host.docker.internal:host-gateway \
+     -p 10201:10201 -p 10205-10300:10205-10300 \
+     -v $(pwd)/proxy-worker.toml:/etc/backend.ai/proxy-worker.toml:ro \
+     -e PYTHONUNBUFFERED=1 \
+     --restart unless-stopped \
+     backend.ai/appproxy-worker:26.1.0rc1
 
 **Webserver:**
 
@@ -328,6 +435,8 @@ Check logs:
 .. code-block:: bash
 
    docker logs backend-ai-manager
+   docker logs backend-ai-appproxy-coordinator
+   docker logs backend-ai-appproxy-worker
    docker logs backend-ai-webserver
 
 Connection issues
@@ -364,5 +473,5 @@ Or manually:
 
 .. code-block:: bash
 
-   docker stop backend-ai-manager backend-ai-webserver
-   docker rm backend-ai-manager backend-ai-webserver
+   docker stop backend-ai-manager backend-ai-appproxy-coordinator backend-ai-appproxy-worker backend-ai-webserver
+   docker rm backend-ai-manager backend-ai-appproxy-coordinator backend-ai-appproxy-worker backend-ai-webserver
