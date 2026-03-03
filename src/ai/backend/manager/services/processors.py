@@ -94,6 +94,12 @@ from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
 from ai.backend.manager.services.project_resource_policy.service import ProjectResourcePolicyService
+from ai.backend.manager.services.prometheus_query_preset.processors import (
+    PrometheusQueryPresetProcessors,
+)
+from ai.backend.manager.services.prometheus_query_preset.service import (
+    PrometheusQueryPresetService,
+)
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
@@ -187,6 +193,7 @@ class Services:
     manager_admin: ManagerAdminService
     user_resource_policy: UserResourcePolicyService
     project_resource_policy: ProjectResourcePolicyService
+    prometheus_query_preset: PrometheusQueryPresetService
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService
     resource_usage: ResourceUsageService
@@ -318,6 +325,11 @@ class Services:
         project_resource_policy_service = ProjectResourcePolicyService(
             repositories.project_resource_policy.repository
         )
+        prometheus_query_preset_service = PrometheusQueryPresetService(
+            repository=repositories.prometheus_query_preset.repository,
+            prometheus_client=args.prometheus_client,
+            default_timewindow=args.config_provider.config.metric.timewindow,
+        )
         resource_preset_service = ResourcePresetService(
             repositories.resource_preset.repository,
         )
@@ -444,6 +456,7 @@ class Services:
             manager_admin=manager_admin_service,
             user_resource_policy=user_resource_policy_service,
             project_resource_policy=project_resource_policy_service,
+            prometheus_query_preset=prometheus_query_preset_service,
             resource_preset=resource_preset_service,
             resource_slot=resource_slot_service,
             resource_usage=resource_usage_service,
@@ -496,6 +509,7 @@ class Processors(AbstractProcessorPackage):
     manager_admin: ManagerAdminProcessors
     user_resource_policy: UserResourcePolicyProcessors
     project_resource_policy: ProjectResourcePolicyProcessors
+    prometheus_query_preset: PrometheusQueryPresetProcessors
     resource_preset: ResourcePresetProcessors
     resource_slot: ResourceSlotProcessors
     resource_usage: ResourceUsageProcessors
@@ -553,6 +567,9 @@ class Processors(AbstractProcessorPackage):
         )
         project_resource_policy_processors = ProjectResourcePolicyProcessors(
             services.project_resource_policy, action_monitors
+        )
+        prometheus_query_preset_processors = PrometheusQueryPresetProcessors(
+            services.prometheus_query_preset, action_monitors
         )
         resource_preset_processors = ResourcePresetProcessors(
             services.resource_preset, action_monitors
@@ -622,6 +639,7 @@ class Processors(AbstractProcessorPackage):
             manager_admin=manager_admin_processors,
             user_resource_policy=user_resource_policy_processors,
             project_resource_policy=project_resource_policy_processors,
+            prometheus_query_preset=prometheus_query_preset_processors,
             resource_preset=resource_preset_processors,
             resource_slot=resource_slot_processors,
             resource_usage=resource_usage_processors,
@@ -669,6 +687,7 @@ class Processors(AbstractProcessorPackage):
             *self.manager_admin.supported_actions(),
             *self.user_resource_policy.supported_actions(),
             *self.project_resource_policy.supported_actions(),
+            *self.prometheus_query_preset.supported_actions(),
             *self.resource_preset.supported_actions(),
             *self.resource_slot.supported_actions(),
             *self.resource_usage.supported_actions(),
