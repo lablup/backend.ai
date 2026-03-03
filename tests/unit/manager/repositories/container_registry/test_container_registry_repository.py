@@ -1197,7 +1197,6 @@ class TestContainerRegistryRepository:
                 )
             )
 
-    @pytest.mark.asyncio
     async def test_modify_registry_set_is_global_clears_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
@@ -1238,7 +1237,6 @@ class TestContainerRegistryRepository:
 
             assert len(associations) == 0
 
-    @pytest.mark.asyncio
     async def test_delete_registry_success(
         self,
         repository: ContainerRegistryRepository,
