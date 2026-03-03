@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import dataclasses
 import logging
 from collections import defaultdict
@@ -183,10 +182,10 @@ class SessionProvisioner:
             log.warning("Missing snapshot data for scaling group {}", scaling_group)
             return ScheduleResult()
 
-        # Load per-session failed agents from Valkey for retry deprioritization
-        failed_agents_list = await asyncio.gather(*[
-            self._valkey_schedule.get_session_failed_agents(workload.session_id)
-            for workload in base_workloads
+        # Load per-session failed agents from Valkey for retry deprioritization.
+        # Uses a single pipelined Batch request instead of N parallel round-trips.
+        failed_agents_list = await self._valkey_schedule.get_multiple_session_failed_agents([
+            workload.session_id for workload in base_workloads
         ])
         workloads = [
             dataclasses.replace(workload, failed_agent_ids=failed_agents)

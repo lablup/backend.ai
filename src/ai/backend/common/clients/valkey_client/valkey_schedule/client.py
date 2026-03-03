@@ -392,7 +392,9 @@ class ValkeyScheduleClient:
         if batch_result is None:
             return [frozenset() for _ in session_ids]
         return [
-            frozenset(AgentId(member.decode()) for member in members) if members else frozenset()
+            frozenset(AgentId(member.decode()) for member in members)
+            if isinstance(members, set)
+            else frozenset()
             for members in batch_result
         ]
 
