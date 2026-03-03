@@ -148,7 +148,7 @@ async def _handle_gql_common(request: web.Request, params: GraphQLRequest) -> Ex
             context_value=gql_ctx,
             middleware=[
                 GQLMutationPrivilegeCheckMiddleware(),
-                GQLMutationUnfrozenRequiredMiddleware(),
+                GQLMutationUnfrozenRequiredMiddleware(manager_status),
                 GQLMetricMiddleware(),
                 GQLExceptionMiddleware(),
                 GQLLoggingMiddleware(),

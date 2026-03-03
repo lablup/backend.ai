@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING
 
 import aiotools
 
-from ai.backend.manager.api.manager import READ_ALLOWED, server_status_required
 from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.server_status import READ_ALLOWED, server_status_required
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
@@ -34,7 +34,7 @@ def register_stream_routes(deps: ModuleDeps) -> RouteRegistry:
     reg.app.on_shutdown.append(lambda app: stream_shutdown(app, ctx))
 
     handler = StreamHandler(private_ctx=ctx)
-    _mw = [server_status_required(READ_ALLOWED), auth_required]
+    _mw = [server_status_required(READ_ALLOWED, deps.config_provider), auth_required]
 
     reg.add("GET", r"/session/{session_name}/pty", handler.stream_pty, middlewares=_mw)
     reg.add("GET", r"/session/{session_name}/execute", handler.stream_execute, middlewares=_mw)

@@ -9,14 +9,17 @@ from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 
-from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api.manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from ai.backend.manager.api.rest.middleware.auth import (
     admin_required,
     auth_required,
     superadmin_required,
 )
 from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.server_status import (
+    ALL_ALLOWED,
+    READ_ALLOWED,
+    server_status_required,
+)
 from ai.backend.manager.api.rest.types import RouteMiddleware, WebRequestHandler
 from ai.backend.manager.api.vfolder import (
     check_vfolder_status,
@@ -31,13 +34,6 @@ from ai.backend.manager.models.vfolder import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
-
-
-def _server_status_required_middleware(
-    allowed_status: frozenset[ManagerStatus],
-) -> RouteMiddleware:
-    """Create a RouteMiddleware version of server_status_required."""
-    return server_status_required(allowed_status)
 
 
 def _vfolder_resolver(
@@ -111,22 +107,23 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
     reg.app.on_shutdown.append(vfolder_shutdown)
 
     handler = VFolderHandler()
+    cp = deps.config_provider
 
     # Helper to build middleware lists
     def _auth_rw() -> list[RouteMiddleware]:
-        return [auth_required, _server_status_required_middleware(ALL_ALLOWED)]
+        return [auth_required, server_status_required(ALL_ALLOWED, cp)]
 
     def _auth_ro() -> list[RouteMiddleware]:
-        return [auth_required, _server_status_required_middleware(READ_ALLOWED)]
+        return [auth_required, server_status_required(READ_ALLOWED, cp)]
 
     def _superadmin_rw() -> list[RouteMiddleware]:
-        return [superadmin_required, _server_status_required_middleware(ALL_ALLOWED)]
+        return [superadmin_required, server_status_required(ALL_ALLOWED, cp)]
 
     def _superadmin_ro() -> list[RouteMiddleware]:
-        return [superadmin_required, _server_status_required_middleware(READ_ALLOWED)]
+        return [superadmin_required, server_status_required(READ_ALLOWED, cp)]
 
     def _admin_rw() -> list[RouteMiddleware]:
-        return [admin_required, _server_status_required_middleware(ALL_ALLOWED)]
+        return [admin_required, server_status_required(ALL_ALLOWED, cp)]
 
     # --- Root resource: POST / (create), GET / (list), DELETE / (delete_by_id) ---
     reg.add("POST", "", handler.create, middlewares=_auth_rw())
