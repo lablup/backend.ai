@@ -441,6 +441,7 @@ class AgentSelector:
             )
 
         # Third pass: deprioritize agents that previously failed for this session
+        candidate_trackers = compatible_trackers
         if criteria.failed_agent_ids:
             non_failed = [
                 tracker
@@ -448,12 +449,12 @@ class AgentSelector:
                 if tracker.original_agent.agent_id not in criteria.failed_agent_ids
             ]
             if non_failed:
-                compatible_trackers = non_failed
+                candidate_trackers = non_failed
             # If ALL compatible agents have failed, keep all of them to avoid blocking
 
-        # Use strategy to select from compatible trackers
+        # Use strategy to select from candidates
         return self._strategy.select_tracker_by_strategy(
-            compatible_trackers, resource_req, criteria, config
+            candidate_trackers, resource_req, criteria, config
         )
 
     def _check_tracker_compatibility(
