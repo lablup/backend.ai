@@ -61,7 +61,7 @@ rootfs-path = "/opt/kata/share/kata-containers/kata-containers.img"
 # --- Storage ---
 shared-fs = "virtio-fs"         # "virtio-fs" | "virtio-9p" (9p deprecated)
 virtiofsd-path = "/opt/kata/libexec/virtiofsd"
-virtio-fs-cache-size = 0        # DAX cache window in MB; 0 = auto
+virtio-fs-cache-size = 0        # DAX window in MB; 0 = disabled (recommended default)
 
 # --- Networking ---
 network-model = "tcfilter"      # "tcfilter" | "macvtap"

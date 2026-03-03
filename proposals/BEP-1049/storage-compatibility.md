@@ -215,16 +215,68 @@ VSOCK (`AF_VSOCK`) is a lower-latency alternative for future optimization — pu
 
 ### I/O Performance Characteristics
 
-| Mechanism | Sequential Read | Random Write p99 | Use Case |
-|-----------|----------------|-----------------|----------|
-| Docker bind mount | 100% (native) | 100% (native) | Baseline |
-| virtio-fs (no DAX) | 70-90% | 3-10x overhead | Default Kata |
-| virtio-fs + DAX | 90-98% | 2-5x overhead | Recommended for I/O |
-| virtio-9p (legacy) | ~15% | ~100x overhead | Not recommended |
+#### Throughput (vs Native)
 
-For AI/ML workloads, the I/O profile matters most during data loading phases (reading training data from vfolders). GPU compute phases are unaffected by storage overhead. The virtio-fs + DAX configuration provides acceptable performance for most workloads.
+Benchmark data from Red Hat virtio-fs mailing list, Kata Containers issues, and Proxmox community testing:
 
-**Recommendation**: Enable DAX by default in `KataConfig` (`virtio_fs_cache_size = 0` means auto-sized DAX window). This is configured in [configuration-deployment.md](configuration-deployment.md).
+| Workload | virtio-fs (no DAX) | virtio-fs (DAX) | virtio-9p | Source |
+|----------|-------------------|-----------------|-----------|--------|
+| Sequential read (psync, 4K) | 98 MB/s | 660 MB/s | 99 MB/s | Red Hat ML |
+| Sequential read (mmap, 4 threads) | ~219 MB/s | 2,849-3,107 MB/s | 140 MB/s | LWN RFC |
+| Sequential write (psync) | ~98 MB/s | 487 MB/s | — | Red Hat ML |
+| Random 4K read IOPS | 36.2k | 64.2k | — | Proxmox |
+| Random 4K write IOPS | 15.5k | 21.4k | — | Proxmox |
+| Large file random R/W (4 GB) | 211 / 70.6 MB/s | — | 43 / 14 MB/s | Kata #2815 |
+
+**Relative to native host performance** (tuned, kernel 6.11+, `cache=never`, `direct-io=1`):
+
+| Workload | % of Native | Notes |
+|----------|-------------|-------|
+| Sequential read | 85-95% (DAX) | DAX critical for large sequential reads |
+| Sequential write | 75-85% (DAX) | `cache=none` outperforms `cache=always` for writes |
+| Random 4K read | ~85% (tuned) | 25.4k vs 29.8k IOPS (Proxmox 6.11) |
+| Random 4K write | ~85% (tuned) | 13.7k vs 16.1k IOPS |
+| Metadata (file create) | ~50-70% (est.) | 3.7x faster than 9p (714 vs 194 files/sec) |
+| Directory listing | ~60-80% (est.) | 6.7x faster than 9p with caching (13.5k vs 2k files/sec) |
+
+#### DAX: Critical Caveats
+
+DAX maps host page cache directly into guest memory, providing near-native read performance for sequential workloads. However:
+
+1. **DAX thrashing**: When the working set exceeds the DAX window size, performance **degrades catastrophically** — Kata #2138 measured 3.6k IOPS with DAX enabled vs 252k IOPS with DAX disabled for random workloads. DAX mappings thrash as the VM continuously faults in and evicts pages.
+
+2. **DAX window sizing**: Each 2 MB DAX chunk requires 32 KB of guest page descriptors. A 16 GB window costs ~256 MB in page descriptor overhead (device memory, not counted against VM RAM). Undersized windows trigger thrashing; oversized windows waste host memory reservation.
+
+3. **Small file penalty**: Files under 32 KB should not use DAX — the 32 KB page descriptor overhead per 2 MB chunk exceeds the benefit. Linux 5.17+ supports per-file DAX (`dax=inode`) to selectively enable DAX only for large files.
+
+**Recommendation**: **Disable DAX by default** (`virtio_fs_cache_size = 0` in `kata.toml`). AI/ML workloads alternate between large sequential reads (training data loading — DAX beneficial) and heavy random I/O (checkpointing, Python imports, pip installs — DAX harmful). The penalty from DAX thrashing on random I/O is far worse than the throughput loss from no-DAX on sequential reads. Enable DAX only for workloads with known large-sequential-read-dominant I/O patterns.
+
+#### Host-Side Overhead
+
+Each virtio-fs share runs a separate `virtiofsd` process on the host:
+
+| Resource | Per virtiofsd Process | 20 Shares (1 VM) |
+|----------|----------------------|-------------------|
+| Memory (RSS) | ~15 MB idle | ~300 MB |
+| Heap under load | 5-6 MB | ~100-120 MB |
+| File descriptors | Up to 80k under heavy load | Cumulative FD pressure |
+| Shared memory | VM RAM size (shared with QEMU, not double-counted) | Same (shared) |
+
+The `virtiofsd` Rust implementation is recommended over the legacy C version for better CPU efficiency. Use `--thread-pool-size=1` for most workloads — the default 64 threads causes lock contention that reduces IOPS by ~27%.
+
+**Mount count impact**: KataAgent should consolidate the 15+ individual krunner binary mounts into a single directory mount to reduce the virtiofsd process count per VM. Each eliminated share saves ~15 MB RSS and reduces host scheduling overhead.
+
+#### AI/ML Workload Impact Assessment
+
+| Phase | I/O Pattern | Dominant Factor | virtio-fs Impact |
+|-------|-------------|-----------------|-----------------|
+| Data loading | Large sequential read from vfolders | Throughput | 85-95% native (no DAX sufficient; NVMe/SSD saturates first) |
+| Training | GPU compute, minimal I/O | GPU | Negligible — I/O is not on critical path |
+| Checkpointing | Large sequential write | Throughput | 75-85% native |
+| pip install / imports | Many small file metadata ops | Latency | 50-70% native (one-time cost at session start) |
+| Jupyter notebook | Small random R/W | Latency | ~85% native (tuned) |
+
+For typical AI/ML workloads, GPU compute dominates wall-clock time. The virtio-fs overhead is concentrated in data loading (first minutes of a training run) and session startup (pip install, Python imports). Once training begins, the GPU utilization rate determines throughput — not storage I/O.
 
 ## Interface / API
 
