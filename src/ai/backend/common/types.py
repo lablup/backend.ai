@@ -1646,7 +1646,10 @@ def _stringify_number(v: BinarySize | int | float | Decimal) -> str:
         elif math.isinf(v) and v < 0:
             result = "-Infinity"
         else:
-            result = f"{v:f}"
+            if isinstance(v, Decimal):
+                result = f"{v.quantize(Decimal('0.01')).normalize():f}"
+            else:
+                result = f"{v:.2f}".rstrip("0").rstrip(".")
     elif isinstance(v, BinarySize):
         result = f"{int(v):d}"
     else:
