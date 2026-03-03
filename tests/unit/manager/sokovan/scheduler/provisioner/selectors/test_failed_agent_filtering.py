@@ -86,7 +86,15 @@ def dispersed_selector() -> AgentSelector:
 
 
 class TestFailedAgentFiltering:
-    """Test that failed agents are deprioritized during agent selection."""
+    """Tests for the failed agent deprioritization pass in agent selection.
+
+    When a session fails to start on an agent (kernel creation RPC error, timeout, etc.),
+    that agent is recorded in Valkey as a "failed agent" for that session. On retry,
+    the selector reads these records and excludes the failed agents from the candidate
+    pool before passing it to the placement strategy (concentrated/dispersed).
+
+    Pool: agent-a, agent-b (both have sufficient resources for all tests)
+    """
 
     async def test_failed_agent_is_avoided(
         self,
@@ -94,7 +102,15 @@ class TestFailedAgentFiltering:
         selection_config: AgentSelectionConfig,
         concentrated_selector: AgentSelector,
     ) -> None:
-        """When one agent has failed, the other agent should be selected."""
+        """Basic filtering: a previously-failed agent is excluded from selection.
+
+        Scenario:
+          - agent-a failed on the previous start attempt for this session
+          - agent-b has not failed
+        Expected:
+          - agent-a is removed from the candidate pool
+          - agent-b is selected
+        """
         criteria = _make_criteria_with_failed_agents(failed_agent_ids=frozenset({AGENT_A}))
 
         selections = await concentrated_selector.select_agents_for_batch_requirements(
@@ -110,7 +126,15 @@ class TestFailedAgentFiltering:
         selection_config: AgentSelectionConfig,
         concentrated_selector: AgentSelector,
     ) -> None:
-        """When all compatible agents have failed, all should remain available."""
+        """Fallback: when every compatible agent has failed, the filter is skipped.
+
+        Scenario:
+          - Both agent-a and agent-b previously failed for this session
+          - No other agents are available
+        Expected:
+          - Filtering is skipped (removing all agents would block scheduling entirely)
+          - One of the two agents is selected anyway, allowing the session to proceed
+        """
         criteria = _make_criteria_with_failed_agents(failed_agent_ids=frozenset({AGENT_A, AGENT_B}))
 
         selections = await concentrated_selector.select_agents_for_batch_requirements(
@@ -126,7 +150,15 @@ class TestFailedAgentFiltering:
         selection_config: AgentSelectionConfig,
         concentrated_selector: AgentSelector,
     ) -> None:
-        """When no agents have failed, selection proceeds normally."""
+        """No-op: an empty failed_agent_ids set leaves selection unchanged.
+
+        Scenario:
+          - First scheduling attempt — no prior failures recorded
+          - failed_agent_ids is empty
+        Expected:
+          - The filtering pass has no effect
+          - Normal selection proceeds and returns one agent
+        """
         criteria = _make_criteria_with_failed_agents(failed_agent_ids=frozenset())
 
         selections = await concentrated_selector.select_agents_for_batch_requirements(
@@ -141,7 +173,15 @@ class TestFailedAgentFiltering:
         selection_config: AgentSelectionConfig,
         concentrated_selector: AgentSelector,
     ) -> None:
-        """Designated agents should be selected even if they previously failed."""
+        """Designated agent takes precedence over the failed-agent filter.
+
+        Scenario:
+          - The user explicitly designated agent-a for this session
+          - agent-a also appears in failed_agent_ids from a prior attempt
+        Expected:
+          - The designated-agent check runs before the failed-agent filter
+          - agent-a is returned as-is, respecting the user's explicit choice
+        """
         criteria = _make_criteria_with_failed_agents(failed_agent_ids=frozenset({AGENT_A}))
 
         selections = await concentrated_selector.select_agents_for_batch_requirements(
@@ -160,7 +200,16 @@ class TestFailedAgentFiltering:
         selection_config: AgentSelectionConfig,
         dispersed_selector: AgentSelector,
     ) -> None:
-        """Failed agent filtering works with dispersed strategy too."""
+        """Failed-agent filtering is strategy-agnostic (dispersed policy).
+
+        Scenario:
+          - agent-a previously failed for this session
+          - The scaling group uses dispersed (spread) placement policy
+        Expected:
+          - agent-a is excluded from the candidate pool before the strategy runs
+          - agent-b is selected regardless of the placement policy
+        This verifies that filtering happens upstream of the strategy, not inside it.
+        """
         criteria = _make_criteria_with_failed_agents(failed_agent_ids=frozenset({AGENT_A}))
 
         selections = await dispersed_selector.select_agents_for_batch_requirements(
@@ -176,7 +225,16 @@ class TestFailedAgentFiltering:
         selection_config: AgentSelectionConfig,
         concentrated_selector: AgentSelector,
     ) -> None:
-        """Failed agent IDs not present in the agent pool are safely ignored."""
+        """Stale record: a failed agent ID that no longer exists in the pool is harmless.
+
+        Scenario:
+          - Valkey contains a failed_agent_id for "agent-nonexistent"
+            (e.g. the agent was removed from the cluster after the failure was recorded)
+          - The current pool contains only agent-a and agent-b
+        Expected:
+          - The nonexistent ID has no effect on the candidate pool
+          - Normal selection proceeds and returns one of the two available agents
+        """
         criteria = _make_criteria_with_failed_agents(
             failed_agent_ids=frozenset({AgentId("agent-nonexistent")})
         )
