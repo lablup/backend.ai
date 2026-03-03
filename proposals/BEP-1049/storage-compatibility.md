@@ -17,6 +17,8 @@ key-decisions:
   - Docker named volumes (krunner, deeplearning-samples) not available with containerd; use virtio-fs bind mount or guest rootfs
   - Accelerator plugin mounts differ entirely (VFIO PCI passthrough replaces Docker DeviceRequests)
   - virtio-fs for all storage backends; direct guest mount not proposed (no vendor Kata integration, CephFS benchmarks favor virtio-fs)
+  - Hybrid storage model recommended: block devices (virtio-blk) for read-only infrastructure, virtio-fs only for bidirectional data exchange (scratch, vfolders)
+  - Phase 1 uses virtio-fs for everything; hybrid model deferred to Phase 2
 -->
 
 # BEP-1049: Storage and Volume Mount Compatibility
@@ -388,3 +390,99 @@ Direct guest mount (NFS or native client) could be revisited as a future optimiz
 - Guest-side mount credential provisioning via kata-agent
 
 This is **not proposed for the initial implementation**.
+
+## Per-VM Cloned Disk: Hybrid Storage Model
+
+### Motivation
+
+The default virtio-fs-for-everything model creates 20-30+ `virtiofsd` processes per VM (one per shared directory/file). Each process consumes ~15 MB RSS, producing 300-450 MB of host memory overhead per VM just for filesystem translation. For a host running 10 concurrent sessions, this totals 3-4.5 GB of overhead — comparable to a full extra VM's worth of RAM.
+
+Conventional VM hypervisors (VMware, Proxmox, OpenStack) solve this differently: they clone a template disk image for each VM and the guest mounts it as a local block device. Kata Containers supports a similar model via **qcow2 CoW (Copy-on-Write) cloning** and **virtio-blk device passthrough**.
+
+### Block Device Options in Kata
+
+**qcow2 CoW cloning**: Create instant thin-clone disks from a base image. `qemu-img create -f qcow2 -b base.qcow2 -F qcow2 clone.qcow2` takes <10ms and produces a file that starts at near-zero size, growing only as the guest writes new data. Reads fall through to the base image. QEMU and Cloud Hypervisor both support multi-level backing chains.
+
+**devicemapper snapshotter**: containerd's devicemapper snapshotter stores each OCI image layer as a thin-provisioned block device. The Kata shim attaches these as `virtio-blk` devices to the guest VM. The kata-agent inside the guest assembles the layers using devicemapper. No virtiofsd needed for the container rootfs.
+
+**EROFS snapshotter** (containerd 2.1+): Each OCI image layer is stored as a read-only EROFS (Enhanced Read-Only File System) blob and exposed to the guest via `virtio-blk`. EROFS is optimized for read-heavy container workloads with better compression and lower memory overhead than ext4/xfs overlays.
+
+### Two Models Compared
+
+**Model A: virtio-fs for everything** (current proposal)
+
+```
+Host                                     Guest VM
+┌──────────────────────┐                ┌────────────────────────┐
+│ virtiofsd (scratch)  │──virtio-fs───→ │ /home/config, /home/work│
+│ virtiofsd (tz)       │──virtio-fs───→ │ /etc/localtime          │
+│ virtiofsd (krunner)  │──virtio-fs───→ │ /opt/kernel/*           │
+│ virtiofsd (pylib)    │──virtio-fs───→ │ /opt/backend.ai/...     │
+│ virtiofsd (vfolder1) │──virtio-fs───→ │ /home/work/data         │
+│ virtiofsd (vfolder2) │──virtio-fs───→ │ /home/work/models       │
+│ ...                  │                │                          │
+│ (20-30 virtiofsd)    │                │                          │
+└──────────────────────┘                └────────────────────────┘
+```
+
+**Model B: Per-VM cloned disk + selective virtio-fs** (hybrid)
+
+```
+Host                                     Guest VM
+┌──────────────────────┐                ┌────────────────────────┐
+│ base.qcow2 (template)│                │                          │
+│   └─ clone.qcow2     │──virtio-blk──→│ / (root, includes       │
+│      (CoW thin clone) │                │    krunner, pylibs,     │
+│                       │                │    timezone, etc.)       │
+│                       │                │                          │
+│ virtiofsd (scratch)  │──virtio-fs───→ │ /home/config, /home/work│
+│ virtiofsd (vfolder1) │──virtio-fs───→ │ /home/work/data         │
+│ virtiofsd (vfolder2) │──virtio-fs───→ │ /home/work/models       │
+└──────────────────────┘                └────────────────────────┘
+```
+
+### Trade-off Analysis
+
+| Dimension | Model A (virtio-fs only) | Model B (hybrid) |
+|-----------|-------------------------|-------------------|
+| Host memory overhead | ~300-450 MB per VM (20-30 virtiofsd) | ~30-75 MB per VM (2 + N_vfolders virtiofsd) |
+| Sequential read perf | 85-95% native (no DAX) | Near-native (virtio-blk, host page cache) |
+| Random 4K IOPS | ~85% native (tuned) | Near-native for rootfs; ~85% for vfolders |
+| Bidirectional sharing | Native (inherent to virtio-fs) | Only for virtio-fs mounts (scratch, vfolders) |
+| Config injection | Write to host path → visible in guest | Write to host path → visible only for virtio-fs mounts |
+| Disk space per VM | Zero (shared host paths) | Thin clone overhead (~100-500 MB per VM for CoW writes) |
+| Startup complexity | Low (Kata shim handles) | Medium (template management, clone lifecycle) |
+| Image update rollout | Immediate (host files are live) | Requires template rebuild + new clones |
+
+### Critical Constraint: Bidirectional File Sharing
+
+Backend.AI's architecture relies on the agent writing config files (environ.txt, resource.txt, SSH keys, accelerator configs) to scratch directories **after** container creation — the kernel runner reads these at startup. This requires **bidirectional** host-guest file sharing:
+
+1. Agent writes `scratch_dir/config/environ.txt` on the host
+2. Kernel runner reads `/home/config/environ.txt` inside the guest
+3. User writes files to `/home/work/` inside the guest
+4. VFolder sync reads those files from `scratch_dir/work/` on the host
+
+Block devices (qcow2 clones, virtio-blk) are **guest-local** — the host cannot write to them after the VM boots without offline image manipulation. This means scratch directories and vfolders **must** remain on virtio-fs regardless of what model is chosen for read-only infrastructure mounts.
+
+### Recommended Hybrid Approach
+
+Use block devices for **read-only infrastructure** (VM rootfs, container image, krunner binaries, Python libraries) and virtio-fs for **bidirectional data exchange** (scratch dirs, vfolders):
+
+| Mount Category | Transport | Rationale |
+|---------------|-----------|-----------|
+| VM boot rootfs | virtio-pmem (existing) | Kata default — read-only shared base image |
+| Container OCI image | virtio-blk (devicemapper/EROFS) | Read-only layers; eliminates largest virtiofsd share |
+| krunner + Python libs | Baked into guest rootfs template **or** virtio-blk overlay | Eliminates 15+ individual virtio-fs shares |
+| Timezone | Baked into guest rootfs template | Static config, no runtime changes |
+| Scratch dirs (`/home/config`, `/home/work`) | virtio-fs | Bidirectional sharing required |
+| VFolders | virtio-fs | Bidirectional sharing required |
+
+This reduces the virtiofsd process count from **20-30+** to **2 + N_vfolders** (scratch + one per vfolder), saving ~270-375 MB RSS per VM.
+
+### Implementation Considerations
+
+- **Template lifecycle**: The guest rootfs template containing krunner binaries and Python libraries must be rebuilt when these components are updated. This is analogous to rebuilding a VM template in conventional hypervisor environments. A versioned template naming scheme (`kata-rootfs-{krunner_version}.qcow2`) enables atomic rollover.
+- **devicemapper setup**: Requires a dedicated thin pool on the host (LVM thin provisioning or loopback device). containerd's devicemapper snapshotter handles pool management, but initial setup is more complex than the default overlayfs snapshotter.
+- **EROFS availability**: Requires containerd >= 2.1 and the `nydus-snapshotter` plugin. EROFS support is maturing but not yet the default in most distributions.
+- **Phase 1 recommendation**: Start with Model A (virtio-fs for everything) for simplicity. Transition to the hybrid model in Phase 2 once the basic Kata backend is validated. The mount abstraction change is internal to `KataKernelCreationContext` — no API or scheduler changes needed.
