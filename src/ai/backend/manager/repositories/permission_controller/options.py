@@ -814,6 +814,13 @@ class ScopedPermissionConditions:
 
         return inner
 
+    @staticmethod
+    def by_role_ids(role_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.role_id.in_(role_ids)
+
+        return inner
+
 
 class ScopedPermissionOrders:
     """Query orders for scoped permissions."""
