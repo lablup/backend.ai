@@ -103,35 +103,42 @@ class TestInferenceModelFolderRule:
             rule.validate(spec, basic_context)
         assert "model-type virtual folder" in str(exc_info.value)
 
-    def test_inference_custom_variant_without_model_folder_passes(
+    def test_inference_custom_variant_without_model_folder_raises(
         self,
         basic_context: SessionCreationContext,
         session_spec_factory: Callable[..., SessionCreationSpec],
     ) -> None:
-        """INFERENCE session with runtime_variant=custom should pass even without model folder."""
+        """INFERENCE session with runtime_variant=custom should also require a model folder."""
         rule = InferenceModelFolderRule()
         spec = session_spec_factory(
             session_type=SessionTypes.INFERENCE,
             creation_spec={"runtime_variant": "custom"},
         )
 
-        rule.validate(spec, basic_context)
-
-    def test_inference_no_runtime_variant_without_model_folder_raises(
-        self,
-        basic_context: SessionCreationContext,
-        session_spec_factory: Callable[..., SessionCreationSpec],
-    ) -> None:
-        """INFERENCE session with runtime_variant=None should still require a model folder."""
-        rule = InferenceModelFolderRule()
-        spec = session_spec_factory(
-            session_type=SessionTypes.INFERENCE,
-            creation_spec={},
-        )
-
         with pytest.raises(InvalidAPIParameters) as exc_info:
             rule.validate(spec, basic_context)
         assert "model-type virtual folder" in str(exc_info.value)
+
+    def test_inference_custom_variant_with_model_folder_passes(
+        self,
+        session_spec_factory: Callable[..., SessionCreationSpec],
+    ) -> None:
+        """INFERENCE session with runtime_variant=custom and a model folder should pass."""
+        rule = InferenceModelFolderRule()
+        spec = session_spec_factory(
+            session_type=SessionTypes.INFERENCE,
+            creation_spec={"runtime_variant": "custom"},
+        )
+        context = SessionCreationContext(
+            scaling_group_network=ScalingGroupNetworkInfo(use_host_network=False),
+            allowed_scaling_groups=[],
+            image_infos={},
+            vfolder_mounts=[_make_vfolder_mount(VFolderUsageMode.MODEL, "my-model")],
+            dotfile_data={},
+            container_user_info=ContainerUserInfo(),
+        )
+
+        rule.validate(spec, context)
 
     def test_inference_with_general_folder_only_raises(
         self,
