@@ -245,7 +245,6 @@ class TestUpdateRoute:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_update_route(
         self,
         scenario: ScenarioBase[UpdateRouteAction, UpdateRouteActionResult],
@@ -310,7 +309,6 @@ class TestUpdateRoute:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_update_route_failure(
         self,
         scenario: ScenarioBase[UpdateRouteAction, Exception],
@@ -336,7 +334,6 @@ class TestUpdateRoute:
 
         await scenario.test(update_route)
 
-    @pytest.mark.asyncio
     async def test_update_route_appproxy_failure(
         self,
         user_data: UserData,

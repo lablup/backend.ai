@@ -29,7 +29,6 @@ from .conftest import ImageFactoryHelper
 
 
 class TestImageSearch:
-    @pytest.mark.asyncio
     async def test_admin_searches_images(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -43,7 +42,6 @@ class TestImageSearch:
         found_ids = [item.id for item in result.items]
         assert image_id in found_ids
 
-    @pytest.mark.asyncio
     async def test_search_with_name_filter(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -66,7 +64,6 @@ class TestImageSearch:
         assert other_id in found_ids
         assert image_id not in found_ids
 
-    @pytest.mark.asyncio
     async def test_search_with_ordering(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -92,7 +89,6 @@ class TestImageSearch:
         timestamps = [item.created_at for item in result.items if item.created_at is not None]
         assert timestamps == sorted(timestamps, reverse=True)
 
-    @pytest.mark.asyncio
     async def test_search_with_pagination(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -111,7 +107,6 @@ class TestImageSearch:
 
 
 class TestImageGet:
-    @pytest.mark.asyncio
     async def test_admin_gets_image_by_id(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -125,7 +120,6 @@ class TestImageGet:
         assert result.item.architecture == "x86_64"
         assert result.item.status == "ALIVE"
 
-    @pytest.mark.asyncio
     async def test_get_nonexistent_image_returns_not_found(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -137,7 +131,6 @@ class TestImageGet:
 
 
 class TestImageAlias:
-    @pytest.mark.asyncio
     async def test_admin_aliases_image(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -156,7 +149,6 @@ class TestImageAlias:
 
 
 class TestImageDealias:
-    @pytest.mark.asyncio
     async def test_admin_dealiases_image(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -179,7 +171,6 @@ class TestImageDealias:
 
 
 class TestImageForget:
-    @pytest.mark.asyncio
     async def test_admin_forgets_image(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -196,7 +187,6 @@ class TestImageForget:
 
 
 class TestImagePurge:
-    @pytest.mark.asyncio
     async def test_admin_purges_image(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -215,7 +205,6 @@ class TestImagePurge:
 
 
 class TestImagePermissions:
-    @pytest.mark.asyncio
     @pytest.mark.xfail(
         reason="Handler may return 400 instead of 403 depending on middleware chain",
         strict=False,
@@ -229,7 +218,6 @@ class TestImagePermissions:
         with pytest.raises(PermissionDeniedError):
             await user_registry.image.search(SearchImagesRequest())
 
-    @pytest.mark.asyncio
     @pytest.mark.xfail(
         reason="Handler may return 400 instead of 403 depending on middleware chain",
         strict=False,

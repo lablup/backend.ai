@@ -539,7 +539,6 @@ class TestCreateModelService:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_create_model_service(
         self,
         scenario: ScenarioBase[CreateModelServiceAction, CreateModelServiceActionResult],
@@ -841,7 +840,6 @@ class TestCreateWithServiceDefinitionOverrides:
             ),
         )
 
-    @pytest.mark.asyncio
     async def test_service_definition_overrides_applied(
         self,
         model_serving_processors: ModelServingProcessors,

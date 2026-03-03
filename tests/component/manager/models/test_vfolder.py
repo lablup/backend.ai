@@ -134,7 +134,6 @@ FIXTURES = [
 ]
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "extra_fixtures",
     FIXTURES,

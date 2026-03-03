@@ -23,7 +23,6 @@ from .conftest import UserFactory
 
 @pytest.mark.integration
 class TestUserLifecycle:
-    @pytest.mark.asyncio
     async def test_full_user_lifecycle(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -73,7 +72,6 @@ class TestUserLifecycle:
         after_delete = await admin_registry.user.get(user_id)
         assert after_delete.user.status == UserStatus.DELETED
 
-    @pytest.mark.asyncio
     async def test_create_and_purge_user(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -92,7 +90,6 @@ class TestUserLifecycle:
 
 @pytest.mark.integration
 class TestUserPermissionVerification:
-    @pytest.mark.asyncio
     async def test_regular_user_denied_all_admin_endpoints(
         self,
         admin_registry: BackendAIClientRegistry,

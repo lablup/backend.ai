@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIAuthClient
@@ -60,7 +59,6 @@ _SAMPLE_PERMISSIONS = [
 
 
 class TestACLClient:
-    @pytest.mark.asyncio
     async def test_get_permissions(self) -> None:
         resp = _json_response({
             "vfolder_host_permission_list": _SAMPLE_PERMISSIONS,
@@ -77,7 +75,6 @@ class TestACLClient:
         assert url.endswith("/acl")
         assert body is None
 
-    @pytest.mark.asyncio
     async def test_get_permissions_empty_list(self) -> None:
         resp = _json_response({
             "vfolder_host_permission_list": [],

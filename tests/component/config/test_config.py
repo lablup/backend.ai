@@ -47,7 +47,6 @@ _HMAC_QUERY_PARAM_XFAIL = pytest.mark.xfail(
 
 
 class TestUserDotfileCreate:
-    @pytest.mark.asyncio
     async def test_admin_creates_user_dotfile(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -61,7 +60,6 @@ class TestUserDotfileCreate:
         )
         assert isinstance(result, CreateDotfileResponse)
 
-    @pytest.mark.asyncio
     async def test_create_duplicate_user_dotfile_fails(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -75,7 +73,6 @@ class TestUserDotfileCreate:
                 CreateUserDotfileRequest(path=path, data="second", permission="644")
             )
 
-    @pytest.mark.asyncio
     async def test_regular_user_creates_own_dotfile(
         self,
         user_registry: BackendAIClientRegistry,
@@ -92,7 +89,6 @@ class TestUserDotfileCreate:
 
 class TestUserDotfileGet:
     @_HMAC_QUERY_PARAM_XFAIL
-    @pytest.mark.asyncio
     async def test_admin_gets_user_dotfile(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -108,7 +104,6 @@ class TestUserDotfileGet:
         assert result.perm == "600"
 
     @_HMAC_QUERY_PARAM_XFAIL
-    @pytest.mark.asyncio
     async def test_admin_lists_user_dotfiles(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -125,7 +120,6 @@ class TestUserDotfileGet:
         assert f".list-b-{unique2}" in paths
 
     @_HMAC_QUERY_PARAM_XFAIL
-    @pytest.mark.asyncio
     async def test_get_nonexistent_user_dotfile(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -138,7 +132,6 @@ class TestUserDotfileGet:
 
 class TestUserDotfileUpdate:
     @_HMAC_QUERY_PARAM_XFAIL
-    @pytest.mark.asyncio
     async def test_admin_updates_user_dotfile(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -156,7 +149,6 @@ class TestUserDotfileUpdate:
         assert get_result.data == "updated-data"
         assert get_result.perm == "755"
 
-    @pytest.mark.asyncio
     async def test_update_nonexistent_user_dotfile_fails(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -169,7 +161,6 @@ class TestUserDotfileUpdate:
 
 class TestUserDotfileDelete:
     @_HMAC_QUERY_PARAM_XFAIL
-    @pytest.mark.asyncio
     async def test_admin_deletes_user_dotfile(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -187,7 +178,6 @@ class TestUserDotfileDelete:
         with pytest.raises(NotFoundError):
             await admin_registry.config.get_user_dotfile(GetUserDotfileRequest(path=path))
 
-    @pytest.mark.asyncio
     async def test_delete_nonexistent_user_dotfile_fails(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -204,7 +194,6 @@ class TestUserDotfileDelete:
 
 
 class TestBootstrapScript:
-    @pytest.mark.asyncio
     async def test_get_bootstrap_script_default_empty(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -213,7 +202,6 @@ class TestBootstrapScript:
         assert isinstance(result, GetBootstrapScriptResponse)
         assert result.script == ""
 
-    @pytest.mark.asyncio
     async def test_update_and_get_bootstrap_script(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -236,7 +224,6 @@ class TestBootstrapScript:
 
 
 class TestGroupDotfileCreate:
-    @pytest.mark.asyncio
     async def test_admin_creates_group_dotfile(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -250,7 +237,6 @@ class TestGroupDotfileCreate:
         )
         assert isinstance(result, CreateDotfileResponse)
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_create_group_dotfile(
         self,
         user_registry: BackendAIClientRegistry,
@@ -270,7 +256,6 @@ class TestGroupDotfileCreate:
 
 class TestGroupDotfileGet:
     @_HMAC_QUERY_PARAM_XFAIL
-    @pytest.mark.asyncio
     async def test_admin_gets_group_dotfile(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -289,7 +274,6 @@ class TestGroupDotfileGet:
         assert result.perm == "600"
 
     @_HMAC_QUERY_PARAM_XFAIL
-    @pytest.mark.asyncio
     async def test_admin_lists_group_dotfiles(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -311,7 +295,6 @@ class TestGroupDotfileGet:
 
 class TestGroupDotfileUpdate:
     @_HMAC_QUERY_PARAM_XFAIL
-    @pytest.mark.asyncio
     async def test_admin_updates_group_dotfile(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -339,7 +322,6 @@ class TestGroupDotfileUpdate:
 
 class TestGroupDotfileDelete:
     @_HMAC_QUERY_PARAM_XFAIL
-    @pytest.mark.asyncio
     async def test_admin_deletes_group_dotfile(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -366,7 +348,6 @@ class TestGroupDotfileDelete:
 
 
 class TestDomainDotfileCreate:
-    @pytest.mark.asyncio
     async def test_admin_creates_domain_dotfile(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -380,7 +361,6 @@ class TestDomainDotfileCreate:
         )
         assert isinstance(result, CreateDotfileResponse)
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_create_domain_dotfile(
         self,
         user_registry: BackendAIClientRegistry,
@@ -400,7 +380,6 @@ class TestDomainDotfileCreate:
 
 class TestDomainDotfileGet:
     @_HMAC_QUERY_PARAM_XFAIL
-    @pytest.mark.asyncio
     async def test_admin_gets_domain_dotfile(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -419,7 +398,6 @@ class TestDomainDotfileGet:
         assert result.perm == "600"
 
     @_HMAC_QUERY_PARAM_XFAIL
-    @pytest.mark.asyncio
     async def test_admin_lists_domain_dotfiles(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -441,7 +419,6 @@ class TestDomainDotfileGet:
 
 class TestDomainDotfileUpdate:
     @_HMAC_QUERY_PARAM_XFAIL
-    @pytest.mark.asyncio
     async def test_admin_updates_domain_dotfile(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -469,7 +446,6 @@ class TestDomainDotfileUpdate:
 
 class TestDomainDotfileDelete:
     @_HMAC_QUERY_PARAM_XFAIL
-    @pytest.mark.asyncio
     async def test_admin_deletes_domain_dotfile(
         self,
         admin_registry: BackendAIClientRegistry,

@@ -14,7 +14,6 @@ from .conftest import ArtifactFactory, ArtifactFixtureData
 
 @pytest.mark.integration
 class TestArtifactUpdateLifecycle:
-    @pytest.mark.asyncio
     async def test_update_artifact_readonly_and_description(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -60,7 +59,6 @@ class TestArtifactUpdateLifecycle:
         assert row.readonly is True
         assert row.description == "Final description"
 
-    @pytest.mark.asyncio
     async def test_update_artifact_with_multiple_seeds(
         self,
         admin_registry: BackendAIClientRegistry,

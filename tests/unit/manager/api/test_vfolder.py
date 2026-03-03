@@ -16,7 +16,6 @@ from ai.backend.manager.models.vfolder import (
 )
 
 
-@pytest.mark.asyncio
 async def test_uuid_or_name_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_resolver = AsyncMock()
     monkeypatch.setattr(vfolder, "resolve_vfolder_rows", mock_resolver)

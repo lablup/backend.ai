@@ -26,7 +26,6 @@ def dummy_path() -> Iterator[Path]:
         yield tmpdir_path
 
 
-@pytest.mark.asyncio
 async def test_scan_tree(dummy_path: Path) -> None:
     fsop_model = BaseFSOpModel(dummy_path, 10)
 
@@ -59,7 +58,6 @@ async def test_scan_tree(dummy_path: Path) -> None:
     assert "x.txt" in names
 
 
-@pytest.mark.asyncio
 async def test_scan_tree_with_limit(dummy_path: Path) -> None:
     fsop_model = BaseFSOpModel(dummy_path, 5)
 

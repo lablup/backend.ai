@@ -1026,7 +1026,6 @@ class TestMultiClusterScenarios:
             assert kernel.image == "llm:server"
 
 
-@pytest.mark.asyncio
 class TestMarkSessionsForTermination:
     """Test cases for SchedulingController.mark_sessions_for_termination"""
 

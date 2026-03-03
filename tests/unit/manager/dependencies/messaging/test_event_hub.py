@@ -10,7 +10,6 @@ from ai.backend.manager.dependencies.messaging.event_hub import EventHubDependen
 class TestEventHubDependency:
     """Test EventHubDependency lifecycle."""
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.messaging.event_hub.EventHub")
     async def test_provide_event_hub(self, mock_hub_class: MagicMock) -> None:
         """Dependency should create and shut down event hub."""
@@ -27,7 +26,6 @@ class TestEventHubDependency:
         # Event hub should be shut down after context exit
         mock_hub.shutdown.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.messaging.event_hub.EventHub")
     async def test_cleanup_on_exception(self, mock_hub_class: MagicMock) -> None:
         """Dependency should shut down event hub even on exception."""

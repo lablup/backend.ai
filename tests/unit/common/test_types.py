@@ -16,7 +16,6 @@ from ai.backend.common.types import (
 )
 
 
-@pytest.mark.asyncio
 async def test_aobject() -> None:
     init_count = 0
     ainit_count = 0

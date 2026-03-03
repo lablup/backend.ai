@@ -23,7 +23,6 @@ class TestNetworkPluginDependency:
         dep = NetworkPluginDependency()
         assert dep.stage_name == "network-plugin"
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.plugins.network.NetworkPluginContext")
     async def test_provide_initializes_and_yields_context(self, mock_ctx_class: MagicMock) -> None:
         plugins_input = _make_plugins_input()
@@ -46,7 +45,6 @@ class TestNetworkPluginDependency:
 
         mock_ctx.cleanup.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.plugins.network.NetworkPluginContext")
     async def test_cleanup_on_exception(self, mock_ctx_class: MagicMock) -> None:
         plugins_input = _make_plugins_input()

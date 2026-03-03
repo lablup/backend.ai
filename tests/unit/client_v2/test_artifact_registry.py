@@ -6,7 +6,6 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIAuthClient
@@ -118,7 +117,6 @@ _SAMPLE_ARTIFACT_WITH_REVISIONS_DTO = {
 
 
 class TestScanOperations:
-    @pytest.mark.asyncio
     async def test_scan_artifacts(self) -> None:
         resp = _json_response({"artifacts": [_SAMPLE_ARTIFACT_DTO]})
         mock_session = _make_request_session(resp)
@@ -142,7 +140,6 @@ class TestScanOperations:
         assert body["limit"] == 50
         assert body["search"] == "DialoGPT"
 
-    @pytest.mark.asyncio
     async def test_delegate_scan_artifacts(self) -> None:
         resp = _json_response({
             "artifacts": [_SAMPLE_ARTIFACT_DTO],
@@ -175,7 +172,6 @@ class TestScanOperations:
             _SAMPLE_DELEGATEE_RESERVOIR_ID
         )
 
-    @pytest.mark.asyncio
     async def test_delegate_import_artifacts(self) -> None:
         resp = _json_response({
             "tasks": [
@@ -208,7 +204,6 @@ class TestScanOperations:
 
 
 class TestSearchOperations:
-    @pytest.mark.asyncio
     async def test_search_artifacts(self) -> None:
         resp = _json_response({"artifacts": [_SAMPLE_ARTIFACT_DTO]})
         mock_session = _make_request_session(resp)
@@ -231,7 +226,6 @@ class TestSearchOperations:
 
 
 class TestModelScanning:
-    @pytest.mark.asyncio
     async def test_scan_single_model(self) -> None:
         resp = _json_response({"artifact": _SAMPLE_ARTIFACT_WITH_REVISIONS_DTO})
         mock_session = _make_request_session(resp)
@@ -251,7 +245,6 @@ class TestModelScanning:
         assert "/artifact-registries/model/microsoft/DialoGPT-medium" in url
         assert body is None
 
-    @pytest.mark.asyncio
     async def test_scan_single_model_minimal(self) -> None:
         resp = _json_response({"artifact": _SAMPLE_ARTIFACT_WITH_REVISIONS_DTO})
         mock_session = _make_request_session(resp)
@@ -267,7 +260,6 @@ class TestModelScanning:
         _, kwargs = mock_session.request.call_args
         assert kwargs.get("params") == {}
 
-    @pytest.mark.asyncio
     async def test_scan_models_batch(self) -> None:
         resp = _json_response({"artifacts": [_SAMPLE_ARTIFACT_DTO]})
         mock_session = _make_request_session(resp)

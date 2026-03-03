@@ -198,7 +198,6 @@ class TestModifyAutoScalingRule:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_modify_auto_scaling_rule(
         self,
         scenario: ScenarioBase[

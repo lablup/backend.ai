@@ -26,7 +26,6 @@ from ai.backend.manager.models.agent import agents
 
 
 class TestAppendErrorLog:
-    @pytest.mark.asyncio
     async def test_admin_appends_error_log(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -43,7 +42,6 @@ class TestAppendErrorLog:
         assert isinstance(result, AppendErrorLogResponse)
         assert result.success is True
 
-    @pytest.mark.asyncio
     async def test_user_appends_error_log(
         self,
         user_registry: BackendAIClientRegistry,
@@ -62,7 +60,6 @@ class TestAppendErrorLog:
 
 
 class TestListErrorLogs:
-    @pytest.mark.asyncio
     async def test_admin_lists_error_logs_default(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -89,7 +86,6 @@ class TestListErrorLogs:
             " cause 401."
         ),
     )
-    @pytest.mark.asyncio
     async def test_admin_lists_error_logs_with_params(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -99,7 +95,6 @@ class TestListErrorLogs:
         )
         assert isinstance(result, ListErrorLogsResponse)
 
-    @pytest.mark.asyncio
     async def test_user_lists_own_error_logs(
         self,
         user_registry: BackendAIClientRegistry,
@@ -120,7 +115,6 @@ class TestListErrorLogs:
 
 
 class TestClearErrorLog:
-    @pytest.mark.asyncio
     async def test_admin_clears_error_log(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -144,7 +138,6 @@ class TestClearErrorLog:
 
 
 class TestGetManagerStatus:
-    @pytest.mark.asyncio
     async def test_admin_gets_manager_status(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -156,7 +149,6 @@ class TestGetManagerStatus:
 
 
 class TestUpdateManagerStatus:
-    @pytest.mark.asyncio
     async def test_superadmin_updates_manager_status(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -171,7 +163,6 @@ class TestUpdateManagerStatus:
 
 
 class TestGetAnnouncement:
-    @pytest.mark.asyncio
     async def test_admin_gets_announcement(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -183,7 +174,6 @@ class TestGetAnnouncement:
 
 
 class TestUpdateAnnouncement:
-    @pytest.mark.asyncio
     async def test_superadmin_updates_announcement(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -204,7 +194,6 @@ class TestUpdateAnnouncement:
 
 
 class TestPerformSchedulerOps:
-    @pytest.mark.asyncio
     async def test_superadmin_excludes_agents(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -223,7 +212,6 @@ class TestPerformSchedulerOps:
             )
             assert result.scalar_one() is False
 
-    @pytest.mark.asyncio
     async def test_superadmin_includes_agents(
         self,
         admin_registry: BackendAIClientRegistry,

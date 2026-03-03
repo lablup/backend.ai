@@ -295,7 +295,6 @@ class TestRouteRegistryAutoWrapping:
         route = registry.add("GET", "/test", _dummy_handler)
         assert id(route.handler) != id(_dummy_handler)
 
-    @pytest.mark.asyncio
     async def test_wrapped_handler_parses_body(self) -> None:
         """_wrap_api_handler should parse BodyParam from request JSON body."""
 
@@ -322,7 +321,6 @@ class TestRouteRegistryAutoWrapping:
         assert body["name"] == "Alice"
         assert body["email"] == "alice@example.com"
 
-    @pytest.mark.asyncio
     async def test_wrapped_handler_converts_api_response(self) -> None:
         """_wrap_api_handler should convert APIResponse to web.Response with correct status and body."""
 
@@ -342,7 +340,6 @@ class TestRouteRegistryAutoWrapping:
         body = json.loads(response.body)
         assert body["handler"] == "health"
 
-    @pytest.mark.asyncio
     async def test_middleware_param_extracted(self) -> None:
         """_wrap_api_handler should call from_request() for MiddlewareParam subclasses."""
 
@@ -362,7 +359,6 @@ class TestRouteRegistryAutoWrapping:
         body = json.loads(response.body)
         assert body["handler"] == "test-user-123"
 
-    @pytest.mark.asyncio
     async def test_no_params_handler_works(self) -> None:
         """Handlers with no parameters should work correctly."""
 

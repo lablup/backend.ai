@@ -82,7 +82,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metadata_returns_metric_names(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -101,7 +100,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metadata_empty_result(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -118,7 +116,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metadata_propagates_connection_error(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -145,7 +142,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_gauge_returns_correct_result(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -185,7 +181,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_rate_returns_correct_result(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -229,7 +224,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_diff_returns_correct_result(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -272,7 +266,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_by_project(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -312,7 +305,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_by_user(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -353,7 +345,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_with_multiple_labels(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -383,7 +374,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         mock_prometheus_client.query_range = AsyncMock(return_value=_make_query_range_response([]))
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_empty_result(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -410,7 +400,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_propagates_failed_to_get_metric(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -433,7 +422,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_propagates_connection_error(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -467,7 +455,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_capacity_value_type(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -602,7 +589,6 @@ class TestTimewindowInitialization:
             ("cpu_util", ValueType.CURRENT),  # DIFF
         ],
     )
-    @pytest.mark.asyncio
     async def test_timewindow_applied_to_preset(
         self, mock_prometheus_client: MagicMock, metric_name: str, value_type: ValueType
     ) -> None:
@@ -768,7 +754,6 @@ class TestBuildPreset:
         ],
         ids=lambda c: c.id,
     )
-    @pytest.mark.asyncio
     async def test_build_preset_renders_expected_query(
         self, mock_prometheus_client: MagicMock, case: BuildPresetTestCase
     ) -> None:

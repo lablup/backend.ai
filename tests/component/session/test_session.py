@@ -21,7 +21,6 @@ from .conftest import SessionSeedData
 
 
 class TestSessionGetInfo:
-    @pytest.mark.asyncio
     async def test_admin_gets_session_info(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -35,7 +34,6 @@ class TestSessionGetInfo:
         assert result.root["status"] == "RUNNING"
         assert result.root["domainName"] == session_seed.domain_name
 
-    @pytest.mark.asyncio
     async def test_get_nonexistent_session_returns_not_found(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -45,7 +43,6 @@ class TestSessionGetInfo:
 
 
 class TestSessionRename:
-    @pytest.mark.asyncio
     async def test_admin_renames_session(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -61,7 +58,6 @@ class TestSessionRename:
         assert isinstance(result, GetSessionInfoResponse)
         assert result.root["status"] == "RUNNING"
 
-    @pytest.mark.asyncio
     async def test_rename_nonexistent_session_returns_not_found(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -78,7 +74,6 @@ class TestSessionMatchSessions:
         strict=False,
         reason="match_sessions query param conflicts with HMAC signing - SDK signing bug",
     )
-    @pytest.mark.asyncio
     async def test_admin_matches_sessions_by_name(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -96,7 +91,6 @@ class TestSessionMatchSessions:
         strict=False,
         reason="match_sessions query param conflicts with HMAC signing - SDK signing bug",
     )
-    @pytest.mark.asyncio
     async def test_match_returns_empty_for_unknown_name(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -109,7 +103,6 @@ class TestSessionMatchSessions:
 
 
 class TestSessionGetStatusHistory:
-    @pytest.mark.asyncio
     async def test_admin_gets_status_history(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -122,7 +115,6 @@ class TestSessionGetStatusHistory:
         # The result dict should contain status history entries
         assert isinstance(result.result, dict)
 
-    @pytest.mark.asyncio
     async def test_get_status_history_nonexistent_session(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -134,7 +126,6 @@ class TestSessionGetStatusHistory:
 
 
 class TestSessionDestroy:
-    @pytest.mark.asyncio
     async def test_admin_destroys_session(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -146,7 +137,6 @@ class TestSessionDestroy:
         )
         assert isinstance(result, DestroySessionResponse)
 
-    @pytest.mark.asyncio
     async def test_destroy_nonexistent_session_returns_not_found(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -159,7 +149,6 @@ class TestSessionDestroy:
 
 
 class TestSessionGetContainerLogs:
-    @pytest.mark.asyncio
     async def test_admin_gets_container_logs_for_terminated_session(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -171,7 +160,6 @@ class TestSessionGetContainerLogs:
         assert isinstance(result, GetContainerLogsResponse)
         assert isinstance(result.result, dict)
 
-    @pytest.mark.asyncio
     async def test_get_container_logs_nonexistent_session(
         self,
         admin_registry: BackendAIClientRegistry,

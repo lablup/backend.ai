@@ -34,7 +34,6 @@ class TestRedisProvider:
         session_config = SessionConfig(redis=redis_config)  # type: ignore[call-arg]
         return WebServerUnifiedConfig(session=session_config)  # type: ignore[call-arg]
 
-    @pytest.mark.asyncio
     async def test_provide_redis_client(
         self,
         web_config: WebServerUnifiedConfig,
@@ -48,7 +47,6 @@ class TestRedisProvider:
             server_time = await client.get_server_time_second()
             assert server_time > 0
 
-    @pytest.mark.asyncio
     async def test_cleanup_on_exception(
         self,
         web_config: WebServerUnifiedConfig,
@@ -64,7 +62,6 @@ class TestRedisProvider:
         # Client should be closed - we can't easily verify this,
         # but the test should complete without hanging
 
-    @pytest.mark.asyncio
     async def test_stage_name(self) -> None:
         """Provider should have correct stage name."""
         provider = RedisProvider()

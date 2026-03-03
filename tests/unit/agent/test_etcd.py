@@ -76,7 +76,6 @@ class TestAgentEtcdClientViewInitialization:
 
 
 class TestPutOperations:
-    @pytest.mark.asyncio
     async def test_put(
         self,
         agent_etcd_view: AgentEtcdClientView,
@@ -92,7 +91,6 @@ class TestPutOperations:
         result = await agent_etcd_view.get(key, scope=scope)
         assert result == val
 
-    @pytest.mark.asyncio
     async def test_put_with_different_scopes(
         self,
         agent_etcd_view: AgentEtcdClientView,
@@ -113,7 +111,6 @@ class TestPutOperations:
         assert await agent_etcd_view.get(key, scope=ConfigScopes.SGROUP) == sgroup_val
         assert await agent_etcd_view.get(key, scope=ConfigScopes.NODE) == node_val
 
-    @pytest.mark.asyncio
     async def test_put_prefix(
         self,
         agent_etcd_view: AgentEtcdClientView,
@@ -133,7 +130,6 @@ class TestPutOperations:
         assert isinstance(nested, dict)
         assert nested.get("key") == "value"
 
-    @pytest.mark.asyncio
     async def test_put_dict(
         self,
         agent_etcd_view: AgentEtcdClientView,
@@ -150,7 +146,6 @@ class TestPutOperations:
 
 
 class TestGetOperations:
-    @pytest.mark.asyncio
     async def test_get(
         self,
         agent_etcd_view: AgentEtcdClientView,
@@ -164,7 +159,6 @@ class TestGetOperations:
 
         assert result == expected_value
 
-    @pytest.mark.asyncio
     async def test_get_with_scope(
         self,
         agent_etcd_view: AgentEtcdClientView,
@@ -196,7 +190,6 @@ class TestGetOperations:
         result_sgroup_after = await agent_etcd_view.get(key, scope=ConfigScopes.SGROUP)
         assert result_sgroup_after == sgroup_value
 
-    @pytest.mark.asyncio
     async def test_get_prefix(
         self,
         agent_etcd_view: AgentEtcdClientView,
@@ -219,7 +212,6 @@ class TestGetOperations:
 
 
 class TestReplaceOperation:
-    @pytest.mark.asyncio
     async def test_replace(
         self,
         agent_etcd_view: AgentEtcdClientView,
@@ -235,7 +227,6 @@ class TestReplaceOperation:
         assert result is True
         assert await agent_etcd_view.get(key) == new_val
 
-    @pytest.mark.asyncio
     async def test_replace_with_scope(
         self,
         agent_etcd_view: AgentEtcdClientView,
@@ -252,7 +243,6 @@ class TestReplaceOperation:
         assert result is True
         assert await agent_etcd_view.get(key, scope=scope) == new_val
 
-    @pytest.mark.asyncio
     async def test_replace_with_wrong_initial_value(
         self,
         agent_etcd_view: AgentEtcdClientView,
@@ -272,7 +262,6 @@ class TestReplaceOperation:
 
 
 class TestDeleteOperations:
-    @pytest.mark.asyncio
     async def test_delete(
         self,
         agent_etcd_view: AgentEtcdClientView,
@@ -287,7 +276,6 @@ class TestDeleteOperations:
         result = await agent_etcd_view.get(key)
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_delete_with_scope(
         self,
         agent_etcd_view: AgentEtcdClientView,
@@ -303,7 +291,6 @@ class TestDeleteOperations:
         result = await agent_etcd_view.get(key, scope=scope)
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_delete_multi(
         self,
         agent_etcd_view: AgentEtcdClientView,
@@ -320,7 +307,6 @@ class TestDeleteOperations:
             result = await agent_etcd_view.get(key)
             assert result is None
 
-    @pytest.mark.asyncio
     async def test_delete_prefix(
         self,
         agent_etcd_view: AgentEtcdClientView,
@@ -343,7 +329,6 @@ class TestDeleteOperations:
 
 
 class TestConfigContainerUpdates:
-    @pytest.mark.asyncio
     async def test_config_container_updates_reflect_in_scope_prefix_map(
         self,
         etcd: AsyncEtcd,

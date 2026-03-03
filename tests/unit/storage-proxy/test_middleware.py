@@ -1,14 +1,12 @@
 from typing import Any
 
 import aiohttp
-import pytest
 from aiohttp import web
 
 from ai.backend.storage.api.manager import token_auth_middleware
 
 
 class TestStorageManagerAPIMiddleware:
-    @pytest.mark.asyncio
     async def test_auth_token_middleware_return_json_body_response(
         self, aiohttp_client: Any
     ) -> None:

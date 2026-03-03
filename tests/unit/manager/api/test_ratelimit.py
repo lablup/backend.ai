@@ -83,7 +83,6 @@ class TestRlimMiddleware:
         request.__getitem__ = MagicMock(side_effect=getitem)
         return request
 
-    @pytest.mark.asyncio
     async def test_anonymous_query_returns_default_headers(
         self,
         mock_app: web.Application,
@@ -104,7 +103,6 @@ class TestRlimMiddleware:
         mock_valkey_client = mock_app["ratelimit.context"].valkey_rate_limit_client
         mock_valkey_client.execute_rate_limit_logic.assert_not_called()
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "test_case",
         [
@@ -171,7 +169,6 @@ class TestRlimMiddleware:
             window=_rlim_window,
         )
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "test_case",
         [

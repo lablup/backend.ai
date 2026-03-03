@@ -38,7 +38,6 @@ class TestBackendAIClientRegistry:
         client = BackendAIAuthClient(config, MockAuth(), mock_session)
         return BackendAIClientRegistry(client)
 
-    @pytest.mark.asyncio
     async def test_create_factory(self) -> None:
         config = ClientConfig(endpoint=URL("https://api.example.com"))
         with patch("ai.backend.client.v2.base_client.aiohttp.ClientSession") as mock_cls:
@@ -81,7 +80,6 @@ class TestBackendAIClientRegistry:
     ) -> None:
         assert id(registry.session) != id(registry.vfolder)
 
-    @pytest.mark.asyncio
     async def test_close_delegates_to_client(self) -> None:
         mock_session = AsyncMock()
         config = ClientConfig(endpoint=URL("https://api.example.com"))

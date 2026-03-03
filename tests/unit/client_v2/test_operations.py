@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIAuthClient
@@ -49,7 +48,6 @@ def _make_ops_client(mock_session: MagicMock) -> OperationsClient:
 
 
 class TestAppendErrorLog:
-    @pytest.mark.asyncio
     async def test_sends_post_with_body(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -72,7 +70,6 @@ class TestAppendErrorLog:
         assert isinstance(result, AppendErrorLogResponse)
         assert result.success is True
 
-    @pytest.mark.asyncio
     async def test_serializes_all_fields(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -102,7 +99,6 @@ class TestAppendErrorLog:
 
 
 class TestListErrorLogs:
-    @pytest.mark.asyncio
     async def test_sends_get_with_query_params(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -122,7 +118,6 @@ class TestListErrorLogs:
         assert call_kwargs["params"]["mark_read"] == "True"
         assert isinstance(result, ListErrorLogsResponse)
 
-    @pytest.mark.asyncio
     async def test_works_without_request(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -134,7 +129,6 @@ class TestListErrorLogs:
         assert isinstance(result, ListErrorLogsResponse)
         assert result.count == 0
 
-    @pytest.mark.asyncio
     async def test_deserializes_log_items(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -169,7 +163,6 @@ class TestListErrorLogs:
 
 
 class TestClearErrorLog:
-    @pytest.mark.asyncio
     async def test_interpolates_log_id_in_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -187,7 +180,6 @@ class TestClearErrorLog:
 
 
 class TestGetManagerStatus:
-    @pytest.mark.asyncio
     async def test_sends_get_and_deserializes(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -225,7 +217,6 @@ class TestGetManagerStatus:
 
 
 class TestUpdateManagerStatus:
-    @pytest.mark.asyncio
     async def test_sends_put_with_body(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 204
@@ -247,7 +238,6 @@ class TestUpdateManagerStatus:
 
 
 class TestGetAnnouncement:
-    @pytest.mark.asyncio
     async def test_sends_get_and_deserializes(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -266,7 +256,6 @@ class TestGetAnnouncement:
 
 
 class TestUpdateAnnouncement:
-    @pytest.mark.asyncio
     async def test_sends_post_with_body(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 204
@@ -288,7 +277,6 @@ class TestUpdateAnnouncement:
 
 
 class TestPerformSchedulerOps:
-    @pytest.mark.asyncio
     async def test_sends_post_with_body(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 204

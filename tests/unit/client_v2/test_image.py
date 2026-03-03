@@ -3,7 +3,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIAuthClient
@@ -80,7 +79,6 @@ def _make_image_client(mock_session: MagicMock) -> ImageClient:
 
 
 class TestSearchImages:
-    @pytest.mark.asyncio
     async def test_happy_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -106,7 +104,6 @@ class TestSearchImages:
         assert result.items[0].architecture == "x86_64"
         assert result.pagination.total == 1
 
-    @pytest.mark.asyncio
     async def test_with_name_filter(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -131,7 +128,6 @@ class TestSearchImages:
         assert body["filter"]["name"]["contains"] == "python"
         assert isinstance(result, SearchImagesResponse)
 
-    @pytest.mark.asyncio
     async def test_with_ordering(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -164,7 +160,6 @@ class TestSearchImages:
 
 
 class TestGetImage:
-    @pytest.mark.asyncio
     async def test_happy_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -190,7 +185,6 @@ class TestGetImage:
 
 
 class TestRescanImages:
-    @pytest.mark.asyncio
     async def test_happy_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -220,7 +214,6 @@ class TestRescanImages:
         assert result.item.id == _SAMPLE_IMAGE_ID
         assert result.errors == []
 
-    @pytest.mark.asyncio
     async def test_with_errors(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -245,7 +238,6 @@ class TestRescanImages:
 
 
 class TestAliasImage:
-    @pytest.mark.asyncio
     async def test_happy_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -279,7 +271,6 @@ class TestAliasImage:
 
 
 class TestDealiasImage:
-    @pytest.mark.asyncio
     async def test_happy_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -307,7 +298,6 @@ class TestDealiasImage:
 
 
 class TestForgetImage:
-    @pytest.mark.asyncio
     async def test_happy_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -334,7 +324,6 @@ class TestForgetImage:
 
 
 class TestPurgeImage:
-    @pytest.mark.asyncio
     async def test_happy_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200

@@ -1,6 +1,5 @@
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIAuthClient
@@ -33,7 +32,6 @@ def _make_client(mock_session: MagicMock) -> BackendAIAuthClient:
 
 
 class TestContainerRegistryClient:
-    @pytest.mark.asyncio
     async def test_patch_sends_correct_request(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -59,7 +57,6 @@ class TestContainerRegistryClient:
         assert call_args[0][0] == "PATCH"
         assert "/container-registries/reg-123" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_patch_path_interpolation(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -76,7 +73,6 @@ class TestContainerRegistryClient:
         assert "my-special-id" in url
         assert "container-registries" in url
 
-    @pytest.mark.asyncio
     async def test_patch_serializes_request_body(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -97,7 +93,6 @@ class TestContainerRegistryClient:
 
 
 class TestHarborWebhook:
-    @pytest.mark.asyncio
     async def test_handle_harbor_webhook_sends_post(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 204

@@ -89,7 +89,6 @@ class TestExtendedAsyncSAEngineReadCommitted:
             return None
         return IsolationTestRowData(value=row[0], version=row[1])
 
-    @pytest.mark.asyncio
     async def test_begin_read_committed_basic(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -108,7 +107,6 @@ class TestExtendedAsyncSAEngineReadCommitted:
         assert data.value == test_value
         assert data.version == expected_version
 
-    @pytest.mark.asyncio
     async def test_begin_read_committed_isolation_level(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -123,7 +121,6 @@ class TestExtendedAsyncSAEngineReadCommitted:
 
         assert isolation_level == expected_isolation_level
 
-    @pytest.mark.asyncio
     async def test_begin_read_committed_can_write(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -145,7 +142,6 @@ class TestExtendedAsyncSAEngineReadCommitted:
         assert data.value == test_value
         assert data.version == expected_version
 
-    @pytest.mark.asyncio
     async def test_begin_readonly_read_committed_basic(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -167,7 +163,6 @@ class TestExtendedAsyncSAEngineReadCommitted:
         assert data.value == test_value
         assert data.version == expected_version
 
-    @pytest.mark.asyncio
     async def test_begin_readonly_read_committed_isolation_level(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -182,7 +177,6 @@ class TestExtendedAsyncSAEngineReadCommitted:
 
         assert isolation_level == expected_isolation_level
 
-    @pytest.mark.asyncio
     async def test_begin_readonly_read_committed_cannot_write(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -198,7 +192,6 @@ class TestExtendedAsyncSAEngineReadCommitted:
         # PostgreSQL raises "cannot execute INSERT in a read-only transaction"
         assert "read-only" in str(exc_info.value).lower()
 
-    @pytest.mark.asyncio
     async def test_begin_session_read_committed_basic(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -229,7 +222,6 @@ class TestExtendedAsyncSAEngineReadCommitted:
         assert row[0] == test_value
         assert row[1] == expected_version
 
-    @pytest.mark.asyncio
     async def test_begin_session_read_committed_isolation_level(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -244,7 +236,6 @@ class TestExtendedAsyncSAEngineReadCommitted:
 
         assert isolation_level == expected_isolation_level
 
-    @pytest.mark.asyncio
     async def test_begin_session_read_committed_auto_commit(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -269,7 +260,6 @@ class TestExtendedAsyncSAEngineReadCommitted:
         assert data is not None
         assert data.value == test_value
 
-    @pytest.mark.asyncio
     async def test_begin_readonly_session_read_committed_basic(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -296,7 +286,6 @@ class TestExtendedAsyncSAEngineReadCommitted:
         assert row[0] == test_value
         assert row[1] == expected_version
 
-    @pytest.mark.asyncio
     async def test_begin_readonly_session_read_committed_isolation_level(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -311,7 +300,6 @@ class TestExtendedAsyncSAEngineReadCommitted:
 
         assert isolation_level == expected_isolation_level
 
-    @pytest.mark.asyncio
     async def test_begin_readonly_session_read_committed_cannot_write(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -329,7 +317,6 @@ class TestExtendedAsyncSAEngineReadCommitted:
         # PostgreSQL raises "cannot execute INSERT in a read-only transaction"
         assert "read-only" in str(exc_info.value).lower()
 
-    @pytest.mark.asyncio
     async def test_read_committed_sees_committed_changes(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -373,7 +360,6 @@ class TestExtendedAsyncSAEngineReadCommitted:
             assert data_after.value == updated_value
             assert data_after.version == updated_version
 
-    @pytest.mark.asyncio
     async def test_multiple_concurrent_readonly_read_committed_connections(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -401,7 +387,6 @@ class TestExtendedAsyncSAEngineReadCommitted:
         assert data1 is not None
         assert data1.value == test_value
 
-    @pytest.mark.asyncio
     async def test_read_committed_prevents_dirty_reads(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -453,7 +438,6 @@ class TestExtendedAsyncSAEngineReadCommitted:
             assert final_data.value == initial_value
             assert final_data.version == initial_version
 
-    @pytest.mark.asyncio
     async def test_read_committed_allows_phantom_reads(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -517,7 +501,6 @@ class TestExtendedAsyncSAEngineReadCommitted:
             phantom_ids = final_ids - initial_ids
             assert len(phantom_ids) == 1
 
-    @pytest.mark.asyncio
     async def test_read_committed_phantom_read_with_range_query(
         self,
         database_connection: ExtendedAsyncSAEngine,

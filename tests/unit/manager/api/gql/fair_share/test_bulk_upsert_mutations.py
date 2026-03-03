@@ -103,7 +103,6 @@ def create_mock_info(context: MagicMock) -> MagicMock:
 class TestBulkUpsertDomainFairShareWeightMutation:
     """Tests for bulk_upsert_domain_fair_share_weight mutation."""
 
-    @pytest.mark.asyncio
     async def test_mutation_calls_processor_with_correct_action(
         self,
         mock_superadmin_user: MagicMock,
@@ -151,7 +150,6 @@ class TestBulkUpsertDomainFairShareWeightMutation:
         assert isinstance(result, BulkUpsertDomainFairShareWeightPayload)
         assert result.upserted_count == 2
 
-    @pytest.mark.asyncio
     async def test_mutation_returns_correct_count(
         self,
         mock_superadmin_user: MagicMock,
@@ -187,7 +185,6 @@ class TestBulkUpsertDomainFairShareWeightMutation:
         # Then
         assert result.upserted_count == 5
 
-    @pytest.mark.asyncio
     async def test_mutation_requires_superadmin(
         self,
         mock_regular_user: MagicMock,
@@ -224,7 +221,6 @@ class TestBulkUpsertDomainFairShareWeightMutation:
 class TestBulkUpsertProjectFairShareWeightMutation:
     """Tests for bulk_upsert_project_fair_share_weight mutation."""
 
-    @pytest.mark.asyncio
     async def test_mutation_calls_processor_with_correct_action(
         self,
         mock_superadmin_user: MagicMock,
@@ -284,7 +280,6 @@ class TestBulkUpsertProjectFairShareWeightMutation:
         assert isinstance(result, BulkUpsertProjectFairShareWeightPayload)
         assert result.upserted_count == 2
 
-    @pytest.mark.asyncio
     async def test_mutation_requires_superadmin(
         self,
         mock_regular_user: MagicMock,
@@ -327,7 +322,6 @@ class TestBulkUpsertProjectFairShareWeightMutation:
 class TestBulkUpsertUserFairShareWeightMutation:
     """Tests for bulk_upsert_user_fair_share_weight mutation."""
 
-    @pytest.mark.asyncio
     async def test_mutation_calls_processor_with_correct_action(
         self,
         mock_superadmin_user: MagicMock,
@@ -393,7 +387,6 @@ class TestBulkUpsertUserFairShareWeightMutation:
         assert isinstance(result, BulkUpsertUserFairShareWeightPayload)
         assert result.upserted_count == 2
 
-    @pytest.mark.asyncio
     async def test_mutation_requires_superadmin(
         self,
         mock_regular_user: MagicMock,

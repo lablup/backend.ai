@@ -16,7 +16,6 @@ from ai.backend.common.dto.manager.container_registry.response import (
 
 
 class TestContainerRegistryPatch:
-    @pytest.mark.asyncio
     async def test_admin_patches_container_registry(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -30,7 +29,6 @@ class TestContainerRegistryPatch:
         assert result.id == container_registry_fixture
         assert result.ssl_verify is False
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_patch_registry(
         self,
         user_registry: BackendAIClientRegistry,
@@ -56,7 +54,6 @@ class TestContainerRegistryHarborWebhook:
             "tracked separately for resolution."
         ),
     )
-    @pytest.mark.asyncio
     async def test_handle_harbor_webhook(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -80,7 +77,6 @@ class TestContainerRegistryHarborWebhook:
         )
         await admin_registry.container_registry.handle_harbor_webhook(request)
 
-    @pytest.mark.asyncio
     async def test_harbor_webhook_with_nonexistent_registry(
         self,
         admin_registry: BackendAIClientRegistry,

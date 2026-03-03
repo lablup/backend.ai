@@ -34,7 +34,6 @@ def _make_append_request(
 
 @pytest.mark.integration
 class TestErrorLogLifecycle:
-    @pytest.mark.asyncio
     async def test_append_list_clear_lifecycle(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -71,7 +70,6 @@ class TestErrorLogLifecycle:
         assert cleared is not None
         assert cleared.is_cleared is True
 
-    @pytest.mark.asyncio
     async def test_user_sees_only_own_logs(
         self,
         user_registry: BackendAIClientRegistry,
@@ -109,7 +107,6 @@ class TestErrorLogLifecycle:
             " cause 401."
         ),
     )
-    @pytest.mark.asyncio
     async def test_list_with_pagination_params(
         self,
         admin_registry: BackendAIClientRegistry,

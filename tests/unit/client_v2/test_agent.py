@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIAuthClient
@@ -46,7 +45,6 @@ def _make_agent_client(mock_session: MagicMock) -> AgentClient:
 
 
 class TestSearchAgents:
-    @pytest.mark.asyncio
     async def test_happy_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -85,7 +83,6 @@ class TestSearchAgents:
         assert result.items[0].schedulable is True
         assert result.pagination.total == 1
 
-    @pytest.mark.asyncio
     async def test_with_status_filter(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -112,7 +109,6 @@ class TestSearchAgents:
         assert body["filter"]["status"]["in_"] == ["ALIVE", "RESTARTING"]
         assert isinstance(result, SearchAgentsResponse)
 
-    @pytest.mark.asyncio
     async def test_with_ordering(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -145,7 +141,6 @@ class TestSearchAgents:
 
 
 class TestGetAgent:
-    @pytest.mark.asyncio
     async def test_happy_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -179,7 +174,6 @@ class TestGetAgent:
         assert result.agent.schedulable is True
         assert result.agent.available_slots == {"cpu": "4", "mem": "8G"}
 
-    @pytest.mark.asyncio
     async def test_field_validation(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -213,7 +207,6 @@ class TestGetAgent:
 
 
 class TestGetResourceStats:
-    @pytest.mark.asyncio
     async def test_happy_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200

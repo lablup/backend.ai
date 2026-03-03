@@ -203,7 +203,6 @@ class TestAppConfigRepository:
         repo = AppConfigRepository(db=db_with_cleanup, valkey_stat=valkey_stat_client)
         yield repo
 
-    @pytest.mark.asyncio
     async def test_create_domain_config(
         self,
         app_config_repository: AppConfigRepository,
@@ -226,7 +225,6 @@ class TestAppConfigRepository:
         assert config.scope_id == test_domain_name
         assert config.extra_config == {"theme": "dark", "language": "en"}
 
-    @pytest.mark.asyncio
     async def test_create_user_config(
         self,
         app_config_repository: AppConfigRepository,
@@ -249,7 +247,6 @@ class TestAppConfigRepository:
         assert config.scope_id == test_user_id
         assert config.extra_config == {"theme": "light", "notifications": True}
 
-    @pytest.mark.asyncio
     async def test_get_merged_config_domain_only(
         self,
         app_config_repository: AppConfigRepository,
@@ -274,7 +271,6 @@ class TestAppConfigRepository:
 
         assert merged_config == {"theme": "dark", "language": "en"}
 
-    @pytest.mark.asyncio
     async def test_get_merged_config_with_user_override(
         self,
         app_config_repository: AppConfigRepository,
@@ -315,7 +311,6 @@ class TestAppConfigRepository:
         assert merged_config["sidebar"] == "expanded"  # From domain
         assert merged_config["notifications"] is True  # From user only
 
-    @pytest.mark.asyncio
     async def test_upsert_config_create(
         self,
         app_config_repository: AppConfigRepository,
@@ -334,7 +329,6 @@ class TestAppConfigRepository:
         assert config.scope_id == test_domain_name
         assert config.extra_config == {"theme": "dark", "language": "en"}
 
-    @pytest.mark.asyncio
     async def test_upsert_config_update(
         self,
         app_config_repository: AppConfigRepository,
@@ -364,7 +358,6 @@ class TestAppConfigRepository:
         assert updated_config.id == initial_config.id
         assert updated_config.extra_config == {"theme": "light", "language": "ko"}
 
-    @pytest.mark.asyncio
     async def test_delete_config(
         self,
         app_config_repository: AppConfigRepository,
@@ -394,7 +387,6 @@ class TestAppConfigRepository:
         config = await app_config_repository.get_config(AppConfigScopeType.DOMAIN, test_domain_name)
         assert config is None
 
-    @pytest.mark.asyncio
     async def test_delete_nonexistent_config(
         self,
         app_config_repository: AppConfigRepository,
@@ -407,7 +399,6 @@ class TestAppConfigRepository:
 
         assert deleted is False
 
-    @pytest.mark.asyncio
     async def test_get_merged_config_empty(
         self,
         app_config_repository: AppConfigRepository,
@@ -418,7 +409,6 @@ class TestAppConfigRepository:
 
         assert merged_config == {}
 
-    @pytest.mark.asyncio
     async def test_cache_invalidation_domain_config(
         self,
         app_config_repository: AppConfigRepository,

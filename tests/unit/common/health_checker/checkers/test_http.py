@@ -77,7 +77,6 @@ class TestHttpHealthChecker:
 
         await runner.cleanup()
 
-    @pytest.mark.asyncio
     async def test_success_get(
         self,
         http_test_server: str,
@@ -97,7 +96,6 @@ class TestHttpHealthChecker:
         assert status.is_healthy
         assert status.error_message is None
 
-    @pytest.mark.asyncio
     async def test_success_post(
         self,
         http_test_server: str,
@@ -117,7 +115,6 @@ class TestHttpHealthChecker:
         status = result.results[list(result.results.keys())[0]]
         assert status.is_healthy
 
-    @pytest.mark.asyncio
     async def test_success_head(
         self,
         http_test_server: str,
@@ -137,7 +134,6 @@ class TestHttpHealthChecker:
         status = result.results[list(result.results.keys())[0]]
         assert status.is_healthy
 
-    @pytest.mark.asyncio
     async def test_success_options(
         self,
         http_test_server: str,
@@ -157,7 +153,6 @@ class TestHttpHealthChecker:
         status = result.results[list(result.results.keys())[0]]
         assert status.is_healthy
 
-    @pytest.mark.asyncio
     async def test_custom_status_codes(
         self,
         http_test_server: str,
@@ -178,7 +173,6 @@ class TestHttpHealthChecker:
         status = result.results[list(result.results.keys())[0]]
         assert status.is_healthy
 
-    @pytest.mark.asyncio
     async def test_unexpected_status_code(
         self,
         http_test_server: str,
@@ -200,7 +194,6 @@ class TestHttpHealthChecker:
         assert "returned status 500" in status.error_message
         assert "expected one of [200]" in status.error_message
 
-    @pytest.mark.asyncio
     async def test_not_found(
         self,
         http_test_server: str,
@@ -221,7 +214,6 @@ class TestHttpHealthChecker:
         assert status.error_message is not None
         assert "returned status 404" in status.error_message
 
-    @pytest.mark.asyncio
     async def test_timeout(
         self,
         http_test_server: str,
@@ -243,7 +235,6 @@ class TestHttpHealthChecker:
         assert "timed out" in status.error_message.lower()
         assert "0.5s" in status.error_message
 
-    @pytest.mark.asyncio
     async def test_connection_error(
         self,
         aiohttp_session: aiohttp.ClientSession,
@@ -264,7 +255,6 @@ class TestHttpHealthChecker:
         assert status.error_message is not None
         assert "health check failed" in status.error_message.lower()
 
-    @pytest.mark.asyncio
     async def test_timeout_property(
         self,
         http_test_server: str,
@@ -281,7 +271,6 @@ class TestHttpHealthChecker:
 
         assert checker.timeout == timeout_value
 
-    @pytest.mark.asyncio
     async def test_method_in_error_message(
         self,
         http_test_server: str,

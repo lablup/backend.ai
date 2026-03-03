@@ -87,7 +87,6 @@ class TestDependencyProviderConcrete:
     Test concrete DependencyProvider implementations.
     """
 
-    @pytest.mark.asyncio
     async def test_provider_lifecycle(self) -> None:
         """
 
@@ -99,7 +98,6 @@ class TestDependencyProviderConcrete:
         async with provider.provide("test") as resource:
             assert resource == "resource-test"
 
-    @pytest.mark.asyncio
     async def test_provider_cleanup_on_exception(self) -> None:
         """
 

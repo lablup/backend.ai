@@ -55,7 +55,6 @@ def test_is_containerized() -> None:
 
 
 @pytest.mark.skip
-@pytest.mark.asyncio
 @pytest.mark.parametrize("provider", ["amazon", "google", "azure", None])
 async def test_get_instance_id(provider: str | None) -> None:
     ai.backend.common.identity.current_provider = (
@@ -92,7 +91,6 @@ async def test_get_instance_id(provider: str | None) -> None:
 
 
 @pytest.mark.skip
-@pytest.mark.asyncio
 @pytest.mark.parametrize("provider", ["amazon", "google", "azure", None])
 async def test_get_instance_id_failures(provider: str | None) -> None:
     ai.backend.common.identity.current_provider = (
@@ -108,7 +106,6 @@ async def test_get_instance_id_failures(provider: str | None) -> None:
 
 
 @pytest.mark.skip
-@pytest.mark.asyncio
 @pytest.mark.parametrize("provider", ["amazon", "google", "azure", None])
 async def test_get_instance_ip(provider: str | None) -> None:
     ai.backend.common.identity.current_provider = (
@@ -179,7 +176,6 @@ async def test_get_instance_ip(provider: str | None) -> None:
 
 
 @pytest.mark.skip
-@pytest.mark.asyncio
 @pytest.mark.parametrize("provider", ["amazon", "google", "azure", None])
 async def test_get_instance_type(provider: str | None) -> None:
     ai.backend.common.identity.current_provider = (

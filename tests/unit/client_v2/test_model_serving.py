@@ -3,7 +3,6 @@ from __future__ import annotations
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIAuthClient
@@ -50,7 +49,6 @@ def _make_model_serving_client(
 
 
 class TestListServe:
-    @pytest.mark.asyncio
     async def test_list_serve_calls_request_with_get(self) -> None:
         ms, mock = _make_model_serving_client()
         mock._request.return_value = [
@@ -69,14 +67,12 @@ class TestListServe:
         assert len(result) == 1
         assert result[0].name == "test-svc"
 
-    @pytest.mark.asyncio
     async def test_list_serve_with_name_filter(self) -> None:
         ms, mock = _make_model_serving_client()
         mock._request.return_value = []
         await ms.list_serve(name="my-service")
         mock._request.assert_awaited_once_with("GET", "/services", params={"name": "my-service"})
 
-    @pytest.mark.asyncio
     async def test_list_serve_returns_empty_list(self) -> None:
         ms, mock = _make_model_serving_client()
         mock._request.return_value = []
@@ -85,7 +81,6 @@ class TestListServe:
 
 
 class TestSearchServices:
-    @pytest.mark.asyncio
     async def test_search_services(self) -> None:
         ms, mock = _make_model_serving_client()
         request = SearchServicesRequestModel(offset=0, limit=10)
@@ -101,7 +96,6 @@ class TestSearchServices:
 
 
 class TestGetInfo:
-    @pytest.mark.asyncio
     async def test_get_info(self) -> None:
         ms, mock = _make_model_serving_client()
         mock.typed_request.return_value = MagicMock(spec=ServeInfoModel)
@@ -115,7 +109,6 @@ class TestGetInfo:
 
 
 class TestCreate:
-    @pytest.mark.asyncio
     async def test_create(self) -> None:
         ms, mock = _make_model_serving_client()
         request = MagicMock(spec=NewServiceRequestModel)
@@ -131,7 +124,6 @@ class TestCreate:
 
 
 class TestTryStart:
-    @pytest.mark.asyncio
     async def test_try_start(self) -> None:
         ms, mock = _make_model_serving_client()
         request = MagicMock(spec=NewServiceRequestModel)
@@ -147,7 +139,6 @@ class TestTryStart:
 
 
 class TestDelete:
-    @pytest.mark.asyncio
     async def test_delete(self) -> None:
         ms, mock = _make_model_serving_client()
         mock.typed_request.return_value = MagicMock(spec=SuccessResponseModel)
@@ -161,7 +152,6 @@ class TestDelete:
 
 
 class TestSync:
-    @pytest.mark.asyncio
     async def test_sync(self) -> None:
         ms, mock = _make_model_serving_client()
         mock.typed_request.return_value = MagicMock(spec=SuccessResponseModel)
@@ -175,7 +165,6 @@ class TestSync:
 
 
 class TestScale:
-    @pytest.mark.asyncio
     async def test_scale(self) -> None:
         ms, mock = _make_model_serving_client()
         request = ScaleRequestModel(to=3)
@@ -191,7 +180,6 @@ class TestScale:
 
 
 class TestUpdateRoute:
-    @pytest.mark.asyncio
     async def test_update_route(self) -> None:
         ms, mock = _make_model_serving_client()
         request = UpdateRouteRequestModel(traffic_ratio=0.5)
@@ -207,7 +195,6 @@ class TestUpdateRoute:
 
 
 class TestDeleteRoute:
-    @pytest.mark.asyncio
     async def test_delete_route(self) -> None:
         ms, mock = _make_model_serving_client()
         mock.typed_request.return_value = MagicMock(spec=SuccessResponseModel)
@@ -221,7 +208,6 @@ class TestDeleteRoute:
 
 
 class TestGenerateToken:
-    @pytest.mark.asyncio
     async def test_generate_token(self) -> None:
         ms, mock = _make_model_serving_client()
         request = MagicMock(spec=TokenRequestModel)
@@ -237,7 +223,6 @@ class TestGenerateToken:
 
 
 class TestListErrors:
-    @pytest.mark.asyncio
     async def test_list_errors(self) -> None:
         ms, mock = _make_model_serving_client()
         mock.typed_request.return_value = MagicMock(spec=ErrorListResponseModel)
@@ -251,7 +236,6 @@ class TestListErrors:
 
 
 class TestClearError:
-    @pytest.mark.asyncio
     async def test_clear_error_calls_typed_request_no_content(self) -> None:
         ms, mock = _make_model_serving_client()
         mock.typed_request_no_content = AsyncMock()
@@ -263,7 +247,6 @@ class TestClearError:
 
 
 class TestListSupportedRuntimes:
-    @pytest.mark.asyncio
     async def test_list_supported_runtimes(self) -> None:
         ms, mock = _make_model_serving_client()
         mock.typed_request.return_value = MagicMock(spec=RuntimeInfoModel)

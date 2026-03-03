@@ -291,7 +291,6 @@ class TestDeploymentRevisionRow:
 
         yield endpoint
 
-    @pytest.mark.asyncio
     async def test_create_revision(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -322,7 +321,6 @@ class TestDeploymentRevisionRow:
             assert revision.endpoint == test_endpoint.id
             assert revision.revision_number == 1
 
-    @pytest.mark.asyncio
     async def test_to_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -370,7 +368,6 @@ class TestDeploymentRevisionRow:
             assert data.model_runtime_config.environ == {"DEBUG": "true"}
             assert data.image_id == test_image.id
 
-    @pytest.mark.asyncio
     async def test_unique_constraint_endpoint_revision_number(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,

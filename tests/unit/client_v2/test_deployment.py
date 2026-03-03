@@ -6,7 +6,6 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIAuthClient
@@ -148,7 +147,6 @@ _SAMPLE_ROUTE_DTO: dict[str, Any] = {
 
 
 class TestDeploymentCRUD:
-    @pytest.mark.asyncio
     async def test_create_deployment(self) -> None:
         resp = _json_response({"deployment": _SAMPLE_DEPLOYMENT_DTO})
         mock_session = _make_request_session(resp)
@@ -189,7 +187,6 @@ class TestDeploymentCRUD:
         assert body is not None
         assert body["metadata"]["name"] == "my-deployment"
 
-    @pytest.mark.asyncio
     async def test_search_deployments(self) -> None:
         resp = _json_response({
             "deployments": [_SAMPLE_DEPLOYMENT_DTO],
@@ -207,7 +204,6 @@ class TestDeploymentCRUD:
         assert url.endswith("/deployments/search")
         assert body is not None
 
-    @pytest.mark.asyncio
     async def test_get_deployment(self) -> None:
         resp = _json_response({"deployment": _SAMPLE_DEPLOYMENT_DTO})
         mock_session = _make_request_session(resp)
@@ -220,7 +216,6 @@ class TestDeploymentCRUD:
         assert method == "GET"
         assert str(_SAMPLE_DEPLOYMENT_ID) in url
 
-    @pytest.mark.asyncio
     async def test_update_deployment(self) -> None:
         resp = _json_response({"deployment": _SAMPLE_DEPLOYMENT_DTO})
         mock_session = _make_request_session(resp)
@@ -238,7 +233,6 @@ class TestDeploymentCRUD:
         assert body is not None
         assert body["name"] == "updated-name"
 
-    @pytest.mark.asyncio
     async def test_destroy_deployment(self) -> None:
         resp = _json_response({"deleted": True})
         mock_session = _make_request_session(resp)
@@ -259,7 +253,6 @@ class TestDeploymentCRUD:
 
 
 class TestRevisionOperations:
-    @pytest.mark.asyncio
     async def test_search_revisions(self) -> None:
         resp = _json_response({
             "revisions": [_SAMPLE_REVISION_DTO],
@@ -277,7 +270,6 @@ class TestRevisionOperations:
         assert f"/deployments/{_SAMPLE_DEPLOYMENT_ID}/revisions/search" in url
         assert body is not None
 
-    @pytest.mark.asyncio
     async def test_get_revision(self) -> None:
         resp = _json_response({"revision": _SAMPLE_REVISION_DTO})
         mock_session = _make_request_session(resp)
@@ -290,7 +282,6 @@ class TestRevisionOperations:
         assert method == "GET"
         assert f"/deployments/{_SAMPLE_DEPLOYMENT_ID}/revisions/{_SAMPLE_REVISION_ID}" in url
 
-    @pytest.mark.asyncio
     async def test_activate_revision(self) -> None:
         resp = _json_response({"success": True})
         mock_session = _make_request_session(resp)
@@ -306,7 +297,6 @@ class TestRevisionOperations:
             f"/deployments/{_SAMPLE_DEPLOYMENT_ID}/revisions/{_SAMPLE_REVISION_ID}/activate" in url
         )
 
-    @pytest.mark.asyncio
     async def test_deactivate_revision(self) -> None:
         resp = _json_response({"success": True})
         mock_session = _make_request_session(resp)
@@ -330,7 +320,6 @@ class TestRevisionOperations:
 
 
 class TestRouteOperations:
-    @pytest.mark.asyncio
     async def test_search_routes(self) -> None:
         resp = _json_response({
             "routes": [_SAMPLE_ROUTE_DTO],
@@ -348,7 +337,6 @@ class TestRouteOperations:
         assert f"/deployments/{_SAMPLE_DEPLOYMENT_ID}/routes/search" in url
         assert body is not None
 
-    @pytest.mark.asyncio
     async def test_update_route_traffic_status(self) -> None:
         resp = _json_response({"route": _SAMPLE_ROUTE_DTO})
         mock_session = _make_request_session(resp)

@@ -32,7 +32,6 @@ from .conftest import UserFactory
 
 
 class TestUserCreate:
-    @pytest.mark.asyncio
     async def test_admin_creates_user(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -49,7 +48,6 @@ class TestUserCreate:
         assert result.user.status == UserStatus.ACTIVE
         assert result.user.id is not None
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_create_user(
         self,
         user_registry: BackendAIClientRegistry,
@@ -67,7 +65,6 @@ class TestUserCreate:
         with pytest.raises(PermissionDeniedError):
             await user_registry.user.create(request)
 
-    @pytest.mark.asyncio
     async def test_create_user_with_optional_fields(
         self,
         user_factory: UserFactory,
@@ -87,7 +84,6 @@ class TestUserCreate:
 
 
 class TestUserGet:
-    @pytest.mark.asyncio
     async def test_admin_gets_user_by_uuid(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -99,7 +95,6 @@ class TestUserGet:
         assert get_result.user.email == target_user.user.email
         assert get_result.user.username == target_user.user.username
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_get_user(
         self,
         user_registry: BackendAIClientRegistry,
@@ -108,7 +103,6 @@ class TestUserGet:
         with pytest.raises(PermissionDeniedError):
             await user_registry.user.get(target_user.user.id)
 
-    @pytest.mark.asyncio
     async def test_get_nonexistent_user_returns_not_found(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -118,7 +112,6 @@ class TestUserGet:
 
 
 class TestUserSearch:
-    @pytest.mark.asyncio
     async def test_admin_searches_users(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -131,7 +124,6 @@ class TestUserSearch:
         assert result.pagination.total >= 2
         assert len(result.items) >= 2
 
-    @pytest.mark.asyncio
     async def test_search_with_email_filter(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -148,7 +140,6 @@ class TestUserSearch:
         assert result.pagination.total == 1
         assert result.items[0].email == f"{marker}@test.local"
 
-    @pytest.mark.asyncio
     async def test_search_with_status_filter(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -172,7 +163,6 @@ class TestUserSearch:
         assert len(found) == 1
         assert found[0].status == UserStatus.INACTIVE
 
-    @pytest.mark.asyncio
     async def test_search_with_ordering(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -190,7 +180,6 @@ class TestUserSearch:
         emails = [u.email for u in result.items]
         assert emails == sorted(emails, reverse=True)
 
-    @pytest.mark.asyncio
     async def test_search_with_pagination(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -201,7 +190,6 @@ class TestUserSearch:
         assert result.pagination.limit == 1
         assert len(result.items) <= 1
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_search_users(
         self,
         user_registry: BackendAIClientRegistry,
@@ -211,7 +199,6 @@ class TestUserSearch:
 
 
 class TestUserUpdate:
-    @pytest.mark.asyncio
     async def test_admin_updates_user_fields(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -231,7 +218,6 @@ class TestUserUpdate:
         assert update_result.user.full_name == "Updated Full Name"
         assert update_result.user.description == "Updated description"
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_update_user(
         self,
         user_registry: BackendAIClientRegistry,
@@ -245,7 +231,6 @@ class TestUserUpdate:
 
 
 class TestUserDelete:
-    @pytest.mark.asyncio
     async def test_admin_soft_deletes_user(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -257,7 +242,6 @@ class TestUserDelete:
         assert isinstance(delete_result, DeleteUserResponse)
         assert delete_result.success is True
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_delete_user(
         self,
         user_registry: BackendAIClientRegistry,
@@ -268,7 +252,6 @@ class TestUserDelete:
 
 
 class TestUserPurge:
-    @pytest.mark.asyncio
     async def test_admin_purges_user(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -281,7 +264,6 @@ class TestUserPurge:
         with pytest.raises(NotFoundError):
             await admin_registry.user.get(r.user.id)
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_purge_user(
         self,
         user_registry: BackendAIClientRegistry,

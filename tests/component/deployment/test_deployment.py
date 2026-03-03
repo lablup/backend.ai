@@ -20,7 +20,6 @@ from ai.backend.common.dto.manager.query import StringFilter
 
 
 class TestSearchDeployments:
-    @pytest.mark.asyncio
     async def test_search_deployments_empty(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -33,7 +32,6 @@ class TestSearchDeployments:
         assert result.deployments == []
         assert result.pagination.total == 0
 
-    @pytest.mark.asyncio
     async def test_search_deployments_with_filter(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -52,7 +50,6 @@ class TestSearchDeployments:
 
 
 class TestGetDeployment:
-    @pytest.mark.asyncio
     async def test_get_deployment_not_found(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -64,7 +61,6 @@ class TestGetDeployment:
 
 
 class TestSearchRevisions:
-    @pytest.mark.asyncio
     async def test_search_revisions_empty(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -81,7 +77,6 @@ class TestSearchRevisions:
 
 
 class TestDeactivateRevision:
-    @pytest.mark.asyncio
     async def test_deactivate_revision_stub(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -98,7 +93,6 @@ class TestDeactivateRevision:
 
 
 class TestSearchRoutes:
-    @pytest.mark.asyncio
     async def test_search_routes_empty(
         self,
         admin_registry: BackendAIClientRegistry,

@@ -4,7 +4,6 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIAuthClient
@@ -60,7 +59,6 @@ def _make_error_log_client(mock_session: MagicMock) -> ErrorLogClient:
 
 
 class TestAppendErrorLog:
-    @pytest.mark.asyncio
     async def test_append_error_log(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -91,7 +89,6 @@ class TestAppendErrorLog:
         assert call_args.kwargs["json"]["source"] == "webui"
         assert call_args.kwargs["json"]["message"] == "Something went wrong"
 
-    @pytest.mark.asyncio
     async def test_append_error_log_minimal(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -121,7 +118,6 @@ class TestAppendErrorLog:
 
 
 class TestListErrorLogs:
-    @pytest.mark.asyncio
     async def test_list_logs_default(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -149,7 +145,6 @@ class TestListErrorLogs:
         assert "/logs/error" in str(call_args.args[1])
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_list_logs_with_params(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -175,7 +170,6 @@ class TestListErrorLogs:
         assert call_args.kwargs["params"]["page_size"] == "10"
         assert call_args.kwargs["params"]["page_no"] == "2"
 
-    @pytest.mark.asyncio
     async def test_list_logs_empty(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -192,7 +186,6 @@ class TestListErrorLogs:
 
 
 class TestMarkCleared:
-    @pytest.mark.asyncio
     async def test_mark_cleared(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200

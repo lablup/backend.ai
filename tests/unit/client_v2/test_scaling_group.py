@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIAuthClient
@@ -36,7 +35,6 @@ def _make_scaling_group_client(mock_session: MagicMock) -> ScalingGroupClient:
 
 
 class TestListScalingGroups:
-    @pytest.mark.asyncio
     async def test_happy_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -61,7 +59,6 @@ class TestListScalingGroups:
         assert result.scaling_groups[0].name == "default"
         assert result.scaling_groups[1].name == "gpu-cluster"
 
-    @pytest.mark.asyncio
     async def test_empty_list(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -78,7 +75,6 @@ class TestListScalingGroups:
         assert isinstance(result, ListScalingGroupsResponse)
         assert len(result.scaling_groups) == 0
 
-    @pytest.mark.asyncio
     async def test_group_param_passed(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -97,7 +93,6 @@ class TestListScalingGroups:
 
 
 class TestGetWsproxyVersion:
-    @pytest.mark.asyncio
     async def test_happy_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -117,7 +112,6 @@ class TestGetWsproxyVersion:
         assert isinstance(result, GetWsproxyVersionResponse)
         assert result.wsproxy_version == "v5.20240101"
 
-    @pytest.mark.asyncio
     async def test_scaling_group_name_in_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200

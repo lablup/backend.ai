@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
 from ai.backend.client.v2.base_client import BackendAIAuthClient
@@ -54,7 +53,6 @@ def _make_template_client(mock_session: MagicMock) -> TemplateClient:
 
 
 class TestCreateSessionTemplate:
-    @pytest.mark.asyncio
     async def test_sends_post_to_correct_path(self) -> None:
         raw_data = [{"id": "tmpl-1", "user": "user-1"}]
         mock_resp = AsyncMock()
@@ -77,7 +75,6 @@ class TestCreateSessionTemplate:
         assert result.root[0].id == "tmpl-1"
         assert result.model_dump() == raw_data
 
-    @pytest.mark.asyncio
     async def test_serializes_request_body(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -99,7 +96,6 @@ class TestCreateSessionTemplate:
 
 
 class TestListSessionTemplates:
-    @pytest.mark.asyncio
     async def test_sends_get_with_query_params(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -116,7 +112,6 @@ class TestListSessionTemplates:
         assert call_args.kwargs["params"]["all"] == "True"
         assert isinstance(result, ListSessionTemplatesResponse)
 
-    @pytest.mark.asyncio
     async def test_deserializes_list_response(self) -> None:
         raw_data = [
             {
@@ -145,7 +140,6 @@ class TestListSessionTemplates:
 
 
 class TestGetSessionTemplate:
-    @pytest.mark.asyncio
     async def test_interpolates_template_id(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -169,7 +163,6 @@ class TestGetSessionTemplate:
         assert isinstance(result, GetSessionTemplateResponse)
         assert result.name == "test"
 
-    @pytest.mark.asyncio
     async def test_passes_query_params(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -193,7 +186,6 @@ class TestGetSessionTemplate:
 
 
 class TestUpdateSessionTemplate:
-    @pytest.mark.asyncio
     async def test_sends_put_with_body(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -212,7 +204,6 @@ class TestUpdateSessionTemplate:
 
 
 class TestDeleteSessionTemplate:
-    @pytest.mark.asyncio
     async def test_sends_delete_with_path_param(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -228,7 +219,6 @@ class TestDeleteSessionTemplate:
         assert isinstance(result, DeleteSessionTemplateResponse)
         assert result.success is True
 
-    @pytest.mark.asyncio
     async def test_passes_owner_access_key_as_param(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -244,7 +234,6 @@ class TestDeleteSessionTemplate:
 
 
 class TestCreateClusterTemplate:
-    @pytest.mark.asyncio
     async def test_sends_post_to_correct_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -263,7 +252,6 @@ class TestCreateClusterTemplate:
 
 
 class TestListClusterTemplates:
-    @pytest.mark.asyncio
     async def test_sends_get_with_query_params(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -279,7 +267,6 @@ class TestListClusterTemplates:
         assert "/template/cluster" in str(call_args[0][1])
         assert isinstance(result, ListClusterTemplatesResponse)
 
-    @pytest.mark.asyncio
     async def test_deserializes_list_response(self) -> None:
         raw_data = [
             {
@@ -306,7 +293,6 @@ class TestListClusterTemplates:
 
 
 class TestGetClusterTemplate:
-    @pytest.mark.asyncio
     async def test_interpolates_template_id(self) -> None:
         raw_data = {"name": "cluster-tmpl", "nodes": []}
         mock_resp = AsyncMock()
@@ -324,7 +310,6 @@ class TestGetClusterTemplate:
         assert result.root["name"] == "cluster-tmpl"
         assert result.model_dump() == raw_data
 
-    @pytest.mark.asyncio
     async def test_passes_format_query_param(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -340,7 +325,6 @@ class TestGetClusterTemplate:
 
 
 class TestUpdateClusterTemplate:
-    @pytest.mark.asyncio
     async def test_sends_put_with_body(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -359,7 +343,6 @@ class TestUpdateClusterTemplate:
 
 
 class TestDeleteClusterTemplate:
-    @pytest.mark.asyncio
     async def test_sends_delete_with_path_param(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -375,7 +358,6 @@ class TestDeleteClusterTemplate:
         assert isinstance(result, DeleteClusterTemplateResponse)
         assert result.success is True
 
-    @pytest.mark.asyncio
     async def test_passes_owner_access_key_as_param(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200

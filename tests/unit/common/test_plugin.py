@@ -88,7 +88,6 @@ def mock_entrypoints_with_class(
         )
 
 
-@pytest.mark.asyncio
 async def test_plugin_context_init_cleanup(etcd: AsyncEtcd, mocker: MockerFixture) -> None:
     print("test plugin context init cleanup")
     mocked_plugin = AsyncMock(DummyPlugin)
@@ -107,7 +106,6 @@ async def test_plugin_context_init_cleanup(etcd: AsyncEtcd, mocker: MockerFixtur
         ctx.plugins["dummy"].cleanup.assert_awaited_once()  # type: ignore[attr-defined]
 
 
-@pytest.mark.asyncio
 async def test_plugin_context_config_allow_and_block_list(
     etcd: AsyncEtcd, allow_and_block_list: tuple[set[str], set[str]]
 ) -> None:
@@ -120,7 +118,6 @@ async def test_plugin_context_config_allow_and_block_list(
     await ctx.init(allowlist=allowlist, blocklist=blocklist)
 
 
-@pytest.mark.asyncio
 async def test_plugin_context_config_allow_and_block_list_has_union(
     etcd: AsyncEtcd, allow_and_block_list_has_union: tuple[set[str], set[str]]
 ) -> None:
@@ -134,7 +131,6 @@ async def test_plugin_context_config_allow_and_block_list_has_union(
         await ctx.init(allowlist=allowlist, blocklist=blocklist)
 
 
-@pytest.mark.asyncio
 async def test_plugin_context_config(etcd: AsyncEtcd, mocker: MockerFixture) -> None:
     mocked_entrypoints = functools.partial(mock_entrypoints_with_class, plugin_cls=DummyPlugin)
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
@@ -154,7 +150,6 @@ async def test_plugin_context_config(etcd: AsyncEtcd, mocker: MockerFixture) -> 
         await ctx.cleanup()
 
 
-@pytest.mark.asyncio
 async def test_plugin_context_config_autoupdate(etcd: AsyncEtcd, mocker: MockerFixture) -> None:
     mocked_plugin = AsyncMock(DummyPlugin)
     mocked_entrypoints = functools.partial(
@@ -269,7 +264,6 @@ class DummyHookErrorPlugin(HookPlugin):
         raise ZeroDivisionError("oops")
 
 
-@pytest.mark.asyncio
 async def test_hook_dispatch(etcd: AsyncEtcd, mocker: MockerFixture) -> None:
     mocked_entrypoints = functools.partial(
         mock_entrypoints_with_class,
@@ -327,7 +321,6 @@ async def test_hook_dispatch(etcd: AsyncEtcd, mocker: MockerFixture) -> None:
         await ctx.cleanup()
 
 
-@pytest.mark.asyncio
 async def test_hook_notify(etcd: AsyncEtcd, mocker: MockerFixture) -> None:
     mocked_entrypoints = functools.partial(
         mock_entrypoints_with_class,
