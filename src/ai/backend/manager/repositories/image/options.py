@@ -158,6 +158,67 @@ class ImageConditions:
 
         return inner
 
+    # String filter factories for alias (exists subquery-based)
+    @staticmethod
+    def by_alias_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(ImageAliasRow.image_id == ImageRow.id)
+            if spec.case_insensitive:
+                subq = subq.where(ImageAliasRow.alias.ilike(f"%{spec.value}%"))
+            else:
+                subq = subq.where(ImageAliasRow.alias.like(f"%{spec.value}%"))
+            condition: sa.sql.expression.ColumnElement[bool] = sa.exists(subq)
+            if spec.negated:
+                condition = ~condition
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_alias_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(ImageAliasRow.image_id == ImageRow.id)
+            if spec.case_insensitive:
+                subq = subq.where(sa.func.lower(ImageAliasRow.alias) == spec.value.lower())
+            else:
+                subq = subq.where(ImageAliasRow.alias == spec.value)
+            condition: sa.sql.expression.ColumnElement[bool] = sa.exists(subq)
+            if spec.negated:
+                condition = ~condition
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_alias_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(ImageAliasRow.image_id == ImageRow.id)
+            if spec.case_insensitive:
+                subq = subq.where(ImageAliasRow.alias.ilike(f"{spec.value}%"))
+            else:
+                subq = subq.where(ImageAliasRow.alias.like(f"{spec.value}%"))
+            condition: sa.sql.expression.ColumnElement[bool] = sa.exists(subq)
+            if spec.negated:
+                condition = ~condition
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_alias_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(ImageAliasRow.image_id == ImageRow.id)
+            if spec.case_insensitive:
+                subq = subq.where(ImageAliasRow.alias.ilike(f"%{spec.value}"))
+            else:
+                subq = subq.where(ImageAliasRow.alias.like(f"%{spec.value}"))
+            condition: sa.sql.expression.ColumnElement[bool] = sa.exists(subq)
+            if spec.negated:
+                condition = ~condition
+            return condition
+
+        return inner
+
 
 class ImageOrders:
     """Query orders for images."""
