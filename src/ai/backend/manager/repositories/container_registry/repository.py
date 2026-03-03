@@ -106,14 +106,13 @@ class ContainerRegistryRepository:
             if reg_row is None:
                 raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
 
-            if updater.spec.has_allowed_groups_update is True:
-                await self._handle_allowed_groups_update(
-                    session, registry_id, updater.spec.allowed_groups.value()
-                )
-
             is_global_value = updater.spec.is_global.optional_value()
             if is_global_value is True:
                 await self._clear_all_allowed_groups(session, registry_id)
+            elif updater.spec.has_allowed_groups_update is True:
+                await self._handle_allowed_groups_update(
+                    session, registry_id, updater.spec.allowed_groups.value()
+                )
 
             to_update = updater.spec.build_values()
             if to_update == {}:  # means no fields to update or only allowed_groups updated
