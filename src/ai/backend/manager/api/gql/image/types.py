@@ -525,7 +525,7 @@ class ImageV2FilterGQL(GQLFilter):
     status: list[ImageV2StatusGQL] | None = None
     name: StringFilter | None = None
     architecture: StringFilter | None = None
-    alias: StringFilter | None = None
+    alias: StringFilter | None = strawberry.field(default=None, description="Added in 26.3.0.")
 
     AND: list[ImageV2FilterGQL] | None = None
     OR: list[ImageV2FilterGQL] | None = None
