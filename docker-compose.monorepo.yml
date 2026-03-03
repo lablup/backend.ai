@@ -20,6 +20,28 @@ services:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
+  backend-ai-agent:
+    image: backend.ai/agent:26.1.0rc1
+    container_name: backend-ai-agent
+    networks:
+      - half
+    ports:
+      - "6001:6001"
+      - "6003:6003"
+      - "30000-31000:30000-31000"
+    volumes:
+      - ./agent.toml:/etc/backend.ai/agent.toml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/backend.ai/ipc:/tmp/backend.ai/ipc
+      - ./scratches:/app/scratches
+    environment:
+      - PYTHONUNBUFFERED=1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    depends_on:
+      - backend-ai-manager
+
   backend-ai-webserver:
     image: backend.ai/webserver:26.1.0rc1
     container_name: backend-ai-webserver

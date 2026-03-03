@@ -1,7 +1,7 @@
 Install from Docker Containers
 ==============================
 
-This guide explains how to run Backend.AI components (manager, webserver) using Docker containers built from the monorepo.
+This guide explains how to run Backend.AI components (manager, agent, webserver) using Docker containers built from the monorepo.
 
 Prerequisites
 -------------
@@ -27,7 +27,7 @@ Prerequisites
 Building Docker Images
 ----------------------
 
-Build the manager and webserver Docker images:
+Build the Docker images:
 
 .. code-block:: bash
 
@@ -44,6 +44,13 @@ Build the manager and webserver Docker images:
    # Build manager image
    docker build -f docker/backend.ai-manager.Dockerfile \
      -t backend.ai/manager:${PKGVER} \
+     --build-arg PYTHON_VERSION=3.13 \
+     --build-arg PKGVER=${PKGVER} \
+     .
+
+   # Build agent image
+   docker build -f docker/backend.ai-agent.dockerfile \
+     -t backend.ai/agent:${PKGVER} \
      --build-arg PYTHON_VERSION=3.13 \
      --build-arg PKGVER=${PKGVER} \
      .
@@ -106,6 +113,62 @@ Create ``manager.toml`` with the following content:
    enabled = true
    log-level = "INFO"
    endpoint = "http://host.docker.internal:4317"
+
+Agent Configuration
+~~~~~~~~~~~~~~~~~~~
+
+Create ``agent.toml`` with the following content:
+
+.. code-block:: toml
+
+   # Backend.AI Agent configuration for Docker containers (DooD mode)
+
+   [etcd]
+   namespace = "local"
+   addr = { host = "host.docker.internal", port = 8121 }
+   user = ""
+   password = ""
+
+   [agent]
+   mode = "docker"
+   rpc-listen-addr = { host = "0.0.0.0", port = 6001 }
+   service-addr = { host = "0.0.0.0", port = 6003 }
+   agent-sock-port = 6007
+   scaling-group = "default"
+   ipc-base-path = "/tmp/backend.ai/ipc"
+   var-base-path = "/var/lib/backend.ai"
+   image-commit-path = "/tmp/backend.ai/commit/"
+
+   [container]
+   port-range = [30000, 31000]
+   bind-host = "host.docker.internal"
+   sandbox-type = "docker"
+   scratch-type = "hostdir"
+   scratch-root = "/app/scratches"
+   scratch-size = "1G"
+
+   [resource]
+   reserved-cpu = 1
+   reserved-mem = "1G"
+   reserved-disk = "8G"
+
+   [logging]
+   level = "INFO"
+   drivers = ["console"]
+
+   [logging.console]
+   colored = true
+   format = "verbose"
+
+   [debug]
+   enabled = true
+
+The agent runs in DooD (Docker-out-of-Docker) mode, using the host's Docker daemon
+via the mounted ``/var/run/docker.sock``. Key points:
+
+- ``container.bind-host`` must be ``host.docker.internal`` so session containers can reach the agent
+- ``ipc-base-path`` is shared with the manager via a host volume mount
+- ``scratch-root`` must be a host-mounted path since session containers mount scratch directories from the host
 
 Webserver Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -211,60 +274,18 @@ Create ``webserver.conf`` with the following content:
 
 Key configuration points for Docker containers:
 
-- Use ``host.docker.internal`` to access services on the host machine (etcd, PostgreSQL, OTEL)
-- Use container service names for inter-container communication (``backend-ai-manager``, ``backendai-half-redis-node01``)
+- Use ``host.docker.internal`` to access services on the host machine (etcd, PostgreSQL, Redis, OTEL)
+- Use container service names for inter-container communication (``backend-ai-manager``, ``backend-ai-agent``)
 - The webserver endpoint uses multiple values: first for container-to-container, second for browser access
+- Port numbers (8121, 8101, 8111) correspond to ``docker-compose.halfstack.current.yml``. Adjust if using a different halfstack configuration
 
 Running with Docker Compose
 ----------------------------
 
 The easiest way to run the components is using docker-compose.
 
-The ``docker-compose.monorepo.yml`` file includes both manager and webserver:
-
-.. code-block:: yaml
-
-   version: "3.8"
-
-   services:
-     backend-ai-manager:
-       image: backend.ai/manager:26.1.0rc1
-       container_name: backend-ai-manager
-       networks:
-         - half
-       ports:
-         - "8091:8091"
-       volumes:
-         - ./fixtures:/app/fixtures:ro
-         - ./manager.toml:/etc/backend.ai/manager.toml:ro
-         - ./logs:/var/log/backend.ai
-         - /tmp/backend.ai/ipc:/tmp/backend.ai/ipc
-         - /var/run/docker.sock:/var/run/docker.sock
-       environment:
-         - PYTHONUNBUFFERED=1
-       extra_hosts:
-         - "host.docker.internal:host-gateway"
-       restart: unless-stopped
-
-     backend-ai-webserver:
-       image: backend.ai/webserver:26.1.0rc1
-       container_name: backend-ai-webserver
-       networks:
-         - half
-       ports:
-         - "8090:8090"
-       volumes:
-         - ./webserver.conf:/etc/backend.ai/webserver.conf:ro
-       extra_hosts:
-         - "host.docker.internal:host-gateway"
-       restart: unless-stopped
-       depends_on:
-         - backend-ai-manager
-
-   networks:
-     half:
-       external: true
-       name: backendai_half
+The ``docker-compose.monorepo.yml`` file includes manager, agent, and webserver.
+Refer to the file in the repository for the latest configuration.
 
 Start the services:
 
@@ -294,6 +315,23 @@ Alternatively, you can run the containers manually:
      -e PYTHONUNBUFFERED=1 \
      --restart unless-stopped \
      backend.ai/manager:26.1.0rc1
+
+**Agent (DooD):**
+
+.. code-block:: bash
+
+   docker run -d \
+     --name backend-ai-agent \
+     --network backendai_half \
+     --add-host host.docker.internal:host-gateway \
+     -p 6001:6001 -p 6003:6003 -p 30000-31000:30000-31000 \
+     -v $(pwd)/agent.toml:/etc/backend.ai/agent.toml:ro \
+     -v /var/run/docker.sock:/var/run/docker.sock \
+     -v /tmp/backend.ai/ipc:/tmp/backend.ai/ipc \
+     -v $(pwd)/scratches:/app/scratches \
+     -e PYTHONUNBUFFERED=1 \
+     --restart unless-stopped \
+     backend.ai/agent:26.1.0rc1
 
 **Webserver:**
 
@@ -328,6 +366,7 @@ Check logs:
 .. code-block:: bash
 
    docker logs backend-ai-manager
+   docker logs backend-ai-agent
    docker logs backend-ai-webserver
 
 Connection issues
@@ -364,5 +403,5 @@ Or manually:
 
 .. code-block:: bash
 
-   docker stop backend-ai-manager backend-ai-webserver
-   docker rm backend-ai-manager backend-ai-webserver
+   docker stop backend-ai-manager backend-ai-agent backend-ai-webserver
+   docker rm backend-ai-manager backend-ai-agent backend-ai-webserver
