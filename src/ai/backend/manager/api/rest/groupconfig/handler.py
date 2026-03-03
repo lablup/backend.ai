@@ -147,10 +147,10 @@ class GroupConfigHandler:
 
     async def delete(
         self,
-        body: BodyParam[DeleteGroupDotfileRequest],
+        query: QueryParam[DeleteGroupDotfileRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        params = body.parsed
+        params = query.parsed
         log.info("GROUPCONFIG.DELETE(group:{})", params.group)
         resolve_result = await self._processors.dotfile.resolve_group.wait_for_complete(
             ResolveGroupAction(
