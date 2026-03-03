@@ -25,9 +25,13 @@ RUN install -m 0755 -d /etc/apt/keyrings \
 
 # Create necessary directories
 RUN mkdir -p /tmp/backend.ai/ipc /var/log/backend.ai /etc/backend.ai \
-    /var/lib/backend.ai /app/scratches
+    /var/lib/backend.ai
 
 # Set working directory
 WORKDIR /app
 
+COPY docker/agent-entrypoint.sh /usr/local/bin/agent-entrypoint.sh
+RUN chmod +x /usr/local/bin/agent-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/agent-entrypoint.sh"]
 CMD ["backend.ai", "ag", "start-server", "-f", "/etc/backend.ai/agent.toml"]

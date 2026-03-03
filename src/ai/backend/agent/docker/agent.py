@@ -1083,8 +1083,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             if sport["name"] in self.protected_services:
                 protected_service_ports.update(sport["container_ports"])
         for eport in exposed_ports:
-            if eport in self.repl_ports or eport in protected_service_ports:  # always protected
-                host_ips.append("127.0.0.1")
+            if eport in self.repl_ports or eport in protected_service_ports:
+                # In DooD (Docker-out-of-Docker) mode, the agent runs inside a container
+                # but creates session containers via the host Docker daemon.
+                # REPL ports must be accessible from the agent container, so they need to
+                # bind to the same host as other ports when advertised_host is configured.
+                if advertised_kernel_host:
+                    host_ips.append(str(container_bind_host))
+                else:
+                    host_ips.append("127.0.0.1")
             else:
                 host_ips.append(str(container_bind_host))
         if len(host_ips) != len(host_ports) or len(host_ports) != len(exposed_ports):

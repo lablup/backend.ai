@@ -26,14 +26,17 @@ services:
     networks:
       - half
     ports:
-      - "6001:6001"
-      - "6003:6003"
-      - "30000-31000:30000-31000"
+      - "6001:6001"       # RPC (Manager -> Agent)
+      - "6003:6003"       # Metrics/Internal API
+      # NOTE: Do NOT map service ports (30000-31000) here.
+      # In DooD mode, session containers bind these ports directly on the host.
+      # Mapping them to the agent container would cause port conflicts.
     volumes:
       - ./agent.toml:/etc/backend.ai/agent.toml:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /tmp/backend.ai/ipc:/tmp/backend.ai/ipc
-      - ./scratches:/app/scratches
+      - /var/run/docker.sock:/var/run/docker.sock     # DooD: host Docker daemon
+      - /tmp/backend.ai/ipc:/tmp/backend.ai/ipc       # IPC with session containers
+      - /tmp/scratches:/tmp/scratches                  # Scratch storage (must use host path)
+      - /tmp/backend-ai-krunner:/tmp/backend-ai-krunner  # Shared krunner files for DooD
     environment:
       - PYTHONUNBUFFERED=1
     extra_hosts:
@@ -56,6 +59,51 @@ services:
     restart: unless-stopped
     depends_on:
       - backend-ai-manager
+
+  backend-ai-storage-proxy:
+    image: backend.ai/storage-proxy:26.1.0rc1
+    container_name: backend-ai-storage-proxy
+    networks:
+      - half
+    ports:
+      - "6021:6021"       # Client API
+      - "6022:6022"       # Manager API
+    volumes:
+      - ./storage-proxy.toml:/etc/backend.ai/storage-proxy.toml:ro
+      - ./vfroot:/vfroot
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  backend-ai-appproxy-coordinator:
+    image: backend.ai/appproxy-coordinator:26.1.0rc1
+    container_name: backend-ai-appproxy-coordinator
+    networks:
+      - half
+    ports:
+      - "10200:10200"
+    volumes:
+      - ./proxy-coordinator.toml:/etc/backend.ai/proxy-coordinator.toml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    depends_on:
+      - backend-ai-manager
+
+  backend-ai-appproxy-worker:
+    image: backend.ai/appproxy-worker:26.1.0rc1
+    container_name: backend-ai-appproxy-worker
+    networks:
+      - half
+    ports:
+      - "10205-10300:10205-10300"   # Port proxy range
+    volumes:
+      - ./proxy-worker.toml:/etc/backend.ai/proxy-worker.toml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    depends_on:
+      - backend-ai-appproxy-coordinator
 
 networks:
   half:
