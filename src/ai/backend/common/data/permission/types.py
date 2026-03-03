@@ -291,9 +291,9 @@ class EntityType(enum.StrEnum):
 class FieldType(enum.StrEnum):
     """Field types for RBAC field-scoped entities.
 
-    Fields are sub-resources that belong to a parent entity.
-    Unlike EntityType which represents scope-scoped entities,
-    FieldType represents entity-scoped sub-entities.
+    Deprecated: No longer actively used. The field-scoped entity concept
+    (RBACFieldCreator/RBACFieldPurger) was removed by BEP-1048.
+    Kept only for the existing entity_fields table schema compatibility.
     """
 
     KERNEL = "kernel"
