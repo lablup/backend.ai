@@ -21,10 +21,13 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, NoPagination
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment.creators import RouteBatchUpdaterSpec
-from ai.backend.manager.repositories.deployment.options import RouteConditions
+from ai.backend.manager.repositories.deployment.options import (
+    DeploymentPolicyConditions,
+    RouteConditions,
+)
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 
 from .blue_green import blue_green_evaluate
@@ -60,9 +63,13 @@ class DeploymentStrategyEvaluator:
         endpoint_ids = {d.id for d in deployments}
 
         # ── 1. Bulk-load policies and routes ──
-        policy_map = await self._deployment_repo.fetch_deployment_policies_by_endpoint_ids(
-            endpoint_ids
+        policy_search = await self._deployment_repo.search_deployment_policies(
+            BatchQuerier(
+                pagination=NoPagination(),
+                conditions=[DeploymentPolicyConditions.by_endpoint_ids(endpoint_ids)],
+            )
         )
+        policy_map = {p.endpoint: p for p in policy_search.items}
         route_map = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(endpoint_ids)
 
         # ── 2. Per-deployment evaluation ──

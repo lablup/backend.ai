@@ -557,12 +557,14 @@ class DeploymentCoordinator:
         sub_steps = extract_sub_steps_for_entity(entity_id, records)
         if sub_status is not None:
             now = datetime.now(UTC)
-            sub_steps.append(SubStepResult(
-                step=sub_status.value,
-                result=scheduling_result,
-                started_at=now,
-                ended_at=now,
-            ))
+            sub_steps.append(
+                SubStepResult(
+                    step=sub_status.value,
+                    result=scheduling_result,
+                    started_at=now,
+                    ended_at=now,
+                )
+            )
         return sub_steps
 
     def _build_lifecycle_notification_event(
