@@ -1,13 +1,15 @@
 <!-- context-for-ai
 type: detail-doc
 parent: BEP-1049 (Kata Containers Agent Backend)
-scope: KataAgent, KataKernel, KataKernelCreationContext implementation
-depends-on: [configuration-deployment.md]
+scope: KataAgent, KataKernel, KataKernelCreationContext implementation; kernel runner boot sequence in guest VM
+depends-on: [configuration-deployment.md, storage-compatibility.md]
 key-decisions:
   - Full AbstractAgent implementation with Kata-specific lifecycle
   - Container management via containerd gRPC with Kata shim
-  - VSOCK for host-guest communication
-  - virtio-fs for storage sharing
+  - virtio-fs for storage sharing (scratch dirs, vfolders, krunner binaries)
+  - ZMQ TCP for agent↔kernel-runner communication (already TCP-based, works across VM boundary)
+  - Agent socket (/opt/kernel/agent.sock) not needed for Kata (only used by jail/C binaries, both skipped)
+  - entrypoint.sh requires Kata-specific variant (skip LD_PRELOAD/libbaihook, skip jail references)
 -->
 
 # BEP-1049: KataAgent Backend
@@ -18,7 +20,9 @@ KataAgent is the third `AbstractAgent` implementation that manages containers in
 
 ## Current Design
 
-The existing backend abstraction (`src/ai/backend/agent/types.py`):
+### Backend Abstraction
+
+The existing backend enum and dynamic import pattern (`src/ai/backend/agent/types.py`):
 
 ```python
 class AgentBackend(enum.StrEnum):
@@ -36,6 +40,86 @@ def get_agent_discovery(backend: AgentBackend) -> AbstractAgentDiscovery:
 - Merges accelerator plugin args via `update_nested_dict(container_config, plugin_args)`
 - Monitors events via `docker.events.subscribe()`
 - Shares storage via Docker bind mounts (zero overhead, direct kernel VFS)
+
+### Three-Package Architecture Inside Containers
+
+Backend.AI runs three software layers inside every container:
+
+| Package | Role | Lifecycle |
+|---------|------|-----------|
+| `ai.backend.runner` (`entrypoint.sh` + static binaries) | Bootstrap: user/group setup, SSH keys, LD_PRELOAD, password generation | Runs once at container start, then `exec`s the main program |
+| `ai.backend.kernel` (`BaseRunner` subclasses) | Long-running process (`bai-krunner`): receives commands from agent, executes user code, manages services | Runs for container lifetime |
+| `ai.backend.agent` (host-side) | Writes config files to scratch dirs, communicates with kernel runner via ZMQ TCP | Runs on host |
+
+**Boot sequence:**
+
+```
+Agent (host)                           Container (guest in Kata)
+─────────────────────────────────────────────────────────────────
+1. Create scratch dirs on host
+2. Write environ.txt, resource.txt,
+   intrinsic-ports.json, SSH keys
+   to scratch_dir/config/
+3. Create container with mounts        ──→ Container starts
+                                            │
+                                        4. entrypoint.sh runs:
+                                           - Create user/group (LOCAL_USER_ID)
+                                           - Set up LD_PRELOAD (Docker only)
+                                           - Symlink scp, extract dotfiles
+                                           - Generate random password
+                                           - exec su-exec → bai-krunner
+                                            │
+                                        5. BaseRunner.__init__():
+                                           - Read /home/config/environ.txt
+                                             → populate child_env + os.environ
+                                            │
+                                        6. BaseRunner._init():
+                                           - Read /home/config/intrinsic-ports.json
+                                             → determine ZMQ socket ports
+                                           - Bind ZMQ PULL on tcp://*:{insock_port}
+                                           - Bind ZMQ PUSH on tcp://*:{outsock_port}
+                                           - Parse service definitions
+                                            │
+                                        7. main_loop():
+                                           - Start sshd (dropbear) + ttyd
+                                           - Run user bootstrap.sh if present
+                                           - Enter ZMQ command loop
+                                            │
+8. Connect ZMQ PUSH to                 ←── Kernel runner ready
+   tcp://{guest_ip}:{repl_in_port}
+9. Connect ZMQ PULL to
+   tcp://{guest_ip}:{repl_out_port}
+```
+
+### Config Files in /home/config
+
+The agent writes several files to `scratch_dir/config/` before container creation. These are mounted read-only at `/home/config` inside the container:
+
+| File | Writer | Reader | Purpose |
+|------|--------|--------|---------|
+| `environ.txt` | Agent (`docker/agent.py:844-854`) | **Kernel runner** (`BaseRunner.__init__`, line 187) | `key=value` pairs loaded into `child_env` and `os.environ` for all subprocess execution |
+| `resource.txt` | Agent (`docker/agent.py:856-867`) | **Agent only** (recovery: `resources.py:887-910`, `scratch/utils.py:100-103`) | Serialized `KernelResourceSpec` — slot allocations, mounts, device mappings. NOT read by the kernel runner |
+| `intrinsic-ports.json` | Agent | **Kernel runner** (`BaseRunner._init`, line 244) | Maps service names to ports: `{"replin": 2000, "replout": 2001, "sshd": 2200, "ttyd": 7681}` |
+| `ssh/id_cluster` | Agent | **Kernel runner** (`intrinsic.py:89-130`) | Private key for inter-container SSH in multi-node sessions |
+| `ssh/id_cluster.pub` | Agent | **Kernel runner** (`intrinsic.py:130-140`) | Public key appended to `~/.ssh/authorized_keys` |
+| `ssh/port-mapping.json` | Agent | **Kernel runner** (`intrinsic.py:100-112`) | Cluster node SSH port mapping → written to `~/.ssh/config` |
+| `docker-creds.json` | Agent | Container bootstrap | Docker registry credentials for image pull inside container |
+| `environ_base.txt` | Agent (backup copy) | Agent (recovery) | Baseline copy of environ.txt for hot-update diffing |
+| `resource_base.txt` | Agent (backup copy) | Agent (recovery) | Baseline copy of resource.txt for hot-update diffing |
+
+**Key insight for Kata**: `environ.txt` and `intrinsic-ports.json` must be present **before** the kernel runner process starts — they are read during initialization. `resource.txt` is read only by the agent (host-side) for recovery after restarts and for tracking resource usage — it never crosses into the guest's runtime.
+
+### Agent Socket (agent.sock)
+
+The agent socket (`/opt/kernel/agent.sock`) is a ZMQ REP socket that serves requests from **C binaries inside the container** — not from the Python kernel runner. It handles three operations (`docker/agent.py:1733-1822`):
+
+1. `host-pid-to-container-pid` — PID namespace translation (used by jail sandbox)
+2. `container-pid-to-host-pid` — reverse PID translation (used by jail sandbox)
+3. `is-jail-enabled` — queries whether jail sandbox is active
+
+The socket is relayed via socat: agent binds TCP on `agent_sock_port`, a relay container proxies it to a Unix domain socket mounted inside the container. This exists solely for the jail sandbox and krunner C binaries.
+
+**For Kata**: The jail sandbox is skipped (VM boundary is stronger isolation), and PID translation is irrelevant (guest PIDs are isolated by the VM). The agent socket mount and socat relay are **not needed**.
 
 ## Proposed Design
 
@@ -77,8 +161,9 @@ class KataAgentDiscovery(AbstractAgentDiscovery):
         return await scan_available_resources(compute_device_types)
 
     async def prepare_krunner_env(self, local_config):
-        # Kata approach: krunner binaries must be baked into the guest rootfs
-        # image, not mounted as Docker volumes. Return paths to verify.
+        # Kata approach: krunner binaries are shared into the guest via
+        # virtio-fs from a host directory, or baked into the guest rootfs.
+        # No Docker volumes needed.
         return await prepare_krunner_env_kata(local_config)
 
 def get_agent_discovery() -> AbstractAgentDiscovery:
@@ -109,25 +194,8 @@ async def __ainit__(self):
     if not runtime_info:
         raise AgentError("Kata runtime not found in containerd")
 
-    # Detect hypervisor
     self._hypervisor = kata_config.hypervisor
     log.info("KataAgent initialized with hypervisor: {}", self._hypervisor)
-```
-
-**`scan_images()`** — Scan container images via containerd (not Docker):
-
-```python
-async def scan_images(self):
-    images = await self._containerd.list_images()
-    # Convert to Backend.AI image format
-    # containerd stores images with full references (registry/repo:tag)
-```
-
-**`pull_image()`** — Pull via containerd:
-
-```python
-async def pull_image(self, image_ref, registry_conf):
-    await self._containerd.pull_image(image_ref, auth=registry_conf)
 ```
 
 **Container lifecycle** — The core difference from DockerAgent:
@@ -136,7 +204,7 @@ async def pull_image(self, image_ref, registry_conf):
 DockerAgent:  docker.containers.create() → docker.containers.start()
 KataAgent:    containerd.create_container() → containerd.create_task() → task.start()
               ↓ (internally)
-              Kata shim boots VM → virtio-fs setup → VSOCK → kata-agent → container
+              Kata shim boots VM → virtio-fs setup → kata-agent → container
 ```
 
 **`destroy_kernel()`** — Stop and remove via containerd:
@@ -159,27 +227,105 @@ async def _handle_container_events(self):
             await self._handle_kernel_exit(kernel_id, event.exit_status)
 ```
 
+**No agent socket handler** — `handle_agent_socket()` is not started. The jail sandbox and PID translation operations it serves are both irrelevant inside a VM. This eliminates the socat relay container dependency.
+
 ### KataKernelCreationContext
 
 Key overrides that differ from `DockerKernelCreationContext`:
 
-**`prepare_scratch()`** — Create directories that will be shared via virtio-fs:
+**`prepare_scratch()`** — Create directories shared via virtio-fs:
 
-Scratch directories are still required for Kata despite the VM having its own boot disk. The VM boot disk (`kata-containers.img`) is a **read-only, shared mini-OS** that only contains the kata-agent — it is not per-session storage. Scratch directories serve a different purpose:
+The VM boot disk (`kata-containers.img`) is a read-only, shared mini-OS containing only the kata-agent. Scratch directories serve a different purpose — they carry per-session configuration and workspace:
 
-- `/home/config` (RO): Agent-written config files (`environ.txt`, `resource.txt`, SSH keys, accelerator configs) consumed by the kernel runner at startup
-- `/home/work` (RW): User's persistent workspace directory and vfolder mount point
-
-The `resource.txt` and `environ.txt` files remain necessary even with VM-level resource isolation. The hypervisor enforces resource **limits** (vCPU, memory), but these files communicate resource **metadata** to the kernel runner — what was allocated, environment variables for the session, accelerator device mappings, etc. The kernel runner reads them to configure the user's environment, not to enforce limits.
+- `/home/config` (RO): Agent-written config files consumed by entrypoint.sh and kernel runner at startup
+- `/home/work` (RW): User's persistent workspace and vfolder mount point
 
 ```python
 async def prepare_scratch(self):
-    # Same directory structure as Docker — these are shared into the
-    # guest VM via virtio-fs (not the VM boot disk, which is read-only)
     scratch_dir = self.scratch_root / str(self.kernel_id)
-    scratch_dir.mkdir(parents=True, exist_ok=True)
-    # Write environ.txt, resource.txt, etc. into scratch_dir
-    # These become visible inside the guest at /home/config via virtio-fs
+    config_dir = scratch_dir / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (scratch_dir / "work").mkdir(parents=True, exist_ok=True)
+```
+
+**`write_config_files()`** — Write environ.txt and resource.txt:
+
+```python
+async def write_config_files(self, environ, resource_spec):
+    # environ.txt — consumed by BaseRunner.__init__() inside the guest.
+    # Every key=value pair becomes part of the child process environment.
+    with StringIO() as buf:
+        for k, v in environ.items():
+            buf.write(f"{k}={v}\n")
+        for env in self.computer_docker_args.get("Env", []):
+            buf.write(f"{env}\n")
+        (self.config_dir / "environ.txt").write_bytes(buf.getvalue().encode("utf8"))
+
+    # resource.txt — read only by the agent (host-side) for recovery.
+    # The kernel runner does NOT read this file.
+    with StringIO() as buf:
+        resource_spec.write_to_file(buf)
+        for dev_type, device_alloc in resource_spec.allocations.items():
+            device_plugin = self.computers[dev_type].instance
+            kvpairs = await device_plugin.generate_resource_data(device_alloc)
+            for k, v in kvpairs.items():
+                buf.write(f"{k}={v}\n")
+        (self.config_dir / "resource.txt").write_bytes(buf.getvalue().encode("utf8"))
+
+    # intrinsic-ports.json — consumed by BaseRunner._init__() for
+    # ZMQ socket binding and service port assignment.
+    ports = {
+        "replin": self._repl_in_port,
+        "replout": self._repl_out_port,
+        "sshd": 2200,
+        "ttyd": 7681,
+    }
+    (self.config_dir / "intrinsic-ports.json").write_bytes(
+        json.dumps(ports).encode("utf8")
+    )
+```
+
+**`get_intrinsic_mounts()`** — Skip mounts that are unnecessary or incompatible with Kata:
+
+```python
+async def get_intrinsic_mounts(self) -> Sequence[Mount]:
+    mounts = []
+    # KEEP: scratch dirs (bidirectional sharing via virtio-fs)
+    mounts.append(Mount(MountTypes.BIND, self.config_dir, Path("/home/config"),
+                        MountPermission.READ_ONLY))
+    mounts.append(Mount(MountTypes.BIND, self.work_dir, Path("/home/work"),
+                        MountPermission.READ_WRITE))
+    # KEEP: timezone (guest rootfs ships UTC; override with host timezone)
+    mounts.extend(self._timezone_mounts())
+    # CHANGE: /tmp as guest-side tmpfs (no need to cross VM boundary)
+    mounts.append(Mount(MountTypes.TMPFS, None, Path("/tmp"),
+                        MountPermission.READ_WRITE))
+    # SKIP: lxcfs — guest kernel provides accurate /proc and /sys
+    # SKIP: agent.sock — only used by jail/C binaries, both skipped for Kata
+    # SKIP: domain socket proxies — UDS cannot cross VM boundary
+    # SKIP: deep learning samples — deprecated Docker volume
+    return mounts
+```
+
+**`mount_krunner()`** — Skip jail, libbaihook, accelerator LD_PRELOAD hooks:
+
+```python
+async def mount_krunner(self, resource_spec, environ):
+    # KEEP: krunner binaries (su-exec, entrypoint.sh, dropbearmulti, etc.)
+    # Shared from host via virtio-fs as individual file mounts.
+    for binary_name, target_path in KRUNNER_BINARY_MAP.items():
+        resource_spec.mounts.append(
+            Mount(MountTypes.BIND, self._krunner_dir / binary_name,
+                  Path(f"/opt/kernel/{target_path}"), MountPermission.READ_ONLY)
+        )
+    # KEEP: Python libraries (ai.backend.kernel, ai.backend.helpers)
+    resource_spec.mounts.extend(self._python_lib_mounts())
+
+    # SKIP: libbaihook.so + LD_PRELOAD — guest kernel provides accurate
+    # sysconf(_SC_NPROCESSORS_ONLN) natively
+    # SKIP: jail binary — VM boundary is stronger isolation
+    # SKIP: accelerator LD_PRELOAD hooks — VFIO passthrough makes GPU
+    # natively visible in guest; no hook libraries needed
 ```
 
 **`apply_accelerator_allocation()`** — Collect VFIO device info from plugins:
@@ -207,7 +353,6 @@ async def spawn(self):
         "mounts": self._build_virtio_fs_mounts(),
         "labels": self._build_labels(),
         "annotations": {
-            # VFIO devices passed via annotations for Kata shim
             "io.katacontainers.config.hypervisor.hotplug_vfio_on_root_bus": "true",
             **self._build_vfio_annotations(),
         },
@@ -221,6 +366,22 @@ async def spawn(self):
     return container.id
 ```
 
+### Kata-Specific entrypoint.sh
+
+The runner's `entrypoint.sh` needs a Kata-specific variant. The Docker version performs several operations that are incompatible or unnecessary:
+
+| Operation | Docker | Kata | Reason |
+|-----------|--------|------|--------|
+| Create user/group | Yes | **Yes** | Same user setup needed inside guest |
+| `LD_PRELOAD` → `/etc/ld.so.preload` | Yes | **No** | libbaihook.so is not mounted; guest kernel provides accurate sysconf |
+| `chown agent.sock` | Yes | **No** | Agent socket is not mounted |
+| Extract dotfiles | Yes | **Yes** | Same user environment customization |
+| SSH key setup | Yes | **Yes** | Same inter-container SSH support |
+| Password generation | Yes | **Yes** | Same session security model |
+| `exec su-exec` | Yes | **Yes** | Same privilege drop to user UID/GID |
+
+The Kata variant skips the `LD_PRELOAD` block and the `chown agent.sock` line, but is otherwise identical.
+
 ### KataKernel
 
 ```python
@@ -229,22 +390,33 @@ class KataKernel(AbstractKernel):
     sandbox_id: str          # Kata sandbox (VM) identifier
 
     async def create_code_runner(self):
-        # Code runner connects to the kernel process inside the guest VM.
-        # The connection path differs from Docker:
-        #   Docker: TCP localhost:<mapped_port>
-        #   Kata:   TCP <guest_ip>:<service_port> (routed via virtio-net)
-        # The guest IP is assigned by the CNI plugin and is reachable
-        # from the host via the TC-filter bridge.
-        return await create_code_runner(
+        # The agent↔kernel-runner communication channel is ZMQ TCP,
+        # which already works across the VM boundary without modification.
+        #
+        # Docker: agent connects to tcp://localhost:{host_mapped_port}
+        #         (Docker maps container port to a host port)
+        # Kata:   agent connects to tcp://{guest_ip}:{container_port}
+        #         (guest IP assigned by Calico CNI, reachable via TC filter)
+        #
+        # The kernel runner inside the guest binds:
+        #   insock  = tcp://*:{repl_in_port}   (ZMQ PULL)
+        #   outsock = tcp://*:{repl_out_port}   (ZMQ PUSH)
+        # These ports come from /home/config/intrinsic-ports.json.
+        return DockerCodeRunner(
             kernel_id=self.kernel_id,
-            host=self._guest_ip,
-            port=self._service_port,
+            kernel_host=self._guest_ip,
+            repl_in_port=self._repl_in_port,
+            repl_out_port=self._repl_out_port,
+            exec_timeout=self.exec_timeout,
+            client_features=client_features,
         )
 
     async def check_status(self):
         status = await self._containerd.get_task_status(self.container_id)
         return status == "running"
 ```
+
+The `DockerCodeRunner` class (or a renamed `CodeRunner` base) is reusable because its only transport is ZMQ over TCP — `get_repl_in_addr()` returns `tcp://{host}:{port}`. The difference is the address: Docker uses `localhost` with port mapping; Kata uses the guest's Calico-assigned IP with direct port access.
 
 ### ContainerdClient
 
@@ -286,17 +458,19 @@ This client uses `grpcio` (or `grpclib` for async) to communicate with container
 
 | Class | Extends | Key Responsibility |
 |-------|---------|-------------------|
-| `KataAgent` | `AbstractAgent[KataKernel, KataKernelCreationContext]` | Container lifecycle via containerd + Kata shim |
-| `KataKernel` | `AbstractKernel` | Guest VM container state, code runner connection |
-| `KataKernelCreationContext` | `AbstractKernelCreationContext` | VFIO device collection, virtio-fs mounts, containerd spawn |
+| `KataAgent` | `AbstractAgent[KataKernel, KataKernelCreationContext]` | Container lifecycle via containerd + Kata shim; no agent socket handler |
+| `KataKernel` | `AbstractKernel` | Guest VM container state; code runner connection via ZMQ TCP to guest IP |
+| `KataKernelCreationContext` | `AbstractKernelCreationContext` | Config file writing (environ.txt, resource.txt, intrinsic-ports.json); VFIO device collection; mount filtering (skip lxcfs, jail, agent.sock, libbaihook) |
 | `KataAgentDiscovery` | `AbstractAgentDiscovery` | Plugin loading, resource scanning, krunner env |
 | `ContainerdClient` | (standalone) | Async containerd gRPC wrapper |
 
 ## Implementation Notes
 
 - Kata runtime must be installed on the host; the agent does not install it
-- The krunner environment (entrypoint scripts, hook libraries) must be included in the guest rootfs image, unlike Docker where they are mounted from a host volume
 - Image format: standard OCI images work unchanged; containerd handles the pull and unpack
 - The `[container]` section settings (`scratch-root`, `port-range`) are shared between Docker and Kata backends
 - Intrinsic CPU/Memory plugins (`intrinsic.py`) can largely reuse the Docker versions; the main difference is that resource limits apply to the VM (host cgroup) rather than directly to the container process
 - Log collection: containerd tasks expose stdout/stderr via FIFO pipes, similar to Docker's log stream
+- `entrypoint.sh` needs a Kata variant that skips the `LD_PRELOAD` setup and `agent.sock` chown. This can be a conditional branch in the existing script (check an env var like `BACKENDAI_CONTAINER_BACKEND=kata`) or a separate entrypoint file
+- The `DockerCodeRunner` class can be reused directly for Kata — its only dependency is ZMQ TCP addressing, which works identically with a guest IP instead of localhost
+- `resource.txt` is written to `/home/config/` for agent-side recovery consistency, but the kernel runner never reads it. The hypervisor enforces resource limits (vCPU, memory) at the VM level; environ.txt communicates resource metadata to the kernel runner's child environment

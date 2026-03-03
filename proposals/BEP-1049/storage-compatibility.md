@@ -10,7 +10,7 @@ key-decisions:
   - lxcfs mounts skipped (guest kernel provides accurate /proc and /sys natively)
   - libbaihook.so LD_PRELOAD skipped (guest kernel provides accurate sysconf natively)
   - jail ptrace sandbox skipped (VM boundary is stronger isolation)
-  - Agent socket replaced with TCP (UDS cannot cross VM boundary)
+  - Agent socket skipped entirely (only used by jail/C binaries, both irrelevant for Kata)
   - Domain socket proxies deferred (UDS limitation; niche feature)
   - /tmp uses guest-side tmpfs (no need to cross VM boundary)
   - Core dump requires guest-side core_pattern configuration
@@ -145,7 +145,13 @@ Each mount is evaluated against the fundamental difference: Docker containers sh
 
 #### Mounts That Work Transparently (KEEP)
 
-**Scratch directories** (`/home/config` RO, `/home/work` RW): The agent creates these on the host and the Kata shim shares them via virtio-fs. Files written by the agent (environ.txt, resource.txt, SSH keys) are immediately visible in the guest. Files written by the container are immediately visible on the host. Bidirectional sync is inherent to virtio-fs.
+**Scratch directories** (`/home/config` RO, `/home/work` RW): The agent creates these on the host and the Kata shim shares them via virtio-fs. `/home/config` contains per-session configuration files written by the agent before container start:
+- `environ.txt` — read by `BaseRunner.__init__()` to populate the child process environment (`child_env` and `os.environ`)
+- `intrinsic-ports.json` — read by `BaseRunner._init()` for ZMQ socket binding and intrinsic service port assignment
+- `resource.txt` — read only by the **agent** (host-side) for recovery/resource tracking; NOT consumed by the kernel runner
+- `ssh/` — cluster SSH keys and port mappings, read by the kernel runner's `init_sshd_service()`
+
+`/home/work` is the user's persistent workspace and vfolder mount point. Bidirectional sync is inherent to virtio-fs — agent writes are immediately visible in the guest, and user writes are immediately visible on the host.
 
 **Timezone files** (`/etc/localtime`, `/etc/timezone`): Docker containers need these because they share the host kernel but not its timezone configuration files. Kata VMs also need them — the guest rootfs ships with UTC as default, but the container should match the host's timezone. Sharing via virtio-fs overrides the guest default.
 
@@ -163,16 +169,7 @@ Each mount is evaluated against the fundamental difference: Docker containers sh
 
 **Core dump mount**: In Docker, the host kernel's `/proc/sys/kernel/core_pattern` governs container processes because they share the host kernel. The agent bind-mounts the host's coredump directory so dumps land on the host filesystem. In Kata, the **guest kernel** has its own `core_pattern` — host-side configuration doesn't affect guest processes. To capture guest core dumps: configure the guest kernel's `core_pattern` to write to a virtio-fs-shared path (e.g., `/home/work/.coredumps`). Low priority for Phase 1.
 
-**Agent socket** (`/opt/kernel/agent.sock`): Unix domain sockets are host-kernel objects that cannot traverse the KVM boundary. The socket relay sidecar (`backendai-socket-relay`) is Docker-specific. For Kata, the kernel runner connects to the agent via **TCP over virtio-net**. No socket mount; connection info passed via environment variables:
-
-```python
-# KataKernelCreationContext — no agent.sock mount
-environ["BACKENDAI_AGENT_CONNECT"] = "tcp"
-environ["BACKENDAI_AGENT_HOST"] = self._agent_rpc_host
-environ["BACKENDAI_AGENT_PORT"] = str(self._agent_rpc_port)
-```
-
-VSOCK (`AF_VSOCK`) is a lower-latency alternative for future optimization — purpose-built for host-guest communication without network stack overhead, but requires socket API changes in both agent and kernel runner.
+**Agent socket** (`/opt/kernel/agent.sock`): This ZMQ REP socket is **not used by the Python kernel runner** — it serves requests from C binaries inside the container: `host-pid-to-container-pid` and `container-pid-to-host-pid` (PID namespace translation for the jail sandbox) and `is-jail-enabled` (jail status query). The socket is relayed via a socat sidecar (UDS inside container → TCP on host). For Kata, **both the jail sandbox and PID translation are irrelevant** (VM boundary provides stronger isolation, guest PIDs are isolated by KVM). The agent socket mount, socat relay, and `handle_agent_socket()` handler are all skipped. Note: the primary agent↔kernel-runner communication channel (ZMQ PUSH/PULL for code execution commands) is already TCP-based and works across the VM boundary without any changes.
 
 #### Mounts That Are Skipped (SKIP)
 
@@ -205,7 +202,7 @@ VSOCK (`AF_VSOCK`) is a lower-latency alternative for future optimization — pu
 | lxcfs `/proc/*`, `/sys/*` | Bind mount | N/A | **SKIP** — guest kernel provides |
 | `libbaihook.so` + `LD_PRELOAD` | Bind mount | N/A | **SKIP** — guest kernel provides |
 | `jail` sandbox | Bind mount | N/A | **SKIP** — VM is stronger isolation |
-| `/opt/kernel/agent.sock` | Unix socket | TCP / VSOCK | **REPLACE** — env vars |
+| `/opt/kernel/agent.sock` | Unix socket (jail/C binaries only) | N/A | **SKIP** — jail skipped, PID translation irrelevant in VM |
 | Domain socket proxies | Unix socket | N/A | **SKIP** — defer to future phase |
 | Core dump path | Host core_pattern | Guest core_pattern | **CHANGE** — guest-side config |
 | krunner volume (`/opt/backend.ai`) | Docker volume | virtio-fs / rootfs | **CHANGE** — no Docker volumes |
@@ -290,7 +287,7 @@ No new storage interfaces are introduced. The existing abstractions are reused:
 | `Mount` / `MountTypes` | `src/ai/backend/common/types.py:612` | None |
 | `MountPermission` | `src/ai/backend/common/types.py:603` | None |
 | `mount_vfolders()` | Agent method | Reuse as-is |
-| `get_intrinsic_mounts()` | Agent method | Override: skip lxcfs, domain socket proxies, deep learning samples; replace agent socket with TCP env vars; use guest-side tmpfs |
+| `get_intrinsic_mounts()` | Agent method | Override: skip lxcfs, agent socket, domain socket proxies, deep learning samples; use guest-side tmpfs |
 | `mount_krunner()` | Agent method | Override: skip libbaihook.so + LD_PRELOAD, skip jail; convert krunner Docker volume to bind mount; skip accelerator LD_PRELOAD hooks |
 | `process_mounts()` | Agent method | Override to produce OCI mount format (vs Docker API format) |
 
