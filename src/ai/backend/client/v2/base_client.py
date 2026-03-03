@@ -369,10 +369,13 @@ class BackendAIAnonymousClient:
         *,
         json: Any | None = None,
         params: dict[str, str] | None = None,
+        extra_headers: Mapping[str, str] | None = None,
     ) -> dict[str, Any] | list[Any] | None:
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
-        headers = self._build_headers(method, rel_url, content_type)
+        headers = {**self._build_headers(method, rel_url, content_type)}
+        if extra_headers:
+            headers.update(extra_headers)
         url = self._build_url(path)
         async with self._session.request(
             method,
@@ -400,11 +403,14 @@ class BackendAIAnonymousClient:
         request: BaseRequestModel | None = None,
         response_model: type[ResponseT],
         params: dict[str, str] | None = None,
+        extra_headers: Mapping[str, str] | None = None,
     ) -> ResponseT:
         json_body = (
             request.model_dump(mode="json", exclude_none=True) if request is not None else None
         )
-        data = await self._request(method, path, json=json_body, params=params)
+        data = await self._request(
+            method, path, json=json_body, params=params, extra_headers=extra_headers
+        )
         if data is None:
             raise BackendAPIError(
                 204,
@@ -416,28 +422,44 @@ class BackendAIAnonymousClient:
             )
         return cast(ResponseT, response_model.model_validate(data))
 
-    async def authorize(self, request: AuthorizeRequest) -> AuthorizeResponse:
+    async def authorize(
+        self,
+        request: AuthorizeRequest,
+        *,
+        extra_headers: Mapping[str, str] | None = None,
+    ) -> AuthorizeResponse:
         return await self._typed_request(
             "POST",
             "/auth/authorize",
             request=request,
             response_model=AuthorizeResponse,
+            extra_headers=extra_headers,
         )
 
-    async def signup(self, request: SignupRequest) -> SignupResponse:
+    async def signup(
+        self,
+        request: SignupRequest,
+        *,
+        extra_headers: Mapping[str, str] | None = None,
+    ) -> SignupResponse:
         return await self._typed_request(
             "POST",
             "/auth/signup",
             request=request,
             response_model=SignupResponse,
+            extra_headers=extra_headers,
         )
 
     async def update_password_no_auth(
-        self, request: UpdatePasswordNoAuthRequest
+        self,
+        request: UpdatePasswordNoAuthRequest,
+        *,
+        extra_headers: Mapping[str, str] | None = None,
     ) -> UpdatePasswordNoAuthResponse:
         return await self._typed_request(
             "POST",
             "/auth/update-password-no-auth",
             request=request,
             response_model=UpdatePasswordNoAuthResponse,
+            extra_headers=extra_headers,
         )
