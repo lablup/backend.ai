@@ -25,15 +25,6 @@ from ai.backend.common.dto.manager.template import (
     UpdateSessionTemplateResponse,
 )
 
-_HMAC_XFAIL = pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Client SDK v2 HMAC signing omits query params; server verifies against"
-        " request.raw_path (including ?param=...). Endpoints passing query params"
-        " cause 401."
-    ),
-)
-
 
 def _session_template_payload(name: str = "test-template") -> str:
     return json.dumps([
@@ -156,7 +147,6 @@ class TestGetSessionTemplate:
         assert isinstance(result, GetSessionTemplateResponse)
         assert result.name == "user-get-test"
 
-    @_HMAC_XFAIL
     async def test_get_with_format_param(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -180,7 +170,6 @@ class TestGetSessionTemplate:
 
 
 class TestListSessionTemplates:
-    @_HMAC_XFAIL
     async def test_list_session_templates(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -309,7 +298,6 @@ class TestCreateClusterTemplate:
 
 
 class TestGetClusterTemplate:
-    @_HMAC_XFAIL
     async def test_admin_gets_cluster_template(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -341,7 +329,6 @@ class TestGetClusterTemplate:
         assert isinstance(result, GetClusterTemplateResponse)
         assert result.root is not None
 
-    @_HMAC_XFAIL
     async def test_get_with_format_param(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -374,7 +361,6 @@ class TestGetClusterTemplate:
 
 
 class TestListClusterTemplates:
-    @_HMAC_XFAIL
     async def test_list_cluster_templates(
         self,
         admin_registry: BackendAIClientRegistry,

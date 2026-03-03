@@ -4770,6 +4770,18 @@ type Image
   hash: String
 }
 
+"""
+Added in 26.3.0. Nested filter for aliases belonging to an image. Filters images that have at least one alias matching all specified conditions.
+"""
+input ImageAliasNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by alias string. Supports equals, contains, startsWith, and endsWith.
+  """
+  alias: StringFilter = null
+}
+
 """Added in 25.3.0."""
 type ImageConnection
   @join__type(graph: GRAPHENE)
@@ -5052,6 +5064,9 @@ input ImageV2FilterGQL
   status: [ImageV2Status!] = null
   name: StringFilter = null
   architecture: StringFilter = null
+
+  """Added in 26.3.0. Filter by nested alias conditions."""
+  alias: ImageAliasNestedFilter = null
   AND: [ImageV2FilterGQL!] = null
   OR: [ImageV2FilterGQL!] = null
   NOT: [ImageV2FilterGQL!] = null
@@ -9336,12 +9351,17 @@ type Query
   """
   Added in 26.3.0. List role assignments with filtering and pagination (admin only).
   """
-  adminRoleAssignments(filter: RoleAssignmentFilter = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection! @join__field(graph: STRAWBERRY)
+  adminRoleAssignments(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.3.0. Search entity associations (admin only). Optionally filter by entity_type and entity_id.
   """
   adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.3.0. List roles assigned to the current authenticated user.
+  """
+  myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection @join__field(graph: STRAWBERRY)
@@ -10383,6 +10403,33 @@ input RoleAssignmentFilter
   @join__type(graph: STRAWBERRY)
 {
   roleId: UUID = null
+  role: RoleAssignmentRoleNestedFilter = null
+}
+
+"""Added in 26.3.0. Order by specification for role assignments"""
+input RoleAssignmentOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: RoleAssignmentOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.3.0. Role assignment ordering field"""
+enum RoleAssignmentOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  GRANTED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.3.0. Nested filter for roles within a role assignment. Filters assignments that have a role matching all specified conditions.
+"""
+input RoleAssignmentRoleNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  name: StringFilter = null
+  source: [RoleSource!] = null
+  status: [RoleStatus!] = null
 }
 
 """Added in 26.3.0. Role connection"""

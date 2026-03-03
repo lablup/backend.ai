@@ -52,6 +52,7 @@ def _make_processing_input() -> ProcessingInput:
         appproxy_client_pool=MagicMock(),
         prometheus_client=MagicMock(),
         agent_client_pool=MagicMock(),
+        distributed_lock_factory=MagicMock(),
     )
 
 

@@ -8,11 +8,8 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
-from ai.backend.manager.api.ratelimit import (
-    PrivateContext,
-    _rlim_window,
-    rlim_middleware,
-)
+from ai.backend.manager.api.rest.ratelimit.handler import _rlim_window, rlim_middleware
+from ai.backend.manager.api.rest.ratelimit.registry import RatelimitContext
 from ai.backend.manager.errors.api import RateLimitExceeded
 
 
@@ -43,8 +40,7 @@ class TestRlimMiddleware:
         app = MagicMock(spec=web.Application)
         mock_valkey_client = MagicMock(spec=ValkeyRateLimitClient)
         mock_valkey_client.execute_rate_limit_logic = AsyncMock()
-        app_ctx = PrivateContext()
-        app_ctx.valkey_rate_limit_client = mock_valkey_client
+        app_ctx = RatelimitContext(valkey_rate_limit_client=mock_valkey_client)
         app["ratelimit.context"] = app_ctx
         return app
 

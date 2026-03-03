@@ -3,8 +3,6 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-import pytest
-
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.error_log import (
     AppendErrorLogRequest,
@@ -125,14 +123,6 @@ class TestListErrorLogs:
         for log_entry in result.logs:
             assert log_entry.is_cleared is None  # non-admin does not see is_cleared
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 HMAC signing omits query params; server verifies against"
-            " request.raw_path (including ?param=...). Endpoints passing query params"
-            " cause 401."
-        ),
-    )
     async def test_list_logs_with_query_params(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -145,14 +135,6 @@ class TestListErrorLogs:
         )
         assert isinstance(result, ListErrorLogsResponse)
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 HMAC signing omits query params; server verifies against"
-            " request.raw_path (including ?param=...). Endpoints passing query params"
-            " cause 401."
-        ),
-    )
     async def test_list_logs_with_mark_read(
         self,
         admin_registry: BackendAIClientRegistry,

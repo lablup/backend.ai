@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.manager import READ_ALLOWED, server_status_required
 from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.server_status import READ_ALLOWED, server_status_required
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
@@ -28,7 +28,7 @@ def register_events_routes(deps: ModuleDeps) -> RouteRegistry:
     reg.app.cleanup_ctx.append(events_app_ctx)
 
     handler = EventsHandler(private_ctx=ctx)
-    _mw = [server_status_required(READ_ALLOWED), auth_required]
+    _mw = [server_status_required(READ_ALLOWED, deps.config_provider), auth_required]
 
     reg.add("GET", r"/session", handler.push_session_events, middlewares=_mw)
     reg.add("GET", r"/background-task", handler.push_background_task_events, middlewares=_mw)

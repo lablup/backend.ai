@@ -602,11 +602,11 @@ class SessionHandler:
 
     async def restart(
         self,
-        body: BodyParam[RestartSessionRequest],
+        query: QueryParam[RestartSessionRequest],
         ctx: RequestCtx,
     ) -> web.Response:
         request = ctx.request
-        params = body.parsed
+        params = query.parsed
         session_name = request.match_info["session_name"]
         scopes_param = {"owner_access_key": params.owner_access_key}
         requester_access_key, owner_access_key = await get_access_key_scopes(
@@ -637,11 +637,11 @@ class SessionHandler:
 
     async def destroy(
         self,
-        body: BodyParam[DestroySessionRequest],
+        query: QueryParam[DestroySessionRequest],
         ctx: RequestCtx,
     ) -> APIResponse:
         request = ctx.request
-        params = body.parsed
+        params = query.parsed
         session_name = request.match_info["session_name"]
         user_role = cast(UserRole, request["user"]["role"])
         scopes_param = {"owner_access_key": params.owner_access_key}
@@ -927,11 +927,11 @@ class SessionHandler:
 
     async def list_files(
         self,
-        body: BodyParam[ListFilesRequest],
+        query: QueryParam[ListFilesRequest],
         ctx: RequestCtx,
     ) -> APIResponse:
         request = ctx.request
-        params = body.parsed
+        params = query.parsed
         session_name = request.match_info["session_name"]
         requester_access_key, owner_access_key = await get_access_key_scopes(request)
         log.info(
@@ -957,11 +957,11 @@ class SessionHandler:
 
     async def rename_session(
         self,
-        body: BodyParam[RenameSessionRequest],
+        query: QueryParam[RenameSessionRequest],
         ctx: RequestCtx,
     ) -> web.Response:
         request = ctx.request
-        params = body.parsed
+        params = query.parsed
         session_name = request.match_info["session_name"]
         new_name = params.session_name
         requester_access_key, owner_access_key = await get_access_key_scopes(request)
@@ -987,11 +987,11 @@ class SessionHandler:
 
     async def commit_session(
         self,
-        body: BodyParam[CommitSessionRequest],
+        query: QueryParam[CommitSessionRequest],
         ctx: RequestCtx,
     ) -> APIResponse:
         request = ctx.request
-        params = body.parsed
+        params = query.parsed
         session_name: str = request.match_info["session_name"]
         requester_access_key, owner_access_key = await get_access_key_scopes(request)
         log.info(
@@ -1018,11 +1018,11 @@ class SessionHandler:
 
     async def convert_session_to_image(
         self,
-        body: BodyParam[ConvertSessionToImageRequest],
+        query: QueryParam[ConvertSessionToImageRequest],
         ctx: RequestCtx,
     ) -> APIResponse:
         request = ctx.request
-        params = body.parsed
+        params = query.parsed
         session_name: str = request.match_info["session_name"]
         requester_access_key, owner_access_key = await get_access_key_scopes(request)
         log.info(

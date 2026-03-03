@@ -37,14 +37,6 @@ class TestListServe:
         assert isinstance(result, list)
         assert len(result) == 0
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 HMAC signing omits query params; server verifies against"
-            " request.raw_path (including ?param=...). Endpoints passing query params"
-            " cause 401."
-        ),
-    )
     async def test_list_serve_with_name_filter(
         self,
         admin_registry: BackendAIClientRegistry,

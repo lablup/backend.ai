@@ -139,11 +139,11 @@ class UserConfigHandler:
 
     async def delete(
         self,
-        body: BodyParam[DeleteUserDotfileRequest],
+        query: QueryParam[DeleteUserDotfileRequest],
         ctx: UserContext,
         req: RequestCtx,
     ) -> APIResponse:
-        params = body.parsed
+        params = query.parsed
         requester_access_key, owner_access_key = await get_access_key_scopes(
             req.request,
             {"owner_access_key": params.owner_access_key},

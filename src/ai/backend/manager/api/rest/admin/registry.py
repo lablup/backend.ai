@@ -9,9 +9,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.admin import PrivateContext as AdminPrivateContext
-from ai.backend.manager.api.admin import init as admin_init
-from ai.backend.manager.api.admin import shutdown as admin_shutdown
 from ai.backend.manager.api.gql_legacy.schema import graphene_schema
 from ai.backend.manager.api.rest.auto_scaling_rule.registry import register_auto_scaling_rule_routes
 from ai.backend.manager.api.rest.domain.registry import register_domain_routes
@@ -31,12 +28,6 @@ if TYPE_CHECKING:
 def register_admin_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the admin tree: admin's own routes + six sub-registries."""
     reg = RouteRegistry.create("admin", deps.cors_options)
-
-    # Admin private context + lifecycle hooks
-    ctx = AdminPrivateContext()
-    reg.app["admin.context"] = ctx
-    reg.app.on_startup.append(admin_init)
-    reg.app.on_shutdown.append(admin_shutdown)
 
     # Admin's own routes (GraphQL)
     if deps.gql_context_deps is None:

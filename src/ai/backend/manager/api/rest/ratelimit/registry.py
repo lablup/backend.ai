@@ -1,13 +1,32 @@
-"""Ratelimit module registrar."""
+"""Ratelimit module registrar.
+
+The ValkeyRateLimitClient lifecycle (init/shutdown) is managed by the
+DependencyComposer infrastructure layer (``ValkeyDependency``).  This
+registry only wires the pre-created client into the sub-application
+context for the ``rlim_middleware`` to use.
+"""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import logging
+from typing import TYPE_CHECKING, Final
 
+import attrs
+
+from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
+
+log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+@attrs.define(slots=True, auto_attribs=True)
+class RatelimitContext:
+    valkey_rate_limit_client: ValkeyRateLimitClient
+    redis_rlim_script: str = ""
 
 
 def register_ratelimit_routes(deps: ModuleDeps) -> RouteRegistry:
@@ -15,33 +34,14 @@ def register_ratelimit_routes(deps: ModuleDeps) -> RouteRegistry:
 
     This module does not register any routes -- it only provides the
     ``rlim_middleware`` global middleware for rate-limiting authorized
-    requests.  The PrivateContext and lifecycle hooks are wired here so
-    that server.py can reference them from a single canonical location.
+    requests.  The ``RatelimitContext`` is populated from the pre-created
+    ValkeyRateLimitClient injected via ``ModuleDeps``.
     """
-    from ai.backend.manager.api.ratelimit import (
-        PrivateContext as RatelimitPrivateContext,
-    )
-    from ai.backend.manager.api.ratelimit import (
-        init as rlim_init,
-    )
-    from ai.backend.manager.api.ratelimit import (
-        shutdown as rlim_shutdown,
-    )
-
     reg = RouteRegistry.create("ratelimit", deps.cors_options)
-    ctx = RatelimitPrivateContext()
 
-    # Store ctx on app dict for backward compatibility (lifecycle functions
-    # read from app["ratelimit.context"]).
-    reg.app["ratelimit.context"] = ctx
+    if deps.valkey_rate_limit is not None:
+        ctx = RatelimitContext(valkey_rate_limit_client=deps.valkey_rate_limit)
+        reg.app["ratelimit.context"] = ctx
+        reg.ratelimit_ctx = ctx
 
-    # Expose ctx on the registry for typed access by server.py when
-    # installing rlim_middleware as a root-app middleware.
-    reg.ratelimit_ctx = ctx
-
-    # Wire lifecycle hooks
-    reg.app.on_startup.append(rlim_init)
-    reg.app.on_shutdown.append(rlim_shutdown)
-
-    # No routes to register -- ratelimit is middleware-only.
     return reg
