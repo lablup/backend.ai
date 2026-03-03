@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIAuthClient
+from ai.backend.client.v2.base_client import BackendAIAnonymousClient, BackendAIAuthClient
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.auth import AuthClient
@@ -36,7 +36,8 @@ class TestBackendAIClientRegistry:
         config = ClientConfig(endpoint=URL("https://api.example.com"))
         mock_session = MagicMock(spec_set=["request", "close"])
         client = BackendAIAuthClient(config, MockAuth(), mock_session)
-        return BackendAIClientRegistry(client)
+        anon_client = BackendAIAnonymousClient(config, MagicMock())
+        return BackendAIClientRegistry(client, anon_client)
 
     async def test_create_factory(self) -> None:
         config = ClientConfig(endpoint=URL("https://api.example.com"))
@@ -82,8 +83,11 @@ class TestBackendAIClientRegistry:
 
     async def test_close_delegates_to_client(self) -> None:
         mock_session = AsyncMock()
+        mock_anon_session = AsyncMock()
         config = ClientConfig(endpoint=URL("https://api.example.com"))
         client = BackendAIAuthClient(config, MockAuth(), mock_session)
-        registry = BackendAIClientRegistry(client)
+        anon_client = BackendAIAnonymousClient(config, mock_anon_session)
+        registry = BackendAIClientRegistry(client, anon_client)
         await registry.close()
         mock_session.close.assert_awaited_once()
+        mock_anon_session.close.assert_awaited_once()
