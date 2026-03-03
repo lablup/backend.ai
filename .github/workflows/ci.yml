@@ -38,12 +38,15 @@ jobs:
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
           if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.event.pull_request.base.repo.full_name }}" ]; then
+            echo "IS_FORK_PR=true" >> "${GITHUB_ENV}"
             # Fork PRs need full history to find the merge base
             echo "GIT_FETCH_DEPTH=0" >> "${GITHUB_ENV}"
           else
+            echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
             echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
           fi
         else
+          echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - name: Check out the revision with minimal required history
@@ -80,7 +83,7 @@ jobs:
     - name: Calculate base ref
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.event.pull_request.base.repo.full_name }}" ]; then
+          if [ "$IS_FORK_PR" == "true" ]; then
             # Fork PR: full history already fetched, just ensure the base SHA is available
             git fetch origin "${{ github.event.pull_request.base.sha }}"
           else
@@ -293,12 +296,15 @@ jobs:
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
           if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.event.pull_request.base.repo.full_name }}" ]; then
+            echo "IS_FORK_PR=true" >> "${GITHUB_ENV}"
             # Fork PRs need full history to find the merge base
             echo "GIT_FETCH_DEPTH=0" >> "${GITHUB_ENV}"
           else
+            echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
             echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
           fi
         else
+          echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - name: Check out the revision with minimal required history
@@ -342,7 +348,7 @@ jobs:
             tests/component/:: -- -v
         else
           if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-            if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.event.pull_request.base.repo.full_name }}" ]; then
+            if [ "$IS_FORK_PR" == "true" ]; then
               # Fork PR: full history already fetched, just ensure the base SHA is available
               git fetch origin "${{ github.event.pull_request.base.sha }}"
             else
