@@ -1,3 +1,4 @@
+from ai.backend.client.v2.base_client import BackendAIAnonymousClient, BackendAIAuthClient
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
@@ -25,8 +26,12 @@ from ai.backend.common.dto.manager.auth.response import (
 
 
 class AuthClient(BaseDomainClient):
+    def __init__(self, client: BackendAIAuthClient, anon_client: BackendAIAnonymousClient) -> None:
+        super().__init__(client)
+        self._anon_client = anon_client
+
     async def authorize(self, request: AuthorizeRequest) -> AuthorizeResponse:
-        return await self._client.typed_request(
+        return await self._anon_client.typed_request(
             "POST",
             "/auth/authorize",
             request=request,
@@ -34,7 +39,7 @@ class AuthClient(BaseDomainClient):
         )
 
     async def signup(self, request: SignupRequest) -> SignupResponse:
-        return await self._client.typed_request(
+        return await self._anon_client.typed_request(
             "POST",
             "/auth/signup",
             request=request,
@@ -71,7 +76,7 @@ class AuthClient(BaseDomainClient):
     async def update_password_no_auth(
         self, request: UpdatePasswordNoAuthRequest
     ) -> UpdatePasswordNoAuthResponse:
-        return await self._client.typed_request(
+        return await self._anon_client.typed_request(
             "POST",
             "/auth/update-password-no-auth",
             request=request,
