@@ -34,6 +34,7 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import RoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.options import (
     AssignedUserConditions,
+    AssignedUserOrders,
     RoleConditions,
     RoleOrders,
 )
@@ -311,6 +312,24 @@ class RoleOrderBy(GQLOrderBy):
                 return RoleOrders.created_at(ascending)
             case RoleOrderField.UPDATED_AT:
                 return RoleOrders.updated_at(ascending)
+
+
+@strawberry.enum(description="Added in 26.3.0. Role assignment ordering field")
+class RoleAssignmentOrderField(StrEnum):
+    GRANTED_AT = "granted_at"
+
+
+@strawberry.input(description="Added in 26.3.0. Order by specification for role assignments")
+class RoleAssignmentOrderBy(GQLOrderBy):
+    field: RoleAssignmentOrderField
+    direction: OrderDirection = OrderDirection.DESC
+
+    @override
+    def to_query_order(self) -> QueryOrder:
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case RoleAssignmentOrderField.GRANTED_AT:
+                return AssignedUserOrders.granted_at(ascending)
 
 
 # ==================== Input Types ====================

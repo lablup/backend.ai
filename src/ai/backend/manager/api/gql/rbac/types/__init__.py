@@ -34,6 +34,8 @@ from .role import (
     RoleAssignmentEdge,
     RoleAssignmentFilter,
     RoleAssignmentGQL,
+    RoleAssignmentOrderBy,
+    RoleAssignmentOrderField,
     RoleAssignmentRoleNestedFilter,
     RoleConnection,
     RoleEdge,
@@ -55,6 +57,7 @@ __all__ = [
     "RoleSourceGQL",
     "RoleStatusGQL",
     "RoleOrderField",
+    "RoleAssignmentOrderField",
     # Entity enums
     "EntityOrderField",
     # Types
@@ -71,6 +74,7 @@ __all__ = [
     # OrderBy
     "PermissionOrderBy",
     "RoleOrderBy",
+    "RoleAssignmentOrderBy",
     "EntityOrderBy",
     # Inputs
     "CreatePermissionInput",

@@ -50,6 +50,7 @@ class TestMyRoles:
             result = await resolver_fn(
                 info,
                 None,  # filter
+                None,  # order_by
                 None,  # before
                 None,  # after
                 10,  # first
@@ -80,6 +81,7 @@ class TestMyRoles:
                 await resolver_fn(
                     info,
                     None,  # filter
+                    None,  # order_by
                     None,  # before
                     None,  # after
                     None,  # first
@@ -111,6 +113,7 @@ class TestMyRoles:
             await resolver_fn(
                 info,
                 None,  # filter
+                None,  # order_by
                 "before_cursor",  # before
                 "after_cursor",  # after
                 5,  # first

@@ -5078,7 +5078,7 @@ type Query {
   """
   Added in 26.3.0. List role assignments with filtering and pagination (admin only).
   """
-  adminRoleAssignments(filter: RoleAssignmentFilter = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
+  adminRoleAssignments(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
 
   """
   Added in 26.3.0. Search entity associations (admin only). Optionally filter by entity_type and entity_id.
@@ -5088,7 +5088,7 @@ type Query {
   """
   Added in 26.3.0. List roles assigned to the current authenticated user.
   """
-  myRoles(filter: RoleAssignmentFilter = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
+  myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
 
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
@@ -5947,6 +5947,17 @@ type RoleAssignmentEdge {
 input RoleAssignmentFilter {
   roleId: UUID = null
   role: RoleAssignmentRoleNestedFilter = null
+}
+
+"""Added in 26.3.0. Order by specification for role assignments"""
+input RoleAssignmentOrderBy {
+  field: RoleAssignmentOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.3.0. Role assignment ordering field"""
+enum RoleAssignmentOrderField {
+  GRANTED_AT
 }
 
 """
