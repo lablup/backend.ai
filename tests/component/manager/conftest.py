@@ -814,7 +814,10 @@ async def app(bootstrap_config: BootstrapConfig) -> web.Application:
 
 
 @pytest.fixture
-async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncIterator[AppBuilder]:
+async def create_app_and_client(
+    bootstrap_config: BootstrapConfig,
+    server_module_deps_factory: Callable[[RootContext], ModuleDeps],
+) -> AsyncIterator[AppBuilder]:
     client: Client | None = None
     client_session: aiohttp.ClientSession | None = None
     runner: web.BaseRunner | None = None
@@ -871,11 +874,7 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
         # (e.g. processors_ctx is often omitted), so fall back to MagicMock
         # for deps that the test's cleanup contexts did not initialise.
         if all_registrars:
-            deps = ModuleDeps(
-                cors_options=root_ctx.cors_options,
-                processors=getattr(root_ctx, "processors", None) or MagicMock(),
-                config_provider=root_ctx.config_provider,
-            )
+            deps = server_module_deps_factory(root_ctx)
             register_modules(app, all_registrars, deps=deps)
 
         runner = web.AppRunner(app, handle_signals=False)

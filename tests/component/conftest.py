@@ -876,6 +876,7 @@ def server_module_deps_factory() -> ModuleDepsFactory:
             cors_options=root_ctx.cors_options,
             processors=getattr(root_ctx, "processors", None) or MagicMock(),
             config_provider=root_ctx.config_provider,
+            gql_context_deps=MagicMock(),
         )
 
     return _factory
