@@ -7,15 +7,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import object_storage as _object_storage_api
-from ai.backend.manager.api import vfs_storage as _vfs_storage_api
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.context import CleanupContext, RootContext
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.object_storage.registry import register_object_storage_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.rest.vfs_storage.registry import register_vfs_storage_routes
-from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.server import (
@@ -33,7 +30,7 @@ from ai.backend.manager.services.processors import ProcessorArgs, Processors, Se
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
-_STORAGE_SERVER_SUBAPP_MODULES = (_auth_api, _object_storage_api, _vfs_storage_api)
+_STORAGE_SERVER_SUBAPP_MODULES = (_auth_api,)
 
 
 @asynccontextmanager

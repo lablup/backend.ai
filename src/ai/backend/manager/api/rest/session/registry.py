@@ -18,17 +18,10 @@ if TYPE_CHECKING:
 
 def register_session_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the session sub-application."""
-    from ai.backend.manager.api.session import (
-        PrivateContext as SessionPrivateContext,
-    )
-    from ai.backend.manager.api.session import (
-        init as session_init,
-    )
-    from ai.backend.manager.api.session import (
-        shutdown as session_shutdown,
-    )
-
     from .handler import SessionHandler
+    from .lifecycle import PrivateContext as SessionPrivateContext
+    from .lifecycle import init as session_init
+    from .lifecycle import shutdown as session_shutdown
 
     reg = RouteRegistry.create("session", deps.cors_options)
     ctx = SessionPrivateContext()

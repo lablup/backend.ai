@@ -17,7 +17,7 @@ import json
 import uuid
 from decimal import Decimal
 from http import HTTPStatus
-from typing import Any, cast
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -32,10 +32,8 @@ from ai.backend.common.dto.manager.resource.request import (
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api.resource import get_container_registries
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
 from ai.backend.manager.dto.context import RequestCtx, UserContext
-from ai.backend.manager.errors.common import GenericForbidden
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -133,41 +131,6 @@ def superadmin_request(mock_root_ctx: MagicMock) -> MagicMock:
 # ---------------------------------------------------------------------------
 # Test Classes
 # ---------------------------------------------------------------------------
-
-
-class TestGetContainerRegistries:
-    """Tests for get_container_registries handler."""
-
-    async def test_returns_registries_from_result(
-        self,
-        superadmin_request: MagicMock,
-        mock_root_ctx: MagicMock,
-    ) -> None:
-        """Verify result.registries is returned as JSON response."""
-        expected_registries = {"docker.io": {"url": "https://docker.io"}}
-        mock_result = MagicMock()
-        mock_result.registries = expected_registries
-        mock_root_ctx.processors.container_registry.get_container_registries.wait_for_complete = (
-            AsyncMock(return_value=mock_result)
-        )
-
-        response = await get_container_registries(superadmin_request)
-
-        mock_root_ctx.processors.container_registry.get_container_registries.wait_for_complete.assert_called_once()
-        assert response.status == HTTPStatus.OK
-        # Verify response body contains expected registries
-        json_response = cast(web.Response, response)
-        assert json_response._body is not None
-        response_body = json.loads(cast(bytes, json_response._body))
-        assert response_body == expected_registries
-
-    async def test_rejects_non_superadmin_request(
-        self,
-        authorized_request: MagicMock,
-    ) -> None:
-        """Verify non-superadmin request is rejected."""
-        with pytest.raises(GenericForbidden):
-            await get_container_registries(authorized_request)
 
 
 class TestWatcherAgentStart:

@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.rbac import (
     SearchUsersAssignedToRolePathParam,
     SearchUsersAssignedToRoleRequest,
 )
-from ai.backend.manager.api.adapter import BaseFilterAdapter
+from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.permission.role import AssignedUserData
 from ai.backend.manager.repositories.base import (
     BatchQuerier,

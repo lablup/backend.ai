@@ -20,7 +20,7 @@ from ai.backend.common.api_handlers import (
     BodyParam,
     MiddlewareParam,
 )
-from ai.backend.manager.api.auth import (
+from ai.backend.manager.api.rest.middleware.auth import (
     admin_required,
     auth_middleware,
     auth_required,

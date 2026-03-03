@@ -13,17 +13,10 @@ if TYPE_CHECKING:
 
 def register_service_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the service (model serving) sub-application."""
-    from ai.backend.manager.api.service import (
-        PrivateContext as ServicePrivateContext,
-    )
-    from ai.backend.manager.api.service import (
-        init as service_init,
-    )
-    from ai.backend.manager.api.service import (
-        shutdown as service_shutdown,
-    )
-
     from .handler import ServiceHandler
+    from .lifecycle import PrivateContext as ServicePrivateContext
+    from .lifecycle import init as service_init
+    from .lifecycle import shutdown as service_shutdown
 
     reg = RouteRegistry.create("services", deps.cors_options)
     ctx = ServicePrivateContext()

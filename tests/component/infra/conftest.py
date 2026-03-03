@@ -15,16 +15,12 @@ from ai.backend.common.types import ResourceSlot, SlotName, SlotTypes, current_r
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
 from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import etcd as _etcd_api
-from ai.backend.manager.api import resource as _resource_api
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.context import CleanupContext, RootContext
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
 from ai.backend.manager.api.rest.resource.registry import register_resource_routes
 from ai.backend.manager.api.rest.scaling_group.registry import register_scaling_group_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
-from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.repositories.repositories import Repositories
@@ -40,8 +36,6 @@ from ai.backend.manager.server import (
     storage_manager_ctx,
 )
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
-
-_INFRA_SERVER_SUBAPP_MODULES = (_auth_api, _etcd_api, _resource_api)
 
 
 def _make_mock_agent_registry() -> MagicMock:

@@ -10,7 +10,7 @@ from ai.backend.common.dto.manager.rbac.request import (
     SearchEntitiesRequest,
 )
 from ai.backend.common.dto.manager.rbac.response import EntityDTO
-from ai.backend.manager.api.adapter import BaseFilterAdapter
+from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.permission.entity import EntityData
 from ai.backend.manager.repositories.base import (
     BatchQuerier,

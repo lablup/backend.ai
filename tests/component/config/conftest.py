@@ -21,13 +21,12 @@ from ai.backend.common.dto.manager.config import (
     DeleteUserDotfileRequest,
 )
 from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.context import CleanupContext, RootContext
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.domainconfig.registry import register_domainconfig_routes
 from ai.backend.manager.api.rest.groupconfig.registry import register_groupconfig_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.rest.userconfig.registry import register_userconfig_routes
-from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.server import (

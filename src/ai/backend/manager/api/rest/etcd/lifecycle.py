@@ -1,11 +1,7 @@
-"""Backward-compatibility shim for the etcd (config) module.
+"""Etcd (config) sub-app lifecycle hooks.
 
-All handler logic has been migrated to:
-
-* ``api.rest.etcd`` — EtcdHandler + route registration
-
-This module retains ``app_ctx()`` because it is still imported by
-``api.rest.etcd.registry`` for lifecycle management.
+Extracted from the legacy ``api/etcd.py`` module so that the
+``rest/etcd`` package owns its own startup/shutdown concerns.
 """
 
 from __future__ import annotations
@@ -16,7 +12,7 @@ from typing import TYPE_CHECKING
 from aiohttp import web
 
 if TYPE_CHECKING:
-    from .context import RootContext
+    from ai.backend.manager.api.context import RootContext
 
 
 async def app_ctx(app: web.Application) -> AsyncGenerator[None, None]:

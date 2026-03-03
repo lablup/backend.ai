@@ -8,13 +8,12 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.context import CleanupContext, RootContext
 from ai.backend.manager.api.rest import error_log as _error_log_rest
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.error_log.registry import register_error_log_routes
+from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.types import ModuleRegistrar
-from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.models.error_logs import error_logs
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs

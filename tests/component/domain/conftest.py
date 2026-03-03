@@ -16,17 +16,14 @@ from ai.backend.common.dto.manager.domain import (
     CreateDomainResponse,
     PurgeDomainRequest,
 )
+from ai.backend.manager.api.context import CleanupContext, RootContext
+from ai.backend.manager.api.rest.admin.registry import register_admin_routes
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import domain as _domain_api
-from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.rest.admin.registry import register_admin_routes
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
-from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 from ai.backend.manager.repositories.repositories import Repositories
@@ -42,8 +39,6 @@ from ai.backend.manager.server import (
     storage_manager_ctx,
 )
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
-
-_DOMAIN_SERVER_SUBAPP_MODULES = (_auth_api, _domain_api)
 
 DomainFactory = Callable[..., Coroutine[Any, Any, CreateDomainResponse]]
 

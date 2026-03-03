@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
 from typing import TYPE_CHECKING
 
 import attrs
@@ -62,7 +64,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.types import DistributedLockFactory
 
     from .gql.adapter import BaseGQLAdapter
-    from .types import CORSOptions
+    from .rest.types import CORSOptions
 
 
 class BaseContext:
@@ -125,3 +127,6 @@ class RootContext(BaseContext):
     sd_loop: ServiceDiscoveryLoop
     gql_adapter: BaseGQLAdapter
     health_probe: HealthProbe
+
+
+type CleanupContext = Callable[["RootContext"], AbstractAsyncContextManager[None]]

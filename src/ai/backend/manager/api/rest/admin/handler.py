@@ -29,7 +29,7 @@ from ai.backend.manager.api.gql_legacy.schema import (
     GQLMutationPrivilegeCheckMiddleware,
     GraphQueryContext,
 )
-from ai.backend.manager.api.manager import GQLMutationUnfrozenRequiredMiddleware
+from ai.backend.manager.api.rest.manager.lifecycle import GQLMutationUnfrozenRequiredMiddleware
 from ai.backend.manager.api.rest.types import GQLContextDeps
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import GraphQLError as BackendGQLError

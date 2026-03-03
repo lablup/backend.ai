@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.image.response import (
     ImageTagEntryDTO,
 )
 from ai.backend.common.dto.manager.image.types import ImageOrderField, OrderDirection
-from ai.backend.manager.api.adapter import BaseFilterAdapter
+from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.image.types import ImageData, ImageDataWithDetails
 from ai.backend.manager.repositories.base import (
     BatchQuerier,

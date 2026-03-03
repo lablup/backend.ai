@@ -20,13 +20,10 @@ from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
 from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import session as _session_api
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.context import CleanupContext, RootContext
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.session.registry import register_session_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
-from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import kernels
@@ -44,8 +41,6 @@ from ai.backend.manager.server import (
     storage_manager_ctx,
 )
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
-
-_SESSION_SERVER_SUBAPP_MODULES = (_auth_api, _session_api)
 
 
 @dataclass

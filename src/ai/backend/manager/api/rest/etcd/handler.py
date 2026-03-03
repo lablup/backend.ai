@@ -11,8 +11,6 @@ import logging
 from http import HTTPStatus
 from typing import Final
 
-from aiohttp import web
-
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
 from ai.backend.common.dto.manager.etcd.request import (
     DeleteConfigRequest,
@@ -27,9 +25,12 @@ from ai.backend.common.dto.manager.etcd.response import (
     ResourceSlotsResponse,
     VfolderTypesResponse,
 )
+from ai.backend.common.dto.manager.resource.response import ContainerRegistriesResponse
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.resource import get_container_registries
-from ai.backend.manager.dto.context import RequestCtx, UserContext
+from ai.backend.manager.dto.context import UserContext
+from ai.backend.manager.services.container_registry.actions.get_container_registries import (
+    GetContainerRegistriesAction,
+)
 from ai.backend.manager.services.etcd_config import (
     DeleteConfigAction,
     GetConfigAction,
@@ -90,13 +91,18 @@ class EtcdHandler:
     # GET /config/docker-registries  (deprecated)
     # ------------------------------------------------------------------
 
-    async def get_docker_registries(self, ctx: RequestCtx) -> web.StreamResponse:
+    async def get_docker_registries(self, ctx: UserContext) -> APIResponse:
         log.info("ETCD.GET_DOCKER_REGISTRIES ()")
         log.warning(
             "ETCD.GET_DOCKER_REGISTRIES has been deprecated because it no longer uses etcd."
             " Use /resource/container-registries API instead."
         )
-        return await get_container_registries(ctx.request)
+        result = (
+            await self._processors.container_registry.get_container_registries.wait_for_complete(
+                GetContainerRegistriesAction()
+            )
+        )
+        return APIResponse.build(HTTPStatus.OK, ContainerRegistriesResponse(root=result.registries))
 
     # ------------------------------------------------------------------
     # POST /config/get  (superadmin)

@@ -12,13 +12,11 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import object_storage as _object_storage_api
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.context import CleanupContext, RootContext
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.object_storage.registry import register_object_storage_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
-from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 from ai.backend.manager.repositories.repositories import Repositories
@@ -38,7 +36,7 @@ from ai.backend.manager.services.processors import ProcessorArgs, Processors, Se
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
-_OBJECT_STORAGE_SERVER_SUBAPP_MODULES = (_auth_api, _object_storage_api)
+_OBJECT_STORAGE_SERVER_SUBAPP_MODULES = (_auth_api,)
 
 ObjectStorageFixtureData = dict[str, Any]
 ObjectStorageFactory = Callable[..., Coroutine[Any, Any, ObjectStorageFixtureData]]

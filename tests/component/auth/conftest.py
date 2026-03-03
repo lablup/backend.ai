@@ -18,15 +18,14 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.plugin.hook import HookResult, HookResults
+from ai.backend.manager.api.context import CleanupContext, RootContext
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.types import ModuleRegistrar
-from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.group import association_groups_users

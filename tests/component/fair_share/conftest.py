@@ -11,13 +11,10 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import fair_share as _fair_share_api
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.context import CleanupContext, RootContext
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.fair_share.registry import register_fair_share_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
-from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.scaling_group import sgroups_for_groups
 from ai.backend.manager.repositories.repositories import Repositories
@@ -33,11 +30,6 @@ from ai.backend.manager.server import (
     storage_manager_ctx,
 )
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
-
-# Statically imported so that Pants includes these modules in the test PEX.
-# build_root_app() loads them at runtime via importlib.import_module(),
-# which Pants cannot trace statically.
-_FAIR_SHARE_SERVER_SUBAPP_MODULES = (_auth_api, _fair_share_api)
 
 
 @asynccontextmanager

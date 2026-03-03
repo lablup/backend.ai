@@ -13,7 +13,7 @@ from ai.backend.common.dto.manager.rbac.request import (
 )
 from ai.backend.common.dto.manager.rbac.response import ScopeDTO
 from ai.backend.common.dto.manager.rbac.types import OrderDirection, ScopeOrderField
-from ai.backend.manager.api.adapter import BaseFilterAdapter
+from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.permission.types import ScopeData
 from ai.backend.manager.repositories.base import (
     BatchQuerier,

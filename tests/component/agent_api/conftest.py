@@ -11,13 +11,10 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api import agent as _agent_api
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.context import CleanupContext, RootContext
 from ai.backend.manager.api.rest.agent.registry import register_agent_routes
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
-from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.repositories.repositories import Repositories
@@ -33,11 +30,6 @@ from ai.backend.manager.server import (
     storage_manager_ctx,
 )
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
-
-# Statically imported so that Pants includes these modules in the test PEX.
-# build_root_app() loads them at runtime via importlib.import_module(),
-# which Pants cannot trace statically.
-_AGENT_API_SERVER_SUBAPP_MODULES = (_auth_api, _agent_api)
 
 
 @asynccontextmanager

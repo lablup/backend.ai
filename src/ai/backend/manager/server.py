@@ -217,10 +217,8 @@ from .types import DistributedLockFactory, SMTPTriggerPolicy
 if TYPE_CHECKING:
     from ai.backend.manager.reporters.base import AbstractReporter
 
-    from .api.types import (
-        CleanupContext,
-        WebRequestHandler,
-    )
+    from .api.context import CleanupContext
+    from .api.rest.types import WebRequestHandler
 
 VALID_VERSIONS: Final = frozenset([
     # 'v1.20160915',  # deprecated

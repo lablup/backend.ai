@@ -14,13 +14,10 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import auto_scaling_rule as _auto_scaling_rule_api
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.context import CleanupContext, RootContext
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
-from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.endpoint import EndpointRow
@@ -54,12 +51,6 @@ class UserFixtureData:
     user_uuid: uuid.UUID
     keypair: KeypairFixtureData
     email: str = ""
-
-
-# Statically imported so that Pants includes these modules in the test PEX.
-# build_root_app() loads them at runtime via importlib.import_module(),
-# which Pants cannot trace statically.
-_AUTO_SCALING_RULE_SERVER_SUBAPP_MODULES = (_auth_api, _auto_scaling_rule_api)
 
 
 @asynccontextmanager

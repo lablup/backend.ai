@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+from ai.backend.manager.api.context import CleanupContext
 from ai.backend.manager.api.rest.types import ModuleRegistrar
-from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.server import monitoring_ctx
 
 

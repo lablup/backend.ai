@@ -13,17 +13,10 @@ if TYPE_CHECKING:
 
 def register_manager_api_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the manager sub-application."""
-    from ai.backend.manager.api.manager import (
-        PrivateContext as ManagerApiPrivateContext,
-    )
-    from ai.backend.manager.api.manager import (
-        init as manager_api_init,
-    )
-    from ai.backend.manager.api.manager import (
-        shutdown as manager_api_shutdown,
-    )
-
     from .handler import ManagerHandler
+    from .lifecycle import PrivateContext as ManagerApiPrivateContext
+    from .lifecycle import init as manager_api_init
+    from .lifecycle import shutdown as manager_api_shutdown
 
     reg = RouteRegistry.create("manager", deps.cors_options)
     ctx = ManagerApiPrivateContext()

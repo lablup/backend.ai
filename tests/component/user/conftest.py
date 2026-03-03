@@ -17,17 +17,14 @@ from ai.backend.common.dto.manager.user import (
     PurgeUserRequest,
     UserStatus,
 )
+from ai.backend.manager.api.context import CleanupContext, RootContext
+from ai.backend.manager.api.rest.admin.registry import register_admin_routes
+from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import user as _user_api
-from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.rest.admin.registry import register_admin_routes
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
-from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.user import users
@@ -44,8 +41,6 @@ from ai.backend.manager.server import (
     storage_manager_ctx,
 )
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
-
-_USER_SERVER_SUBAPP_MODULES = (_auth_api, _user_api)
 
 UserFactory = Callable[..., Coroutine[Any, Any, CreateUserResponse]]
 
