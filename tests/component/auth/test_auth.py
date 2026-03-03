@@ -79,14 +79,7 @@ class TestGetRole:
         assert result.global_role == "user"
         assert result.domain_role == "user"
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 HMAC signing omits query params from the signature, "
-            "but the server verifies against request.raw_path which includes ?group=..."
-        ),
-    )
-    async def test_get_role_with_group_xfail(
+    async def test_get_role_with_group(
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,

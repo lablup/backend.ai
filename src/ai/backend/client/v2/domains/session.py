@@ -127,7 +127,10 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: DestroySessionRequest | None = None,
     ) -> DestroySessionResponse:
-        params = request.model_dump(mode="json", exclude_none=True) if request else None
+        params: dict[str, str] | None = None
+        if request is not None:
+            raw = request.model_dump(mode="json", exclude_none=True)
+            params = {k: str(v) for k, v in raw.items()}
         return await self._client.typed_request(
             "DELETE",
             f"{_BASE_PATH}/{session_name}",
@@ -140,10 +143,11 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: RenameSessionRequest,
     ) -> None:
+        params = request.model_dump(mode="json", exclude_none=True)
         await self._client.typed_request_no_content(
             "POST",
             f"{_BASE_PATH}/{session_name}/rename",
-            params=request.model_dump(mode="json", exclude_none=True),
+            params={k: str(v) for k, v in params.items()},
         )
 
     async def interrupt(

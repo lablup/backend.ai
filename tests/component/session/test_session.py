@@ -70,10 +70,6 @@ class TestSessionRename:
 
 
 class TestSessionMatchSessions:
-    @pytest.mark.xfail(
-        strict=False,
-        reason="match_sessions query param conflicts with HMAC signing - SDK signing bug",
-    )
     async def test_admin_matches_sessions_by_name(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -87,10 +83,6 @@ class TestSessionMatchSessions:
         matched_ids = [str(m["id"]) for m in result.matches]
         assert str(session_seed.session_id) in matched_ids
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="match_sessions query param conflicts with HMAC signing - SDK signing bug",
-    )
     async def test_match_returns_empty_for_unknown_name(
         self,
         admin_registry: BackendAIClientRegistry,

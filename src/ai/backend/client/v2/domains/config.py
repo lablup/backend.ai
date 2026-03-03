@@ -66,10 +66,11 @@ class ConfigClient(BaseDomainClient):
         )
 
     async def delete_user_dotfile(self, request: DeleteUserDotfileRequest) -> DeleteDotfileResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "DELETE",
             "/user-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=DeleteDotfileResponse,
         )
 
@@ -133,10 +134,11 @@ class ConfigClient(BaseDomainClient):
     async def delete_group_dotfile(
         self, request: DeleteGroupDotfileRequest
     ) -> DeleteDotfileResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "DELETE",
             "/group-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=DeleteDotfileResponse,
         )
 
@@ -183,9 +185,10 @@ class ConfigClient(BaseDomainClient):
     async def delete_domain_dotfile(
         self, request: DeleteDomainDotfileRequest
     ) -> DeleteDotfileResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "DELETE",
             "/domain-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=DeleteDotfileResponse,
         )

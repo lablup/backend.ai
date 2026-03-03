@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
@@ -78,14 +77,6 @@ class TestListErrorLogs:
         assert result.count >= 1
         assert len(result.logs) >= 1
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 HMAC signing omits query params; server verifies against"
-            " request.raw_path (including ?param=...). Endpoints passing query params"
-            " cause 401."
-        ),
-    )
     async def test_admin_lists_error_logs_with_params(
         self,
         admin_registry: BackendAIClientRegistry,
