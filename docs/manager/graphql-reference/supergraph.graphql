@@ -10403,6 +10403,18 @@ input RoleAssignmentFilter
   @join__type(graph: STRAWBERRY)
 {
   roleId: UUID = null
+  role: RoleAssignmentRoleNestedFilter = null
+}
+
+"""
+Added in 26.3.0. Nested filter for roles within a role assignment. Filters assignments that have a role matching all specified conditions.
+"""
+input RoleAssignmentRoleNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  name: StringFilter = null
+  source: [RoleSource!] = null
+  status: [RoleStatus!] = null
 }
 
 """Added in 26.3.0. Role connection"""

@@ -331,6 +331,18 @@ class AssignedUserConditions:
 
         return inner
 
+    @staticmethod
+    def exists_role_combined(role_conditions: list[QueryCondition]) -> QueryCondition:
+        """Combine multiple role conditions into single EXISTS subquery."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(RoleRow.id == UserRoleRow.role_id)
+            for cond in role_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
+
+        return inner
+
 
 class AssignedUserOrders:
     """Query orders for assigned users."""

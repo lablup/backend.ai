@@ -27,7 +27,6 @@ class TestMyRoles:
             domain_name="default",
         )
 
-    @pytest.mark.asyncio
     async def test_calls_fetch_role_assignments_with_user_condition(
         self,
         user_data: UserData,
@@ -68,7 +67,6 @@ class TestMyRoles:
             base_conditions = call_args.kwargs["base_conditions"]
             assert len(base_conditions) == 1
 
-    @pytest.mark.asyncio
     async def test_raises_insufficient_privilege_when_not_authenticated(self) -> None:
         """Should raise InsufficientPrivilege when no user is authenticated."""
         info = MagicMock()
@@ -90,7 +88,6 @@ class TestMyRoles:
                     None,  # offset
                 )
 
-    @pytest.mark.asyncio
     async def test_passes_pagination_params(
         self,
         user_data: UserData,
