@@ -1217,6 +1217,7 @@ class ScheduleCoordinator:
                 spec=SessionStatusBatchUpdaterSpec(
                     to_status=transition.session,
                     status_changed_at=status_changed_at,
+                    reason="" if transition.session == SessionStatus.RUNNING else None,
                 ),
                 conditions=[SessionConditions.by_ids(session_ids)],
             )
