@@ -38,6 +38,9 @@ from ai.backend.manager.repositories.permission_controller.repositories import (
 from ai.backend.manager.repositories.project_resource_policy.repositories import (
     ProjectResourcePolicyRepositories,
 )
+from ai.backend.manager.repositories.prometheus_query_preset import (
+    PrometheusQueryPresetRepositories,
+)
 from ai.backend.manager.repositories.reservoir_registry.repositories import (
     ReservoirRegistryRepositories,
 )
@@ -87,6 +90,7 @@ class Repositories:
     notification: NotificationRepositories
     permission_controller: PermissionControllerRepositories
     project_resource_policy: ProjectResourcePolicyRepositories
+    prometheus_query_preset: PrometheusQueryPresetRepositories
     reservoir_registry: ReservoirRegistryRepositories
     resource_preset: ResourcePresetRepositories
     resource_slot: ResourceSlotRepositories
@@ -129,6 +133,7 @@ class Repositories:
         notification_repositories = NotificationRepositories.create(args)
         permission_controller_repositories = PermissionControllerRepositories.create(args)
         project_resource_policy_repositories = ProjectResourcePolicyRepositories.create(args)
+        prometheus_query_preset_repositories = PrometheusQueryPresetRepositories.create(args)
         reservoir_registry_repositories = ReservoirRegistryRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
         resource_slot_repositories = ResourceSlotRepositories.create(args)
@@ -170,6 +175,7 @@ class Repositories:
             notification=notification_repositories,
             permission_controller=permission_controller_repositories,
             project_resource_policy=project_resource_policy_repositories,
+            prometheus_query_preset=prometheus_query_preset_repositories,
             reservoir_registry=reservoir_registry_repositories,
             resource_preset=resource_preset_repositories,
             resource_slot=resource_slot_repositories,

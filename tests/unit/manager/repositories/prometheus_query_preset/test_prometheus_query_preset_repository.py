@@ -239,8 +239,8 @@ class TestPrometheusQueryPresetRepository:
         preset_repository: PrometheusQueryPresetRepository,
         sample_preset_id: uuid.UUID,
     ) -> None:
-        deleted = await preset_repository.delete(sample_preset_id)
-        assert deleted is True
+        result = await preset_repository.delete(sample_preset_id)
+        assert result is True
 
         with pytest.raises(PrometheusQueryPresetNotFound):
             await preset_repository.get_by_id(sample_preset_id)
@@ -249,5 +249,5 @@ class TestPrometheusQueryPresetRepository:
         self,
         preset_repository: PrometheusQueryPresetRepository,
     ) -> None:
-        result = await preset_repository.delete(uuid.uuid4())
-        assert result is False
+        with pytest.raises(PrometheusQueryPresetNotFound):
+            await preset_repository.delete(uuid.uuid4())

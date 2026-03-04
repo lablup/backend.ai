@@ -107,7 +107,11 @@ class PrometheusQueryPresetDBSource:
                 PrometheusQueryPresetRow.id == preset_id
             )
             result = await db_sess.execute(stmt)
-            return cast(CursorResult[Any], result).rowcount > 0
+            if cast(CursorResult[Any], result).rowcount == 0:
+                raise PrometheusQueryPresetNotFound(
+                    f"Prometheus query preset {preset_id} not found"
+                )
+            return True
 
     async def get_by_id(self, preset_id: UUID) -> PrometheusQueryPresetData:
         """Retrieves a prometheus query preset by ID."""
