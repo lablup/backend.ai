@@ -51,7 +51,7 @@ class BlueGreenStrategy(AbstractDeploymentStrategy):
             4. If all green failed → drain green → ROLLED_BACK.
             5. If not all green healthy → PROGRESSING (wait).
             6. If all green healthy + auto_promote=False → PROGRESSING (manual wait).
-            7. If all green healthy + auto_promote=True + delay>0 → PROGRESSING (delay wait).
+            7. If all green healthy + auto_promote=True + delay>0 → check elapsed time.
             8. If all green healthy + auto_promote=True + delay=0 → promote + COMPLETED.
         """
         deploying_rev = deployment.deploying_revision_id
