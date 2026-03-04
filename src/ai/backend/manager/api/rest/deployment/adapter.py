@@ -52,6 +52,7 @@ from ai.backend.common.dto.manager.deployment.types import (
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.api.adapter import BaseFilterAdapter
 from ai.backend.manager.data.deployment.creator import (
+    DeploymentPolicyConfig,
     DeploymentPolicyCreator,
     ModelRevisionCreator,
     NewDeploymentCreator,
@@ -482,8 +483,8 @@ class CreateDeploymentAdapter:
     def _build_policy_config(
         self,
         strategy_input: Any,  # DeploymentStrategyInput
-    ) -> DeploymentPolicyCreator:
-        """Build DeploymentPolicyCreator from strategy input."""
+    ) -> DeploymentPolicyConfig:
+        """Build DeploymentPolicyConfig from strategy input."""
         strategy = DeploymentStrategy(strategy_input.type)
 
         strategy_spec: RollingUpdateSpec | BlueGreenSpec
@@ -505,7 +506,7 @@ class CreateDeploymentAdapter:
                         promote_delay_seconds=strategy_input.blue_green.promote_delay_seconds,
                     )
 
-        return DeploymentPolicyCreator(
+        return DeploymentPolicyConfig(
             strategy=strategy,
             strategy_spec=strategy_spec,
             rollback_on_failure=strategy_input.rollback_on_failure,
