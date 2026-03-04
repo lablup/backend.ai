@@ -224,7 +224,9 @@ class RevisionAdapter(BaseFilterAdapter):
                 runtime_variant=data.model_runtime_config.runtime_variant,
             ),
             model_mount_config=ModelMountConfigDTO(
+                # TODO: Generating a random UUID when vfolder_id is None creates a reference to a non-existent vfolder. Should raise an error instead.
                 vfolder_id=data.model_mount_config.vfolder_id or uuid4(),
+                # TODO: Empty string is not a valid path when mount_destination is None. Should make it a required field or assign a sensible default path.
                 mount_destination=data.model_mount_config.mount_destination or "",
                 definition_path=data.model_mount_config.definition_path,
             ),
@@ -387,6 +389,7 @@ class AddRevisionAdapter:
             extra_mounts = [
                 MountInfo(
                     vfolder_id=mount.vfolder_id,
+                    # TODO: Empty string is not a valid path when mount_destination is None. Should make it a required field or assign a sensible default path.
                     kernel_path=PurePosixPath(mount.mount_destination or ""),
                 )
                 for mount in revision_input.extra_mounts
@@ -502,6 +505,7 @@ class CreateDeploymentAdapter:
             extra_mounts = [
                 MountInfo(
                     vfolder_id=mount.vfolder_id,
+                    # TODO: Empty string is not a valid path when mount_destination is None. Should make it a required field or assign a sensible default path.
                     kernel_path=PurePosixPath(mount.mount_destination or ""),
                 )
                 for mount in revision_input.extra_mounts

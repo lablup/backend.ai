@@ -611,20 +611,24 @@ class DeploymentService:
             image_id=merged_creator.image_id,
             resource_group=endpoint_info.metadata.resource_group,
             resource_slots=ResourceSlot(merged_creator.resource_spec.resource_slots),
+            # TODO: None and {} have different semantics (not provided vs empty options). CreatorSpec should accept Optional.
             resource_opts=merged_creator.resource_spec.resource_opts or {},
             cluster_mode=merged_creator.resource_spec.cluster_mode.value,
             cluster_size=merged_creator.resource_spec.cluster_size,
             model_id=merged_creator.mounts.model_vfolder_id,
             model_mount_destination=merged_creator.mounts.model_mount_destination,
             model_definition_path=merged_creator.mounts.model_definition_path,
+            # TODO: model_definition is always hardcoded to None. Should be propagated from input or loaded from service-definition.
             model_definition=None,
             startup_command=merged_creator.execution.startup_command,
             bootstrap_script=merged_creator.execution.bootstrap_script,
+            # TODO: None and {} have different semantics (not provided vs empty environ). CreatorSpec should accept Optional.
             environ=merged_creator.execution.environ or {},
             callback_url=str(merged_creator.execution.callback_url)
             if merged_creator.execution.callback_url
             else None,
             runtime_variant=merged_creator.execution.runtime_variant,
+            # TODO: Convert merged_creator.mounts.extra_mounts (list[MountInfo]) to Sequence[VFolderMount] instead of discarding.
             extra_mounts=(),
         )
         creator: Creator[DeploymentRevisionRow] = Creator(spec=spec)
