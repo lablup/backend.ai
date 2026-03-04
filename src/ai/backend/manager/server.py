@@ -363,16 +363,8 @@ def _setup_api(
         valkey_rate_limit=r.infrastructure.valkey.rate_limit,
         event_hub=r.messaging.event_hub,
         event_fetcher=r.messaging.event_fetcher,
-        stream_cleanup_handler=r.processing.stream_cleanup_handler,
-        events_service=r.processing.events_service,
-        stream_service=r.processing.stream_service,
         health_probe=r.system.health_probe,
-        db=r.infrastructure.db,
-        registry=r.agents.registry,
         error_monitor=r.monitoring.error_monitor,
-        valkey_live=r.infrastructure.valkey.live,
-        idle_checker_host=r.orchestration.idle_checker_host,
-        etcd=r.bootstrap.etcd,
         event_dispatcher=r.processing.event_dispatcher,
     )
 

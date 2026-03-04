@@ -46,9 +46,7 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.service.container_registry.harbor import (
     AbstractPerProjectContainerRegistryQuotaService,
 )
-from ai.backend.manager.services.events.service import EventsService
 from ai.backend.manager.services.processors import Processors, ServiceArgs
-from ai.backend.manager.services.stream.service import StreamService
 from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
@@ -136,8 +134,6 @@ class ProcessingResources:
     event_dispatcher: EventDispatcher
     processors: Processors
     stream_cleanup_handler: StreamCleanupEventHandler
-    events_service: EventsService
-    stream_service: StreamService
 
 
 def _make_registered_reporters(
@@ -329,22 +325,8 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             ),
         )
 
-        events_service = EventsService(
-            repository=setup_input.repositories.events.repository,
-            db=setup_input.db,
-        )
-        stream_service = StreamService(
-            repository=setup_input.repositories.stream.repository,
-            registry=setup_input.agent_registry,
-            valkey_live=setup_input.valkey_live,
-            idle_checker_host=setup_input.idle_checker_host,
-            etcd=setup_input.etcd,
-        )
-
         yield ProcessingResources(
             event_dispatcher=event_dispatcher,
             processors=processors,
             stream_cleanup_handler=dispatchers.stream_cleanup_handler,
-            events_service=events_service,
-            stream_service=stream_service,
         )

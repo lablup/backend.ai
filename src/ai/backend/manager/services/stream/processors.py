@@ -1,5 +1,7 @@
+from collections.abc import Awaitable, Callable
 from typing import override
 
+from ai.backend.common.types import KernelId
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
@@ -39,6 +41,8 @@ from ai.backend.manager.services.stream.service import StreamService
 
 
 class StreamProcessors(AbstractProcessorPackage):
+    _service: StreamService
+
     get_streaming_session: ActionProcessor[
         GetStreamingSessionAction, GetStreamingSessionActionResult
     ]
@@ -53,6 +57,7 @@ class StreamProcessors(AbstractProcessorPackage):
     ]
 
     def __init__(self, service: StreamService, action_monitors: list[ActionMonitor]) -> None:
+        self._service = service
         self.get_streaming_session = ActionProcessor(service.get_streaming_session, action_monitors)
         self.track_connection = ActionProcessor(service.track_connection, action_monitors)
         self.untrack_connection = ActionProcessor(service.untrack_connection, action_monitors)
@@ -63,6 +68,14 @@ class StreamProcessors(AbstractProcessorPackage):
         self.start_service_in_stream = ActionProcessor(
             service.start_service_in_stream, action_monitors
         )
+
+    def create_connection_refresh_callback(
+        self,
+        kernel_id: KernelId,
+        service: str,
+        stream_id: str,
+    ) -> Callable[..., Awaitable[None]]:
+        return self._service.create_connection_refresh_callback(kernel_id, service, stream_id)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:

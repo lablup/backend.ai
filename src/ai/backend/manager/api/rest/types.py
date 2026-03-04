@@ -29,9 +29,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.config.unified import ExportConfig
-    from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import (
-        StreamCleanupEventHandler,
-    )
     from ai.backend.manager.idle import IdleCheckerHost
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
     from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -41,9 +38,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
     from ai.backend.manager.repositories.user.repository import UserRepository
     from ai.backend.manager.service.base import ServicesContext
-    from ai.backend.manager.services.events.service import EventsService
     from ai.backend.manager.services.processors import Processors
-    from ai.backend.manager.services.stream.service import StreamService
 
     from .routing import RouteRegistry
 
@@ -100,10 +95,12 @@ class GQLContextDeps:
 class ModuleDeps:
     """Shared dependencies injected into all API module registrar functions."""
 
+    # Core (required)
     cors_options: CORSOptions
     processors: Processors
     config_provider: ManagerConfigProvider
     pidx: int = 0
+    # Per-module (optional)
     storage_manager: StorageSessionManager | None = None
     export_repository: ExportRepository | None = None
     export_config: ExportConfig | None = None
@@ -111,16 +108,8 @@ class ModuleDeps:
     valkey_rate_limit: ValkeyRateLimitClient | None = None
     event_hub: EventHub | None = None
     event_fetcher: EventFetcher | None = None
-    stream_cleanup_handler: StreamCleanupEventHandler | None = None
-    events_service: EventsService | None = None
-    stream_service: StreamService | None = None
     health_probe: HealthProbe | None = None
-    db: ExtendedAsyncSAEngine | None = None
-    registry: AgentRegistry | None = None
     error_monitor: ErrorPluginContext | None = None
-    valkey_live: ValkeyLiveClient | None = None
-    idle_checker_host: IdleCheckerHost | None = None
-    etcd: AsyncEtcd | None = None
     event_dispatcher: EventDispatcher | None = None
 
 

@@ -16,18 +16,11 @@ def register_events_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the events sub-application."""
     from .handler import EventsHandler, PrivateContext, events_app_ctx, events_shutdown
 
-    if (
-        deps.db is None
-        or deps.event_hub is None
-        or deps.event_fetcher is None
-        or deps.event_dispatcher is None
-    ):
+    if deps.event_hub is None or deps.event_fetcher is None or deps.event_dispatcher is None:
         raise RuntimeError(
-            "Events module requires db, event_hub, event_fetcher, event_dispatcher in ModuleDeps"
+            "Events module requires event_hub, event_fetcher, event_dispatcher in ModuleDeps"
         )
 
-    # Capture narrowed (non-None) references for use in closures.
-    db = deps.db
     event_hub = deps.event_hub
     event_fetcher = deps.event_fetcher
     event_dispatcher = deps.event_dispatcher
@@ -47,10 +40,9 @@ def register_events_routes(deps: ModuleDeps) -> RouteRegistry:
 
     handler = EventsHandler(
         private_ctx=ctx,
-        db=db,
+        events_processors=deps.processors.events,
         event_hub=event_hub,
         event_fetcher=event_fetcher,
-        event_dispatcher=event_dispatcher,
     )
     _mw = [server_status_required(READ_ALLOWED, deps.config_provider), auth_required]
 

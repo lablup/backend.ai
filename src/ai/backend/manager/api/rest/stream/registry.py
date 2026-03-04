@@ -18,28 +18,12 @@ def register_stream_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the stream sub-application."""
     from .handler import PrivateContext, StreamHandler, stream_app_ctx, stream_shutdown
 
-    if (
-        deps.db is None
-        or deps.registry is None
-        or deps.error_monitor is None
-        or deps.valkey_live is None
-        or deps.idle_checker_host is None
-        or deps.etcd is None
-        or deps.event_dispatcher is None
-    ):
-        raise RuntimeError(
-            "Stream module requires db, registry, error_monitor, valkey_live,"
-            " idle_checker_host, etcd, event_dispatcher in ModuleDeps"
-        )
+    if deps.error_monitor is None or deps.event_dispatcher is None:
+        raise RuntimeError("Stream module requires error_monitor, event_dispatcher in ModuleDeps")
 
-    # Capture narrowed (non-None) references for use in closures.
-    db = deps.db
-    registry = deps.registry
-    error_monitor = deps.error_monitor
-    valkey_live = deps.valkey_live
-    idle_checker_host = deps.idle_checker_host
-    etcd = deps.etcd
+    stream_processors = deps.processors.stream
     event_dispatcher = deps.event_dispatcher
+    error_monitor = deps.error_monitor
 
     reg = RouteRegistry.create("stream", deps.cors_options)
     ctx = PrivateContext()
@@ -53,10 +37,7 @@ def register_stream_routes(deps: ModuleDeps) -> RouteRegistry:
         lambda app: stream_app_ctx(
             app,
             ctx,
-            db=db,
-            valkey_live=valkey_live,
-            etcd=etcd,
-            idle_checker_host=idle_checker_host,
+            stream_processors=stream_processors,
             event_dispatcher=event_dispatcher,
         )
     )
@@ -64,14 +45,9 @@ def register_stream_routes(deps: ModuleDeps) -> RouteRegistry:
 
     handler = StreamHandler(
         private_ctx=ctx,
-        db=db,
-        registry=registry,
+        stream_processors=stream_processors,
         config_provider=deps.config_provider,
         error_monitor=error_monitor,
-        valkey_live=valkey_live,
-        idle_checker_host=idle_checker_host,
-        etcd=etcd,
-        event_dispatcher=event_dispatcher,
     )
     _mw = [server_status_required(READ_ALLOWED, deps.config_provider), auth_required]
 

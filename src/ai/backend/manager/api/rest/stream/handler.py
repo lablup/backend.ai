@@ -14,8 +14,7 @@ import secrets
 import uuid
 import weakref
 from collections import defaultdict
-from collections.abc import AsyncIterator, MutableMapping
-from datetime import timedelta
+from collections.abc import AsyncIterator
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -30,9 +29,7 @@ import zmq
 import zmq.asyncio
 from aiohttp import web
 from aiotools import apartial
-from etcd_client import GRPCStatusCode, GRPCStatusError
 
-from ai.backend.common import validators as tx
 from ai.backend.common.api_handlers import PathParam, QueryParam
 from ai.backend.common.dto.manager.stream.request import SessionNamePath, StreamProxyRequest
 from ai.backend.common.dto.manager.stream.response import StreamAppItem
@@ -45,29 +42,31 @@ from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.utils import call_non_bursty
 from ai.backend.manager.api.wsproxy import TCPProxy
-from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.kernel import (
-    InvalidStreamMode,
-    SessionNotFound,
-    TooManySessionsMatched,
-)
+from ai.backend.manager.errors.kernel import InvalidStreamMode
 from ai.backend.manager.errors.resource import AppNotFound, NoCurrentTaskContext
 from ai.backend.manager.errors.service import AppServiceStartFailed
-from ai.backend.manager.idle import AppStreamingStatus
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+from ai.backend.manager.services.stream.actions.execute_in_stream import ExecuteInStreamAction
+from ai.backend.manager.services.stream.actions.gc_stale_connections import (
+    GCStaleConnectionsAction,
+)
+from ai.backend.manager.services.stream.actions.get_streaming_session import (
+    GetStreamingSessionAction,
+)
+from ai.backend.manager.services.stream.actions.interrupt_in_stream import InterruptInStreamAction
+from ai.backend.manager.services.stream.actions.restart_in_stream import RestartInStreamAction
+from ai.backend.manager.services.stream.actions.start_service_in_stream import (
+    StartServiceInStreamAction,
+)
+from ai.backend.manager.services.stream.actions.track_connection import TrackConnectionAction
+from ai.backend.manager.services.stream.actions.untrack_connection import UntrackConnectionAction
 
 if TYPE_CHECKING:
-    from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-    from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.common.events.dispatcher import EventDispatcher
     from ai.backend.common.plugin.monitor import ErrorPluginContext
     from ai.backend.manager.config.provider import ManagerConfigProvider
-    from ai.backend.manager.idle import IdleCheckerHost
-    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-    from ai.backend.manager.registry import AgentRegistry
+    from ai.backend.manager.services.stream.processors import StreamProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -91,24 +90,14 @@ class StreamHandler:
         self,
         *,
         private_ctx: PrivateContext,
-        db: ExtendedAsyncSAEngine,
-        registry: AgentRegistry,
+        stream_processors: StreamProcessors,
         config_provider: ManagerConfigProvider,
         error_monitor: ErrorPluginContext,
-        valkey_live: ValkeyLiveClient,
-        idle_checker_host: IdleCheckerHost,
-        etcd: AsyncEtcd,
-        event_dispatcher: EventDispatcher,
     ) -> None:
         self._ctx = private_ctx
-        self.db = db
-        self.registry = registry
+        self._stream = stream_processors
         self.config_provider = config_provider
         self.error_monitor = error_monitor
-        self.valkey_live = valkey_live
-        self.idle_checker_host = idle_checker_host
-        self.etcd = etcd
-        self.event_dispatcher = event_dispatcher
 
     # ------------------------------------------------------------------
     # stream_pty (GET /stream/session/{session_name}/pty)
@@ -122,33 +111,27 @@ class StreamHandler:
     ) -> web.StreamResponse:
         request = ctx.request
         app_ctx = self._ctx
-        database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
         session_name = path.parsed.session_name
         access_key = AccessKey(user_ctx.access_key)
         api_version = request["api_version"]
-        try:
-            async with self.db.begin_readonly_session() as db_sess:
-                session = await asyncio.shield(
-                    database_ptask_group.create_task(
-                        SessionRow.get_session(
-                            db_sess,
-                            session_name,
-                            access_key,
-                            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                        )
-                    ),
-                )
-        except SessionNotFound:
-            raise
-        log.info("STREAM_PTY(ak:{0}, s:{1})", access_key, session_name)
-        compute_session: KernelRow = session.main_kernel
-        stream_key = compute_session.id
-
-        await asyncio.shield(
-            database_ptask_group.create_task(
-                self.registry.increment_session_usage(session),
-            )
+        result = await self._stream.get_streaming_session.wait_for_complete(
+            GetStreamingSessionAction(session_name=session_name, access_key=access_key),
         )
+        log.info("STREAM_PTY(ak:{0}, s:{1})", access_key, session_name)
+        stream_key = KernelId(uuid.UUID(result.kernel_id))
+        kernel_host: str
+        if result.kernel_host is None:
+            hostname = urlparse(result.agent_addr).hostname
+            if hostname is None:
+                raise InvalidAPIParameters(
+                    f"Cannot determine kernel host from agent address: {result.agent_addr}"
+                )
+            kernel_host = hostname.decode() if isinstance(hostname, bytes) else hostname
+        else:
+            kernel_host = result.kernel_host
+        repl_in_port = result.repl_in_port
+        repl_out_port = result.repl_out_port
+
         ws = web.WebSocketResponse(max_msg_size=self.config_provider.config.manager.max_wsmsg_size)
         await ws.prepare(request)
 
@@ -158,19 +141,16 @@ class StreamHandler:
         app_ctx.stream_pty_handlers[stream_key].add(myself)
 
         async def connect_streams(
-            kernel: KernelRow,
+            _kernel_host: str,
+            _repl_in_port: int,
+            _repl_out_port: int,
         ) -> tuple[zmq.asyncio.Socket, zmq.asyncio.Socket]:
-            if kernel.kernel_host is None:
-                hostname = urlparse(kernel.agent_addr).hostname
-                kernel_host = hostname.decode() if isinstance(hostname, bytes) else hostname
-            else:
-                kernel_host = kernel.kernel_host
-            stdin_addr = f"tcp://{kernel_host}:{kernel.repl_in_port}"
+            stdin_addr = f"tcp://{_kernel_host}:{_repl_in_port}"
             log.debug("stream_pty({0}): stdin: {1}", stream_key, stdin_addr)
             stdin_sock = app_ctx.zctx.socket(zmq.PUB)
             stdin_sock.connect(stdin_addr)
             stdin_sock.setsockopt(zmq.LINGER, 100)
-            stdout_addr = f"tcp://{kernel_host}:{kernel.repl_out_port}"
+            stdout_addr = f"tcp://{_kernel_host}:{_repl_out_port}"
             log.debug("stream_pty({0}): stdout: {1}", stream_key, stdout_addr)
             stdout_sock = app_ctx.zctx.socket(zmq.SUB)
             stdout_sock.connect(stdout_addr)
@@ -178,7 +158,7 @@ class StreamHandler:
             stdout_sock.subscribe(b"")
             return stdin_sock, stdout_sock
 
-        socks = list(await connect_streams(compute_session))
+        socks = list(await connect_streams(kernel_host, repl_in_port, repl_out_port))
         app_ctx.stream_stdin_socks[stream_key].add(socks[0])
         stream_sync = asyncio.Event()
 
@@ -195,7 +175,9 @@ class StreamHandler:
                             except (RuntimeError, zmq.error.ZMQError):
                                 app_ctx.stream_stdin_socks[stream_key].discard(socks[0])
                                 socks[1].close()
-                                stdin_sock, stdout_sock = await connect_streams(compute_session)
+                                stdin_sock, stdout_sock = await connect_streams(
+                                    kernel_host, repl_in_port, repl_out_port
+                                )
                                 socks[0] = stdin_sock
                                 socks[1] = stdout_sock
                                 app_ctx.stream_stdin_socks[stream_key].add(socks[0])
@@ -204,41 +186,41 @@ class StreamHandler:
                                 stream_sync.set()
                                 continue
                         else:
-                            await asyncio.shield(
-                                database_ptask_group.create_task(
-                                    self.registry.increment_session_usage(session),
-                                ),
-                            )
                             run_id = secrets.token_hex(8)
                             if data["type"] == "resize":
                                 code = f"%resize {data['rows']} {data['cols']}"
-                                await self.registry.execute(
-                                    session,
-                                    api_version,
-                                    run_id,
-                                    "query",
-                                    code,
-                                    {},
-                                    flush_timeout=None,
+                                await self._stream.execute_in_stream.wait_for_complete(
+                                    ExecuteInStreamAction(
+                                        session_name=session_name,
+                                        access_key=access_key,
+                                        api_version=api_version,
+                                        run_id=run_id,
+                                        mode="query",
+                                        code=code,
+                                        opts={},
+                                        flush_timeout=None,
+                                    ),
                                 )
                             elif data["type"] == "ping":
-                                await self.registry.execute(
-                                    session,
-                                    api_version,
-                                    run_id,
-                                    "query",
-                                    "%ping",
-                                    {},
-                                    flush_timeout=None,
+                                await self._stream.execute_in_stream.wait_for_complete(
+                                    ExecuteInStreamAction(
+                                        session_name=session_name,
+                                        access_key=access_key,
+                                        api_version=api_version,
+                                        run_id=run_id,
+                                        mode="query",
+                                        code="%ping",
+                                        opts={},
+                                        flush_timeout=None,
+                                    ),
                                 )
                             elif data["type"] == "restart":
                                 log.debug("stream_stdin: restart requested")
                                 if not socks[0].closed:
-                                    await asyncio.shield(
-                                        database_ptask_group.create_task(
-                                            self.registry.restart_session(
-                                                session,
-                                            ),
+                                    await self._stream.restart_in_stream.wait_for_complete(
+                                        RestartInStreamAction(
+                                            session_name=session_name,
+                                            access_key=access_key,
                                         ),
                                     )
                                     socks[0].close()
@@ -323,36 +305,17 @@ class StreamHandler:
         """WebSocket-version of gateway.kernel.execute()."""
         request = ctx.request
         app_ctx = self._ctx
-        database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
-        rpc_ptask_group: aiotools.PersistentTaskGroup = request.app["rpc_ptask_group"]
 
         config = self.config_provider.config
-        registry = self.registry
         session_name = path.parsed.session_name
         access_key = AccessKey(user_ctx.access_key)
         api_version = request["api_version"]
         log.info("STREAM_EXECUTE(ak:{0}, s:{1})", access_key, session_name)
-        try:
-            async with self.db.begin_readonly_session() as db_sess:
-                session: SessionRow = await asyncio.shield(
-                    database_ptask_group.create_task(
-                        SessionRow.get_session(
-                            db_sess,
-                            session_name,
-                            access_key,
-                            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                        ),
-                    ),
-                )
-        except SessionNotFound:
-            raise
-        stream_key = session.main_kernel.id
-
-        await asyncio.shield(
-            database_ptask_group.create_task(
-                registry.increment_session_usage(session),
-            )
+        session_result = await self._stream.get_streaming_session.wait_for_complete(
+            GetStreamingSessionAction(session_name=session_name, access_key=access_key),
         )
+        stream_key = KernelId(uuid.UUID(session_result.kernel_id))
+
         ws = web.WebSocketResponse(max_msg_size=config.manager.max_wsmsg_size)
         await ws.prepare(request)
 
@@ -377,15 +340,26 @@ class StreamHandler:
             opts = params.get("options", None) or {}
 
             while True:
-                raw_result = await registry.execute(
-                    session, api_version, run_id, mode, code, opts, flush_timeout=0.2
+                exec_result = await self._stream.execute_in_stream.wait_for_complete(
+                    ExecuteInStreamAction(
+                        session_name=session_name,
+                        access_key=access_key,
+                        api_version=api_version,
+                        run_id=run_id,
+                        mode=mode,
+                        code=code,
+                        opts=opts,
+                        flush_timeout=0.2,
+                    ),
                 )
+                raw_result = exec_result.result
                 if ws.closed:
                     log.debug("STREAM_EXECUTE: client disconnected (interrupted)")  # type: ignore[unreachable]
-                    await asyncio.shield(
-                        rpc_ptask_group.create_task(
-                            registry.interrupt_session(session),
-                        )
+                    await self._stream.interrupt_in_stream.wait_for_complete(
+                        InterruptInStreamAction(
+                            session_name=session_name,
+                            access_key=access_key,
+                        ),
                     )
                     break
                 await ws.send_json({
@@ -446,7 +420,6 @@ class StreamHandler:
     ) -> web.StreamResponse:
         request = ctx.request
         app_ctx = self._ctx
-        database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
         rpc_ptask_group: aiotools.PersistentTaskGroup = request.app["rpc_ptask_group"]
         session_name: str = path.parsed.session_name
         access_key = AccessKey(user_ctx.access_key)
@@ -455,37 +428,25 @@ class StreamHandler:
         myself = asyncio.current_task()
         if myself is None:
             raise NoCurrentTaskContext("No current task context")
-        try:
-            async with self.db.begin_readonly_session() as db_sess:
-                session = await asyncio.shield(
-                    database_ptask_group.create_task(
-                        SessionRow.get_session(
-                            db_sess,
-                            session_name,
-                            access_key,
-                            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                        ),
-                    )
-                )
-        except (SessionNotFound, TooManySessionsMatched):
-            raise
-        kernel: KernelRow = session.main_kernel
-        kernel_id = kernel.id
-        session_id = SessionId(session.id)
+        session_result = await self._stream.get_streaming_session.wait_for_complete(
+            GetStreamingSessionAction(session_name=session_name, access_key=access_key),
+        )
+        kernel_id = KernelId(uuid.UUID(session_result.kernel_id))
+        session_id = SessionId(uuid.UUID(session_result.session_id))
         stream_key = kernel_id
         stream_id = uuid.uuid4().hex
         app_ctx.stream_proxy_handlers[stream_key].add(myself)
         kernel_host: str
-        if kernel.kernel_host is None:
-            hostname = urlparse(kernel.agent_addr).hostname
+        if session_result.kernel_host is None:
+            hostname = urlparse(session_result.agent_addr).hostname
             if hostname is None:
                 raise InvalidAPIParameters(
-                    f"Cannot determine kernel host from agent address: {kernel.agent_addr}"
+                    f"Cannot determine kernel host from agent address: {session_result.agent_addr}"
                 )
             kernel_host = hostname.decode() if isinstance(hostname, bytes) else hostname
         else:
-            kernel_host = kernel.kernel_host
-        service_ports: list[dict[str, Any]] = kernel.service_ports or []
+            kernel_host = session_result.kernel_host
+        service_ports: list[dict[str, Any]] = session_result.service_ports
         sport: dict[str, Any] = {}
         host_port: int = 0
         dest: tuple[str, int] = ("", 0)
@@ -526,11 +487,10 @@ class StreamHandler:
         else:
             raise InvalidAPIParameters(f"Unsupported service protocol: {sport['protocol']}")
 
-        valkey_live = self.valkey_live
         conn_tracker_key = f"session.{kernel_id}.active_app_connections"
-
-        async def update_connection_tracker() -> None:
-            await valkey_live.update_app_connection_tracker(str(kernel_id), service, stream_id)
+        update_connection_tracker = self._stream.create_connection_refresh_callback(
+            kernel_id, service, stream_id
+        )
 
         async def refresh_cb(_kernel_id_str: str, _data: bytes) -> None:
             await asyncio.shield(
@@ -551,10 +511,13 @@ class StreamHandler:
         async def add_conn_track() -> None:
             async with app_ctx.conn_tracker_lock:
                 app_ctx.active_session_ids[kernel_id] += 1
-                await valkey_live.update_connection_tracker(str(kernel_id), service, stream_id)
-                await self.idle_checker_host.update_app_streaming_status(
-                    session_id,
-                    AppStreamingStatus.HAS_ACTIVE_CONNECTIONS,
+                await self._stream.track_connection.wait_for_complete(
+                    TrackConnectionAction(
+                        kernel_id=kernel_id,
+                        session_id=session_id,
+                        service=service,
+                        stream_id=stream_id,
+                    ),
                 )
 
         async def clear_conn_track() -> None:
@@ -562,40 +525,36 @@ class StreamHandler:
                 app_ctx.active_session_ids[kernel_id] -= 1
                 if app_ctx.active_session_ids[kernel_id] <= 0:
                     del app_ctx.active_session_ids[kernel_id]
-                await valkey_live.remove_connection_tracker(str(kernel_id), service, stream_id)
-                remaining_count = await valkey_live.count_active_connections(str(kernel_id))
-                if remaining_count == 0:
-                    await self.idle_checker_host.update_app_streaming_status(
-                        session_id,
-                        AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
-                    )
+                await self._stream.untrack_connection.wait_for_complete(
+                    UntrackConnectionAction(
+                        kernel_id=kernel_id,
+                        session_id=session_id,
+                        service=service,
+                        stream_id=stream_id,
+                    ),
+                )
 
         try:
-            await asyncio.shield(
-                database_ptask_group.create_task(
-                    add_conn_track(),
-                )
-            )
-            await asyncio.shield(
-                database_ptask_group.create_task(
-                    self.registry.increment_session_usage(session),
-                )
-            )
+            await add_conn_track()
 
-            opts: MutableMapping[str, None | str | list[str]] = {}
+            opts: dict[str, Any] = {}
             if params.arguments is not None:
                 opts["arguments"] = load_json(params.arguments)
             if params.envs is not None:
                 opts["envs"] = load_json(params.envs)
 
-            result = await asyncio.shield(
-                rpc_ptask_group.create_task(
-                    self.registry.start_service(session, service, opts),
+            start_result = await self._stream.start_service_in_stream.wait_for_complete(
+                StartServiceInStreamAction(
+                    session_name=session_name,
+                    access_key=access_key,
+                    service=service,
+                    opts=opts,
                 ),
             )
-            if result["status"] == "failed":
+            if start_result.result.get("status") == "failed":
                 raise AppServiceStartFailed(
-                    "Failed to launch the app service", extra_data=result["error"]
+                    "Failed to launch the app service",
+                    extra_data=start_result.result.get("error"),
                 )
 
             ws = web.WebSocketResponse(
@@ -617,7 +576,7 @@ class StreamHandler:
             raise
         finally:
             app_ctx.stream_proxy_handlers[stream_key].discard(myself)
-            await asyncio.shield(database_ptask_group.create_task(clear_conn_track()))
+            await clear_conn_track()
 
     # ------------------------------------------------------------------
     # get_stream_apps (GET /stream/session/{session_name}/apps)
@@ -631,17 +590,12 @@ class StreamHandler:
     ) -> web.StreamResponse:
         session_name = path.parsed.session_name
         access_key = AccessKey(user_ctx.access_key)
-        async with self.db.begin_readonly_session() as db_sess:
-            compute_session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
-        raw_service_ports = compute_session.main_kernel.service_ports
-        if raw_service_ports is None:
+        result = await self._stream.get_streaming_session.wait_for_complete(
+            GetStreamingSessionAction(session_name=session_name, access_key=access_key),
+        )
+        service_ports: list[dict[str, Any]] = result.service_ports
+        if not service_ports:
             return web.json_response([])
-        service_ports: list[dict[str, Any]] = raw_service_ports
         resp: list[dict[str, Any]] = []
         for item in service_ports:
             app_item = StreamAppItem(
@@ -666,76 +620,40 @@ async def handle_kernel_terminating(
     _source: AgentId,
     event: KernelTerminatingBroadcastEvent,
     *,
-    db: ExtendedAsyncSAEngine,
     app_ctx: PrivateContext,
 ) -> None:
-    try:
-        kernel = await KernelRow.get_kernel(
-            db,
-            event.kernel_id,
-            allow_stale=True,
-        )
-    except SessionNotFound:
-        return
-    if kernel.cluster_role == DEFAULT_ROLE:
-        stream_key = kernel.id
-        cancelled_tasks: list[asyncio.Task[Any]] = []
-        for sock in app_ctx.stream_stdin_socks[stream_key]:
-            sock.close()
-        for handler in list(app_ctx.stream_pty_handlers.get(stream_key, [])):
-            handler.cancel()
-            cancelled_tasks.append(handler)
-        for handler in list(app_ctx.stream_execute_handlers.get(stream_key, [])):
-            handler.cancel()
-            cancelled_tasks.append(handler)
-        for handler in list(app_ctx.stream_proxy_handlers.get(stream_key, [])):
-            handler.cancel()
-            cancelled_tasks.append(handler)
+    stream_key = event.kernel_id
+    cancelled_tasks: list[asyncio.Task[Any]] = []
+    for sock in app_ctx.stream_stdin_socks[stream_key]:
+        sock.close()
+    for handler in list(app_ctx.stream_pty_handlers.get(stream_key, [])):
+        handler.cancel()
+        cancelled_tasks.append(handler)
+    for handler in list(app_ctx.stream_execute_handlers.get(stream_key, [])):
+        handler.cancel()
+        cancelled_tasks.append(handler)
+    for handler in list(app_ctx.stream_proxy_handlers.get(stream_key, [])):
+        handler.cancel()
+        cancelled_tasks.append(handler)
+    if cancelled_tasks:
         await asyncio.gather(*cancelled_tasks, return_exceptions=True)
 
 
 async def stream_conn_tracker_gc(
     app_ctx: PrivateContext,
     *,
-    valkey_live: ValkeyLiveClient,
-    etcd: AsyncEtcd,
-    idle_checker_host: IdleCheckerHost,
+    stream_processors: StreamProcessors,
 ) -> None:
     try:
         while True:
-            try:
-                no_packet_timeout: timedelta = tx.TimeDuration().check(
-                    await etcd.get("config/idle/app-streaming-packet-timeout") or "5m",
-                )
-            except GRPCStatusError as e:
-                err_detail = e.args[0]
-                if err_detail["code"] == GRPCStatusCode.Unavailable:
-                    log.warning(
-                        "stream_conn_tracker_gc(): error while connecting to Etcd server,"
-                        " retrying..."
+            active_ids = list(app_ctx.active_session_ids.keys())
+            if active_ids:
+                try:
+                    await stream_processors.gc_stale_connections.wait_for_complete(
+                        GCStaleConnectionsAction(active_session_ids=active_ids),
                     )
-                    continue
-                raise e
-            async with app_ctx.conn_tracker_lock:
-                now = await valkey_live.get_server_time()
-                for session_id in app_ctx.active_session_ids.keys():
-                    prev_remaining_count = await valkey_live.count_active_connections(
-                        str(session_id)
-                    )
-                    removed_count = await valkey_live.remove_stale_connections(
-                        str(session_id),
-                        now - no_packet_timeout.total_seconds(),
-                    )
-                    remaining_count = await valkey_live.count_active_connections(str(session_id))
-                    log.debug(
-                        f"conn_tracker: gc {session_id} "
-                        f"removed/remaining = {removed_count}/{remaining_count}",
-                    )
-                    if prev_remaining_count > 0 and remaining_count == 0:
-                        await idle_checker_host.update_app_streaming_status(
-                            SessionId(session_id),
-                            AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
-                        )
+                except Exception:
+                    log.warning("stream_conn_tracker_gc(): error during GC, retrying...")
             await asyncio.sleep(10)
     except asyncio.CancelledError:
         pass
@@ -745,10 +663,7 @@ async def stream_app_ctx(
     app: web.Application,
     priv_ctx: PrivateContext,
     *,
-    db: ExtendedAsyncSAEngine,
-    valkey_live: ValkeyLiveClient,
-    etcd: AsyncEtcd,
-    idle_checker_host: IdleCheckerHost,
+    stream_processors: StreamProcessors,
     event_dispatcher: EventDispatcher,
 ) -> AsyncIterator[None]:
     """Initialize stream application context."""
@@ -764,16 +679,14 @@ async def stream_app_ctx(
     app_ctx.conn_tracker_gc_task = asyncio.create_task(
         stream_conn_tracker_gc(
             app_ctx,
-            valkey_live=valkey_live,
-            etcd=etcd,
-            idle_checker_host=idle_checker_host,
+            stream_processors=stream_processors,
         )
     )
 
     event_dispatcher.subscribe(
         KernelTerminatingBroadcastEvent,
         app,
-        lambda app, src, ev: handle_kernel_terminating(app, src, ev, db=db, app_ctx=app_ctx),
+        lambda app, src, ev: handle_kernel_terminating(app, src, ev, app_ctx=app_ctx),
     )
 
     yield

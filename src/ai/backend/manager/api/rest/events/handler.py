@@ -17,7 +17,6 @@ from typing import (
 from weakref import WeakSet
 
 import attrs
-import sqlalchemy as sa
 from aiohttp import web
 from aiohttp_sse import sse_response
 
@@ -55,18 +54,20 @@ from ai.backend.common.types import AccessKey, AgentId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.errors.kernel import SessionNotFound
-from ai.backend.manager.errors.resource import NoCurrentTaskContext, ProjectNotFound
-from ai.backend.manager.events.hub.propagators.session import SessionEventPropagator
+from ai.backend.manager.errors.resource import NoCurrentTaskContext
 from ai.backend.manager.exceptions import InvalidArgument
-from ai.backend.manager.models.group import groups
-from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.services.events.actions.resolve_group_for_events import (
+    ResolveGroupForEventsAction,
+)
+from ai.backend.manager.services.events.actions.resolve_session_for_events import (
+    ResolveSessionForEventsAction,
+)
 
 if TYPE_CHECKING:
     from ai.backend.common.events.fetcher import EventFetcher
     from ai.backend.common.events.hub.hub import EventHub
-    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+    from ai.backend.manager.services.events.processors import EventsProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -83,16 +84,14 @@ class EventsHandler:
         self,
         *,
         private_ctx: PrivateContext,
-        db: ExtendedAsyncSAEngine,
+        events_processors: EventsProcessors,
         event_hub: EventHub,
         event_fetcher: EventFetcher,
-        event_dispatcher: EventDispatcher,
     ) -> None:
         self._ctx = private_ctx
-        self.db = db
+        self._events = events_processors
         self.event_hub = event_hub
         self.event_fetcher = event_fetcher
-        self.event_dispatcher = event_dispatcher
 
     # ------------------------------------------------------------------
     # push_session_events (GET /events/session)
@@ -139,26 +138,21 @@ class EventsHandler:
         if session_name == "*":
             resolved_session_id: Any = WILDCARD
         else:
-            async with self.db.begin_readonly_session(isolation_level="READ COMMITTED") as db_sess:
-                rows = await SessionRow.match_sessions(
-                    db_sess, session_name, AccessKey(access_key), allow_prefix=False
-                )
-                if not rows:
-                    raise SessionNotFound
-                resolved_session_id = rows[0].id
+            resolve_result = await self._events.resolve_session.wait_for_complete(
+                ResolveSessionForEventsAction(
+                    session_name=session_name, access_key=AccessKey(access_key)
+                ),
+            )
+            resolved_session_id = resolve_result.session_id
 
         # Resolve group name to group ID
         if group_name == "*":
             group_id: Any = WILDCARD
         else:
-            async with self.db.begin_readonly(isolation_level="READ COMMITTED") as conn:
-                result = await conn.execute(
-                    sa.select(groups.c.id).select_from(groups).where(groups.c.name == group_name)
-                )
-                row = result.first()
-                if row is None:
-                    raise ProjectNotFound
-                group_id = row.id
+            group_result = await self._events.resolve_group.wait_for_complete(
+                ResolveGroupForEventsAction(group_name=group_name),
+            )
+            group_id = group_result.group_id
 
         filters = {
             "user_role": user_role,
@@ -202,7 +196,7 @@ class EventsHandler:
                     except asyncio.CancelledError:
                         pass
 
-            propagator = SessionEventPropagator(resp, self.db, filters)
+            propagator = self._events.create_session_propagator(resp, filters)
             self.event_hub.register_event_propagator(propagator, aliases)
             try:
                 await resp.wait()
