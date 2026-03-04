@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .loader import (
+    load_assignments_by_role_ids,
     load_element_associations_by_ids,
     load_entities_by_type_and_ids,
     load_permissions_by_ids,
@@ -11,6 +12,7 @@ from .loader import (
 )
 
 __all__ = [
+    "load_assignments_by_role_ids",
     "load_element_associations_by_ids",
     "load_entities_by_type_and_ids",
     "load_roles_by_ids",

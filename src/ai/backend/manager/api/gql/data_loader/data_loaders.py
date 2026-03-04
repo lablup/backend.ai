@@ -63,6 +63,7 @@ from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
 from .project import load_projects_by_ids
 from .rbac import (
+    load_assignments_by_role_ids,
     load_element_associations_by_ids,
     load_entities_by_type_and_ids,
     load_permissions_by_ids,
@@ -364,6 +365,17 @@ class DataLoaders:
         return DataLoader(
             load_fn=partial(
                 load_element_associations_by_ids,
+                self._processors.permission_controller,
+            )
+        )
+
+    @cached_property
+    def assignments_by_role_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, list[AssignedUserData]]:
+        return DataLoader(
+            load_fn=partial(
+                load_assignments_by_role_ids,
                 self._processors.permission_controller,
             )
         )
