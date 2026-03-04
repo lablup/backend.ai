@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
+
+from pydantic import BaseModel
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentSubStep,
+    RouteInfo,
 )
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base import Creator
@@ -67,3 +72,21 @@ class EvaluationResult:
     # Aggregated route mutations from all per-deployment evaluations.
     # The coordinator applies these after evaluation completes.
     route_changes: RouteChanges = field(default_factory=RouteChanges)
+
+
+class BaseDeploymentStrategy(ABC):
+    """Base interface for deployment strategy cycle evaluation.
+
+    Each concrete strategy (Blue-Green, Rolling Update) implements this interface.
+    The spec is injected via ``__init__`` — one instance per deployment.
+    """
+
+    def __init__(self, spec: BaseModel) -> None:
+        self._spec = spec
+
+    @abstractmethod
+    def evaluate_cycle(
+        self,
+        deployment: DeploymentInfo,
+        routes: Sequence[RouteInfo],
+    ) -> CycleEvaluationResult: ...

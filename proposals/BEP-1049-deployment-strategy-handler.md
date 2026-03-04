@@ -189,10 +189,8 @@ DeploymentStrategyEvaluator.evaluate(deployments)
     │  │    policy = policy_map[deployment.id]                   │
     │  │    routes = route_map[deployment.id]                    │
     │  │                                                         │
-    │  │    if policy.strategy == ROLLING:                       │
-    │  │      cycle_result = rolling_update_evaluate(...)        │
-    │  │    elif policy.strategy == BLUE_GREEN:                  │
-    │  │      cycle_result = blue_green_evaluate(...)            │
+    │  │    strategy_fsm = create_strategy(policy)                │
+    │  │    cycle_result = strategy_fsm.evaluate_cycle(...)      │
     │  │                                                         │
     │  │    if cycle_result.completed:                            │
     │  │      completed.append(deployment)                       │
@@ -220,7 +218,7 @@ DeploymentStrategyEvaluator.evaluate(deployments)
 #### Key Design Principles
 
 1. **Route changes are aggregated by the evaluator, applied by the coordinator**: The evaluator collects route mutations (rollout/drain/promote) from each strategy FSM into `EvaluationResult.route_changes`. The coordinator's `_apply_route_changes()` applies them after evaluation. Individual handlers do not touch routes.
-2. **Strategy FSMs are separate modules dispatched by the evaluator**: `rolling_update_evaluate()` and `blue_green_evaluate()` live in dedicated module files (`strategy/rolling_update.py`, `strategy/blue_green.py`). The evaluator dispatches to them based on the deployment policy's strategy type.
+2. **Strategy FSMs implement a common interface via registry**: All strategy implementations extend the `BaseDeploymentStrategy` abstract base class and implement `evaluate_cycle()`. Concrete classes (`RollingUpdateStrategy`, `BlueGreenStrategy`) live in dedicated module files (`strategy/rolling_update.py`, `strategy/blue_green.py`). The coordinator owns a `StrategyRegistry` that maps each `DeploymentStrategy` enum to its implementation class and expected spec type. The registry is injected into the evaluator, which uses it to instantiate the appropriate strategy per deployment.
 3. **Only grouping is returned**: The evaluator classifies deployments by sub-step; actual processing (revision swap, deploying_revision cleanup, etc.) is delegated to handlers.
 
 ### Per-Sub-Step Handlers
