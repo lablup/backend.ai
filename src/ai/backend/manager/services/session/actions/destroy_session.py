@@ -5,18 +5,12 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.services.session.base import SessionSingleEntityAction
+from ai.backend.manager.services.session.base import SessionAction
 
 
 # TODO: Change this to BatchAction since it can destroy multiple sessions with recursive option
 @dataclass
-class DestroySessionAction(SessionSingleEntityAction):
-    """Destroy a specific session.
-
-    RBAC validation checks if the user has DELETE permission for this session.
-    session_id must be resolved from session_name before RBAC validation.
-    """
-
+class DestroySessionAction(SessionAction):
     user_role: UserRole
     session_name: str
     forced: bool
@@ -25,7 +19,7 @@ class DestroySessionAction(SessionSingleEntityAction):
 
     @override
     def entity_id(self) -> str | None:
-        return self.session_id if self.session_id else None
+        return None
 
     @override
     @classmethod
