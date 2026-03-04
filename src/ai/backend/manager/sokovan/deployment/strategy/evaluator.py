@@ -1,14 +1,14 @@
 """Deployment strategy evaluator — orchestrates per-deployment FSM evaluation (BEP-1049).
 
 Loads policies and routes in bulk, dispatches each deployment to the appropriate
-strategy FSM, aggregates route mutations, and applies them in one batch.
+strategy FSM, and aggregates route mutations.  The coordinator is responsible for
+applying the aggregated route changes after evaluation.
 """
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from uuid import UUID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.logging import BraceStyleAdapter
@@ -16,21 +16,15 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentPolicyData,
     RouteInfo,
-    RouteStatus,
-    RouteTrafficStatus,
 )
 from ai.backend.manager.errors.deployment import (
     InvalidDeploymentStrategy,
     InvalidDeploymentStrategySpec,
 )
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, NoPagination
-from ai.backend.manager.repositories.base.updater import BatchUpdater
-from ai.backend.manager.repositories.deployment.creators import RouteBatchUpdaterSpec
+from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.deployment.options import (
     DeploymentPolicyConditions,
-    RouteConditions,
 )
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 
@@ -56,7 +50,7 @@ class DeploymentStrategyEvaluator:
         Steps:
             1. Bulk-load policies and active routes.
             2. Per-deployment: dispatch to strategy FSM.
-            3. Aggregate route changes and apply in one batch.
+            3. Aggregate route changes into result (applied by coordinator).
             4. Group deployments by sub-step and return.
         """
         result = EvaluationResult()
@@ -77,9 +71,6 @@ class DeploymentStrategyEvaluator:
         route_map = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(endpoint_ids)
 
         # ── 2. Per-deployment evaluation ──
-        all_scale_out: list[Creator[RoutingRow]] = []
-        all_scale_in_ids: list[UUID] = []
-
         for deployment in deployments:
             policy = policy_map.get(deployment.id)
             if policy is None:
@@ -96,10 +87,10 @@ class DeploymentStrategyEvaluator:
                 result.errors.append((deployment, str(e)))
                 continue
 
-            # Collect route changes
+            # ── 3. Aggregate route changes ──
             changes = cycle_result.route_changes
-            all_scale_out.extend(changes.scale_out_specs)
-            all_scale_in_ids.extend(changes.scale_in_route_ids)
+            result.route_changes.scale_out_specs.extend(changes.scale_out_specs)
+            result.route_changes.scale_in_route_ids.extend(changes.scale_in_route_ids)
 
             # Group by sub-step
             if cycle_result.completed:
@@ -111,9 +102,6 @@ class DeploymentStrategyEvaluator:
                     EvaluationGroup(sub_step=cycle_result.sub_step),
                 )
                 group.deployments.append(deployment)
-
-        # ── 3. Apply route mutations in batch ──
-        await self._apply_route_changes(all_scale_out, all_scale_in_ids)
 
         return result
 
@@ -144,30 +132,3 @@ class DeploymentStrategyEvaluator:
                 raise InvalidDeploymentStrategy(
                     extra_msg=f"Unsupported deployment strategy: {strategy}"
                 )
-
-    async def _apply_route_changes(
-        self,
-        scale_out: list[Creator[RoutingRow]],
-        scale_in_ids: list[UUID],
-    ) -> None:
-        """Apply aggregated route mutations in a single DB transaction."""
-        if not scale_out and not scale_in_ids:
-            return
-
-        scale_in_updater: BatchUpdater[RoutingRow] | None = None
-        if scale_in_ids:
-            scale_in_updater = BatchUpdater(
-                spec=RouteBatchUpdaterSpec(
-                    status=RouteStatus.TERMINATING,
-                    traffic_ratio=0.0,
-                    traffic_status=RouteTrafficStatus.INACTIVE,
-                ),
-                conditions=[RouteConditions.by_ids(scale_in_ids)],
-            )
-
-        await self._deployment_repo.scale_routes(scale_out, scale_in_updater)
-        log.debug(
-            "Applied route changes: {} created, {} terminated",
-            len(scale_out),
-            len(scale_in_ids),
-        )
