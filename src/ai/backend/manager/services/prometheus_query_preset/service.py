@@ -89,22 +89,11 @@ class PrometheusQueryPresetService:
                     f"Allowed: {sorted(preset_data.group_labels)}"
                 )
 
-    def _resolve_window(
-        self,
-        request_window: str | None,
-        preset_window: str | None,
-    ) -> str:
-        """Resolve window with fallback: request → preset → server default."""
-        if request_window is not None:
-            return request_window
-        if preset_window is not None:
-            return preset_window
-        return self._default_timewindow
-
     async def execute_preset(self, action: ExecutePresetAction) -> ExecutePresetActionResult:
         preset_data = await self._repository.get_by_id(action.preset_id)
         self._validate_labels(action.options, preset_data)
-        window = self._resolve_window(action.window, preset_data.time_window)
+        # Window fallback: request → preset → server default
+        window = action.window or preset_data.time_window or self._default_timewindow
 
         metric_preset = MetricPreset(
             template=preset_data.query_template,
