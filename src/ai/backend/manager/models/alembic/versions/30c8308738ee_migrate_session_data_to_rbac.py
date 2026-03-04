@@ -25,7 +25,7 @@ depends_on = None
 
 # Constants
 BATCH_SIZE = 1000
-MEMBER_ROLE_POSTFIX = "member"
+MEMBER_ROLE_SUFFIX = "member"
 
 
 def _add_entity_type_permissions(db_conn: Connection) -> None:
@@ -92,7 +92,7 @@ def _add_entity_type_permissions(db_conn: Connection) -> None:
         {
             "member_ops": member_ops,
             "owner_ops": owner_ops,
-            "member_pattern": f"%{MEMBER_ROLE_POSTFIX}",
+            "member_pattern": f"%{MEMBER_ROLE_SUFFIX}",
             "entity_type": EntityType.SESSION.value,
         },
     )
