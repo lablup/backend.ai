@@ -249,5 +249,5 @@ class TestPrometheusQueryPresetRepository:
         self,
         preset_repository: PrometheusQueryPresetRepository,
     ) -> None:
-        preset_id = await preset_repository.delete(uuid.uuid4())
-        assert preset_id is None
+        with pytest.raises(PrometheusQueryPresetNotFound):
+            await preset_repository.delete(uuid.uuid4())
