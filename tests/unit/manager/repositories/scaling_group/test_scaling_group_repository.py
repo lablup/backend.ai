@@ -63,8 +63,8 @@ from ai.backend.manager.repositories.scaling_group.purgers import (
     create_scaling_group_for_keypairs_purger,
 )
 from ai.backend.manager.repositories.scaling_group.scope_binders import (
-    SGDomainEntityUnbinder,
-    SGProjectEntityUnbinder,
+    ResourceGroupDomainEntityUnbinder,
+    ResourceGroupProjectEntityUnbinder,
 )
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupDriverConfigUpdaterSpec,
@@ -845,7 +845,7 @@ class TestScalingGroupRepositoryDB:
         scaling_group, domain = sample_scaling_group_with_domain_association
 
         # Disassociate the scaling group from the domain
-        unbinder = SGDomainEntityUnbinder(scaling_groups=[scaling_group], domain=domain)
+        unbinder = ResourceGroupDomainEntityUnbinder(scaling_groups=[scaling_group], domain=domain)
         await scaling_group_repository.disassociate_scaling_group_with_domains(unbinder)
 
         # Verify association is removed
@@ -865,7 +865,7 @@ class TestScalingGroupRepositoryDB:
     ) -> None:
         """Test disassociating a non-existent association (should not raise error)"""
         # Disassociate without prior association should succeed without error
-        unbinder = SGDomainEntityUnbinder(
+        unbinder = ResourceGroupDomainEntityUnbinder(
             scaling_groups=[sample_scaling_group_for_association],
             domain=sample_domain,
         )
@@ -958,7 +958,7 @@ class TestScalingGroupRepositoryDB:
 
         # Disassociate all domains at once
         for domain in domains:
-            unbinder = SGDomainEntityUnbinder(scaling_groups=[scaling_group], domain=domain)
+            unbinder = ResourceGroupDomainEntityUnbinder(scaling_groups=[scaling_group], domain=domain)
             await scaling_group_repository.disassociate_scaling_group_with_domains(unbinder)
 
         # Verify all associations are removed
@@ -1201,7 +1201,7 @@ class TestScalingGroupRepositoryDB:
         assert association_exists is True
 
         # When: Disassociate the scaling group from the project
-        unbinder = SGProjectEntityUnbinder(scaling_groups=[sgroup_name], project=project_id)
+        unbinder = ResourceGroupProjectEntityUnbinder(scaling_groups=[sgroup_name], project=project_id)
         await scaling_group_repository.disassociate_scaling_group_with_user_groups(unbinder)
 
         # Then: Association should no longer exist
@@ -1225,7 +1225,7 @@ class TestScalingGroupRepositoryDB:
         _, _, project_id = test_user_domain_group
 
         # When: Disassociate (even though no association exists)
-        unbinder = SGProjectEntityUnbinder(scaling_groups=[sgroup_name], project=project_id)
+        unbinder = ResourceGroupProjectEntityUnbinder(scaling_groups=[sgroup_name], project=project_id)
         # Then: Should not raise any error (unbinder deletes 0 rows silently)
         await scaling_group_repository.disassociate_scaling_group_with_user_groups(unbinder)
 

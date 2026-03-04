@@ -51,8 +51,8 @@ from ai.backend.manager.repositories.scaling_group.purgers import (
     create_scaling_group_for_keypairs_purger,
 )
 from ai.backend.manager.repositories.scaling_group.scope_binders import (
-    SGDomainEntityUnbinder,
-    SGProjectEntityUnbinder,
+    ResourceGroupDomainEntityUnbinder,
+    ResourceGroupProjectEntityUnbinder,
 )
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupDriverConfigUpdaterSpec,
@@ -904,7 +904,7 @@ class DisassociateScalingGroupWithDomain(graphene.Mutation):  # type: ignore[mis
     ) -> DisassociateScalingGroupWithDomain:
         graph_ctx: GraphQueryContext = info.context
         action = DisassociateScalingGroupWithDomainsAction(
-            unbinder=SGDomainEntityUnbinder(
+            unbinder=ResourceGroupDomainEntityUnbinder(
                 scaling_groups=[scaling_group],
                 domain=domain,
             ),
@@ -937,7 +937,7 @@ class DisassociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[mi
     ) -> DisassociateScalingGroupsWithDomain:
         graph_ctx: GraphQueryContext = info.context
         action = DisassociateScalingGroupWithDomainsAction(
-            unbinder=SGDomainEntityUnbinder(
+            unbinder=ResourceGroupDomainEntityUnbinder(
                 scaling_groups=scaling_groups,
                 domain=domain,
             ),
@@ -974,7 +974,7 @@ class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):  # type: ignore
             scaling_groups = result.scalars().all()
 
         action = DisassociateScalingGroupWithDomainsAction(
-            unbinder=SGDomainEntityUnbinder(
+            unbinder=ResourceGroupDomainEntityUnbinder(
                 scaling_groups=list(scaling_groups),
                 domain=domain,
             ),
@@ -1086,7 +1086,7 @@ class DisassociateScalingGroupWithUserGroup(graphene.Mutation):  # type: ignore[
     ) -> DisassociateScalingGroupWithUserGroup:
         graph_ctx: GraphQueryContext = info.context
         action = DisassociateScalingGroupWithUserGroupsAction(
-            unbinder=SGProjectEntityUnbinder(
+            unbinder=ResourceGroupProjectEntityUnbinder(
                 scaling_groups=[scaling_group],
                 project=user_group,
             ),
@@ -1119,7 +1119,7 @@ class DisassociateScalingGroupsWithUserGroup(graphene.Mutation):  # type: ignore
     ) -> DisassociateScalingGroupsWithUserGroup:
         graph_ctx: GraphQueryContext = info.context
         action = DisassociateScalingGroupWithUserGroupsAction(
-            unbinder=SGProjectEntityUnbinder(
+            unbinder=ResourceGroupProjectEntityUnbinder(
                 scaling_groups=scaling_groups,
                 project=user_group,
             ),
@@ -1157,7 +1157,7 @@ class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):  # type: ignore[
             scaling_groups = result.scalars().all()
 
         action = DisassociateScalingGroupWithUserGroupsAction(
-            unbinder=SGProjectEntityUnbinder(
+            unbinder=ResourceGroupProjectEntityUnbinder(
                 scaling_groups=list(scaling_groups),
                 project=user_group,
             ),

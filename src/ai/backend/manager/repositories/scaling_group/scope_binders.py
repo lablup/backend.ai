@@ -26,7 +26,7 @@ from ai.backend.manager.repositories.scaling_group.purgers import (
 
 
 @dataclass
-class SGDomainEntityUnbinder(RBACScopeEntityUnbinder[ScalingGroupForDomainRow]):
+class ResourceGroupDomainEntityUnbinder(RBACScopeEntityUnbinder[ScalingGroupForDomainRow]):
     """Unbind specific scaling groups from a domain."""
 
     scaling_groups: Sequence[str]
@@ -56,7 +56,7 @@ class SGDomainEntityUnbinder(RBACScopeEntityUnbinder[ScalingGroupForDomainRow]):
 
 
 @dataclass
-class SGProjectEntityUnbinder(RBACScopeEntityUnbinder[ScalingGroupForProjectRow]):
+class ResourceGroupProjectEntityUnbinder(RBACScopeEntityUnbinder[ScalingGroupForProjectRow]):
     """Unbind specific scaling groups from a project."""
 
     scaling_groups: Sequence[str]

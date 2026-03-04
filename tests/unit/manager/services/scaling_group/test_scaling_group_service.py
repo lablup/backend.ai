@@ -57,8 +57,8 @@ from ai.backend.manager.repositories.scaling_group.purgers import (
     create_scaling_group_for_keypairs_purger,
 )
 from ai.backend.manager.repositories.scaling_group.scope_binders import (
-    SGDomainEntityUnbinder,
-    SGProjectEntityUnbinder,
+    ResourceGroupDomainEntityUnbinder,
+    ResourceGroupProjectEntityUnbinder,
 )
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupMetadataUpdaterSpec,
@@ -455,7 +455,7 @@ class TestScalingGroupService:
         """Test disassociating a scaling group from domains"""
         mock_repository.disassociate_scaling_group_with_domains = AsyncMock(return_value=None)
 
-        unbinder = SGDomainEntityUnbinder(
+        unbinder = ResourceGroupDomainEntityUnbinder(
             scaling_groups=["test-sgroup"],
             domain="test-domain",
         )
@@ -555,7 +555,7 @@ class TestScalingGroupService:
         scaling_group_name = "test-scaling-group"
         project_id = uuid.uuid4()
 
-        unbinder = SGProjectEntityUnbinder(
+        unbinder = ResourceGroupProjectEntityUnbinder(
             scaling_groups=[scaling_group_name],
             project=project_id,
         )
