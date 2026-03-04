@@ -104,9 +104,7 @@ class VFolderHandler:
 
         return APIResponse.build(
             status_code=HTTPStatus.OK,
-            response_model=VFolderListResponse(
-                items=[vfolder.to_field() for vfolder in vfolder_list]
-            ),
+            response_model=VFolderListResponse([vfolder.to_field() for vfolder in vfolder_list]),
         )
 
     @api_handler
