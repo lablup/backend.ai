@@ -5,24 +5,18 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
-from ai.backend.manager.services.session.base import SessionSingleEntityAction
+from ai.backend.manager.services.session.base import SessionAction
 from ai.backend.manager.services.session.types import LegacySessionInfo
 
 
 @dataclass
-class GetSessionInfoAction(SessionSingleEntityAction):
-    """Get information about a specific session.
-
-    RBAC validation checks if the user has READ permission for this session.
-    session_id must be resolved from session_name before RBAC validation.
-    """
-
+class GetSessionInfoAction(SessionAction):
     session_name: str
     owner_access_key: AccessKey
 
     @override
     def entity_id(self) -> str | None:
-        return self.session_id if self.session_id else None
+        return None
 
     @override
     @classmethod

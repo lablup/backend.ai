@@ -7,27 +7,17 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.services.session.base import SessionSingleEntityAction
+from ai.backend.manager.services.session.base import SessionAction
 
 
 @dataclass
-class ModifySessionAction(SessionSingleEntityAction):
-    """Modify a specific session.
-
-    RBAC validation checks if the user has UPDATE permission for this session.
-    session_id (str) is automatically set from the session_uuid (UUID) field.
-    """
-
-    session_uuid: uuid.UUID  # Renamed to avoid conflict with base class session_id
+class ModifySessionAction(SessionAction):
+    session_id: uuid.UUID
     updater: Updater[SessionRow]
-
-    def __post_init__(self) -> None:
-        # Set session_id (str) for RBAC validation from session_uuid (UUID)
-        object.__setattr__(self, "session_id", str(self.session_uuid))
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.session_uuid)
+        return str(self.session_id)
 
     @override
     @classmethod
