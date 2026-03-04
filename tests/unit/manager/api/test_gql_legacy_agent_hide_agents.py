@@ -1,8 +1,3 @@
-"""
-Regression test: superadmin must bypass hide_agents restriction
-in agent_summary and agent_summary_list GQL resolvers. (BA-4862)
-"""
-
 from __future__ import annotations
 
 import uuid
@@ -16,79 +11,93 @@ from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.user import UserRole
 
 
-def _make_mock_info(role: UserRole) -> MagicMock:
-    ctx = MagicMock()
-    ctx.user = {
-        "role": role,
-        "domain_name": "default",
-        "uuid": uuid.uuid4(),
-        "email": "test@test.com",
-    }
-    ctx.access_key = "TESTKEY"
-    ctx.config_provider.config.manager.hide_agents = True
-    info = MagicMock(spec=graphene.ResolveInfo)
-    info.context = ctx
-    return info
-
-
 class TestAgentSummaryHideAgents:
     """Superadmin must bypass hide_agents in agent_summary resolvers."""
 
-    async def test_agent_summary_allows_superadmin_when_hide_agents(self) -> None:
-        info = _make_mock_info(UserRole.SUPERADMIN)
+    @pytest.fixture
+    def mock_info_with_hide_agents_true(self, request: pytest.FixtureRequest) -> MagicMock:
+        role: UserRole = request.param
+        ctx = MagicMock()
+        ctx.user = {
+            "role": role,
+            "domain_name": "default",
+            "uuid": uuid.uuid4(),
+            "email": "test@test.com",
+        }
+        ctx.access_key = "TESTKEY"
+        ctx.config_provider.config.manager.hide_agents = True
+        info = MagicMock(spec=graphene.ResolveInfo)
+        info.context = ctx
+        return info
+
+    @pytest.mark.parametrize(
+        "mock_info_with_hide_agents_true", [UserRole.SUPERADMIN], indirect=True
+    )
+    async def test_agent_summary_allows_superadmin(
+        self, mock_info_with_hide_agents_true: MagicMock
+    ) -> None:
         loader = AsyncMock()
         loader.load = AsyncMock(return_value=MagicMock())
-        info.context.dataloader_manager.get_loader_by_func.return_value = loader
+        mock_info_with_hide_agents_true.context.dataloader_manager.get_loader_by_func.return_value = loader
 
         result = await Query.resolve_agent_summary(
             None,
-            info,
+            mock_info_with_hide_agents_true,
             agent_id="test-agent-id",
         )
         assert result is not None
 
-    async def test_agent_summary_blocks_non_superadmin_when_hide_agents(self) -> None:
-        info = _make_mock_info(UserRole.ADMIN)
-
+    @pytest.mark.parametrize(
+        "mock_info_with_hide_agents_true", [UserRole.ADMIN, UserRole.USER], indirect=True
+    )
+    async def test_agent_summary_blocks_non_superadmin(
+        self, mock_info_with_hide_agents_true: MagicMock
+    ) -> None:
         with pytest.raises(ObjectNotFound):
             await Query.resolve_agent_summary(
                 None,
-                info,
+                mock_info_with_hide_agents_true,
                 agent_id="test-agent-id",
             )
 
-    async def test_agent_summary_list_allows_superadmin_when_hide_agents(self) -> None:
-        info = _make_mock_info(UserRole.SUPERADMIN)
-        info.context.__class__ = type("GraphQueryContext", (), {})
-        mock_load_count = AsyncMock(return_value=1)
-        mock_load_slice = AsyncMock(return_value=[MagicMock()])
+    @pytest.fixture
+    def mock_agent_summary_loader(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "ai.backend.manager.api.gql_legacy.agent.AgentSummary.load_count",
+            AsyncMock(return_value=1),
+        )
+        monkeypatch.setattr(
+            "ai.backend.manager.api.gql_legacy.agent.AgentSummary.load_slice",
+            AsyncMock(return_value=[MagicMock()]),
+        )
 
-        with (
-            pytest.MonkeyPatch.context() as mp,
-        ):
-            mp.setattr(
-                "ai.backend.manager.api.gql_legacy.agent.AgentSummary.load_count",
-                mock_load_count,
-            )
-            mp.setattr(
-                "ai.backend.manager.api.gql_legacy.agent.AgentSummary.load_slice",
-                mock_load_slice,
-            )
-            result = await Query.resolve_agent_summary_list(
-                None,
-                info,
-                limit=50,
-                offset=0,
-            )
+    @pytest.mark.parametrize(
+        "mock_info_with_hide_agents_true", [UserRole.SUPERADMIN], indirect=True
+    )
+    @pytest.mark.usefixtures("mock_agent_summary_loader")
+    async def test_agent_summary_list_allows_superadmin(
+        self, mock_info_with_hide_agents_true: MagicMock
+    ) -> None:
+        mock_info_with_hide_agents_true.context.__class__ = type("GraphQueryContext", (), {})
+
+        result = await Query.resolve_agent_summary_list(
+            None,
+            mock_info_with_hide_agents_true,
+            limit=50,
+            offset=0,
+        )
         assert result is not None
 
-    async def test_agent_summary_list_blocks_non_superadmin_when_hide_agents(self) -> None:
-        info = _make_mock_info(UserRole.USER)
-
+    @pytest.mark.parametrize(
+        "mock_info_with_hide_agents_true", [UserRole.ADMIN, UserRole.USER], indirect=True
+    )
+    async def test_agent_summary_list_blocks_non_superadmin(
+        self, mock_info_with_hide_agents_true: MagicMock
+    ) -> None:
         with pytest.raises(ObjectNotFound):
             await Query.resolve_agent_summary_list(
                 None,
-                info,
+                mock_info_with_hide_agents_true,
                 limit=50,
                 offset=0,
             )
