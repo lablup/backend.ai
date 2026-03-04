@@ -445,7 +445,12 @@ def update_route_traffic_cmd(
 
 @deployment.group()
 def policy() -> None:
-    """Manage deployment policies"""
+    """Manage deployment policies.
+
+    Deployment policies govern how new revisions are rolled out.
+    A policy defines the rollout strategy (rolling update or blue-green),
+    concurrency limits, and automatic rollback behavior.
+    """
 
 
 @policy.command("info")
@@ -471,21 +476,55 @@ def info_policy_cmd(ctx: CLIContext, deployment_id: str) -> None:
     "--strategy",
     type=click.Choice(["ROLLING", "BLUE_GREEN"], case_sensitive=False),
     required=True,
-    help="Deployment strategy type",
+    help=(
+        "Rollout strategy for new revisions. "
+        "ROLLING replaces replicas gradually with configurable concurrency limits. "
+        "BLUE_GREEN runs two parallel environments and switches traffic atomically."
+    ),
 )
 @click.option(
     "--rollback-on-failure",
     is_flag=True,
     default=False,
-    help="Automatically rollback on failure",
+    help=(
+        "Automatically revert to the previous stable revision if health checks fail during rollout."
+    ),
 )
-@click.option("--max-surge", type=int, default=None, help="Max surge for rolling update")
 @click.option(
-    "--max-unavailable", type=int, default=None, help="Max unavailable for rolling update"
+    "--max-surge",
+    type=int,
+    default=None,
+    help=(
+        "Maximum number of extra replicas that can be created beyond the desired count "
+        "during a rolling update. Only applicable when --strategy is ROLLING. [default: 1]"
+    ),
 )
-@click.option("--auto-promote", is_flag=True, default=False, help="Auto promote for blue-green")
 @click.option(
-    "--promote-delay", type=int, default=None, help="Promote delay seconds for blue-green"
+    "--max-unavailable",
+    type=int,
+    default=None,
+    help=(
+        "Maximum number of replicas that can be unavailable during a rolling update. "
+        "Only applicable when --strategy is ROLLING. [default: 0]"
+    ),
+)
+@click.option(
+    "--auto-promote",
+    is_flag=True,
+    default=False,
+    help=(
+        "Automatically promote the new (green) environment to receive production traffic "
+        "after the promote delay. Only applicable when --strategy is BLUE_GREEN."
+    ),
+)
+@click.option(
+    "--promote-delay",
+    type=int,
+    default=None,
+    help=(
+        "Number of seconds to wait before auto-promoting the new environment. "
+        "Only applicable when --strategy is BLUE_GREEN and --auto-promote is set. [default: 0]"
+    ),
 )
 def create_policy_cmd(
     ctx: CLIContext,
@@ -544,21 +583,57 @@ def create_policy_cmd(
     "--strategy",
     type=click.Choice(["ROLLING", "BLUE_GREEN"], case_sensitive=False),
     default=None,
-    help="Deployment strategy type",
+    help=(
+        "Change the rollout strategy. "
+        "ROLLING replaces replicas gradually with configurable concurrency limits. "
+        "BLUE_GREEN runs two parallel environments and switches traffic atomically. "
+        "Changing the strategy resets any strategy-specific configuration."
+    ),
 )
 @click.option(
     "--rollback-on-failure/--no-rollback-on-failure",
     is_flag=True,
     default=None,
-    help="Automatically rollback on failure",
+    help=(
+        "Enable or disable automatic rollback. When enabled, the system reverts to "
+        "the previous stable revision if health checks fail during rollout."
+    ),
 )
-@click.option("--max-surge", type=int, default=None, help="Max surge for rolling update")
 @click.option(
-    "--max-unavailable", type=int, default=None, help="Max unavailable for rolling update"
+    "--max-surge",
+    type=int,
+    default=None,
+    help=(
+        "Maximum number of extra replicas that can be created beyond the desired count "
+        "during a rolling update. Only applicable when strategy is ROLLING."
+    ),
 )
-@click.option("--auto-promote", is_flag=True, default=False, help="Auto promote for blue-green")
 @click.option(
-    "--promote-delay", type=int, default=None, help="Promote delay seconds for blue-green"
+    "--max-unavailable",
+    type=int,
+    default=None,
+    help=(
+        "Maximum number of replicas that can be unavailable during a rolling update. "
+        "Only applicable when strategy is ROLLING."
+    ),
+)
+@click.option(
+    "--auto-promote",
+    is_flag=True,
+    default=False,
+    help=(
+        "Automatically promote the new (green) environment to receive production traffic "
+        "after the promote delay. Only applicable when strategy is BLUE_GREEN."
+    ),
+)
+@click.option(
+    "--promote-delay",
+    type=int,
+    default=None,
+    help=(
+        "Number of seconds to wait before auto-promoting the new environment. "
+        "Only applicable when strategy is BLUE_GREEN and --auto-promote is set."
+    ),
 )
 def update_policy_cmd(
     ctx: CLIContext,
