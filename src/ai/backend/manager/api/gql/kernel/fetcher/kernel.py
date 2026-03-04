@@ -5,6 +5,7 @@ from functools import lru_cache
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.types import KernelId
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
@@ -16,6 +17,7 @@ from ai.backend.manager.api.gql.kernel.types import (
     KernelV2OrderByGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.scheduler.options import KernelConditions
@@ -45,6 +47,10 @@ async def fetch_kernels(
     offset: int | None = None,
     base_conditions: list[QueryCondition] | None = None,
 ) -> KernelV2ConnectionGQL:
+    user = current_user()
+    if user is None:
+        raise UserNotFound("User not found in context")
+
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
             first=first,
@@ -61,7 +67,7 @@ async def fetch_kernels(
     )
 
     action_result = await info.context.processors.session.search_kernels.wait_for_complete(
-        SearchKernelsAction(querier=querier)
+        SearchKernelsAction(querier=querier, user_id=user.user_id)
     )
     nodes = [KernelV2GQL.from_kernel_info(kernel_info) for kernel_info in action_result.data]
     edges = [KernelV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]

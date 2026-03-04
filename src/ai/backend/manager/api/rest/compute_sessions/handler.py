@@ -7,6 +7,7 @@ from http import HTTPStatus
 from typing import Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.compute_session import (
     PaginationInfo,
     SearchComputeSessionsRequest,
@@ -15,6 +16,7 @@ from ai.backend.common.dto.manager.compute_session import (
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import UserContext
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 from ai.backend.manager.services.session.processors import SessionProcessors
@@ -39,10 +41,14 @@ class ComputeSessionsHandler:
         """Search compute sessions with nested container data."""
         log.info("SEARCH_SESSIONS (ak:{})", ctx.access_key)
 
+        user = current_user()
+        if user is None:
+            raise UserNotFound("User not found in context")
+
         # Step 1: Search sessions
         session_querier = self._adapter.build_session_querier(body.parsed)
         session_result = await self._session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=session_querier)
+            SearchSessionsAction(querier=session_querier, user_id=user.user_id)
         )
 
         # Step 2: Fetch kernels for found sessions
@@ -51,7 +57,7 @@ class ComputeSessionsHandler:
         if session_ids:
             kernel_querier = self._adapter.build_kernel_querier_for_sessions(session_ids)
             kernel_result = await self._session.search_kernels.wait_for_complete(
-                SearchKernelsAction(querier=kernel_querier)
+                SearchKernelsAction(querier=kernel_querier, user_id=user.user_id)
             )
             kernels_by_session = self._adapter.group_kernels_by_session(kernel_result.data)
 

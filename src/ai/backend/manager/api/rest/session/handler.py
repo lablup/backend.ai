@@ -20,6 +20,7 @@ from aiohttp import web
 from pydantic import BaseModel
 
 from ai.backend.common.api_handlers import APIResponse, BaseResponseModel, BodyParam, QueryParam
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.session.request import (
     CommitSessionRequest,
     CompleteRequest,
@@ -91,6 +92,7 @@ from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource import NoCurrentTaskContext
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
@@ -519,6 +521,9 @@ class SessionHandler:
             )
         )
         requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
+        user = current_user()
+        if user is None:
+            raise UserNotFound("User not found in context")
         log.info(
             "MATCH_SESSIONS(ak:{0}/{1}, prefix:{2})",
             requester_access_key,
@@ -529,6 +534,7 @@ class SessionHandler:
             MatchSessionsAction(
                 id_or_name_prefix=params.id,
                 owner_access_key=owner_access_key,
+                user_id=user.user_id,
             )
         )
         return APIResponse.build(HTTPStatus.OK, MatchSessionsResponse(matches=result.result))

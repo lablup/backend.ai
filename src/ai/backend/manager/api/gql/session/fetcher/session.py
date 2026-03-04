@@ -5,6 +5,7 @@ from functools import lru_cache
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.session.types import (
@@ -15,6 +16,7 @@ from ai.backend.manager.api.gql.session.types import (
     SessionV2OrderByGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.scheduler.options import SessionConditions, SessionOrders
@@ -44,6 +46,10 @@ async def fetch_sessions(
     offset: int | None = None,
     base_conditions: list[QueryCondition] | None = None,
 ) -> SessionV2ConnectionGQL:
+    user = current_user()
+    if user is None:
+        raise UserNotFound("User not found in context")
+
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
             first=first,
@@ -60,7 +66,7 @@ async def fetch_sessions(
     )
 
     action_result = await info.context.processors.session.search_sessions.wait_for_complete(
-        SearchSessionsAction(querier=querier)
+        SearchSessionsAction(querier=querier, user_id=user.user_id)
     )
 
     nodes = [SessionV2GQL.from_data(session_data) for session_data in action_result.data]

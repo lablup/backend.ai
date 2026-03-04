@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.types import KernelId
 from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.scheduler.options import KernelConditions
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
@@ -26,13 +28,17 @@ async def load_kernels_by_ids(
     if not kernel_ids:
         return []
 
+    user = current_user()
+    if user is None:
+        raise UserNotFound("User not found in context")
+
     querier = BatchQuerier(
         pagination=NoPagination(),
         conditions=[KernelConditions.by_ids(kernel_ids)],
     )
 
     action_result = await processor.search_kernels.wait_for_complete(
-        SearchKernelsAction(querier=querier)
+        SearchKernelsAction(querier=querier, user_id=user.user_id)
     )
 
     kernel_map: dict[KernelId, KernelInfo] = {kernel.id: kernel for kernel in action_result.data}
