@@ -365,12 +365,17 @@ class TestPrometheusQueryPresetService:
         call_args = mock_prometheus_client.query_range.call_args
         assert call_args.kwargs["preset"].window == "1m"
 
+    @pytest.fixture
+    def time_range(self) -> QueryTimeRange:
+        return QueryTimeRange(start="1704067200", end="1704153600", step="60s")
+
     async def test_execute_preset_empty_filter_labels_allows_any(
         self,
         service: PrometheusQueryPresetService,
         mock_repository: MagicMock,
         mock_prometheus_client: MagicMock,
         preset_data: PrometheusQueryPresetData,
+        time_range: QueryTimeRange,
     ) -> None:
         """When preset has empty filter_labels, any labels are allowed."""
         preset_data = replace(preset_data, filter_labels=[], group_labels=[])
@@ -382,7 +387,6 @@ class TestPrometheusQueryPresetService:
         )
         mock_prometheus_client.query_range = AsyncMock(return_value=prometheus_response)
 
-        time_range = QueryTimeRange(start="1704067200", end="1704153600", step="60s")
         action = ExecutePresetAction(
             preset_id=preset_data.id,
             options=ExecutePresetOptions(
