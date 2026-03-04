@@ -6,6 +6,7 @@ from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import PrometheusQueryRangeResponse
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.prometheus_query_preset import ExecutePresetOptions
 from ai.backend.manager.services.prometheus_query_preset.actions.base import (
     PrometheusQueryPresetAction,
 )
@@ -14,8 +15,7 @@ from ai.backend.manager.services.prometheus_query_preset.actions.base import (
 @dataclass
 class ExecutePresetAction(PrometheusQueryPresetAction):
     preset_id: uuid.UUID
-    labels: dict[str, str]
-    group_labels: list[str]
+    options: ExecutePresetOptions
     window: str | None
     time_range: QueryTimeRange
 

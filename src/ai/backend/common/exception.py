@@ -1180,3 +1180,15 @@ class PrometheusQueryPresetNotFound(BackendAIError, web.HTTPNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class PrometheusQueryPresetInvalidLabel(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/prometheus-query-preset-invalid-label"
+    error_title = "Invalid label specified for prometheus query preset execution."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PROMETHEUS_QUERY_PRESET,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )

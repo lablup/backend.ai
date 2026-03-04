@@ -1,10 +1,13 @@
 import logging
-import re
 
 from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.prometheus.preset import MetricPreset
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.prometheus_query_preset import (
+    ExecutePresetOptions,
+    PrometheusQueryPresetData,
+)
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
 )
@@ -24,8 +27,6 @@ from ai.backend.manager.services.prometheus_query_preset.actions import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-_WINDOW_PATTERN = re.compile(r"^\d+[smhdw]$")
 
 
 class PrometheusQueryPresetService:
@@ -68,49 +69,46 @@ class PrometheusQueryPresetService:
         preset_id = await self._repository.delete(action.preset_id)
         return DeletePresetActionResult(preset_id=preset_id)
 
+    def _validate_labels(
+        self,
+        options: ExecutePresetOptions,
+        preset_data: PrometheusQueryPresetData,
+    ) -> None:
+        if preset_data.filter_labels:
+            invalid = set(options.labels.keys()) - set(preset_data.filter_labels)
+            if invalid:
+                raise PrometheusQueryPresetInvalidLabel(
+                    f"Invalid filter labels: {sorted(invalid)}. "
+                    f"Allowed: {sorted(preset_data.filter_labels)}"
+                )
+        if preset_data.group_labels:
+            invalid = set(options.group_labels) - set(preset_data.group_labels)
+            if invalid:
+                raise PrometheusQueryPresetInvalidLabel(
+                    f"Invalid group labels: {sorted(invalid)}. "
+                    f"Allowed: {sorted(preset_data.group_labels)}"
+                )
+
+    def _resolve_window(
+        self,
+        request_window: str | None,
+        preset_window: str | None,
+    ) -> str:
+        return request_window or preset_window or self._default_timewindow
+
     async def execute_preset(self, action: ExecutePresetAction) -> ExecutePresetActionResult:
         preset_data = await self._repository.get_by_id(action.preset_id)
-
-        # Validate labels against allowed filter_labels
-        if preset_data.filter_labels:
-            allowed = set(preset_data.filter_labels)
-            invalid_labels = set(action.labels.keys()) - allowed
-            if invalid_labels:
-                raise InvalidAPIParameters(
-                    f"Invalid filter labels: {sorted(invalid_labels)}. "
-                    f"Allowed labels: {sorted(allowed)}"
-                )
-
-        # Validate group_labels against allowed group_labels
-        if preset_data.group_labels:
-            allowed_groups = set(preset_data.group_labels)
-            invalid_groups = set(action.group_labels) - allowed_groups
-            if invalid_groups:
-                raise InvalidAPIParameters(
-                    f"Invalid group labels: {sorted(invalid_groups)}. "
-                    f"Allowed group labels: {sorted(allowed_groups)}"
-                )
-
-        # Window fallback chain: request window → preset time_window → server config
-        window = action.window or preset_data.time_window or self._default_timewindow
-
-        # Validate window format
-        if not _WINDOW_PATTERN.match(window):
-            raise InvalidAPIParameters(
-                f"Invalid window format: '{window}'. Expected format: <number><unit> "
-                f"where unit is one of s, m, h, d, w (e.g., '5m', '1h', '30s')"
-            )
+        self._validate_labels(action.options, preset_data)
+        window = self._resolve_window(action.window, preset_data.time_window)
 
         metric_preset = MetricPreset(
             template=preset_data.query_template,
-            labels=action.labels,
-            group_by=set(action.group_labels),
+            labels=action.options.labels,
+            group_by=set(action.options.group_labels),
             window=window,
         )
-
         response = await self._prometheus_client.query_range(
             preset=metric_preset,
             time_range=action.time_range,
         )
-
         return ExecutePresetActionResult(response=response)

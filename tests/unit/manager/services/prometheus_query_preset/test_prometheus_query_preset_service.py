@@ -18,8 +18,12 @@ from ai.backend.common.dto.clients.prometheus.response import (
     PrometheusQueryData,
     PrometheusQueryRangeResponse,
 )
-from ai.backend.common.exception import InvalidAPIParameters, PrometheusQueryPresetNotFound
+from ai.backend.common.exception import (
+    PrometheusQueryPresetInvalidLabel,
+    PrometheusQueryPresetNotFound,
+)
 from ai.backend.manager.data.prometheus_query_preset import (
+    ExecutePresetOptions,
     PrometheusQueryPresetData,
     PrometheusQueryPresetListResult,
 )
@@ -236,8 +240,10 @@ class TestPrometheusQueryPresetService:
         time_range = QueryTimeRange(start="1704067200", end="1704153600", step="60s")
         action = ExecutePresetAction(
             preset_id=preset_data.id,
-            labels={"kernel_id": "test-kernel"},
-            group_labels=["kernel_id"],
+            options=ExecutePresetOptions(
+                labels={"kernel_id": "test-kernel"},
+                group_labels=["kernel_id"],
+            ),
             window="5m",
             time_range=time_range,
         )
@@ -258,13 +264,15 @@ class TestPrometheusQueryPresetService:
         time_range = QueryTimeRange(start="1704067200", end="1704153600", step="60s")
         action = ExecutePresetAction(
             preset_id=preset_data.id,
-            labels={"invalid_label": "value"},
-            group_labels=[],
+            options=ExecutePresetOptions(
+                labels={"invalid_label": "value"},
+                group_labels=[],
+            ),
             window="5m",
             time_range=time_range,
         )
 
-        with pytest.raises(InvalidAPIParameters):
+        with pytest.raises(PrometheusQueryPresetInvalidLabel):
             await service.execute_preset(action)
 
     async def test_execute_preset_invalid_group_label(
@@ -278,33 +286,15 @@ class TestPrometheusQueryPresetService:
         time_range = QueryTimeRange(start="1704067200", end="1704153600", step="60s")
         action = ExecutePresetAction(
             preset_id=preset_data.id,
-            labels={},
-            group_labels=["invalid_group"],
+            options=ExecutePresetOptions(
+                labels={},
+                group_labels=["invalid_group"],
+            ),
             window="5m",
             time_range=time_range,
         )
 
-        with pytest.raises(InvalidAPIParameters):
-            await service.execute_preset(action)
-
-    async def test_execute_preset_invalid_window_format(
-        self,
-        service: PrometheusQueryPresetService,
-        mock_repository: MagicMock,
-        preset_data: PrometheusQueryPresetData,
-    ) -> None:
-        mock_repository.get_by_id = AsyncMock(return_value=preset_data)
-
-        time_range = QueryTimeRange(start="1704067200", end="1704153600", step="60s")
-        action = ExecutePresetAction(
-            preset_id=preset_data.id,
-            labels={},
-            group_labels=[],
-            window="invalid",
-            time_range=time_range,
-        )
-
-        with pytest.raises(InvalidAPIParameters):
+        with pytest.raises(PrometheusQueryPresetInvalidLabel):
             await service.execute_preset(action)
 
     async def test_execute_preset_window_fallback_to_preset(
@@ -327,8 +317,10 @@ class TestPrometheusQueryPresetService:
         time_range = QueryTimeRange(start="1704067200", end="1704153600", step="60s")
         action = ExecutePresetAction(
             preset_id=preset_data.id,
-            labels={},
-            group_labels=[],
+            options=ExecutePresetOptions(
+                labels={},
+                group_labels=[],
+            ),
             window=None,
             time_range=time_range,
         )
@@ -359,8 +351,10 @@ class TestPrometheusQueryPresetService:
         time_range = QueryTimeRange(start="1704067200", end="1704153600", step="60s")
         action = ExecutePresetAction(
             preset_id=preset_data.id,
-            labels={},
-            group_labels=[],
+            options=ExecutePresetOptions(
+                labels={},
+                group_labels=[],
+            ),
             window=None,
             time_range=time_range,
         )
@@ -391,8 +385,10 @@ class TestPrometheusQueryPresetService:
         time_range = QueryTimeRange(start="1704067200", end="1704153600", step="60s")
         action = ExecutePresetAction(
             preset_id=preset_data.id,
-            labels={"any_label": "value"},
-            group_labels=["any_group"],
+            options=ExecutePresetOptions(
+                labels={"any_label": "value"},
+                group_labels=["any_group"],
+            ),
             window="5m",
             time_range=time_range,
         )

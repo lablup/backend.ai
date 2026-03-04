@@ -9,6 +9,14 @@ from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
 @dataclass(frozen=True)
+class ExecutePresetOptions:
+    """Options for executing a prometheus query preset."""
+
+    labels: dict[str, str]
+    group_labels: list[str]
+
+
+@dataclass(frozen=True)
 class PrometheusQueryPresetData:
     """Domain model data for prometheus query preset."""
 
