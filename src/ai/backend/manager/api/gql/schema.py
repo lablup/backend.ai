@@ -181,6 +181,7 @@ from .rbac import (
     admin_roles,
     admin_update_role,
     my_roles,
+    rbac_scope_entity_combinations,
 )
 from .reservoir_registry import (
     create_reservoir_registry,
@@ -314,6 +315,7 @@ class Query:
     admin_entities = admin_entities
     # RBAC User APIs
     my_roles = my_roles
+    rbac_scope_entity_combinations = rbac_scope_entity_combinations
     # Session Scoped APIs
     session_kernels_v2 = session_kernels_v2
     # Resource Group Scoped APIs

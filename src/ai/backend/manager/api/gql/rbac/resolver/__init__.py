@@ -5,6 +5,7 @@ from .permission import (
     admin_create_permission,
     admin_delete_permission,
     admin_permissions,
+    rbac_scope_entity_combinations,
 )
 from .role import (
     admin_assign_role,
@@ -22,6 +23,7 @@ from .role import (
 __all__ = [
     # Permission queries
     "admin_permissions",
+    "rbac_scope_entity_combinations",
     # Entity queries
     "admin_entities",
     # Permission mutations

@@ -5090,6 +5090,9 @@ type Query {
   """
   myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
 
+  """Added in 26.3.0. List valid RBAC scope-entity type combinations."""
+  rbacScopeEntityCombinations: [ScopeEntityCombination!]!
+
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
 
@@ -6319,6 +6322,14 @@ enum SchedulingStatus {
   TERMINATED
   CANCELLED
   ERROR
+}
+
+"""
+Added in 26.3.0. Valid scope-entity type combination for RBAC permissions.
+"""
+type ScopeEntityCombination {
+  scopeType: RBACElementType!
+  validEntityTypes: [RBACElementType!]!
 }
 
 """Added in 26.3.0. A registered service instance in the catalog."""

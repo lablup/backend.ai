@@ -5,6 +5,9 @@ from __future__ import annotations
 import strawberry
 from strawberry import ID, Info
 
+from ai.backend.common.data.permission.scope_entity_combinations import (
+    VALID_SCOPE_ENTITY_COMBINATIONS,
+)
 from ai.backend.manager.api.gql.rbac.fetcher.permission import fetch_permissions
 from ai.backend.manager.api.gql.rbac.types import (
     CreatePermissionInput,
@@ -14,6 +17,8 @@ from ai.backend.manager.api.gql.rbac.types import (
     PermissionFilter,
     PermissionGQL,
     PermissionOrderBy,
+    RBACElementTypeGQL,
+    ScopeEntityCombinationGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -51,6 +56,22 @@ async def admin_permissions(
         limit=limit,
         offset=offset,
     )
+
+
+@strawberry.field(description="Added in 26.3.0. List valid RBAC scope-entity type combinations.")  # type: ignore[misc]
+async def rbac_scope_entity_combinations(
+    info: Info[StrawberryGQLContext],
+) -> list[ScopeEntityCombinationGQL]:
+    return [
+        ScopeEntityCombinationGQL(
+            scope_type=RBACElementTypeGQL.from_element(scope),
+            valid_entity_types=sorted(
+                [RBACElementTypeGQL.from_element(entity) for entity in entities],
+                key=lambda e: e.value,
+            ),
+        )
+        for scope, entities in VALID_SCOPE_ENTITY_COMBINATIONS.items()
+    ]
 
 
 # ==================== Mutation Resolvers ====================
