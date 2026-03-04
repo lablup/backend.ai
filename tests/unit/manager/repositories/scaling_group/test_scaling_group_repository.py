@@ -956,7 +956,7 @@ class TestScalingGroupRepositoryDB:
         """Test disassociating a scaling group from multiple domains"""
         scaling_group, domains = sample_scaling_group_with_multiple_domain_associations
 
-        # Disassociate all domains at once
+        # Disassociate all domains one by one
         for domain in domains:
             unbinder = ResourceGroupDomainEntityUnbinder(
                 scaling_groups=[scaling_group], domain=domain
