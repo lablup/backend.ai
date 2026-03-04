@@ -17,10 +17,6 @@ class DownloadFileAction(SessionFileAction):
     owner_access_key: AccessKey
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-    @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET

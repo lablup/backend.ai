@@ -19,10 +19,6 @@ class StartServiceAction(SessionAppServiceAction):
     envs: str | None  # json_string
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-    @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE

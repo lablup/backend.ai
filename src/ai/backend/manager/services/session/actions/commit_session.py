@@ -16,10 +16,6 @@ class CommitSessionAction(SessionCommitAction):
     filename: str | None
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-    @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE

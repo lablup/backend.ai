@@ -15,10 +15,6 @@ class ShutdownServiceAction(SessionAppServiceAction):
     service_name: str
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-    @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.DELETE

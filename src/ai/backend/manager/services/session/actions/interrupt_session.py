@@ -5,17 +5,13 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
-from ai.backend.manager.services.session.base import SessionAction
+from ai.backend.manager.services.session.base import SessionSingleEntityAction
 
 
 @dataclass
-class InterruptSessionAction(SessionAction):
+class InterruptSessionAction(SessionSingleEntityAction):
     session_name: str
     owner_access_key: AccessKey
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
     @override
     @classmethod

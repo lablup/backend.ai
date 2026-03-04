@@ -6,11 +6,11 @@ from ai.backend.common.types import AccessKey, KernelId
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
-from ai.backend.manager.services.session.base import SessionAction
+from ai.backend.manager.services.session.base import SessionSingleEntityAction
 
 
 @dataclass
-class GetContainerLogsAction(SessionAction):
+class GetContainerLogsAction(SessionSingleEntityAction):
     session_name: str
     owner_access_key: AccessKey
     kernel_id: KernelId | None
@@ -19,10 +19,6 @@ class GetContainerLogsAction(SessionAction):
     @classmethod
     def entity_type(cls) -> EntityType:
         return EntityType.SESSION_CONTAINER_LOG
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
     @override
     @classmethod

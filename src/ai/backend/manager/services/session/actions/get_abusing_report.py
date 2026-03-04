@@ -6,11 +6,11 @@ from ai.backend.common.types import AbuseReport, AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
-from ai.backend.manager.services.session.base import SessionAction
+from ai.backend.manager.services.session.base import SessionSingleEntityAction
 
 
 @dataclass
-class GetAbusingReportAction(SessionAction):
+class GetAbusingReportAction(SessionSingleEntityAction):
     session_name: str
     owner_access_key: AccessKey
 
@@ -18,10 +18,6 @@ class GetAbusingReportAction(SessionAction):
     @classmethod
     def entity_type(cls) -> EntityType:
         return EntityType.SESSION_ABUSING_REPORT
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
     @override
     @classmethod
