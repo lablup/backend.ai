@@ -94,7 +94,12 @@ class PrometheusQueryPresetService:
         request_window: str | None,
         preset_window: str | None,
     ) -> str:
-        return request_window or preset_window or self._default_timewindow
+        """Resolve window with fallback: request → preset → server default."""
+        if request_window is not None:
+            return request_window
+        if preset_window is not None:
+            return preset_window
+        return self._default_timewindow
 
     async def execute_preset(self, action: ExecutePresetAction) -> ExecutePresetActionResult:
         preset_data = await self._repository.get_by_id(action.preset_id)
