@@ -33,6 +33,7 @@ from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolder
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
+from ai.backend.manager.api.rest.middleware import build_auth_middleware, build_exception_middleware
 from ai.backend.manager.api.rest.types import ModuleDeps, ModuleRegistrar
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
@@ -865,29 +866,43 @@ async def server(
     app = build_root_app(
         0,
         bootstrap_config,
-        cleanup_contexts=[],
     )
-    root_ctx = app["_root.context"]
 
     cp = server_module_deps.config_provider
-    root_ctx.config_provider = cp
 
     # Real DB connection for HMAC auth middleware
     async with connect_database(cp.config.db) as db:
-        root_ctx.db = db
-
         # Mocks for exception middleware
-        root_ctx.error_monitor = MagicMock()
-        root_ctx.error_monitor.capture_exception = AsyncMock()
-        root_ctx.stats_monitor = MagicMock()
-        root_ctx.stats_monitor.report_metric = AsyncMock()
+        error_monitor = MagicMock()
+        error_monitor.capture_exception = AsyncMock()
+        stats_monitor = MagicMock()
+        stats_monitor.report_metric = AsyncMock()
 
         # Mocks for auth middleware
-        root_ctx.valkey_stat = MagicMock()
-        root_ctx.valkey_stat.increment_keypair_query_count = AsyncMock()
-        root_ctx.hook_plugin_ctx = MagicMock()
-        root_ctx.hook_plugin_ctx.dispatch = AsyncMock(return_value=MagicMock())
-        root_ctx.jwt_validator = MagicMock()
+        valkey_stat = MagicMock()
+        valkey_stat.increment_keypair_query_count = AsyncMock()
+        hook_plugin_ctx = MagicMock()
+        hook_plugin_ctx.dispatch = AsyncMock(return_value=MagicMock())
+        jwt_validator = MagicMock()
+
+        # Insert DI-based middlewares
+        app.middlewares.insert(
+            1,
+            build_exception_middleware(
+                error_monitor=error_monitor,
+                stats_monitor=stats_monitor,
+                config_provider=cp,
+            ),
+        )
+        app.middlewares.insert(
+            2,
+            build_auth_middleware(
+                db=db,
+                jwt_validator=jwt_validator,
+                valkey_stat=valkey_stat,
+                hook_plugin_ctx=hook_plugin_ctx,
+            ),
+        )
 
         if server_module_registrars:
             register_modules(app, server_module_registrars, deps=server_module_deps)

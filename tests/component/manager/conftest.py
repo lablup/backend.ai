@@ -741,7 +741,6 @@ async def app(bootstrap_config: BootstrapConfig) -> web.Application:
     return build_root_app(
         0,
         bootstrap_config,
-        cleanup_contexts=[],
     )
 
 
@@ -768,14 +767,11 @@ async def create_app_and_client(
         app = build_root_app(
             0,
             bootstrap_config,
-            cleanup_contexts=[],
             scheduler_opts={
                 "close_timeout": 10,
                 **scheduler_opts,
             },
         )
-        root_ctx = app["_root.context"]
-        root_ctx.config_provider = config_provider
 
         # Register all requested modules using the provided deps.
         all_registrars = list(registrars or [])

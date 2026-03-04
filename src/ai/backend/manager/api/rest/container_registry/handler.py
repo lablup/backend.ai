@@ -46,9 +46,7 @@ class RegistryIdPath(BaseRequestModel):
 class ContainerRegistryHandler:
     """Container registry API handler.
 
-    Dependencies are resolved at request time via middleware parameters
-    because the handler is instantiated inside ``create_app()`` before
-    ``RootContext`` is available.
+    Dependencies are resolved at request time via middleware parameters.
     """
 
     # ------------------------------------------------------------------

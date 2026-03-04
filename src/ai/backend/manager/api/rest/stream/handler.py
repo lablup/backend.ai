@@ -60,7 +60,14 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.context import RootContext
+    from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+    from ai.backend.common.etcd import AsyncEtcd
+    from ai.backend.common.events.dispatcher import EventDispatcher
+    from ai.backend.common.plugin.monitor import ErrorPluginContext
+    from ai.backend.manager.config.provider import ManagerConfigProvider
+    from ai.backend.manager.idle import IdleCheckerHost
+    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+    from ai.backend.manager.registry import AgentRegistry
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -80,8 +87,28 @@ class PrivateContext:
 class StreamHandler:
     """Stream API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, private_ctx: PrivateContext) -> None:
+    def __init__(
+        self,
+        *,
+        private_ctx: PrivateContext,
+        db: ExtendedAsyncSAEngine,
+        registry: AgentRegistry,
+        config_provider: ManagerConfigProvider,
+        error_monitor: ErrorPluginContext,
+        valkey_live: ValkeyLiveClient,
+        idle_checker_host: IdleCheckerHost,
+        etcd: AsyncEtcd,
+        event_dispatcher: EventDispatcher,
+    ) -> None:
         self._ctx = private_ctx
+        self.db = db
+        self.registry = registry
+        self.config_provider = config_provider
+        self.error_monitor = error_monitor
+        self.valkey_live = valkey_live
+        self.idle_checker_host = idle_checker_host
+        self.etcd = etcd
+        self.event_dispatcher = event_dispatcher
 
     # ------------------------------------------------------------------
     # stream_pty (GET /stream/session/{session_name}/pty)
@@ -94,14 +121,13 @@ class StreamHandler:
         user_ctx: UserContext,
     ) -> web.StreamResponse:
         request = ctx.request
-        root_ctx: RootContext = request.app["_root.context"]
         app_ctx = self._ctx
         database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
         session_name = path.parsed.session_name
         access_key = AccessKey(user_ctx.access_key)
         api_version = request["api_version"]
         try:
-            async with root_ctx.db.begin_readonly_session() as db_sess:
+            async with self.db.begin_readonly_session() as db_sess:
                 session = await asyncio.shield(
                     database_ptask_group.create_task(
                         SessionRow.get_session(
@@ -120,12 +146,10 @@ class StreamHandler:
 
         await asyncio.shield(
             database_ptask_group.create_task(
-                root_ctx.registry.increment_session_usage(session),
+                self.registry.increment_session_usage(session),
             )
         )
-        ws = web.WebSocketResponse(
-            max_msg_size=root_ctx.config_provider.config.manager.max_wsmsg_size
-        )
+        ws = web.WebSocketResponse(max_msg_size=self.config_provider.config.manager.max_wsmsg_size)
         await ws.prepare(request)
 
         myself = asyncio.current_task()
@@ -182,13 +206,13 @@ class StreamHandler:
                         else:
                             await asyncio.shield(
                                 database_ptask_group.create_task(
-                                    root_ctx.registry.increment_session_usage(session),
+                                    self.registry.increment_session_usage(session),
                                 ),
                             )
                             run_id = secrets.token_hex(8)
                             if data["type"] == "resize":
                                 code = f"%resize {data['rows']} {data['cols']}"
-                                await root_ctx.registry.execute(
+                                await self.registry.execute(
                                     session,
                                     api_version,
                                     run_id,
@@ -198,7 +222,7 @@ class StreamHandler:
                                     flush_timeout=None,
                                 )
                             elif data["type"] == "ping":
-                                await root_ctx.registry.execute(
+                                await self.registry.execute(
                                     session,
                                     api_version,
                                     run_id,
@@ -212,7 +236,7 @@ class StreamHandler:
                                 if not socks[0].closed:
                                     await asyncio.shield(
                                         database_ptask_group.create_task(
-                                            root_ctx.registry.restart_session(
+                                            self.registry.restart_session(
                                                 session,
                                             ),
                                         ),
@@ -234,7 +258,7 @@ class StreamHandler:
             except asyncio.CancelledError:
                 raise
             except Exception:
-                await root_ctx.error_monitor.capture_exception(context={"user": user_ctx.user_uuid})
+                await self.error_monitor.capture_exception(context={"user": user_ctx.user_uuid})
                 log.exception("stream_stdin({0}): unexpected error", stream_key)
             finally:
                 log.debug("stream_stdin({0}): terminated", stream_key)
@@ -267,7 +291,7 @@ class StreamHandler:
             except asyncio.CancelledError:
                 pass
             except Exception:
-                await root_ctx.error_monitor.capture_exception(context={"user": user_ctx.user_uuid})
+                await self.error_monitor.capture_exception(context={"user": user_ctx.user_uuid})
                 log.exception("stream_stdout({0}): unexpected error", stream_key)
             finally:
                 log.debug("stream_stdout({0}): terminated", stream_key)
@@ -277,7 +301,7 @@ class StreamHandler:
         try:
             await stream_stdin()
         except Exception:
-            await root_ctx.error_monitor.capture_exception(context={"user": user_ctx.user_uuid})
+            await self.error_monitor.capture_exception(context={"user": user_ctx.user_uuid})
             log.exception("stream_pty({0}): unexpected error", stream_key)
         finally:
             app_ctx.stream_pty_handlers[stream_key].discard(myself)
@@ -298,19 +322,18 @@ class StreamHandler:
     ) -> web.StreamResponse:
         """WebSocket-version of gateway.kernel.execute()."""
         request = ctx.request
-        root_ctx: RootContext = request.app["_root.context"]
         app_ctx = self._ctx
         database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
         rpc_ptask_group: aiotools.PersistentTaskGroup = request.app["rpc_ptask_group"]
 
-        config = root_ctx.config_provider.config
-        registry = root_ctx.registry
+        config = self.config_provider.config
+        registry = self.registry
         session_name = path.parsed.session_name
         access_key = AccessKey(user_ctx.access_key)
         api_version = request["api_version"]
         log.info("STREAM_EXECUTE(ak:{0}, s:{1})", access_key, session_name)
         try:
-            async with root_ctx.db.begin_readonly_session() as db_sess:
+            async with self.db.begin_readonly_session() as db_sess:
                 session: SessionRow = await asyncio.shield(
                     database_ptask_group.create_task(
                         SessionRow.get_session(
@@ -422,7 +445,6 @@ class StreamHandler:
         user_ctx: UserContext,
     ) -> web.StreamResponse:
         request = ctx.request
-        root_ctx: RootContext = request.app["_root.context"]
         app_ctx = self._ctx
         database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
         rpc_ptask_group: aiotools.PersistentTaskGroup = request.app["rpc_ptask_group"]
@@ -434,7 +456,7 @@ class StreamHandler:
         if myself is None:
             raise NoCurrentTaskContext("No current task context")
         try:
-            async with root_ctx.db.begin_readonly_session() as db_sess:
+            async with self.db.begin_readonly_session() as db_sess:
                 session = await asyncio.shield(
                     database_ptask_group.create_task(
                         SessionRow.get_session(
@@ -504,7 +526,7 @@ class StreamHandler:
         else:
             raise InvalidAPIParameters(f"Unsupported service protocol: {sport['protocol']}")
 
-        valkey_live = root_ctx.valkey_live
+        valkey_live = self.valkey_live
         conn_tracker_key = f"session.{kernel_id}.active_app_connections"
 
         async def update_connection_tracker() -> None:
@@ -530,7 +552,7 @@ class StreamHandler:
             async with app_ctx.conn_tracker_lock:
                 app_ctx.active_session_ids[kernel_id] += 1
                 await valkey_live.update_connection_tracker(str(kernel_id), service, stream_id)
-                await root_ctx.idle_checker_host.update_app_streaming_status(
+                await self.idle_checker_host.update_app_streaming_status(
                     session_id,
                     AppStreamingStatus.HAS_ACTIVE_CONNECTIONS,
                 )
@@ -543,7 +565,7 @@ class StreamHandler:
                 await valkey_live.remove_connection_tracker(str(kernel_id), service, stream_id)
                 remaining_count = await valkey_live.count_active_connections(str(kernel_id))
                 if remaining_count == 0:
-                    await root_ctx.idle_checker_host.update_app_streaming_status(
+                    await self.idle_checker_host.update_app_streaming_status(
                         session_id,
                         AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
                     )
@@ -556,7 +578,7 @@ class StreamHandler:
             )
             await asyncio.shield(
                 database_ptask_group.create_task(
-                    root_ctx.registry.increment_session_usage(session),
+                    self.registry.increment_session_usage(session),
                 )
             )
 
@@ -568,7 +590,7 @@ class StreamHandler:
 
             result = await asyncio.shield(
                 rpc_ptask_group.create_task(
-                    root_ctx.registry.start_service(session, service, opts),
+                    self.registry.start_service(session, service, opts),
                 ),
             )
             if result["status"] == "failed":
@@ -578,7 +600,7 @@ class StreamHandler:
 
             ws = web.WebSocketResponse(
                 autoping=False,
-                max_msg_size=root_ctx.config_provider.config.manager.max_wsmsg_size,
+                max_msg_size=self.config_provider.config.manager.max_wsmsg_size,
             )
             await ws.prepare(request)
             proxy = proxy_cls(
@@ -607,11 +629,9 @@ class StreamHandler:
         ctx: RequestCtx,
         user_ctx: UserContext,
     ) -> web.StreamResponse:
-        request = ctx.request
         session_name = path.parsed.session_name
         access_key = AccessKey(user_ctx.access_key)
-        root_ctx: RootContext = request.app["_root.context"]
-        async with root_ctx.db.begin_readonly_session() as db_sess:
+        async with self.db.begin_readonly_session() as db_sess:
             compute_session = await SessionRow.get_session(
                 db_sess,
                 session_name,
@@ -642,15 +662,16 @@ class StreamHandler:
 
 
 async def handle_kernel_terminating(
-    app: web.Application,
+    _app: web.Application,
     _source: AgentId,
     event: KernelTerminatingBroadcastEvent,
+    *,
+    db: ExtendedAsyncSAEngine,
+    app_ctx: PrivateContext,
 ) -> None:
-    root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["stream.context"]
     try:
         kernel = await KernelRow.get_kernel(
-            root_ctx.db,
+            db,
             event.kernel_id,
             allow_stale=True,
         )
@@ -673,13 +694,18 @@ async def handle_kernel_terminating(
         await asyncio.gather(*cancelled_tasks, return_exceptions=True)
 
 
-async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext) -> None:
-    valkey_live = root_ctx.valkey_live
+async def stream_conn_tracker_gc(
+    app_ctx: PrivateContext,
+    *,
+    valkey_live: ValkeyLiveClient,
+    etcd: AsyncEtcd,
+    idle_checker_host: IdleCheckerHost,
+) -> None:
     try:
         while True:
             try:
                 no_packet_timeout: timedelta = tx.TimeDuration().check(
-                    await root_ctx.etcd.get("config/idle/app-streaming-packet-timeout") or "5m",
+                    await etcd.get("config/idle/app-streaming-packet-timeout") or "5m",
                 )
             except GRPCStatusError as e:
                 err_detail = e.args[0]
@@ -706,7 +732,7 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
                         f"removed/remaining = {removed_count}/{remaining_count}",
                     )
                     if prev_remaining_count > 0 and remaining_count == 0:
-                        await root_ctx.idle_checker_host.update_app_streaming_status(
+                        await idle_checker_host.update_app_streaming_status(
                             SessionId(session_id),
                             AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
                         )
@@ -717,16 +743,15 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
 
 async def stream_app_ctx(
     app: web.Application,
-    priv_ctx: PrivateContext | None = None,
+    priv_ctx: PrivateContext,
+    *,
+    db: ExtendedAsyncSAEngine,
+    valkey_live: ValkeyLiveClient,
+    etcd: AsyncEtcd,
+    idle_checker_host: IdleCheckerHost,
+    event_dispatcher: EventDispatcher,
 ) -> AsyncIterator[None]:
-    """Initialize stream application context.
-
-    When *priv_ctx* is ``None`` (legacy call path), falls back to
-    ``app["stream.context"]``.
-    """
-    root_ctx: RootContext = app["_root.context"]
-    if priv_ctx is None:
-        priv_ctx = app["stream.context"]
+    """Initialize stream application context."""
     app_ctx = priv_ctx
 
     app_ctx.stream_pty_handlers = defaultdict(weakref.WeakSet)
@@ -736,10 +761,19 @@ async def stream_app_ctx(
     app_ctx.zctx = zmq.asyncio.Context()
     app_ctx.conn_tracker_lock = asyncio.Lock()
     app_ctx.active_session_ids = defaultdict(int)
-    app_ctx.conn_tracker_gc_task = asyncio.create_task(stream_conn_tracker_gc(root_ctx, app_ctx))
+    app_ctx.conn_tracker_gc_task = asyncio.create_task(
+        stream_conn_tracker_gc(
+            app_ctx,
+            valkey_live=valkey_live,
+            etcd=etcd,
+            idle_checker_host=idle_checker_host,
+        )
+    )
 
-    root_ctx.event_dispatcher.subscribe(
-        KernelTerminatingBroadcastEvent, app, handle_kernel_terminating
+    event_dispatcher.subscribe(
+        KernelTerminatingBroadcastEvent,
+        app,
+        lambda app, src, ev: handle_kernel_terminating(app, src, ev, db=db, app_ctx=app_ctx),
     )
 
     yield
@@ -749,20 +783,14 @@ async def stream_app_ctx(
 
 async def stream_shutdown(
     app: web.Application,
-    priv_ctx: PrivateContext | None = None,
+    priv_ctx: PrivateContext,
 ) -> None:
-    """Shutdown handler for stream app.
-
-    When *priv_ctx* is ``None`` (legacy call path), falls back to
-    ``app["stream.context"]``.
-    """
+    """Shutdown handler for stream app."""
     database_ptask_group: aiotools.PersistentTaskGroup = app["database_ptask_group"]
     rpc_ptask_group: aiotools.PersistentTaskGroup = app["rpc_ptask_group"]
     await database_ptask_group.shutdown()
     await rpc_ptask_group.shutdown()
     cancelled_tasks: list[asyncio.Task[Any]] = []
-    if priv_ctx is None:
-        priv_ctx = app["stream.context"]
     app_ctx = priv_ctx
     app_ctx.conn_tracker_gc_task.cancel()
     cancelled_tasks.append(app_ctx.conn_tracker_gc_task)

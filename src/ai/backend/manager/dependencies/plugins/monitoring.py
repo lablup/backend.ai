@@ -42,7 +42,7 @@ class ErrorMonitorDependency(MonitoringDependency[ManagerErrorPluginContext | No
     """Provides ManagerErrorPluginContext lifecycle management.
 
     Tolerates initialization failures — yields None if init fails.
-    Injects error_log_repository directly, bypassing root_ctx lookup.
+    Injects error_log_repository directly.
     """
 
     @property

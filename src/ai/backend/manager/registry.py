@@ -203,8 +203,6 @@ class AgentRegistry:
     pending_waits: set[asyncio.Task[None]]
     database_ptask_group: aiotools.PersistentTaskGroup
     webhook_ptask_group: aiotools.PersistentTaskGroup
-    # TODO: Migrate to use root_ctx.appproxy_client_pool instead.
-    # After migration, remove _client_pool and _load_app_proxy_client.
     _client_pool: ClientPool
     _agent_client_pool: AgentClientPool
 
@@ -269,7 +267,6 @@ class AgentRegistry:
         await self.database_ptask_group.shutdown()
         await self.webhook_ptask_group.shutdown()
 
-    # TODO: Migrate callers to use root_ctx.appproxy_client_pool.load_client() instead.
     def _load_app_proxy_client(self, address: str, token: str) -> AppProxyClient:
         client_session = self._client_pool.load_client_session(
             ClientKey(

@@ -14,13 +14,12 @@ if TYPE_CHECKING:
 def register_etcd_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the etcd config sub-application."""
     from .handler import EtcdHandler
-    from .lifecycle import app_ctx as etcd_app_ctx
+    from .lifecycle import make_app_ctx
 
     reg = RouteRegistry.create("config", deps.cors_options)
 
-    # Wire lifecycle hook -- etcd_app_ctx reads root context directly,
-    # no PrivateContext needed.
-    reg.app.cleanup_ctx.append(etcd_app_ctx)
+    # Wire lifecycle hook via factory closure
+    reg.app.cleanup_ctx.append(make_app_ctx(deps.pidx, deps.config_provider))
 
     handler = EtcdHandler(processors=deps.processors)
 

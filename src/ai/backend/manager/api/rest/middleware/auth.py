@@ -3,7 +3,7 @@
 This module contains:
 
 * ``build_auth_middleware`` — factory that creates a global (``web.middleware``)
-  middleware with explicit dependencies (no RootContext lookup).
+  middleware with explicit dependencies.
 
 * ``auth_required``, ``admin_required``, ``superadmin_required`` —
   route-level decorators (usable as ``RouteMiddleware``) that enforce
@@ -761,7 +761,7 @@ def build_auth_middleware(
     valkey_stat: ValkeyStatClient,
     hook_plugin_ctx: HookPluginContext,
 ) -> Middleware:
-    """Build an auth middleware with explicit dependencies (no RootContext lookup)."""
+    """Build an auth middleware with explicit dependencies."""
 
     @web.middleware
     async def _middleware(request: web.Request, handler: Handler) -> web.StreamResponse:

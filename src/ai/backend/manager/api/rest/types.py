@@ -20,10 +20,12 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.common.etcd import AsyncEtcd
+    from ai.backend.common.events.dispatcher import EventDispatcher
     from ai.backend.common.events.fetcher import EventFetcher
     from ai.backend.common.events.hub.hub import EventHub
     from ai.backend.common.health_checker.probe import HealthProbe
     from ai.backend.common.metrics.metric import GraphQLMetricObserver
+    from ai.backend.common.plugin.monitor import ErrorPluginContext
     from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.config.unified import ExportConfig
@@ -113,6 +115,13 @@ class ModuleDeps:
     events_service: EventsService | None = None
     stream_service: StreamService | None = None
     health_probe: HealthProbe | None = None
+    db: ExtendedAsyncSAEngine | None = None
+    registry: AgentRegistry | None = None
+    error_monitor: ErrorPluginContext | None = None
+    valkey_live: ValkeyLiveClient | None = None
+    idle_checker_host: IdleCheckerHost | None = None
+    etcd: AsyncEtcd | None = None
+    event_dispatcher: EventDispatcher | None = None
 
 
 type ModuleRegistrar = Callable[[ModuleDeps], RouteRegistry]

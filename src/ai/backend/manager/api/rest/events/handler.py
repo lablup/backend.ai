@@ -64,7 +64,9 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.context import RootContext
+    from ai.backend.common.events.fetcher import EventFetcher
+    from ai.backend.common.events.hub.hub import EventHub
+    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -77,8 +79,20 @@ class PrivateContext:
 class EventsHandler:
     """Events API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, private_ctx: PrivateContext) -> None:
+    def __init__(
+        self,
+        *,
+        private_ctx: PrivateContext,
+        db: ExtendedAsyncSAEngine,
+        event_hub: EventHub,
+        event_fetcher: EventFetcher,
+        event_dispatcher: EventDispatcher,
+    ) -> None:
         self._ctx = private_ctx
+        self.db = db
+        self.event_hub = event_hub
+        self.event_fetcher = event_fetcher
+        self.event_dispatcher = event_dispatcher
 
     # ------------------------------------------------------------------
     # push_session_events (GET /events/session)
@@ -91,7 +105,6 @@ class EventsHandler:
         user_ctx: UserContext,
     ) -> web.StreamResponse:
         request = ctx.request
-        root_ctx: RootContext = request.app["_root.context"]
         params = query.parsed
         session_name = params.session_name
         session_id = params.session_id
@@ -126,9 +139,7 @@ class EventsHandler:
         if session_name == "*":
             resolved_session_id: Any = WILDCARD
         else:
-            async with root_ctx.db.begin_readonly_session(
-                isolation_level="READ COMMITTED"
-            ) as db_sess:
+            async with self.db.begin_readonly_session(isolation_level="READ COMMITTED") as db_sess:
                 rows = await SessionRow.match_sessions(
                     db_sess, session_name, AccessKey(access_key), allow_prefix=False
                 )
@@ -140,7 +151,7 @@ class EventsHandler:
         if group_name == "*":
             group_id: Any = WILDCARD
         else:
-            async with root_ctx.db.begin_readonly(isolation_level="READ COMMITTED") as conn:
+            async with self.db.begin_readonly(isolation_level="READ COMMITTED") as conn:
                 result = await conn.execute(
                     sa.select(groups.c.id).select_from(groups).where(groups.c.name == group_name)
                 )
@@ -191,12 +202,12 @@ class EventsHandler:
                     except asyncio.CancelledError:
                         pass
 
-            propagator = SessionEventPropagator(resp, root_ctx.db, filters)
-            root_ctx.event_hub.register_event_propagator(propagator, aliases)
+            propagator = SessionEventPropagator(resp, self.db, filters)
+            self.event_hub.register_event_propagator(propagator, aliases)
             try:
                 await resp.wait()
             finally:
-                root_ctx.event_hub.unregister_event_propagator(propagator.id())
+                self.event_hub.unregister_event_propagator(propagator.id())
                 await propagator.close()
                 return resp
 
@@ -211,7 +222,6 @@ class EventsHandler:
         user_ctx: UserContext,
     ) -> web.StreamResponse:
         request = ctx.request
-        root_ctx: RootContext = request.app["_root.context"]
         priv_ctx = self._ctx
         task_id = query.parsed.task_id
         access_key = user_ctx.access_key
@@ -223,8 +233,8 @@ class EventsHandler:
             )
         priv_ctx.active_tasks.add(current_task)
         async with sse_response(request) as resp:
-            propagator = WithCachePropagator(root_ctx.event_fetcher)
-            root_ctx.event_hub.register_event_propagator(
+            propagator = WithCachePropagator(self.event_fetcher)
+            self.event_hub.register_event_propagator(
                 propagator, [(EventDomain.BGTASK, str(task_id))]
             )
             try:
@@ -250,7 +260,7 @@ class EventsHandler:
                         break
                 await resp.send(dump_json_str({}), event="server_close")
             finally:
-                root_ctx.event_hub.unregister_event_propagator(propagator.id())
+                self.event_hub.unregister_event_propagator(propagator.id())
         return resp
 
 
@@ -260,48 +270,64 @@ class EventsHandler:
 
 
 async def _propagate_events(
-    app: web.Application,
+    _app: web.Application,
     _agent_id: AgentId,
     event: BaseSessionEvent | BaseKernelEvent | SchedulingBroadcastEvent,
+    *,
+    event_hub: EventHub,
 ) -> None:
     """A private connector from EventDispatcher subscription to EventHub."""
-    root_ctx: RootContext = app["_root.context"]
     log.trace("api.events._propagate_event({!r})", event)
-    await root_ctx.event_hub.propagate_event(event)
+    await event_hub.propagate_event(event)
 
 
-async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
+async def events_app_ctx(
+    app: web.Application,
+    *,
+    event_dispatcher: EventDispatcher,
+    event_hub: EventHub,
+) -> AsyncIterator[None]:
     """Initialize events application context."""
-    root_ctx: RootContext = app["_root.context"]
-    event_dispatcher: EventDispatcher = root_ctx.event_dispatcher
 
-    event_dispatcher.subscribe(SessionEnqueuedBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(KernelPreparingBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(KernelPullingBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(KernelCreatingBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(KernelStartedBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(KernelTerminatingBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(KernelTerminatedBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(KernelCancelledBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(SessionTerminatingBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(SessionTerminatedBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(SessionCancelledBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(SessionSuccessBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(SessionFailureBroadcastEvent, app, _propagate_events)
+    def _make_propagator(
+        eh: EventHub,
+    ) -> Any:
+        async def _handler(
+            app: web.Application,
+            agent_id: AgentId,
+            event: BaseSessionEvent | BaseKernelEvent | SchedulingBroadcastEvent,
+        ) -> None:
+            await _propagate_events(app, agent_id, event, event_hub=eh)
+
+        return _handler
+
+    propagator = _make_propagator(event_hub)
+
+    event_dispatcher.subscribe(SessionEnqueuedBroadcastEvent, app, propagator)
+    event_dispatcher.subscribe(KernelPreparingBroadcastEvent, app, propagator)
+    event_dispatcher.subscribe(KernelPullingBroadcastEvent, app, propagator)
+    event_dispatcher.subscribe(KernelCreatingBroadcastEvent, app, propagator)
+    event_dispatcher.subscribe(KernelStartedBroadcastEvent, app, propagator)
+    event_dispatcher.subscribe(KernelTerminatingBroadcastEvent, app, propagator)
+    event_dispatcher.subscribe(KernelTerminatedBroadcastEvent, app, propagator)
+    event_dispatcher.subscribe(KernelCancelledBroadcastEvent, app, propagator)
+    event_dispatcher.subscribe(SessionTerminatingBroadcastEvent, app, propagator)
+    event_dispatcher.subscribe(SessionTerminatedBroadcastEvent, app, propagator)
+    event_dispatcher.subscribe(SessionCancelledBroadcastEvent, app, propagator)
+    event_dispatcher.subscribe(SessionSuccessBroadcastEvent, app, propagator)
+    event_dispatcher.subscribe(SessionFailureBroadcastEvent, app, propagator)
 
     yield
 
 
-async def events_shutdown(app: web.Application, priv_ctx: PrivateContext | None = None) -> None:
-    """Shutdown handler for events app.
-
-    When *priv_ctx* is ``None`` (legacy call path), falls back to
-    ``app["events.context"]``.
-    """
-    root_ctx: RootContext = app["_root.context"]
-    if priv_ctx is None:
-        priv_ctx = app["events.context"]
-    await root_ctx.event_hub.shutdown()
+async def events_shutdown(
+    _app: web.Application,
+    priv_ctx: PrivateContext,
+    *,
+    event_hub: EventHub,
+) -> None:
+    """Shutdown handler for events app."""
+    await event_hub.shutdown()
     cancelled_tasks: list[asyncio.Task[Any]] = []
     for task in priv_ctx.active_tasks:
         if not task.done():

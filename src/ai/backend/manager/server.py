@@ -64,7 +64,6 @@ from ai.backend.logging.otel import (
 
 from . import __version__
 from .api import ManagerStatus
-from .api.context import RootContext
 from .api.rest import build_api_routes
 from .api.rest.middleware import (
     build_api_metric_middleware,
@@ -87,7 +86,6 @@ from .errors.common import (
 from .plugin.webapp import WebappPluginContext
 
 if TYPE_CHECKING:
-    from .api.context import CleanupContext
     from .api.rest.types import WebRequestHandler
 
 VALID_VERSIONS: Final = frozenset([
@@ -214,108 +212,28 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
 # after all dependencies are initialized.
 
 
-def _bridge_resources_to_root_ctx(
-    root_ctx: RootContext,
-    resources: DependencyResources,
-) -> None:
-    """Bridge DependencyResources to RootContext for backward compatibility.
-
-    Maps all Composer outputs to the corresponding RootContext attributes
-    so that existing code referencing root_ctx.xxx continues to work.
-    """
-    # Bootstrap
-    root_ctx.etcd = resources.bootstrap.etcd
-    root_ctx.config_provider = resources.bootstrap.config_provider
-
-    # Infrastructure
-    root_ctx.db = resources.infrastructure.db
-    root_ctx.valkey_artifact = resources.infrastructure.valkey.artifact
-    root_ctx.valkey_container_log = resources.infrastructure.valkey.container_log
-    root_ctx.valkey_live = resources.infrastructure.valkey.live
-    root_ctx.valkey_stat = resources.infrastructure.valkey.stat
-    root_ctx.valkey_image = resources.infrastructure.valkey.image
-    root_ctx.valkey_stream = resources.infrastructure.valkey.stream
-    root_ctx.valkey_schedule = resources.infrastructure.valkey.schedule
-    root_ctx.valkey_bgtask = resources.infrastructure.valkey.bgtask
-    valkey_profile_target = (
-        resources.bootstrap.config_provider.config.redis.to_valkey_profile_target()
-    )
-    root_ctx.valkey_profile_target = valkey_profile_target
-
-    # Components
-    root_ctx.storage_manager = resources.components.storage_manager
-    root_ctx.agent_cache = resources.components.agent_cache
-
-    # Plugins
-    root_ctx.hook_plugin_ctx = resources.plugins.hook_plugin_ctx
-    root_ctx.network_plugin_ctx = resources.plugins.network_plugin_ctx
-    root_ctx.event_dispatcher_plugin_ctx = resources.plugins.event_dispatcher_plugin_ctx
-
-    # Monitoring (initialized after Domain — requires error_log_repository)
-    if resources.monitoring.error_monitor is not None:
-        root_ctx.error_monitor = resources.monitoring.error_monitor
-    if resources.monitoring.stats_monitor is not None:
-        root_ctx.stats_monitor = resources.monitoring.stats_monitor
-
-    # Messaging
-    root_ctx.event_hub = resources.messaging.event_hub
-    root_ctx.message_queue = resources.messaging.message_queue
-    root_ctx.event_producer = resources.messaging.event_producer
-    root_ctx.event_fetcher = resources.messaging.event_fetcher
-
-    # Domain
-    root_ctx.notification_center = resources.domain.notification_center
-    root_ctx.distributed_lock_factory = resources.domain.distributed_lock_factory
-    root_ctx.repositories = resources.domain.repositories
-    root_ctx.services_ctx = resources.domain.services_ctx
-
-    # System
-    root_ctx.cors_options = resources.system.cors_options
-    root_ctx.metrics = resources.system.metrics
-    root_ctx.gql_adapter = resources.system.gql_adapter
-    root_ctx.jwt_validator = resources.system.jwt_validator
-    root_ctx.prometheus_client = resources.system.prometheus_client
-    root_ctx.service_discovery = resources.system.service_discovery
-    root_ctx.sd_loop = resources.system.sd_loop
-    root_ctx.background_task_manager = resources.system.background_task_manager
-    root_ctx.health_probe = resources.system.health_probe
-
-    # Agents
-    root_ctx.scheduling_controller = resources.agents.scheduling_controller
-    root_ctx.revision_generator_registry = resources.agents.revision_generator_registry
-    root_ctx.deployment_controller = resources.agents.deployment_controller
-    root_ctx.route_controller = resources.agents.route_controller
-    root_ctx.agent_client_pool = resources.agents.agent_client_pool
-    root_ctx.appproxy_client_pool = resources.agents.appproxy_client_pool
-    root_ctx.registry = resources.agents.registry
-
-    # Orchestration
-    root_ctx.idle_checker_host = resources.orchestration.idle_checker_host
-    root_ctx.sokovan_orchestrator = resources.orchestration.sokovan_orchestrator
-    root_ctx.leader_election = resources.orchestration.leader_election
-
-    # Processing
-    root_ctx.event_dispatcher = resources.processing.event_dispatcher
-    root_ctx.processors = resources.processing.processors
-
-
 @asynccontextmanager
-async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
-    root_ctx: RootContext = root_app["_root.context"]
+async def webapp_plugin_ctx(
+    root_app: web.Application,
+    *,
+    dep_resources: DependencyResources,
+    pidx: int,
+) -> AsyncIterator[None]:
+    r = dep_resources
     plugin_ctx = WebappPluginContext(
-        root_ctx.etcd,
-        root_ctx.config_provider.config.model_dump(by_alias=True),
+        r.bootstrap.etcd,
+        r.bootstrap.config_provider.config.model_dump(by_alias=True),
     )
     await plugin_ctx.init(
-        context=root_ctx,
-        allowlist=root_ctx.config_provider.config.manager.allowed_plugins,
-        blocklist=root_ctx.config_provider.config.manager.disabled_plugins,
+        context=None,
+        allowlist=r.bootstrap.config_provider.config.manager.allowed_plugins,
+        blocklist=r.bootstrap.config_provider.config.manager.disabled_plugins,
     )
-    root_ctx.webapp_plugin_ctx = plugin_ctx
+    cors_options = r.system.cors_options
     for plugin_name, plugin_instance in plugin_ctx.plugins.items():
-        if root_ctx.pidx == 0:
+        if pidx == 0:
             log.info("Loading webapp plugin: {0}", plugin_name)
-        subapp, global_middlewares = await plugin_instance.create_app(root_ctx.cors_options)
+        subapp, global_middlewares = await plugin_instance.create_app(cors_options)
         _init_subapp(plugin_name, root_app, subapp, global_middlewares)
     try:
         yield
@@ -324,23 +242,28 @@ async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
 
 
 @asynccontextmanager
-async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    if root_ctx.pidx == 0:
-        mgr_status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
+async def manager_status_ctx(
+    pidx: int,
+    config_provider: Any,
+) -> AsyncIterator[None]:
+    if pidx == 0:
+        mgr_status = await config_provider.legacy_etcd_config_loader.get_manager_status()
         if mgr_status is None or mgr_status not in (ManagerStatus.RUNNING, ManagerStatus.FROZEN):
             # legacy transition: we now have only RUNNING or FROZEN for HA setup.
-            await root_ctx.config_provider.legacy_etcd_config_loader.update_manager_status(
+            await config_provider.legacy_etcd_config_loader.update_manager_status(
                 ManagerStatus.RUNNING
             )
             mgr_status = ManagerStatus.RUNNING
         log.info("Manager status: {}", mgr_status)
-        tz = root_ctx.config_provider.config.system.timezone
+        tz = config_provider.config.system.timezone
         log.info("Configured timezone: {}", tz.tzname(datetime.now(UTC)))
     yield
 
 
+_error_monitor_ref: Any = None
+
+
 def handle_loop_error(
-    root_ctx: RootContext,
     loop: asyncio.AbstractEventLoop,
     context: Mapping[str, Any],
 ) -> None:
@@ -349,13 +272,13 @@ def handle_loop_error(
     if exception is not None:
         if sys.exc_info()[0] is not None:
             log.exception("Error inside event loop: {0}", msg)
-            if (error_monitor := getattr(root_ctx, "error_monitor", None)) is not None:
-                loop.create_task(error_monitor.capture_exception())
+            if _error_monitor_ref is not None:
+                loop.create_task(_error_monitor_ref.capture_exception())
         else:
             exc_info = (type(exception), exception, exception.__traceback__)
             log.error("Error inside event loop: {0}", msg, exc_info=exc_info)
-            if (error_monitor := getattr(root_ctx, "error_monitor", None)) is not None:
-                loop.create_task(error_monitor.capture_exception(exc_instance=exception))
+            if _error_monitor_ref is not None:
+                loop.create_task(_error_monitor_ref.capture_exception(exc_instance=exception))
 
 
 def _init_subapp(
@@ -366,14 +289,11 @@ def _init_subapp(
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 
-    async def _set_root_ctx(subapp: web.Application) -> None:
-        # Allow subapp's access to the root app properties.
-        # These are the public APIs exposed to plugins as well.
-        subapp["_root.context"] = root_app["_root.context"]
+    async def _set_root_app(subapp: web.Application) -> None:
         subapp["_root_app"] = root_app
 
     # We must copy the public interface prior to all user-defined startup signal handlers.
-    subapp.on_startup.insert(0, _set_root_ctx)
+    subapp.on_startup.insert(0, _set_root_app)
     if "prefix" not in subapp:
         subapp["prefix"] = pkg_name.split(".")[-1].replace("_", "-")
     prefix = subapp["prefix"]
@@ -386,22 +306,16 @@ def _mount_registry_tree(
     root_registry: RouteRegistry,
     pidx: int = 0,
 ) -> None:
-    """Flatten the registry tree and mount all subapps on *root_app*.
+    """Flatten the registry tree and mount all subapps on *root_app*."""
 
-    Each sub-application receives a bridge to the root context at
-    startup so that legacy handlers can still access
-    ``app["_root.context"]``.
-    """
-
-    async def _bridge_root_ctx(subapp: web.Application) -> None:
-        subapp["_root.context"] = root_app["_root.context"]
+    async def _bridge_root_app(subapp: web.Application) -> None:
         subapp["_root_app"] = root_app
 
     for prefix, app, _reg in root_registry.collect_apps():
         if pidx == 0:
             log.info("Loading module: {}", prefix)
         app["_registry_prefix"] = prefix
-        app.on_startup.insert(0, _bridge_root_ctx)
+        app.on_startup.insert(0, _bridge_root_app)
         root_app.add_subapp("/" + prefix, app)
 
 
@@ -416,43 +330,50 @@ def _setup_api(
     ``dep_resources.processing.processors`` is available) but **before**
     ``runner.setup()`` freezes the application router.
     """
-    root_ctx: RootContext = root_app["_root.context"]
+    r = dep_resources
     gql_context_deps = GQLContextDeps(
-        config_provider=root_ctx.config_provider,
-        etcd=root_ctx.etcd,
-        db=root_ctx.db,
-        valkey_stat=root_ctx.valkey_stat,
-        valkey_image=root_ctx.valkey_image,
-        valkey_live=root_ctx.valkey_live,
-        valkey_schedule=root_ctx.valkey_schedule,
-        network_plugin_ctx=root_ctx.network_plugin_ctx,
-        background_task_manager=root_ctx.background_task_manager,
-        services_ctx=root_ctx.services_ctx,
-        storage_manager=root_ctx.storage_manager,
-        registry=root_ctx.registry,
-        idle_checker_host=root_ctx.idle_checker_host,
-        metric_observer=root_ctx.metrics.gql,
-        processors=dep_resources.processing.processors,
-        scheduler_repository=root_ctx.repositories.scheduler.repository,
-        user_repository=root_ctx.repositories.user.repository,
-        agent_repository=root_ctx.repositories.agent.repository,
+        config_provider=r.bootstrap.config_provider,
+        etcd=r.bootstrap.etcd,
+        db=r.infrastructure.db,
+        valkey_stat=r.infrastructure.valkey.stat,
+        valkey_image=r.infrastructure.valkey.image,
+        valkey_live=r.infrastructure.valkey.live,
+        valkey_schedule=r.infrastructure.valkey.schedule,
+        network_plugin_ctx=r.plugins.network_plugin_ctx,
+        background_task_manager=r.system.background_task_manager,
+        services_ctx=r.domain.services_ctx,
+        storage_manager=r.components.storage_manager,
+        registry=r.agents.registry,
+        idle_checker_host=r.orchestration.idle_checker_host,
+        metric_observer=r.system.metrics.gql,
+        processors=r.processing.processors,
+        scheduler_repository=r.domain.repositories.scheduler.repository,
+        user_repository=r.domain.repositories.user.repository,
+        agent_repository=r.domain.repositories.agent.repository,
     )
     deps = ModuleDeps(
-        cors_options=root_ctx.cors_options,
-        processors=dep_resources.processing.processors,
-        config_provider=root_ctx.config_provider,
+        cors_options=r.system.cors_options,
+        processors=r.processing.processors,
+        config_provider=r.bootstrap.config_provider,
         pidx=pidx,
-        storage_manager=root_ctx.storage_manager,
-        export_repository=root_ctx.repositories.export.repository,
-        export_config=root_ctx.config_provider.config.export,
+        storage_manager=r.components.storage_manager,
+        export_repository=r.domain.repositories.export.repository,
+        export_config=r.bootstrap.config_provider.config.export,
         gql_context_deps=gql_context_deps,
-        valkey_rate_limit=dep_resources.infrastructure.valkey.rate_limit,
-        event_hub=root_ctx.event_hub,
-        event_fetcher=root_ctx.event_fetcher,
-        stream_cleanup_handler=dep_resources.processing.stream_cleanup_handler,
-        events_service=dep_resources.processing.events_service,
-        stream_service=dep_resources.processing.stream_service,
-        health_probe=root_ctx.health_probe,
+        valkey_rate_limit=r.infrastructure.valkey.rate_limit,
+        event_hub=r.messaging.event_hub,
+        event_fetcher=r.messaging.event_fetcher,
+        stream_cleanup_handler=r.processing.stream_cleanup_handler,
+        events_service=r.processing.events_service,
+        stream_service=r.processing.stream_service,
+        health_probe=r.system.health_probe,
+        db=r.infrastructure.db,
+        registry=r.agents.registry,
+        error_monitor=r.monitoring.error_monitor,
+        valkey_live=r.infrastructure.valkey.live,
+        idle_checker_host=r.orchestration.idle_checker_host,
+        etcd=r.bootstrap.etcd,
+        event_dispatcher=r.processing.event_dispatcher,
     )
 
     # 1. Build API module tree
@@ -496,7 +417,6 @@ def build_root_app(
     pidx: int,
     bootstrap_config: BootstrapConfig,
     *,
-    cleanup_contexts: Sequence[CleanupContext] | None = None,
     scheduler_opts: Mapping[str, Any] | None = None,
 ) -> web.Application:
     if bootstrap_config.pyroscope.enabled:
@@ -516,21 +436,24 @@ def build_root_app(
             )
         )
 
-    root_ctx = RootContext()
-    root_ctx.metrics = CommonMetricRegistry.instance()
+    metrics = CommonMetricRegistry.instance()
+    cors_options = {
+        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
+            allow_credentials=False, expose_headers="*", allow_headers="*"
+        ),
+    }
     app = web.Application(
         middlewares=[
             request_id_middleware,
             # exception_middleware and auth_middleware are inserted later
             # in server_main() after dependencies are available.
             api_middleware,
-            build_api_metric_middleware(root_ctx.metrics.api),
+            build_api_metric_middleware(metrics.api),
         ]
     )
-    global_exception_handler = functools.partial(handle_loop_error, root_ctx)
+    global_exception_handler = functools.partial(handle_loop_error)
     loop = asyncio.get_running_loop()
     loop.set_exception_handler(global_exception_handler)
-    app["_root.context"] = root_ctx
 
     # If the request path starts with the following route, the auth_middleware is bypassed.
     # In this case, all authentication flags are turned off.
@@ -539,12 +462,9 @@ def build_root_app(
         "/container-registries/webhook",
     ]
 
-    root_ctx.pidx = pidx
-    root_ctx.cors_options = {
-        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
-            allow_credentials=False, expose_headers="*", allow_headers="*"
-        ),
-    }
+    app["_pidx"] = pidx
+    app["_cors_options"] = cors_options
+    app["_metrics"] = metrics
     default_scheduler_opts = {
         "limit": 2048,
         "close_timeout": 30,
@@ -557,43 +477,7 @@ def build_root_app(
     }
     app.on_response_prepare.append(on_prepare)
 
-    if cleanup_contexts is None:
-        # All dependency initialization is now handled by ManagerDependencyComposer
-        # in server_main(). Only manager_status_ctx remains as a cleanup context
-        # because it performs a one-time etcd status check during startup.
-        cleanup_contexts = [
-            manager_status_ctx,
-        ]
-    shutdown_context_instances = []
-
-    async def _cleanup_context_wrapper(_app: web.Application) -> AsyncIterator[None]:
-        # aiohttp's cleanup contexts are just async generators, not async context managers.
-        if cleanup_contexts is None:
-            raise ServerMisconfiguredError("cleanup_contexts is not initialized")
-        async with AsyncExitStack() as stack:
-            for cctx in cleanup_contexts:
-                cctx_name = cctx.__name__
-                try:
-                    cctx_instance = cctx(root_ctx)
-                    if hasattr(cctx_instance, "shutdown"):
-                        shutdown_context_instances.append(cctx_instance)
-                    await stack.enter_async_context(cctx_instance)
-                except Exception:
-                    log.exception("Failed to initialize cleanup context: {}", cctx_name)
-                    raise
-            yield
-
-    async def _trigger_shutdown(_app: web.Application) -> None:
-        # shutdown is triggered before cleanup, giving chances to close client connections first.
-        for cctx_instance in shutdown_context_instances:
-            try:
-                await cctx_instance.shutdown()
-            except Exception:
-                log.exception("error while shutting down a cleanup context")
-
-    app.on_shutdown.append(_trigger_shutdown)
-    app.cleanup_ctx.append(_cleanup_context_wrapper)
-    cors = aiohttp_cors.setup(app, defaults=root_ctx.cors_options)
+    cors = aiohttp_cors.setup(app, defaults=cors_options)
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
@@ -606,10 +490,10 @@ def build_root_app(
 
 
 def build_prometheus_service_discovery_handler(
-    root_ctx: RootContext,
+    service_discovery: Any,
 ) -> Handler:
     async def _handler(_request: web.Request) -> web.Response:
-        services = await root_ctx.service_discovery.discover()
+        services = await service_discovery.discover()
         resp = []
         for service in services:
             resp.append({
@@ -632,13 +516,14 @@ def build_prometheus_service_discovery_handler(
     return _handler
 
 
-def build_internal_app(root_ctx: RootContext) -> web.Application:
+def build_internal_app(dep_resources: DependencyResources) -> web.Application:
     app = web.Application()
-    app["_root.context"] = root_ctx
     metric_registry = CommonMetricRegistry.instance()
     app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
     app.router.add_route(
-        "GET", r"/metrics/service_discovery", build_prometheus_service_discovery_handler(root_ctx)
+        "GET",
+        r"/metrics/service_discovery",
+        build_prometheus_service_discovery_handler(dep_resources.system.service_discovery),
     )
     return app
 
@@ -674,11 +559,8 @@ async def server_main(
             hook_task_factory=boostrap_config.debug.enhanced_aiomonitor_task_info,
         )
         m.prompt = f"monitor (manager[{pidx}@{os.getpid()}]) >>> "
-        # Add some useful console_locals for ease of debugging
         m.console_locals["root_app"] = root_app
-        m.console_locals["root_ctx"] = root_ctx
         aiomon_started = False
-        # Start aiomonitor.
         try:
             m.start()
             aiomon_started = True
@@ -694,25 +576,28 @@ async def server_main(
                 m.close()
 
     @asynccontextmanager
-    async def webapp_ctx(root_app: web.Application) -> AsyncGenerator[None]:
-        root_ctx: RootContext = root_app["_root.context"]
+    async def webapp_ctx(
+        root_app: web.Application,
+        dep_resources: DependencyResources,
+    ) -> AsyncGenerator[None]:
+        config_provider = dep_resources.bootstrap.config_provider
 
         runner = web.AppRunner(root_app, keepalive_timeout=30.0)
 
-        internal_app = build_internal_app(root_ctx)
+        internal_app = build_internal_app(dep_resources)
         internal_runner = web.AppRunner(internal_app, keepalive_timeout=30.0)
 
         ssl_ctx = None
-        if root_ctx.config_provider.config.manager.ssl_enabled:
+        if config_provider.config.manager.ssl_enabled:
             ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
             ssl_ctx.load_cert_chain(
-                str(root_ctx.config_provider.config.manager.ssl_cert),
-                root_ctx.config_provider.config.manager.ssl_privkey,
+                str(config_provider.config.manager.ssl_cert),
+                config_provider.config.manager.ssl_privkey,
             )
         await runner.setup()  # The cleanup context initialization happens here.
         await internal_runner.setup()
-        service_addr = root_ctx.config_provider.config.manager.service_addr
-        internal_addr = root_ctx.config_provider.config.manager.internal_addr
+        service_addr = config_provider.config.manager.service_addr
+        internal_addr = config_provider.config.manager.internal_addr
         site = web.TCPSite(
             runner,
             service_addr.host,
@@ -743,7 +628,6 @@ async def server_main(
     await manager_init_stack.__aenter__()
     try:
         root_app = build_root_app(pidx, boostrap_config)
-        root_ctx: RootContext = root_app["_root.context"]
 
         await manager_init_stack.enter_async_context(aiomonitor_ctx())
 
@@ -760,8 +644,9 @@ async def server_main(
             dep_input,
         )
 
-        # Bridge all Composer outputs to RootContext for backward compatibility
-        _bridge_resources_to_root_ctx(root_ctx, dep_resources)
+        # Set the error monitor reference for the event loop error handler
+        global _error_monitor_ref
+        _error_monitor_ref = dep_resources.monitoring.error_monitor
 
         # Insert DI-based middlewares now that dependencies are available.
         # Maintain order: request_id(0) → exception(1) → auth(2) → api → metric
@@ -788,26 +673,31 @@ async def server_main(
         )
 
         # Build and mount the API module tree.
-        # Must happen after bridging (cors_options must be set) and before
-        # runner.setup() which freezes the application router.
+        # Must happen before runner.setup() which freezes the application router.
         _setup_api(root_app, dep_resources, pidx)
+
+        # Manager status check
+        config_provider = dep_resources.bootstrap.config_provider
+        await manager_init_stack.enter_async_context(manager_status_ctx(pidx, config_provider))
 
         # TODO: Remove manual middleware injection once the manager startup is
         # decoupled from the aiohttp Application lifecycle. Currently root_app is
         # instantiated before OTel config is available, so instrument_aiohttp_server()
         # (which patches the class via setattr) cannot take effect automatically.
-        if root_ctx.config_provider.config.otel.enabled:
+        if config_provider.config.otel.enabled:
             instrument_aiohttp_server()
             instrument_aiohttp_client()
             root_app.middlewares.insert(0, otel_server_middleware)
 
         # Plugin webapps should be loaded before runner.setup() because root_app is frozen upon on_startup event.
-        await manager_init_stack.enter_async_context(webapp_plugin_ctx(root_app))
-        await manager_init_stack.enter_async_context(webapp_ctx(root_app))
+        await manager_init_stack.enter_async_context(
+            webapp_plugin_ctx(root_app, dep_resources=dep_resources, pidx=pidx)
+        )
+        await manager_init_stack.enter_async_context(webapp_ctx(root_app, dep_resources))
 
         if os.geteuid() == 0:
-            uid = root_ctx.config_provider.config.manager.user
-            gid = root_ctx.config_provider.config.manager.group
+            uid = config_provider.config.manager.user
+            gid = config_provider.config.manager.group
             if uid is None or gid is None:
                 raise ValueError("user/group must be specified when running as root")
 
@@ -826,6 +716,7 @@ async def server_main(
     try:
         yield
     finally:
+        _error_monitor_ref = None
         log.info("shutting down...")
         await manager_init_stack.__aexit__(None, None, None)
 

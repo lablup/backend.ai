@@ -64,7 +64,7 @@ def build_exception_middleware(
     stats_monitor: StatsPluginContext,
     config_provider: ManagerConfigProvider,
 ) -> Middleware:
-    """Build an exception middleware with explicit dependencies (no RootContext lookup)."""
+    """Build an exception middleware with explicit dependencies."""
 
     @web.middleware
     async def _middleware(request: web.Request, handler: WebRequestHandler) -> web.StreamResponse:

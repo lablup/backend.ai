@@ -1,10 +1,8 @@
 """Server-status route middleware (DI-based).
 
 Provides ``server_status_required`` which checks the current manager status
-before allowing a request through.  Unlike the legacy version in
-``api.manager``, this variant receives ``config_provider`` via constructor
-dependency injection instead of reading ``root_ctx`` from
-``request.app["_root.context"]``.
+before allowing a request through.  Receives ``config_provider`` via
+constructor dependency injection.
 
 Constants ``READ_ALLOWED`` and ``ALL_ALLOWED`` define the standard
 status sets used across all REST registry modules.

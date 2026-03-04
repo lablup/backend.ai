@@ -28,7 +28,7 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
     async def init(self, context: Any | None = None) -> None:
         if context is None:
             log.warning(
-                "manager.plugin.error_monitor is initialized without the root context. "
+                "manager.plugin.error_monitor is initialized without a context. "
                 "The plugin is disabled.",
             )
             self.enabled = False
@@ -98,7 +98,7 @@ class ErrorEventDispatcher(AbstractEventDispatcherPlugin):
     async def init(self, context: Any | None = None) -> None:
         if context is None:
             log.warning(
-                "manager.plugin.error_event_dispatcher is initialized without the root context. "
+                "manager.plugin.error_event_dispatcher is initialized without a context. "
                 "The plugin is disabled.",
             )
             self.enabled = False
