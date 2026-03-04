@@ -7,10 +7,12 @@ from __future__ import annotations
 from .request import (
     BlueGreenConfigInput,
     ClusterConfigInput,
+    CreateDeploymentPolicyRequest,
     CreateDeploymentRequest,
     DeploymentFilter,
     DeploymentMetadataInput,
     DeploymentPathParam,
+    DeploymentPolicyPathParam,
     DeploymentStrategyInput,
     ExtraVFolderMountInput,
     ImageInput,
@@ -27,17 +29,21 @@ from .request import (
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
+    UpdateDeploymentPolicyRequest,
     UpdateDeploymentRequest,
     UpdateRouteTrafficStatusRequest,
 )
 from .response import (
     ActivateRevisionResponse,
     ClusterConfigDTO,
+    CreateDeploymentPolicyResponse,
     CreateDeploymentResponse,
     CursorPaginationInfo,
     DeactivateRevisionResponse,
     DeploymentDTO,
+    DeploymentPolicyDTO,
     DestroyDeploymentResponse,
+    GetDeploymentPolicyResponse,
     GetDeploymentResponse,
     GetRevisionResponse,
     ListDeploymentsResponse,
@@ -51,6 +57,7 @@ from .response import (
     ResourceConfigDTO,
     RevisionDTO,
     RouteDTO,
+    UpdateDeploymentPolicyResponse,
     UpdateDeploymentResponse,
     UpdateRouteTrafficStatusResponse,
 )
@@ -79,6 +86,7 @@ __all__ = (
     "RouteFilter",
     # Request DTOs - Path params
     "DeploymentPathParam",
+    "DeploymentPolicyPathParam",
     "RevisionPathParam",
     "RoutePathParam",
     # Request DTOs - Search/List
@@ -100,10 +108,13 @@ __all__ = (
     "RevisionInput",
     # Request DTOs - Create/Update requests
     "CreateDeploymentRequest",
+    "CreateDeploymentPolicyRequest",
     "UpdateDeploymentRequest",
+    "UpdateDeploymentPolicyRequest",
     "UpdateRouteTrafficStatusRequest",
     # Response DTOs - Data
     "DeploymentDTO",
+    "DeploymentPolicyDTO",
     "RevisionDTO",
     "RouteDTO",
     "NetworkConfigDTO",
@@ -114,10 +125,13 @@ __all__ = (
     "ReplicaStateDTO",
     # Response DTOs - Create responses
     "CreateDeploymentResponse",
+    "CreateDeploymentPolicyResponse",
     # Response DTOs - Get/List responses
     "GetDeploymentResponse",
+    "GetDeploymentPolicyResponse",
     "ListDeploymentsResponse",
     "UpdateDeploymentResponse",
+    "UpdateDeploymentPolicyResponse",
     "DestroyDeploymentResponse",
     "GetRevisionResponse",
     "ListRevisionsResponse",

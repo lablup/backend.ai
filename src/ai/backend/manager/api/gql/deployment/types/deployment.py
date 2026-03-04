@@ -738,11 +738,11 @@ class UpdateDeploymentInput:
             return None
 
         # Validate and convert
-        policy_config = self.default_deployment_strategy.to_policy_config()
+        creator = self.default_deployment_strategy.to_policy_config()
         return DeploymentPolicyUpdaterSpec(
-            strategy=OptionalState.update(policy_config.strategy),
-            strategy_spec=OptionalState.update(policy_config.strategy_spec),
-            rollback_on_failure=OptionalState.update(policy_config.rollback_on_failure),
+            strategy=OptionalState.update(creator.strategy),
+            strategy_spec=OptionalState.update(creator.strategy_spec),
+            rollback_on_failure=OptionalState.update(creator.rollback_on_failure),
         )
 
 

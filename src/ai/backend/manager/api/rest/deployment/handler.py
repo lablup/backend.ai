@@ -15,12 +15,16 @@ from aiohttp import web
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
+    CreateDeploymentPolicyRequest,
+    CreateDeploymentPolicyResponse,
     CreateDeploymentRequest,
     CreateDeploymentResponse,
     CursorPaginationInfo,
     DeactivateRevisionResponse,
     DeploymentPathParam,
+    DeploymentPolicyPathParam,
     DestroyDeploymentResponse,
+    GetDeploymentPolicyResponse,
     GetDeploymentResponse,
     GetRevisionResponse,
     ListDeploymentsResponse,
@@ -34,6 +38,8 @@ from ai.backend.common.dto.manager.deployment import (
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
+    UpdateDeploymentPolicyRequest,
+    UpdateDeploymentPolicyResponse,
     UpdateDeploymentRequest,
     UpdateDeploymentResponse,
     UpdateRouteTrafficStatusRequest,
@@ -50,6 +56,15 @@ from ai.backend.manager.repositories.deployment.updaters import (
 )
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.create_deployment_policy import (
+    CreateDeploymentPolicyAction,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.get_deployment_policy import (
+    GetDeploymentPolicyAction,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.update_deployment_policy import (
+    UpdateDeploymentPolicyAction,
 )
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
@@ -82,6 +97,7 @@ from ai.backend.manager.types import OptionalState
 from .adapter import (
     CreateDeploymentAdapter,
     DeploymentAdapter,
+    DeploymentPolicyAdapter,
     RevisionAdapter,
     RouteAdapter,
 )
@@ -99,6 +115,7 @@ class DeploymentAPIHandler:
         self._revision_adapter = RevisionAdapter()
         self._route_adapter = RouteAdapter()
         self._create_deployment_adapter = CreateDeploymentAdapter()
+        self._policy_adapter = DeploymentPolicyAdapter()
 
     def bind_processors(self, processors: Processors) -> None:
         """Late-bind processors for backward-compatible create_app() usage."""
@@ -387,5 +404,71 @@ class DeploymentAPIHandler:
         # Build response
         resp = UpdateRouteTrafficStatusResponse(
             route=self._route_adapter.convert_to_dto(action_result.route)
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    # Deployment Policy Endpoints
+
+    async def create_deployment_policy(
+        self,
+        path: PathParam[DeploymentPolicyPathParam],
+        body: BodyParam[CreateDeploymentPolicyRequest],
+    ) -> APIResponse:
+        """Create a deployment policy for a deployment."""
+        deployment_processors = self._get_deployment_processors()
+
+        creator = self._policy_adapter.build_creator(
+            body.parsed, deployment_id=path.parsed.deployment_id
+        )
+
+        action_result = await deployment_processors.create_deployment_policy.wait_for_complete(
+            CreateDeploymentPolicyAction(creator=creator)
+        )
+
+        resp = CreateDeploymentPolicyResponse(
+            deployment_policy=self._policy_adapter.convert_to_dto(action_result.data)
+        )
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
+
+    async def update_deployment_policy(
+        self,
+        path: PathParam[DeploymentPolicyPathParam],
+        body: BodyParam[UpdateDeploymentPolicyRequest],
+    ) -> APIResponse:
+        """Update a deployment policy."""
+        deployment_processors = self._get_deployment_processors()
+
+        modifier = self._policy_adapter.build_modifier(body.parsed)
+
+        # Get the policy first to find its ID
+        policy_result = await deployment_processors.get_deployment_policy.wait_for_complete(
+            GetDeploymentPolicyAction(endpoint_id=path.parsed.deployment_id)
+        )
+
+        action_result = await deployment_processors.update_deployment_policy.wait_for_complete(
+            UpdateDeploymentPolicyAction(
+                policy_id=policy_result.data.id,
+                modifier=modifier,
+            )
+        )
+
+        resp = UpdateDeploymentPolicyResponse(
+            deployment_policy=self._policy_adapter.convert_to_dto(action_result.data)
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    async def get_deployment_policy(
+        self,
+        path: PathParam[DeploymentPolicyPathParam],
+    ) -> APIResponse:
+        """Get a deployment policy for a deployment."""
+        deployment_processors = self._get_deployment_processors()
+
+        action_result = await deployment_processors.get_deployment_policy.wait_for_complete(
+            GetDeploymentPolicyAction(endpoint_id=path.parsed.deployment_id)
+        )
+
+        resp = GetDeploymentPolicyResponse(
+            deployment_policy=self._policy_adapter.convert_to_dto(action_result.data)
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
