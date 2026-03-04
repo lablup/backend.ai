@@ -7141,6 +7141,7 @@ input UpdateRoleInput {
   id: UUID!
   name: String = null
   description: String = null
+  status: RoleStatus = null
 }
 
 """Added in 25.19.0. Input for updating route traffic status."""
