@@ -194,11 +194,13 @@ class TestSSHProvisionerWriteConfigFunc:
 
 
 class TestContainerSSHProvisioner:
-    _DEFAULT_AGENT_CONFIG = AgentConfig(
-        kernel_features=frozenset(),
-        kernel_uid=1000,
-        kernel_gid=1001,
-    )
+    @pytest.fixture
+    def agent_config(self) -> AgentConfig:
+        return AgentConfig(
+            kernel_features=frozenset(),
+            kernel_uid=1000,
+            kernel_gid=1001,
+        )
 
     @pytest.fixture
     def ssh_keypair(self) -> ContainerSSHKeyPair:
@@ -212,19 +214,19 @@ class TestContainerSSHProvisioner:
         return ContainerSSHProvisioner()
 
     @pytest.fixture
-    def spec_no_keypair(self, tmp_path: Path) -> ContainerSSHSpec:
+    def spec_no_keypair(self, tmp_path: Path, agent_config: AgentConfig) -> ContainerSSHSpec:
         return ContainerSSHSpec(
             work_dir=tmp_path,
             ssh_keypair=cast(ContainerSSHKeyPair, None),
             mounts=[],
             uid_override=None,
             gid_override=None,
-            agent_config=self._DEFAULT_AGENT_CONFIG,
+            agent_config=agent_config,
         )
 
     @pytest.fixture
     def spec_with_ssh_mount(
-        self, tmp_path: Path, ssh_keypair: ContainerSSHKeyPair
+        self, tmp_path: Path, ssh_keypair: ContainerSSHKeyPair, agent_config: AgentConfig
     ) -> ContainerSSHSpec:
         return ContainerSSHSpec(
             work_dir=tmp_path,
@@ -232,23 +234,25 @@ class TestContainerSSHProvisioner:
             mounts=[Mount(type=MountTypes.BIND, source=None, target=Path("/home/work/.ssh"))],
             uid_override=None,
             gid_override=None,
-            agent_config=self._DEFAULT_AGENT_CONFIG,
+            agent_config=agent_config,
         )
 
     @pytest.fixture
-    def spec_default(self, tmp_path: Path, ssh_keypair: ContainerSSHKeyPair) -> ContainerSSHSpec:
+    def spec_default(
+        self, tmp_path: Path, ssh_keypair: ContainerSSHKeyPair, agent_config: AgentConfig
+    ) -> ContainerSSHSpec:
         return ContainerSSHSpec(
             work_dir=tmp_path,
             ssh_keypair=ssh_keypair,
             mounts=[],
             uid_override=None,
             gid_override=None,
-            agent_config=self._DEFAULT_AGENT_CONFIG,
+            agent_config=agent_config,
         )
 
     @pytest.fixture
     def spec_with_ownership(
-        self, tmp_path: Path, ssh_keypair: ContainerSSHKeyPair
+        self, tmp_path: Path, ssh_keypair: ContainerSSHKeyPair, agent_config: AgentConfig
     ) -> ContainerSSHSpec:
         return ContainerSSHSpec(
             work_dir=tmp_path,
@@ -256,7 +260,7 @@ class TestContainerSSHProvisioner:
             mounts=[],
             uid_override=3000,
             gid_override=3001,
-            agent_config=self._DEFAULT_AGENT_CONFIG,
+            agent_config=agent_config,
         )
 
     async def test_setup_no_keypair(
