@@ -10,6 +10,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -32,7 +33,7 @@ class TestVFSStorageRepository:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
             database_connection,
-            [VFSStorageRow],
+            [ArtifactStorageRow, VFSStorageRow],
         ):
             yield database_connection
 

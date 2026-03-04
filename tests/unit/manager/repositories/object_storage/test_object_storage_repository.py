@@ -11,6 +11,7 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.manager.errors.object_storage import ObjectStorageNotFoundError
+from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -34,6 +35,7 @@ class TestObjectStorageRepository:
         async with with_tables(
             database_connection,
             [
+                ArtifactStorageRow,
                 ObjectStorageRow,
             ],
         ):

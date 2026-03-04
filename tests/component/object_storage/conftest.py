@@ -19,6 +19,7 @@ from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.object_storage.registry import register_object_storage_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.api.types import CleanupContext
+from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 from ai.backend.manager.repositories.repositories import Repositories
@@ -143,7 +144,21 @@ async def object_storage_factory(
         }
         defaults.update(overrides)
         async with db_engine.begin() as conn:
-            await conn.execute(sa.insert(ObjectStorageRow.__table__).values(**defaults))
+            # Insert parent row first (Joined Table Inheritance)
+            await conn.execute(
+                sa.insert(ArtifactStorageRow.__table__).values(
+                    id=defaults["id"],
+                    name=defaults["name"],
+                    type="object_storage",
+                )
+            )
+            # Insert child row with remaining columns
+            child_cols = {
+                k: v
+                for k, v in defaults.items()
+                if k in ("id", "host", "access_key", "secret_key", "endpoint", "region")
+            }
+            await conn.execute(sa.insert(ObjectStorageRow.__table__).values(**child_cols))
         created_ids.append(defaults["id"])
         return defaults
 
@@ -158,6 +173,11 @@ async def object_storage_factory(
             )
             await conn.execute(
                 sa.delete(ObjectStorageRow.__table__).where(ObjectStorageRow.__table__.c.id == sid)
+            )
+            await conn.execute(
+                sa.delete(ArtifactStorageRow.__table__).where(
+                    ArtifactStorageRow.__table__.c.id == sid
+                )
             )
 
 
