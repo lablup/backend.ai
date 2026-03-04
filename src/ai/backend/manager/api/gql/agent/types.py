@@ -445,11 +445,11 @@ class AgentV2GQL(Node):
             last=last,
             limit=limit,
             offset=offset,
-            base_conditions=[KernelConditions.by_agent_id(str(self._agent_id))],
+            base_conditions=[KernelConditions.by_agent_id(self._agent_id)],
         )
 
     @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. List of sessions running on this agent with pagination support."
+        description="Added in 26.3.0. List of sessions running on this agent with pagination support."
     )
     async def sessions(
         self,
@@ -486,7 +486,7 @@ class AgentV2GQL(Node):
             last=last,
             limit=limit,
             offset=offset,
-            base_conditions=[SessionConditions.by_agent_id(str(self._agent_id))],
+            base_conditions=[SessionConditions.by_agent_id(self._agent_id)],
         )
 
     @classmethod

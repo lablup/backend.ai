@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.kernel.types import KernelStatusInMatchSpec
 
-from ai.backend.common.types import KernelId, SessionId
+from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
 from ai.backend.manager.models.image import ImageRow
@@ -457,7 +457,7 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_agent_id(agent_id: str) -> QueryCondition:
+    def by_agent_id(agent_id: AgentId) -> QueryCondition:
         """Filter sessions that have kernels running on the given agent."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -628,7 +628,7 @@ class KernelConditions:
         return inner
 
     @staticmethod
-    def by_agent_id(agent_id: str) -> QueryCondition:
+    def by_agent_id(agent_id: AgentId) -> QueryCondition:
         """Filter kernels by agent ID."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
