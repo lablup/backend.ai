@@ -93,23 +93,19 @@ class TestCPUPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
         cgroup_stat_context.agent.get_cgroup_path = mock_get_cgroup_path
         return cgroup_stat_context
 
-    async def test_init_creates_docker_client(self) -> None:
+    async def test_init_creates_docker_client(self, cpu_plugin: CPUPlugin) -> None:
         """Verify init() creates a Docker client instance."""
-        plugin = CPUPlugin.__new__(CPUPlugin)
-        plugin.local_config = {"agent": {"docker-mode": "default"}}
         with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
             mock_docker_cls.return_value = AsyncMock()
-            await plugin.init()
+            await cpu_plugin.init()
             mock_docker_cls.assert_called_once()
-            assert plugin._docker is not None
+            assert cpu_plugin._docker is not None
 
-    async def test_cleanup_closes_docker_client(self) -> None:
+    async def test_cleanup_closes_docker_client(self, cpu_plugin: CPUPlugin) -> None:
         """Verify cleanup() closes the Docker client."""
-        plugin = CPUPlugin.__new__(CPUPlugin)
-        plugin.local_config = {"agent": {"docker-mode": "default"}}
-        plugin._docker = AsyncMock()
-        await plugin.cleanup()
-        plugin._docker.close.assert_called_once()
+        cpu_plugin._docker = AsyncMock()
+        await cpu_plugin.cleanup()
+        cpu_plugin._docker.close.assert_called_once()
 
     async def test_api_mode_uses_instance_docker_client(
         self,
@@ -195,23 +191,19 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
             mock_loop.return_value.run_in_executor = AsyncMock(return_value=0)
             yield ctx
 
-    async def test_init_creates_docker_client(self) -> None:
+    async def test_init_creates_docker_client(self, memory_plugin: MemoryPlugin) -> None:
         """Verify init() creates a Docker client instance."""
-        plugin = MemoryPlugin.__new__(MemoryPlugin)
-        plugin.local_config = {"agent": {"docker-mode": "default"}}
         with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
             mock_docker_cls.return_value = AsyncMock()
-            await plugin.init()
+            await memory_plugin.init()
             mock_docker_cls.assert_called_once()
-            assert plugin._docker is not None
+            assert memory_plugin._docker is not None
 
-    async def test_cleanup_closes_docker_client(self) -> None:
+    async def test_cleanup_closes_docker_client(self, memory_plugin: MemoryPlugin) -> None:
         """Verify cleanup() closes the Docker client."""
-        plugin = MemoryPlugin.__new__(MemoryPlugin)
-        plugin.local_config = {"agent": {"docker-mode": "default"}}
-        plugin._docker = AsyncMock()
-        await plugin.cleanup()
-        plugin._docker.close.assert_called_once()
+        memory_plugin._docker = AsyncMock()
+        await memory_plugin.cleanup()
+        memory_plugin._docker.close.assert_called_once()
 
     async def test_api_mode_uses_instance_docker_client(
         self,
