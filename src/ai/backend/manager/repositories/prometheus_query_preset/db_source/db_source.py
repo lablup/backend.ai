@@ -100,7 +100,7 @@ class PrometheusQueryPresetDBSource:
                 )
             return result.row.to_data()
 
-    async def delete(self, preset_id: UUID) -> UUID:
+    async def delete(self, preset_id: UUID) -> bool:
         """Deletes a prometheus query preset."""
         async with self._db.begin_session() as db_sess:
             stmt = sa.delete(PrometheusQueryPresetRow).where(
@@ -111,7 +111,7 @@ class PrometheusQueryPresetDBSource:
                 raise PrometheusQueryPresetNotFound(
                     f"Prometheus query preset {preset_id} not found"
                 )
-            return preset_id
+            return True
 
     async def get_by_id(self, preset_id: UUID) -> PrometheusQueryPresetData:
         """Retrieves a prometheus query preset by ID."""

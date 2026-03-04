@@ -74,7 +74,7 @@ class PrometheusQueryPresetRepository:
         return await self._db_source.update(updater=updater)
 
     @prometheus_query_preset_repository_resilience.apply()
-    async def delete(self, preset_id: UUID) -> UUID:
+    async def delete(self, preset_id: UUID) -> bool:
         """Deletes a prometheus query preset."""
         return await self._db_source.delete(preset_id)
 

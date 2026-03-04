@@ -66,8 +66,8 @@ class PrometheusQueryPresetService:
         return ModifyPresetActionResult(preset=preset_data)
 
     async def delete_preset(self, action: DeletePresetAction) -> DeletePresetActionResult:
-        preset_id = await self._repository.delete(action.preset_id)
-        return DeletePresetActionResult(preset_id=preset_id)
+        await self._repository.delete(action.preset_id)
+        return DeletePresetActionResult(preset_id=action.preset_id)
 
     def _validate_labels(
         self,

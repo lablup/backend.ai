@@ -200,7 +200,7 @@ class TestPrometheusQueryPresetService:
         mock_repository: MagicMock,
     ) -> None:
         preset_id = uuid4()
-        mock_repository.delete = AsyncMock(return_value=preset_id)
+        mock_repository.delete = AsyncMock(return_value=True)
 
         action = DeletePresetAction(preset_id=preset_id)
         result = await service.delete_preset(action)
