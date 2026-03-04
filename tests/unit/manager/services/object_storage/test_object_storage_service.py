@@ -11,6 +11,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.storage.types import ArtifactStorageType
+from ai.backend.common.types import ArtifactStorageId
 from ai.backend.manager.data.object_storage.types import (
     ObjectStorageData,
     ObjectStorageListResult,
@@ -75,7 +76,7 @@ class TestObjectStorageService:
     def sample_object_storage_data(self) -> ObjectStorageData:
         """Create sample Object storage data"""
         return ObjectStorageData(
-            id=uuid4(),
+            id=ArtifactStorageId(uuid4()),
             name="test-object-storage",
             type=ArtifactStorageType.OBJECT_STORAGE,
             host="storage-proxy-1",

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 
+from ai.backend.common.types import ArtifactStorageId
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.object_storage.options import ObjectStorageConditions
@@ -12,7 +12,7 @@ from ai.backend.manager.services.object_storage.processors import ObjectStorageP
 
 async def load_object_storages_by_ids(
     processor: ObjectStorageProcessors,
-    storage_ids: Sequence[uuid.UUID],
+    storage_ids: Sequence[ArtifactStorageId],
 ) -> list[ObjectStorageData | None]:
     """Batch load object storages by their IDs.
 
