@@ -25,6 +25,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
@@ -207,6 +208,7 @@ class TestDryRunModelService:
         return ModelServingProcessors(
             service=model_serving_service,
             action_monitors=[mock_action_monitor],
+            validators=MagicMock(spec=ActionValidators),
         )
 
     @pytest.fixture
@@ -696,6 +698,7 @@ class TestDryRunWithServiceDefinitionOverrides:
         return ModelServingProcessors(
             service=model_serving_service,
             action_monitors=[mock_action_monitor],
+            validators=MagicMock(spec=ActionValidators),
         )
 
     @pytest.fixture
@@ -999,6 +1002,7 @@ class TestDryRunExtraMountsHandling:
         return ModelServingProcessors(
             service=model_serving_service,
             action_monitors=[mock_action_monitor],
+            validators=MagicMock(spec=ActionValidators),
         )
 
     @pytest.fixture

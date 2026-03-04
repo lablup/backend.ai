@@ -5,6 +5,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions.fetch_status import FetchManagerStatusAction, FetchManagerStatusActionResult
 from .actions.get_announcement import GetAnnouncementAction, GetAnnouncementActionResult
@@ -32,7 +33,12 @@ class ManagerAdminProcessors(AbstractProcessorPackage):
     ]
     get_db_cxn_status: ActionProcessor[GetDbCxnStatusAction, GetDbCxnStatusActionResult]
 
-    def __init__(self, service: ManagerAdminService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: ManagerAdminService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.fetch_status = ActionProcessor(service.fetch_status, action_monitors)
         self.update_status = ActionProcessor(service.update_status, action_monitors)
         self.get_announcement = ActionProcessor(service.get_announcement, action_monitors)

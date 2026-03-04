@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
     AuthorizeActionResult,
@@ -63,7 +64,12 @@ class AuthProcessors(AbstractProcessorPackage):
     ]
     resolve_user_scope: ActionProcessor[ResolveUserScopeAction, ResolveUserScopeResult]
 
-    def __init__(self, service: AuthService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: AuthService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.signout = ActionProcessor(service.signout, action_monitors)
         self.update_full_name = ActionProcessor(service.update_full_name, action_monitors)
         self.get_ssh_keypair = ActionProcessor(service.get_ssh_keypair, action_monitors)

@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.stream.handler import StreamHandler
@@ -71,7 +72,9 @@ def stream_processors(
         idle_checker_host=AsyncMock(),
         etcd=async_etcd,
     )
-    return StreamProcessors(service=service, action_monitors=[])
+    return StreamProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()

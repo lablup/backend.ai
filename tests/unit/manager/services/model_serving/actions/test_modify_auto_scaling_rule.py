@@ -17,6 +17,7 @@ from ai.backend.common.types import (
     RuleId,
 )
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
@@ -83,6 +84,7 @@ class TestModifyAutoScalingRule:
         return ModelServingAutoScalingProcessors(
             service=auto_scaling_service,
             action_monitors=[mock_action_monitor],
+            validators=MagicMock(spec=ActionValidators),
         )
 
     @pytest.fixture

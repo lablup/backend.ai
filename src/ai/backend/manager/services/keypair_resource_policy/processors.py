@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
     CreateKeyPairResourcePolicyActionResult,
@@ -32,7 +33,10 @@ class KeypairResourcePolicyProcessors(AbstractProcessorPackage):
     ]
 
     def __init__(
-        self, service: KeypairResourcePolicyService, action_monitors: list[ActionMonitor]
+        self,
+        service: KeypairResourcePolicyService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
     ) -> None:
         self.create_keypair_resource_policy = ActionProcessor(
             service.create_keypair_resource_policy, action_monitors

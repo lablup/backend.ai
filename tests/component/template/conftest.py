@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import uuid
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.cluster_template.handler import ClusterTemplateHandler
 from ai.backend.manager.api.rest.cluster_template.registry import register_cluster_template_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -24,7 +26,9 @@ from ai.backend.manager.services.template.service import TemplateService
 def template_processors(database_engine: ExtendedAsyncSAEngine) -> TemplateProcessors:
     repo = TemplateRepository(database_engine)
     service = TemplateService(repository=repo)
-    return TemplateProcessors(service=service, action_monitors=[])
+    return TemplateProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()

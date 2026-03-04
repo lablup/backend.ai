@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
 
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.notification.handler import NotificationHandler
 from ai.backend.manager.api.rest.notification.registry import register_notification_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -20,7 +23,9 @@ def notification_processors(
 ) -> NotificationProcessors:
     repo = NotificationRepository(database_engine)
     service = NotificationService(repo, notification_center)
-    return NotificationProcessors(service=service, action_monitors=[])
+    return NotificationProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()

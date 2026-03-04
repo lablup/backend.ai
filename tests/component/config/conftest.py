@@ -4,6 +4,7 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
@@ -18,6 +19,7 @@ from ai.backend.common.dto.manager.config import (
     DeleteGroupDotfileRequest,
     DeleteUserDotfileRequest,
 )
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.domainconfig.handler import DomainConfigHandler
 from ai.backend.manager.api.rest.domainconfig.registry import register_domainconfig_routes
 from ai.backend.manager.api.rest.groupconfig.handler import GroupConfigHandler
@@ -41,7 +43,9 @@ DomainDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
 def dotfile_processors(database_engine: ExtendedAsyncSAEngine) -> DotfileProcessors:
     repo = DotfileRepository(database_engine)
     service = DotfileService(repo)
-    return DotfileProcessors(service=service, action_monitors=[])
+    return DotfileProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()

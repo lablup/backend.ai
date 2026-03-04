@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
@@ -169,7 +170,12 @@ class DeploymentProcessors(AbstractProcessorPackage):
     create_access_token: ActionProcessor[CreateAccessTokenAction, CreateAccessTokenActionResult]
     search_access_tokens: ActionProcessor[SearchAccessTokensAction, SearchAccessTokensActionResult]
 
-    def __init__(self, service: DeploymentService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: DeploymentService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         # Deployment CRUD
         self.create_deployment = ActionProcessor(service.create_deployment, action_monitors)
         self.create_legacy_deployment = ActionProcessor(

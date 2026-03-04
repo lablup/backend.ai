@@ -20,6 +20,7 @@ from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageCanonical, ImageID, SlotName
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
@@ -118,7 +119,7 @@ class ImageServiceBaseFixtures:
     @pytest.fixture
     def processors(self, image_service: ImageService) -> ImageProcessors:
         """Create ImageProcessors with mock ImageService."""
-        return ImageProcessors(image_service, [])
+        return ImageProcessors(image_service, [], MagicMock(spec=ActionValidators))
 
     @pytest.fixture
     def container_registry_id(self) -> uuid.UUID:

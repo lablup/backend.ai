@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.deployment.handler import DeploymentAPIHandler
 from ai.backend.manager.api.rest.deployment.registry import register_deployment_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -32,7 +33,9 @@ def deployment_processors(
     deployment_controller = AsyncMock()
     revision_generator_registry = MagicMock()
     service = DeploymentService(deployment_controller, repo, revision_generator_registry)
-    return DeploymentProcessors(service=service, action_monitors=[])
+    return DeploymentProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
