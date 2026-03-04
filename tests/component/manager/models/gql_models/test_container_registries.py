@@ -10,7 +10,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.extra_fixtures import FIXTURES_FOR_HARBOR_CRUD_TEST
 
 # TODO: These tests require services_ctx (harbor quota service) which is not
-# yet available through the new ModuleDeps / database_engine pattern.
+# yet available through the current test fixture pattern.
 # They need to be refactored to inject the quota service directly.
 
 
@@ -51,7 +51,7 @@ def get_graphquery_context(
 
 
 @pytest.mark.skip(
-    reason="Needs services_ctx (harbor quota service) -- not available via ModuleDeps yet"
+    reason="Needs services_ctx (harbor quota service) -- not available via test fixtures yet"
 )
 @pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST, indirect=True)
 @pytest.mark.parametrize(
@@ -95,7 +95,7 @@ async def test_harbor_create_project_quota(
 
 
 @pytest.mark.skip(
-    reason="Needs services_ctx (harbor quota service) -- not available via ModuleDeps yet"
+    reason="Needs services_ctx (harbor quota service) -- not available via test fixtures yet"
 )
 @pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST, indirect=True)
 @pytest.mark.parametrize(
@@ -139,7 +139,7 @@ async def test_harbor_update_project_quota(
 
 
 @pytest.mark.skip(
-    reason="Needs services_ctx (harbor quota service) -- not available via ModuleDeps yet"
+    reason="Needs services_ctx (harbor quota service) -- not available via test fixtures yet"
 )
 @pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST, indirect=True)
 @pytest.mark.parametrize(

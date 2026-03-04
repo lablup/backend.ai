@@ -5,6 +5,7 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -15,13 +16,15 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
-from ai.backend.manager.api.rest.types import ModuleRegistrar
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.group import association_groups_users
@@ -45,9 +48,12 @@ class AuthUserFixtureData:
 
 
 @pytest.fixture()
-def server_module_registrars() -> list[ModuleRegistrar]:
+def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the auth module for auth-domain tests."""
-    return [register_auth_routes]
+    mock_processors = MagicMock()
+    return [
+        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+    ]
 
 
 @pytest.fixture()

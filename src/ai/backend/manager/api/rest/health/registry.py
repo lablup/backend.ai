@@ -6,20 +6,18 @@ from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
+from .handler import HealthHandler
+
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_health_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_health_routes(
+    handler: HealthHandler,
+    route_deps: RouteDeps,
+) -> RouteRegistry:
     """Build the health sub-application."""
-    from .handler import HealthHandler
-
-    reg = RouteRegistry.create("health", deps.cors_options)
-
-    if deps.health_probe is None:
-        raise RuntimeError("health_probe is required for the health module")
-
-    handler = HealthHandler(health_probe=deps.health_probe)
+    reg = RouteRegistry.create("health", route_deps.cors_options)
 
     # Public endpoint — no auth required
     reg.add("GET", "", handler.hello)

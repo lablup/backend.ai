@@ -21,12 +21,12 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
     StorageProxyManagerFacingClient,
 )
-from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.dto.response import (
     GetVFSStorageResponse,
     ListVFSStorageResponse,
     VFSStorage,
 )
+from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.vfs_storage.actions.get import GetVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.list import ListVFSStorageAction
 
@@ -79,11 +79,13 @@ class VFSDirectoryDownloadProxyStreamReader(StreamReader):
 class VFSStorageHandler:
     """VFS storage API handler with constructor-injected dependencies."""
 
+    def __init__(self, processors: Processors) -> None:
+        self._processors = processors
+
     async def download_file(
         self,
         path: PathParam[VFSStorageAPIPathParams],
         body: BodyParam[VFSDownloadFileReq],
-        processors_ctx: ProcessorsCtx,
     ) -> APIStreamResponse:
         """Download artifact directory from VFS storage via storage proxy streaming."""
         req = body.parsed
@@ -92,7 +94,7 @@ class VFSStorageHandler:
 
         log.info("Download request for file: {} from storage: {}", filepath, storage_name)
 
-        vfs_processors = processors_ctx.processors.vfs_storage
+        vfs_processors = self._processors.vfs_storage
         action_result = await vfs_processors.get.wait_for_complete(
             GetVFSStorageAction(storage_name=storage_name)
         )
@@ -123,14 +125,13 @@ class VFSStorageHandler:
     async def get_storage(
         self,
         path: PathParam[VFSStorageAPIPathParams],
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """Get VFS storage information by storage name."""
         storage_name = path.parsed.storage_name
 
         log.info("Get storage request for storage: {}", storage_name)
 
-        processors = processors_ctx.processors
+        processors = self._processors
 
         action_result = await processors.vfs_storage.get.wait_for_complete(
             GetVFSStorageAction(storage_name=storage_name)
@@ -149,12 +150,11 @@ class VFSStorageHandler:
 
     async def list_storages(
         self,
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """List all VFS storages."""
         log.info("List all VFS storages.")
 
-        processors = processors_ctx.processors
+        processors = self._processors
 
         action_result = await processors.vfs_storage.list_storages.wait_for_complete(
             ListVFSStorageAction()
@@ -178,7 +178,6 @@ class VFSStorageHandler:
         self,
         path: PathParam[VFSStorageAPIPathParams],
         body: BodyParam[VFSListFilesReq],
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """List files recursively in a VFS storage directory via storage proxy."""
         req = body.parsed
@@ -187,7 +186,7 @@ class VFSStorageHandler:
 
         log.info("List files request for directory: {} from storage: {}", directory, storage_name)
 
-        vfs_processors = processors_ctx.processors.vfs_storage
+        vfs_processors = self._processors.vfs_storage
         action_result = await vfs_processors.get.wait_for_complete(
             GetVFSStorageAction(storage_name=storage_name)
         )

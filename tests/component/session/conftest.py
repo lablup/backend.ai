@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -17,9 +18,13 @@ from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
+from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.session.handler import SessionHandler
 from ai.backend.manager.api.rest.session.registry import register_session_routes
-from ai.backend.manager.api.rest.types import ModuleRegistrar
+from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import kernels
@@ -48,9 +53,17 @@ class SessionSeedData:
 
 
 @pytest.fixture()
-def server_module_registrars() -> list[ModuleRegistrar]:
+def server_module_registries(
+    route_deps: RouteDeps, config_provider: ManagerConfigProvider
+) -> list[RouteRegistry]:
     """Load only the modules required for session component tests."""
-    return [register_auth_routes, register_session_routes]
+    mock_processors = MagicMock()
+    return [
+        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+        register_session_routes(
+            SessionHandler(processors=mock_processors, config_provider=config_provider), route_deps
+        ),
+    ]
 
 
 @pytest.fixture()

@@ -7,20 +7,16 @@ from typing import TYPE_CHECKING
 from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
+from .handler import ExportHandler
+
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_export_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_export_routes(handler: ExportHandler, route_deps: RouteDeps) -> RouteRegistry:
     """Build the export sub-application."""
-    # Import handler inside function to avoid circular imports
-    from .handler import ExportHandler
 
-    reg = RouteRegistry.create("export", deps.cors_options)
-    handler = ExportHandler(
-        processors=deps.processors,
-        export_config=deps.config_provider.config.export,
-    )
+    reg = RouteRegistry.create("export", route_deps.cors_options)
 
     # Report metadata endpoints
     reg.add(

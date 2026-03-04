@@ -4,14 +4,18 @@ import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from dataclasses import dataclass
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.manager.api.rest.artifact.handler import ArtifactHandler
 from ai.backend.manager.api.rest.artifact.registry import register_artifact_routes
+from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
-from ai.backend.manager.api.rest.types import ModuleRegistrar
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactStatus,
@@ -32,9 +36,13 @@ ArtifactFactory = Callable[..., Coroutine[Any, Any, ArtifactFixtureData]]
 
 
 @pytest.fixture()
-def server_module_registrars() -> list[ModuleRegistrar]:
+def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the modules required for artifact-domain tests."""
-    return [register_auth_routes, register_artifact_routes]
+    mock_processors = MagicMock()
+    return [
+        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+        register_artifact_routes(ArtifactHandler(processors=mock_processors), route_deps),
+    ]
 
 
 @pytest.fixture()

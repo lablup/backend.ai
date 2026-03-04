@@ -6,18 +6,18 @@ from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.rest.middleware.auth import superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
-from ai.backend.manager.api.rest.server_status import ALL_ALLOWED, server_status_required
 
 from .handler import ComputeSessionsHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_compute_sessions_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_compute_sessions_routes(
+    handler: ComputeSessionsHandler, route_deps: RouteDeps
+) -> RouteRegistry:
     """Build the compute sessions sub-application."""
-    reg = RouteRegistry.create("compute-sessions", deps.cors_options)
-    handler = ComputeSessionsHandler(processors=deps.processors)
+    reg = RouteRegistry.create("compute-sessions", route_deps.cors_options)
 
     reg.add(
         "POST",
@@ -25,7 +25,7 @@ def register_compute_sessions_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.search_sessions,
         middlewares=[
             superadmin_required,
-            server_status_required(ALL_ALLOWED, deps.config_provider),
+            route_deps.all_status_mw,
         ],
     )
     return reg

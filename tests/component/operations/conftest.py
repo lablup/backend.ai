@@ -3,24 +3,34 @@ from __future__ import annotations
 import secrets
 from collections.abc import AsyncIterator
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.error_log.handler import ErrorLogHandler
 from ai.backend.manager.api.rest.error_log.registry import register_error_log_routes
+from ai.backend.manager.api.rest.manager.handler import ManagerHandler
 from ai.backend.manager.api.rest.manager.registry import register_manager_api_routes
-from ai.backend.manager.api.rest.types import ModuleRegistrar
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.error_logs import error_logs
 
 
 @pytest.fixture()
-def server_module_registrars() -> list[ModuleRegistrar]:
+def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the modules required for operations-domain tests."""
-    return [register_auth_routes, register_error_log_routes, register_manager_api_routes]
+    mock_processors = MagicMock()
+    return [
+        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+        register_error_log_routes(ErrorLogHandler(processors=mock_processors), route_deps),
+        register_manager_api_routes(ManagerHandler(processors=mock_processors), route_deps),
+    ]
 
 
 @pytest.fixture()

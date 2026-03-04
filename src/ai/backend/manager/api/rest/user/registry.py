@@ -10,13 +10,12 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from .handler import UserHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_user_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_user_routes(handler: UserHandler, route_deps: RouteDeps) -> RouteRegistry:
     """Build the user sub-registry (child of admin)."""
-    reg = RouteRegistry.create("users", deps.cors_options)
-    handler = UserHandler(processors=deps.processors, config_provider=deps.config_provider)
+    reg = RouteRegistry.create("users", route_deps.cors_options)
 
     reg.add("POST", "", handler.create_user, middlewares=[superadmin_required])
     reg.add(

@@ -5,7 +5,6 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
-from functools import partial
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -15,13 +14,15 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
+from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.stream.handler import StreamHandler
 from ai.backend.manager.api.rest.stream.registry import register_stream_routes
-from ai.backend.manager.api.rest.types import ModuleRegistrar
+from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import StreamCleanupEventHandler
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 
@@ -50,13 +51,21 @@ class SessionSeedData:
 
 
 @pytest.fixture()
-def server_module_registrars() -> list[ModuleRegistrar]:
+def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the modules required for streaming component tests."""
+    mock_processors = MagicMock()
     return [
-        register_auth_routes,
-        partial(
-            register_stream_routes,
-            stream_cleanup_handler=StreamCleanupEventHandler(MagicMock()),
+        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+        register_stream_routes(
+            StreamHandler(
+                private_ctx=MagicMock(),
+                stream_processors=MagicMock(),
+                config_provider=MagicMock(),
+                error_monitor=MagicMock(),
+            ),
+            route_deps,
+            stream_processors=MagicMock(),
+            stream_cleanup_handler=MagicMock(),
         ),
     ]
 

@@ -4,6 +4,7 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -14,21 +15,28 @@ from ai.backend.common.dto.manager.rbac.request import (
 )
 from ai.backend.common.dto.manager.rbac.response import CreateRoleResponse
 from ai.backend.common.dto.manager.rbac.types import RoleSource, RoleStatus
+from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
+from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
-
-# Statically imported so that Pants includes these modules in the test PEX.
-# build_root_app() loads them at runtime via importlib.import_module(),
-# which Pants cannot trace statically.
-from ai.backend.manager.api.rest.types import ModuleRegistrar
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.types import RouteDeps
 
 RoleFactory = Callable[..., Coroutine[Any, Any, CreateRoleResponse]]
 
 
 @pytest.fixture()
-def server_module_registrars() -> list[ModuleRegistrar]:
+def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the modules required for RBAC-domain tests."""
-    return [register_auth_routes, register_admin_routes]
+    mock_processors = MagicMock()
+    return [
+        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+        register_admin_routes(
+            AdminHandler(gql_schema=MagicMock(), gql_deps=MagicMock()),
+            route_deps,
+            sub_registries=[],
+        ),
+    ]
 
 
 @pytest.fixture()

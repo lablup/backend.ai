@@ -6,27 +6,28 @@ from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
-from ai.backend.manager.api.rest.server_status import READ_ALLOWED, server_status_required
+
+from .handler import StreamHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
     from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import (
         StreamCleanupEventHandler,
     )
+    from ai.backend.manager.services.stream.processors import StreamProcessors
 
 
 def register_stream_routes(
-    deps: ModuleDeps,
+    handler: StreamHandler,
+    route_deps: RouteDeps,
     *,
+    stream_processors: StreamProcessors,
     stream_cleanup_handler: StreamCleanupEventHandler,
 ) -> RouteRegistry:
     """Build the stream sub-application."""
-    from .handler import PrivateContext, StreamHandler, stream_app_ctx, stream_shutdown
+    from .handler import PrivateContext, stream_app_ctx, stream_shutdown
 
-    stream_processors = deps.processors.stream
-    error_monitor = deps.error_monitor
-
-    reg = RouteRegistry.create("stream", deps.cors_options)
+    reg = RouteRegistry.create("stream", route_deps.cors_options)
     ctx = PrivateContext()
 
     # Wire lifecycle hooks — capture deps via closure
@@ -40,13 +41,7 @@ def register_stream_routes(
     )
     reg.app.on_shutdown.append(lambda app: stream_shutdown(app, ctx))
 
-    handler = StreamHandler(
-        private_ctx=ctx,
-        stream_processors=stream_processors,
-        config_provider=deps.config_provider,
-        error_monitor=error_monitor,
-    )
-    _mw = [server_status_required(READ_ALLOWED, deps.config_provider), auth_required]
+    _mw = [route_deps.read_status_mw, auth_required]
 
     reg.add("GET", r"/session/{session_name}/pty", handler.stream_pty, middlewares=_mw)
     reg.add("GET", r"/session/{session_name}/execute", handler.stream_execute, middlewares=_mw)

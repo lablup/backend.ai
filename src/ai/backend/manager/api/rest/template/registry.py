@@ -2,24 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_template_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_template_routes(
+    route_deps: RouteDeps,
+    sub_registries: Sequence[RouteRegistry],
+) -> RouteRegistry:
     """Build the template tree: cluster + session sub-registries."""
-    from ai.backend.manager.api.rest.cluster_template.registry import (
-        register_cluster_template_routes,
-    )
-    from ai.backend.manager.api.rest.session_template.registry import (
-        register_session_template_routes,
-    )
-
-    reg = RouteRegistry.create("template", deps.cors_options)
-    reg.add_subregistry(register_cluster_template_routes(deps))
-    reg.add_subregistry(register_session_template_routes(deps))
+    reg = RouteRegistry.create("template", route_deps.cors_options)
+    for sub in sub_registries:
+        reg.add_subregistry(sub)
     return reg

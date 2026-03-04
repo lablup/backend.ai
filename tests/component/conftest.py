@@ -35,7 +35,13 @@ from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.rest.middleware import build_auth_middleware, build_exception_middleware
-from ai.backend.manager.api.rest.types import ModuleDeps, ModuleRegistrar
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.server_status import (
+    ALL_ALLOWED,
+    READ_ALLOWED,
+    server_status_required,
+)
+from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
@@ -69,7 +75,7 @@ from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.models.vfolder import vfolders
-from ai.backend.manager.server import build_root_app, register_modules
+from ai.backend.manager.server import build_root_app, mount_registries
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
@@ -816,14 +822,22 @@ class _TestConfigProvider(ManagerConfigProvider):
 
 
 @pytest.fixture()
-def server_module_registrars() -> list[ModuleRegistrar]:
-    """
-    The list of module registrar functions to load for the test server.
+def route_deps(config_provider: ManagerConfigProvider) -> RouteDeps:
+    """Shared routing context for test registrar calls."""
+    return RouteDeps(
+        cors_options={},
+        read_status_mw=server_status_required(READ_ALLOWED, config_provider),
+        all_status_mw=server_status_required(ALL_ALLOWED, config_provider),
+    )
 
-    Override this fixture in domain-specific conftest.py to load only the
-    modules relevant to that domain's tests. Each domain conftest must
-    statically import the corresponding API modules so that Pants can
-    include them in the test PEX.
+
+@pytest.fixture()
+def server_module_registries() -> list[RouteRegistry]:
+    """
+    Pre-built route registries to load for the test server.
+
+    Override this fixture in domain-specific conftest.py to build only the
+    registries relevant to that domain's tests.
     """
     return []
 
@@ -847,26 +861,12 @@ def config_provider(
 
 
 @pytest.fixture()
-def server_module_deps(
-    config_provider: ManagerConfigProvider,
-) -> ModuleDeps:
-    """Default ModuleDeps for tests. Override in domain conftest if needed."""
-    return ModuleDeps(
-        cors_options={},
-        processors=MagicMock(),
-        config_provider=config_provider,
-        error_monitor=MagicMock(),
-        gql_context_deps=MagicMock(),
-    )
-
-
-@pytest.fixture()
 async def server(
     bootstrap_config: BootstrapConfig,
     etcd_fixture: None,
     database_fixture: None,
-    server_module_registrars: list[ModuleRegistrar],
-    server_module_deps: ModuleDeps,
+    server_module_registries: list[RouteRegistry],
+    config_provider: ManagerConfigProvider,
 ) -> AsyncIterator[ServerInfo]:
     """Start a test server with real DB (for auth middleware) and mock monitors."""
     app = build_root_app(
@@ -874,7 +874,7 @@ async def server(
         bootstrap_config,
     )
 
-    cp = server_module_deps.config_provider
+    cp = config_provider
 
     # Real DB connection for HMAC auth middleware
     async with connect_database(cp.config.db) as db:
@@ -910,8 +910,8 @@ async def server(
             ),
         )
 
-        if server_module_registrars:
-            register_modules(app, server_module_registrars, deps=server_module_deps)
+        if server_module_registries:
+            mount_registries(app, server_module_registries)
 
         runner = web.AppRunner(app, handle_signals=False)
         await runner.setup()

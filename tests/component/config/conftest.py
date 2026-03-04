@@ -4,6 +4,7 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
@@ -18,10 +19,15 @@ from ai.backend.common.dto.manager.config import (
     DeleteGroupDotfileRequest,
     DeleteUserDotfileRequest,
 )
+from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.domainconfig.handler import DomainConfigHandler
 from ai.backend.manager.api.rest.domainconfig.registry import register_domainconfig_routes
+from ai.backend.manager.api.rest.groupconfig.handler import GroupConfigHandler
 from ai.backend.manager.api.rest.groupconfig.registry import register_groupconfig_routes
-from ai.backend.manager.api.rest.types import ModuleRegistrar
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.api.rest.userconfig.handler import UserConfigHandler
 from ai.backend.manager.api.rest.userconfig.registry import register_userconfig_routes
 
 UserDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
@@ -30,13 +36,14 @@ DomainDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
 
 
 @pytest.fixture()
-def server_module_registrars() -> list[ModuleRegistrar]:
+def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the modules required for config-domain tests."""
+    mock_processors = MagicMock()
     return [
-        register_auth_routes,
-        register_groupconfig_routes,
-        register_userconfig_routes,
-        register_domainconfig_routes,
+        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+        register_groupconfig_routes(GroupConfigHandler(processors=mock_processors), route_deps),
+        register_userconfig_routes(UserConfigHandler(processors=mock_processors), route_deps),
+        register_domainconfig_routes(DomainConfigHandler(processors=mock_processors), route_deps),
     ]
 
 

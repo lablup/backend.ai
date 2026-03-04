@@ -71,7 +71,7 @@ from .api.rest.middleware import (
     request_id_middleware,
 )
 from .api.rest.routing import RouteRegistry
-from .api.rest.types import GQLContextDeps, ModuleDeps, ModuleRegistrar
+from .api.rest.types import CORSOptions, GQLContextDeps
 from .config.bootstrap import BootstrapConfig
 from .config.unified import EventLoopType
 from .dependencies import DependencyInput, DependencyResources, ManagerDependencyComposer
@@ -348,23 +348,20 @@ def _setup_api(
         user_repository=r.domain.repositories.user.repository,
         agent_repository=r.domain.repositories.agent.repository,
     )
-    deps = ModuleDeps(
-        cors_options=r.system.cors_options,
+
+    # 1. Build API module tree
+    root_registry = RouteRegistry.create("", r.system.cors_options)
+    for sub in build_api_routes(
         processors=r.processing.processors,
+        cors_options=r.system.cors_options,
         config_provider=r.bootstrap.config_provider,
         error_monitor=r.monitoring.error_monitor,
-        pidx=pidx,
         gql_context_deps=gql_context_deps,
         valkey_rate_limit=r.infrastructure.valkey.rate_limit,
         health_probe=r.system.health_probe,
-    )
-
-    # 1. Build API module tree
-    root_registry = RouteRegistry.create("", deps.cors_options)
-    for sub in build_api_routes(
-        deps,
         root_app=root_app,
         stream_cleanup_handler=r.processing.stream_cleanup_handler,
+        pidx=pidx,
     ):
         root_registry.add_subregistry(sub)
 
@@ -377,21 +374,20 @@ def _setup_api(
         root_app.middlewares.append(rlim_reg.rlim_middleware)
 
 
-def register_modules(
+def mount_registries(
     root_app: web.Application,
-    registrars: Sequence[ModuleRegistrar],
+    registries: Sequence[RouteRegistry],
     *,
-    deps: ModuleDeps,
+    cors_options: CORSOptions | None = None,
 ) -> None:
-    """Register selected modules for test fixtures.
+    """Mount pre-built registries on *root_app*.
 
-    Public API used by ``tests/component/conftest.py`` to register only
+    Public API used by ``tests/component/conftest.py`` to mount only
     the modules needed for a particular test.
     """
-    root_registry = RouteRegistry.create("", deps.cors_options)
-    for registrar in registrars:
-        sub = registrar(deps)
-        root_registry.add_subregistry(sub)
+    root_registry = RouteRegistry.create("", cors_options or {})
+    for reg in registries:
+        root_registry.add_subregistry(reg)
     _mount_registry_tree(root_app, root_registry)
 
     # Install ratelimit middleware on root app if the module is present

@@ -2,29 +2,44 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.etcd.handler import EtcdHandler
 from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
+from ai.backend.manager.api.rest.resource.handler import ResourceHandler
 from ai.backend.manager.api.rest.resource.registry import register_resource_routes
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.scaling_group.handler import ScalingGroupHandler
 from ai.backend.manager.api.rest.scaling_group.registry import register_scaling_group_routes
-from ai.backend.manager.api.rest.types import ModuleRegistrar
+from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 
 
 @pytest.fixture()
-def server_module_registrars() -> list[ModuleRegistrar]:
+def server_module_registries(
+    route_deps: RouteDeps, config_provider: ManagerConfigProvider
+) -> list[RouteRegistry]:
     """Load only the modules required for infra-domain tests."""
+    mock_processors = MagicMock()
     return [
-        register_auth_routes,
-        register_etcd_routes,
-        register_resource_routes,
-        register_scaling_group_routes,
+        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+        register_etcd_routes(
+            EtcdHandler(processors=mock_processors),
+            route_deps,
+            pidx=0,
+            config_provider=config_provider,
+        ),
+        register_resource_routes(ResourceHandler(processors=mock_processors), route_deps),
+        register_scaling_group_routes(ScalingGroupHandler(processors=mock_processors), route_deps),
     ]
 
 

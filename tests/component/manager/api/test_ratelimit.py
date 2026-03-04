@@ -1,28 +1,33 @@
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.ratelimit.handler import _rlim_window
 from ai.backend.manager.api.rest.ratelimit.registry import register_ratelimit_routes
-from ai.backend.manager.api.rest.types import ModuleDeps
+from ai.backend.manager.api.rest.types import RouteDeps
 
 # TODO: These tests require a full Valkey rate-limit infrastructure
-# (ValkeyRateLimitClient) that is not available through the new ModuleDeps
-# pattern.  They need to be refactored to inject a ValkeyRateLimitClient
-# into ModuleDeps or to use a dedicated fixture.
+# (ValkeyRateLimitClient) that is not available through the current
+# RouteDeps pattern.  They need to be refactored to inject a
+# ValkeyRateLimitClient or to use a dedicated fixture.
 
 
-@pytest.mark.skip(reason="Needs ValkeyRateLimitClient infrastructure via ModuleDeps")
+@pytest.mark.skip(reason="Needs ValkeyRateLimitClient infrastructure")
 async def test_check_rlim_for_anonymous_query(
     etcd_fixture: None,
     database_fixture: None,
-    server_module_deps: ModuleDeps,
+    route_deps: RouteDeps,
     create_app_and_client: Any,
 ) -> None:
+    mock_processors = MagicMock()
     app, client = await create_app_and_client(
-        module_deps=server_module_deps,
-        registrars=[register_auth_routes, register_ratelimit_routes],
+        registries=[
+            register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+            register_ratelimit_routes(route_deps, valkey_rate_limit=None),
+        ],
     )
     ret = await client.get("/")
     assert ret.status == 200
@@ -31,17 +36,20 @@ async def test_check_rlim_for_anonymous_query(
     assert str(_rlim_window) == ret.headers["X-RateLimit-Window"]
 
 
-@pytest.mark.skip(reason="Needs ValkeyRateLimitClient infrastructure via ModuleDeps")
+@pytest.mark.skip(reason="Needs ValkeyRateLimitClient infrastructure")
 async def test_check_rlim_for_authorized_query(
     etcd_fixture: None,
     database_fixture: None,
-    server_module_deps: ModuleDeps,
+    route_deps: RouteDeps,
     create_app_and_client: Any,
     get_headers: Any,
 ) -> None:
+    mock_processors = MagicMock()
     app, client = await create_app_and_client(
-        module_deps=server_module_deps,
-        registrars=[register_auth_routes, register_ratelimit_routes],
+        registries=[
+            register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+            register_ratelimit_routes(route_deps, valkey_rate_limit=None),
+        ],
     )
     url = "/auth/test"
     req_bytes = b'{"echo": "hello!"}'

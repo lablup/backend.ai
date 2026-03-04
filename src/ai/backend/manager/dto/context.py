@@ -9,7 +9,6 @@ from pydantic import ConfigDict
 
 from ai.backend.common.api_handlers import MiddlewareParam
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.services.processors import Processors
 
 
 class RequestCtx(MiddlewareParam):
@@ -52,19 +51,6 @@ class UserContext(MiddlewareParam):
             is_admin=request["is_admin"],
             is_superadmin=request["is_superadmin"],
         )
-
-
-class ProcessorsCtx(MiddlewareParam):
-    """Middleware parameter providing access to service processors."""
-
-    processors: Processors
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    @override
-    @classmethod
-    async def from_request(cls, request: web.Request) -> Self:
-        return cls(processors=request.app["_processors"])
 
 
 class VFolderAuthContext(MiddlewareParam):

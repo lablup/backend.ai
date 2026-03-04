@@ -8,9 +8,10 @@ import pytest
 from aiohttp import web
 from dateutil.tz import gettz, tzutc
 
+from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.middleware.auth import _extract_auth_params, check_date
-from ai.backend.manager.api.rest.types import ModuleDeps
+from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.errors.auth import InvalidAuthParameters
 
 
@@ -88,14 +89,16 @@ def test_check_date() -> None:
 async def test_authorize(
     etcd_fixture: None,
     database_fixture: None,
-    server_module_deps: ModuleDeps,
+    route_deps: RouteDeps,
     create_app_and_client: Any,
     get_headers: Any,
 ) -> None:
     # The auth module requires config_server and database to be set up.
+    mock_processors = MagicMock()
     app, client = await create_app_and_client(
-        module_deps=server_module_deps,
-        registrars=[register_auth_routes],
+        registries=[
+            register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+        ],
     )
 
     async def do_authorize(hash_type: str, api_version: str) -> None:

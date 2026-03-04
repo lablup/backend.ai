@@ -6,29 +6,25 @@ from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.rest.middleware.auth import superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
-from ai.backend.manager.api.rest.server_status import (
-    ALL_ALLOWED,
-    READ_ALLOWED,
-    server_status_required,
-)
 
 from .handler import ContainerRegistryHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_container_registry_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_container_registry_routes(
+    handler: ContainerRegistryHandler, route_deps: RouteDeps
+) -> RouteRegistry:
     """Build the container registry sub-application."""
-    reg = RouteRegistry.create("container-registries", deps.cors_options)
-    handler = ContainerRegistryHandler()
+    reg = RouteRegistry.create("container-registries", route_deps.cors_options)
 
     reg.add(
         "PATCH",
         "/{registry_id}",
         handler.patch,
         middlewares=[
-            server_status_required(READ_ALLOWED, deps.config_provider),
+            route_deps.read_status_mw,
             superadmin_required,
         ],
     )
@@ -36,6 +32,6 @@ def register_container_registry_routes(deps: ModuleDeps) -> RouteRegistry:
         "POST",
         "/webhook/harbor",
         handler.harbor_webhook,
-        middlewares=[server_status_required(ALL_ALLOWED, deps.config_provider)],
+        middlewares=[route_deps.all_status_mw],
     )
     return reg

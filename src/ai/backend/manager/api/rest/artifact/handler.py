@@ -1,9 +1,9 @@
 """Artifact handler class using constructor dependency injection.
 
 All handlers use the new ApiHandler pattern: typed parameters
-(``BodyParam``, ``PathParam``, ``ProcessorsCtx``) are automatically
-extracted by ``_wrap_api_handler`` and responses are returned as
-``APIResponse`` objects.
+(``BodyParam``, ``PathParam``) are automatically extracted by
+``_wrap_api_handler`` and responses are returned as ``APIResponse``
+objects.
 """
 
 from __future__ import annotations

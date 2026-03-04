@@ -13,35 +13,34 @@ from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
-from ai.backend.manager.api.rest.server_status import READ_ALLOWED, server_status_required
+
+from .handler import ErrorLogHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_error_log_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_error_log_routes(handler: ErrorLogHandler, route_deps: RouteDeps) -> RouteRegistry:
     """Build the error log sub-application."""
-    from .handler import ErrorLogHandler
 
-    reg = RouteRegistry.create("logs", deps.cors_options)
-    handler = ErrorLogHandler(processors=deps.processors)
+    reg = RouteRegistry.create("logs", route_deps.cors_options)
 
     reg.add(
         "POST",
         "/error",
         handler.append,
-        middlewares=[server_status_required(READ_ALLOWED, deps.config_provider), auth_required],
+        middlewares=[route_deps.read_status_mw, auth_required],
     )
     reg.add(
         "GET",
         "/error",
         handler.list_logs,
-        middlewares=[auth_required, server_status_required(READ_ALLOWED, deps.config_provider)],
+        middlewares=[auth_required, route_deps.read_status_mw],
     )
     reg.add(
         "POST",
         "/error/{log_id}/clear",
         handler.mark_cleared,
-        middlewares=[auth_required, server_status_required(READ_ALLOWED, deps.config_provider)],
+        middlewares=[auth_required, route_deps.read_status_mw],
     )
     return reg

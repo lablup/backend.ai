@@ -2,28 +2,36 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator, Callable
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
+from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
-
-# Statically imported so that Pants includes these modules in the test PEX.
-# build_root_app() loads them at runtime via importlib.import_module(),
-# which Pants cannot trace statically.
-from ai.backend.manager.api.rest.types import ModuleRegistrar
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 
 
 @pytest.fixture()
-def server_module_registrars() -> list[ModuleRegistrar]:
+def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the modules required for image-domain tests."""
-    return [register_auth_routes, register_admin_routes]
+    mock_processors = MagicMock()
+    return [
+        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+        register_admin_routes(
+            AdminHandler(gql_schema=MagicMock(), gql_deps=MagicMock()),
+            route_deps,
+            sub_registries=[],
+        ),
+    ]
 
 
 @pytest.fixture()

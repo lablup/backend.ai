@@ -45,14 +45,27 @@ from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
+from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.compute_sessions.handler import ComputeSessionsHandler
 from ai.backend.manager.api.rest.compute_sessions.registry import register_compute_sessions_routes
+from ai.backend.manager.api.rest.etcd.handler import EtcdHandler
 from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
+from ai.backend.manager.api.rest.events.handler import EventsHandler
 from ai.backend.manager.api.rest.events.registry import register_events_routes
+from ai.backend.manager.api.rest.manager.handler import ManagerHandler
 from ai.backend.manager.api.rest.manager.registry import register_manager_api_routes
 from ai.backend.manager.api.rest.ratelimit.registry import register_ratelimit_routes
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.server_status import (
+    ALL_ALLOWED,
+    READ_ALLOWED,
+    server_status_required,
+)
+from ai.backend.manager.api.rest.stream.handler import StreamHandler
 from ai.backend.manager.api.rest.stream.registry import register_stream_routes
-from ai.backend.manager.api.rest.types import ModuleDeps, ModuleRegistrar
+from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.api.rest.vfolder.handler import VFolderHandler
 from ai.backend.manager.api.rest.vfolder.registry import register_vfolder_routes
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
@@ -93,7 +106,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, connect_datab
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.server import build_root_app, register_modules
+from ai.backend.manager.server import build_root_app, mount_registries
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
@@ -125,8 +138,7 @@ class AppBuilder(Protocol):
     async def __call__(
         self,
         *,
-        module_deps: ModuleDeps,
-        registrars: Sequence[ModuleRegistrar] | None = None,
+        registries: Sequence[RouteRegistry] | None = None,
         scheduler_opts: Mapping[str, Any] | None = None,
     ) -> tuple[web.Application, Client]: ...
 
@@ -353,14 +365,12 @@ def config_provider(
 
 
 @pytest.fixture()
-def server_module_deps(config_provider: _TestConfigProvider) -> ModuleDeps:
-    """Build ``ModuleDeps`` with a test config provider and mocked processors."""
-    return ModuleDeps(
+def route_deps(config_provider: _TestConfigProvider) -> RouteDeps:
+    """Shared routing context for test registrar calls."""
+    return RouteDeps(
         cors_options={},
-        processors=MagicMock(),
-        config_provider=config_provider,
-        error_monitor=MagicMock(),
-        gql_context_deps=MagicMock(),
+        read_status_mw=server_status_required(READ_ALLOWED, config_provider),
+        all_status_mw=server_status_required(ALL_ALLOWED, config_provider),
     )
 
 
@@ -762,8 +772,7 @@ async def create_app_and_client(
 
     async def app_builder(
         *,
-        module_deps: ModuleDeps,
-        registrars: Sequence[ModuleRegistrar] | None = None,
+        registries: Sequence[RouteRegistry] | None = None,
         scheduler_opts: Mapping[str, Any] | None = None,
     ) -> tuple[web.Application, Client]:
         nonlocal client, client_session, runner
@@ -780,10 +789,10 @@ async def create_app_and_client(
             },
         )
 
-        # Register all requested modules using the provided deps.
-        all_registrars = list(registrars or [])
-        if all_registrars:
-            register_modules(app, all_registrars, deps=module_deps)
+        # Mount pre-built registries.
+        all_registries = list(registries or [])
+        if all_registries:
+            mount_registries(app, all_registries)
 
         runner = web.AppRunner(app, handle_signals=False)
         await runner.setup()
@@ -910,28 +919,51 @@ def get_headers(
 async def prepare_kernel(
     request: Any,
     create_app_and_client: AppBuilder,
-    server_module_deps: ModuleDeps,
+    route_deps: RouteDeps,
+    config_provider: _TestConfigProvider,
     get_headers: Callable[..., dict[str, str]],
     default_keypair: dict[str, str],
 ) -> AsyncIterator[
     tuple[web.Application, Client, Callable[[str, str | None], Awaitable[dict[str, Any]]]]
 ]:
+    mock_processors = MagicMock()
+
     sess_id = f"test-kernel-session-{secrets.token_hex(8)}"
     app, client = await create_app_and_client(
-        module_deps=server_module_deps,
-        registrars=[
-            register_etcd_routes,
-            register_events_routes,
-            register_auth_routes,
-            register_vfolder_routes,
-            register_admin_routes,
-            register_ratelimit_routes,
-            register_compute_sessions_routes,
-            partial(
-                register_stream_routes,
+        registries=[
+            register_etcd_routes(
+                EtcdHandler(processors=mock_processors),
+                route_deps,
+                pidx=0,
+                config_provider=config_provider,
+            ),
+            register_events_routes(
+                MagicMock(spec=EventsHandler),
+                route_deps,
+                event_hub=MagicMock(),
+            ),
+            register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+            register_vfolder_routes(
+                VFolderHandler(mock_processors),
+                route_deps,
+                processors=mock_processors,
+            ),
+            register_admin_routes(MagicMock(), route_deps, sub_registries=[]),
+            register_ratelimit_routes(route_deps, valkey_rate_limit=None),
+            register_compute_sessions_routes(
+                ComputeSessionsHandler(processors=mock_processors),
+                route_deps,
+            ),
+            register_stream_routes(
+                MagicMock(spec=StreamHandler),
+                route_deps,
+                stream_processors=MagicMock(),
                 stream_cleanup_handler=StreamCleanupEventHandler(MagicMock()),
             ),
-            register_manager_api_routes,
+            register_manager_api_routes(
+                ManagerHandler(processors=mock_processors),
+                route_deps,
+            ),
         ],
         scheduler_opts=None,
     )

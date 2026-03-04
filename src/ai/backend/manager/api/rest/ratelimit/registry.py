@@ -15,12 +15,19 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
+        ValkeyRateLimitClient,
+    )
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def register_ratelimit_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_ratelimit_routes(
+    route_deps: RouteDeps,
+    *,
+    valkey_rate_limit: ValkeyRateLimitClient | None,
+) -> RouteRegistry:
     """Build the ratelimit sub-application.
 
     This module does not register any routes -- it only provides the
@@ -29,9 +36,9 @@ def register_ratelimit_routes(deps: ModuleDeps) -> RouteRegistry:
     """
     from .handler import make_rlim_middleware
 
-    reg = RouteRegistry.create("ratelimit", deps.cors_options)
+    reg = RouteRegistry.create("ratelimit", route_deps.cors_options)
 
-    if deps.valkey_rate_limit is not None:
-        reg.rlim_middleware = make_rlim_middleware(deps.valkey_rate_limit)
+    if valkey_rate_limit is not None:
+        reg.rlim_middleware = make_rlim_middleware(valkey_rate_limit)
 
     return reg

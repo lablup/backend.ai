@@ -22,7 +22,6 @@ from ai.backend.common.dto.manager.response import (
     ObjectStorageListResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
 )
@@ -32,6 +31,7 @@ from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url
 from ai.backend.manager.services.object_storage.actions.list import (
     ListObjectStorageAction,
 )
+from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.storage_namespace.actions.get_all import GetAllNamespacesAction
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
 
@@ -41,13 +41,15 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ObjectStorageHandler:
     """Object storage API handler with constructor-injected dependencies."""
 
+    def __init__(self, processors: Processors) -> None:
+        self._processors = processors
+
     async def get_presigned_download_url(
         self,
         body: BodyParam[GetPresignedDownloadURLReq],
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """Generate a presigned URL for safely downloading artifact files."""
-        processors = processors_ctx.processors
+        processors = self._processors
 
         action_result = (
             await processors.object_storage.get_presigned_download_url.wait_for_complete(
@@ -65,10 +67,9 @@ class ObjectStorageHandler:
     async def get_presigned_upload_url(
         self,
         body: BodyParam[GetPresignedUploadURLReq],
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """Generate a presigned URL for uploading artifact files."""
-        processors = processors_ctx.processors
+        processors = self._processors
 
         action_result = await processors.object_storage.get_presigned_upload_url.wait_for_complete(
             GetUploadPresignedURLAction(
@@ -85,13 +86,12 @@ class ObjectStorageHandler:
 
     async def get_all_buckets(
         self,
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """Retrieve all storage namespaces (buckets) across all storage systems.
 
         Note: This API is deprecated. Use /storage-namespaces instead.
         """
-        processors = processors_ctx.processors
+        processors = self._processors
         action_result = await processors.storage_namespace.get_all_namespaces.wait_for_complete(
             GetAllNamespacesAction()
         )
@@ -102,13 +102,12 @@ class ObjectStorageHandler:
     async def get_buckets(
         self,
         path: PathParam[ObjectStoragePathParam],
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """Retrieve storage namespaces (buckets) for a specific storage system.
 
         Note: This API is deprecated. Use /storage-namespaces instead.
         """
-        processors = processors_ctx.processors
+        processors = self._processors
         storage_id: uuid.UUID = path.parsed.storage_id
 
         action_result = await processors.storage_namespace.get_namespaces.wait_for_complete(
@@ -121,10 +120,9 @@ class ObjectStorageHandler:
 
     async def list_object_storages(
         self,
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """List all configured object storage systems."""
-        processors = processors_ctx.processors
+        processors = self._processors
 
         action_result = await processors.object_storage.list_storages.wait_for_complete(
             ListObjectStorageAction()

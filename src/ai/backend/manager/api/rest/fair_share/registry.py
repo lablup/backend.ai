@@ -7,17 +7,18 @@ from typing import TYPE_CHECKING
 from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
+from .handler import FairShareAPIHandler
+
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_fair_share_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_fair_share_routes(
+    handler: FairShareAPIHandler, route_deps: RouteDeps
+) -> RouteRegistry:
     """Build the fair share sub-application."""
-    # Import handler inside function to avoid circular imports
-    from .handler import FairShareAPIHandler
 
-    reg = RouteRegistry.create("fair-share", deps.cors_options)
-    handler = FairShareAPIHandler()
+    reg = RouteRegistry.create("fair-share", route_deps.cors_options)
 
     # Domain fair share routes (superadmin)
     reg.add(

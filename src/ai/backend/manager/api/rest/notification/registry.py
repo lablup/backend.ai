@@ -7,17 +7,18 @@ from typing import TYPE_CHECKING
 from ai.backend.manager.api.rest.middleware.auth import superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
+from .handler import NotificationHandler
+
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_notification_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_notification_routes(
+    handler: NotificationHandler, route_deps: RouteDeps
+) -> RouteRegistry:
     """Build the notification sub-application."""
-    # Import handler inside function to avoid circular imports
-    from .handler import NotificationHandler
 
-    reg = RouteRegistry.create("notifications", deps.cors_options)
-    handler = NotificationHandler(processors=deps.processors)
+    reg = RouteRegistry.create("notifications", route_deps.cors_options)
 
     # Channel routes
     reg.add(

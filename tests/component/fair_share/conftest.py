@@ -3,22 +3,30 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.fair_share.handler import FairShareAPIHandler
 from ai.backend.manager.api.rest.fair_share.registry import register_fair_share_routes
-from ai.backend.manager.api.rest.types import ModuleRegistrar
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.scaling_group import sgroups_for_groups
 
 
 @pytest.fixture()
-def server_module_registrars() -> list[ModuleRegistrar]:
+def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the modules required for fair-share-domain tests."""
-    return [register_auth_routes, register_fair_share_routes]
+    mock_processors = MagicMock()
+    return [
+        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+        register_fair_share_routes(FairShareAPIHandler(mock_processors), route_deps),
+    ]
 
 
 @pytest.fixture()
