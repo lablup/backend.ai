@@ -6,6 +6,8 @@ Create Date: 2026-03-05 03:10:36.273207
 
 """
 
+from uuid import UUID
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.engine import Connection
@@ -93,12 +95,12 @@ def _associate_sessions_to_scopes(db_conn: Connection) -> None:
     relation_type = "auto"
 
     # Process User scope edges
-    last_id = "00000000-0000-0000-0000-000000000000"
+    last_id = UUID("00000000-0000-0000-0000-000000000000")
     while True:
         query = sa.text("""
-            SELECT id::text AS id, user_uuid::text AS user_uuid
+            SELECT id, user_uuid
             FROM sessions
-            WHERE id::text > :last_id
+            WHERE id > :last_id
             ORDER BY id
             LIMIT :limit
         """)
@@ -122,12 +124,12 @@ def _associate_sessions_to_scopes(db_conn: Connection) -> None:
         db_conn.execute(insert_query)
 
     # Process Project scope edges
-    last_id = "00000000-0000-0000-0000-000000000000"
+    last_id = UUID("00000000-0000-0000-0000-000000000000")
     while True:
         query = sa.text("""
-            SELECT id::text AS id, group_id::text AS group_id
+            SELECT id, group_id
             FROM sessions
-            WHERE id::text > :last_id
+            WHERE id > :last_id
             ORDER BY id
             LIMIT :limit
         """)
