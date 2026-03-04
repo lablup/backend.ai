@@ -475,6 +475,7 @@ class CreateDeploymentAdapter:
 
         return ModelRevisionCreator(
             image_id=revision_input.image.id,
+            resource_group_name=revision_input.resource_config.resource_group,
             resource_spec=resource_spec,
             mounts=mounts,
             execution=execution,

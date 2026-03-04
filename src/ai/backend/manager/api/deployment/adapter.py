@@ -425,7 +425,6 @@ class CreateDeploymentAdapter:
 
     def _build_revision_creator(
         self,
-        deployment_id: UUID,
         revision_input: RevisionInput,
     ) -> ModelRevisionCreator:
         """Build ModelRevisionCreator from revision input."""

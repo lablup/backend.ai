@@ -139,6 +139,7 @@ async def _auto_scaling_rule_domain_ctx(root_ctx: RootContext) -> AsyncIterator[
     deployment_service = DeploymentService(
         deployment_controller=MagicMock(),
         deployment_repository=deployment_repo,
+        revision_generator_registry=MagicMock(),
     )
     root_ctx.processors.deployment = DeploymentProcessors(deployment_service, [])
     yield

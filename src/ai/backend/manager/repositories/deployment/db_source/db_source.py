@@ -88,7 +88,6 @@ from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow, scaling_groups
 from ai.backend.manager.models.scheduling_history import (
@@ -1953,17 +1952,6 @@ class DeploymentDBSource:
 
             db_sess.add(row)
             await db_sess.flush()
-
-            pk_value: str = sa.inspect(row).identity[0]
-            db_sess.add(
-                EntityFieldRow(
-                    entity_type=EntityType.MODEL_DEPLOYMENT,
-                    entity_id=str(deployment_id),
-                    field_type=FieldType.MODEL_REVISION,
-                    field_id=str(pk_value),
-                )
-            )
-
             return row.to_data()
 
     async def get_revision(
