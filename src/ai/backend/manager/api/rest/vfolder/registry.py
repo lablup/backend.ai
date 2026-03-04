@@ -96,7 +96,7 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
     reg.app.on_startup.append(vfolder_init)
     reg.app.on_shutdown.append(vfolder_shutdown)
 
-    handler = VFolderHandler()
+    handler = VFolderHandler(deps.processors)
     cp = deps.config_provider
 
     # Helper to build middleware lists

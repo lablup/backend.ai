@@ -1,7 +1,7 @@
 """VFolder handler class using the ApiHandler pattern.
 
 All handlers use typed parameters (``BodyParam``, ``QueryParam``,
-``UserContext``, ``RequestCtx``, ``VFolderAuthContext``, ``ProcessorsCtx``)
+``UserContext``, ``RequestCtx``, ``VFolderAuthContext``)
 that are automatically extracted by ``_wrap_api_handler``, and responses are
 returned as ``APIResponse`` objects.
 """
@@ -103,7 +103,6 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.dto.context import (
-    ProcessorsCtx,
     RequestCtx,
     UserContext,
     VFolderAuthContext,
@@ -133,6 +132,7 @@ from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpd
 from ai.backend.manager.services.auth.actions.resolve_user_scope import (
     ResolveUserScopeAction,
 )
+from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CreateVFolderAction,
@@ -197,6 +197,9 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class VFolderHandler:
     """VFolder API handler with typed parameter injection."""
 
+    def __init__(self, processors: Processors) -> None:
+        self.processors = processors
+
     # ------------------------------------------------------------------
     # 1. create (POST /)
     # ------------------------------------------------------------------
@@ -206,7 +209,6 @@ class VFolderHandler:
         body: BodyParam[VFolderCreateReq],
         ctx: UserContext,
         req: RequestCtx,
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         params = body.parsed
         user_role = req.request["user"]["role"]
@@ -237,7 +239,7 @@ class VFolderHandler:
             scope_id = str(ctx.user_uuid)
 
         try:
-            result = await processors_ctx.processors.vfolder.create_vfolder.wait_for_complete(
+            result = await self.processors.vfolder.create_vfolder.wait_for_complete(
                 CreateVFolderAction(
                     name=params.name,
                     keypair_resource_policy=keypair_resource_policy,
@@ -297,7 +299,6 @@ class VFolderHandler:
         query: QueryParam[ListVFoldersQuery],
         ctx: UserContext,
         req: RequestCtx,
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         params = query.parsed
         log.info(
@@ -305,7 +306,7 @@ class VFolderHandler:
             ctx.user_email,
             ctx.access_key,
         )
-        user_scope = await processors_ctx.processors.auth.resolve_user_scope.wait_for_complete(
+        user_scope = await self.processors.auth.resolve_user_scope.wait_for_complete(
             ResolveUserScopeAction(
                 requester_uuid=ctx.user_uuid,
                 requester_role=ctx.user_role,
@@ -322,7 +323,7 @@ class VFolderHandler:
         else:
             scope_type = ScopeType.USER
             scope_id = str(owner_user_uuid)
-        result = await processors_ctx.processors.vfolder.list_vfolder.wait_for_complete(
+        result = await self.processors.vfolder.list_vfolder.wait_for_complete(
             ListVFolderAction(
                 user_uuid=owner_user_uuid,
                 _scope_type=scope_type,
@@ -361,7 +362,6 @@ class VFolderHandler:
         query: QueryParam[ListHostsQuery],
         ctx: UserContext,
         req: RequestCtx,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         params = query.parsed
         log.info(
@@ -371,7 +371,7 @@ class VFolderHandler:
         )
         resource_policy = req.request["keypair"]["resource_policy"]
 
-        result = await procs.processors.vfolder.list_hosts.wait_for_complete(
+        result = await self.processors.vfolder.list_hosts.wait_for_complete(
             ListHostsAction(
                 user_uuid=ctx.user_uuid,
                 domain_name=ctx.user_domain,
@@ -403,14 +403,13 @@ class VFolderHandler:
     async def list_all_hosts(
         self,
         ctx: UserContext,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         log.info(
             "VFOLDER.LIST_ALL_HOSTS (email:{}, ak:{})",
             ctx.user_email,
             ctx.access_key,
         )
-        result = await procs.processors.vfolder.list_all_hosts.wait_for_complete(
+        result = await self.processors.vfolder.list_all_hosts.wait_for_complete(
             ListAllHostsAction()
         )
         resp = ListAllHostsResponse(
@@ -427,7 +426,6 @@ class VFolderHandler:
         self,
         query: QueryParam[GetVolumePerfMetricQuery],
         ctx: UserContext,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         params = query.parsed
         log.info(
@@ -435,7 +433,7 @@ class VFolderHandler:
             ctx.user_email,
             ctx.access_key,
         )
-        result = await procs.processors.vfolder.get_volume_perf_metric.wait_for_complete(
+        result = await self.processors.vfolder.get_volume_perf_metric.wait_for_complete(
             GetVolumePerfMetricAction(folder_host=params.folder_host)
         )
         resp = GetVolumePerfMetricResponse(data=result.data)
@@ -448,14 +446,13 @@ class VFolderHandler:
     async def list_allowed_types(
         self,
         ctx: UserContext,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         log.info(
             "VFOLDER.LIST_ALLOWED_TYPES (email:{}, ak:{})",
             ctx.user_email,
             ctx.access_key,
         )
-        result = await procs.processors.vfolder.list_allowed_types.wait_for_complete(
+        result = await self.processors.vfolder.list_allowed_types.wait_for_complete(
             ListAllowedTypesAction()
         )
         resp = ListAllowedTypesResponse(allowed_types=result.allowed_types)
@@ -478,7 +475,7 @@ class VFolderHandler:
             row["id"],
             req.request.match_info["name"],
         )
-        result = await vfctx.processors.vfolder.get_vfolder.wait_for_complete(
+        result = await self.processors.vfolder.get_vfolder.wait_for_complete(
             GetVFolderAction(
                 vfctx.user_uuid,
                 vfolder_uuid=row["id"],
@@ -518,10 +515,9 @@ class VFolderHandler:
         query: QueryParam[GetQuotaQuery],
         ctx: UserContext,
         req: RequestCtx,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         params = query.parsed
-        resolved = await procs.processors.vfolder.get_accessible_vfolder.wait_for_complete(
+        resolved = await self.processors.vfolder.get_accessible_vfolder.wait_for_complete(
             GetAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
                 user_role=req.request["user"]["role"],
@@ -542,7 +538,7 @@ class VFolderHandler:
         user_role = req.request["user"]["role"]
         vfid = str(VFolderID.from_row(vfolder_row))
 
-        result = await procs.processors.vfolder.get_quota.wait_for_complete(
+        result = await self.processors.vfolder.get_quota.wait_for_complete(
             GetQuotaAction(
                 folder_host=params.folder_host,
                 vfid=vfid,
@@ -565,10 +561,9 @@ class VFolderHandler:
         body: BodyParam[UpdateQuotaReq],
         ctx: UserContext,
         req: RequestCtx,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         params = body.parsed
-        resolved = await procs.processors.vfolder.get_accessible_vfolder.wait_for_complete(
+        resolved = await self.processors.vfolder.get_accessible_vfolder.wait_for_complete(
             GetAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
                 user_role=req.request["user"]["role"],
@@ -592,7 +587,7 @@ class VFolderHandler:
         resource_policy = req.request["keypair"]["resource_policy"]
         vfid = str(VFolderID.from_row(vfolder_row))
 
-        result = await procs.processors.vfolder.update_quota.wait_for_complete(
+        result = await self.processors.vfolder.update_quota.wait_for_complete(
             UpdateQuotaAction(
                 folder_host=params.folder_host,
                 vfid=vfid,
@@ -617,10 +612,9 @@ class VFolderHandler:
         query: QueryParam[GetUsageQuery],
         ctx: UserContext,
         req: RequestCtx,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         params = query.parsed
-        resolved = await procs.processors.vfolder.get_accessible_vfolder.wait_for_complete(
+        resolved = await self.processors.vfolder.get_accessible_vfolder.wait_for_complete(
             GetAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
                 user_role=req.request["user"]["role"],
@@ -637,7 +631,7 @@ class VFolderHandler:
             ctx.user_email,
             params.id,
         )
-        result = await procs.processors.vfolder.get_usage.wait_for_complete(
+        result = await self.processors.vfolder.get_usage.wait_for_complete(
             GetVFolderUsageAction(
                 folder_host=params.folder_host,
                 vfolder_id=str(VFolderID(vfolder_row["quota_scope_id"], params.id)),
@@ -656,10 +650,9 @@ class VFolderHandler:
         query: QueryParam[GetUsedBytesQuery],
         ctx: UserContext,
         req: RequestCtx,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         params = query.parsed
-        resolved = await procs.processors.vfolder.get_accessible_vfolder.wait_for_complete(
+        resolved = await self.processors.vfolder.get_accessible_vfolder.wait_for_complete(
             GetAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
                 user_role=req.request["user"]["role"],
@@ -672,7 +665,7 @@ class VFolderHandler:
         )
         vfolder_row = resolved.row
         log.info("VFOLDER.GET_USED_BYTES (vf:{})", params.id)
-        result = await procs.processors.vfolder.get_used_bytes.wait_for_complete(
+        result = await self.processors.vfolder.get_used_bytes.wait_for_complete(
             GetVFolderUsedBytesAction(
                 folder_host=params.folder_host,
                 vfolder_id=str(VFolderID(vfolder_row["quota_scope_id"], params.id)),
@@ -707,7 +700,7 @@ class VFolderHandler:
         updater_spec = VFolderAttributeUpdaterSpec(
             name=OptionalState[str].update(new_name),
         )
-        await vfctx.processors.vfolder.update_vfolder_attribute.wait_for_complete(
+        await self.processors.vfolder.update_vfolder_attribute.wait_for_complete(
             UpdateVFolderAttributeAction(
                 user_uuid=vfctx.user_uuid,
                 vfolder_uuid=row["id"],
@@ -748,7 +741,7 @@ class VFolderHandler:
             if params.permission is not None
             else OptionalState[VFolderPermission].nop()
         )
-        await vfctx.processors.vfolder.update_vfolder_attribute.wait_for_complete(
+        await self.processors.vfolder.update_vfolder_attribute.wait_for_complete(
             UpdateVFolderAttributeAction(
                 user_uuid=vfctx.user_uuid,
                 vfolder_uuid=row["id"],
@@ -784,7 +777,7 @@ class VFolderHandler:
             params.path,
         )
 
-        result = await vfctx.processors.vfolder_file.mkdir.wait_for_complete(
+        result = await self.processors.vfolder_file.mkdir.wait_for_complete(
             MkdirAction(
                 user_id=vfctx.user_uuid,
                 vfolder_uuid=row["id"],
@@ -816,7 +809,7 @@ class VFolderHandler:
             req.request.match_info["name"],
             params.path,
         )
-        result = await vfctx.processors.vfolder_file.download_file.wait_for_complete(
+        result = await self.processors.vfolder_file.download_file.wait_for_complete(
             CreateDownloadSessionAction(
                 user_uuid=vfctx.user_uuid,
                 keypair_resource_policy=req.request["keypair"]["resource_policy"],
@@ -861,7 +854,7 @@ class VFolderHandler:
             files,
         )
         result = (
-            await vfctx.processors.vfolder_file.create_archive_download_session.wait_for_complete(
+            await self.processors.vfolder_file.create_archive_download_session.wait_for_complete(
                 CreateArchiveDownloadSessionAction(
                     keypair_resource_policy=req.request["keypair"]["resource_policy"],
                     vfolder_uuid=row["id"],
@@ -892,7 +885,7 @@ class VFolderHandler:
             req.request.match_info["name"],
             params.path,
         )
-        result = await vfctx.processors.vfolder_file.upload_file.wait_for_complete(
+        result = await self.processors.vfolder_file.upload_file.wait_for_complete(
             CreateUploadSessionAction(
                 user_uuid=vfctx.user_uuid,
                 keypair_resource_policy=req.request["keypair"]["resource_policy"],
@@ -926,7 +919,7 @@ class VFolderHandler:
             params.target_path,
             params.new_name,
         )
-        await vfctx.processors.vfolder_file.rename_file.wait_for_complete(
+        await self.processors.vfolder_file.rename_file.wait_for_complete(
             RenameFileAction(
                 user_uuid=vfctx.user_uuid,
                 keypair_resource_policy=req.request["keypair"]["resource_policy"],
@@ -957,7 +950,7 @@ class VFolderHandler:
             params.src,
             params.dst,
         )
-        await vfctx.processors.vfolder_file.move_file.wait_for_complete(
+        await self.processors.vfolder_file.move_file.wait_for_complete(
             MoveFileAction(
                 user_uuid=vfctx.user_uuid,
                 vfolder_uuid=row["id"],
@@ -990,7 +983,7 @@ class VFolderHandler:
             params.files,
             params.recursive,
         )
-        await vfctx.processors.vfolder_file.delete_files.wait_for_complete(
+        await self.processors.vfolder_file.delete_files.wait_for_complete(
             DeleteFilesAction(
                 user_uuid=vfctx.user_uuid,
                 vfolder_uuid=row["id"],
@@ -1024,7 +1017,7 @@ class VFolderHandler:
             params.recursive,
         )
 
-        result = await vfctx.processors.vfolder_file.delete_files_async.wait_for_complete(
+        result = await self.processors.vfolder_file.delete_files_async.wait_for_complete(
             DeleteFilesAsyncAction(
                 user_uuid=vfctx.user_uuid,
                 vfolder_uuid=row["id"],
@@ -1056,7 +1049,7 @@ class VFolderHandler:
             req.request.match_info["name"],
             params.path,
         )
-        result = await vfctx.processors.vfolder_file.list_files.wait_for_complete(
+        result = await self.processors.vfolder_file.list_files.wait_for_complete(
             ListFilesAction(
                 user_uuid=vfctx.user_uuid,
                 vfolder_uuid=row["id"],
@@ -1075,14 +1068,13 @@ class VFolderHandler:
     async def list_sent_invitations(
         self,
         ctx: UserContext,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         log.info(
             "VFOLDER.LIST_SENT_INVITATIONS (email:{}, ak:{})",
             ctx.user_email,
             ctx.access_key,
         )
-        result = await procs.processors.vfolder_invite.list_sent_invitations.wait_for_complete(
+        result = await self.processors.vfolder_invite.list_sent_invitations.wait_for_complete(
             ListSentInvitationsAction(requester_user_uuid=ctx.user_uuid)
         )
         invs_info = []
@@ -1112,7 +1104,6 @@ class VFolderHandler:
         body: BodyParam[UpdateInvitationReq],
         ctx: UserContext,
         req: RequestCtx,
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         params = body.parsed
         inv_id = req.request.match_info["inv_id"]
@@ -1122,7 +1113,7 @@ class VFolderHandler:
             ctx.access_key,
             inv_id,
         )
-        await processors_ctx.processors.vfolder_invite.update_invitation.wait_for_complete(
+        await self.processors.vfolder_invite.update_invitation.wait_for_complete(
             UpdateInvitationAction(
                 invitation_id=uuid.UUID(inv_id),
                 requester_user_uuid=ctx.user_uuid,
@@ -1154,7 +1145,7 @@ class VFolderHandler:
             req.request.match_info["name"],
             ",".join(invitee_emails),
         )
-        result = await vfctx.processors.vfolder_invite.invite_vfolder.wait_for_complete(
+        result = await self.processors.vfolder_invite.invite_vfolder.wait_for_complete(
             InviteVFolderAction(
                 keypair_resource_policy=req.request["keypair"]["resource_policy"],
                 user_uuid=vfctx.user_uuid,
@@ -1174,14 +1165,13 @@ class VFolderHandler:
         self,
         ctx: UserContext,
         req: RequestCtx,
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         log.info(
             "VFOLDER.INVITATIONS (email:{}, ak:{})",
             ctx.user_email,
             ctx.access_key,
         )
-        result = await processors_ctx.processors.vfolder_invite.list_invitation.wait_for_complete(
+        result = await self.processors.vfolder_invite.list_invitation.wait_for_complete(
             ListInvitationAction(
                 requester_user_uuid=ctx.user_uuid,
             )
@@ -1215,7 +1205,6 @@ class VFolderHandler:
         body: BodyParam[AcceptInvitationReq],
         ctx: UserContext,
         req: RequestCtx,
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         params = body.parsed
         inv_id = params.inv_id
@@ -1225,7 +1214,7 @@ class VFolderHandler:
             ctx.access_key,
             inv_id,
         )
-        await processors_ctx.processors.vfolder_invite.accept_invitation.wait_for_complete(
+        await self.processors.vfolder_invite.accept_invitation.wait_for_complete(
             AcceptInvitationAction(
                 invitation_id=uuid.UUID(inv_id),
             )
@@ -1242,7 +1231,6 @@ class VFolderHandler:
         body: BodyParam[DeleteInvitationReq],
         ctx: UserContext,
         req: RequestCtx,
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         params = body.parsed
         inv_id = params.inv_id
@@ -1252,7 +1240,7 @@ class VFolderHandler:
             ctx.access_key,
             inv_id,
         )
-        await processors_ctx.processors.vfolder_invite.reject_invitation.wait_for_complete(
+        await self.processors.vfolder_invite.reject_invitation.wait_for_complete(
             RejectInvitationAction(
                 invitation_id=uuid.UUID(inv_id),
                 requester_user_uuid=ctx.user_uuid,
@@ -1282,7 +1270,7 @@ class VFolderHandler:
             params.permission,
             ",".join(params.emails),
         )
-        result = await vfctx.processors.vfolder_sharing.share.wait_for_complete(
+        result = await self.processors.vfolder_sharing.share.wait_for_complete(
             ShareVFolderAction(
                 user_uuid=vfctx.user_uuid,
                 vfolder_uuid=row["id"],
@@ -1314,7 +1302,7 @@ class VFolderHandler:
             req.request.match_info["name"],
             ",".join(params.emails),
         )
-        result = await vfctx.processors.vfolder_sharing.unshare.wait_for_complete(
+        result = await self.processors.vfolder_sharing.unshare.wait_for_complete(
             UnshareVFolderAction(
                 user_uuid=vfctx.user_uuid,
                 vfolder_uuid=row["id"],
@@ -1334,7 +1322,6 @@ class VFolderHandler:
         body: BodyParam[DeleteVFolderByIDReq],
         ctx: UserContext,
         req: RequestCtx,
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         params = body.parsed
         resource_policy = req.request["keypair"]["resource_policy"]
@@ -1347,7 +1334,7 @@ class VFolderHandler:
             folder_id,
         )
         try:
-            await processors_ctx.processors.vfolder.move_to_trash_vfolder.wait_for_complete(
+            await self.processors.vfolder.move_to_trash_vfolder.wait_for_complete(
                 MoveToTrashVFolderAction(
                     user_uuid=ctx.user_uuid,
                     keypair_resource_policy=resource_policy,
@@ -1367,12 +1354,11 @@ class VFolderHandler:
         self,
         ctx: UserContext,
         req: RequestCtx,
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         resource_policy = req.request["keypair"]["resource_policy"]
         folder_name = req.request.match_info["name"]
 
-        resolved = await processors_ctx.processors.vfolder.get_accessible_vfolder.wait_for_complete(
+        resolved = await self.processors.vfolder.get_accessible_vfolder.wait_for_complete(
             GetAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
                 user_role=req.request["user"]["role"],
@@ -1392,7 +1378,7 @@ class VFolderHandler:
             folder_name,
         )
         try:
-            await processors_ctx.processors.vfolder.move_to_trash_vfolder.wait_for_complete(
+            await self.processors.vfolder.move_to_trash_vfolder.wait_for_complete(
                 MoveToTrashVFolderAction(
                     user_uuid=ctx.user_uuid,
                     keypair_resource_policy=resource_policy,
@@ -1412,11 +1398,10 @@ class VFolderHandler:
         query: QueryParam[GetVFolderIDReq],
         ctx: UserContext,
         req: RequestCtx,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         params = query.parsed
         folder_name = params.name
-        resolved = await procs.processors.vfolder.get_accessible_vfolder.wait_for_complete(
+        resolved = await self.processors.vfolder.get_accessible_vfolder.wait_for_complete(
             GetAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
                 user_role=req.request["user"]["role"],
@@ -1448,7 +1433,6 @@ class VFolderHandler:
         body: BodyParam[DeleteVFolderFromTrashReq],
         ctx: UserContext,
         req: RequestCtx,
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         params = body.parsed
         folder_id = params.vfolder_id
@@ -1461,7 +1445,7 @@ class VFolderHandler:
             folder_id,
         )
         try:
-            await processors_ctx.processors.vfolder.delete_forever_vfolder.wait_for_complete(
+            await self.processors.vfolder.delete_forever_vfolder.wait_for_complete(
                 DeleteForeverVFolderAction(
                     user_uuid=user_uuid,
                     vfolder_uuid=folder_id,
@@ -1482,7 +1466,6 @@ class VFolderHandler:
         self,
         ctx: UserContext,
         req: RequestCtx,
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         piece = req.request.match_info["folder_id"]
         try:
@@ -1490,7 +1473,7 @@ class VFolderHandler:
         except ValueError as e:
             raise InvalidAPIParameters(f"Not allowed UUID type value ({piece})") from e
 
-        await processors_ctx.processors.vfolder.force_delete_vfolder.wait_for_complete(
+        await self.processors.vfolder.force_delete_vfolder.wait_for_complete(
             ForceDeleteVFolderAction(
                 user_uuid=ctx.user_uuid,
                 vfolder_uuid=folder_id,
@@ -1507,7 +1490,6 @@ class VFolderHandler:
         body: BodyParam[PurgeVFolderReq],
         ctx: UserContext,
         req: RequestCtx,
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         params = body.parsed
         folder_id = params.vfolder_id
@@ -1524,7 +1506,7 @@ class VFolderHandler:
         ):
             raise InsufficientPrivilege("You are not allowed to purge vfolders")
 
-        await processors_ctx.processors.vfolder.purge_vfolder.wait_for_complete(
+        await self.processors.vfolder.purge_vfolder.wait_for_complete(
             PurgeVFolderAction(
                 purger=RBACEntityPurger(
                     row_class=VFolderRow,
@@ -1545,7 +1527,6 @@ class VFolderHandler:
         body: BodyParam[RestoreVFolderReq],
         ctx: UserContext,
         req: RequestCtx,
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         params = body.parsed
         folder_id = params.vfolder_id
@@ -1557,7 +1538,7 @@ class VFolderHandler:
             folder_id,
         )
 
-        await processors_ctx.processors.vfolder.restore_vfolder_from_trash.wait_for_complete(
+        await self.processors.vfolder.restore_vfolder_from_trash.wait_for_complete(
             RestoreVFolderFromTrashAction(
                 user_uuid=user_uuid,
                 vfolder_uuid=folder_id,
@@ -1591,7 +1572,7 @@ class VFolderHandler:
         )
         if row["ownership_type"] == VFolderOwnershipType.GROUP:
             raise InvalidAPIParameters("Cannot leave a group vfolder.")
-        await vfctx.processors.vfolder_invite.leave_invited_vfolder.wait_for_complete(
+        await self.processors.vfolder_invite.leave_invited_vfolder.wait_for_complete(
             LeaveInvitedVFolderAction(
                 vfolder_uuid=vfolder_id,
                 requester_user_uuid=vfctx.user_uuid,
@@ -1630,7 +1611,7 @@ class VFolderHandler:
             params.permission.value,
         )
 
-        result = await vfctx.processors.vfolder.clone_vfolder.wait_for_complete(
+        result = await self.processors.vfolder.clone_vfolder.wait_for_complete(
             CloneVFolderAction(
                 requester_user_uuid=vfctx.user_uuid,
                 source_vfolder_uuid=row["id"],
@@ -1665,7 +1646,6 @@ class VFolderHandler:
         self,
         query: QueryParam[ListSharedVFoldersQuery],
         ctx: UserContext,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         params = query.parsed
         target_vfid = params.vfolder_id
@@ -1675,7 +1655,7 @@ class VFolderHandler:
             ctx.access_key,
             target_vfid,
         )
-        result = await procs.processors.vfolder_sharing.list_shared.wait_for_complete(
+        result = await self.processors.vfolder_sharing.list_shared.wait_for_complete(
             ListSharedVFoldersAction(vfolder_id=target_vfid)
         )
         shared_info = []
@@ -1706,7 +1686,6 @@ class VFolderHandler:
         body: BodyParam[UpdateSharedVFolderReq],
         ctx: UserContext,
         req: RequestCtx,
-        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         params = body.parsed
         vfolder_id = params.vfolder
@@ -1721,7 +1700,7 @@ class VFolderHandler:
             perm,
         )
         if perm is not None:
-            await processors_ctx.processors.vfolder_invite.update_invited_vfolder_mount_permission.wait_for_complete(
+            await self.processors.vfolder_invite.update_invited_vfolder_mount_permission.wait_for_complete(
                 UpdateInvitedVFolderMountPermissionAction(
                     vfolder_id=vfolder_id,
                     user_id=user_uuid,
@@ -1729,7 +1708,7 @@ class VFolderHandler:
                 )
             )
         else:
-            await processors_ctx.processors.vfolder_invite.revoke_invited_vfolder.wait_for_complete(
+            await self.processors.vfolder_invite.revoke_invited_vfolder.wait_for_complete(
                 RevokeInvitedVFolderAction(vfolder_id=vfolder_id, shared_user_id=user_uuid)
             )
         resp = MessageResponse(msg="shared vfolder permission updated")
@@ -1743,7 +1722,6 @@ class VFolderHandler:
         self,
         body: BodyParam[UpdateVFolderSharingStatusReq],
         ctx: UserContext,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         params = body.parsed
         vfolder_id = params.vfolder_id
@@ -1764,7 +1742,7 @@ class VFolderHandler:
             else:
                 to_update.append((mapping.user_id, VFolderPermission(mapping.perm.value)))
 
-        await procs.processors.vfolder_sharing.update_sharing_status.wait_for_complete(
+        await self.processors.vfolder_sharing.update_sharing_status.wait_for_complete(
             UpdateVFolderSharingStatusAction(
                 vfolder_id=vfolder_id,
                 to_delete=to_delete,
@@ -1781,7 +1759,6 @@ class VFolderHandler:
         self,
         query: QueryParam[GetFstabContentsQuery],
         ctx: UserContext,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         params = query.parsed
         log.info(
@@ -1790,7 +1767,7 @@ class VFolderHandler:
             ctx.access_key,
             params.agent_id,
         )
-        result = await procs.processors.vfolder.get_fstab_contents.wait_for_complete(
+        result = await self.processors.vfolder.get_fstab_contents.wait_for_complete(
             GetFstabContentsAction(
                 agent_id=params.agent_id,
                 fstab_path=params.fstab_path,
@@ -1810,13 +1787,12 @@ class VFolderHandler:
     async def list_mounts(
         self,
         ctx: UserContext,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         log.info(
             "VFOLDER.LIST_MOUNTS(ak:{})",
             ctx.access_key,
         )
-        result = await procs.processors.vfolder.list_mounts.wait_for_complete(ListMountsAction())
+        result = await self.processors.vfolder.list_mounts.wait_for_complete(ListMountsAction())
         resp = ListMountsResponse(
             manager=MountResultDTO(
                 success=result.manager.success,
@@ -1847,7 +1823,6 @@ class VFolderHandler:
         self,
         body: BodyParam[MountHostReq],
         ctx: UserContext,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         params = body.parsed
         log.info(
@@ -1857,7 +1832,7 @@ class VFolderHandler:
             params.fs_location,
             params.scaling_group,
         )
-        result = await procs.processors.vfolder.mount_host.wait_for_complete(
+        result = await self.processors.vfolder.mount_host.wait_for_complete(
             MountHostAction(
                 name=params.name,
                 fs_location=params.fs_location,
@@ -1893,7 +1868,6 @@ class VFolderHandler:
         self,
         body: BodyParam[UmountHostReq],
         ctx: UserContext,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         params = body.parsed
         log.info(
@@ -1902,7 +1876,7 @@ class VFolderHandler:
             params.name,
             params.scaling_group,
         )
-        result = await procs.processors.vfolder.umount_host.wait_for_complete(
+        result = await self.processors.vfolder.umount_host.wait_for_complete(
             UmountHostAction(
                 name=params.name,
                 scaling_group=params.scaling_group,
@@ -1935,7 +1909,6 @@ class VFolderHandler:
         self,
         body: BodyParam[ChangeVFolderOwnershipReq],
         ctx: UserContext,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         params = body.parsed
         log.info(
@@ -1945,7 +1918,7 @@ class VFolderHandler:
             params.vfolder,
             params.user_email,
         )
-        await procs.processors.vfolder.change_vfolder_ownership.wait_for_complete(
+        await self.processors.vfolder.change_vfolder_ownership.wait_for_complete(
             ChangeVFolderOwnershipAction(
                 vfolder_id=params.vfolder,
                 user_email=params.user_email,
