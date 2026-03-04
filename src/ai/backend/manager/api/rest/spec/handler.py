@@ -19,6 +19,8 @@ from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.openapi import generate_openapi
 
 if TYPE_CHECKING:
+    from aiohttp.web import Application
+
     from ai.backend.manager.config.provider import ManagerConfigProvider
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -110,8 +112,14 @@ GRAPHIQL_V2_HTML = """
 class SpecHandler:
     """Spec API handler for documentation endpoints."""
 
-    def __init__(self, *, config_provider: ManagerConfigProvider) -> None:
+    def __init__(
+        self,
+        *,
+        config_provider: ManagerConfigProvider,
+        root_app: Application,
+    ) -> None:
         self._config_provider = config_provider
+        self._root_app = root_app
 
     # ------------------------------------------------------------------
     # render_graphiql_graphene_html (GET /spec/graphiql)
@@ -171,4 +179,4 @@ class SpecHandler:
     ) -> web.StreamResponse:
         if not self._config_provider.config.api.allow_openapi_schema_introspection:
             raise GenericForbidden
-        return web.json_response(generate_openapi(ctx.request.app["_root_app"]._subapps))
+        return web.json_response(generate_openapi(self._root_app._subapps))

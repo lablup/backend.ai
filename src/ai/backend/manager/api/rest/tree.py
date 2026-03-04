@@ -8,13 +8,24 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from aiohttp import web
+
 from .routing import RouteRegistry
 
 if TYPE_CHECKING:
+    from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import (
+        StreamCleanupEventHandler,
+    )
+
     from .types import ModuleDeps
 
 
-def build_api_routes(deps: ModuleDeps) -> list[RouteRegistry]:
+def build_api_routes(
+    deps: ModuleDeps,
+    *,
+    root_app: web.Application,
+    stream_cleanup_handler: StreamCleanupEventHandler,
+) -> list[RouteRegistry]:
     """Build the full API module tree and return all root-level registries."""
     from .acl.registry import register_acl_routes
     from .admin.registry import register_admin_routes
@@ -63,10 +74,10 @@ def build_api_routes(deps: ModuleDeps) -> list[RouteRegistry]:
         register_etcd_routes(deps),
         register_events_routes(deps),
         register_vfolder_routes(deps),
-        register_spec_routes(deps),
+        register_spec_routes(deps, root_app=root_app),
         register_service_routes(deps),
         register_session_routes(deps),
-        register_stream_routes(deps),
+        register_stream_routes(deps, stream_cleanup_handler=stream_cleanup_handler),
         register_manager_api_routes(deps),
         register_resource_routes(deps),
         register_userconfig_routes(deps),

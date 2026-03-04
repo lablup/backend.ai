@@ -5,6 +5,8 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
+from ai.backend.common.events.fetcher import EventFetcher
+from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
 
@@ -15,6 +17,8 @@ class ProcessorsProviderInput:
 
     service_args: ServiceArgs
     action_monitors: list[ActionMonitor]
+    event_hub: EventHub
+    event_fetcher: EventFetcher
 
 
 class ProcessorsDependency(NonMonitorableDependencyProvider[ProcessorsProviderInput, Processors]):
@@ -31,7 +35,11 @@ class ProcessorsDependency(NonMonitorableDependencyProvider[ProcessorsProviderIn
     @asynccontextmanager
     async def provide(self, setup_input: ProcessorsProviderInput) -> AsyncIterator[Processors]:
         processors = Processors.create(
-            ProcessorArgs(service_args=setup_input.service_args),
+            ProcessorArgs(
+                service_args=setup_input.service_args,
+                event_hub=setup_input.event_hub,
+                event_fetcher=setup_input.event_fetcher,
+            ),
             setup_input.action_monitors,
         )
         yield processors

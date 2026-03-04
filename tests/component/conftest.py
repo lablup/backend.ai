@@ -850,6 +850,7 @@ def server_module_deps(
         cors_options={},
         processors=MagicMock(),
         config_provider=config_provider,
+        error_monitor=MagicMock(),
         gql_context_deps=MagicMock(),
     )
 

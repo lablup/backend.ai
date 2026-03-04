@@ -245,6 +245,8 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             ProcessorsProviderInput(
                 service_args=service_args,
                 action_monitors=[reporter_monitor, prometheus_monitor, audit_log_monitor],
+                event_hub=setup_input.event_hub,
+                event_fetcher=setup_input.event_fetcher,
             ),
         )
 

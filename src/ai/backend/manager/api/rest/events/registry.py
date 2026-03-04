@@ -14,33 +14,21 @@ if TYPE_CHECKING:
 
 def register_events_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the events sub-application."""
-    from .handler import EventsHandler, PrivateContext, events_app_ctx, events_shutdown
+    from .handler import EventsHandler, PrivateContext, events_shutdown
 
-    if deps.event_hub is None or deps.event_fetcher is None or deps.event_dispatcher is None:
-        raise RuntimeError(
-            "Events module requires event_hub, event_fetcher, event_dispatcher in ModuleDeps"
-        )
-
-    event_hub = deps.event_hub
-    event_fetcher = deps.event_fetcher
-    event_dispatcher = deps.event_dispatcher
+    events_processors = deps.processors.events
+    event_hub = events_processors.event_hub
+    event_fetcher = events_processors.event_fetcher
 
     reg = RouteRegistry.create("events", deps.cors_options)
     ctx = PrivateContext()
 
     # Wire lifecycle hooks — capture deps via closure
     reg.app.on_shutdown.append(lambda app: events_shutdown(app, ctx, event_hub=event_hub))
-    reg.app.cleanup_ctx.append(
-        lambda app: events_app_ctx(
-            app,
-            event_dispatcher=event_dispatcher,
-            event_hub=event_hub,
-        )
-    )
 
     handler = EventsHandler(
         private_ctx=ctx,
-        events_processors=deps.processors.events,
+        events_processors=events_processors,
         event_hub=event_hub,
         event_fetcher=event_fetcher,
     )

@@ -503,6 +503,8 @@ class Services:
 @dataclass
 class ProcessorArgs:
     service_args: ServiceArgs
+    event_hub: EventHub
+    event_fetcher: EventFetcher
 
 
 @dataclass
@@ -638,7 +640,12 @@ class Processors(AbstractProcessorPackage):
         )
         template_processors = TemplateProcessors(services.template, action_monitors)
         stream_processors = StreamProcessors(services.stream, action_monitors)
-        events_processors = EventsProcessors(services.events, action_monitors)
+        events_processors = EventsProcessors(
+            services.events,
+            action_monitors,
+            event_hub=args.event_hub,
+            event_fetcher=args.event_fetcher,
+        )
 
         return cls(
             agent=agent_processors,

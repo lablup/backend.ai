@@ -28,6 +28,8 @@ class TestProcessorsDependency:
         processors_input = ProcessorsProviderInput(
             service_args=mock_service_args,
             action_monitors=mock_monitors,
+            event_hub=MagicMock(),
+            event_fetcher=MagicMock(),
         )
 
         async with dependency.provide(processors_input) as processors:

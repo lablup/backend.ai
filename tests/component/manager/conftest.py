@@ -63,6 +63,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import StreamCleanupEventHandler
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.base import (
     pgsql_connect_opts,
@@ -353,6 +354,7 @@ def server_module_deps(config_provider: _TestConfigProvider) -> ModuleDeps:
         cors_options={},
         processors=MagicMock(),
         config_provider=config_provider,
+        error_monitor=MagicMock(),
         gql_context_deps=MagicMock(),
     )
 
@@ -920,7 +922,10 @@ async def prepare_kernel(
             register_admin_routes,
             register_ratelimit_routes,
             register_compute_sessions_routes,
-            register_stream_routes,
+            partial(
+                register_stream_routes,
+                stream_cleanup_handler=StreamCleanupEventHandler(MagicMock()),
+            ),
             register_manager_api_routes,
         ],
         scheduler_opts=None,

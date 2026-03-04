@@ -5,7 +5,9 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
+from functools import partial
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -19,6 +21,7 @@ from ai.backend.manager.api.rest.stream.registry import register_stream_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import StreamCleanupEventHandler
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 
@@ -49,7 +52,13 @@ class SessionSeedData:
 @pytest.fixture()
 def server_module_registrars() -> list[ModuleRegistrar]:
     """Load only the modules required for streaming component tests."""
-    return [register_auth_routes, register_stream_routes]
+    return [
+        register_auth_routes,
+        partial(
+            register_stream_routes,
+            stream_cleanup_handler=StreamCleanupEventHandler(MagicMock()),
+        ),
+    ]
 
 
 @pytest.fixture()

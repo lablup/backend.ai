@@ -33,12 +33,9 @@ from aiotools import apartial
 from ai.backend.common.api_handlers import PathParam, QueryParam
 from ai.backend.common.dto.manager.stream.request import SessionNamePath, StreamProxyRequest
 from ai.backend.common.dto.manager.stream.response import StreamAppItem
-from ai.backend.common.events.event_types.kernel.broadcast import (
-    KernelTerminatingBroadcastEvent,
-)
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.json import dump_json, load_json
-from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
+from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.utils import call_non_bursty
 from ai.backend.manager.api.wsproxy import TCPProxy
@@ -47,6 +44,7 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.kernel import InvalidStreamMode
 from ai.backend.manager.errors.resource import AppNotFound, NoCurrentTaskContext
 from ai.backend.manager.errors.service import AppServiceStartFailed
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.services.stream.actions.execute_in_stream import ExecuteInStreamAction
 from ai.backend.manager.services.stream.actions.gc_stale_connections import (
     GCStaleConnectionsAction,
@@ -63,9 +61,11 @@ from ai.backend.manager.services.stream.actions.track_connection import TrackCon
 from ai.backend.manager.services.stream.actions.untrack_connection import UntrackConnectionAction
 
 if TYPE_CHECKING:
-    from ai.backend.common.events.dispatcher import EventDispatcher
     from ai.backend.common.plugin.monitor import ErrorPluginContext
     from ai.backend.manager.config.provider import ManagerConfigProvider
+    from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import (
+        StreamCleanupEventHandler,
+    )
     from ai.backend.manager.services.stream.processors import StreamProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -73,6 +73,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
+    database_ptask_group: aiotools.PersistentTaskGroup
+    rpc_ptask_group: aiotools.PersistentTaskGroup
     stream_pty_handlers: defaultdict[KernelId, weakref.WeakSet[asyncio.Task[Any]]]
     stream_execute_handlers: defaultdict[KernelId, weakref.WeakSet[asyncio.Task[Any]]]
     stream_proxy_handlers: defaultdict[KernelId, weakref.WeakSet[asyncio.Task[Any]]]
@@ -420,7 +422,7 @@ class StreamHandler:
     ) -> web.StreamResponse:
         request = ctx.request
         app_ctx = self._ctx
-        rpc_ptask_group: aiotools.PersistentTaskGroup = request.app["rpc_ptask_group"]
+        rpc_ptask_group = app_ctx.rpc_ptask_group
         session_name: str = path.parsed.session_name
         access_key = AccessKey(user_ctx.access_key)
         params = query.parsed
@@ -616,13 +618,12 @@ class StreamHandler:
 
 
 async def handle_kernel_terminating(
-    _app: web.Application,
-    _source: AgentId,
-    event: KernelTerminatingBroadcastEvent,
+    kernel: KernelRow,
     *,
     app_ctx: PrivateContext,
 ) -> None:
-    stream_key = event.kernel_id
+    """Cleanup callback invoked by StreamCleanupEventHandler."""
+    stream_key = kernel.id
     cancelled_tasks: list[asyncio.Task[Any]] = []
     for sock in app_ctx.stream_stdin_socks[stream_key]:
         sock.close()
@@ -660,15 +661,17 @@ async def stream_conn_tracker_gc(
 
 
 async def stream_app_ctx(
-    app: web.Application,
+    _app: web.Application,
     priv_ctx: PrivateContext,
     *,
     stream_processors: StreamProcessors,
-    event_dispatcher: EventDispatcher,
+    stream_cleanup_handler: StreamCleanupEventHandler,
 ) -> AsyncIterator[None]:
     """Initialize stream application context."""
     app_ctx = priv_ctx
 
+    app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
+    app_ctx.rpc_ptask_group = aiotools.PersistentTaskGroup()
     app_ctx.stream_pty_handlers = defaultdict(weakref.WeakSet)
     app_ctx.stream_execute_handlers = defaultdict(weakref.WeakSet)
     app_ctx.stream_proxy_handlers = defaultdict(weakref.WeakSet)
@@ -683,10 +686,8 @@ async def stream_app_ctx(
         )
     )
 
-    event_dispatcher.subscribe(
-        KernelTerminatingBroadcastEvent,
-        app,
-        lambda app, src, ev: handle_kernel_terminating(app, src, ev, app_ctx=app_ctx),
+    stream_cleanup_handler.register_cleanup_callback(
+        lambda kernel: handle_kernel_terminating(kernel, app_ctx=app_ctx),
     )
 
     yield
@@ -695,14 +696,12 @@ async def stream_app_ctx(
 
 
 async def stream_shutdown(
-    app: web.Application,
+    _app: web.Application,
     priv_ctx: PrivateContext,
 ) -> None:
     """Shutdown handler for stream app."""
-    database_ptask_group: aiotools.PersistentTaskGroup = app["database_ptask_group"]
-    rpc_ptask_group: aiotools.PersistentTaskGroup = app["rpc_ptask_group"]
-    await database_ptask_group.shutdown()
-    await rpc_ptask_group.shutdown()
+    await priv_ctx.database_ptask_group.shutdown()
+    await priv_ctx.rpc_ptask_group.shutdown()
     cancelled_tasks: list[asyncio.Task[Any]] = []
     app_ctx = priv_ctx
     app_ctx.conn_tracker_gc_task.cancel()

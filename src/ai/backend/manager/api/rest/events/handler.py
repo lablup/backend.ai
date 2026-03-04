@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -25,32 +24,11 @@ from ai.backend.common.dto.manager.events.request import (
     PushBackgroundTaskEventsRequest,
     PushSessionEventsRequest,
 )
-from ai.backend.common.events.dispatcher import EventDispatcher
-from ai.backend.common.events.event_types.kernel.broadcast import (
-    BaseKernelEvent,
-    KernelCancelledBroadcastEvent,
-    KernelCreatingBroadcastEvent,
-    KernelPreparingBroadcastEvent,
-    KernelPullingBroadcastEvent,
-    KernelStartedBroadcastEvent,
-    KernelTerminatedBroadcastEvent,
-    KernelTerminatingBroadcastEvent,
-)
-from ai.backend.common.events.event_types.session.broadcast import (
-    BaseSessionEvent,
-    SchedulingBroadcastEvent,
-    SessionCancelledBroadcastEvent,
-    SessionEnqueuedBroadcastEvent,
-    SessionFailureBroadcastEvent,
-    SessionSuccessBroadcastEvent,
-    SessionTerminatedBroadcastEvent,
-    SessionTerminatingBroadcastEvent,
-)
 from ai.backend.common.events.hub import WILDCARD
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.json import dump_json_str
-from ai.backend.common.types import AccessKey, AgentId
+from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.common import GenericForbidden
@@ -261,57 +239,6 @@ class EventsHandler:
 # ------------------------------------------------------------------
 # Application lifecycle helpers (used by create_app shim)
 # ------------------------------------------------------------------
-
-
-async def _propagate_events(
-    _app: web.Application,
-    _agent_id: AgentId,
-    event: BaseSessionEvent | BaseKernelEvent | SchedulingBroadcastEvent,
-    *,
-    event_hub: EventHub,
-) -> None:
-    """A private connector from EventDispatcher subscription to EventHub."""
-    log.trace("api.events._propagate_event({!r})", event)
-    await event_hub.propagate_event(event)
-
-
-async def events_app_ctx(
-    app: web.Application,
-    *,
-    event_dispatcher: EventDispatcher,
-    event_hub: EventHub,
-) -> AsyncIterator[None]:
-    """Initialize events application context."""
-
-    def _make_propagator(
-        eh: EventHub,
-    ) -> Any:
-        async def _handler(
-            app: web.Application,
-            agent_id: AgentId,
-            event: BaseSessionEvent | BaseKernelEvent | SchedulingBroadcastEvent,
-        ) -> None:
-            await _propagate_events(app, agent_id, event, event_hub=eh)
-
-        return _handler
-
-    propagator = _make_propagator(event_hub)
-
-    event_dispatcher.subscribe(SessionEnqueuedBroadcastEvent, app, propagator)
-    event_dispatcher.subscribe(KernelPreparingBroadcastEvent, app, propagator)
-    event_dispatcher.subscribe(KernelPullingBroadcastEvent, app, propagator)
-    event_dispatcher.subscribe(KernelCreatingBroadcastEvent, app, propagator)
-    event_dispatcher.subscribe(KernelStartedBroadcastEvent, app, propagator)
-    event_dispatcher.subscribe(KernelTerminatingBroadcastEvent, app, propagator)
-    event_dispatcher.subscribe(KernelTerminatedBroadcastEvent, app, propagator)
-    event_dispatcher.subscribe(KernelCancelledBroadcastEvent, app, propagator)
-    event_dispatcher.subscribe(SessionTerminatingBroadcastEvent, app, propagator)
-    event_dispatcher.subscribe(SessionTerminatedBroadcastEvent, app, propagator)
-    event_dispatcher.subscribe(SessionCancelledBroadcastEvent, app, propagator)
-    event_dispatcher.subscribe(SessionSuccessBroadcastEvent, app, propagator)
-    event_dispatcher.subscribe(SessionFailureBroadcastEvent, app, propagator)
-
-    yield
 
 
 async def events_shutdown(

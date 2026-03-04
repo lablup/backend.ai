@@ -14,7 +14,6 @@ from .agents import AgentsComposer, AgentsInput, AgentsResources
 from .bootstrap import BootstrapComposer, BootstrapInput, BootstrapResources
 from .components import ComponentsComposer, ComponentsInput, ComponentsResources
 from .domain import DomainComposer, DomainInput, DomainResources
-from .errors import DependencyInitializationError
 from .infrastructure import (
     InfrastructureComposer,
     InfrastructureInput,
@@ -49,8 +48,8 @@ class MonitoringResources:
     Initialized after DomainComposer so that error_log_repository is available.
     """
 
-    error_monitor: ManagerErrorPluginContext | None
-    stats_monitor: ManagerStatsPluginContext | None
+    error_monitor: ManagerErrorPluginContext
+    stats_monitor: ManagerStatsPluginContext
 
 
 @dataclass
@@ -271,12 +270,6 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
         )
 
         # Stage 10: Processing (event dispatcher, processors, bgtask registry)
-        # error_monitor is required by ProcessingInput; raise if not initialized
-        # since the processing stage cannot function without it.
-        if monitoring.error_monitor is None:
-            raise DependencyInitializationError("error_monitor plugin failed to initialize")
-        if monitoring.stats_monitor is None:
-            raise DependencyInitializationError("stats_monitor plugin failed to initialize")
         processing = await stack.enter_composer(
             ProcessingComposer(),
             ProcessingInput(

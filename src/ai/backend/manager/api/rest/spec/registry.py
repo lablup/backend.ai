@@ -18,10 +18,15 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
 
+
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def register_spec_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_spec_routes(
+    deps: ModuleDeps,
+    *,
+    root_app: web.Application,
+) -> RouteRegistry:
     """Build the spec sub-application."""
     from .handler import SpecHandler
 
@@ -40,7 +45,7 @@ def register_spec_routes(deps: ModuleDeps) -> RouteRegistry:
     # Lifecycle: warn about introspection at startup
     reg.app.on_startup.append(_spec_startup)
 
-    handler = SpecHandler(config_provider=deps.config_provider)
+    handler = SpecHandler(config_provider=deps.config_provider, root_app=root_app)
 
     reg.add(
         "GET",

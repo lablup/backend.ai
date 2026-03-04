@@ -37,7 +37,6 @@ import click
 import uvloop
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
-from aiotools import apartial
 from opentelemetry.instrumentation.aiohttp_server import (
     middleware as otel_server_middleware,
 )
@@ -71,13 +70,11 @@ from .api.rest.middleware import (
     build_exception_middleware,
     request_id_middleware,
 )
-from .api.rest.ratelimit.handler import rlim_middleware
 from .api.rest.routing import RouteRegistry
 from .api.rest.types import GQLContextDeps, ModuleDeps, ModuleRegistrar
 from .config.bootstrap import BootstrapConfig
 from .config.unified import EventLoopType
 from .dependencies import DependencyInput, DependencyResources, ManagerDependencyComposer
-from .dependencies.errors import DependencyInitializationError
 from .errors.common import (
     GenericBadRequest,
     InternalServerError,
@@ -355,22 +352,20 @@ def _setup_api(
         cors_options=r.system.cors_options,
         processors=r.processing.processors,
         config_provider=r.bootstrap.config_provider,
+        error_monitor=r.monitoring.error_monitor,
         pidx=pidx,
-        storage_manager=r.components.storage_manager,
-        export_repository=r.domain.repositories.export.repository,
-        export_config=r.bootstrap.config_provider.config.export,
         gql_context_deps=gql_context_deps,
         valkey_rate_limit=r.infrastructure.valkey.rate_limit,
-        event_hub=r.messaging.event_hub,
-        event_fetcher=r.messaging.event_fetcher,
         health_probe=r.system.health_probe,
-        error_monitor=r.monitoring.error_monitor,
-        event_dispatcher=r.processing.event_dispatcher,
     )
 
     # 1. Build API module tree
     root_registry = RouteRegistry.create("", deps.cors_options)
-    for sub in build_api_routes(deps):
+    for sub in build_api_routes(
+        deps,
+        root_app=root_app,
+        stream_cleanup_handler=r.processing.stream_cleanup_handler,
+    ):
         root_registry.add_subregistry(sub)
 
     # 2. Flatten and mount all on root_app
@@ -378,8 +373,8 @@ def _setup_api(
 
     # 3. Root middleware — only registered here, never from modules
     rlim_reg = root_registry.find_subregistry("ratelimit")
-    if rlim_reg is not None and rlim_reg.ratelimit_ctx is not None:
-        root_app.middlewares.append(web.middleware(apartial(rlim_middleware, rlim_reg.app)))
+    if rlim_reg is not None and rlim_reg.rlim_middleware is not None:
+        root_app.middlewares.append(rlim_reg.rlim_middleware)
 
 
 def register_modules(
@@ -401,8 +396,8 @@ def register_modules(
 
     # Install ratelimit middleware on root app if the module is present
     rlim_reg = root_registry.find_subregistry("ratelimit")
-    if rlim_reg is not None and rlim_reg.ratelimit_ctx is not None:
-        root_app.middlewares.append(web.middleware(apartial(rlim_middleware, rlim_reg.app)))
+    if rlim_reg is not None and rlim_reg.rlim_middleware is not None:
+        root_app.middlewares.append(rlim_reg.rlim_middleware)
 
 
 def build_root_app(
@@ -642,10 +637,6 @@ async def server_main(
 
         # Insert DI-based middlewares now that dependencies are available.
         # Maintain order: request_id(0) → exception(1) → auth(2) → api → metric
-        if dep_resources.monitoring.error_monitor is None:
-            raise DependencyInitializationError("error_monitor plugin failed to initialize")
-        if dep_resources.monitoring.stats_monitor is None:
-            raise DependencyInitializationError("stats_monitor plugin failed to initialize")
         root_app.middlewares.insert(
             1,
             build_exception_middleware(

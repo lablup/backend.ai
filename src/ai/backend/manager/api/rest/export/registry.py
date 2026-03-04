@@ -17,9 +17,10 @@ def register_export_routes(deps: ModuleDeps) -> RouteRegistry:
     from .handler import ExportHandler
 
     reg = RouteRegistry.create("export", deps.cors_options)
-    reg.app["_export_repository"] = deps.export_repository
-    reg.app["_export_config"] = deps.export_config
-    handler = ExportHandler(processors=deps.processors)
+    handler = ExportHandler(
+        processors=deps.processors,
+        export_config=deps.config_provider.config.export,
+    )
 
     # Report metadata endpoints
     reg.add(

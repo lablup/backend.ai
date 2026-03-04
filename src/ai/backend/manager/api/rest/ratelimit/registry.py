@@ -11,9 +11,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Final
 
-import attrs
-
-from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
@@ -23,25 +20,18 @@ if TYPE_CHECKING:
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-@attrs.define(slots=True, auto_attribs=True)
-class RatelimitContext:
-    valkey_rate_limit_client: ValkeyRateLimitClient
-    redis_rlim_script: str = ""
-
-
 def register_ratelimit_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the ratelimit sub-application.
 
     This module does not register any routes -- it only provides the
     ``rlim_middleware`` global middleware for rate-limiting authorized
-    requests.  The ``RatelimitContext`` is populated from the pre-created
-    ValkeyRateLimitClient injected via ``ModuleDeps``.
+    requests.
     """
+    from .handler import make_rlim_middleware
+
     reg = RouteRegistry.create("ratelimit", deps.cors_options)
 
     if deps.valkey_rate_limit is not None:
-        ctx = RatelimitContext(valkey_rate_limit_client=deps.valkey_rate_limit)
-        reg.app["ratelimit.context"] = ctx
-        reg.ratelimit_ctx = ctx
+        reg.rlim_middleware = make_rlim_middleware(deps.valkey_rate_limit)
 
     return reg

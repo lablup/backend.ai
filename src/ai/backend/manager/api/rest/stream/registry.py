@@ -4,33 +4,30 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import aiotools
-
 from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.server_status import READ_ALLOWED, server_status_required
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import (
+        StreamCleanupEventHandler,
+    )
 
 
-def register_stream_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_stream_routes(
+    deps: ModuleDeps,
+    *,
+    stream_cleanup_handler: StreamCleanupEventHandler,
+) -> RouteRegistry:
     """Build the stream sub-application."""
     from .handler import PrivateContext, StreamHandler, stream_app_ctx, stream_shutdown
 
-    if deps.error_monitor is None or deps.event_dispatcher is None:
-        raise RuntimeError("Stream module requires error_monitor, event_dispatcher in ModuleDeps")
-
     stream_processors = deps.processors.stream
-    event_dispatcher = deps.event_dispatcher
     error_monitor = deps.error_monitor
 
     reg = RouteRegistry.create("stream", deps.cors_options)
     ctx = PrivateContext()
-
-    # PersistentTaskGroups required by stream handlers and shutdown logic
-    reg.app["database_ptask_group"] = aiotools.PersistentTaskGroup()
-    reg.app["rpc_ptask_group"] = aiotools.PersistentTaskGroup()
 
     # Wire lifecycle hooks — capture deps via closure
     reg.app.cleanup_ctx.append(
@@ -38,7 +35,7 @@ def register_stream_routes(deps: ModuleDeps) -> RouteRegistry:
             app,
             ctx,
             stream_processors=stream_processors,
-            event_dispatcher=event_dispatcher,
+            stream_cleanup_handler=stream_cleanup_handler,
         )
     )
     reg.app.on_shutdown.append(lambda app: stream_shutdown(app, ctx))
