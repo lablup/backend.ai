@@ -18,8 +18,8 @@ from ai.backend.manager.repositories.base import Creator
 class RouteChanges:
     """Route mutations to apply for a single deployment cycle."""
 
-    scale_out_specs: list[Creator[RoutingRow]] = field(default_factory=list)
-    scale_in_route_ids: list[UUID] = field(default_factory=list)
+    rollout_specs: list[Creator[RoutingRow]] = field(default_factory=list)
+    drain_route_ids: list[UUID] = field(default_factory=list)
 
 
 @dataclass

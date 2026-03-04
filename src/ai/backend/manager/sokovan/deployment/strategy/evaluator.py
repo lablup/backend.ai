@@ -27,10 +27,11 @@ from ai.backend.manager.repositories.deployment.options import (
     DeploymentPolicyConditions,
 )
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.sokovan.deployment.recorder import DeploymentRecorderContext
 
 from .blue_green import blue_green_evaluate
 from .rolling_update import rolling_update_evaluate
-from .types import CycleEvaluationResult, EvaluationGroup, EvaluationResult
+from .types import CycleEvaluationResult, EvaluationGroup, EvaluationResult, RouteChanges
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -87,10 +88,11 @@ class DeploymentStrategyEvaluator:
                 result.errors.append((deployment, str(e)))
                 continue
 
-            # ── 3. Aggregate route changes ──
+            # ── 3. Aggregate route changes and record sub-steps ──
             changes = cycle_result.route_changes
-            result.route_changes.scale_out_specs.extend(changes.scale_out_specs)
-            result.route_changes.scale_in_route_ids.extend(changes.scale_in_route_ids)
+            result.route_changes.rollout_specs.extend(changes.rollout_specs)
+            result.route_changes.drain_route_ids.extend(changes.drain_route_ids)
+            self._record_route_changes(deployment, changes)
 
             # Group by sub-step
             if cycle_result.completed:
@@ -104,6 +106,27 @@ class DeploymentStrategyEvaluator:
                 group.deployments.append(deployment)
 
         return result
+
+    @staticmethod
+    def _record_route_changes(deployment: DeploymentInfo, changes: RouteChanges) -> None:
+        """Record rollout/drain operations as sub-steps for observability."""
+        if not changes.rollout_specs and not changes.drain_route_ids:
+            return
+        pool = DeploymentRecorderContext.current_pool()
+        recorder = pool.recorder(deployment.id)
+        with recorder.phase("route_mutations"):
+            if changes.rollout_specs:
+                with recorder.step(
+                    "rollout",
+                    success_detail=f"{len(changes.rollout_specs)} new route(s)",
+                ):
+                    pass
+            if changes.drain_route_ids:
+                with recorder.step(
+                    "drain",
+                    success_detail=f"{len(changes.drain_route_ids)} route(s)",
+                ):
+                    pass
 
     def _evaluate_single(
         self,

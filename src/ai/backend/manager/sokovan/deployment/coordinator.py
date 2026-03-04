@@ -498,25 +498,25 @@ class DeploymentCoordinator:
     ) -> None:
         """Apply aggregated route mutations from the evaluation result."""
         changes = eval_result.route_changes
-        if not changes.scale_out_specs and not changes.scale_in_route_ids:
+        if not changes.rollout_specs and not changes.drain_route_ids:
             return
 
         scale_in_updater: BatchUpdater[RoutingRow] | None = None
-        if changes.scale_in_route_ids:
+        if changes.drain_route_ids:
             scale_in_updater = BatchUpdater(
                 spec=RouteBatchUpdaterSpec(
                     status=RouteStatus.TERMINATING,
                     traffic_ratio=0.0,
                     traffic_status=RouteTrafficStatus.INACTIVE,
                 ),
-                conditions=[RouteConditions.by_ids(changes.scale_in_route_ids)],
+                conditions=[RouteConditions.by_ids(changes.drain_route_ids)],
             )
 
-        await self._deployment_repository.scale_routes(changes.scale_out_specs, scale_in_updater)
+        await self._deployment_repository.scale_routes(changes.rollout_specs, scale_in_updater)
         log.debug(
             "Applied route changes: {} created, {} terminated",
-            len(changes.scale_out_specs),
-            len(changes.scale_in_route_ids),
+            len(changes.rollout_specs),
+            len(changes.drain_route_ids),
         )
 
     async def _transition_completed_deployments(
