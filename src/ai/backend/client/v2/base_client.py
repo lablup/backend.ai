@@ -14,16 +14,6 @@ from ai.backend.common.api_handlers import (
     BaseResponseModel,
     BaseRootResponseModel,
 )
-from ai.backend.common.dto.manager.auth.request import (
-    AuthorizeRequest,
-    SignupRequest,
-    UpdatePasswordNoAuthRequest,
-)
-from ai.backend.common.dto.manager.auth.response import (
-    AuthorizeResponse,
-    SignupResponse,
-    UpdatePasswordNoAuthResponse,
-)
 
 from .auth import AuthStrategy
 from .config import ClientConfig
@@ -399,7 +389,7 @@ class BackendAIAnonymousClient:
             result: dict[str, Any] | list[Any] = await resp.json()
             return result
 
-    async def _typed_request(
+    async def typed_request(
         self,
         method: str,
         path: str,
@@ -425,45 +415,3 @@ class BackendAIAnonymousClient:
                 },
             )
         return cast(ResponseT, response_model.model_validate(data))
-
-    async def authorize(
-        self,
-        request: AuthorizeRequest,
-        *,
-        extra_headers: Mapping[str, str] | None = None,
-    ) -> AuthorizeResponse:
-        return await self._typed_request(
-            "POST",
-            "/auth/authorize",
-            request=request,
-            response_model=AuthorizeResponse,
-            extra_headers=extra_headers,
-        )
-
-    async def signup(
-        self,
-        request: SignupRequest,
-        *,
-        extra_headers: Mapping[str, str] | None = None,
-    ) -> SignupResponse:
-        return await self._typed_request(
-            "POST",
-            "/auth/signup",
-            request=request,
-            response_model=SignupResponse,
-            extra_headers=extra_headers,
-        )
-
-    async def update_password_no_auth(
-        self,
-        request: UpdatePasswordNoAuthRequest,
-        *,
-        extra_headers: Mapping[str, str] | None = None,
-    ) -> UpdatePasswordNoAuthResponse:
-        return await self._typed_request(
-            "POST",
-            "/auth/update-password-no-auth",
-            request=request,
-            response_model=UpdatePasswordNoAuthResponse,
-            extra_headers=extra_headers,
-        )

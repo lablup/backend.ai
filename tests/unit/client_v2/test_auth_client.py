@@ -3,7 +3,7 @@ from uuid import UUID
 
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIAuthClient
+from ai.backend.client.v2.base_client import BackendAIAnonymousClient, BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.auth import AuthClient
 from ai.backend.common.dto.manager.auth.request import (
@@ -47,6 +47,16 @@ def _make_client(
     )
 
 
+def _make_anon_client(
+    mock_session: MagicMock | None = None,
+    config: ClientConfig | None = None,
+) -> BackendAIAnonymousClient:
+    return BackendAIAnonymousClient(
+        config or _DEFAULT_CONFIG,
+        mock_session or MagicMock(),
+    )
+
+
 def _make_request_session(resp: AsyncMock) -> MagicMock:
     """Build a mock session whose ``request()`` returns *resp* as a context manager."""
     mock_ctx = AsyncMock()
@@ -76,8 +86,8 @@ class TestAuthClient:
         )
 
         mock_session = _make_request_session(mock_resp)
-        client = _make_client(mock_session)
-        auth_client = AuthClient(client)
+        anon_client = _make_anon_client(mock_session)
+        auth_client = AuthClient(_make_client(), anon_client)
 
         request = AuthorizeRequest(
             type=AuthTokenType.KEYPAIR,
@@ -109,8 +119,8 @@ class TestAuthClient:
         )
 
         mock_session = _make_request_session(mock_resp)
-        client = _make_client(mock_session)
-        auth_client = AuthClient(client)
+        anon_client = _make_anon_client(mock_session)
+        auth_client = AuthClient(_make_client(), anon_client)
 
         request = SignupRequest(
             domain="default",
@@ -136,7 +146,7 @@ class TestAuthClient:
 
         mock_session = _make_request_session(mock_resp)
         client = _make_client(mock_session)
-        auth_client = AuthClient(client)
+        auth_client = AuthClient(client, _make_anon_client())
 
         request = SignoutRequest(email="user@example.com", password="secret")
         result = await auth_client.signout(request)
@@ -162,7 +172,7 @@ class TestAuthClient:
 
         mock_session = _make_request_session(mock_resp)
         client = _make_client(mock_session)
-        auth_client = AuthClient(client)
+        auth_client = AuthClient(client, _make_anon_client())
 
         request = GetRoleRequest(group=group_id)
         result = await auth_client.get_role(request)
@@ -191,7 +201,7 @@ class TestAuthClient:
 
         mock_session = _make_request_session(mock_resp)
         client = _make_client(mock_session)
-        auth_client = AuthClient(client)
+        auth_client = AuthClient(client, _make_anon_client())
 
         request = GetRoleRequest()
         result = await auth_client.get_role(request)
@@ -210,7 +220,7 @@ class TestAuthClient:
 
         mock_session = _make_request_session(mock_resp)
         client = _make_client(mock_session)
-        auth_client = AuthClient(client)
+        auth_client = AuthClient(client, _make_anon_client())
 
         request = UpdatePasswordRequest(
             old_password="old",
@@ -234,8 +244,8 @@ class TestAuthClient:
         )
 
         mock_session = _make_request_session(mock_resp)
-        client = _make_client(mock_session)
-        auth_client = AuthClient(client)
+        anon_client = _make_anon_client(mock_session)
+        auth_client = AuthClient(_make_client(), anon_client)
 
         request = UpdatePasswordNoAuthRequest(
             domain="default",
@@ -259,7 +269,7 @@ class TestAuthClient:
 
         mock_session = _make_request_session(mock_resp)
         client = _make_client(mock_session)
-        auth_client = AuthClient(client)
+        auth_client = AuthClient(client, _make_anon_client())
 
         request = UpdateFullNameRequest(
             email="user@example.com",
@@ -281,7 +291,7 @@ class TestAuthClient:
 
         mock_session = _make_request_session(mock_resp)
         client = _make_client(mock_session)
-        auth_client = AuthClient(client)
+        auth_client = AuthClient(client, _make_anon_client())
 
         result = await auth_client.get_ssh_keypair()
 
@@ -305,7 +315,7 @@ class TestAuthClient:
 
         mock_session = _make_request_session(mock_resp)
         client = _make_client(mock_session)
-        auth_client = AuthClient(client)
+        auth_client = AuthClient(client, _make_anon_client())
 
         result = await auth_client.generate_ssh_keypair()
 
@@ -330,7 +340,7 @@ class TestAuthClient:
 
         mock_session = _make_request_session(mock_resp)
         client = _make_client(mock_session)
-        auth_client = AuthClient(client)
+        auth_client = AuthClient(client, _make_anon_client())
 
         request = UploadSSHKeypairRequest(
             pubkey="ssh-rsa AAAA... uploaded",
@@ -358,7 +368,7 @@ class TestAuthClient:
 
         mock_session = _make_request_session(mock_resp)
         client = _make_client(mock_session)
-        auth_client = AuthClient(client)
+        auth_client = AuthClient(client, _make_anon_client())
 
         request = VerifyAuthRequest(echo="hello")
         result = await auth_client.verify_auth(request)

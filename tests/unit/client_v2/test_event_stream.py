@@ -6,7 +6,7 @@ from uuid import UUID
 import aiohttp
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIAuthClient
+from ai.backend.client.v2.base_client import BackendAIAnonymousClient, BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.event_stream import EventStreamClient
 from ai.backend.client.v2.registry import BackendAIClientRegistry
@@ -276,7 +276,8 @@ class TestRegistryEventStream:
     def test_registry_has_event_stream_property(self) -> None:
         mock_session = MagicMock()
         backend_client = _make_client(mock_session)
-        registry = BackendAIClientRegistry(backend_client)
+        anon_client = BackendAIAnonymousClient(_DEFAULT_CONFIG, MagicMock())
+        registry = BackendAIClientRegistry(backend_client, anon_client)
 
         es = registry.event_stream
         assert isinstance(es, EventStreamClient)
