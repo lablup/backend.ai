@@ -220,8 +220,8 @@ With `auto_promote=False`:
   │         strategy = policy.strategy                           │
   │    3. Dispatch by strategy:                                  │
   │         BLUE_GREEN → blue_green_evaluate(...)                │
-  │    4. Group by sub_step and return                           │
-  │    5. Apply route changes (scale_out + scale_in)             │
+  │    4. Aggregate route changes + group by sub_step            │
+  │  Coordinator applies route changes after evaluation          │
   └──────────────────────────┬───────────────────────────────────┘
                              │
                              ▼
@@ -240,27 +240,23 @@ With `auto_promote=False`:
   │  │  blue_active:        blue + is_active()            │      │
   │  └────────────────────────────────────────────────────┘      │
   │                                                              │
-  │  Actions applied:                                            │
+  │  Route changes returned (applied by coordinator):            │
   │  ┌────────────────────────────────────────────────────┐      │
-  │  │  ● Green creation:                                 │      │
+  │  │  ● Green creation (rollout_specs):                 │      │
   │  │    RouteCreatorSpec(                               │      │
   │  │      revision_id = deploying_revision,             │      │
   │  │      traffic_status = INACTIVE  ← differs from RU  │      │
   │  │    ) × target_count                                │      │
   │  │                                                    │      │
   │  │  ● Promotion (traffic switch):                     │      │
-  │  │    Green: RouteBatchUpdaterSpec(                   │      │
-  │  │      traffic_status = ACTIVE                       │      │
-  │  │    )                                               │      │
-  │  │    Blue: RouteBatchUpdaterSpec(                    │      │
-  │  │      status = TERMINATING,                         │      │
-  │  │      traffic_status = INACTIVE                     │      │
-  │  │    )                                               │      │
+  │  │    promote_route_ids: Green route IDs              │      │
+  │  │      → traffic_status = ACTIVE                     │      │
+  │  │    drain_route_ids: Blue route IDs                 │      │
+  │  │      → status = TERMINATING                        │      │
   │  │                                                    │      │
   │  │  ● Rollback:                                       │      │
-  │  │    Green: RouteBatchUpdaterSpec(                   │      │
-  │  │      status = TERMINATING                          │      │
-  │  │    )                                               │      │
+  │  │    drain_route_ids: Green route IDs                │      │
+  │  │      → status = TERMINATING                        │      │
   │  └────────────────────────────────────────────────────┘      │
   └──────────────────────────────────────────────────────────────┘
                              │

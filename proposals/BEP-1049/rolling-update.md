@@ -190,8 +190,8 @@ Example with `desired_replicas = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │         strategy = policy.strategy                           │
   │    3. Dispatch by strategy:                                  │
   │         ROLLING → rolling_update_evaluate(...)               │
-  │    4. Group by sub_step and return                           │
-  │    5. Apply route changes (scale_out + scale_in)             │
+  │    4. Aggregate route changes + group by sub_step            │
+  │  Coordinator applies route changes after evaluation          │
   └──────────────────────────┬───────────────────────────────────┘
                              │
                              ▼
@@ -209,17 +209,15 @@ Example with `desired_replicas = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │  │  old_active:       old + is_active()               │      │
   │  └────────────────────────────────────────────────────┘      │
   │                                                              │
-  │  Actions applied:                                            │
+  │  Route changes returned (applied by coordinator):            │
   │  ┌────────────────────────────────────────────────────┐      │
-  │  │  scale_out: RouteCreatorSpec(                      │      │
+  │  │  rollout_specs: RouteCreatorSpec(                  │      │
   │  │    revision_id = deploying_revision,               │      │
   │  │    traffic_status = ACTIVE  ← differs from BG      │      │
   │  │  )                                                 │      │
   │  │                                                    │      │
-  │  │  scale_in: RouteBatchUpdaterSpec(                  │      │
-  │  │    status = TERMINATING,                           │      │
-  │  │    traffic_status = INACTIVE                       │      │
-  │  │  )                                                 │      │
+  │  │  drain_route_ids: old route IDs                    │      │
+  │  │    → status = TERMINATING                          │      │
   │  └────────────────────────────────────────────────────┘      │
   └──────────────────────────────────────────────────────────────┘
                              │
