@@ -861,7 +861,7 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):  # type: ignore[mis
 
         result = await graph_ctx.processors.session.modify_session.wait_for_complete(
             ModifySessionAction(
-                session_id=session_id,
+                session_uuid=session_id,
                 updater=Updater(
                     spec=SessionUpdaterSpec(
                         name=OptionalState[str].from_graphql(name),
