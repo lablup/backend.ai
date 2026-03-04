@@ -15,7 +15,12 @@ from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.object_storage.creators import ObjectStorageCreatorSpec
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.manager.repositories.object_storage.updaters import ObjectStorageUpdaterSpec
+from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
 
@@ -127,6 +132,26 @@ class TestObjectStorageRepository:
         """Create ObjectStorageRepository instance with database"""
         repo = ObjectStorageRepository(db=db_with_cleanup)
         yield repo
+
+    @pytest.fixture
+    def object_storage_creator_spec(self) -> ObjectStorageCreatorSpec:
+        """Spec for creating a new object storage"""
+        return ObjectStorageCreatorSpec(
+            name="new-object-storage",
+            host="storage-proxy-2",
+            access_key="new-access-key",
+            secret_key="new-secret-key",
+            endpoint="https://s3.new.example.com",
+            region="ap-northeast-2",
+        )
+
+    @pytest.fixture
+    def object_storage_updater_spec(self) -> ObjectStorageUpdaterSpec:
+        """Spec for updating object storage fields"""
+        return ObjectStorageUpdaterSpec(
+            host=OptionalState.update("updated-host"),
+            endpoint=OptionalState.update("https://s3.updated.example.com"),
+        )
 
     # =========================================================================
     # Tests - Get by ID
@@ -341,3 +366,107 @@ class TestObjectStorageRepository:
         # Verify ordering is ascending
         result_names = [storage.name for storage in result.items]
         assert result_names == sorted(result_names)
+
+    # =========================================================================
+    # Tests - Create
+    # =========================================================================
+
+    async def test_create(
+        self,
+        object_storage_repository: ObjectStorageRepository,
+        object_storage_creator_spec: ObjectStorageCreatorSpec,
+    ) -> None:
+        """Test creating a new object storage via Creator"""
+        result = await object_storage_repository.create(Creator(spec=object_storage_creator_spec))
+
+        assert result.name == "new-object-storage"
+        assert result.host == "storage-proxy-2"
+        assert result.access_key == "new-access-key"
+        assert result.secret_key == "new-secret-key"
+        assert result.endpoint == "https://s3.new.example.com"
+        assert result.region == "ap-northeast-2"
+        assert result.id is not None
+
+        # Verify persisted in DB
+        fetched = await object_storage_repository.get_by_id(result.id)
+        assert fetched.name == "new-object-storage"
+
+    async def test_create_duplicate_name_raises_error(
+        self,
+        object_storage_repository: ObjectStorageRepository,
+        sample_storage_id: uuid.UUID,
+        object_storage_creator_spec: ObjectStorageCreatorSpec,
+    ) -> None:
+        """Test creating object storage with duplicate name raises error"""
+        duplicate_spec = ObjectStorageCreatorSpec(
+            name="test-object-storage",
+            host=object_storage_creator_spec.host,
+            access_key=object_storage_creator_spec.access_key,
+            secret_key=object_storage_creator_spec.secret_key,
+            endpoint=object_storage_creator_spec.endpoint,
+            region=object_storage_creator_spec.region,
+        )
+        with pytest.raises(Exception):
+            await object_storage_repository.create(Creator(spec=duplicate_spec))
+
+    # =========================================================================
+    # Tests - Update
+    # =========================================================================
+
+    async def test_update(
+        self,
+        object_storage_repository: ObjectStorageRepository,
+        sample_storage_id: uuid.UUID,
+        object_storage_updater_spec: ObjectStorageUpdaterSpec,
+    ) -> None:
+        """Test updating an existing object storage via Updater"""
+        updater = Updater(spec=object_storage_updater_spec, pk_value=sample_storage_id)
+        result = await object_storage_repository.update(updater)
+
+        assert result.id == sample_storage_id
+        assert result.host == "updated-host"
+        assert result.endpoint == "https://s3.updated.example.com"
+        # Unchanged fields remain the same
+        assert result.name == "test-object-storage"
+        assert result.access_key == "test-access-key"
+
+    async def test_update_not_found(
+        self,
+        object_storage_repository: ObjectStorageRepository,
+    ) -> None:
+        """Test updating non-existent object storage raises error"""
+        not_found_updater = Updater(
+            spec=ObjectStorageUpdaterSpec(
+                host=OptionalState.update("updated-host"),
+            ),
+            pk_value=uuid.uuid4(),
+        )
+
+        with pytest.raises(ObjectStorageNotFoundError):
+            await object_storage_repository.update(not_found_updater)
+
+    # =========================================================================
+    # Tests - Delete
+    # =========================================================================
+
+    async def test_delete(
+        self,
+        object_storage_repository: ObjectStorageRepository,
+        sample_storage_id: uuid.UUID,
+    ) -> None:
+        """Test deleting an existing object storage"""
+        deleted_id = await object_storage_repository.delete(sample_storage_id)
+
+        assert deleted_id == sample_storage_id
+
+        # Verify it no longer exists
+        with pytest.raises(ObjectStorageNotFoundError):
+            await object_storage_repository.get_by_id(sample_storage_id)
+
+    async def test_delete_not_found(
+        self,
+        object_storage_repository: ObjectStorageRepository,
+    ) -> None:
+        """Test deleting non-existent object storage raises error"""
+        with pytest.raises(ObjectStorageNotFoundError):
+            await object_storage_repository.delete(uuid.uuid4())

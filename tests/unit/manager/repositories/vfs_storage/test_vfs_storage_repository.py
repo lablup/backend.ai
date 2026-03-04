@@ -10,11 +10,17 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.manager.errors.vfs_storage import VFSStorageNotFoundError
 from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.vfs_storage.creators import VFSStorageCreatorSpec
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
+from ai.backend.manager.repositories.vfs_storage.updaters import VFSStorageUpdaterSpec
+from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
 
@@ -64,6 +70,23 @@ class TestVFSStorageRepository:
             await db_sess.flush()
 
         yield storage_id
+
+    @pytest.fixture
+    def vfs_storage_creator_spec(self) -> VFSStorageCreatorSpec:
+        """Spec for creating a new VFS storage"""
+        return VFSStorageCreatorSpec(
+            name="new-vfs-storage",
+            host="storage-host-1",
+            base_path="/mnt/nfs/new",
+        )
+
+    @pytest.fixture
+    def vfs_storage_updater_spec(self) -> VFSStorageUpdaterSpec:
+        """Spec for updating VFS storage fields"""
+        return VFSStorageUpdaterSpec(
+            host=OptionalState.update("updated-host"),
+            base_path=OptionalState.update("/mnt/vfs/updated"),
+        )
 
     @pytest.fixture
     async def sample_vfs_storages_for_filtering(
@@ -310,3 +333,164 @@ class TestVFSStorageRepository:
         # Verify ordering is ascending
         result_names = [storage.name for storage in result.items]
         assert result_names == sorted(result_names)
+
+    # =========================================================================
+    # Tests - Get by ID
+    # =========================================================================
+
+    async def test_get_by_id(
+        self,
+        vfs_storage_repository: VFSStorageRepository,
+        sample_vfs_storage_id: uuid.UUID,
+    ) -> None:
+        """Test retrieving VFS storage by ID"""
+        result = await vfs_storage_repository.get_by_id(sample_vfs_storage_id)
+
+        assert result.id == sample_vfs_storage_id
+        assert result.name == "test-vfs-storage"
+        assert result.host == "localhost"
+        assert str(result.base_path) == "/mnt/vfs/test"
+
+    async def test_get_by_id_not_found(
+        self,
+        vfs_storage_repository: VFSStorageRepository,
+    ) -> None:
+        """Test retrieving non-existent VFS storage raises error"""
+        with pytest.raises(VFSStorageNotFoundError):
+            await vfs_storage_repository.get_by_id(uuid.uuid4())
+
+    # =========================================================================
+    # Tests - Get by Name
+    # =========================================================================
+
+    async def test_get_by_name(
+        self,
+        vfs_storage_repository: VFSStorageRepository,
+        sample_vfs_storage_id: uuid.UUID,
+    ) -> None:
+        """Test retrieving VFS storage by name"""
+        result = await vfs_storage_repository.get_by_name("test-vfs-storage")
+
+        assert result.id == sample_vfs_storage_id
+        assert result.name == "test-vfs-storage"
+
+    async def test_get_by_name_not_found(
+        self,
+        vfs_storage_repository: VFSStorageRepository,
+    ) -> None:
+        """Test retrieving non-existent VFS storage by name raises error"""
+        with pytest.raises(VFSStorageNotFoundError):
+            await vfs_storage_repository.get_by_name("non-existent-storage")
+
+    # =========================================================================
+    # Tests - Create
+    # =========================================================================
+
+    async def test_create(
+        self,
+        vfs_storage_repository: VFSStorageRepository,
+        vfs_storage_creator_spec: VFSStorageCreatorSpec,
+    ) -> None:
+        """Test creating a new VFS storage via Creator"""
+        result = await vfs_storage_repository.create(Creator(spec=vfs_storage_creator_spec))
+
+        assert result.name == "new-vfs-storage"
+        assert result.host == "storage-host-1"
+        assert str(result.base_path) == "/mnt/nfs/new"
+        assert result.id is not None
+
+        # Verify persisted in DB
+        fetched = await vfs_storage_repository.get_by_id(result.id)
+        assert fetched.name == "new-vfs-storage"
+
+    async def test_create_duplicate_name_raises_error(
+        self,
+        vfs_storage_repository: VFSStorageRepository,
+        sample_vfs_storage_id: uuid.UUID,
+        vfs_storage_creator_spec: VFSStorageCreatorSpec,
+    ) -> None:
+        """Test creating VFS storage with duplicate name raises error"""
+        duplicate_spec = VFSStorageCreatorSpec(
+            name="test-vfs-storage",
+            host=vfs_storage_creator_spec.host,
+            base_path=vfs_storage_creator_spec.base_path,
+        )
+        with pytest.raises(Exception):
+            await vfs_storage_repository.create(Creator(spec=duplicate_spec))
+
+    # =========================================================================
+    # Tests - Update
+    # =========================================================================
+
+    async def test_update(
+        self,
+        vfs_storage_repository: VFSStorageRepository,
+        sample_vfs_storage_id: uuid.UUID,
+        vfs_storage_updater_spec: VFSStorageUpdaterSpec,
+    ) -> None:
+        """Test updating an existing VFS storage via Updater"""
+        updater = Updater(spec=vfs_storage_updater_spec, pk_value=sample_vfs_storage_id)
+        result = await vfs_storage_repository.update(updater)
+
+        assert result.id == sample_vfs_storage_id
+        assert result.host == "updated-host"
+        assert str(result.base_path) == "/mnt/vfs/updated"
+        # Unchanged fields remain the same
+        assert result.name == "test-vfs-storage"
+
+    async def test_update_partial(
+        self,
+        vfs_storage_repository: VFSStorageRepository,
+        sample_vfs_storage_id: uuid.UUID,
+    ) -> None:
+        """Test partial update only changes specified fields"""
+        partial_spec = VFSStorageUpdaterSpec(
+            host=OptionalState.update("partial-updated-host"),
+        )
+        updater = Updater(spec=partial_spec, pk_value=sample_vfs_storage_id)
+        result = await vfs_storage_repository.update(updater)
+
+        assert result.host == "partial-updated-host"
+        # base_path should remain unchanged
+        assert str(result.base_path) == "/mnt/vfs/test"
+
+    async def test_update_not_found(
+        self,
+        vfs_storage_repository: VFSStorageRepository,
+    ) -> None:
+        """Test updating non-existent VFS storage raises error"""
+        not_found_updater = Updater(
+            spec=VFSStorageUpdaterSpec(
+                host=OptionalState.update("updated-host"),
+            ),
+            pk_value=uuid.uuid4(),
+        )
+
+        with pytest.raises(VFSStorageNotFoundError):
+            await vfs_storage_repository.update(not_found_updater)
+
+    # =========================================================================
+    # Tests - Delete
+    # =========================================================================
+
+    async def test_delete(
+        self,
+        vfs_storage_repository: VFSStorageRepository,
+        sample_vfs_storage_id: uuid.UUID,
+    ) -> None:
+        """Test deleting an existing VFS storage"""
+        deleted_id = await vfs_storage_repository.delete(sample_vfs_storage_id)
+
+        assert deleted_id == sample_vfs_storage_id
+
+        # Verify it no longer exists
+        with pytest.raises(VFSStorageNotFoundError):
+            await vfs_storage_repository.get_by_id(sample_vfs_storage_id)
+
+    async def test_delete_not_found(
+        self,
+        vfs_storage_repository: VFSStorageRepository,
+    ) -> None:
+        """Test deleting non-existent VFS storage raises error"""
+        with pytest.raises(VFSStorageNotFoundError):
+            await vfs_storage_repository.delete(uuid.uuid4())
