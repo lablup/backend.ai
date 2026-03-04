@@ -14,13 +14,20 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec
 
-from .types import CycleEvaluationResult
+from .types import BaseDeploymentStrategy, CycleEvaluationResult
 
 
-def blue_green_evaluate(
-    deployment: DeploymentInfo,
-    routes: Sequence[RouteInfo],
-    spec: BlueGreenSpec,
-) -> CycleEvaluationResult:
-    """Evaluate one cycle of blue-green deployment for a single deployment."""
-    raise NotImplementedError("Blue-green deployment strategy is not yet implemented")
+class BlueGreenStrategy(BaseDeploymentStrategy):
+    """Blue-green deployment strategy FSM."""
+
+    def __init__(self, spec: BlueGreenSpec) -> None:
+        super().__init__(spec)
+        self._spec = spec
+
+    def evaluate_cycle(
+        self,
+        deployment: DeploymentInfo,
+        routes: Sequence[RouteInfo],
+    ) -> CycleEvaluationResult:
+        """Evaluate one cycle of blue-green deployment for a single deployment."""
+        raise NotImplementedError("Blue-green deployment strategy is not yet implemented")

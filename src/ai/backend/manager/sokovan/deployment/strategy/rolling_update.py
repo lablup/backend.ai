@@ -14,13 +14,20 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.deployment_policy import RollingUpdateSpec
 
-from .types import CycleEvaluationResult
+from .types import BaseDeploymentStrategy, CycleEvaluationResult
 
 
-def rolling_update_evaluate(
-    deployment: DeploymentInfo,
-    routes: Sequence[RouteInfo],
-    spec: RollingUpdateSpec,
-) -> CycleEvaluationResult:
-    """Evaluate one cycle of rolling update for a single deployment."""
-    raise NotImplementedError("Rolling update strategy is not yet implemented")
+class RollingUpdateStrategy(BaseDeploymentStrategy):
+    """Rolling update deployment strategy FSM."""
+
+    def __init__(self, spec: RollingUpdateSpec) -> None:
+        super().__init__(spec)
+        self._spec = spec
+
+    def evaluate_cycle(
+        self,
+        deployment: DeploymentInfo,
+        routes: Sequence[RouteInfo],
+    ) -> CycleEvaluationResult:
+        """Evaluate one cycle of rolling update for a single deployment."""
+        raise NotImplementedError("Rolling update strategy is not yet implemented")

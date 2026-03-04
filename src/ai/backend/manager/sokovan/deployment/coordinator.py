@@ -36,6 +36,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 from ai.backend.manager.defs import LockID
+from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
@@ -72,7 +73,9 @@ from .handlers import (
     ReconcileDeploymentHandler,
     ScalingDeploymentHandler,
 )
-from .strategy.evaluator import DeploymentStrategyEvaluator
+from .strategy.blue_green import BlueGreenStrategy
+from .strategy.evaluator import DeploymentStrategyEvaluator, DeploymentStrategyRegistry
+from .strategy.rolling_update import RollingUpdateStrategy
 from .strategy.types import EvaluationResult
 from .types import DeploymentExecutionResult, DeploymentLifecycleType
 
@@ -155,11 +158,21 @@ class DeploymentCoordinator:
             valkey_stat=valkey_stat,
         )
         self._deployment_handlers = self._init_handlers(executor)
+        self._strategy_registry = self._init_deployment_strategy_registry()
         self._deployment_evaluators = {
             DeploymentLifecycleType.DEPLOYING: DeploymentStrategyEvaluator(
                 deployment_repo=self._deployment_repository,
+                strategy_registry=self._strategy_registry,
             ),
         }
+
+    @staticmethod
+    def _init_deployment_strategy_registry() -> DeploymentStrategyRegistry:
+        """Initialize the strategy registry with all supported deployment strategies."""
+        registry = DeploymentStrategyRegistry()
+        registry.register(DeploymentStrategy.ROLLING, RollingUpdateStrategy, RollingUpdateSpec)
+        registry.register(DeploymentStrategy.BLUE_GREEN, BlueGreenStrategy, BlueGreenSpec)
+        return registry
 
     def _init_handlers(
         self, executor: DeploymentExecutor
