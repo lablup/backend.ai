@@ -7,7 +7,7 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
-    RBACScopeWideEntityUnbinder,
+    RBACScopeEntityUnbinder,
 )
 
 from .domain_base import ScalingGroupDomainAction
@@ -17,7 +17,7 @@ from .domain_base import ScalingGroupDomainAction
 class DisassociateScalingGroupWithDomainsAction(ScalingGroupDomainAction):
     """Action to disassociate scaling groups from a domain."""
 
-    unbinder: RBACScopeWideEntityUnbinder[ScalingGroupForDomainRow]
+    unbinder: RBACScopeEntityUnbinder[ScalingGroupForDomainRow]
 
     @override
     @classmethod

@@ -13,7 +13,7 @@ from ai.backend.manager.models.scaling_group import (
 )
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
-    RBACScopeWideEntityUnbinder,
+    RBACScopeEntityUnbinder,
 )
 from ai.backend.manager.repositories.scaling_group.purgers import (
     ScalingGroupsForDomainPurgerSpec,
@@ -26,7 +26,7 @@ from ai.backend.manager.repositories.scaling_group.purgers import (
 
 
 @dataclass
-class SGDomainEntityUnbinder(RBACScopeWideEntityUnbinder[ScalingGroupForDomainRow]):
+class SGDomainEntityUnbinder(RBACScopeEntityUnbinder[ScalingGroupForDomainRow]):
     """Unbind specific scaling groups from a domain."""
 
     scaling_groups: Sequence[str]
@@ -56,7 +56,7 @@ class SGDomainEntityUnbinder(RBACScopeWideEntityUnbinder[ScalingGroupForDomainRo
 
 
 @dataclass
-class SGProjectEntityUnbinder(RBACScopeWideEntityUnbinder[ScalingGroupForProjectRow]):
+class SGProjectEntityUnbinder(RBACScopeEntityUnbinder[ScalingGroupForProjectRow]):
     """Unbind specific scaling groups from a project."""
 
     scaling_groups: Sequence[str]

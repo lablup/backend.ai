@@ -28,7 +28,7 @@ from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.purger import BatchPurger, Purger
 from ai.backend.manager.repositories.base.rbac.scope_binder import RBACScopeBinder
 from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
-    RBACScopeWideEntityUnbinder,
+    RBACScopeEntityUnbinder,
 )
 from ai.backend.manager.repositories.base.updater import Updater
 
@@ -135,7 +135,7 @@ class ScalingGroupRepository:
 
     async def disassociate_scaling_group_with_domains(
         self,
-        unbinder: RBACScopeWideEntityUnbinder[ScalingGroupForDomainRow],
+        unbinder: RBACScopeEntityUnbinder[ScalingGroupForDomainRow],
     ) -> None:
         """Disassociates scaling groups from a domain."""
         await self._db_source.disassociate_scaling_group_with_domains(unbinder)
@@ -184,7 +184,7 @@ class ScalingGroupRepository:
 
     async def disassociate_scaling_group_with_user_groups(
         self,
-        unbinder: RBACScopeWideEntityUnbinder[ScalingGroupForProjectRow],
+        unbinder: RBACScopeEntityUnbinder[ScalingGroupForProjectRow],
     ) -> None:
         """Disassociates scaling groups from a project."""
         await self._db_source.disassociate_scaling_group_with_user_groups(unbinder)
