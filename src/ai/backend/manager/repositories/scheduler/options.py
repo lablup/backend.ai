@@ -457,6 +457,15 @@ class SessionConditions:
         return inner
 
     @staticmethod
+    def by_agent_id(agent_id: str) -> QueryCondition:
+        """Filter sessions that have kernels running on the given agent."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.literal(agent_id) == sa.any_(SessionRow.agent_ids)
+
+        return inner
+
+    @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         """Cursor condition for forward pagination (after cursor).
 

@@ -20,6 +20,11 @@ if TYPE_CHECKING:
         KernelV2FilterGQL,
         KernelV2OrderByGQL,
     )
+    from ai.backend.manager.api.gql.session.types import (
+        SessionV2ConnectionGQL,
+        SessionV2FilterGQL,
+        SessionV2OrderByGQL,
+    )
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
@@ -32,6 +37,7 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.scheduler.options import (
     KernelConditions,
+    SessionConditions,
 )
 
 
@@ -440,6 +446,47 @@ class AgentV2GQL(Node):
             limit=limit,
             offset=offset,
             base_conditions=[KernelConditions.by_agent_id(str(self._agent_id))],
+        )
+
+    @strawberry.field(  # type: ignore[misc]
+        description="Added in 26.2.0. List of sessions running on this agent with pagination support."
+    )
+    async def sessions(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            SessionV2FilterGQL, strawberry.lazy("ai.backend.manager.api.gql.session.types")
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                SessionV2OrderByGQL, strawberry.lazy("ai.backend.manager.api.gql.session.types")
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Annotated[
+        SessionV2ConnectionGQL, strawberry.lazy("ai.backend.manager.api.gql.session.types")
+    ]:
+        """Fetch sessions associated with this agent."""
+        from ai.backend.manager.api.gql.session.fetcher.session import fetch_sessions
+
+        return await fetch_sessions(
+            info=info,
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+            base_conditions=[SessionConditions.by_agent_id(str(self._agent_id))],
         )
 
     @classmethod
