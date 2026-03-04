@@ -3,19 +3,21 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.types import AccessKey, SessionTypes
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.base import SessionScopeAction
 
 
 @dataclass
 class CreateClusterAction(SessionScopeAction):
-    """Create a new cluster session within a scope (domain/project).
+    """Create a new cluster session.
 
-    The scope is determined by group_id (PROJECT scope) or domain_name (DOMAIN scope).
-    RBAC validation checks if the user has CREATE permission in the target scope.
+    RBAC validation checks if the user has CREATE permission in USER scope.
+    Scope is always USER scope with user_id.
     """
 
     session_name: str
@@ -42,6 +44,21 @@ class CreateClusterAction(SessionScopeAction):
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
+
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.USER
+
+    @override
+    def scope_id(self) -> str:
+        return str(self.user_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.USER,
+            element_id=str(self.user_id),
+        )
 
 
 @dataclass
