@@ -1,14 +1,14 @@
 """Deployment strategy evaluator — orchestrates per-deployment FSM evaluation (BEP-1049).
 
 Loads policies and routes in bulk, dispatches each deployment to the appropriate
-strategy FSM, aggregates route mutations, and applies them in one batch.
+strategy FSM, and aggregates route mutations.  The coordinator is responsible for
+applying the aggregated route changes after evaluation.
 """
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from uuid import UUID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.logging import BraceStyleAdapter
@@ -16,27 +16,22 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentPolicyData,
     RouteInfo,
-    RouteStatus,
-    RouteTrafficStatus,
 )
 from ai.backend.manager.errors.deployment import (
     InvalidDeploymentStrategy,
     InvalidDeploymentStrategySpec,
 )
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, NoPagination
-from ai.backend.manager.repositories.base.updater import BatchUpdater
-from ai.backend.manager.repositories.deployment.creators import RouteBatchUpdaterSpec
+from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.deployment.options import (
     DeploymentPolicyConditions,
-    RouteConditions,
 )
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.sokovan.deployment.recorder import DeploymentRecorderContext
 
 from .blue_green import blue_green_evaluate
 from .rolling_update import rolling_update_evaluate
-from .types import CycleEvaluationResult, EvaluationGroup, EvaluationResult
+from .types import CycleEvaluationResult, EvaluationGroup, EvaluationResult, RouteChanges
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -56,7 +51,7 @@ class DeploymentStrategyEvaluator:
         Steps:
             1. Bulk-load policies and active routes.
             2. Per-deployment: dispatch to strategy FSM.
-            3. Aggregate route changes and apply in one batch.
+            3. Aggregate route changes into result (applied by coordinator).
             4. Group deployments by sub-step and return.
         """
         result = EvaluationResult()
@@ -77,9 +72,6 @@ class DeploymentStrategyEvaluator:
         route_map = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(endpoint_ids)
 
         # ── 2. Per-deployment evaluation ──
-        all_scale_out: list[Creator[RoutingRow]] = []
-        all_scale_in_ids: list[UUID] = []
-
         for deployment in deployments:
             policy = policy_map.get(deployment.id)
             if policy is None:
@@ -96,10 +88,11 @@ class DeploymentStrategyEvaluator:
                 result.errors.append((deployment, str(e)))
                 continue
 
-            # Collect route changes
+            # ── 3. Aggregate route changes and record sub-steps ──
             changes = cycle_result.route_changes
-            all_scale_out.extend(changes.scale_out_specs)
-            all_scale_in_ids.extend(changes.scale_in_route_ids)
+            result.route_changes.rollout_specs.extend(changes.rollout_specs)
+            result.route_changes.drain_route_ids.extend(changes.drain_route_ids)
+            self._record_route_changes(deployment, changes)
 
             # Group by sub-step
             if cycle_result.completed:
@@ -112,10 +105,28 @@ class DeploymentStrategyEvaluator:
                 )
                 group.deployments.append(deployment)
 
-        # ── 3. Apply route mutations in batch ──
-        await self._apply_route_changes(all_scale_out, all_scale_in_ids)
-
         return result
+
+    @staticmethod
+    def _record_route_changes(deployment: DeploymentInfo, changes: RouteChanges) -> None:
+        """Record rollout/drain operations as sub-steps for observability."""
+        if not changes.rollout_specs and not changes.drain_route_ids:
+            return
+        pool = DeploymentRecorderContext.current_pool()
+        recorder = pool.recorder(deployment.id)
+        with recorder.phase("route_mutations"):
+            if changes.rollout_specs:
+                with recorder.step(
+                    "rollout",
+                    success_detail=f"{len(changes.rollout_specs)} new route(s)",
+                ):
+                    pass
+            if changes.drain_route_ids:
+                with recorder.step(
+                    "drain",
+                    success_detail=f"{len(changes.drain_route_ids)} route(s)",
+                ):
+                    pass
 
     def _evaluate_single(
         self,
@@ -144,30 +155,3 @@ class DeploymentStrategyEvaluator:
                 raise InvalidDeploymentStrategy(
                     extra_msg=f"Unsupported deployment strategy: {strategy}"
                 )
-
-    async def _apply_route_changes(
-        self,
-        scale_out: list[Creator[RoutingRow]],
-        scale_in_ids: list[UUID],
-    ) -> None:
-        """Apply aggregated route mutations in a single DB transaction."""
-        if not scale_out and not scale_in_ids:
-            return
-
-        scale_in_updater: BatchUpdater[RoutingRow] | None = None
-        if scale_in_ids:
-            scale_in_updater = BatchUpdater(
-                spec=RouteBatchUpdaterSpec(
-                    status=RouteStatus.TERMINATING,
-                    traffic_ratio=0.0,
-                    traffic_status=RouteTrafficStatus.INACTIVE,
-                ),
-                conditions=[RouteConditions.by_ids(scale_in_ids)],
-            )
-
-        await self._deployment_repo.scale_routes(scale_out, scale_in_updater)
-        log.debug(
-            "Applied route changes: {} created, {} terminated",
-            len(scale_out),
-            len(scale_in_ids),
-        )

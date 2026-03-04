@@ -31,17 +31,24 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentSubStatus,
     DeploymentSubStep,
+    RouteStatus,
+    RouteTrafficStatus,
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment import (
     DeploymentConditions,
     DeploymentRepository,
 )
-from ai.backend.manager.repositories.deployment.creators import EndpointLifecycleBatchUpdaterSpec
+from ai.backend.manager.repositories.deployment.creators import (
+    EndpointLifecycleBatchUpdaterSpec,
+    RouteBatchUpdaterSpec,
+)
+from ai.backend.manager.repositories.deployment.options import RouteConditions
 from ai.backend.manager.repositories.scheduling_history.creators import DeploymentHistoryCreatorSpec
 from ai.backend.manager.sokovan.deployment.recorder import DeploymentRecorderContext
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
@@ -66,6 +73,7 @@ from .handlers import (
     ScalingDeploymentHandler,
 )
 from .strategy.evaluator import DeploymentStrategyEvaluator
+from .strategy.types import EvaluationResult
 from .types import DeploymentExecutionResult, DeploymentLifecycleType
 
 # Handler key: either a simple lifecycle type or a (lifecycle, sub-step) tuple
@@ -375,10 +383,11 @@ class DeploymentCoordinator:
 
         1. Acquire distributed lock.
         2. Load DEPLOYING deployments.
-        3. Run evaluator (evaluates strategy FSM + applies route mutations).
-        4. For each sub-step group, run the corresponding handler.
-        5. Handle errors and skipped deployments.
-        6. For completed deployments, swap revisions and transition to READY.
+        3. Run evaluator (evaluates strategy FSM, aggregates route mutations).
+        4. Apply aggregated route mutations.
+        5. For each sub-step group, run the corresponding handler.
+        6. Handle errors and skipped deployments.
+        7. For completed deployments, swap revisions and transition to READY.
         """
         lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
         async with self._lock_factory(LockID.LOCKID_DEPLOYMENT_DEPLOYING, lock_lifetime):
@@ -396,6 +405,10 @@ class DeploymentCoordinator:
                 lifecycle_type.value, entity_ids=deployment_ids
             ) as pool:
                 eval_result = await evaluator.evaluate(deployments)
+
+                # Apply aggregated route mutations from the evaluation
+                await self._apply_route_changes(eval_result)
+
                 all_records = pool.build_all_records()
 
                 # Process each sub-step group with its handler
@@ -477,13 +490,42 @@ class DeploymentCoordinator:
                     lifecycle_type,
                     eval_result.completed,
                     strategies=eval_result.completed_strategies,
+                    records=all_records,
                 )
+
+    async def _apply_route_changes(
+        self,
+        eval_result: EvaluationResult,
+    ) -> None:
+        """Apply aggregated route mutations from the evaluation result."""
+        changes = eval_result.route_changes
+        if not changes.rollout_specs and not changes.drain_route_ids:
+            return
+
+        scale_in_updater: BatchUpdater[RoutingRow] | None = None
+        if changes.drain_route_ids:
+            scale_in_updater = BatchUpdater(
+                spec=RouteBatchUpdaterSpec(
+                    status=RouteStatus.TERMINATING,
+                    traffic_ratio=0.0,
+                    traffic_status=RouteTrafficStatus.INACTIVE,
+                ),
+                conditions=[RouteConditions.by_ids(changes.drain_route_ids)],
+            )
+
+        await self._deployment_repository.scale_routes(changes.rollout_specs, scale_in_updater)
+        log.debug(
+            "Applied route changes: {} created, {} terminated",
+            len(changes.rollout_specs),
+            len(changes.drain_route_ids),
+        )
 
     async def _transition_completed_deployments(
         self,
         lifecycle_type: DeploymentLifecycleType,
         completed: list[DeploymentInfo],
         strategies: dict[UUID, DeploymentStrategy],
+        records: Mapping[UUID, ExecutionRecord],
     ) -> None:
         """Transition completed DEPLOYING deployments to READY.
 
@@ -518,7 +560,7 @@ class DeploymentCoordinator:
                 else "Deployment completed successfully",
                 from_status=from_status,
                 to_status=to_status,
-                sub_steps=[],
+                sub_steps=extract_sub_steps_for_entity(deployment.id, records),
             )
             for deployment in completed
         ]

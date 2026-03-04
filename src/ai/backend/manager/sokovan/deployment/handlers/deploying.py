@@ -1,9 +1,9 @@
 """Handlers for DEPLOYING sub-steps (BEP-1049).
 
-In-progress handlers (PROVISIONING, PROGRESSING) run *after* the strategy
-evaluator has already applied route mutations.  Their ``execute`` simply
-returns success.  ``post_process`` triggers the next DEPLOYING cycle and
-route provisioning.
+In-progress handlers (PROVISIONING, PROGRESSING) run *after* the coordinator
+has applied route mutations from the evaluation result.  Their ``execute``
+simply returns success.  ``post_process`` triggers the next DEPLOYING cycle
+and route provisioning.
 
 The rolled-back handler clears ``deploying_revision`` and transitions the
 deployment back to READY.

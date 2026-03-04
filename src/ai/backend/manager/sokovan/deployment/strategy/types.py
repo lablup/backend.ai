@@ -18,8 +18,8 @@ from ai.backend.manager.repositories.base import Creator
 class RouteChanges:
     """Route mutations to apply for a single deployment cycle."""
 
-    scale_out_specs: list[Creator[RoutingRow]] = field(default_factory=list)
-    scale_in_route_ids: list[UUID] = field(default_factory=list)
+    rollout_specs: list[Creator[RoutingRow]] = field(default_factory=list)
+    drain_route_ids: list[UUID] = field(default_factory=list)
 
 
 @dataclass
@@ -63,3 +63,7 @@ class EvaluationResult:
     # with the error message. The coordinator records NEED_RETRY history and keeps
     # the lifecycle at DEPLOYING so the next cycle can retry.
     errors: list[tuple[DeploymentInfo, str]] = field(default_factory=list)
+
+    # Aggregated route mutations from all per-deployment evaluations.
+    # The coordinator applies these after evaluation completes.
+    route_changes: RouteChanges = field(default_factory=RouteChanges)
