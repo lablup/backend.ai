@@ -965,17 +965,9 @@ class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):  # type: ignore
         domain: str,
     ) -> DisassociateAllScalingGroupsWithDomain:
         graph_ctx: GraphQueryContext = info.context
-        # Query all scaling groups associated with this domain
-        async with graph_ctx.db.begin_readonly_session() as session:
-            query = sa.select(ScalingGroupForDomainRow.scaling_group).where(
-                ScalingGroupForDomainRow.domain == domain
-            )
-            result = await session.execute(query)
-            scaling_groups = result.scalars().all()
-
         action = DisassociateScalingGroupWithDomainsAction(
             unbinder=ResourceGroupDomainEntityUnbinder(
-                scaling_groups=list(scaling_groups),
+                scaling_groups=None,
                 domain=domain,
             ),
         )
@@ -1147,18 +1139,9 @@ class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):  # type: ignore[
         user_group: uuid.UUID,
     ) -> DisassociateAllScalingGroupsWithGroup:
         graph_ctx: GraphQueryContext = info.context
-
-        # Query all scaling groups associated with this user group
-        async with graph_ctx.db.begin_readonly_session() as session:
-            query = sa.select(ScalingGroupForProjectRow.scaling_group).where(
-                ScalingGroupForProjectRow.group == user_group
-            )
-            result = await session.execute(query)
-            scaling_groups = result.scalars().all()
-
         action = DisassociateScalingGroupWithUserGroupsAction(
             unbinder=ResourceGroupProjectEntityUnbinder(
-                scaling_groups=list(scaling_groups),
+                scaling_groups=None,
                 project=user_group,
             ),
         )

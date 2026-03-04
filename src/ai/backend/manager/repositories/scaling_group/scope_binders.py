@@ -16,6 +16,8 @@ from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
     RBACScopeEntityUnbinder,
 )
 from ai.backend.manager.repositories.scaling_group.purgers import (
+    AllScalingGroupsForDomainPurgerSpec,
+    AllScalingGroupsForProjectPurgerSpec,
     ScalingGroupsForDomainPurgerSpec,
     ScalingGroupsForProjectPurgerSpec,
 )
@@ -27,13 +29,18 @@ from ai.backend.manager.repositories.scaling_group.purgers import (
 
 @dataclass
 class ResourceGroupDomainEntityUnbinder(RBACScopeEntityUnbinder[ScalingGroupForDomainRow]):
-    """Unbind specific scaling groups from a domain."""
+    """Unbind scaling groups from a domain.
 
-    scaling_groups: Sequence[str]
+    When scaling_groups is None, all scaling groups in the domain are unbound.
+    """
+
+    scaling_groups: Sequence[str] | None
     domain: str
 
     @override
     def build_purger_spec(self) -> BatchPurgerSpec[ScalingGroupForDomainRow]:
+        if self.scaling_groups is None:
+            return AllScalingGroupsForDomainPurgerSpec(domain=self.domain)
         return ScalingGroupsForDomainPurgerSpec(
             scaling_groups=list(self.scaling_groups),
             domain=self.domain,
@@ -51,19 +58,24 @@ class ResourceGroupDomainEntityUnbinder(RBACScopeEntityUnbinder[ScalingGroupForD
 
     @property
     @override
-    def entity_ids(self) -> Sequence[str]:
-        return list(self.scaling_groups)
+    def entity_ids(self) -> Sequence[str] | None:
+        return list(self.scaling_groups) if self.scaling_groups is not None else None
 
 
 @dataclass
 class ResourceGroupProjectEntityUnbinder(RBACScopeEntityUnbinder[ScalingGroupForProjectRow]):
-    """Unbind specific scaling groups from a project."""
+    """Unbind scaling groups from a project.
 
-    scaling_groups: Sequence[str]
+    When scaling_groups is None, all scaling groups in the project are unbound.
+    """
+
+    scaling_groups: Sequence[str] | None
     project: UUID
 
     @override
     def build_purger_spec(self) -> BatchPurgerSpec[ScalingGroupForProjectRow]:
+        if self.scaling_groups is None:
+            return AllScalingGroupsForProjectPurgerSpec(project=self.project)
         return ScalingGroupsForProjectPurgerSpec(
             scaling_groups=list(self.scaling_groups),
             project=self.project,
@@ -81,5 +93,5 @@ class ResourceGroupProjectEntityUnbinder(RBACScopeEntityUnbinder[ScalingGroupFor
 
     @property
     @override
-    def entity_ids(self) -> Sequence[str]:
-        return list(self.scaling_groups)
+    def entity_ids(self) -> Sequence[str] | None:
+        return list(self.scaling_groups) if self.scaling_groups is not None else None
