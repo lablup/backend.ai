@@ -75,7 +75,7 @@ class PrometheusQueryPresetService:
         preset_data: PrometheusQueryPresetData,
     ) -> None:
         if preset_data.filter_labels:
-            invalid = set(options.labels.keys()) - set(preset_data.filter_labels)
+            invalid = set(options.filter_labels.keys()) - set(preset_data.filter_labels)
             if invalid:
                 raise PrometheusQueryPresetInvalidLabel(
                     f"Invalid filter labels: {sorted(invalid)}. "
@@ -103,7 +103,7 @@ class PrometheusQueryPresetService:
 
         metric_preset = MetricPreset(
             template=preset_data.query_template,
-            labels=action.options.labels,
+            labels=action.options.filter_labels,
             group_by=set(action.options.group_labels),
             window=window,
         )

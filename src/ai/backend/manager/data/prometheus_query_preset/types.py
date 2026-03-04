@@ -12,7 +12,7 @@ from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 class ExecutePresetOptions:
     """Options for executing a prometheus query preset."""
 
-    labels: dict[str, str]
+    filter_labels: dict[str, str]
     group_labels: list[str]
 
 

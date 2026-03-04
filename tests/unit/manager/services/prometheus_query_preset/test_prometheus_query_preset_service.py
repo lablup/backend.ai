@@ -241,7 +241,7 @@ class TestPrometheusQueryPresetService:
         action = ExecutePresetAction(
             preset_id=preset_data.id,
             options=ExecutePresetOptions(
-                labels={"kernel_id": "test-kernel"},
+                filter_labels={"kernel_id": "test-kernel"},
                 group_labels=["kernel_id"],
             ),
             window="5m",
@@ -265,7 +265,7 @@ class TestPrometheusQueryPresetService:
         action = ExecutePresetAction(
             preset_id=preset_data.id,
             options=ExecutePresetOptions(
-                labels={"invalid_label": "value"},
+                filter_labels={"invalid_label": "value"},
                 group_labels=[],
             ),
             window="5m",
@@ -287,7 +287,7 @@ class TestPrometheusQueryPresetService:
         action = ExecutePresetAction(
             preset_id=preset_data.id,
             options=ExecutePresetOptions(
-                labels={},
+                filter_labels={},
                 group_labels=["invalid_group"],
             ),
             window="5m",
@@ -318,7 +318,7 @@ class TestPrometheusQueryPresetService:
         action = ExecutePresetAction(
             preset_id=preset_data.id,
             options=ExecutePresetOptions(
-                labels={},
+                filter_labels={},
                 group_labels=[],
             ),
             window=None,
@@ -352,7 +352,7 @@ class TestPrometheusQueryPresetService:
         action = ExecutePresetAction(
             preset_id=preset_data.id,
             options=ExecutePresetOptions(
-                labels={},
+                filter_labels={},
                 group_labels=[],
             ),
             window=None,
@@ -386,7 +386,7 @@ class TestPrometheusQueryPresetService:
         action = ExecutePresetAction(
             preset_id=preset_data.id,
             options=ExecutePresetOptions(
-                labels={"any_label": "value"},
+                filter_labels={"any_label": "value"},
                 group_labels=["any_group"],
             ),
             window="5m",
