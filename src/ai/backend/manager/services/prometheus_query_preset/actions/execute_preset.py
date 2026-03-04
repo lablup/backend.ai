@@ -1,6 +1,6 @@
-import uuid
 from dataclasses import dataclass
 from typing import override
+from uuid import UUID
 
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import PrometheusQueryRangeResponse
@@ -14,7 +14,7 @@ from ai.backend.manager.services.prometheus_query_preset.actions.base import (
 
 @dataclass
 class ExecutePresetAction(PrometheusQueryPresetAction):
-    preset_id: uuid.UUID
+    preset_id: UUID
     options: ExecutePresetOptions
     window: str | None
     time_range: QueryTimeRange

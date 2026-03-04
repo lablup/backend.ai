@@ -1,6 +1,6 @@
-import uuid
 from dataclasses import dataclass
 from typing import override
+from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
@@ -12,7 +12,7 @@ from ai.backend.manager.services.prometheus_query_preset.actions.base import (
 
 @dataclass
 class GetPresetAction(PrometheusQueryPresetAction):
-    preset_id: uuid.UUID
+    preset_id: UUID
 
     @override
     def entity_id(self) -> str | None:
