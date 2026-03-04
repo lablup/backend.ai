@@ -49,28 +49,28 @@ class EvaluationResult:
     """Aggregate result of evaluating all DEPLOYING deployments."""
 
     # In-progress deployments grouped by sub-step (PROVISIONING, PROGRESSING, etc.).
-    # The coordinator looks up the handler for each sub-step and calls execute().
+    # DeployingHandler.prepare() resolves the sub-step handler for each group.
     groups: dict[DeploymentSubStep, EvaluationGroup] = field(default_factory=dict)
 
     # Deployments that satisfied all strategy FSM conditions and are ready to finish.
-    # The coordinator performs an atomic revision swap + READY transition for these.
+    # DeployingHandler.finalize() performs an atomic revision swap + READY transition.
     completed: list[DeploymentInfo] = field(default_factory=list)
 
     # Maps each completed deployment to the strategy (ROLLING, BLUE_GREEN) it used.
-    # The coordinator includes this in the history message for observability.
+    # Included in the history message for observability.
     completed_strategies: dict[UUID, DeploymentStrategy] = field(default_factory=dict)
 
     # Deployments skipped because no deployment policy was found.
-    # The coordinator records SKIPPED history and emits a warning log.
+    # DeployingHandler.finalize() records SKIPPED history and emits a warning log.
     skipped: list[DeploymentInfo] = field(default_factory=list)
 
     # Deployments that raised an exception during strategy FSM evaluation, paired
-    # with the error message. The coordinator records NEED_RETRY history and keeps
-    # the lifecycle at DEPLOYING so the next cycle can retry.
+    # with the error message. DeployingHandler.finalize() records NEED_RETRY history
+    # and keeps the lifecycle at DEPLOYING so the next cycle can retry.
     errors: list[tuple[DeploymentInfo, str]] = field(default_factory=list)
 
     # Aggregated route mutations from all per-deployment evaluations.
-    # The coordinator applies these after evaluation completes.
+    # DeployingHandler.prepare() applies these after evaluation completes.
     route_changes: RouteChanges = field(default_factory=RouteChanges)
 
 

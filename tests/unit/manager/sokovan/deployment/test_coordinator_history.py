@@ -171,6 +171,7 @@ def mock_handler_with_success(
             failure=None,
         )
     )
+    mock.prepare = AsyncMock(side_effect=lambda deployments: [(mock, deployments)])
     mock.execute = AsyncMock(
         return_value=DeploymentExecutionResult(
             successes=[sample_deployment_info],
@@ -178,6 +179,7 @@ def mock_handler_with_success(
         )
     )
     mock.post_process = AsyncMock()
+    mock.finalize = AsyncMock()
     return mock
 
 
@@ -196,6 +198,7 @@ def mock_handler_with_failure(
             failure=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
         )
     )
+    mock.prepare = AsyncMock(side_effect=lambda deployments: [(mock, deployments)])
     mock.execute = AsyncMock(
         return_value=DeploymentExecutionResult(
             successes=[],
@@ -203,6 +206,7 @@ def mock_handler_with_failure(
         )
     )
     mock.post_process = AsyncMock()
+    mock.finalize = AsyncMock()
     return mock
 
 
@@ -219,8 +223,10 @@ def mock_handler_with_empty_result() -> MagicMock:
             failure=None,
         )
     )
+    mock.prepare = AsyncMock(side_effect=lambda deployments: [(mock, deployments)])
     mock.execute = AsyncMock(return_value=DeploymentExecutionResult())
     mock.post_process = AsyncMock()
+    mock.finalize = AsyncMock()
     return mock
 
 

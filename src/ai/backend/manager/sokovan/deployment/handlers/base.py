@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from abc import abstractmethod
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from uuid import UUID
 
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -8,6 +11,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.types import DeploymentExecutionResult
+from ai.backend.manager.sokovan.recorder.types import ExecutionRecord
 
 
 class DeploymentHandler:
@@ -53,6 +57,16 @@ class DeploymentHandler:
         """
         raise NotImplementedError("Subclasses must implement status_transitions()")
 
+    async def prepare(
+        self, deployments: Sequence[DeploymentInfo]
+    ) -> list[tuple[DeploymentHandler, Sequence[DeploymentInfo]]]:
+        """Prepare handler tasks for execution.
+
+        Default: treat self as a single sub-step.
+        Override for composite handlers (e.g., DeployingHandler) that dispatch to sub-handlers.
+        """
+        return [(self, deployments)]
+
     @abstractmethod
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
         """Execute the scheduling operation.
@@ -64,9 +78,24 @@ class DeploymentHandler:
 
     @abstractmethod
     async def post_process(self, result: DeploymentExecutionResult) -> None:
-        """Handle post-processing after the operation.
+        """Per-handler post-processing after execute().
+
+        Called for each (handler, result) pair returned by prepare().
+        For composite handlers, this means each sub-step handler's post_process
+        is called individually — not the composite handler itself.
+
+        Typical use: reschedule the next lifecycle cycle, trigger dependent lifecycles.
 
         Args:
-            result: The result from execute()
+            result: The result from this handler's execute()
         """
         raise NotImplementedError("Subclasses must implement post_process()")
+
+    async def finalize(self, records: Mapping[UUID, ExecutionRecord]) -> None:
+        """Post-execution finalization with access to execution records.
+
+        Called after all handler tasks have been executed and status transitions recorded,
+        but before post_process. Default: no-op.
+        Override for composite handlers that need atomic completion transitions.
+        """
+        pass
