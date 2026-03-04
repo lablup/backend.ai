@@ -661,7 +661,7 @@ class DeploymentService:
         _revision = await self._deployment_repository.get_revision(action.revision_id)
 
         # 2. Set deploying_revision and transition to DEPLOYING lifecycle
-        previous_revision_id = await self._deployment_repository.start_deploying_revision(
+        previous_revision_id = await self._deployment_repository.set_deploying_revision(
             action.deployment_id, action.revision_id
         )
 

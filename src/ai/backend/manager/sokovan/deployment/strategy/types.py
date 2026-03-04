@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
@@ -28,53 +29,37 @@ class RouteChanges:
 
 
 @dataclass
-class CycleEvaluationResult:
-    """Result of evaluating a single deployment's strategy cycle."""
+class StrategyCycleResult:
+    """Result of evaluating a single deployment's strategy cycle.
+
+    ``sub_step`` indicates the next state: PROVISIONING, PROGRESSING,
+    COMPLETED, or ROLLED_BACK.
+    """
 
     sub_step: DeploymentSubStep
-    completed: bool = False
     route_changes: RouteChanges = field(default_factory=RouteChanges)
 
 
 @dataclass
-class EvaluationGroup:
-    """Deployments grouped by their sub-step result."""
+class StrategyEvaluationSummary:
+    """Aggregate result of evaluating all DEPLOYING deployments.
 
-    sub_step: DeploymentSubStep
-    deployments: list[DeploymentInfo] = field(default_factory=list)
+    The evaluator classifies each deployment into a sub_step and records
+    the mapping so the evaluate handler can bulk-update the DB column.
+    All outcomes — including COMPLETED and ROLLED_BACK — are expressed
+    as sub_step values and persisted to the DB for their respective handlers.
+    """
 
-
-@dataclass
-class EvaluationResult:
-    """Aggregate result of evaluating all DEPLOYING deployments."""
-
-    # In-progress deployments grouped by sub-step (PROVISIONING, PROGRESSING, etc.).
-    # The coordinator looks up the handler for each sub-step and calls execute().
-    groups: dict[DeploymentSubStep, EvaluationGroup] = field(default_factory=dict)
-
-    # Deployments that satisfied all strategy FSM conditions and are ready to finish.
-    # The coordinator performs an atomic revision swap + READY transition for these.
-    completed: list[DeploymentInfo] = field(default_factory=list)
-
-    # Maps each completed deployment to the strategy (ROLLING, BLUE_GREEN) it used.
-    # The coordinator includes this in the history message for observability.
-    completed_strategies: dict[UUID, DeploymentStrategy] = field(default_factory=dict)
-
-    # Deployments skipped because no deployment policy was found.
-    # The coordinator records SKIPPED history and emits a warning log.
-    skipped: list[DeploymentInfo] = field(default_factory=list)
-
-    # Deployments that raised an exception during strategy FSM evaluation, paired
-    # with the error message. The coordinator records NEED_RETRY history and keeps
-    # the lifecycle at DEPLOYING so the next cycle can retry.
-    errors: list[tuple[DeploymentInfo, str]] = field(default_factory=list)
+    # Mapping from sub_step to endpoint IDs — used to bulk-update the DB.
+    assignments: defaultdict[DeploymentSubStep, set[UUID]] = field(
+        default_factory=lambda: defaultdict(set)
+    )
 
     # Aggregated route mutations from all per-deployment evaluations.
-    # The coordinator applies these after evaluation completes.
     route_changes: RouteChanges = field(default_factory=RouteChanges)
 
 
-class BaseDeploymentStrategy(ABC):
+class AbstractDeploymentStrategy(ABC):
     """Base interface for deployment strategy cycle evaluation.
 
     Each concrete strategy (Blue-Green, Rolling Update) implements this interface.
@@ -89,4 +74,30 @@ class BaseDeploymentStrategy(ABC):
         self,
         deployment: DeploymentInfo,
         routes: Sequence[RouteInfo],
-    ) -> CycleEvaluationResult: ...
+    ) -> StrategyCycleResult: ...
+
+
+@dataclass(frozen=True)
+class DeploymentStrategyRegistryEntry:
+    """Maps a deployment strategy to its implementation class and expected spec type."""
+
+    strategy_cls: type[AbstractDeploymentStrategy]
+    spec_type: type[BaseModel]
+
+
+class DeploymentStrategyRegistry:
+    """Registry of deployment strategy implementations."""
+
+    def __init__(self) -> None:
+        self._entries: dict[DeploymentStrategy, DeploymentStrategyRegistryEntry] = {}
+
+    def register(
+        self,
+        strategy: DeploymentStrategy,
+        strategy_cls: type[AbstractDeploymentStrategy],
+        spec_type: type[BaseModel],
+    ) -> None:
+        self._entries[strategy] = DeploymentStrategyRegistryEntry(strategy_cls, spec_type)
+
+    def get(self, strategy: DeploymentStrategy) -> DeploymentStrategyRegistryEntry | None:
+        return self._entries.get(strategy)

@@ -1,17 +1,14 @@
 """Deployment strategy evaluator — orchestrates per-deployment FSM evaluation (BEP-1049).
 
 Loads policies and routes in bulk, dispatches each deployment to the appropriate
-strategy FSM, and aggregates route mutations.  The coordinator is responsible for
-applying the aggregated route changes after evaluation.
+strategy FSM, and aggregates route mutations.  The evaluate handler is responsible
+for applying the aggregated route changes and updating sub_step in DB.
 """
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from dataclasses import dataclass
-
-from pydantic import BaseModel
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.logging import BraceStyleAdapter
@@ -31,40 +28,18 @@ from ai.backend.manager.repositories.deployment.options import (
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.recorder import DeploymentRecorderContext
 
-from .types import BaseDeploymentStrategy, EvaluationGroup, EvaluationResult, RouteChanges
-
-
-@dataclass(frozen=True)
-class DeploymentStrategyRegistryEntry:
-    """Maps a deployment strategy to its implementation class and expected spec type."""
-
-    strategy_cls: type[BaseDeploymentStrategy]
-    spec_type: type[BaseModel]
-
-
-class DeploymentStrategyRegistry:
-    """Registry of deployment strategy implementations."""
-
-    def __init__(self) -> None:
-        self._entries: dict[DeploymentStrategy, DeploymentStrategyRegistryEntry] = {}
-
-    def register(
-        self,
-        strategy: DeploymentStrategy,
-        strategy_cls: type[BaseDeploymentStrategy],
-        spec_type: type[BaseModel],
-    ) -> None:
-        self._entries[strategy] = DeploymentStrategyRegistryEntry(strategy_cls, spec_type)
-
-    def get(self, strategy: DeploymentStrategy) -> DeploymentStrategyRegistryEntry | None:
-        return self._entries.get(strategy)
-
+from .types import (
+    AbstractDeploymentStrategy,
+    DeploymentStrategyRegistry,
+    RouteChanges,
+    StrategyEvaluationSummary,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class DeploymentStrategyEvaluator:
-    """Evaluates DEPLOYING deployments and produces grouped results + route mutations."""
+    """Evaluates DEPLOYING deployments and produces sub_step assignments + route mutations."""
 
     def __init__(
         self,
@@ -77,16 +52,15 @@ class DeploymentStrategyEvaluator:
     async def evaluate(
         self,
         deployments: Sequence[DeploymentInfo],
-    ) -> EvaluationResult:
+    ) -> StrategyEvaluationSummary:
         """Evaluate all DEPLOYING deployments in a single cycle.
 
         Steps:
             1. Bulk-load policies and active routes.
             2. Per-deployment: dispatch to strategy FSM.
-            3. Aggregate route changes into result (applied by coordinator).
-            4. Group deployments by sub-step and return.
+            3. Aggregate route changes and sub_step assignments.
         """
-        result = EvaluationResult()
+        result = StrategyEvaluationSummary()
 
         if not deployments:
             return result
@@ -108,7 +82,6 @@ class DeploymentStrategyEvaluator:
             policy = policy_map.get(deployment.id)
             if policy is None:
                 log.warning("deployment {}: no policy found — skipping", deployment.id)
-                result.skipped.append(deployment)
                 continue
 
             routes: list[RouteInfo] = list(route_map.get(deployment.id, []))
@@ -118,7 +91,6 @@ class DeploymentStrategyEvaluator:
                 cycle_result = strategy.evaluate_cycle(deployment, routes)
             except Exception as e:
                 log.warning("deployment {}: evaluation error — {}", deployment.id, e)
-                result.errors.append((deployment, str(e)))
                 continue
 
             # ── 3. Aggregate route changes and record sub-steps ──
@@ -127,16 +99,8 @@ class DeploymentStrategyEvaluator:
             result.route_changes.drain_route_ids.extend(changes.drain_route_ids)
             self._record_route_changes(deployment, changes)
 
-            # Group by sub-step
-            if cycle_result.completed:
-                result.completed.append(deployment)
-                result.completed_strategies[deployment.id] = policy.strategy
-            else:
-                group = result.groups.setdefault(
-                    cycle_result.sub_step,
-                    EvaluationGroup(sub_step=cycle_result.sub_step),
-                )
-                group.deployments.append(deployment)
+            # Classify into assignments
+            result.assignments[cycle_result.sub_step].add(deployment.id)
 
         return result
 
@@ -165,7 +129,7 @@ class DeploymentStrategyEvaluator:
         self,
         strategy: DeploymentStrategy,
         policy: DeploymentPolicyData,
-    ) -> BaseDeploymentStrategy:
+    ) -> AbstractDeploymentStrategy:
         """Create a strategy instance for the given deployment policy."""
         entry = self._strategy_registry.get(strategy)
         if entry is None:

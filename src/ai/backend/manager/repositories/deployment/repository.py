@@ -50,6 +50,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
+    DeploymentSubStep,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
@@ -285,9 +286,10 @@ class DeploymentRepository:
     async def get_endpoints_by_statuses(
         self,
         statuses: list[EndpointLifecycle],
+        sub_steps: list[DeploymentSubStep] | None = None,
     ) -> list[DeploymentInfo]:
-        """Get endpoints by lifecycle statuses."""
-        return await self._db_source.get_endpoints_by_statuses(statuses)
+        """Get endpoints by lifecycle statuses, optionally filtered by sub_steps."""
+        return await self._db_source.get_endpoints_by_statuses(statuses, sub_steps=sub_steps)
 
     @deployment_repository_resilience.apply()
     async def get_endpoint_info(
@@ -1128,7 +1130,7 @@ class DeploymentRepository:
         return await self._db_source.update_endpoint(updater)
 
     @deployment_repository_resilience.apply()
-    async def start_deploying_revision(
+    async def set_deploying_revision(
         self,
         endpoint_id: uuid.UUID,
         revision_id: uuid.UUID,
@@ -1138,7 +1140,7 @@ class DeploymentRepository:
         Returns:
             The current (previous) revision ID, or None if there was no previous revision.
         """
-        return await self._db_source.start_deploying_revision(endpoint_id, revision_id)
+        return await self._db_source.set_deploying_revision(endpoint_id, revision_id)
 
     # ========== Deployment Auto-Scaling Policy Operations ==========
 
@@ -1227,24 +1229,38 @@ class DeploymentRepository:
         await self._db_source.complete_deployment_revision_swap(endpoint_ids)
 
     @deployment_repository_resilience.apply()
-    async def complete_deployment_and_transition_to_ready(
-        self,
-        endpoint_ids: set[uuid.UUID],
-        batch_updaters: list[BatchUpdater[EndpointRow]],
-        bulk_creator: BulkCreator[DeploymentHistoryRow],
-    ) -> None:
-        """Atomically swap revisions, update lifecycle, and record history."""
-        await self._db_source.complete_deployment_and_transition_to_ready(
-            endpoint_ids, batch_updaters, bulk_creator
-        )
-
-    @deployment_repository_resilience.apply()
     async def clear_deploying_revision(
         self,
         endpoint_ids: set[uuid.UUID],
     ) -> None:
         """Clear deploying_revision for rolled-back deployments."""
         await self._db_source.clear_deploying_revision(endpoint_ids)
+
+    @deployment_repository_resilience.apply()
+    async def update_sub_steps(
+        self,
+        sub_step_map: dict[DeploymentSubStep, set[uuid.UUID]],
+    ) -> None:
+        """Bulk-update the sub_step column for multiple endpoints."""
+        await self._db_source.update_sub_steps(sub_step_map)
+
+    @deployment_repository_resilience.apply()
+    async def get_last_deployment_histories(
+        self,
+        deployment_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, DeploymentHistoryRow]:
+        """Get last history records for multiple deployments.
+
+        Returns the most recent history record for each deployment. The caller
+        should compare history.phase with the current phase to determine
+        if attempts should be used or reset to 0.
+        """
+        return await self._db_source.get_last_deployment_histories(deployment_ids)
+
+    @deployment_repository_resilience.apply()
+    async def get_db_now(self) -> datetime:
+        """Get current database server time."""
+        return await self._db_source.get_db_now()
 
     # ===================
     # Route operations

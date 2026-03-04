@@ -35,7 +35,6 @@ class DeploymentExecutionResult:
     successes: list[DeploymentInfo] = field(default_factory=list)
     errors: list[DeploymentExecutionError] = field(default_factory=list)
     skipped: list[DeploymentInfo] = field(default_factory=list)
-    completed: list[DeploymentInfo] = field(default_factory=list)
 
 
 @dataclass

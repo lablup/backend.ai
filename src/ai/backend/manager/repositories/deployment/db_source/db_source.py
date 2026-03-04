@@ -45,6 +45,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
+    DeploymentSubStep,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
@@ -429,6 +430,7 @@ class DeploymentDBSource:
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
+                    selectinload(EndpointRow.deployment_policy),
                 )
             )
             result = await db_sess.execute(query)
@@ -476,26 +478,32 @@ class DeploymentDBSource:
             return cleanup_configs
 
     async def get_endpoints_by_statuses(
-        self, statuses: list[EndpointLifecycle]
+        self,
+        statuses: list[EndpointLifecycle],
+        sub_steps: list[DeploymentSubStep] | None = None,
     ) -> list[DeploymentInfo]:
-        """Get all active endpoints."""
+        """Get endpoints by lifecycle statuses, optionally filtered by sub_steps."""
         async with self._begin_readonly_session_read_committed() as db_sess:
-            rows = await self._get_endpoints_by_statuses(db_sess, statuses)
-
-        return [row.to_deployment_info() for row in rows]
+            rows = await self._get_endpoints_by_statuses(db_sess, statuses, sub_steps)
+            return [row.to_deployment_info() for row in rows]
 
     async def _get_endpoints_by_statuses(
         self,
         db_sess: SASession,
         statuses: list[EndpointLifecycle],
+        sub_steps: list[DeploymentSubStep] | None = None,
     ) -> list[EndpointRow]:
-        """Fetch endpoints by lifecycle statuses."""
+        """Fetch endpoints by lifecycle statuses, optionally filtered by sub_steps."""
+        where_clause: sa.ColumnElement[bool] = EndpointRow.lifecycle_stage.in_(statuses)
+        if sub_steps is not None:
+            where_clause = sa.and_(where_clause, EndpointRow.sub_step.in_(sub_steps))
         query = (
             sa.select(EndpointRow)
-            .where(EndpointRow.lifecycle_stage.in_(statuses))
+            .where(where_clause)
             .options(
                 selectinload(EndpointRow.image_row),
                 selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
+                selectinload(EndpointRow.deployment_policy),
             )
         )
         result = await db_sess.execute(query)
@@ -707,6 +715,28 @@ class DeploymentDBSource:
         result = await db_sess.execute(query)
         rows = result.scalars().all()
         return {row.deployment_id: row for row in rows}
+
+    async def get_last_deployment_histories(
+        self,
+        deployment_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, DeploymentHistoryRow]:
+        """Get last history records for multiple deployments (regardless of phase).
+
+        Returns the most recent history record for each deployment. The caller
+        should compare history.phase with the current phase to determine
+        if attempts should be used or reset to 0.
+        """
+        if not deployment_ids:
+            return {}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            return await self._get_last_deployment_histories_bulk(db_sess, deployment_ids)
+
+    async def get_db_now(self) -> datetime:
+        """Get current database server time."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            result = await db_sess.execute(sa.select(sa.func.now()))
+            return result.scalar_one()
 
     async def delete_endpoint_with_routes(
         self,
@@ -2143,7 +2173,7 @@ class DeploymentDBSource:
 
             return row.to_deployment_info()
 
-    async def start_deploying_revision(
+    async def set_deploying_revision(
         self,
         endpoint_id: uuid.UUID,
         revision_id: uuid.UUID,
@@ -2313,39 +2343,6 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             stmt = (
                 sa.update(EndpointRow)
-                .where(EndpointRow.id.in_(endpoint_ids))
-                .values(
-                    current_revision=EndpointRow.deploying_revision,
-                    deploying_revision=None,
-                )
-            )
-            await db_sess.execute(stmt)
-
-    async def complete_deployment_and_transition_to_ready(
-        self,
-        endpoint_ids: set[uuid.UUID],
-        batch_updaters: Sequence[BatchUpdater[EndpointRow]],
-        bulk_creator: BulkCreator[DeploymentHistoryRow],
-    ) -> None:
-        """Atomically swap revisions, update lifecycle, and record history.
-
-        Performs all three operations in a single transaction to prevent
-        inconsistent state if the process crashes between steps.
-
-        The revision swap includes an idempotency guard
-        (deploying_revision IS NOT NULL) to prevent double-call issues.
-
-        Args:
-            endpoint_ids: Set of endpoint IDs to swap revisions for.
-            batch_updaters: Sequence of BatchUpdaters for lifecycle status updates.
-            bulk_creator: BulkCreator containing all history records.
-        """
-        if not endpoint_ids:
-            return
-        async with self._begin_session_read_committed() as db_sess:
-            # 1. Swap revisions with idempotency guard
-            swap_stmt = (
-                sa.update(EndpointRow)
                 .where(
                     EndpointRow.id.in_(endpoint_ids),
                     EndpointRow.deploying_revision.isnot(None),
@@ -2355,41 +2352,7 @@ class DeploymentDBSource:
                     deploying_revision=None,
                 )
             )
-            await db_sess.execute(swap_stmt)
-
-            # 2. Execute all lifecycle status updates
-            for batch_updater in batch_updaters:
-                await execute_batch_updater(db_sess, batch_updater)
-
-            # 3. Record history (same logic as update_endpoint_lifecycle_bulk_with_history)
-            if not bulk_creator.specs:
-                return
-
-            new_rows = [spec.build_row() for spec in bulk_creator.specs]
-            deployment_ids = [row.deployment_id for row in new_rows]
-
-            last_records = await self._get_last_deployment_histories_bulk(db_sess, deployment_ids)
-
-            merge_ids: list[uuid.UUID] = []
-            create_rows: list[DeploymentHistoryRow] = []
-
-            for new_row in new_rows:
-                last_row = last_records.get(new_row.deployment_id)
-                if last_row is not None and last_row.should_merge_with(new_row):
-                    merge_ids.append(last_row.id)
-                else:
-                    create_rows.append(new_row)
-
-            if merge_ids:
-                await db_sess.execute(
-                    sa.update(DeploymentHistoryRow)
-                    .where(DeploymentHistoryRow.id.in_(merge_ids))
-                    .values(attempts=DeploymentHistoryRow.attempts + 1)
-                )
-
-            if create_rows:
-                db_sess.add_all(create_rows)
-                await db_sess.flush()
+            await db_sess.execute(stmt)
 
     async def clear_deploying_revision(
         self,
@@ -2411,6 +2374,27 @@ class DeploymentDBSource:
                 .values(deploying_revision=None)
             )
             await db_sess.execute(stmt)
+
+    async def update_sub_steps(
+        self,
+        sub_step_map: dict[DeploymentSubStep, set[uuid.UUID]],
+    ) -> None:
+        """Bulk-update the sub_step column for multiple endpoints.
+
+        Args:
+            sub_step_map: Mapping from sub_step value to the set of endpoint IDs
+                that should be set to that sub_step.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            for sub_step, endpoint_ids in sub_step_map.items():
+                if not endpoint_ids:
+                    continue
+                stmt = (
+                    sa.update(EndpointRow)
+                    .where(EndpointRow.id.in_(endpoint_ids))
+                    .values(sub_step=sub_step)
+                )
+                await db_sess.execute(stmt)
 
     # ========== Access Token Operations ==========
 

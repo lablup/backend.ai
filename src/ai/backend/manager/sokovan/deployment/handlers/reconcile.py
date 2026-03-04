@@ -48,20 +48,21 @@ class ReconcileDeploymentHandler(DeploymentHandler):
         return None
 
     @classmethod
-    def target_statuses(cls) -> list[EndpointLifecycle]:
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
         """Get the target deployment statuses for this handler."""
-        return [EndpointLifecycle.READY]
+        return [DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY)]
 
     @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
         """Define state transitions for reconcile deployment handler (BEP-1030).
 
         - success: None (stays READY)
-        - failure: Deployment → SCALING (replica-route mismatch needs re-scaling)
+        - need_retry: Deployment → SCALING (replica-route mismatch needs re-scaling)
+        - expired / give_up: None (reconcile doesn't have terminal failure states)
         """
         return DeploymentStatusTransitions(
             success=None,
-            failure=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
+            need_retry=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
         )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:

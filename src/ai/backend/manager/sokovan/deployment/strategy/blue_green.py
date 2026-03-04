@@ -7,6 +7,7 @@ switches traffic from the old revision to the new one.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import override
 
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -14,20 +15,21 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec
 
-from .types import BaseDeploymentStrategy, CycleEvaluationResult
+from .types import AbstractDeploymentStrategy, StrategyCycleResult
 
 
-class BlueGreenStrategy(BaseDeploymentStrategy):
+class BlueGreenStrategy(AbstractDeploymentStrategy):
     """Blue-green deployment strategy FSM."""
 
     def __init__(self, spec: BlueGreenSpec) -> None:
         super().__init__(spec)
         self._spec = spec
 
+    @override
     def evaluate_cycle(
         self,
         deployment: DeploymentInfo,
         routes: Sequence[RouteInfo],
-    ) -> CycleEvaluationResult:
+    ) -> StrategyCycleResult:
         """Evaluate one cycle of blue-green deployment for a single deployment."""
         raise NotImplementedError("Blue-green deployment strategy is not yet implemented")

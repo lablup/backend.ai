@@ -45,9 +45,9 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         return LockID.LOCKID_DEPLOYMENT_CHECK_REPLICA
 
     @classmethod
-    def target_statuses(cls) -> list[EndpointLifecycle]:
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
         """Get the target deployment statuses for this handler."""
-        return [EndpointLifecycle.READY]
+        return [DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY)]
 
     @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
@@ -58,7 +58,6 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         """
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
-            failure=None,
         )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
