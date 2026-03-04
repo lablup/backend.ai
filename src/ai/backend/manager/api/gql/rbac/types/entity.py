@@ -151,6 +151,9 @@ class EntityRefGQL(Node):
                 | RBACElementType.PROJECT_RESOURCE_POLICY
                 | RBACElementType.AUDIT_LOG
                 | RBACElementType.EVENT_LOG
+                | RBACElementType.AGENT
+                | RBACElementType.KERNEL
+                | RBACElementType.ROUTING
             ):
                 return None
 

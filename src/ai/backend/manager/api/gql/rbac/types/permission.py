@@ -241,6 +241,9 @@ class PermissionGQL(Node):
                 | RBACElementType.AUDIT_LOG
                 | RBACElementType.EVENT_LOG
                 | RBACElementType.NOTIFICATION_RULE
+                | RBACElementType.AGENT
+                | RBACElementType.KERNEL
+                | RBACElementType.ROUTING
             ):
                 return None
 
