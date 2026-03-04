@@ -36,7 +36,7 @@ A single `evaluate()` call may produce different sub-steps for different deploym
 |--------|-------------|
 | **State transition** | Each sub-step handler returns explicit `next_status()` → coordinator's generic path handles all transitions |
 | **Routing** | Coordinator branches to evaluator path for `DeploymentLifecycleType.DEPLOYING` |
-| **Cycles** | Evaluator runs strategy FSM + applies route changes → handlers process results → coordinator records history |
+| **Cycles** | Evaluator runs strategy FSM → coordinator applies route changes → handlers process results → coordinator records history |
 
 
 ## Sub-documents
@@ -100,7 +100,7 @@ Core idea: A **strategy evaluator** evaluates DEPLOYING-state deployments and gr
 │  Implementations:    │   │  evaluate(deployments) → EvaluationResult        │
 │  ├─ CheckPending     │   │    1. Load policies/routes                       │
 │  ├─ Scaling          │   │    2. Run strategy FSM → CycleEvaluationResult  │
-│  ├─ CheckReplica     │   │    3. Apply route changes (scale_out/scale_in)   │
+│  ├─ CheckReplica     │   │    3. Aggregate route changes                    │
 │  ├─ Reconcile        │   │    4. Group by sub-step                          │
 │  └─ Destroying       │   └───────────────┬──────────────────────────────────┘
 └─────────────────────┘                    │
@@ -180,7 +180,7 @@ DeploymentStrategyEvaluator.evaluate(deployments)
     │  Phase 1: Load policies and routes
     │  ┌─────────────────────────────────────────────────────────┐
     │  │  policy_map = load_policies(deployments)                │
-    │  │  route_map = fetch_active_routes_by_endpoint_ids(...)   │
+    │  │  route_map = fetch_routes_by_endpoint_ids(...)           │
     │  └─────────────────────────────────────────────────────────┘
     │
     │  Phase 2: Run per-deployment strategy FSM
@@ -200,14 +200,6 @@ DeploymentStrategyEvaluator.evaluate(deployments)
     │  │      groups[cycle_result.sub_step].append(deployment)   │
     │  └─────────────────────────────────────────────────────────┘
     │
-    │  Phase 3: Apply route changes (in-progress only)
-    │  ┌─────────────────────────────────────────────────────────┐
-    │  │  Collect route changes from PROVISIONING/PROGRESSING:   │
-    │  │    scale_out_creators → create new routes               │
-    │  │    scale_in_updater → terminate old routes              │
-    │  │  repo.scale_routes(scale_out, scale_in)                │
-    │  └─────────────────────────────────────────────────────────┘
-    │
     ▼
   EvaluationResult {
     groups: {
@@ -217,13 +209,18 @@ DeploymentStrategyEvaluator.evaluate(deployments)
     completed: [deploy_D],  # strategy completed (revision swap pending)
     skipped: [deploy_E],    # no policy / unsupported strategy
     errors:  [error_F],     # exception during evaluation
+    route_changes: RouteChanges {
+      rollout_specs:    [Creator, ...],  # new routes to create
+      drain_route_ids:  [UUID, ...],     # old routes to terminate
+      promote_route_ids: [UUID, ...],    # green routes to activate (Blue-Green)
+    },
   }
 ```
 
 #### Key Design Principles
 
-1. **Route changes are applied by the evaluator**: scale_out/scale_in are applied once in the evaluator. Individual handlers do not touch routes.
-2. **Strategy FSMs live in the evaluator**: `_rolling_update_evaluate()`, `_blue_green_evaluate()` and other strategy FSM logic are internal helper methods of the evaluator.
+1. **Route changes are aggregated by the evaluator, applied by the coordinator**: The evaluator collects route mutations (rollout/drain/promote) from each strategy FSM into `EvaluationResult.route_changes`. The coordinator's `_apply_route_changes()` applies them after evaluation. Individual handlers do not touch routes.
+2. **Strategy FSMs are separate modules dispatched by the evaluator**: `rolling_update_evaluate()` and `blue_green_evaluate()` live in dedicated module files (`strategy/rolling_update.py`, `strategy/blue_green.py`). The evaluator dispatches to them based on the deployment policy's strategy type.
 3. **Only grouping is returned**: The evaluator classifies deployments by sub-step; actual processing (revision swap, deploying_revision cleanup, etc.) is delegated to handlers.
 
 ### Per-Sub-Step Handlers
@@ -245,7 +242,7 @@ The coordinator's `_handle_status_transitions()` extracts `.lifecycle` for DB up
 
 #### DeployingInProgressHandler (base) → Provisioning / Progressing
 
-PROVISIONING and PROGRESSING share the same logic (evaluator already applied route changes; handler returns success + reschedules), so `DeployingInProgressHandler` base class defines common behavior, and subclasses hard-code their sub-step-specific `next_status()` and `status_transitions()`:
+PROVISIONING and PROGRESSING share the same logic (coordinator already applied route changes; handler returns success + reschedules), so `DeployingInProgressHandler` base class defines common behavior, and subclasses hard-code their sub-step-specific `next_status()` and `status_transitions()`:
 
 ```python
 class DeployingInProgressHandler(DeploymentHandler):
@@ -260,7 +257,7 @@ class DeployingInProgressHandler(DeploymentHandler):
         return None
 
     async def execute(self, deployments):
-        # Route changes already applied by evaluator
+        # Route changes already applied by coordinator
         return DeploymentExecutionResult(successes=list(deployments))
 
     async def post_process(self, result):
@@ -335,6 +332,8 @@ _process_with_evaluator(lifecycle_type, evaluator)
     │  ┌───────────────────────────────────────────────────────────────┐
     │  │                                                               │
     │  │  eval_result = evaluator.evaluate(deployments)                │
+    │  │  _apply_route_changes(eval_result)                           │
+    │  │  ↑ coordinator applies rollout/drain/promote                 │
     │  │                                                               │
     │  │  for sub_step, group in eval_result.groups:                   │
     │  │    handler = handlers[(lifecycle_type, sub_step)]             │
@@ -356,8 +355,9 @@ _process_with_evaluator(lifecycle_type, evaluator)
     │
     │  5. Transition completed deployments (coordinator direct)
     │  if eval_result.completed:
-    │    _transition_completed_deployments(completed)
+    │    _transition_completed_deployments(completed, records=all_records)
     │    ↑ atomic revision swap + DEPLOYING → READY + history recording
+    │    ↑ includes route mutation sub_steps from this cycle
     │
     ▼
 ```
@@ -370,45 +370,50 @@ Each cycle evaluation produces sub-step variants recorded via the existing `Depl
 
 The coordinator's `_handle_status_transitions()` calls `extract_sub_steps_for_entity()` for each handler's result, including the deployment's sub-step information in the history.
 
-#### Rolling Update Per-Cycle Recording Examples
+#### Sub-Step Recording: Route Mutation Granularity
 
-**PROVISIONING cycle** — new routes still being provisioned:
+Sub-steps are recorded at the **route mutation level** by the evaluator's `_record_route_changes()`. Each route mutation type (rollout, drain, promote) is recorded as a separate sub-step entry with the count of affected routes.
+
+**PROVISIONING cycle** — new routes created:
 
 ```
 sub_steps:
-  [rolling_update_evaluate] classify_routes      → success
-  [rolling_update_evaluate] wait_provisioning     → success
-  [strategy_result]         determine_sub_step    → success (message: "provisioning")
+  rollout       → SUCCESS (message: "3 new route(s)")
+  provisioning  → SUCCESS
 ```
 
 **PROGRESSING cycle** — creating new routes / terminating old routes:
 
 ```
 sub_steps:
-  [rolling_update_evaluate] classify_routes      → success
-  [rolling_update_evaluate] check_completion     → success
-  [rolling_update_evaluate] calculate_surge      → success
-  [rolling_update_evaluate] build_route_changes  → success
-  [strategy_result]         determine_sub_step   → success (message: "progressing")
+  rollout       → SUCCESS (message: "1 new route(s)")
+  drain         → SUCCESS (message: "1 route(s)")
+  progressing   → SUCCESS
 ```
 
-**COMPLETED cycle** — all new routes healthy, no old routes remaining:
+**COMPLETED cycle (Blue-Green)** — promotion executed:
 
 ```
 sub_steps:
-  [rolling_update_evaluate] classify_routes      → success
-  [rolling_update_evaluate] check_completion     → success
-  [strategy_result]         determine_sub_step   → success (message: "completed")
+  drain         → SUCCESS (message: "3 route(s)")
+  promote       → SUCCESS (message: "3 route(s)")
 ```
 
-The revision swap (`complete_deployment_revision_swap`) is performed by the coordinator's `_transition_completed_deployments()` outside the recorder scope, so it does not appear in sub_steps. This method atomically swaps the revision and transitions the deployment to READY with history recording.
+**COMPLETED cycle (Rolling Update)** — final drain:
 
-Format is `[phase] step`. The `determine_sub_step` step's `message` field records the determined sub-step value. This information is stored as JSON in the `deployment_history` table's `sub_steps` column and is queryable via API/CLI.
+```
+sub_steps:
+  drain         → SUCCESS (message: "1 route(s)")
+```
+
+Route mutation sub-steps are recorded within the `DeploymentRecorderContext` scope. For in-progress deployments, handlers add their own sub-step (e.g., `provisioning`, `progressing`) to the same record. For completed deployments, `_transition_completed_deployments()` receives the recorder pool's `all_records` and includes the current cycle's route mutation sub-steps in the completion history.
+
+The revision swap (`complete_deployment_revision_swap`) is an atomic DB operation that does not appear as a sub-step.
 
 This enables:
 
-- **Observability**: Each deployment's progress is tracked per-entity with sub-step granularity (e.g., "provisioning", "progressing", "completed")
-- **Debugging**: The sub-step history shows exactly which phase each deployment was in at each cycle
+- **Observability**: Each deployment's progress is tracked per-entity with route mutation granularity
+- **Debugging**: The sub-step history shows exactly which route mutations occurred at each cycle
 - **Consistency**: All handlers use the same coordinator generic path
 
 ### Per-Strategy Configuration
