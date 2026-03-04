@@ -3,34 +3,24 @@ import re
 
 from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.prometheus.preset import MetricPreset
-from ai.backend.common.exception import InvalidAPIParameters, PrometheusQueryPresetNotFound
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
 )
-from ai.backend.manager.services.prometheus_query_preset.actions.create_preset import (
+from ai.backend.manager.services.prometheus_query_preset.actions import (
     CreatePresetAction,
     CreatePresetActionResult,
-)
-from ai.backend.manager.services.prometheus_query_preset.actions.delete_preset import (
     DeletePresetAction,
     DeletePresetActionResult,
-)
-from ai.backend.manager.services.prometheus_query_preset.actions.execute_preset import (
     ExecutePresetAction,
     ExecutePresetActionResult,
-)
-from ai.backend.manager.services.prometheus_query_preset.actions.get_preset import (
     GetPresetAction,
     GetPresetActionResult,
-)
-from ai.backend.manager.services.prometheus_query_preset.actions.list_presets import (
-    ListPresetsAction,
-    ListPresetsActionResult,
-)
-from ai.backend.manager.services.prometheus_query_preset.actions.modify_preset import (
     ModifyPresetAction,
     ModifyPresetActionResult,
+    SearchPresetsAction,
+    SearchPresetsActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -61,9 +51,9 @@ class PrometheusQueryPresetService:
         preset_data = await self._repository.get_by_id(action.preset_id)
         return GetPresetActionResult(preset=preset_data)
 
-    async def list_presets(self, action: ListPresetsAction) -> ListPresetsActionResult:
+    async def search_presets(self, action: SearchPresetsAction) -> SearchPresetsActionResult:
         result = await self._repository.search(action.querier)
-        return ListPresetsActionResult(
+        return SearchPresetsActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
@@ -71,17 +61,12 @@ class PrometheusQueryPresetService:
         )
 
     async def modify_preset(self, action: ModifyPresetAction) -> ModifyPresetActionResult:
-        action.updater.pk_value = action.preset_id
         preset_data = await self._repository.update(action.updater)
         return ModifyPresetActionResult(preset=preset_data)
 
     async def delete_preset(self, action: DeletePresetAction) -> DeletePresetActionResult:
-        deleted = await self._repository.delete(action.preset_id)
-        if not deleted:
-            raise PrometheusQueryPresetNotFound(
-                f"Prometheus query preset {action.preset_id} not found"
-            )
-        return DeletePresetActionResult(deleted=deleted)
+        preset_id = await self._repository.delete(action.preset_id)
+        return DeletePresetActionResult(preset_id=preset_id)
 
     async def execute_preset(self, action: ExecutePresetAction) -> ExecutePresetActionResult:
         preset_data = await self._repository.get_by_id(action.preset_id)

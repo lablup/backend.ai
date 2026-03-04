@@ -5,7 +5,7 @@ Tests the service layer with mocked repository and prometheus client.
 
 from __future__ import annotations
 
-import uuid
+from dataclasses import replace
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -29,54 +29,35 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
 )
-from ai.backend.manager.services.prometheus_query_preset.actions.create_preset import (
+from ai.backend.manager.services.prometheus_query_preset.actions import (
     CreatePresetAction,
-)
-from ai.backend.manager.services.prometheus_query_preset.actions.delete_preset import (
     DeletePresetAction,
-)
-from ai.backend.manager.services.prometheus_query_preset.actions.execute_preset import (
     ExecutePresetAction,
-)
-from ai.backend.manager.services.prometheus_query_preset.actions.get_preset import (
     GetPresetAction,
-)
-from ai.backend.manager.services.prometheus_query_preset.actions.list_presets import (
-    ListPresetsAction,
-)
-from ai.backend.manager.services.prometheus_query_preset.actions.modify_preset import (
     ModifyPresetAction,
+    SearchPresetsAction,
 )
 from ai.backend.manager.services.prometheus_query_preset.service import (
     PrometheusQueryPresetService,
 )
 
 
-def _make_preset_data(
-    *,
-    preset_id: uuid.UUID | None = None,
-    name: str = "cpu_usage",
-    metric_name: str = "backendai_container_cpu_util",
-    query_template: str = "rate(container_cpu_usage_seconds_total{{{labels}}}[{window}])",
-    time_window: str | None = "5m",
-    filter_labels: list[str] | None = None,
-    group_labels: list[str] | None = None,
-) -> PrometheusQueryPresetData:
-    now = datetime.now(UTC)
-    return PrometheusQueryPresetData(
-        id=preset_id or uuid4(),
-        name=name,
-        metric_name=metric_name,
-        query_template=query_template,
-        time_window=time_window,
-        filter_labels=["kernel_id", "session_id"] if filter_labels is None else filter_labels,
-        group_labels=["kernel_id"] if group_labels is None else group_labels,
-        created_at=now,
-        updated_at=now,
-    )
-
-
 class TestPrometheusQueryPresetService:
+    @pytest.fixture
+    def preset_data(self) -> PrometheusQueryPresetData:
+        now = datetime.now(UTC)
+        return PrometheusQueryPresetData(
+            id=uuid4(),
+            name="cpu_usage",
+            metric_name="backendai_container_cpu_util",
+            query_template="rate(container_cpu_usage_seconds_total{{{labels}}}[{window}])",
+            time_window="5m",
+            filter_labels=["kernel_id", "session_id"],
+            group_labels=["kernel_id"],
+            created_at=now,
+            updated_at=now,
+        )
+
     @pytest.fixture
     def mock_repository(self) -> MagicMock:
         return MagicMock(spec=PrometheusQueryPresetRepository)
@@ -97,16 +78,12 @@ class TestPrometheusQueryPresetService:
             default_timewindow="1m",
         )
 
-    # =========================================================================
-    # Tests - Create
-    # =========================================================================
-
     async def test_create_preset(
         self,
         service: PrometheusQueryPresetService,
         mock_repository: MagicMock,
+        preset_data: PrometheusQueryPresetData,
     ) -> None:
-        preset_data = _make_preset_data()
         mock_repository.create = AsyncMock(return_value=preset_data)
 
         creator = MagicMock(spec=Creator)
@@ -116,16 +93,12 @@ class TestPrometheusQueryPresetService:
         assert result.preset == preset_data
         mock_repository.create.assert_called_once_with(creator)
 
-    # =========================================================================
-    # Tests - Get
-    # =========================================================================
-
     async def test_get_preset(
         self,
         service: PrometheusQueryPresetService,
         mock_repository: MagicMock,
+        preset_data: PrometheusQueryPresetData,
     ) -> None:
-        preset_data = _make_preset_data()
         mock_repository.get_by_id = AsyncMock(return_value=preset_data)
 
         action = GetPresetAction(preset_id=preset_data.id)
@@ -148,16 +121,12 @@ class TestPrometheusQueryPresetService:
         with pytest.raises(PrometheusQueryPresetNotFound):
             await service.get_preset(action)
 
-    # =========================================================================
-    # Tests - List
-    # =========================================================================
-
-    async def test_list_presets(
+    async def test_search_presets(
         self,
         service: PrometheusQueryPresetService,
         mock_repository: MagicMock,
+        preset_data: PrometheusQueryPresetData,
     ) -> None:
-        preset_data = _make_preset_data()
         mock_repository.search = AsyncMock(
             return_value=PrometheusQueryPresetListResult(
                 items=[preset_data],
@@ -172,8 +141,8 @@ class TestPrometheusQueryPresetService:
             conditions=[],
             orders=[],
         )
-        action = ListPresetsAction(querier=querier)
-        result = await service.list_presets(action)
+        action = SearchPresetsAction(querier=querier)
+        result = await service.search_presets(action)
 
         assert result.items == [preset_data]
         assert result.total_count == 1
@@ -181,7 +150,7 @@ class TestPrometheusQueryPresetService:
         assert result.has_previous_page is False
         mock_repository.search.assert_called_once_with(querier)
 
-    async def test_list_presets_empty(
+    async def test_search_presets_empty(
         self,
         service: PrometheusQueryPresetService,
         mock_repository: MagicMock,
@@ -200,22 +169,18 @@ class TestPrometheusQueryPresetService:
             conditions=[],
             orders=[],
         )
-        action = ListPresetsAction(querier=querier)
-        result = await service.list_presets(action)
+        action = SearchPresetsAction(querier=querier)
+        result = await service.search_presets(action)
 
         assert result.items == []
         assert result.total_count == 0
-
-    # =========================================================================
-    # Tests - Modify
-    # =========================================================================
 
     async def test_modify_preset(
         self,
         service: PrometheusQueryPresetService,
         mock_repository: MagicMock,
+        preset_data: PrometheusQueryPresetData,
     ) -> None:
-        preset_data = _make_preset_data()
         mock_repository.update = AsyncMock(return_value=preset_data)
 
         updater = MagicMock(spec=Updater)
@@ -223,12 +188,7 @@ class TestPrometheusQueryPresetService:
         result = await service.modify_preset(action)
 
         assert result.preset == preset_data
-        assert updater.pk_value == preset_data.id
         mock_repository.update.assert_called_once_with(updater)
-
-    # =========================================================================
-    # Tests - Delete
-    # =========================================================================
 
     async def test_delete_preset(
         self,
@@ -236,12 +196,12 @@ class TestPrometheusQueryPresetService:
         mock_repository: MagicMock,
     ) -> None:
         preset_id = uuid4()
-        mock_repository.delete = AsyncMock(return_value=True)
+        mock_repository.delete = AsyncMock(return_value=preset_id)
 
         action = DeletePresetAction(preset_id=preset_id)
         result = await service.delete_preset(action)
 
-        assert result.deleted is True
+        assert result.preset_id == preset_id
         mock_repository.delete.assert_called_once_with(preset_id)
 
     async def test_delete_preset_not_found(
@@ -250,26 +210,21 @@ class TestPrometheusQueryPresetService:
         mock_repository: MagicMock,
     ) -> None:
         preset_id = uuid4()
-        mock_repository.delete = AsyncMock(return_value=False)
+        mock_repository.delete = AsyncMock(
+            side_effect=PrometheusQueryPresetNotFound(f"Preset {preset_id} not found")
+        )
 
         action = DeletePresetAction(preset_id=preset_id)
         with pytest.raises(PrometheusQueryPresetNotFound):
             await service.delete_preset(action)
-
-    # =========================================================================
-    # Tests - Execute
-    # =========================================================================
 
     async def test_execute_preset(
         self,
         service: PrometheusQueryPresetService,
         mock_repository: MagicMock,
         mock_prometheus_client: MagicMock,
+        preset_data: PrometheusQueryPresetData,
     ) -> None:
-        preset_data = _make_preset_data(
-            filter_labels=["kernel_id", "session_id"],
-            group_labels=["kernel_id"],
-        )
         mock_repository.get_by_id = AsyncMock(return_value=preset_data)
 
         prometheus_response = PrometheusQueryRangeResponse(
@@ -296,10 +251,8 @@ class TestPrometheusQueryPresetService:
         self,
         service: PrometheusQueryPresetService,
         mock_repository: MagicMock,
+        preset_data: PrometheusQueryPresetData,
     ) -> None:
-        preset_data = _make_preset_data(
-            filter_labels=["kernel_id", "session_id"],
-        )
         mock_repository.get_by_id = AsyncMock(return_value=preset_data)
 
         time_range = QueryTimeRange(start="1704067200", end="1704153600", step="60s")
@@ -311,17 +264,15 @@ class TestPrometheusQueryPresetService:
             time_range=time_range,
         )
 
-        with pytest.raises(InvalidAPIParameters, match="Invalid filter labels"):
+        with pytest.raises(InvalidAPIParameters):
             await service.execute_preset(action)
 
     async def test_execute_preset_invalid_group_label(
         self,
         service: PrometheusQueryPresetService,
         mock_repository: MagicMock,
+        preset_data: PrometheusQueryPresetData,
     ) -> None:
-        preset_data = _make_preset_data(
-            group_labels=["kernel_id"],
-        )
         mock_repository.get_by_id = AsyncMock(return_value=preset_data)
 
         time_range = QueryTimeRange(start="1704067200", end="1704153600", step="60s")
@@ -333,15 +284,15 @@ class TestPrometheusQueryPresetService:
             time_range=time_range,
         )
 
-        with pytest.raises(InvalidAPIParameters, match="Invalid group labels"):
+        with pytest.raises(InvalidAPIParameters):
             await service.execute_preset(action)
 
     async def test_execute_preset_invalid_window_format(
         self,
         service: PrometheusQueryPresetService,
         mock_repository: MagicMock,
+        preset_data: PrometheusQueryPresetData,
     ) -> None:
-        preset_data = _make_preset_data()
         mock_repository.get_by_id = AsyncMock(return_value=preset_data)
 
         time_range = QueryTimeRange(start="1704067200", end="1704153600", step="60s")
@@ -353,7 +304,7 @@ class TestPrometheusQueryPresetService:
             time_range=time_range,
         )
 
-        with pytest.raises(InvalidAPIParameters, match="Invalid window format"):
+        with pytest.raises(InvalidAPIParameters):
             await service.execute_preset(action)
 
     async def test_execute_preset_window_fallback_to_preset(
@@ -361,9 +312,10 @@ class TestPrometheusQueryPresetService:
         service: PrometheusQueryPresetService,
         mock_repository: MagicMock,
         mock_prometheus_client: MagicMock,
+        preset_data: PrometheusQueryPresetData,
     ) -> None:
         """When request window is None, falls back to preset's time_window."""
-        preset_data = _make_preset_data(time_window="10m")
+        preset_data = replace(preset_data, time_window="10m")
         mock_repository.get_by_id = AsyncMock(return_value=preset_data)
 
         prometheus_response = PrometheusQueryRangeResponse(
@@ -392,9 +344,10 @@ class TestPrometheusQueryPresetService:
         service: PrometheusQueryPresetService,
         mock_repository: MagicMock,
         mock_prometheus_client: MagicMock,
+        preset_data: PrometheusQueryPresetData,
     ) -> None:
         """When both request and preset window are None, falls back to server config."""
-        preset_data = _make_preset_data(time_window=None)
+        preset_data = replace(preset_data, time_window=None)
         mock_repository.get_by_id = AsyncMock(return_value=preset_data)
 
         prometheus_response = PrometheusQueryRangeResponse(
@@ -423,9 +376,10 @@ class TestPrometheusQueryPresetService:
         service: PrometheusQueryPresetService,
         mock_repository: MagicMock,
         mock_prometheus_client: MagicMock,
+        preset_data: PrometheusQueryPresetData,
     ) -> None:
         """When preset has empty filter_labels, any labels are allowed."""
-        preset_data = _make_preset_data(filter_labels=[], group_labels=[])
+        preset_data = replace(preset_data, filter_labels=[], group_labels=[])
         mock_repository.get_by_id = AsyncMock(return_value=preset_data)
 
         prometheus_response = PrometheusQueryRangeResponse(

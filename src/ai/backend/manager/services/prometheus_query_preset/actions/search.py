@@ -13,7 +13,7 @@ from ai.backend.manager.services.prometheus_query_preset.actions.base import (
 
 
 @dataclass
-class ListPresetsAction(PrometheusQueryPresetAction):
+class SearchPresetsAction(PrometheusQueryPresetAction):
     querier: BatchQuerier
 
     @override
@@ -27,7 +27,7 @@ class ListPresetsAction(PrometheusQueryPresetAction):
 
 
 @dataclass
-class ListPresetsActionResult(BaseActionResult):
+class SearchPresetsActionResult(BaseActionResult):
     items: list[PrometheusQueryPresetData]
     total_count: int
     has_next_page: bool
