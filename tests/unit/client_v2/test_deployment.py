@@ -17,9 +17,12 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
+    CreateDeploymentPolicyRequest,
+    CreateDeploymentPolicyResponse,
     CreateDeploymentResponse,
     DeactivateRevisionResponse,
     DestroyDeploymentResponse,
+    GetDeploymentPolicyResponse,
     GetDeploymentResponse,
     GetRevisionResponse,
     ListDeploymentsResponse,
@@ -28,6 +31,8 @@ from ai.backend.common.dto.manager.deployment import (
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
+    UpdateDeploymentPolicyRequest,
+    UpdateDeploymentPolicyResponse,
     UpdateDeploymentRequest,
     UpdateDeploymentResponse,
     UpdateRouteTrafficStatusResponse,
@@ -356,3 +361,70 @@ class TestRouteOperations:
         )
         assert body is not None
         assert body["traffic_status"] == "active"
+
+
+# ---------------------------------------------------------------------------
+# Policy operations
+# ---------------------------------------------------------------------------
+
+_SAMPLE_POLICY_ID = uuid4()
+
+_SAMPLE_POLICY_DTO: dict[str, Any] = {
+    "id": str(_SAMPLE_POLICY_ID),
+    "strategy": "ROLLING",
+    "strategy_spec": {"max_surge": 1, "max_unavailable": 0},
+    "rollback_on_failure": False,
+    "created_at": "2025-01-01T00:00:00",
+    "updated_at": "2025-01-01T00:00:00",
+}
+
+
+class TestDeploymentPolicyOperations:
+    async def test_get_policy(self) -> None:
+        resp = _json_response({"deployment_policy": _SAMPLE_POLICY_DTO})
+        mock_session = _make_request_session(resp)
+        dc = _make_deployment_client(mock_session)
+
+        result = await dc.get_policy(_SAMPLE_DEPLOYMENT_ID)
+
+        assert isinstance(result, GetDeploymentPolicyResponse)
+        assert result.deployment_policy.strategy == DeploymentStrategy.ROLLING
+        method, url, _ = _last_request_call(mock_session)
+        assert method == "GET"
+        assert f"/deployments/{_SAMPLE_DEPLOYMENT_ID}/policy" in url
+
+    async def test_create_policy(self) -> None:
+        resp = _json_response({"deployment_policy": _SAMPLE_POLICY_DTO}, status=201)
+        mock_session = _make_request_session(resp)
+        dc = _make_deployment_client(mock_session)
+
+        request = CreateDeploymentPolicyRequest(
+            strategy=DeploymentStrategy.ROLLING,
+            rollback_on_failure=False,
+        )
+        result = await dc.create_policy(_SAMPLE_DEPLOYMENT_ID, request)
+
+        assert isinstance(result, CreateDeploymentPolicyResponse)
+        assert result.deployment_policy.strategy == DeploymentStrategy.ROLLING
+        method, url, body = _last_request_call(mock_session)
+        assert method == "POST"
+        assert f"/deployments/{_SAMPLE_DEPLOYMENT_ID}/policy" in url
+        assert body is not None
+        assert body["strategy"] == "ROLLING"
+
+    async def test_update_policy(self) -> None:
+        updated_dto = {**_SAMPLE_POLICY_DTO, "rollback_on_failure": True}
+        resp = _json_response({"deployment_policy": updated_dto})
+        mock_session = _make_request_session(resp)
+        dc = _make_deployment_client(mock_session)
+
+        request = UpdateDeploymentPolicyRequest(rollback_on_failure=True)
+        result = await dc.update_policy(_SAMPLE_DEPLOYMENT_ID, request)
+
+        assert isinstance(result, UpdateDeploymentPolicyResponse)
+        assert result.deployment_policy.rollback_on_failure is True
+        method, url, body = _last_request_call(mock_session)
+        assert method == "PATCH"
+        assert f"/deployments/{_SAMPLE_DEPLOYMENT_ID}/policy" in url
+        assert body is not None
+        assert body["rollback_on_failure"] is True
