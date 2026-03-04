@@ -2313,7 +2313,10 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             stmt = (
                 sa.update(EndpointRow)
-                .where(EndpointRow.id.in_(endpoint_ids))
+                .where(
+                    EndpointRow.id.in_(endpoint_ids),
+                    EndpointRow.deploying_revision.isnot(None),
+                )
                 .values(
                     current_revision=EndpointRow.deploying_revision,
                     deploying_revision=None,
