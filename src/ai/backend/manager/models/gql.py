@@ -1325,7 +1325,8 @@ class Query(graphene.ObjectType):
     ) -> AgentSummary:
         ctx: GraphQueryContext = info.context
         if ctx.config_provider.config.manager.hide_agents:
-            raise ObjectNotFound(object_name="agent")
+            if ctx.user["role"] != UserRole.SUPERADMIN:
+                raise ObjectNotFound(object_name="agent")
 
         loader = ctx.dataloader_manager.get_loader_by_func(
             ctx,
@@ -1354,7 +1355,8 @@ class Query(graphene.ObjectType):
     ) -> AgentSummaryList:
         ctx: GraphQueryContext = info.context
         if ctx.config_provider.config.manager.hide_agents:
-            raise ObjectNotFound(object_name="agent")
+            if ctx.user["role"] != UserRole.SUPERADMIN:
+                raise ObjectNotFound(object_name="agent")
 
         total_count = await AgentSummary.load_count(
             ctx,
