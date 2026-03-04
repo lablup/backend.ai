@@ -15,6 +15,7 @@ import sqlalchemy as sa
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.rest.export.adapter import ExportAdapter
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
@@ -44,6 +45,9 @@ from ai.backend.manager.repositories.export.reports.project import (
     _serialize_json,
 )
 from ai.backend.testutils.db import with_tables
+
+# Reference Row models to prevent unused-import removal (mapper initialization).
+_MAPPER_ROWS = [AgentRow]
 
 
 @dataclass(frozen=True)

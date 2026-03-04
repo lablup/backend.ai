@@ -807,7 +807,7 @@ class _TestConfigProvider(ManagerConfigProvider):
         # LoaderChain, EtcdConfigWatcher, and LegacyEtcdLoader dependencies
         # that are irrelevant in the test environment.
         self._config = config
-        self._etcd_watcher_task = asyncio.create_task(asyncio.sleep(0))
+        self._etcd_watcher_task = None
 
 
 @pytest.fixture()
