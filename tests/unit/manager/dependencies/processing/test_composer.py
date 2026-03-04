@@ -16,6 +16,12 @@ def _make_processing_input() -> ProcessingInput:
     mock_config_provider = MagicMock()
     mock_config_provider.config.reporter.smtp = []
     mock_config_provider.config.reporter.action_monitors = []
+    # Required by lifecycle background tasks (agent_lost_checker, manager_status_watcher)
+    mock_config_provider.config.manager.heartbeat_timeout = 60
+    mock_config_provider.config.manager.status_update_interval = None
+
+    mock_stats_monitor = MagicMock()
+    mock_stats_monitor.report_metric = AsyncMock()
 
     return ProcessingInput(
         message_queue=MagicMock(),
@@ -53,7 +59,7 @@ def _make_processing_input() -> ProcessingInput:
         prometheus_client=MagicMock(),
         agent_client_pool=MagicMock(),
         distributed_lock_factory=MagicMock(),
-        stats_monitor=MagicMock(),
+        stats_monitor=mock_stats_monitor,
         pidx=0,
     )
 

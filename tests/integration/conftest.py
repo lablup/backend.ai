@@ -9,13 +9,14 @@ import tempfile
 import textwrap
 import uuid
 from collections.abc import AsyncIterator, Iterator
-from contextlib import AsyncExitStack, asynccontextmanager
+from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from pathlib import Path
 
 import asyncpg
 import pytest
 import sqlalchemy as sa
+import tomli_w
 import yarl
 from aiohttp import web
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
@@ -25,33 +26,28 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.configs.etcd import EtcdConfig
-from ai.backend.common.configs.loader import EtcdConfigWatcher, LoaderChain
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
-from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.jwt.validator import JWTValidator
+from ai.backend.common.dependencies import DependencyBuilderStack
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest.middleware import build_auth_middleware, build_exception_middleware
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
 from ai.backend.manager.config.bootstrap import BootstrapConfig
-from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import (
     DatabaseConfig,
     DebugConfig,
     ManagerConfig,
-    ManagerUnifiedConfig,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.dependencies.composer import DependencyInput, ManagerDependencyComposer
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import GroupRow, association_groups_users
@@ -71,18 +67,11 @@ from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.server import (
+    _setup_api,
     build_root_app,
     webapp_plugin_ctx,
 )
 from ai.backend.testutils.pants import get_parallel_slot
-
-
-@asynccontextmanager
-async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncIterator[None]:
-    async with AsyncEtcd.create_from_config(etcd_config) as etcd:
-        root_ctx.etcd = etcd
-        yield
-
 
 # Import testcontainer fixtures (etcd_container, redis_container, postgres_container)
 # via pytest_plugins so they are registered as fixtures without triggering
@@ -270,6 +259,20 @@ def bootstrap_config(
         shutil.rmtree(ipc_base_path)
     except OSError:
         pass
+
+
+@pytest.fixture(scope="session")
+def bootstrap_config_path(
+    bootstrap_config: BootstrapConfig,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Path:
+    """Write the bootstrap config to a temp TOML file for ManagerDependencyComposer."""
+    data = json.loads(bootstrap_config.model_dump_json(by_alias=True))
+    config_dir = tmp_path_factory.mktemp("config")
+    config_path = config_dir / "manager.toml"
+    with open(config_path, "wb") as f:
+        tomli_w.dump(data, f)
+    return config_path
 
 
 # ---------------------------------------------------------------------------
@@ -760,72 +763,67 @@ async def database_fixture(
 @pytest.fixture()
 async def server_factory(
     bootstrap_config: BootstrapConfig,
+    bootstrap_config_path: Path,
     database_fixture: None,
     etcd_fixture: None,
 ) -> AsyncIterator[ServerInfo]:
-    """
-    Start a full-stack manager server with ALL cleanup_contexts.
+    """Start a full-stack manager server using ManagerDependencyComposer.
 
-    This is the key difference from component tests:
-    - Component tests use selective cleanup_contexts (or an empty list)
-    - Integration tests use cleanup_contexts=None (ALL cleanup_contexts)
-
-    The server lifecycle follows the same pattern as ``server_main()`` in
-    ``ai.backend.manager.server``:
-    1. Build the root app with ALL cleanup_contexts and subapp packages
-    2. Initialize etcd_ctx and config_provider_ctx separately
-    3. Initialize webapp_plugin_ctx for plugin webapp loading
-    4. Start the server with AppRunner + TCPSite
+    Follows the same pattern as ``server_main()`` in ``ai.backend.manager.server``:
+    1. Build the root app
+    2. Initialize all dependencies via ManagerDependencyComposer
+    3. Insert DI-based middlewares (exception, auth)
+    4. Build and mount the API module tree
+    5. Load webapp plugins
+    6. Start the server with AppRunner + TCPSite
     """
     init_stack = AsyncExitStack()
 
-    root_app = build_root_app(
-        0,
-        bootstrap_config,
-        cleanup_contexts=None,
-    )
-    root_ctx: RootContext = root_app["_root.context"]
+    root_app = build_root_app(0, bootstrap_config)
 
     await init_stack.__aenter__()
-    config_provider: ManagerConfigProvider | None = None
     try:
-        await init_stack.enter_async_context(
-            etcd_ctx(root_ctx, bootstrap_config.etcd.to_dataclass())
+        # Initialize all dependencies via the Composer
+        dep_stack = DependencyBuilderStack()
+        await init_stack.enter_async_context(dep_stack)
+        dep_input = DependencyInput(
+            config_path=bootstrap_config_path,
+            pidx=0,
+        )
+        r = await dep_stack.enter_composer(
+            ManagerDependencyComposer(),
+            dep_input,
         )
 
-        # Create ManagerConfigProvider directly, bypassing the production
-        # config loading pipeline (LoaderChain, TOML parsing, etcd watcher).
-        # NOTE: model_validate() is used instead of direct construction because
-        # ManagerUnifiedConfig has fields with default_factory (e.g. service_discovery,
-        # artifact_registry) that mypy does not recognize as optional constructor args.
-        unified_config = ManagerUnifiedConfig.model_validate({
-            "db": bootstrap_config.db,
-            "etcd": bootstrap_config.etcd,
-            "manager": bootstrap_config.manager,
-            "logging": bootstrap_config.logging,
-            "pyroscope": bootstrap_config.pyroscope,
-            "debug": bootstrap_config.debug,
-        })
-        legacy_etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
-        etcd_watcher = EtcdConfigWatcher(root_ctx.etcd)
-        loader_chain = LoaderChain([legacy_etcd_loader])
-        config_provider = ManagerConfigProvider(
-            loader_chain,
-            unified_config,
-            etcd_watcher,
-            legacy_etcd_loader,
+        # Insert DI-based middlewares
+        root_app.middlewares.insert(
+            1,
+            build_exception_middleware(
+                error_monitor=r.monitoring.error_monitor,
+                stats_monitor=r.monitoring.stats_monitor,
+                config_provider=r.bootstrap.config_provider,
+            ),
         )
-        root_ctx.config_provider = config_provider
+        root_app.middlewares.insert(
+            2,
+            build_auth_middleware(
+                db=r.infrastructure.db,
+                jwt_validator=r.system.jwt_validator,
+                valkey_stat=r.infrastructure.valkey.stat,
+                hook_plugin_ctx=r.plugins.hook_plugin_ctx,
+            ),
+        )
 
-        jwt_config = root_ctx.config_provider.config.jwt.to_jwt_config()
-        root_ctx.jwt_validator = JWTValidator(jwt_config)
+        # Build and mount the API module tree
+        _setup_api(root_app, r, 0)
 
-        await init_stack.enter_async_context(webapp_plugin_ctx(root_app))
+        # Plugin webapps
+        await init_stack.enter_async_context(webapp_plugin_ctx(root_app, dep_resources=r, pidx=0))
 
         runner = web.AppRunner(root_app, handle_signals=False)
         await runner.setup()
 
-        service_addr = root_ctx.config_provider.config.manager.service_addr
+        service_addr = r.bootstrap.config_provider.config.manager.service_addr
         site = web.TCPSite(
             runner,
             service_addr.host,
@@ -837,8 +835,6 @@ async def server_factory(
         yield ServerInfo(host=str(service_addr.host), port=service_addr.port)
     finally:
         await runner.cleanup()
-        if config_provider is not None:
-            await config_provider.terminate()
         await init_stack.__aexit__(None, None, None)
 
 
