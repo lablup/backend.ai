@@ -31,55 +31,71 @@ MEMBER_ROLE_POSTFIX = "member"
 def _add_entity_type_permissions(db_conn: Connection) -> None:
     """Add SESSION entity-type permissions to all role+scope combinations.
 
-    This operation queries existing role+scope combinations from the permissions table
-    and adds SESSION operations based on the role name.
+    Uses a single set-based INSERT ... SELECT to derive SESSION permissions
+    for all role+scope combinations without application-side pagination.
     """
-    offset = 0
+    # Precompute operation lists
+    member_ops = [op.value for op in OperationType.member_operations()]
+    owner_ops = [op.value for op in OperationType.owner_operations()]
 
-    while True:
-        # Get distinct role+scope combinations with role names
-        query = sa.text("""
-            SELECT DISTINCT p.role_id, r.name AS role_name, p.scope_type, p.scope_id
+    # Insert SESSION permissions in a single set-based query
+    #
+    # Rules:
+    # - Skip roles where scope_type == 'domain' and role_name ends with 'member'
+    # - For non-domain member roles, use member_ops (READ only)
+    # - For all other roles (owner/admin), use owner_ops (all operations)
+    insert_query = sa.text("""
+        WITH role_scopes AS (
+            SELECT DISTINCT
+                p.role_id,
+                r.name AS role_name,
+                p.scope_type,
+                p.scope_id
             FROM permissions p
             JOIN roles r ON p.role_id = r.id
-            ORDER BY p.role_id, p.scope_type, p.scope_id
-            OFFSET :offset
-            LIMIT :limit
-        """)
-        rows = db_conn.execute(query, {"offset": offset, "limit": BATCH_SIZE}).all()
-        if not rows:
-            break
+        ),
+        role_operations AS (
+            -- Member operations for non-domain member roles
+            SELECT
+                rs.role_id,
+                rs.scope_type,
+                rs.scope_id,
+                unnest(CAST(:member_ops AS text[])) AS operation
+            FROM role_scopes rs
+            WHERE rs.scope_type != 'domain'
+              AND rs.role_name LIKE :member_pattern
 
-        offset += BATCH_SIZE
+            UNION ALL
 
-        # Prepare permissions to insert
-        values_list = []
-        for row in rows:
-            # Skip domain member roles (scope too broad for Session access)
-            if row.scope_type == "domain" and row.role_name.endswith(MEMBER_ROLE_POSTFIX):
-                continue
+            -- Owner operations for non-member roles
+            SELECT
+                rs.role_id,
+                rs.scope_type,
+                rs.scope_id,
+                unnest(CAST(:owner_ops AS text[])) AS operation
+            FROM role_scopes rs
+            WHERE NOT (rs.role_name LIKE :member_pattern)
+        )
+        INSERT INTO permissions (role_id, scope_type, scope_id, entity_type, operation)
+        SELECT
+            role_id,
+            scope_type,
+            scope_id,
+            :entity_type AS entity_type,
+            operation
+        FROM role_operations
+        ON CONFLICT (role_id, scope_type, scope_id, entity_type, operation) DO NOTHING
+    """)
 
-            # Determine operations based on role type
-            if row.role_name.endswith(MEMBER_ROLE_POSTFIX):
-                operations = OperationType.member_operations()
-            else:
-                operations = OperationType.owner_operations()
-
-            # Add all operations for this role+scope
-            for operation in operations:
-                values_list.append(
-                    f"('{row.role_id}', '{row.scope_type}', '{row.scope_id}', "
-                    f"'{EntityType.SESSION.value}', '{operation.value}')"
-                )
-
-        if values_list:
-            values = ", ".join(values_list)
-            insert_query = sa.text(f"""
-                INSERT INTO permissions (role_id, scope_type, scope_id, entity_type, operation)
-                VALUES {values}
-                ON CONFLICT (role_id, scope_type, scope_id, entity_type, operation) DO NOTHING
-            """)
-            db_conn.execute(insert_query)
+    db_conn.execute(
+        insert_query,
+        {
+            "member_ops": member_ops,
+            "owner_ops": owner_ops,
+            "member_pattern": f"%{MEMBER_ROLE_POSTFIX}",
+            "entity_type": EntityType.SESSION.value,
+        },
+    )
 
 
 def _associate_sessions_to_scopes(db_conn: Connection) -> None:
