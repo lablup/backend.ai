@@ -68,13 +68,14 @@ class BaseDockerIntrinsicTest:
             yield mock
 
 
-class TestCPUPluginGatherContainerMeasures(BaseDockerIntrinsicTest):
-    """Tests for CPUPlugin.gather_container_measures shared Docker client."""
+class TestCPUPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
+    """Tests for CPUPlugin Docker client lifecycle management."""
 
     @pytest.fixture
     def cpu_plugin(self) -> CPUPlugin:
         plugin = CPUPlugin.__new__(CPUPlugin)
         plugin.local_config = {"agent": {"docker-mode": "default"}}
+        plugin._docker = AsyncMock()
         return plugin
 
     @pytest.fixture
@@ -92,56 +93,56 @@ class TestCPUPluginGatherContainerMeasures(BaseDockerIntrinsicTest):
         cgroup_stat_context.agent.get_cgroup_path = mock_get_cgroup_path
         return cgroup_stat_context
 
-    @pytest.mark.asyncio
-    async def test_api_mode_creates_single_docker_instance(
+    async def test_init_creates_docker_client(self) -> None:
+        """Verify init() creates a Docker client instance."""
+        plugin = CPUPlugin.__new__(CPUPlugin)
+        plugin.local_config = {"agent": {"docker-mode": "default"}}
+        with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
+            mock_docker_cls.return_value = AsyncMock()
+            await plugin.init()
+            mock_docker_cls.assert_called_once()
+            assert plugin._docker is not None
+
+    async def test_cleanup_closes_docker_client(self) -> None:
+        """Verify cleanup() closes the Docker client."""
+        plugin = CPUPlugin.__new__(CPUPlugin)
+        plugin.local_config = {"agent": {"docker-mode": "default"}}
+        plugin._docker = AsyncMock()
+        await plugin.cleanup()
+        plugin._docker.close.assert_called_once()
+
+    async def test_api_mode_uses_instance_docker_client(
         self,
         cpu_plugin: CPUPlugin,
         container_ids: list[str],
         docker_stat_context: MagicMock,
         mock_fetch_api_stats: MagicMock,
     ) -> None:
-        """Verify only one Docker() is created regardless of container count."""
-        docker_create_count = 0
-
-        def counting_docker(*args: Any, **kwargs: Any) -> AsyncMock:
-            nonlocal docker_create_count
-            docker_create_count += 1
-            mock_docker = AsyncMock()
-            mock_docker.close = AsyncMock()
-            return mock_docker
-
-        with patch(
-            "ai.backend.agent.docker.intrinsic.Docker",
-            side_effect=counting_docker,
-        ):
+        """Verify API mode uses the plugin's Docker client, not a new one."""
+        with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
             await cpu_plugin.gather_container_measures(docker_stat_context, container_ids)
+            mock_docker_cls.assert_not_called()
 
-        assert docker_create_count == 1, (
-            f"Expected 1 Docker instance, but {docker_create_count} were created"
-        )
-
-    @pytest.mark.asyncio
-    async def test_sysfs_mode_does_not_create_docker(
+    async def test_sysfs_mode_does_not_use_docker(
         self,
         cpu_plugin: CPUPlugin,
         container_ids: list[str],
         cpu_cgroup_context: MagicMock,
     ) -> None:
-        """Verify CGROUP mode doesn't create any Docker instance."""
-        with patch(
-            "ai.backend.agent.docker.intrinsic.Docker",
-        ) as mock_docker_cls:
+        """Verify CGROUP mode doesn't create any new Docker instance."""
+        with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
             await cpu_plugin.gather_container_measures(cpu_cgroup_context, container_ids)
             mock_docker_cls.assert_not_called()
 
 
-class TestMemoryPluginGatherContainerMeasures(BaseDockerIntrinsicTest):
-    """Tests for MemoryPlugin.gather_container_measures shared Docker client."""
+class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
+    """Tests for MemoryPlugin Docker client lifecycle management."""
 
     @pytest.fixture
     def memory_plugin(self) -> MemoryPlugin:
         plugin = MemoryPlugin.__new__(MemoryPlugin)
         plugin.local_config = {"agent": {"docker-mode": "default"}}
+        plugin._docker = AsyncMock()
         return plugin
 
     @pytest.fixture
@@ -194,57 +195,43 @@ class TestMemoryPluginGatherContainerMeasures(BaseDockerIntrinsicTest):
             mock_loop.return_value.run_in_executor = AsyncMock(return_value=0)
             yield ctx
 
-    @pytest.mark.asyncio
-    async def test_api_mode_creates_single_docker_instance(
+    async def test_init_creates_docker_client(self) -> None:
+        """Verify init() creates a Docker client instance."""
+        plugin = MemoryPlugin.__new__(MemoryPlugin)
+        plugin.local_config = {"agent": {"docker-mode": "default"}}
+        with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
+            mock_docker_cls.return_value = AsyncMock()
+            await plugin.init()
+            mock_docker_cls.assert_called_once()
+            assert plugin._docker is not None
+
+    async def test_cleanup_closes_docker_client(self) -> None:
+        """Verify cleanup() closes the Docker client."""
+        plugin = MemoryPlugin.__new__(MemoryPlugin)
+        plugin.local_config = {"agent": {"docker-mode": "default"}}
+        plugin._docker = AsyncMock()
+        await plugin.cleanup()
+        plugin._docker.close.assert_called_once()
+
+    async def test_api_mode_uses_instance_docker_client(
         self,
         memory_plugin: MemoryPlugin,
         container_ids: list[str],
         docker_stat_context: MagicMock,
         mock_fetch_api_stats: MagicMock,
     ) -> None:
-        """Verify only one Docker() in API mode."""
-        docker_create_count = 0
-
-        def counting_docker(*args: Any, **kwargs: Any) -> AsyncMock:
-            nonlocal docker_create_count
-            docker_create_count += 1
-            mock_docker = AsyncMock()
-            mock_docker.close = AsyncMock()
-            return mock_docker
-
-        with patch(
-            "ai.backend.agent.docker.intrinsic.Docker",
-            side_effect=counting_docker,
-        ):
+        """Verify API mode uses the plugin's Docker client, not a new one."""
+        with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
             await memory_plugin.gather_container_measures(docker_stat_context, container_ids)
+            mock_docker_cls.assert_not_called()
 
-        assert docker_create_count == 1, (
-            f"Expected 1 Docker instance, but {docker_create_count} were created"
-        )
-
-    @pytest.mark.asyncio
-    async def test_sysfs_mode_creates_single_docker_instance(
+    async def test_sysfs_mode_uses_instance_docker_client(
         self,
         memory_plugin: MemoryPlugin,
         container_ids: list[str],
         memory_cgroup_context: MagicMock,
     ) -> None:
-        """Even in CGROUP mode, Docker is needed for SandboxKey. Verify single instance."""
-        docker_create_count = 0
-
-        def counting_docker(*args: Any, **kwargs: Any) -> AsyncMock:
-            nonlocal docker_create_count
-            docker_create_count += 1
-            mock_docker = AsyncMock()
-            mock_docker.close = AsyncMock()
-            return mock_docker
-
-        with patch(
-            "ai.backend.agent.docker.intrinsic.Docker",
-            side_effect=counting_docker,
-        ):
+        """Even in CGROUP mode, Docker is needed for SandboxKey. Verify instance client is used."""
+        with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
             await memory_plugin.gather_container_measures(memory_cgroup_context, container_ids)
-
-        assert docker_create_count == 1, (
-            f"Expected 1 Docker instance, but {docker_create_count} were created"
-        )
+            mock_docker_cls.assert_not_called()

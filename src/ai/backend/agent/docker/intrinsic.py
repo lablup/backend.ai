@@ -44,7 +44,7 @@ from ai.backend.agent.stats import (
     StatModes,
 )
 from ai.backend.agent.types import Container, MountInfo
-from ai.backend.agent.utils import closing_async, read_sysfs
+from ai.backend.agent.utils import read_sysfs
 from ai.backend.agent.vendor.linux import libnuma
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.json import dump_json
@@ -171,11 +171,13 @@ class CPUPlugin(AbstractComputePlugin):
         (SlotName("cpu"), SlotTypes.COUNT),
     ]
 
+    _docker: Docker
+
     async def init(self, context: Any | None = None) -> None:
-        pass
+        self._docker = Docker()
 
     async def cleanup(self) -> None:
-        pass
+        await self._docker.close()
 
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
         pass
@@ -275,32 +277,29 @@ class CPUPlugin(AbstractComputePlugin):
                 return None
             return cpu_used
 
+        async def api_impl(container_id: str) -> float | None:
+            container = DockerContainer(self._docker, id=container_id)
+            try:
+                async with async_timeout.timeout(2.0):
+                    ret = await fetch_api_stats(container)
+            except TimeoutError:
+                return None
+            if ret is None:
+                return None
+            cpu_usage = cast(float, nmget(ret, "cpu_stats.cpu_usage.total_usage", 0))
+            return cpu_usage / 1e6
+
         if ctx.mode == StatModes.CGROUP:
-            tasks = []
-            for cid in container_ids:
-                tasks.append(asyncio.create_task(sysfs_impl(cid)))
-            results = await asyncio.gather(*tasks)
+            impl = sysfs_impl
         elif ctx.mode == StatModes.DOCKER:
-            async with closing_async(Docker()) as docker:
-
-                async def api_impl(container_id: str) -> float | None:
-                    container = DockerContainer(docker, id=container_id)
-                    try:
-                        async with async_timeout.timeout(2.0):
-                            ret = await fetch_api_stats(container)
-                    except TimeoutError:
-                        return None
-                    if ret is None:
-                        return None
-                    cpu_usage = cast(float, nmget(ret, "cpu_stats.cpu_usage.total_usage", 0))
-                    return cpu_usage / 1e6
-
-                tasks = []
-                for cid in container_ids:
-                    tasks.append(asyncio.create_task(api_impl(cid)))
-                results = await asyncio.gather(*tasks)
+            impl = api_impl
         else:
             raise RuntimeError("should not reach here")
+
+        tasks = []
+        for cid in container_ids:
+            tasks.append(asyncio.create_task(impl(cid)))
+        results = await asyncio.gather(*tasks)
 
         q = Decimal("0.000")
         per_container_cpu_used = {}
@@ -499,11 +498,13 @@ class MemoryPlugin(AbstractComputePlugin):
         (SlotName("mem"), SlotTypes.BYTES),
     ]
 
+    _docker: Docker
+
     async def init(self, context: Any | None = None) -> None:
-        pass
+        self._docker = Docker()
 
     async def cleanup(self) -> None:
-        pass
+        await self._docker.close()
 
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
         pass
@@ -709,7 +710,7 @@ class MemoryPlugin(AbstractComputePlugin):
                     e,
                 )
                 return None
-            container = DockerContainer(docker, id=container_id)
+            container = DockerContainer(self._docker, id=container_id)
             data = await container.show()
             sandbox_key = data["NetworkSettings"]["SandboxKey"]
             net_rx_bytes = 0
@@ -735,7 +736,7 @@ class MemoryPlugin(AbstractComputePlugin):
         async def api_impl(
             container_id: str,
         ) -> tuple[int, int, int, int, int, int, int] | None:
-            container = DockerContainer(docker, id=container_id)
+            container = DockerContainer(self._docker, id=container_id)
             try:
                 async with async_timeout.timeout(2.0):
                     ret = await fetch_api_stats(container)
@@ -782,11 +783,10 @@ class MemoryPlugin(AbstractComputePlugin):
         per_container_net_rx_bytes = {}
         per_container_net_tx_bytes = {}
         per_container_io_scratch_size = {}
-        async with closing_async(Docker()) as docker:
-            tasks = []
-            for cid in container_ids:
-                tasks.append(asyncio.create_task(impl(cid)))
-            results = await asyncio.gather(*tasks)
+        tasks = []
+        for cid in container_ids:
+            tasks.append(asyncio.create_task(impl(cid)))
+        results = await asyncio.gather(*tasks)
         for cid, result in zip(container_ids, results, strict=True):
             if result is None:
                 continue
