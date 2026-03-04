@@ -490,6 +490,7 @@ class DeploymentCoordinator:
                     lifecycle_type,
                     eval_result.completed,
                     strategies=eval_result.completed_strategies,
+                    records=all_records,
                 )
 
     async def _apply_route_changes(
@@ -524,6 +525,7 @@ class DeploymentCoordinator:
         lifecycle_type: DeploymentLifecycleType,
         completed: list[DeploymentInfo],
         strategies: dict[UUID, DeploymentStrategy],
+        records: Mapping[UUID, ExecutionRecord],
     ) -> None:
         """Transition completed DEPLOYING deployments to READY.
 
@@ -558,7 +560,7 @@ class DeploymentCoordinator:
                 else "Deployment completed successfully",
                 from_status=from_status,
                 to_status=to_status,
-                sub_steps=[],
+                sub_steps=extract_sub_steps_for_entity(deployment.id, records),
             )
             for deployment in completed
         ]
