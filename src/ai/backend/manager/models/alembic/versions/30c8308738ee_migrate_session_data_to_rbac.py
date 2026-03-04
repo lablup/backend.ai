@@ -126,18 +126,26 @@ def _associate_sessions_to_scopes(db_conn: Connection) -> None:
 
         last_id = rows[-1].id
 
-        # Prepare values for bulk insert
-        values = ", ".join(
-            f"('user', '{row.user_uuid}', '{entity_type}', '{row.id}', '{relation_type}')"
+        # Bulk insert using parameterized query
+        values_list = [
+            {
+                "scope_type": "user",
+                "scope_id": str(row.user_uuid),
+                "entity_type": entity_type,
+                "entity_id": str(row.id),
+                "relation_type": relation_type,
+            }
             for row in rows
-        )
+        ]
 
-        insert_query = sa.text(f"""
-            INSERT INTO association_scopes_entities (scope_type, scope_id, entity_type, entity_id, relation_type)
-            VALUES {values}
-            ON CONFLICT (scope_type, scope_id, entity_id) DO NOTHING
-        """)
-        db_conn.execute(insert_query)
+        if values_list:
+            insert_query = sa.text("""
+                INSERT INTO association_scopes_entities (scope_type, scope_id, entity_type, entity_id, relation_type)
+                VALUES (:scope_type, :scope_id, :entity_type, :entity_id, :relation_type)
+                ON CONFLICT (scope_type, scope_id, entity_id) DO NOTHING
+            """)
+            for values in values_list:
+                db_conn.execute(insert_query, values)
 
     # Process Project scope edges
     last_id = UUID("00000000-0000-0000-0000-000000000000")
@@ -155,18 +163,26 @@ def _associate_sessions_to_scopes(db_conn: Connection) -> None:
 
         last_id = rows[-1].id
 
-        # Prepare values for bulk insert
-        values = ", ".join(
-            f"('project', '{row.group_id}', '{entity_type}', '{row.id}', '{relation_type}')"
+        # Bulk insert using parameterized query
+        values_list = [
+            {
+                "scope_type": "project",
+                "scope_id": str(row.group_id),
+                "entity_type": entity_type,
+                "entity_id": str(row.id),
+                "relation_type": relation_type,
+            }
             for row in rows
-        )
+        ]
 
-        insert_query = sa.text(f"""
-            INSERT INTO association_scopes_entities (scope_type, scope_id, entity_type, entity_id, relation_type)
-            VALUES {values}
-            ON CONFLICT (scope_type, scope_id, entity_id) DO NOTHING
-        """)
-        db_conn.execute(insert_query)
+        if values_list:
+            insert_query = sa.text("""
+                INSERT INTO association_scopes_entities (scope_type, scope_id, entity_type, entity_id, relation_type)
+                VALUES (:scope_type, :scope_id, :entity_type, :entity_id, :relation_type)
+                ON CONFLICT (scope_type, scope_id, entity_id) DO NOTHING
+            """)
+            for values in values_list:
+                db_conn.execute(insert_query, values)
 
 
 def _remove_session_permissions(db_conn: Connection) -> None:
@@ -174,23 +190,21 @@ def _remove_session_permissions(db_conn: Connection) -> None:
     entity_type = EntityType.SESSION.value
 
     while True:
-        # Query permission IDs to delete
-        query = sa.text("""
-            SELECT id FROM permissions
-            WHERE entity_type = :entity_type
-            LIMIT :limit
-        """)
-        rows = db_conn.execute(query, {"entity_type": entity_type, "limit": BATCH_SIZE}).all()
-        if not rows:
-            break
-
-        # Delete the queried permissions
-        ids = ", ".join(f"'{row.id}'" for row in rows)
-        delete_query = sa.text(f"""
+        # Delete permissions in batches using a parameterized subquery
+        delete_query = sa.text("""
             DELETE FROM permissions
-            WHERE id IN ({ids})
+            WHERE id IN (
+                SELECT id FROM permissions
+                WHERE entity_type = :entity_type
+                LIMIT :limit
+            )
         """)
-        db_conn.execute(delete_query)
+        result = db_conn.execute(
+            delete_query,
+            {"entity_type": entity_type, "limit": BATCH_SIZE},
+        )
+        if result.rowcount == 0:
+            break
 
 
 def _remove_session_edges(db_conn: Connection) -> None:
@@ -198,23 +212,21 @@ def _remove_session_edges(db_conn: Connection) -> None:
     entity_type = EntityType.SESSION.value
 
     while True:
-        # Query association IDs to delete
-        query = sa.text("""
-            SELECT id FROM association_scopes_entities
-            WHERE entity_type = :entity_type
-            LIMIT :limit
-        """)
-        rows = db_conn.execute(query, {"entity_type": entity_type, "limit": BATCH_SIZE}).all()
-        if not rows:
-            break
-
-        # Delete the queried associations
-        ids = ", ".join(f"'{row.id}'" for row in rows)
-        delete_query = sa.text(f"""
+        # Delete associations in batches using a parameterized subquery
+        delete_query = sa.text("""
             DELETE FROM association_scopes_entities
-            WHERE id IN ({ids})
+            WHERE id IN (
+                SELECT id FROM association_scopes_entities
+                WHERE entity_type = :entity_type
+                LIMIT :limit
+            )
         """)
-        db_conn.execute(delete_query)
+        result = db_conn.execute(
+            delete_query,
+            {"entity_type": entity_type, "limit": BATCH_SIZE},
+        )
+        if result.rowcount == 0:
+            break
 
 
 def upgrade() -> None:
