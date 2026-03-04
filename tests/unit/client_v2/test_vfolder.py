@@ -107,7 +107,7 @@ def _make_vfolder_client(mock_session: MagicMock) -> VFolderClient:
     return VFolderClient(client)
 
 
-def _mock_json_response(data: dict[str, Any], status: int = 200) -> AsyncMock:
+def _mock_json_response(data: dict[str, Any] | list[Any], status: int = 200) -> AsyncMock:
     resp = AsyncMock()
     resp.status = status
     resp.json = AsyncMock(return_value=data)
@@ -159,21 +159,21 @@ class TestVFolderCRUD:
         assert call_args.kwargs["json"]["name"] == "my-folder"
 
     async def test_list(self) -> None:
-        response_data: dict[str, Any] = {"items": []}
+        response_data: list[Any] = []
         mock_session = _make_request_session(_mock_json_response(response_data))
         vfolder = _make_vfolder_client(mock_session)
 
         result = await vfolder.list()
 
         assert isinstance(result, VFolderListResponse)
-        assert result.items == []
+        assert result.root == []
 
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "GET"
         assert call_args[0][1].endswith("/folders")
 
     async def test_list_with_query(self) -> None:
-        response_data: dict[str, Any] = {"items": []}
+        response_data: list[Any] = []
         mock_session = _make_request_session(_mock_json_response(response_data))
         vfolder = _make_vfolder_client(mock_session)
 

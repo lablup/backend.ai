@@ -67,7 +67,7 @@ class TestVFolderList:
         """Admin can list vfolders; the DB-seeded vfolder is visible."""
         result = await admin_registry.vfolder.list()
         assert isinstance(result, VFolderListResponse)
-        names = [item.name for item in result.items]
+        names = [item.name for item in result.root]
         assert target_vfolder["name"] in names
 
     async def test_user_lists_own_vfolders(
@@ -86,7 +86,7 @@ class TestVFolderList:
         )
         result = await user_registry.vfolder.list()
         assert isinstance(result, VFolderListResponse)
-        names = [item.name for item in result.items]
+        names = [item.name for item in result.root]
         assert vf["name"] in names
 
 

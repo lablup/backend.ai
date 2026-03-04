@@ -70,8 +70,8 @@ class TestVFolderCreateResponse:
 
 class TestVFolderListResponse:
     def test_empty_list(self) -> None:
-        resp = VFolderListResponse()
-        assert resp.items == []
+        resp = VFolderListResponse([])
+        assert resp.root == []
 
     def test_with_items(self) -> None:
         item = VFolderItemField(
@@ -96,8 +96,8 @@ class TestVFolderListResponse:
             max_files=0,
             cur_size=0,
         )
-        resp = VFolderListResponse(items=[item])
-        assert len(resp.items) == 1
+        resp = VFolderListResponse([item])
+        assert len(resp.root) == 1
 
 
 class TestVFolderCreatedDTO:
