@@ -28,15 +28,15 @@ Blue-Green deployment spans multiple coordinator cycles through several phases:
 
 Rolling Update similarly progresses gradually across cycles. Both strategies **keep the deployment in `DEPLOYING` state across multiple processing cycles until strategy completion or rollback.**
 
-### Evaluator + Sub-Step Handler Pattern
+### Composite Handler Pattern (DeployingHandler)
 
-A single `evaluate()` call may produce different sub-steps for different deployments — some completed, others still PROGRESSING. To handle this, a **strategy evaluator** groups deployments by sub-step, and **per-sub-step handlers** process each group. Completed deployments are returned separately in `EvaluationResult.completed` and processed directly by the coordinator's `_transition_completed_deployments()`.
+A single `evaluate()` call may produce different sub-steps for different deployments — some completed, others still PROGRESSING. To handle this, DEPLOYING is represented as a **composite handler** (`DeployingHandler`) that internally owns the strategy evaluator and sub-step handlers. The coordinator treats DEPLOYING identically to every other lifecycle type through the unified `prepare → execute → finalize → post_process` flow.
 
 | Aspect | How it works |
 |--------|-------------|
-| **State transition** | Each sub-step handler returns explicit `next_status()` → coordinator's generic path handles all transitions |
-| **Routing** | Coordinator branches to evaluator path for `DeploymentLifecycleType.DEPLOYING` |
-| **Cycles** | Evaluator runs strategy FSM → coordinator applies route changes → handlers process results → coordinator records history |
+| **State transition** | Each sub-step handler returns explicit `status_transitions()` → coordinator's generic path handles all transitions |
+| **Routing** | No special branching — `DeployingHandler.prepare()` runs the evaluator and returns sub-step handler tasks |
+| **Cycles** | `prepare()`: evaluator runs strategy FSM + applies route changes → coordinator executes sub-step handlers → `finalize()`: records evaluation outcomes + transitions completed deployments |
 
 
 ## Sub-documents
@@ -50,7 +50,7 @@ A single `evaluate()` call may produce different sub-steps for different deploym
 
 ### Overall Architecture
 
-Core idea: A **strategy evaluator** evaluates DEPLOYING-state deployments and groups them by sub-step, then **per-sub-step handlers** process each group. The coordinator's generic `_handle_status_transitions()` path handles all history recording and lifecycle transitions.
+Core idea: All lifecycle types — including DEPLOYING — follow a **single coordinator code path**: `prepare → execute → finalize → post_process`. The base `DeploymentHandler` provides default `prepare()` (returns self as single task) and `finalize()` (no-op). The composite `DeployingHandler` overrides these to run strategy evaluation, apply route changes, dispatch to sub-step handlers, and transition completed deployments.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -76,14 +76,20 @@ Core idea: A **strategy evaluator** evaluates DEPLOYING-state deployments and gr
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                         DeploymentCoordinator                                │
 │                                                                              │
-│  process_deployment_lifecycle(type)                                          │
-│    evaluator = evaluators.get(type)                                          │
-│    ├─ evaluator exists → _process_with_evaluator() (evaluator path)          │
-│    └─ no evaluator → existing single-handler path                            │
+│  process_deployment_lifecycle(type)  ← single unified code path              │
+│    handler = handlers[type]                                                  │
+│    ├─ handler.prepare(deployments) → handler_tasks                           │
+│    ├─ _execute_and_transition_handlers(handler_tasks)                        │
+│    ├─ handler.finalize(records)                                              │
+│    └─ _post_process_handlers(results)                                        │
 │                                                                              │
-│  Handler map key: DeploymentHandlerKey                                       │
-│    DeploymentLifecycleType                        ← single handlers          │
-│    | (DeploymentLifecycleType, DeploymentSubStep) ← sub-step handlers        │
+│  Handler map: Mapping[DeploymentLifecycleType, DeploymentHandler]            │
+│    ├─ CHECK_PENDING → CheckPendingHandler                                    │
+│    ├─ CHECK_REPLICA → CheckReplicaHandler                                    │
+│    ├─ SCALING       → ScalingHandler                                         │
+│    ├─ RECONCILE     → ReconcileHandler                                       │
+│    ├─ DEPLOYING     → DeployingHandler (composite)                           │
+│    └─ DESTROYING    → DestroyingHandler                                      │
 │                                                                              │
 │  Result handling (same generic path for all handlers):                       │
 │    successes → next_status (transition + history)                            │
@@ -91,33 +97,28 @@ Core idea: A **strategy evaluator** evaluates DEPLOYING-state deployments and gr
 │    skipped → keep (no transition)                                            │
 └────────────────┬─────────────────────────────────────────────────────────────┘
                  │
-      ┌──────────┴──────────────────────────┐
-      ▼                                     ▼
-┌─────────────────────┐   ┌──────────────────────────────────────────────────┐
-│  DeploymentHandler   │   │  DeploymentStrategyEvaluator                     │
-│  (single-handler)    │   │  (evaluator path — DEPLOYING only)               │
-│                      │   │                                                  │
-│  Implementations:    │   │  evaluate(deployments) → EvaluationResult        │
-│  ├─ CheckPending     │   │    1. Load policies/routes                       │
-│  ├─ Scaling          │   │    2. Run strategy FSM → CycleEvaluationResult  │
-│  ├─ CheckReplica     │   │    3. Aggregate route changes                    │
-│  ├─ Reconcile        │   │    4. Group by sub-step                          │
-│  └─ Destroying       │   └───────────────┬──────────────────────────────────┘
-└─────────────────────┘                    │
-                                           ▼
-                            ┌──────────────────────────────────────┐
-                            │  Per-Sub-Step Handlers (composite)   │
-                            │                                      │
-                            │  (DEPLOYING, PROVISIONING)           │
-                            │    → DeployingProvisioningHandler    │
-                            │  (DEPLOYING, PROGRESSING)            │
-                            │    → DeployingProgressingHandler     │
-                            │      next_status: DEPLOYING          │
-                            │                                      │
-                            │  (DEPLOYING, ROLLED_BACK)            │
-                            │    → DeployingRolledBackHandler      │
-                            │      next_status: READY              │
-                            └──────────────────────────────────────┘
+                 ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  DeploymentHandler (base)                                                    │
+│  ├─ prepare(deployments) → [(self, deployments)]   ← default: single task   │
+│  ├─ execute(deployments) → result                  ← abstract               │
+│  ├─ finalize(records)    → no-op                   ← default                │
+│  └─ post_process(result) → ...                     ← abstract               │
+│                                                                              │
+│  Simple handlers (CheckPending, Scaling, etc.):                              │
+│    Use defaults — prepare returns self, finalize is no-op                    │
+│                                                                              │
+│  DeployingHandler (composite):                                               │
+│  ├─ prepare(): evaluator.evaluate() + apply route changes                    │
+│  │             → [(sub_handler, subset), ...] for each sub-step              │
+│  ├─ finalize(): record evaluation outcomes + transition completed            │
+│  └─ owns:                                                                    │
+│      ├─ DeploymentStrategyEvaluator                                          │
+│      └─ sub_step_handlers:                                                   │
+│          ├─ PROVISIONING → DeployingProvisioningHandler                      │
+│          ├─ PROGRESSING  → DeployingProgressingHandler                       │
+│          └─ ROLLED_BACK  → DeployingRolledBackHandler                        │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Revision Activation Trigger Branching
@@ -170,7 +171,7 @@ Completion is not a sub-step but a signal on `CycleEvaluationResult.completed`. 
 
 ### DeploymentStrategyEvaluator
 
-`DeploymentStrategyEvaluator` evaluates DEPLOYING-state deployments and groups them by sub-step. It is a separate component (not a handler) that the coordinator invokes before handler execution.
+`DeploymentStrategyEvaluator` evaluates DEPLOYING-state deployments and groups them by sub-step. It is owned by `DeployingHandler`, which invokes it during `prepare()`. The coordinator does not interact with the evaluator directly.
 
 #### Execution Flow
 
@@ -217,13 +218,13 @@ DeploymentStrategyEvaluator.evaluate(deployments)
 
 #### Key Design Principles
 
-1. **Route changes are aggregated by the evaluator, applied by the coordinator**: The evaluator collects route mutations (rollout/drain/promote) from each strategy FSM into `EvaluationResult.route_changes`. The coordinator's `_apply_route_changes()` applies them after evaluation. Individual handlers do not touch routes.
-2. **Strategy FSMs implement a common interface via registry**: All strategy implementations extend the `BaseDeploymentStrategy` abstract base class and implement `evaluate_cycle()`. Concrete classes (`RollingUpdateStrategy`, `BlueGreenStrategy`) live in dedicated module files (`strategy/rolling_update.py`, `strategy/blue_green.py`). The coordinator owns a `DeploymentStrategyRegistry` that maps each `DeploymentStrategy` enum to its implementation class and expected spec type. The registry is injected into the evaluator, which uses it to instantiate the appropriate strategy per deployment.
-3. **Only grouping is returned**: The evaluator classifies deployments by sub-step; actual processing (revision swap, deploying_revision cleanup, etc.) is delegated to handlers.
+1. **Route changes are aggregated by the evaluator, applied by `DeployingHandler`**: The evaluator collects route mutations (rollout/drain/promote) from each strategy FSM into `EvaluationResult.route_changes`. `DeployingHandler._apply_route_changes()` applies them during `prepare()`. Individual sub-step handlers do not touch routes.
+2. **Strategy FSMs implement a common interface via registry**: All strategy implementations extend the `BaseDeploymentStrategy` abstract base class and implement `evaluate_cycle()`. Concrete classes (`RollingUpdateStrategy`, `BlueGreenStrategy`) live in dedicated module files (`strategy/rolling_update.py`, `strategy/blue_green.py`). `DeployingHandler` creates and owns the `DeploymentStrategyRegistry`, which is injected into the evaluator to instantiate the appropriate strategy per deployment.
+3. **Only grouping is returned**: The evaluator classifies deployments by sub-step; actual processing (revision swap, deploying_revision cleanup, etc.) is delegated to `DeployingHandler.finalize()` and sub-step handlers.
 
 ### Per-Sub-Step Handlers
 
-Each handler is registered with a `(DeploymentLifecycleType, DeploymentSubStep)` composite key in the coordinator.
+Each sub-step handler is owned by `DeployingHandler` and registered in its `sub_step_handlers` map keyed by `DeploymentSubStep`. They are not directly visible to the coordinator.
 
 #### State Transition Type: `DeploymentLifecycleStatus`
 
@@ -316,51 +317,51 @@ class DeployingRolledBackHandler(DeploymentHandler):
 
 On rollback, only `deploying_revision` is cleared; `current_revision` is preserved. The coordinator transitions to READY.
 
-### Coordinator Evaluator Path (`_process_with_evaluator`)
+### Unified Coordinator Flow
 
-The coordinator takes a separate path for lifecycle types that have an evaluator registered in `_deployment_evaluators`:
+The coordinator uses a single code path for all lifecycle types, including DEPLOYING:
 
 ```
-_process_with_evaluator(lifecycle_type, evaluator)
+process_deployment_lifecycle(lifecycle_type)
     │
-    │  1. Acquire distributed lock (evaluator.lock_id)
-    │  2. Query DEPLOYING-state deployments
+    │  1. Look up handler by lifecycle_type (simple enum key)
+    │  2. Acquire distributed lock if handler.lock_id is set
+    │  3. Query deployments by handler.target_statuses()
     │
-    │  3. Enter DeploymentRecorderContext.scope()
+    │  4. Enter DeploymentRecorderContext.scope()
     │  ┌───────────────────────────────────────────────────────────────┐
     │  │                                                               │
-    │  │  eval_result = evaluator.evaluate(deployments)                │
-    │  │  _apply_route_changes(eval_result)                           │
-    │  │  ↑ coordinator applies rollout/drain/promote                 │
+    │  │  handler_tasks = handler.prepare(deployments)                 │
+    │  │    ↑ simple handlers: [(self, deployments)]                   │
+    │  │    ↑ DeployingHandler: evaluator.evaluate()                   │
+    │  │      + _apply_route_changes()                                 │
+    │  │      → [(sub_handler_A, subset_A), (sub_handler_B, subset_B)] │
     │  │                                                               │
-    │  │  for sub_step, group in eval_result.groups:                   │
-    │  │    handler = handlers[(lifecycle_type, sub_step)]             │
-    │  │    result = handler.execute(group)                            │
-    │  │    handler_results[sub_step] = (handler, result)              │
+    │  │  for (h, deps) in handler_tasks:                              │
+    │  │    result = h.execute(deps)                                   │
     │  │                                                               │
     │  │  all_records = pool.build_all_records()                       │
     │  │                                                               │
-    │  │  for sub_step, (handler, result) in handler_results:          │
-    │  │    _handle_status_transitions(handler, result, all_records)   │
-    │  │    ↑ same generic transition logic as single-handler path     │
+    │  │  for (h, result) in handler_results:                          │
+    │  │    _handle_status_transitions(h, result, all_records)         │
+    │  │    ↑ same generic transition logic for ALL handlers            │
     │  │                                                               │
     │  └───────────────────────────────────────────────────────────────┘
     │
-    │  4. Post-process outside RecorderContext scope
-    │  for sub_step, (handler, result) in handler_results:
-    │    handler.post_process(result)
-    │    ↑ reschedule DEPLOYING cycle + trigger route provisioning
+    │  5. handler.finalize(all_records)
+    │    ↑ simple handlers: no-op
+    │    ↑ DeployingHandler: record evaluation outcomes
+    │      + transition completed deployments (atomic revision swap
+    │        + DEPLOYING → READY + history recording)
     │
-    │  5. Transition completed deployments (coordinator direct)
-    │  if eval_result.completed:
-    │    _transition_completed_deployments(completed, records=all_records)
-    │    ↑ atomic revision swap + DEPLOYING → READY + history recording
-    │    ↑ includes route mutation sub_steps from this cycle
+    │  6. Post-process outside RecorderContext scope
+    │  for (h, result) in handler_results:
+    │    h.post_process(result)
     │
     ▼
 ```
 
-Key: `_handle_status_transitions()` uses the **exact same generic method** as the single-handler path. It performs batch updates and history recording based on each handler's `next_status()`/`failure_status()`. Completed deployments bypass this path — their lifecycle transition is handled directly by the coordinator's `_transition_completed_deployments()`, which atomically performs the revision swap and DEPLOYING→READY transition.
+Key: The coordinator has **no DEPLOYING-specific logic**. `_handle_status_transitions()` uses the same generic method for all handlers. DEPLOYING-specific concerns (evaluator invocation, route mutations, completion transitions) are fully encapsulated in `DeployingHandler.prepare()` and `DeployingHandler.finalize()`.
 
 ### Sub-Step Recording
 
@@ -424,6 +425,29 @@ This enables:
 | | `max_unavailable: int` | Maximum unavailable routes to allow |
 
 On strategy failure (all new routes fail), automatic rollback always occurs.
+
+## Decision Log
+
+### 2026-03-04: Unified coordinator code path via composite handler pattern
+
+**Context**: PR #9566 review identified that the coordinator treated DEPLOYING as a special case with a separate method (`process_deploying_lifecycle`) and separate code path. This created two parallel flows, a union type for handler keys (`DeploymentLifecycleType | (DeploymentLifecycleType, DeploymentSubStep)`), and DEPLOYING-specific branching in the event handler.
+
+**Decision**: Refactor to a single unified code path using the composite handler pattern.
+
+Three design principles drove the change:
+
+1. **DEPLOYING generalization**: DEPLOYING is no longer a special lifecycle type. The coordinator processes it through the same `process_deployment_lifecycle()` as all other types. No `if DEPLOYING` branches exist in the coordinator or event handler.
+
+2. **Sub-step unification via `prepare()`/`finalize()`**: The base `DeploymentHandler` gains two concrete methods with defaults — `prepare()` returns `[(self, deployments)]` (treat self as single task) and `finalize()` is a no-op. Simple handlers use these defaults unchanged. The composite `DeployingHandler` overrides `prepare()` to run the evaluator and return sub-step handler tasks, and `finalize()` to record evaluation outcomes and transition completed deployments.
+
+3. **Evaluator interface integration**: The evaluator is no longer called directly by the coordinator. Instead, `DeployingHandler` owns the evaluator and invokes it within `prepare()`. The coordinator has no knowledge of strategy evaluation, route mutations, or completion transitions — these are fully encapsulated in the handler.
+
+**Changes**:
+- `DeploymentHandler` base: added `prepare()`, `finalize()` with defaults
+- New `DeployingHandler` composite class: owns evaluator, sub-step handlers, route mutation logic, completion transition logic
+- `DeploymentCoordinator`: removed `process_deploying_lifecycle()`, `DeploymentHandlerKey` type, `_strategy_registry`/`_deploying_evaluator` fields, and four private methods moved to `DeployingHandler`
+- Handler map key simplified: `Mapping[DeploymentLifecycleType, DeploymentHandler]`
+- Event handler: removed DEPLOYING branch
 
 ## References
 
