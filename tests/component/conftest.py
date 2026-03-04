@@ -33,6 +33,7 @@ from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolder
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
+from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.rest.middleware import build_auth_middleware, build_exception_middleware
 from ai.backend.manager.api.rest.types import ModuleDeps, ModuleRegistrar
 from ai.backend.manager.cli.context import CLIContext
@@ -808,7 +809,10 @@ class _TestConfigProvider(ManagerConfigProvider):
         # that are irrelevant in the test environment.
         self._config = config
         self._etcd_watcher_task = None
-        self._legacy_etcd_config_loader = MagicMock()
+        mock_etcd_loader = MagicMock()
+        mock_etcd_loader.get_manager_status = AsyncMock(return_value=ManagerStatus.RUNNING)
+        mock_etcd_loader.get_allowed_origins = AsyncMock(return_value=None)
+        self._legacy_etcd_config_loader = mock_etcd_loader
 
 
 @pytest.fixture()
