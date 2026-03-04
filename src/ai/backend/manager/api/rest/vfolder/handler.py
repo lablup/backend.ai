@@ -101,8 +101,6 @@ from ai.backend.common.types import (
     VFolderID,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.utils import get_user_scopes
 from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.dto.context import (
     ProcessorsCtx,
@@ -132,6 +130,9 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPu
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.vfolder.purgers import VFolderPurgerSpec
 from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
+from ai.backend.manager.services.auth.actions.resolve_user_scope import (
+    ResolveUserScopeAction,
+)
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CreateVFolderAction,
@@ -304,14 +305,16 @@ class VFolderHandler:
             ctx.user_email,
             ctx.access_key,
         )
-        owner_user_uuid, owner_user_role = await get_user_scopes(
-            req.request,
-            {
-                "owner_user_email": params.owner_user_email,
-            }
-            if params.owner_user_email
-            else None,
+        user_scope = await processors_ctx.processors.auth.resolve_user_scope.wait_for_complete(
+            ResolveUserScopeAction(
+                requester_uuid=ctx.user_uuid,
+                requester_role=ctx.user_role,
+                requester_domain=ctx.user_domain,
+                is_superadmin=ctx.is_superadmin,
+                owner_user_email=params.owner_user_email,
+            )
         )
+        owner_user_uuid = user_scope.owner_uuid
         group_id = params.group_id
         if group_id is not None:
             scope_type = ScopeType.PROJECT
@@ -1369,8 +1372,7 @@ class VFolderHandler:
         resource_policy = req.request["keypair"]["resource_policy"]
         folder_name = req.request.match_info["name"]
 
-        root_ctx: RootContext = req.request.app["_root.context"]
-        resolved = await root_ctx.processors.vfolder.get_accessible_vfolder.wait_for_complete(
+        resolved = await processors_ctx.processors.vfolder.get_accessible_vfolder.wait_for_complete(
             GetAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
                 user_role=req.request["user"]["role"],

@@ -19,20 +19,8 @@ if TYPE_CHECKING:
 def register_session_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the session sub-application."""
     from .handler import SessionHandler
-    from .lifecycle import PrivateContext as SessionPrivateContext
-    from .lifecycle import init as session_init
-    from .lifecycle import shutdown as session_shutdown
 
     reg = RouteRegistry.create("session", deps.cors_options)
-    ctx = SessionPrivateContext()
-
-    # Store ctx on app dict for backward compatibility (lifecycle functions
-    # read from app["session.context"]).
-    reg.app["session.context"] = ctx
-
-    # Wire lifecycle hooks
-    reg.app.on_startup.append(session_init)
-    reg.app.on_shutdown.append(session_shutdown)
     handler = SessionHandler(processors=deps.processors, config_provider=deps.config_provider)
 
     # --- Session creation ---

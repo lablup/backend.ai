@@ -34,6 +34,7 @@ from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
 from ai.backend.manager.dto.context import RequestCtx, UserContext
+from ai.backend.manager.models.user import UserRole
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -69,6 +70,7 @@ def superadmin_context() -> UserContext:
         user_uuid=uuid.uuid4(),
         user_email="admin@example.com",
         user_domain="default",
+        user_role=UserRole.SUPERADMIN,
         access_key="AKTEST",
         is_admin=True,
         is_superadmin=True,
@@ -284,6 +286,7 @@ class TestCheckPresets:
             user_uuid=user_uuid,
             user_email="test@example.com",
             user_domain="default",
+            user_role=UserRole.USER,
             access_key="AKTEST",
             is_admin=False,
             is_superadmin=False,
@@ -336,6 +339,7 @@ class TestCheckPresets:
             user_uuid=user_uuid,
             user_email="test@example.com",
             user_domain="default",
+            user_role=UserRole.USER,
             access_key="AKTEST",
             is_admin=False,
             is_superadmin=False,

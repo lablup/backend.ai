@@ -22,6 +22,7 @@ from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import ScopeData
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
     GetScopeTypesActionResult,
 )
@@ -41,6 +42,7 @@ def make_test_superadmin_ctx() -> UserContext:
         user_uuid=uuid4(),
         user_email="admin@test.com",
         user_domain="default",
+        user_role=UserRole.SUPERADMIN,
         access_key="TESTKEY",
         is_admin=True,
         is_superadmin=True,
@@ -53,6 +55,7 @@ def make_test_user_ctx() -> UserContext:
         user_uuid=uuid4(),
         user_email="user@test.com",
         user_domain="default",
+        user_role=UserRole.USER,
         access_key="USERKEY",
         is_admin=False,
         is_superadmin=False,

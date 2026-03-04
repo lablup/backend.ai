@@ -22,6 +22,7 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam
 from ai.backend.common.dto.manager.admin.request import GraphQLRequest
 from ai.backend.common.dto.manager.admin.response import GraphQLResponse
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.gql_legacy.base import DataLoaderManager
 from ai.backend.manager.api.gql_legacy.schema import (
     GQLExceptionMiddleware,
@@ -29,15 +30,27 @@ from ai.backend.manager.api.gql_legacy.schema import (
     GQLMutationPrivilegeCheckMiddleware,
     GraphQueryContext,
 )
-from ai.backend.manager.api.rest.manager.lifecycle import GQLMutationUnfrozenRequiredMiddleware
 from ai.backend.manager.api.rest.types import GQLContextDeps
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import GraphQLError as BackendGQLError
+from ai.backend.manager.errors.common import ServerFrozen
 
 if TYPE_CHECKING:
     from graphql import FieldNode
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+class GQLMutationUnfrozenRequiredMiddleware:
+    """GraphQL middleware that blocks mutations when the manager is frozen."""
+
+    def __init__(self, manager_status: ManagerStatus) -> None:
+        self._manager_status = manager_status
+
+    def resolve(self, next: Any, root: Any, info: graphene.ResolveInfo, **args: Any) -> Any:
+        if info.operation.operation == "mutation" and self._manager_status == ManagerStatus.FROZEN:
+            raise ServerFrozen
+        return next(root, info, **args)
 
 
 class GQLLoggingMiddleware:

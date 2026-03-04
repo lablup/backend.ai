@@ -85,7 +85,7 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.utils import get_access_key_scopes, undefined
+from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -94,6 +94,9 @@ from ai.backend.manager.errors.resource import NoCurrentTaskContext
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
+)
+from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
+    ResolveAccessKeyScopeAction,
 )
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
@@ -263,11 +266,15 @@ class SessionHandler:
             template=True,
         )
 
-        scopes_param = {"owner_access_key": params.owner_access_key}
-        requester_access_key, owner_access_key = await get_access_key_scopes(
-            request,
-            scopes_param,
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=params.owner_access_key,
+            )
         )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
 
         log.info(
             "GET_OR_CREATE (ak:{0}/{1}, img:{2}, s:{3})",
@@ -375,11 +382,15 @@ class SessionHandler:
                 )
 
         domain_name = params.domain or request["user"]["domain_name"]
-        scopes_param = {"owner_access_key": params.owner_access_key}
-        requester_access_key, owner_access_key = await get_access_key_scopes(
-            request,
-            scopes_param,
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=params.owner_access_key,
+            )
         )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "GET_OR_CREATE (ak:{0}/{1}, img:{2}, s:{3})",
             requester_access_key,
@@ -444,11 +455,15 @@ class SessionHandler:
         params = body.parsed
 
         domain_name = params.domain or request["user"]["domain_name"]
-        scopes_param = {"owner_access_key": params.owner_access_key}
-        requester_access_key, owner_access_key = await get_access_key_scopes(
-            request,
-            scopes_param,
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=params.owner_access_key,
+            )
         )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "CREAT_CLUSTER (ak:{0}/{1}, s:{2})",
             requester_access_key,
@@ -490,7 +505,15 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         params = query.parsed
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "MATCH_SESSIONS(ak:{0}/{1}, prefix:{2})",
             requester_access_key,
@@ -516,7 +539,15 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         params = body.parsed
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         agent_id = AgentId(params.agent)
         log.info(
             "SYNC_AGENT_REGISTRY (ak:{}/{}, a:{})",
@@ -543,7 +574,15 @@ class SessionHandler:
         session_ids = [SessionId(id_) for id_ in params.ids]
         user_role = cast(UserRole, request["user"]["role"])
         user_id = cast(UUID, request["user"]["uuid"])
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "TRANSIT_STATUS (ak:{}/{}, s:{})",
             requester_access_key,
@@ -573,7 +612,15 @@ class SessionHandler:
     async def get_info(self, ctx: RequestCtx) -> APIResponse:
         request = ctx.request
         session_name = request.match_info["session_name"]
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "GET_INFO (ak:{0}/{1}, s:{2})",
             requester_access_key,
@@ -608,11 +655,15 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name = request.match_info["session_name"]
-        scopes_param = {"owner_access_key": params.owner_access_key}
-        requester_access_key, owner_access_key = await get_access_key_scopes(
-            request,
-            scopes_param,
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=params.owner_access_key,
+            )
         )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "RESTART (ak:{0}/{1}, s:{2})",
             requester_access_key,
@@ -644,11 +695,15 @@ class SessionHandler:
         params = query.parsed
         session_name = request.match_info["session_name"]
         user_role = cast(UserRole, request["user"]["role"])
-        scopes_param = {"owner_access_key": params.owner_access_key}
-        requester_access_key, owner_access_key = await get_access_key_scopes(
-            request,
-            scopes_param,
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=params.owner_access_key,
+            )
         )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         if requester_access_key != owner_access_key and user_role not in (
             UserRole.ADMIN,
             UserRole.SUPERADMIN,
@@ -687,7 +742,15 @@ class SessionHandler:
         request = ctx.request
         params = body.parsed
         session_name = request.match_info["session_name"]
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "EXECUTE(ak:{0}/{1}, s:{2})",
             requester_access_key,
@@ -717,7 +780,15 @@ class SessionHandler:
     async def interrupt(self, ctx: RequestCtx) -> web.Response:
         request = ctx.request
         session_name = request.match_info["session_name"]
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "INTERRUPT(ak:{0}/{1}, s:{2})",
             requester_access_key,
@@ -748,7 +819,15 @@ class SessionHandler:
         request = ctx.request
         params = body.parsed
         session_name = request.match_info["session_name"]
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "COMPLETE(ak:{0}/{1}, s:{2})",
             requester_access_key,
@@ -813,7 +892,15 @@ class SessionHandler:
         request = ctx.request
         params = body.parsed
         session_name = request.match_info["session_name"]
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "SHUTDOWN_SERVICE (ak:{0}/{1}, s:{2})",
             requester_access_key,
@@ -841,7 +928,15 @@ class SessionHandler:
         request = ctx.request
         reader = await request.multipart()
         session_name = request.match_info["session_name"]
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "UPLOAD_FILE (ak:{0}/{1}, s:{2})",
             requester_access_key,
@@ -873,7 +968,15 @@ class SessionHandler:
         request = ctx.request
         params = body.parsed
         session_name = request.match_info["session_name"]
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "DOWNLOAD_FILE (ak:{0}/{1}, s:{2}, path:{3!r})",
             requester_access_key,
@@ -903,7 +1006,15 @@ class SessionHandler:
         request = ctx.request
         params = body.parsed
         session_name = request.match_info["session_name"]
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "DOWNLOAD_SINGLE (ak:{0}/{1}, s:{2}, path:{3!r})",
             requester_access_key,
@@ -933,7 +1044,15 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name = request.match_info["session_name"]
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "LIST_FILES (ak:{0}/{1}, s:{2}, path:{3})",
             requester_access_key,
@@ -964,7 +1083,15 @@ class SessionHandler:
         params = query.parsed
         session_name = request.match_info["session_name"]
         new_name = params.session_name
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "RENAME_SESSION (ak:{0}/{1}, s:{2}, newname:{3})",
             requester_access_key,
@@ -993,7 +1120,15 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name: str = request.match_info["session_name"]
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "COMMIT_SESSION (ak:{}/{}, s:{})",
             requester_access_key,
@@ -1024,7 +1159,15 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name: str = request.match_info["session_name"]
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "CONVERT_SESSION_TO_IMAGE (ak:{}/{}, s:{})",
             requester_access_key,
@@ -1060,7 +1203,15 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         session_name: str = request.match_info["session_name"]
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         myself = asyncio.current_task()
         if myself is None:
             raise NoCurrentTaskContext("No current task context")
@@ -1092,7 +1243,15 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         session_name: str = request.match_info["session_name"]
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "GET_ABUSING_REPORT (ak:{}/{}, s:{})",
             requester_access_key,
@@ -1124,11 +1283,15 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name: str = request.match_info["session_name"]
-        scopes_param = {"owner_access_key": params.owner_access_key}
-        requester_access_key, owner_access_key = await get_access_key_scopes(
-            request,
-            scopes_param,
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=params.owner_access_key,
+            )
         )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "GET_STATUS_HISTORY (ak:{}/{}, s:{})",
             requester_access_key,
@@ -1153,7 +1316,15 @@ class SessionHandler:
     async def get_direct_access_info(self, ctx: RequestCtx) -> APIResponse:
         request = ctx.request
         session_name = request.match_info["session_name"]
-        _, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        owner_access_key = scope.owner_access_key
         result = await self._processors.session.get_direct_access_info.wait_for_complete(
             GetDirectAccessInfoAction(
                 session_name=session_name,
@@ -1177,11 +1348,15 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name: str = request.match_info["session_name"]
-        scopes_param = {"owner_access_key": params.owner_access_key}
-        requester_access_key, owner_access_key = await get_access_key_scopes(
-            request,
-            scopes_param,
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=params.owner_access_key,
+            )
         )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         kernel_id = KernelId(params.kernel_id) if params.kernel_id is not None else None
         log.info(
             "GET_CONTAINER_LOG (ak:{}/{}, s:{}, k:{})",
@@ -1251,7 +1426,15 @@ class SessionHandler:
     async def get_dependency_graph(self, ctx: RequestCtx) -> APIResponse:
         request = ctx.request
         root_session_name = request.match_info["session_name"]
-        requester_access_key, owner_access_key = await get_access_key_scopes(request)
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=None,
+            )
+        )
+        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
         log.info(
             "GET_DEPENDENCY_GRAPH (ak:{0}/{1}, s:{2})",
             requester_access_key,

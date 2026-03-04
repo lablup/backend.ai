@@ -20,18 +20,28 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.common.etcd import AsyncEtcd
+    from ai.backend.common.events.fetcher import EventFetcher
+    from ai.backend.common.events.hub.hub import EventHub
+    from ai.backend.common.health_checker.probe import HealthProbe
     from ai.backend.common.metrics.metric import GraphQLMetricObserver
     from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
     from ai.backend.manager.config.provider import ManagerConfigProvider
+    from ai.backend.manager.config.unified import ExportConfig
+    from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import (
+        StreamCleanupEventHandler,
+    )
     from ai.backend.manager.idle import IdleCheckerHost
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
     from ai.backend.manager.plugin.network import NetworkPluginContext
     from ai.backend.manager.registry import AgentRegistry
     from ai.backend.manager.repositories.agent.repository import AgentRepository
+    from ai.backend.manager.repositories.export import ExportRepository
     from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
     from ai.backend.manager.repositories.user.repository import UserRepository
     from ai.backend.manager.service.base import ServicesContext
+    from ai.backend.manager.services.events.service import EventsService
     from ai.backend.manager.services.processors import Processors
+    from ai.backend.manager.services.stream.service import StreamService
 
     from .routing import RouteRegistry
 
@@ -60,8 +70,8 @@ class GQLContextDeps:
     """Dependencies needed to construct ``GraphQueryContext`` for GraphQL execution.
 
     Injected into ``AdminHandler`` at startup so that the handler does not
-    access ``RootContext`` at request time.  Temporary scaffolding that will
-    be removed when Phase 2 (full DI) lands.
+    need to resolve dependencies at request time.  Temporary scaffolding that
+    will be removed when Phase 2 (full DI) lands.
     """
 
     config_provider: ManagerConfigProvider
@@ -91,8 +101,18 @@ class ModuleDeps:
     cors_options: CORSOptions
     processors: Processors
     config_provider: ManagerConfigProvider
+    pidx: int = 0
+    storage_manager: StorageSessionManager | None = None
+    export_repository: ExportRepository | None = None
+    export_config: ExportConfig | None = None
     gql_context_deps: GQLContextDeps | None = None
     valkey_rate_limit: ValkeyRateLimitClient | None = None
+    event_hub: EventHub | None = None
+    event_fetcher: EventFetcher | None = None
+    stream_cleanup_handler: StreamCleanupEventHandler | None = None
+    events_service: EventsService | None = None
+    stream_service: StreamService | None = None
+    health_probe: HealthProbe | None = None
 
 
 type ModuleRegistrar = Callable[[ModuleDeps], RouteRegistry]

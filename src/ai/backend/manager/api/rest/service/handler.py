@@ -58,7 +58,6 @@ from ai.backend.common.types import (
     RuntimeVariant,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.utils import get_access_key_scopes
 from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -78,6 +77,9 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceInfo,
 )
 from ai.backend.manager.dto.context import RequestCtx, UserContext
+from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
+    ResolveAccessKeyScopeAction,
+)
 from ai.backend.manager.services.deployment.actions.create_legacy_deployment import (
     CreateLegacyDeploymentAction,
     CreateLegacyDeploymentActionResult,
@@ -575,8 +577,17 @@ class ServiceHandler:
         request: Any,
         params: NewServiceRequestModel,
     ) -> ValidateModelServiceActionResult:
-        requester_access_key, owner_access_key = await get_access_key_scopes(
-            request, {"owner_access_key": params.owner_access_key}
+        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=params.owner_access_key,
+            )
+        )
+        requester_access_key, owner_access_key = (
+            scope.requester_access_key,
+            scope.owner_access_key,
         )
         action = ValidateModelServiceAction(
             requester_access_key=requester_access_key,

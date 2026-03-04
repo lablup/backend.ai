@@ -14,20 +14,8 @@ if TYPE_CHECKING:
 def register_manager_api_routes(deps: ModuleDeps) -> RouteRegistry:
     """Build the manager sub-application."""
     from .handler import ManagerHandler
-    from .lifecycle import PrivateContext as ManagerApiPrivateContext
-    from .lifecycle import init as manager_api_init
-    from .lifecycle import shutdown as manager_api_shutdown
 
     reg = RouteRegistry.create("manager", deps.cors_options)
-    ctx = ManagerApiPrivateContext()
-
-    # Store ctx on app dict for backward compatibility (lifecycle functions
-    # read from app["manager.context"]).
-    reg.app["manager.context"] = ctx
-
-    # Wire lifecycle hooks
-    reg.app.on_startup.append(manager_api_init)
-    reg.app.on_shutdown.append(manager_api_shutdown)
     handler = ManagerHandler(processors=deps.processors)
 
     # Public endpoints (no auth required)

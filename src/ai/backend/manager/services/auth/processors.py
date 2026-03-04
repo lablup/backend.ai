@@ -16,6 +16,14 @@ from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
     GetSSHKeypairActionResult,
 )
+from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
+    ResolveAccessKeyScopeAction,
+    ResolveAccessKeyScopeResult,
+)
+from ai.backend.manager.services.auth.actions.resolve_user_scope import (
+    ResolveUserScopeAction,
+    ResolveUserScopeResult,
+)
 from ai.backend.manager.services.auth.actions.signout import SignoutAction, SignoutActionResult
 from ai.backend.manager.services.auth.actions.signup import SignupAction, SignupActionResult
 from ai.backend.manager.services.auth.actions.update_full_name import (
@@ -50,6 +58,10 @@ class AuthProcessors(AbstractProcessorPackage):
     update_password_no_auth: ActionProcessor[
         UpdatePasswordNoAuthAction, UpdatePasswordNoAuthActionResult
     ]
+    resolve_access_key_scope: ActionProcessor[
+        ResolveAccessKeyScopeAction, ResolveAccessKeyScopeResult
+    ]
+    resolve_user_scope: ActionProcessor[ResolveUserScopeAction, ResolveUserScopeResult]
 
     def __init__(self, service: AuthService, action_monitors: list[ActionMonitor]) -> None:
         self.signout = ActionProcessor(service.signout, action_monitors)
@@ -64,6 +76,10 @@ class AuthProcessors(AbstractProcessorPackage):
         self.update_password_no_auth = ActionProcessor(
             service.update_password_no_auth, action_monitors
         )
+        self.resolve_access_key_scope = ActionProcessor(
+            service.resolve_access_key_scope, action_monitors
+        )
+        self.resolve_user_scope = ActionProcessor(service.resolve_user_scope, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -78,4 +94,6 @@ class AuthProcessors(AbstractProcessorPackage):
             SignupAction.spec(),
             UpdatePasswordAction.spec(),
             UpdatePasswordNoAuthAction.spec(),
+            ResolveAccessKeyScopeAction.spec(),
+            ResolveUserScopeAction.spec(),
         ]

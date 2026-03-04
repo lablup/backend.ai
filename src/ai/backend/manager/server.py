@@ -54,7 +54,6 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
     tcp_client_session_factory,
 )
-from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
@@ -89,10 +88,6 @@ from ai.backend.common.events.event_types.service_discovery.anycast import (
 )
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
-from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
-from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
-from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.leader import ValkeyLeaderElection, ValkeyLeaderElectionConfig
 from ai.backend.common.leader.tasks import EventProducerTask, LeaderCron, PeriodicTask
@@ -108,29 +103,13 @@ from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
-from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
-    ETCDServiceDiscovery,
-    ETCDServiceDiscoveryArgs,
-)
-from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
-from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
-    RedisServiceDiscovery,
-    RedisServiceDiscoveryArgs,
-)
-from ai.backend.common.service_discovery.service_discovery import (
-    ServiceDiscoveryLoop,
-    ServiceEndpoint,
-    ServiceMetadata,
-)
 from ai.backend.common.types import (
     AGENTID_MANAGER,
     AgentSelectionStrategy,
-    ServiceDiscoveryType,
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import (
-    OpenTelemetrySpec,
     instrument_aiohttp_client,
     instrument_aiohttp_server,
 )
@@ -151,10 +130,10 @@ from .api.context import RootContext
 from .api.rest import build_api_routes
 from .api.rest.middleware import (
     build_api_metric_middleware,
-    exception_middleware,
+    build_auth_middleware,
+    build_exception_middleware,
     request_id_middleware,
 )
-from .api.rest.middleware.auth import auth_middleware
 from .api.rest.ratelimit.handler import rlim_middleware
 from .api.rest.routing import RouteRegistry
 from .api.rest.types import GQLContextDeps, ModuleDeps, ModuleRegistrar
@@ -163,6 +142,7 @@ from .clients.appproxy.client import AppProxyClientPool
 from .config.bootstrap import BootstrapConfig
 from .config.unified import EventLoopType
 from .dependencies import DependencyInput, DependencyResources, ManagerDependencyComposer
+from .dependencies.errors import DependencyInitializationError
 from .errors.common import (
     GenericBadRequest,
     InternalServerError,
@@ -170,16 +150,13 @@ from .errors.common import (
 )
 from .errors.resource import ConfigurationLoadFailed
 from .event_dispatcher.dispatch import DispatcherArgs, Dispatchers
-from .health.database import DatabaseHealthChecker
 from .idle import init_idle_checkers
 from .models.storage import StorageSessionManager
 from .models.utils import connect_database
-from .notification import NotificationCenter
 from .pglock import PgAdvisoryLock
 from .plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
 from .plugin.network import NetworkPluginContext
 from .plugin.webapp import WebappPluginContext
-from .public_api.health import hello as health_hello
 from .registry import AgentRegistry
 from .reporters.hub import ReporterHub, ReporterHubArgs
 from .reporters.smtp import SMTPReporter, SMTPSenderArgs
@@ -308,7 +285,6 @@ PUBLIC_INTERFACES: Final = [
 
 public_interface_objs: MutableMapping[str, Any] = {}
 
-global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
 
@@ -360,9 +336,10 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
     return await _handler(request)
 
 
-# exception_middleware and _debug_error_response have been extracted to
-# ai.backend.manager.api.rest.middleware.exception and are re-exported
-# from ai.backend.manager.api.rest.middleware.__init__.
+# exception_middleware and auth_middleware are now created via factory functions
+# (build_exception_middleware / build_auth_middleware) in the middleware package.
+# They are inserted into the root application middleware list in server_main()
+# after all dependencies are initialized.
 
 
 def _bridge_resources_to_root_ctx(
@@ -603,28 +580,6 @@ def _make_action_reporters(
 
 
 @asynccontextmanager
-async def notification_center_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    root_ctx.notification_center = NotificationCenter()
-    try:
-        yield
-    finally:
-        await root_ctx.notification_center.close()
-
-
-@asynccontextmanager
-async def prometheus_client_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    client_pool = ClientPool(tcp_client_session_factory)
-    root_ctx.prometheus_client = PrometheusClient(
-        endpoint=f"http://{root_ctx.config_provider.config.metric.address.to_legacy()}/api/v1/",
-        client_pool=client_pool,
-    )
-    try:
-        yield
-    finally:
-        await client_pool.close()
-
-
-@asynccontextmanager
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     registered_reporters = _make_registered_reporters(root_ctx)
     action_reporters = _make_action_reporters(root_ctx, registered_reporters)
@@ -685,103 +640,6 @@ async def event_hub_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         yield
     finally:
         await root_ctx.event_hub.shutdown()
-
-
-@asynccontextmanager
-async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    sd_type = root_ctx.config_provider.config.service_discovery.type
-    match sd_type:
-        case ServiceDiscoveryType.ETCD:
-            root_ctx.service_discovery = ETCDServiceDiscovery(
-                ETCDServiceDiscoveryArgs(root_ctx.etcd)
-            )
-        case ServiceDiscoveryType.REDIS:
-            live_valkey_target = root_ctx.valkey_profile_target.profile_target(RedisRole.LIVE)
-            root_ctx.service_discovery = await RedisServiceDiscovery.create(
-                RedisServiceDiscoveryArgs(valkey_target=live_valkey_target)
-            )
-
-    root_ctx.sd_loop = ServiceDiscoveryLoop(
-        sd_type,
-        root_ctx.service_discovery,
-        ServiceMetadata(
-            display_name=f"manager-{root_ctx.config_provider.config.manager.id}",
-            service_group="manager",
-            version=__version__,
-            endpoint=ServiceEndpoint(
-                address=root_ctx.config_provider.config.manager.announce_addr.address,
-                port=root_ctx.config_provider.config.manager.announce_addr.port,
-                protocol="http",
-                prometheus_address=root_ctx.config_provider.config.manager.announce_internal_addr.address,
-            ),
-        ),
-    )
-
-    if root_ctx.config_provider.config.otel.enabled:
-        meta = root_ctx.sd_loop.metadata
-        otel_config = root_ctx.config_provider.config.otel
-        otel_spec = OpenTelemetrySpec(
-            service_name=meta.service_group,
-            service_version=meta.version,
-            log_level=otel_config.log_level,
-            endpoint=otel_config.endpoint,
-            service_instance_id=meta.id,
-            service_instance_name=meta.display_name,
-            max_queue_size=otel_config.max_queue_size,
-            max_export_batch_size=otel_config.max_export_batch_size,
-        )
-        BraceStyleAdapter.apply_otel(otel_spec)
-
-    # Start event-based SD publishing if config has service_group set
-    sd_config = root_ctx.config_provider.config.service_discovery
-    sd_event_publisher: ServiceDiscoveryEventPublisher | None = None
-    if sd_config.service_group:
-        sd_event_publisher = ServiceDiscoveryEventPublisher(
-            event_producer=root_ctx.event_producer,
-            config=sd_config,
-            component_version=__version__,
-            startup_time=datetime.now(tz=UTC),
-        )
-        await sd_event_publisher.start()
-
-    try:
-        yield
-    finally:
-        if sd_event_publisher is not None:
-            await sd_event_publisher.stop()
-        root_ctx.sd_loop.close()
-
-
-@asynccontextmanager
-async def health_probe_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    """Initialize and start health probe with all health checkers."""
-    probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
-    root_ctx.health_probe = probe
-
-    # Register health checkers using already-initialized resources
-    await probe.register(DatabaseHealthChecker(db=root_ctx.db))
-    await probe.register(EtcdHealthChecker(etcd=root_ctx.etcd))
-    await probe.register(
-        ValkeyHealthChecker(
-            clients={
-                ComponentId("artifact"): root_ctx.valkey_artifact,
-                ComponentId("container_log"): root_ctx.valkey_container_log,
-                ComponentId("live"): root_ctx.valkey_live,
-                ComponentId("stat"): root_ctx.valkey_stat,
-                ComponentId("image"): root_ctx.valkey_image,
-                ComponentId("stream"): root_ctx.valkey_stream,
-                ComponentId("schedule"): root_ctx.valkey_schedule,
-                ComponentId("bgtask"): root_ctx.valkey_bgtask,
-            }
-        )
-    )
-
-    # Start periodic health checking
-    await probe.start()
-    try:
-        yield
-    finally:
-        await probe.stop()
 
 
 @asynccontextmanager
@@ -1389,8 +1247,18 @@ def _setup_api(
         cors_options=root_ctx.cors_options,
         processors=dep_resources.processing.processors,
         config_provider=root_ctx.config_provider,
+        pidx=pidx,
+        storage_manager=root_ctx.storage_manager,
+        export_repository=root_ctx.repositories.export.repository,
+        export_config=root_ctx.config_provider.config.export,
         gql_context_deps=gql_context_deps,
         valkey_rate_limit=dep_resources.infrastructure.valkey.rate_limit,
+        event_hub=root_ctx.event_hub,
+        event_fetcher=root_ctx.event_fetcher,
+        stream_cleanup_handler=dep_resources.processing.stream_cleanup_handler,
+        events_service=dep_resources.processing.events_service,
+        stream_service=dep_resources.processing.stream_service,
+        health_probe=root_ctx.health_probe,
     )
 
     # 1. Build API module tree
@@ -1499,8 +1367,8 @@ def build_root_app(
     app = web.Application(
         middlewares=[
             request_id_middleware,
-            exception_middleware,
-            auth_middleware,
+            # exception_middleware and auth_middleware are inserted later
+            # in server_main() after dependencies are available.
             api_middleware,
             build_api_metric_middleware(root_ctx.metrics.api),
         ]
@@ -1614,28 +1482,10 @@ def build_internal_app(root_ctx: RootContext) -> web.Application:
     app = web.Application()
     app["_root.context"] = root_ctx
     metric_registry = CommonMetricRegistry.instance()
-    app.router.add_route("GET", r"/health", health_hello)
     app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
     app.router.add_route(
         "GET", r"/metrics/service_discovery", build_prometheus_service_discovery_handler(root_ctx)
     )
-    return app
-
-
-def build_public_app(
-    root_ctx: RootContext,
-    subapp_pkgs: Iterable[str] | None = None,
-) -> web.Application:
-    app = web.Application()
-    app["_root.context"] = root_ctx
-    if subapp_pkgs is None:
-        subapp_pkgs = []
-    for pkg_name in subapp_pkgs:
-        if root_ctx.pidx == 0:
-            log.info("Loading module: {0}", pkg_name[1:])
-        subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.public_api")
-        subapp, global_middlewares = subapp_mod.create_app(root_ctx.cors_options)
-        _init_subapp(pkg_name, app, subapp, global_middlewares)
     return app
 
 
@@ -1731,27 +1581,6 @@ async def server_main(
             service_addr,
         )
 
-        public_metrics_port = root_ctx.config_provider.config.manager.public_metrics_port
-        if public_metrics_port is not None:
-            public_metric_app = build_public_app(
-                root_ctx, subapp_pkgs=global_subapp_pkgs_for_public_metrics_app
-            )
-            public_metric_runner = web.AppRunner(public_metric_app, keepalive_timeout=30.0)
-            await public_metric_runner.setup()
-            public_metric_site = web.TCPSite(
-                public_metric_runner,
-                service_addr.host,
-                public_metrics_port,
-                backlog=1024,
-                reuse_port=True,
-            )
-            await public_metric_site.start()
-            log.info(
-                "started handling public metric API requests at {}:{}",
-                service_addr.host,
-                public_metrics_port,
-            )
-
         try:
             yield
         finally:
@@ -1779,6 +1608,30 @@ async def server_main(
 
         # Bridge all Composer outputs to RootContext for backward compatibility
         _bridge_resources_to_root_ctx(root_ctx, dep_resources)
+
+        # Insert DI-based middlewares now that dependencies are available.
+        # Maintain order: request_id(0) → exception(1) → auth(2) → api → metric
+        if dep_resources.monitoring.error_monitor is None:
+            raise DependencyInitializationError("error_monitor plugin failed to initialize")
+        if dep_resources.monitoring.stats_monitor is None:
+            raise DependencyInitializationError("stats_monitor plugin failed to initialize")
+        root_app.middlewares.insert(
+            1,
+            build_exception_middleware(
+                error_monitor=dep_resources.monitoring.error_monitor,
+                stats_monitor=dep_resources.monitoring.stats_monitor,
+                config_provider=dep_resources.bootstrap.config_provider,
+            ),
+        )
+        root_app.middlewares.insert(
+            2,
+            build_auth_middleware(
+                db=dep_resources.infrastructure.db,
+                jwt_validator=dep_resources.system.jwt_validator,
+                valkey_stat=dep_resources.infrastructure.valkey.stat,
+                hook_plugin_ctx=dep_resources.plugins.hook_plugin_ctx,
+            ),
+        )
 
         # Build and mount the API module tree.
         # Must happen after bridging (cors_options must be set) and before

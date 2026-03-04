@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 from aiohttp import web
 
-from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.rest.middleware.auth import (
     admin_required,
     auth_required,
@@ -30,12 +29,14 @@ from ai.backend.manager.services.vfolder.actions.base import GetAccessibleVFolde
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.services.processors import Processors
 
 
 def _vfolder_resolver(
     perm: VFolderPermissionSetAlias | VFolderPermission,
     status: VFolderStatusSet,
     *,
+    processors: Processors,
     allow_privileged_access: bool = False,
 ) -> RouteMiddleware:
     """Route middleware that resolves vfolder rows and checks status.
@@ -56,8 +57,7 @@ def _vfolder_resolver(
                 folder_name_or_id = uuid.UUID(piece)
             except ValueError:
                 folder_name_or_id = piece
-            root_ctx: RootContext = request.app["_root.context"]
-            result = await root_ctx.processors.vfolder.get_accessible_vfolder.wait_for_complete(
+            result = await processors.vfolder.get_accessible_vfolder.wait_for_complete(
                 GetAccessibleVFolderAction(
                     user_uuid=request["user"]["uuid"],
                     user_role=request["user"]["role"],
@@ -90,6 +90,7 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
     # Store ctx on app dict for backward compatibility (lifecycle functions
     # read from app["folders.context"]).
     reg.app["folders.context"] = ctx
+    reg.app["_processors"] = deps.processors
 
     # Wire lifecycle hooks
     reg.app.on_startup.append(vfolder_init)
@@ -126,7 +127,11 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.get_info,
         middlewares=[
             *_auth_ro(),
-            _vfolder_resolver(VFolderPermissionSetAlias.READABLE, VFolderStatusSet.READABLE),
+            _vfolder_resolver(
+                VFolderPermissionSetAlias.READABLE,
+                VFolderStatusSet.READABLE,
+                processors=deps.processors,
+            ),
         ],
     )
     reg.add("DELETE", "/{name}", handler.delete_by_name, middlewares=_auth_rw())
@@ -151,7 +156,9 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.rename_vfolder,
         middlewares=[
             *_auth_rw(),
-            _vfolder_resolver(VFolderPermission.OWNER_PERM, VFolderStatusSet.READABLE),
+            _vfolder_resolver(
+                VFolderPermission.OWNER_PERM, VFolderStatusSet.READABLE, processors=deps.processors
+            ),
         ],
     )
     reg.add(
@@ -160,7 +167,9 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.update_vfolder_options,
         middlewares=[
             *_auth_rw(),
-            _vfolder_resolver(VFolderPermission.OWNER_PERM, VFolderStatusSet.UPDATABLE),
+            _vfolder_resolver(
+                VFolderPermission.OWNER_PERM, VFolderStatusSet.UPDATABLE, processors=deps.processors
+            ),
         ],
     )
 
@@ -171,7 +180,11 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.mkdir,
         middlewares=[
             *_auth_rw(),
-            _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
+            _vfolder_resolver(
+                VFolderPermissionSetAlias.WRITABLE,
+                VFolderStatusSet.UPDATABLE,
+                processors=deps.processors,
+            ),
         ],
     )
     reg.add(
@@ -180,7 +193,11 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.create_upload_session,
         middlewares=[
             *_auth_rw(),
-            _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
+            _vfolder_resolver(
+                VFolderPermissionSetAlias.WRITABLE,
+                VFolderStatusSet.UPDATABLE,
+                processors=deps.processors,
+            ),
         ],
     )
     reg.add(
@@ -189,7 +206,11 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.create_download_session,
         middlewares=[
             *_auth_ro(),
-            _vfolder_resolver(VFolderPermissionSetAlias.READABLE, VFolderStatusSet.READABLE),
+            _vfolder_resolver(
+                VFolderPermissionSetAlias.READABLE,
+                VFolderStatusSet.READABLE,
+                processors=deps.processors,
+            ),
         ],
     )
     reg.add(
@@ -198,7 +219,11 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.create_archive_download_session,
         middlewares=[
             *_auth_ro(),
-            _vfolder_resolver(VFolderPermissionSetAlias.READABLE, VFolderStatusSet.READABLE),
+            _vfolder_resolver(
+                VFolderPermissionSetAlias.READABLE,
+                VFolderStatusSet.READABLE,
+                processors=deps.processors,
+            ),
         ],
     )
     reg.add(
@@ -207,7 +232,11 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.move_file,
         middlewares=[
             *_auth_rw(),
-            _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
+            _vfolder_resolver(
+                VFolderPermissionSetAlias.WRITABLE,
+                VFolderStatusSet.UPDATABLE,
+                processors=deps.processors,
+            ),
         ],
     )
     reg.add(
@@ -216,7 +245,11 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.rename_file,
         middlewares=[
             *_auth_rw(),
-            _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
+            _vfolder_resolver(
+                VFolderPermissionSetAlias.WRITABLE,
+                VFolderStatusSet.UPDATABLE,
+                processors=deps.processors,
+            ),
         ],
     )
     reg.add(
@@ -225,7 +258,11 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.delete_files,
         middlewares=[
             *_auth_rw(),
-            _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
+            _vfolder_resolver(
+                VFolderPermissionSetAlias.WRITABLE,
+                VFolderStatusSet.UPDATABLE,
+                processors=deps.processors,
+            ),
         ],
     )
     reg.add(
@@ -234,7 +271,11 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.delete_files,
         middlewares=[
             *_auth_rw(),
-            _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
+            _vfolder_resolver(
+                VFolderPermissionSetAlias.WRITABLE,
+                VFolderStatusSet.UPDATABLE,
+                processors=deps.processors,
+            ),
         ],
     )
     reg.add(
@@ -243,7 +284,11 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.delete_files_async,
         middlewares=[
             *_auth_rw(),
-            _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
+            _vfolder_resolver(
+                VFolderPermissionSetAlias.WRITABLE,
+                VFolderStatusSet.UPDATABLE,
+                processors=deps.processors,
+            ),
         ],
     )
     # Legacy underbar variants
@@ -253,7 +298,11 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.rename_file,
         middlewares=[
             *_auth_rw(),
-            _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
+            _vfolder_resolver(
+                VFolderPermissionSetAlias.WRITABLE,
+                VFolderStatusSet.UPDATABLE,
+                processors=deps.processors,
+            ),
         ],
     )
     reg.add(
@@ -262,7 +311,11 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.delete_files,
         middlewares=[
             *_auth_rw(),
-            _vfolder_resolver(VFolderPermissionSetAlias.WRITABLE, VFolderStatusSet.UPDATABLE),
+            _vfolder_resolver(
+                VFolderPermissionSetAlias.WRITABLE,
+                VFolderStatusSet.UPDATABLE,
+                processors=deps.processors,
+            ),
         ],
     )
     reg.add(
@@ -271,7 +324,11 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.list_files,
         middlewares=[
             *_auth_ro(),
-            _vfolder_resolver(VFolderPermissionSetAlias.READABLE, VFolderStatusSet.READABLE),
+            _vfolder_resolver(
+                VFolderPermissionSetAlias.READABLE,
+                VFolderStatusSet.READABLE,
+                processors=deps.processors,
+            ),
         ],
     )
 
@@ -282,7 +339,9 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.invite,
         middlewares=[
             *_auth_rw(),
-            _vfolder_resolver(VFolderPermission.OWNER_PERM, VFolderStatusSet.UPDATABLE),
+            _vfolder_resolver(
+                VFolderPermission.OWNER_PERM, VFolderStatusSet.UPDATABLE, processors=deps.processors
+            ),
         ],
     )
     reg.add(
@@ -294,6 +353,7 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
             _vfolder_resolver(
                 VFolderPermissionSetAlias.READABLE,
                 VFolderStatusSet.UPDATABLE,
+                processors=deps.processors,
                 allow_privileged_access=False,
             ),
         ],
@@ -304,7 +364,9 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.share,
         middlewares=[
             *_admin_rw(),
-            _vfolder_resolver(VFolderPermission.READ_ONLY, VFolderStatusSet.UPDATABLE),
+            _vfolder_resolver(
+                VFolderPermission.READ_ONLY, VFolderStatusSet.UPDATABLE, processors=deps.processors
+            ),
         ],
     )
     reg.add(
@@ -313,7 +375,9 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.unshare,
         middlewares=[
             *_admin_rw(),
-            _vfolder_resolver(VFolderPermission.READ_ONLY, VFolderStatusSet.UPDATABLE),
+            _vfolder_resolver(
+                VFolderPermission.READ_ONLY, VFolderStatusSet.UPDATABLE, processors=deps.processors
+            ),
         ],
     )
     reg.add(
@@ -322,7 +386,9 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.unshare,
         middlewares=[
             *_admin_rw(),
-            _vfolder_resolver(VFolderPermission.READ_ONLY, VFolderStatusSet.UPDATABLE),
+            _vfolder_resolver(
+                VFolderPermission.READ_ONLY, VFolderStatusSet.UPDATABLE, processors=deps.processors
+            ),
         ],
     )
     reg.add(
@@ -331,7 +397,11 @@ def register_vfolder_routes(deps: ModuleDeps) -> RouteRegistry:
         handler.clone,
         middlewares=[
             *_auth_rw(),
-            _vfolder_resolver(VFolderPermissionSetAlias.READABLE, VFolderStatusSet.UPDATABLE),
+            _vfolder_resolver(
+                VFolderPermissionSetAlias.READABLE,
+                VFolderStatusSet.UPDATABLE,
+                processors=deps.processors,
+            ),
         ],
     )
 
