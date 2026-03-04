@@ -348,7 +348,7 @@ class VFolderHandler:
                     cloneable=base_info.cloneable,
                 )
             )
-        resp = VFolderListResponse(items=items)
+        resp = VFolderListResponse(items)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------

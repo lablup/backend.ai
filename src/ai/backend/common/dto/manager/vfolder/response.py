@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.api_handlers import BaseResponseModel, BaseRootResponseModel
 from ai.backend.common.bgtask.types import TaskID
 from ai.backend.common.dto.manager.field import (
     VFolderItemField,
@@ -185,10 +185,8 @@ class VFolderCreateResponse(BaseResponseModel):
     item: VFolderItemField
 
 
-class VFolderListResponse(BaseResponseModel):
-    """Response for listing vfolders."""
-
-    items: list[VFolderItemField] = Field(default_factory=list)
+class VFolderListResponse(BaseRootResponseModel[list[VFolderItemField]]):
+    """Response for listing vfolders (plain array for backward compatibility)."""
 
 
 class VFolderGetInfoResponse(BaseResponseModel):
