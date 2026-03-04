@@ -10,21 +10,8 @@ from dateutil.tz import gettz, tzutc
 
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.middleware.auth import _extract_auth_params, check_date
+from ai.backend.manager.api.rest.types import ModuleDeps
 from ai.backend.manager.errors.auth import InvalidAuthParameters
-from ai.backend.manager.server import (
-    agent_registry_ctx,
-    database_ctx,
-    event_dispatcher_plugin_ctx,
-    event_hub_ctx,
-    event_producer_ctx,
-    hook_plugin_ctx,
-    message_queue_ctx,
-    monitoring_ctx,
-    network_plugin_ctx,
-    redis_ctx,
-    repositories_ctx,
-    storage_manager_ctx,
-)
 
 
 def test_extract_auth_params() -> None:
@@ -99,32 +86,16 @@ def test_check_date() -> None:
 
 
 async def test_authorize(
-    mock_etcd_ctx: Any,
-    mock_config_provider_ctx: Any,
     etcd_fixture: None,
     database_fixture: None,
+    server_module_deps: ModuleDeps,
     create_app_and_client: Any,
     get_headers: Any,
 ) -> None:
     # The auth module requires config_server and database to be set up.
     app, client = await create_app_and_client(
-        [
-            event_hub_ctx,
-            mock_etcd_ctx,
-            mock_config_provider_ctx,
-            redis_ctx,
-            database_ctx,
-            message_queue_ctx,
-            event_producer_ctx,
-            storage_manager_ctx,
-            repositories_ctx,
-            monitoring_ctx,
-            network_plugin_ctx,
-            hook_plugin_ctx,
-            event_dispatcher_plugin_ctx,
-            agent_registry_ctx,
-        ],
-        [register_auth_routes],
+        module_deps=server_module_deps,
+        registrars=[register_auth_routes],
     )
 
     async def do_authorize(hash_type: str, api_version: str) -> None:

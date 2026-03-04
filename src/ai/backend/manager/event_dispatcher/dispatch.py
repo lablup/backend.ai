@@ -127,6 +127,7 @@ from .handlers.model_serving import ModelServingEventHandler
 from .handlers.notification import NotificationEventHandler
 from .handlers.service_catalog import ServiceCatalogEventHandler
 from .handlers.session import SessionEventHandler
+from .handlers.stream_cleanup import StreamCleanupEventHandler
 from .handlers.vfolder import VFolderEventHandler
 from .reporters import EventLogger
 
@@ -170,6 +171,7 @@ class Dispatchers:
     _artifact_registry_event_handler: ArtifactRegistryEventHandler
     _service_catalog_event_handler: ServiceCatalogEventHandler
     _log_cleanup_event_handler: LogCleanupEventHandler
+    stream_cleanup_handler: StreamCleanupEventHandler
 
     def __init__(self, args: DispatcherArgs) -> None:
         """
@@ -230,6 +232,7 @@ class Dispatchers:
         )
         self._service_catalog_event_handler = ServiceCatalogEventHandler(args.db)
         self._log_cleanup_event_handler = LogCleanupEventHandler(args.etcd, args.db)
+        self.stream_cleanup_handler = StreamCleanupEventHandler(args.db)
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
         """

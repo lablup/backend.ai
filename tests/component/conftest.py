@@ -9,12 +9,10 @@ import shutil
 import tempfile
 import textwrap
 import uuid
-from collections.abc import AsyncIterator, Callable, Iterator
-from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontextmanager
+from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
-from functools import partial, update_wrapper
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import asyncpg
 import pytest
@@ -29,15 +27,12 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
-from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
-from ai.backend.manager.api.context import CleanupContext, RootContext
 from ai.backend.manager.api.rest.types import ModuleDeps, ModuleRegistrar
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
@@ -70,6 +65,7 @@ from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import users
+from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.server import build_root_app, register_modules
 from ai.backend.testutils.bootstrap import (  # noqa: F401
@@ -80,13 +76,6 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
 from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger("tests.component.conftest")
-
-
-@asynccontextmanager
-async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncIterator[None]:
-    async with AsyncEtcd.create_from_config(etcd_config) as etcd:
-        root_ctx.etcd = etcd
-        yield
 
 
 @dataclass
@@ -265,24 +254,12 @@ def bootstrap_config(
         pass
 
 
-EtcdCtxFactory = Callable[[RootContext], AbstractAsyncContextManager[None]]
-
-
 @pytest.fixture(scope="session")
 def redis_addr(
     redis_container: tuple[str, HostPortPairModel],  # noqa: F811
 ) -> HostPortPairModel:
     """Expose the Redis container address for fixtures that need it directly."""
     return redis_container[1]
-
-
-@pytest.fixture(scope="session")
-def mock_etcd_ctx(
-    bootstrap_config: BootstrapConfig,
-) -> EtcdCtxFactory:
-    argument_binding_ctx = partial(etcd_ctx, etcd_config=bootstrap_config.etcd.to_dataclass())
-    update_wrapper(argument_binding_ctx, etcd_ctx)
-    return argument_binding_ctx
 
 
 @pytest.fixture(scope="session")
@@ -846,76 +823,11 @@ def server_module_registrars() -> list[ModuleRegistrar]:
 
 
 @pytest.fixture()
-def server_cleanup_contexts() -> list[CleanupContext]:
-    """
-    The list of cleanup contexts passed to build_root_app.
-
-    Override this fixture in domain-specific conftest.py to provide only the
-    dependencies required for that domain's tests. The default empty list
-    means no production cleanup contexts run, so each domain must provide
-    its own context to set up root_ctx.db, repositories, processors, etc.
-    """
-    return []
-
-
-type ModuleDepsFactory = Callable[[RootContext], ModuleDeps]
-
-
-@pytest.fixture()
-def server_module_deps_factory() -> ModuleDepsFactory:
-    """Build ``ModuleDeps`` from a ``RootContext``.
-
-    Falls back to ``MagicMock()`` for attributes not initialised by the
-    test's cleanup contexts.  Override in domain-specific conftest.py
-    when custom construction logic is needed.
-    """
-
-    def _factory(root_ctx: RootContext) -> ModuleDeps:
-        return ModuleDeps(
-            cors_options=root_ctx.cors_options,
-            processors=getattr(root_ctx, "processors", None) or MagicMock(),
-            config_provider=root_ctx.config_provider,
-            gql_context_deps=MagicMock(),
-        )
-
-    return _factory
-
-
-@pytest.fixture()
-async def server(
+def config_provider(
     bootstrap_config: BootstrapConfig,
     redis_addr: HostPortPairModel,
-    mock_etcd_ctx: EtcdCtxFactory,
-    etcd_fixture: None,
-    database_fixture: None,
-    server_module_registrars: list[ModuleRegistrar],
-    server_cleanup_contexts: list[CleanupContext],
-    server_module_deps_factory: ModuleDepsFactory,
-) -> AsyncIterator[ServerInfo]:
-    """
-    Start a full manager server and return its connection info.
-
-    All modules are registered via ``register_modules()`` after cleanup
-    contexts have initialised ``root_ctx.processors`` but before
-    ``runner.setup()`` freezes the router.
-    """
-    app = build_root_app(
-        0,
-        bootstrap_config,
-        cleanup_contexts=[],
-    )
-    root_ctx: RootContext = app["_root.context"]
-
-    exit_stack = AsyncExitStack()
-    await exit_stack.__aenter__()
-
-    # Pre-initialize etcd context (real etcd connection via testcontainer)
-    await exit_stack.enter_async_context(mock_etcd_ctx(root_ctx))
-
-    # Set up config provider directly, bypassing the production
-    # LoaderChain / TOML parsing / etcd watcher pipeline.
-    # NOTE: model_validate() used for the same pydantic-mypy reason
-    # documented in the bootstrap_config fixture above.
+) -> ManagerConfigProvider:
+    """Build a test config provider without LoaderChain / etcd watcher."""
     unified_config = ManagerUnifiedConfig.model_validate({
         "db": bootstrap_config.db,
         "etcd": bootstrap_config.etcd,
@@ -925,35 +837,75 @@ async def server(
         "debug": bootstrap_config.debug,
         "redis": {"addr": {"host": redis_addr.host, "port": redis_addr.port}},
     })
-    root_ctx.config_provider = _TestConfigProvider(unified_config)
+    return _TestConfigProvider(unified_config)
 
-    # Run cleanup contexts manually so that root_ctx.processors (and other
-    # dependencies) are available before the router is frozen.
-    for cctx in server_cleanup_contexts:
-        await exit_stack.enter_async_context(cctx(root_ctx))
 
-    # Register all requested modules using the unified dispatch.
-    # At this point processors are ready (set by cleanup contexts above)
-    # and the router is not yet frozen.
-    if server_module_registrars:
-        deps = server_module_deps_factory(root_ctx)
-        register_modules(app, server_module_registrars, deps=deps)
-
-    runner = web.AppRunner(app, handle_signals=False)
-    await runner.setup()
-    service_addr = root_ctx.config_provider.config.manager.service_addr
-    site = web.TCPSite(
-        runner,
-        service_addr.host,
-        service_addr.port,
-        reuse_port=True,
+@pytest.fixture()
+def server_module_deps(
+    config_provider: ManagerConfigProvider,
+) -> ModuleDeps:
+    """Default ModuleDeps for tests. Override in domain conftest if needed."""
+    return ModuleDeps(
+        cors_options={},
+        processors=MagicMock(),
+        config_provider=config_provider,
+        gql_context_deps=MagicMock(),
     )
-    await site.start()
 
-    yield ServerInfo(host=str(service_addr.host), port=service_addr.port)
 
-    await runner.cleanup()
-    await exit_stack.aclose()
+@pytest.fixture()
+async def server(
+    bootstrap_config: BootstrapConfig,
+    etcd_fixture: None,
+    database_fixture: None,
+    server_module_registrars: list[ModuleRegistrar],
+    server_module_deps: ModuleDeps,
+) -> AsyncIterator[ServerInfo]:
+    """Start a test server with real DB (for auth middleware) and mock monitors."""
+    app = build_root_app(
+        0,
+        bootstrap_config,
+        cleanup_contexts=[],
+    )
+    root_ctx = app["_root.context"]
+
+    cp = server_module_deps.config_provider
+    root_ctx.config_provider = cp
+
+    # Real DB connection for HMAC auth middleware
+    async with connect_database(cp.config.db) as db:
+        root_ctx.db = db
+
+        # Mocks for exception middleware
+        root_ctx.error_monitor = MagicMock()
+        root_ctx.error_monitor.capture_exception = AsyncMock()
+        root_ctx.stats_monitor = MagicMock()
+        root_ctx.stats_monitor.report_metric = AsyncMock()
+
+        # Mocks for auth middleware
+        root_ctx.valkey_stat = MagicMock()
+        root_ctx.valkey_stat.increment_keypair_query_count = AsyncMock()
+        root_ctx.hook_plugin_ctx = MagicMock()
+        root_ctx.hook_plugin_ctx.dispatch = AsyncMock(return_value=MagicMock())
+        root_ctx.jwt_validator = MagicMock()
+
+        if server_module_registrars:
+            register_modules(app, server_module_registrars, deps=server_module_deps)
+
+        runner = web.AppRunner(app, handle_signals=False)
+        await runner.setup()
+        service_addr = cp.config.manager.service_addr
+        site = web.TCPSite(
+            runner,
+            service_addr.host,
+            service_addr.port,
+            reuse_port=True,
+        )
+        await site.start()
+
+        yield ServerInfo(host=str(service_addr.host), port=service_addr.port)
+
+        await runner.cleanup()
 
 
 @pytest.fixture()

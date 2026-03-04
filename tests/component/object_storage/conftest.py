@@ -3,35 +3,18 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
-from contextlib import asynccontextmanager
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api.context import CleanupContext, RootContext
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.object_storage.registry import register_object_storage_routes
 from ai.backend.manager.api.rest.types import ModuleRegistrar
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
-from ai.backend.manager.repositories.repositories import Repositories
-from ai.backend.manager.repositories.types import RepositoryArgs
-from ai.backend.manager.server import (
-    background_task_ctx,
-    database_ctx,
-    event_hub_ctx,
-    event_producer_ctx,
-    message_queue_ctx,
-    monitoring_ctx,
-    redis_ctx,
-    storage_manager_ctx,
-)
-from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -44,77 +27,10 @@ StorageNamespaceFixtureData = dict[str, Any]
 StorageNamespaceFactory = Callable[..., Coroutine[Any, Any, StorageNamespaceFixtureData]]
 
 
-@asynccontextmanager
-async def _object_storage_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    """Set up repositories and processors for object-storage-domain component tests."""
-    _mock_loader = MagicMock()
-    _mock_loader.get_manager_status = AsyncMock(return_value=ManagerStatus.RUNNING)
-    root_ctx.config_provider._legacy_etcd_config_loader = _mock_loader
-    root_ctx.repositories = Repositories.create(
-        RepositoryArgs(
-            db=root_ctx.db,
-            storage_manager=root_ctx.storage_manager,
-            config_provider=root_ctx.config_provider,
-            valkey_stat_client=root_ctx.valkey_stat,
-            valkey_schedule_client=root_ctx.valkey_schedule,
-            valkey_image_client=root_ctx.valkey_image,
-            valkey_live_client=root_ctx.valkey_live,
-        )
-    )
-    root_ctx.processors = Processors.create(
-        ProcessorArgs(
-            service_args=ServiceArgs(
-                db=root_ctx.db,
-                repositories=root_ctx.repositories,
-                etcd=root_ctx.etcd,
-                config_provider=root_ctx.config_provider,
-                storage_manager=root_ctx.storage_manager,
-                valkey_stat_client=root_ctx.valkey_stat,
-                valkey_live=root_ctx.valkey_live,
-                valkey_artifact_client=root_ctx.valkey_artifact,
-                error_monitor=root_ctx.error_monitor,
-                event_fetcher=root_ctx.event_fetcher,
-                background_task_manager=root_ctx.background_task_manager,
-                event_hub=root_ctx.event_hub,
-                event_producer=root_ctx.event_producer,
-                agent_registry=MagicMock(),
-                idle_checker_host=MagicMock(),
-                event_dispatcher=MagicMock(),
-                hook_plugin_ctx=MagicMock(),
-                scheduling_controller=MagicMock(),
-                deployment_controller=MagicMock(),
-                revision_generator_registry=MagicMock(),
-                agent_cache=MagicMock(),
-                notification_center=MagicMock(),
-                appproxy_client_pool=MagicMock(),
-                prometheus_client=MagicMock(),
-            ),
-        ),
-        [],
-    )
-    yield
-
-
 @pytest.fixture()
 def server_module_registrars() -> list[ModuleRegistrar]:
     """Load only the modules required for object-storage-domain tests."""
     return [register_auth_routes, register_object_storage_routes]
-
-
-@pytest.fixture()
-def server_cleanup_contexts() -> list[CleanupContext]:
-    """Provide cleanup contexts for object-storage-domain component tests."""
-    return [
-        redis_ctx,
-        database_ctx,
-        monitoring_ctx,
-        storage_manager_ctx,
-        message_queue_ctx,
-        event_producer_ctx,
-        event_hub_ctx,
-        background_task_ctx,
-        _object_storage_domain_ctx,
-    ]
 
 
 @pytest.fixture()

@@ -2,9 +2,8 @@
 
 This module contains:
 
-* ``auth_middleware`` — a global (``web.middleware``) middleware that detects
-  the authentication method (JWT / HMAC / hook) and populates the request
-  with user credentials.
+* ``build_auth_middleware`` — factory that creates a global (``web.middleware``)
+  middleware with explicit dependencies (no RootContext lookup).
 
 * ``auth_required``, ``admin_required``, ``superadmin_required`` —
   route-level decorators (usable as ``RouteMiddleware``) that enforce
@@ -31,7 +30,7 @@ from urllib.parse import urlparse
 import jwt as pyjwt
 import sqlalchemy as sa
 from aiohttp import web
-from aiohttp.typedefs import Handler
+from aiohttp.typedefs import Handler, Middleware
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 
@@ -59,7 +58,10 @@ from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import execute_with_retry
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.context import RootContext
+    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+    from ai.backend.common.jwt.validator import JWTValidator
+    from ai.backend.common.plugin.hook import HookPluginContext
+    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -443,10 +445,10 @@ def _set_unauthenticated_state(request: web.Request) -> None:
 
 
 async def _query_cred_by_access_key(
-    root_ctx: RootContext,
+    db: ExtendedAsyncSAEngine,
     access_key: str,
 ) -> tuple[Any, Any]:
-    async with root_ctx.db.begin_readonly() as conn:
+    async with db.begin_readonly() as conn:
         j = keypairs.join(
             keypair_resource_policies,
             keypairs.c.resource_policy == keypair_resource_policies.c.name,
@@ -528,7 +530,9 @@ def _populate_auth_result(
 
 async def _authenticate_via_jwt(
     request: web.Request,
-    root_ctx: RootContext,
+    db: ExtendedAsyncSAEngine,
+    jwt_validator: JWTValidator,
+    valkey_stat: ValkeyStatClient,
     jwt_token: str,
 ) -> None:
     try:
@@ -541,19 +545,19 @@ async def _authenticate_via_jwt(
             raise AuthorizationFailed("Access key not found in JWT token")
 
         user_row, keypair_row = await execute_with_retry(
-            functools.partial(_query_cred_by_access_key, root_ctx, access_key)
+            functools.partial(_query_cred_by_access_key, db, access_key)
         )
 
         if keypair_row is None:
             raise AuthorizationFailed("Access key not found in database")
 
         secret_key = keypair_row.keypairs_secret_key
-        root_ctx.jwt_validator.validate_token(jwt_token, secret_key)
+        jwt_validator.validate_token(jwt_token, secret_key)
 
         _populate_auth_result(request, user_row, keypair_row)
         log.trace("JWT authentication succeeded for access_key={}", access_key)
 
-        await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
+        await valkey_stat.increment_keypair_query_count(access_key)
 
     except JWTError as e:
         log.warning("JWT authentication failed: {}", e)
@@ -562,7 +566,8 @@ async def _authenticate_via_jwt(
 
 async def _authenticate_via_hmac(
     request: web.Request,
-    root_ctx: RootContext,
+    db: ExtendedAsyncSAEngine,
+    valkey_stat: ValkeyStatClient,
 ) -> None:
     if not check_date(request):
         raise InvalidAuthParameters("Date/time sync error")
@@ -574,7 +579,7 @@ async def _authenticate_via_hmac(
     sign_method, access_key, signature = params
 
     user_row, keypair_row = await execute_with_retry(
-        functools.partial(_query_cred_by_access_key, root_ctx, access_key)
+        functools.partial(_query_cred_by_access_key, db, access_key)
     )
 
     if keypair_row is None:
@@ -587,14 +592,16 @@ async def _authenticate_via_hmac(
 
     _populate_auth_result(request, user_row, keypair_row)
 
-    await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
+    await valkey_stat.increment_keypair_query_count(access_key)
 
 
 async def _authenticate_via_hook(
     request: web.Request,
-    root_ctx: RootContext,
+    db: ExtendedAsyncSAEngine,
+    valkey_stat: ValkeyStatClient,
+    hook_plugin_ctx: HookPluginContext,
 ) -> None:
-    hook_result = await root_ctx.hook_plugin_ctx.dispatch(
+    hook_result = await hook_plugin_ctx.dispatch(
         "PRE_AUTH_MIDDLEWARE",
         (request,),
         return_when=FIRST_COMPLETED,
@@ -611,7 +618,7 @@ async def _authenticate_via_hook(
         return
 
     user_row, keypair_row = await execute_with_retry(
-        functools.partial(_query_cred_by_access_key, root_ctx, access_key)
+        functools.partial(_query_cred_by_access_key, db, access_key)
     )
 
     if keypair_row is None:
@@ -619,7 +626,7 @@ async def _authenticate_via_hook(
 
     _populate_auth_result(request, user_row, keypair_row)
 
-    await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
+    await valkey_stat.increment_keypair_query_count(access_key)
 
 
 def _setup_user_context(request: web.Request) -> ExitStack:
@@ -652,34 +659,6 @@ def _setup_user_context(request: web.Request) -> ExitStack:
 # ---------------------------------------------------------------------------
 # Global middleware
 # ---------------------------------------------------------------------------
-
-
-@web.middleware
-async def auth_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
-    """Unified authentication middleware — routes to the appropriate auth flow."""
-    allow_list = request.app["auth_middleware_allowlist"]
-
-    if any(request.path.startswith(path) for path in allow_list):
-        _set_unauthenticated_state(request)
-        return await handler(request)
-
-    root_ctx: RootContext = request.app["_root.context"]
-    _set_unauthenticated_state(request)
-
-    if not get_handler_attr(request, "auth_required", False):
-        return await handler(request)
-
-    jwt_token = request.headers.get("X-BackendAI-Token")
-    auth_header = request.headers.get("Authorization")
-    if jwt_token:
-        await _authenticate_via_jwt(request, root_ctx, jwt_token)
-    elif auth_header:
-        await _authenticate_via_hmac(request, root_ctx)
-    else:
-        await _authenticate_via_hook(request, root_ctx)
-
-    with _setup_user_context(request):
-        return await handler(request)
 
 
 # ---------------------------------------------------------------------------
@@ -773,3 +752,40 @@ def superadmin_required_for_method(
     set_handler_attr(wrapped, "auth_required", True)
     set_handler_attr(wrapped, "auth_scope", "superadmin")
     return wrapped
+
+
+def build_auth_middleware(
+    *,
+    db: ExtendedAsyncSAEngine,
+    jwt_validator: JWTValidator,
+    valkey_stat: ValkeyStatClient,
+    hook_plugin_ctx: HookPluginContext,
+) -> Middleware:
+    """Build an auth middleware with explicit dependencies (no RootContext lookup)."""
+
+    @web.middleware
+    async def _middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
+        allow_list = request.app.get("auth_middleware_allowlist", [])
+
+        if any(request.path.startswith(path) for path in allow_list):
+            _set_unauthenticated_state(request)
+            return await handler(request)
+
+        _set_unauthenticated_state(request)
+
+        if not get_handler_attr(request, "auth_required", False):
+            return await handler(request)
+
+        jwt_token = request.headers.get("X-BackendAI-Token")
+        auth_header = request.headers.get("Authorization")
+        if jwt_token:
+            await _authenticate_via_jwt(request, db, jwt_validator, valkey_stat, jwt_token)
+        elif auth_header:
+            await _authenticate_via_hmac(request, db, valkey_stat)
+        else:
+            await _authenticate_via_hook(request, db, valkey_stat, hook_plugin_ctx)
+
+        with _setup_user_context(request):
+            return await handler(request)
+
+    return _middleware

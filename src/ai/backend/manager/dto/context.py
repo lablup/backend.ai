@@ -8,6 +8,7 @@ from aiohttp import web
 from pydantic import ConfigDict
 
 from ai.backend.common.api_handlers import MiddlewareParam
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.processors import Processors
 
@@ -92,4 +93,34 @@ class VFolderAuthContext(MiddlewareParam):
             user_email=request["user"]["email"],
             access_key=request["keypair"]["access_key"],
             vfolder_row=request["vfolder_row"],
+        )
+
+
+class StorageSessionManagerCtx(MiddlewareParam):
+    """Middleware parameter providing access to the storage session manager."""
+
+    storage_manager: StorageSessionManager
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @override
+    @classmethod
+    async def from_request(cls, request: web.Request) -> Self:
+        return cls(storage_manager=request.app["_storage_manager"])
+
+
+class ExportCtx(MiddlewareParam):
+    """Middleware parameter providing export repository and config."""
+
+    repository: Any
+    config: Any
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @override
+    @classmethod
+    async def from_request(cls, request: web.Request) -> Self:
+        return cls(
+            repository=request.app["_export_repository"],
+            config=request.app["_export_config"],
         )

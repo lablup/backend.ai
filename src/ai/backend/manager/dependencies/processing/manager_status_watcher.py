@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 import logging
 
-from aiotools import aclosing, cancel_and_wait
+from aiotools import aclosing
 
 from ai.backend.logging import BraceStyleAdapter
 
@@ -120,10 +120,12 @@ class ManagerStatusWatcherDependency(
             )
         finally:
             status_watch_task.cancel()
-            await asyncio.sleep(0)
-            if not status_watch_task.done():
-                await cancel_and_wait(status_watch_task)
+            try:
+                await status_watch_task
+            except asyncio.CancelledError:
+                pass
             db_status_report_task.cancel()
-            await asyncio.sleep(0)
-            if not db_status_report_task.done():
-                await cancel_and_wait(db_status_report_task)
+            try:
+                await db_status_report_task
+            except asyncio.CancelledError:
+                pass

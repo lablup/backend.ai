@@ -17,6 +17,7 @@ def register_vfs_storage_routes(deps: ModuleDeps) -> RouteRegistry:
     from .handler import VFSStorageHandler
 
     reg = RouteRegistry.create("vfs-storages", deps.cors_options)
+    reg.app["_storage_manager"] = deps.storage_manager
     handler = VFSStorageHandler()
 
     reg.add(
