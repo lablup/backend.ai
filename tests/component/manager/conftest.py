@@ -326,6 +326,7 @@ class _TestConfigProvider(ManagerConfigProvider):
         # that are irrelevant in the test environment.
         self._config = config
         self._etcd_watcher_task = None
+        self._legacy_etcd_config_loader = MagicMock()
 
 
 @pytest.fixture()
