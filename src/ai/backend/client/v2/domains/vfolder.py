@@ -97,14 +97,7 @@ class VFolderClient(BaseDomainClient):
             else None
         )
         data = await self._client._request("GET", "/folders", params=params)
-        # Both the legacy and new REST API return a bare JSON list.
-        # VFolderListResponse is a RootModel[list[…]], so validate directly.
-        if isinstance(data, list):
-            return VFolderListResponse.model_validate(data)
-        # Fallback for any envelope format (e.g. {"items": [...]}).
-        if isinstance(data, dict):
-            return VFolderListResponse.model_validate(data.get("items", []))
-        return VFolderListResponse([])
+        return VFolderListResponse.model_validate(data or [])
 
     async def get_info(self, name: str) -> VFolderGetInfoResponse:
         return await self._client.typed_request(
