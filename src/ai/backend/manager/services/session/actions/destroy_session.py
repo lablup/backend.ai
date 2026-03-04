@@ -1,11 +1,9 @@
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.base import SessionSingleEntityAction
 
@@ -16,7 +14,7 @@ class DestroySessionAction(SessionSingleEntityAction):
     """Destroy a specific session.
 
     RBAC validation checks if the user has DELETE permission for this session.
-    session_id will be resolved from session_name before RBAC validation.
+    session_id must be resolved from session_name before RBAC validation.
     """
 
     user_role: UserRole
@@ -24,7 +22,6 @@ class DestroySessionAction(SessionSingleEntityAction):
     forced: bool
     recursive: bool
     owner_access_key: AccessKey
-    session_id: str = ""  # TODO: Resolve from session_name before RBAC validation
 
     @override
     def entity_id(self) -> str | None:
@@ -37,17 +34,6 @@ class DestroySessionAction(SessionSingleEntityAction):
         # if self.recursive:
         #     return "destroy_multi"
         return ActionOperationType.DELETE
-
-    @override
-    def target_entity_id(self) -> str:
-        return self.session_id
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType.SESSION,
-            element_id=self.session_id,
-        )
 
 
 @dataclass
