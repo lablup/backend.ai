@@ -85,7 +85,7 @@ class VFolderByName(BaseFunction):
         })
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()
-            return result
+            return result["item"]
 
     @api_function
     @classmethod
@@ -216,13 +216,16 @@ class VFolderByName(BaseFunction):
         )
 
     async def _get_id_by_name(self) -> UUID:
-        rqst = Request("GET", "/folders/_/id")
-        rqst.set_json({
-            "name": self.name,
-        })
+        rqst = Request(
+            "GET",
+            "/folders/_/id",
+            params={
+                "vfolder_name": self.name,
+            },
+        )
         async with rqst.fetch() as resp:
             data = await resp.json()
-            return UUID(data["id"])
+            return UUID(data["item"]["id"])
 
     @api_function
     async def get_id(self) -> UUID:
@@ -258,7 +261,7 @@ class VFolderByName(BaseFunction):
         rqst = Request("GET", f"/folders/{self.request_key}")
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()
-            return result
+            return result["item"]
 
     @api_function
     async def delete(self) -> dict[str, Any]:
@@ -796,7 +799,7 @@ class VFolderByName(BaseFunction):
         })
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()
-            return result
+            return result["item"]
 
     @api_function
     async def update_options(
