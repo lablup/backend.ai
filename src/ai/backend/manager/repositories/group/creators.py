@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from typing import override
 
@@ -23,8 +24,8 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
     allowed_vfolder_hosts: VFolderHostPermissionMap | None = None
     integration_id: str | None = None
     resource_policy: str | None = None
-    container_registry: dict[str, str] | None = None
     dotfiles: bytes | None = None
+    container_registry_id: uuid.UUID | None = None
 
     @override
     def build_row(self) -> GroupRow:
@@ -39,5 +40,5 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
             integration_id=self.integration_id,
             resource_policy=self.resource_policy,
             dotfiles=self.dotfiles,
-            container_registry=self.container_registry,
+            container_registry_id=self.container_registry_id,
         )

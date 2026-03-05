@@ -4607,11 +4607,13 @@ type Group
   integration_id: String
   resource_policy: String
 
-  """Added in 24.03.0."""
-  type: String
+  """
+  Added in 24.03.0. The default container registry resolved from container_registry_id. Kept for backward compatibility.
+  """
+  container_registry: JSONString
 
   """Added in 24.03.0."""
-  container_registry: JSONString
+  type: String
   scaling_groups: [String]
 }
 
@@ -4653,8 +4655,10 @@ input GroupInput
   integration_id: String = ""
   resource_policy: String = "default"
 
-  """Added in 24.03.0"""
-  container_registry: JSONString = "{}"
+  """
+  Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.
+  """
+  container_registry_id: UUID
 }
 
 type GroupNode implements Node
@@ -4678,11 +4682,13 @@ type GroupNode implements Node
   integration_id: String @join__field(graph: GRAPHENE)
   resource_policy: String @join__field(graph: GRAPHENE)
 
+  """
+  Added in 24.03.0. The default container registry resolved from container_registry_id. Kept for backward compatibility.
+  """
+  container_registry: JSONString @join__field(graph: GRAPHENE)
+
   """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE']."""
   type: String @join__field(graph: GRAPHENE)
-
-  """Added in 24.03.7."""
-  container_registry: JSONString @join__field(graph: GRAPHENE)
   scaling_groups: [String] @join__field(graph: GRAPHENE)
 
   """Added in 25.3.0."""
@@ -6436,8 +6442,10 @@ input ModifyGroupInput
   integration_id: String
   resource_policy: String
 
-  """Added in 24.03.0"""
-  container_registry: JSONString = "{}"
+  """
+  Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.
+  """
+  container_registry_id: UUID
 }
 
 type ModifyImage

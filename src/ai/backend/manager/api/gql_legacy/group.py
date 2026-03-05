@@ -38,10 +38,15 @@ from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ProjectPermission
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.container_registry.options import ContainerRegistryConditions
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
+from ai.backend.manager.services.container_registry.actions.search_container_registries import (
+    SearchContainerRegistriesAction,
+)
 from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
 from ai.backend.manager.services.group.actions.delete_group import (
     DeleteGroupAction,
@@ -95,6 +100,8 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
 
+    _container_registry_id: uuid.UUID | None = None
+
     row_id = graphene.UUID(description="Added in 24.03.7. The undecoded id value stored in DB.")
     name = graphene.String()
     description = graphene.String()
@@ -106,8 +113,10 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
     allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
     resource_policy = graphene.String()
+    container_registry = graphene.JSONString(
+        description="Added in 24.03.0. The default container registry resolved from container_registry_id. Kept for backward compatibility.",
+    )
     type = graphene.String(description=f"Added in 24.03.7. One of {[t.name for t in ProjectType]}.")
-    container_registry = graphene.JSONString(description="Added in 24.03.7.")
     scaling_groups = graphene.List(
         lambda: graphene.String,
     )
@@ -144,7 +153,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         graph_ctx: GraphQueryContext,
         row: GroupRow,
     ) -> Self:
-        return cls(
+        obj = cls(
             id=row.id,
             row_id=row.id,
             name=row.name,
@@ -158,8 +167,9 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             integration_id=row.integration_id,
             resource_policy=row.resource_policy,
             type=row.type.name,
-            container_registry=row.container_registry,
         )
+        obj._container_registry_id = row.container_registry_id
+        return obj
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
         graph_ctx: GraphQueryContext = info.context
@@ -169,6 +179,30 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         )
         sgroups = await loader.load(self.id)
         return [sg.name for sg in sgroups]
+
+    async def resolve_container_registry(
+        self, info: graphene.ResolveInfo
+    ) -> dict[str, str | None] | None:
+        if self._container_registry_id is None:
+            return None
+        graph_ctx: GraphQueryContext = info.context
+        registry_id = uuid.UUID(str(self._container_registry_id))
+        action = SearchContainerRegistriesAction(
+            querier=BatchQuerier(
+                pagination=NoPagination(),
+                conditions=[ContainerRegistryConditions.by_ids([registry_id])],
+            ),
+        )
+        result = await graph_ctx.processors.container_registry.search_container_registries.wait_for_complete(
+            action
+        )
+        if not result.data:
+            return None
+        registry = result.data[0]
+        return {
+            "registry": registry.registry_name,
+            "project": registry.project,
+        }
 
     async def resolve_user_nodes(
         self,
@@ -343,6 +377,8 @@ class GroupPermissionField(graphene.Scalar):  # type: ignore[misc]
 
 
 class Group(graphene.ObjectType):  # type: ignore[misc]
+    _container_registry_id: uuid.UUID | None = None
+
     id = graphene.UUID()
     name = graphene.String()
     description = graphene.String()
@@ -354,8 +390,10 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
     allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
     resource_policy = graphene.String()
+    container_registry = graphene.JSONString(
+        description="Added in 24.03.0. The default container registry resolved from container_registry_id. Kept for backward compatibility.",
+    )
     type = graphene.String(description="Added in 24.03.0.")
-    container_registry = graphene.JSONString(description="Added in 24.03.0.")
 
     scaling_groups = graphene.List(lambda: graphene.String)
 
@@ -363,7 +401,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
     def from_row(cls, graph_ctx: GraphQueryContext, row: Row[Any] | None) -> Group | None:
         if row is None:
             return None
-        return cls(
+        obj = cls(
             id=row.id,
             name=row.name,
             description=row.description,
@@ -378,14 +416,15 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             integration_id=row.integration_id,
             resource_policy=row.resource_policy,
             type=row.type.name,
-            container_registry=row.container_registry,
         )
+        obj._container_registry_id = row.container_registry_id
+        return obj
 
     @classmethod
     def from_dto(cls, dto: GroupData | None) -> Self | None:
         if dto is None:
             return None
-        return cls(
+        obj = cls(
             id=dto.id,
             name=dto.name,
             description=dto.description,
@@ -400,8 +439,33 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             integration_id=dto.integration_id,
             resource_policy=dto.resource_policy,
             type=dto.type.name,
-            container_registry=dto.container_registry,
         )
+        obj._container_registry_id = dto.container_registry_id
+        return obj
+
+    async def resolve_container_registry(
+        self, info: graphene.ResolveInfo
+    ) -> dict[str, str | None] | None:
+        if self._container_registry_id is None:
+            return None
+        graph_ctx: GraphQueryContext = info.context
+        registry_id = uuid.UUID(str(self._container_registry_id))
+        action = SearchContainerRegistriesAction(
+            querier=BatchQuerier(
+                pagination=NoPagination(),
+                conditions=[ContainerRegistryConditions.by_ids([registry_id])],
+            ),
+        )
+        result = await graph_ctx.processors.container_registry.search_container_registries.wait_for_complete(
+            action
+        )
+        if not result.data:
+            return None
+        registry = result.data[0]
+        return {
+            "registry": registry.registry_name,
+            "project": registry.project,
+        }
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
         graph_ctx: GraphQueryContext = info.context
@@ -555,8 +619,9 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
     allowed_vfolder_hosts = graphene.JSONString(required=False, default_value={})
     integration_id = graphene.String(required=False, default_value="")
     resource_policy = graphene.String(required=False, default_value="default")
-    container_registry = graphene.JSONString(
-        required=False, default_value={}, description="Added in 24.03.0"
+    container_registry_id = graphene.UUID(
+        required=False,
+        description="Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.",
     )
 
     def to_action(self, name: str) -> CreateGroupAction:
@@ -578,7 +643,7 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
         )
         integration_id_val = value_or_none(self.integration_id)
         resource_policy_val = value_or_none(self.resource_policy)
-        container_registry_val = value_or_none(self.container_registry)
+        container_registry_id_val = value_or_none(self.container_registry_id)
 
         return CreateGroupAction(
             creator=Creator(
@@ -592,7 +657,7 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
                     allowed_vfolder_hosts=allowed_vfolder_hosts_val,
                     integration_id=integration_id_val,
                     resource_policy=resource_policy_val,
-                    container_registry=container_registry_val,
+                    container_registry_id=container_registry_id_val,
                 )
             ),
         )
@@ -609,8 +674,9 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
     resource_policy = graphene.String(required=False)
-    container_registry = graphene.JSONString(
-        required=False, default_value={}, description="Added in 24.03.0"
+    container_registry_id = graphene.UUID(
+        required=False,
+        description="Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.",
     )
 
     def to_action(self, group_id: uuid.UUID) -> ModifyGroupAction:
@@ -641,8 +707,8 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             resource_policy=OptionalState[str].from_graphql(
                 self.resource_policy,
             ),
-            container_registry=TriState[dict[str, str]].from_graphql(
-                self.container_registry,
+            container_registry_id=TriState[uuid.UUID].from_graphql(
+                self.container_registry_id,
             ),
         )
         return ModifyGroupAction(

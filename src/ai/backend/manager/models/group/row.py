@@ -15,7 +15,6 @@ from typing import (
 )
 
 import sqlalchemy as sa
-import trafaret as t
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,7 +44,6 @@ from ai.backend.manager.models.base import (
     EnumValueType,
     ResourceSlotColumn,
     SlugType,
-    StructuredJSONColumn,
     VFolderHostPermissionColumn,
 )
 from ai.backend.manager.models.rbac import (
@@ -113,12 +111,6 @@ __all__: Sequence[str] = (
 )
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
-
-
-container_registry_iv = t.Dict({}) | t.Dict({
-    t.Key("registry"): t.String(),
-    t.Key("project"): t.String(),
-})
 
 
 class AssocGroupUserRow(Base):  # type: ignore[misc]
@@ -210,13 +202,9 @@ class GroupRow(Base):  # type: ignore[misc]
         nullable=False,
         default=ProjectType.GENERAL,
     )
-    container_registry: Mapped[dict[str, Any] | None] = mapped_column(
-        "container_registry",
-        StructuredJSONColumn(container_registry_iv),
-        nullable=True,
-        default=None,
+    container_registry_id: Mapped[uuid.UUID | None] = mapped_column(
+        "container_registry_id", GUID, nullable=True
     )
-
     # Relationships (defined with deferred join conditions to avoid circular imports)
     sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="group")
     domain: Mapped[DomainRow] = relationship("DomainRow", back_populates="groups")
@@ -263,7 +251,7 @@ class GroupRow(Base):  # type: ignore[misc]
             dotfiles=self.dotfiles,
             resource_policy=self.resource_policy,
             type=self.type,
-            container_registry=self.container_registry,
+            container_registry_id=self.container_registry_id,
         )
 
     @classmethod
@@ -378,7 +366,6 @@ class ProjectModel(RBACModel[ProjectPermission]):
     _allowed_vfolder_hosts: VFolderHostPermissionMap
     _dotfiles: bytes
     _resource_policy: str
-    _container_registry: dict[str, str] | None
 
     _permissions: frozenset[ProjectPermission] = field(default_factory=frozenset)
 
@@ -411,11 +398,6 @@ class ProjectModel(RBACModel[ProjectPermission]):
     def resource_policy(self) -> str:
         return self._resource_policy
 
-    @property
-    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
-    def container_registry(self) -> dict[str, Any] | None:
-        return self._container_registry
-
     @classmethod
     def from_row(cls, row: GroupRow, permissions: Iterable[ProjectPermission]) -> Self:
         return cls(
@@ -432,7 +414,6 @@ class ProjectModel(RBACModel[ProjectPermission]):
             _allowed_vfolder_hosts=row.allowed_vfolder_hosts,
             _dotfiles=row.dotfiles,
             _resource_policy=row.resource_policy,
-            _container_registry=row.container_registry,
             _permissions=frozenset(permissions),
         )
 

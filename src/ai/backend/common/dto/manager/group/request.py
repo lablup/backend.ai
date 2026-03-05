@@ -64,6 +64,13 @@ class CreateGroupRequest(BaseRequestModel):
     )
     integration_id: str | None = Field(default=None, description="External integration ID")
     resource_policy: str | None = Field(default=None, description="Resource policy name")
+    container_registry_id: UUID | None = Field(
+        default=None,
+        description=(
+            "The default container registry used as the target for session commits"
+            " when no container registry is explicitly specified."
+        ),
+    )
 
 
 class UpdateGroupRequest(BaseRequestModel):
@@ -80,6 +87,13 @@ class UpdateGroupRequest(BaseRequestModel):
     )
     integration_id: str | None = Field(default=None, description="Updated external integration ID")
     resource_policy: str | None = Field(default=None, description="Updated resource policy name")
+    container_registry_id: UUID | None = Field(
+        default=None,
+        description=(
+            "The default container registry used as the target for session commits"
+            " when no container registry is explicitly specified."
+        ),
+    )
 
 
 class AddGroupMembersRequest(BaseRequestModel):

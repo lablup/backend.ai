@@ -34,7 +34,6 @@ class TestProjectV2GQL:
             dotfiles=b"",
             resource_policy="default-policy",
             type=ProjectType.GENERAL,
-            container_registry=None,
         )
 
         # Convert to GraphQL type
@@ -75,7 +74,6 @@ class TestProjectV2GQL:
                 dotfiles=b"",
                 resource_policy="default",
                 type=project_type,
-                container_registry=None,
             )
 
             project_gql = ProjectV2GQL.from_data(data)
@@ -98,7 +96,6 @@ class TestProjectV2GQL:
             dotfiles=b"",
             resource_policy="default",
             type=ProjectType.GENERAL,
-            container_registry=None,
         )
 
         project_gql_empty = ProjectV2GQL.from_data(data_empty)
@@ -130,7 +127,6 @@ class TestProjectV2GQL:
             dotfiles=b"",
             resource_policy="default",
             type=ProjectType.GENERAL,
-            container_registry=None,
         )
 
         project_gql_with_hosts = ProjectV2GQL.from_data(data_with_hosts)
@@ -171,7 +167,6 @@ class TestProjectV2GQL:
             dotfiles=b"",
             resource_policy="default",
             type=ProjectType.GENERAL,
-            container_registry=None,
         )
 
         project_gql = ProjectV2GQL.from_data(data)

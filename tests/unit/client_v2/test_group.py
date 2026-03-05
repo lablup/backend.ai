@@ -92,7 +92,6 @@ _SAMPLE_GROUP_DTO: dict[str, Any] = {
     "total_resource_slots": None,
     "allowed_vfolder_hosts": None,
     "resource_policy": None,
-    "container_registry": None,
 }
 
 _SAMPLE_MEMBER_DTO_1: dict[str, Any] = {

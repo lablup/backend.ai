@@ -52,8 +52,12 @@ class GroupDTO(BaseModel):
         default=None, description="Allowed vfolder host permissions"
     )
     resource_policy: str | None = Field(default=None, description="Resource policy name")
-    container_registry: dict[str, Any] | None = Field(
-        default=None, description="Container registry configuration"
+    container_registry_id: UUID | None = Field(
+        default=None,
+        description=(
+            "The default container registry used as the target for session commits"
+            " when no container registry is explicitly specified."
+        ),
     )
 
 

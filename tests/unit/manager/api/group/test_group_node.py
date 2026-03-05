@@ -63,7 +63,7 @@ class TestCreateGroupMutation:
             resource_policy="default",
             type=ProjectType.GENERAL,
             integration_id=None,
-            container_registry={},
+            container_registry_id=None,
         )
 
     @pytest.fixture
@@ -204,7 +204,6 @@ class TestGroupNodeQuery:
         row.integration_id = None
         row.resource_policy = "default"
         row.type = ProjectType.GENERAL
-        row.container_registry = {}
         return row
 
     @pytest.fixture

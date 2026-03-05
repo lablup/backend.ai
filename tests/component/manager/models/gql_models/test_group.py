@@ -136,7 +136,6 @@ async def test_default_value_types_correctly_processed(
         assert result.integration_id is None
         assert result.total_resource_slots == ResourceSlot.from_user_input({}, None)
         assert result.type == ProjectType.GENERAL
-        assert result.container_registry == {}
         assert result.dotfiles == b"\x90"
 
 
@@ -162,10 +161,6 @@ async def test_db_data_insertion(
         "dotfiles": b"test_dotfiles",
         "resource_policy": "default",
         "type": ProjectType.MODEL_STORE,
-        "container_registry": {
-            "registry": "example_registry",
-            "project": "example_project",
-        },
     }
 
     async with database_engine.begin_session() as session:
@@ -182,5 +177,4 @@ async def test_db_data_insertion(
         assert result.allowed_vfolder_hosts == {"local:volume1": {VFolderHostPermission.CREATE}}
         assert result.resource_policy == data["resource_policy"]
         assert result.type == data["type"]
-        assert result.container_registry == data["container_registry"]
         assert result.dotfiles == data["dotfiles"]

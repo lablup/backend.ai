@@ -941,11 +941,13 @@ type GroupNode implements Node @key(fields: "id") {
   integration_id: String
   resource_policy: String
 
+  """
+  Added in 24.03.0. The default container registry resolved from container_registry_id. Kept for backward compatibility.
+  """
+  container_registry: JSONString
+
   """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE']."""
   type: String
-
-  """Added in 24.03.7."""
-  container_registry: JSONString
   scaling_groups: [String]
 
   """Added in 25.3.0."""
@@ -1068,11 +1070,13 @@ type Group {
   integration_id: String
   resource_policy: String
 
-  """Added in 24.03.0."""
-  type: String
+  """
+  Added in 24.03.0. The default container registry resolved from container_registry_id. Kept for backward compatibility.
+  """
+  container_registry: JSONString
 
   """Added in 24.03.0."""
-  container_registry: JSONString
+  type: String
   scaling_groups: [String]
 }
 
@@ -2709,8 +2713,10 @@ input GroupInput {
   integration_id: String = ""
   resource_policy: String = "default"
 
-  """Added in 24.03.0"""
-  container_registry: JSONString = "{}"
+  """
+  Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.
+  """
+  container_registry_id: UUID
 }
 
 type ModifyGroup {
@@ -2731,8 +2737,10 @@ input ModifyGroupInput {
   integration_id: String
   resource_policy: String
 
-  """Added in 24.03.0"""
-  container_registry: JSONString = "{}"
+  """
+  Added in 25.3.0. The default container registry used as the target for session commits when no container registry is explicitly specified.
+  """
+  container_registry_id: UUID
 }
 
 """Instead of deleting the group, just mark it as inactive."""
