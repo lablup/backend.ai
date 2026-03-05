@@ -73,10 +73,11 @@ class AssignedUserAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter: AssignedUserFilter) -> list[QueryCondition]:
         """Convert assigned user filter to list of query conditions."""
-        # Always add role_id as first condition
         conditions: list[QueryCondition] = []
 
-        # Username filter
+        # Username and email filters → EXISTS subquery on users table
+        user_conditions: list[QueryCondition] = []
+
         if filter.username is not None:
             condition = self.convert_string_filter(
                 filter.username,
@@ -86,9 +87,8 @@ class AssignedUserAdapter(BaseFilterAdapter):
                 ends_with_factory=AssignedUserConditions.by_username_ends_with,
             )
             if condition is not None:
-                conditions.append(condition)
+                user_conditions.append(condition)
 
-        # Email filter
         if filter.email is not None:
             condition = self.convert_string_filter(
                 filter.email,
@@ -98,7 +98,10 @@ class AssignedUserAdapter(BaseFilterAdapter):
                 ends_with_factory=AssignedUserConditions.by_email_ends_with,
             )
             if condition is not None:
-                conditions.append(condition)
+                user_conditions.append(condition)
+
+        if user_conditions:
+            conditions.append(AssignedUserConditions.exists_user_combined(user_conditions))
 
         # Granted by filter
         if filter.granted_by is not None:

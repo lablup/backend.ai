@@ -45,6 +45,10 @@ from ai.backend.manager.services.user.actions.search_users_by_project import (
     SearchUsersByProjectAction,
     SearchUsersByProjectActionResult,
 )
+from ai.backend.manager.services.user.actions.search_users_by_role import (
+    SearchUsersByRoleAction,
+    SearchUsersByRoleActionResult,
+)
 from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
@@ -70,6 +74,7 @@ class UserProcessors(AbstractProcessorPackage):
     search_users_by_project: ActionProcessor[
         SearchUsersByProjectAction, SearchUsersByProjectActionResult
     ]
+    search_users_by_role: ActionProcessor[SearchUsersByRoleAction, SearchUsersByRoleActionResult]
 
     def __init__(self, user_service: UserService, action_monitors: list[ActionMonitor]) -> None:
         self.create_user = ActionProcessor(user_service.create_user, action_monitors)
@@ -89,6 +94,9 @@ class UserProcessors(AbstractProcessorPackage):
         self.search_users_by_project = ActionProcessor(
             user_service.search_users_by_project, action_monitors
         )
+        self.search_users_by_role = ActionProcessor(
+            user_service.search_users_by_role, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -106,4 +114,5 @@ class UserProcessors(AbstractProcessorPackage):
             SearchUsersAction.spec(),
             SearchUsersByDomainAction.spec(),
             SearchUsersByProjectAction.spec(),
+            SearchUsersByRoleAction.spec(),
         ]
