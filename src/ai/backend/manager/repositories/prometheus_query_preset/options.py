@@ -73,6 +73,13 @@ class PrometheusQueryPresetConditions:
         return inner
 
     @staticmethod
+    def by_metric_name_equals(metric_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PrometheusQueryPresetRow.metric_name == metric_name
+
+        return inner
+
+    @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         cursor_uuid = uuid.UUID(cursor_id)
 
