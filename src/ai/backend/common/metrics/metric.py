@@ -430,6 +430,7 @@ class LayerType(enum.StrEnum):
     PROMETHEUS_QUERY_PRESET_REPOSITORY = "prometheus_query_preset_repository"
     PROJECT_RESOURCE_POLICY_REPOSITORY = "project_resource_policy_repository"
     RESERVOIR_REGISTRY_REPOSITORY = "reservoir_registry_repository"
+    LOGIN_SESSION_REPOSITORY = "login_session_repository"
     RESOURCE_PRESET_REPOSITORY = "resource_preset_repository"
     SCALING_GROUP_REPOSITORY = "scaling_group_repository"
     SCHEDULE_REPOSITORY = "schedule_repository"

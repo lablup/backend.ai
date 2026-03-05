@@ -7,7 +7,7 @@ from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.manager.data.login_session.types import LoginSessionExpiryReason
+from ai.backend.manager.data.login_session.types import LoginSessionData, LoginSessionExpiryReason
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -59,3 +59,14 @@ class LoginSessionRow(Base):  # type: ignore[misc]
         StrEnumType(LoginSessionExpiryReason),
         nullable=True,
     )
+
+    def to_dataclass(self) -> LoginSessionData:
+        return LoginSessionData(
+            id=self.id,
+            user_uuid=self.user_uuid,
+            session_token=self.session_token,
+            client_ip=self.client_ip,
+            created_at=self.created_at,
+            expired_at=self.expired_at,
+            reason=self.reason,
+        )
