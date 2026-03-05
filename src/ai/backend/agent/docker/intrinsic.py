@@ -113,6 +113,7 @@ async def netstat_ns(ns_path: Path) -> dict[str, Any]:
         with ProcessPoolExecutor(max_workers=1) as executor:
             result = await loop.run_in_executor(executor, netstat_ns_work, ns_path)
     except AssertionError:
+        # We're in a daemon process, run directly in thread pool
         result = await loop.run_in_executor(None, netstat_ns_work, ns_path)
     return result
 
