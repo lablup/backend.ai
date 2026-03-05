@@ -37,6 +37,7 @@ __all__ = (
     "CreateDeploymentPolicyResponse",
     "GetDeploymentResponse",
     "GetDeploymentPolicyResponse",
+    "ListDeploymentPoliciesResponse",
     "ListDeploymentsResponse",
     "UpdateDeploymentResponse",
     "UpdateDeploymentPolicyResponse",
@@ -277,6 +278,15 @@ class UpdateDeploymentPolicyResponse(BaseResponseModel):
     deployment_policy: DeploymentPolicyDTO = Field(
         description="Deployment policy after applying the requested updates"
     )
+
+
+class ListDeploymentPoliciesResponse(BaseResponseModel):
+    """Response for listing deployment policies."""
+
+    deployment_policies: list[DeploymentPolicyDTO] = Field(
+        description="List of deployment policies"
+    )
+    pagination: PaginationInfo = Field(description="Pagination information")
 
 
 class GetDeploymentPolicyResponse(BaseResponseModel):

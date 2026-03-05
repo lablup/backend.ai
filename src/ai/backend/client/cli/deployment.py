@@ -23,6 +23,7 @@ from ai.backend.common.dto.manager.deployment import (
     CreateDeploymentRequest,
     DeploymentFilter,
     RollingUpdateConfigInput,
+    SearchDeploymentPoliciesRequest,
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
@@ -380,6 +381,47 @@ def policy() -> None:
     """
 
 
+@policy.command("list")
+@pass_ctx_obj
+@click.option("--limit", type=int, default=50, help="Maximum items to return")
+@click.option("--offset", type=int, default=0, help="Number of items to skip")
+def list_policies_cmd(
+    ctx: CLIContext,
+    limit: int,
+    offset: int,
+) -> None:
+    """List all deployment policies."""
+
+    async def _run() -> None:
+        api_config = get_config()
+        v2_config = ClientConfig.from_v1_config(api_config)
+        auth = HMACAuth(api_config.access_key, api_config.secret_key)
+        registry = await BackendAIClientRegistry.create(v2_config, auth)
+        try:
+            request = SearchDeploymentPoliciesRequest(limit=limit, offset=offset)
+            result = await registry.deployment.search_policies(request)
+
+            policies = result.deployment_policies
+            if not policies:
+                print("No deployment policies found")
+                return
+
+            for pol in policies:
+                print(f"ID: {pol.id}")
+                print(f"Strategy: {pol.strategy}")
+                print(f"Rollback on Failure: {pol.rollback_on_failure}")
+                print(f"Created: {pol.created_at}")
+                print("---")
+        finally:
+            await registry.close()
+
+    try:
+        asyncio.run(_run())
+    except Exception as e:
+        ctx.output.print_error(e)
+        sys.exit(ExitCode.FAILURE)
+
+
 @policy.command("info")
 @pass_ctx_obj
 @click.argument("deployment_id", type=str)
@@ -475,22 +517,25 @@ def create_policy_cmd(
 ) -> None:
     """Create a deployment policy."""
     strategy_enum = DeploymentStrategy(strategy)
-    rolling_update = (
-        RollingUpdateConfigInput(
-            max_surge=max_surge if max_surge is not None else 1,
-            max_unavailable=max_unavailable if max_unavailable is not None else 0,
+    rolling_update = None
+    blue_green = None
+
+    if strategy_enum == DeploymentStrategy.ROLLING:
+        if max_surge is None or max_unavailable is None:
+            raise click.UsageError(
+                "--max-surge and --max-unavailable are required when --strategy is ROLLING"
+            )
+        rolling_update = RollingUpdateConfigInput(
+            max_surge=max_surge,
+            max_unavailable=max_unavailable,
         )
-        if strategy_enum == DeploymentStrategy.ROLLING
-        else None
-    )
-    blue_green = (
-        BlueGreenConfigInput(
+    elif strategy_enum == DeploymentStrategy.BLUE_GREEN:
+        if promote_delay is None:
+            raise click.UsageError("--promote-delay is required when --strategy is BLUE_GREEN")
+        blue_green = BlueGreenConfigInput(
             auto_promote=auto_promote,
-            promote_delay_seconds=promote_delay if promote_delay is not None else 0,
+            promote_delay_seconds=promote_delay,
         )
-        if strategy_enum == DeploymentStrategy.BLUE_GREEN
-        else None
-    )
 
     async def _run() -> None:
         api_config = get_config()
@@ -590,22 +635,25 @@ def update_policy_cmd(
 ) -> None:
     """Update a deployment policy. Only provided fields are updated."""
     strategy_enum = DeploymentStrategy(strategy) if strategy else None
-    rolling_update = (
-        RollingUpdateConfigInput(
-            max_surge=max_surge if max_surge is not None else 1,
-            max_unavailable=max_unavailable if max_unavailable is not None else 0,
+    rolling_update = None
+    blue_green = None
+
+    if max_surge is not None or max_unavailable is not None:
+        if max_surge is None or max_unavailable is None:
+            raise click.UsageError(
+                "--max-surge and --max-unavailable must both be provided together"
+            )
+        rolling_update = RollingUpdateConfigInput(
+            max_surge=max_surge,
+            max_unavailable=max_unavailable,
         )
-        if max_surge is not None or max_unavailable is not None
-        else None
-    )
-    blue_green = (
-        BlueGreenConfigInput(
+    if auto_promote or promote_delay is not None:
+        if promote_delay is None:
+            raise click.UsageError("--promote-delay is required when --auto-promote is set")
+        blue_green = BlueGreenConfigInput(
             auto_promote=auto_promote,
-            promote_delay_seconds=promote_delay if promote_delay is not None else 0,
+            promote_delay_seconds=promote_delay,
         )
-        if auto_promote or promote_delay is not None
-        else None
-    )
 
     async def _run() -> None:
         api_config = get_config()

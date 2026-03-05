@@ -36,6 +36,7 @@ __all__ = (
     "CreateDeploymentRequest",
     "CreateDeploymentPolicyRequest",
     "AddRevisionRequest",
+    "SearchDeploymentPoliciesRequest",
     # Update requests
     "UpdateDeploymentRequest",
     "UpdateDeploymentPolicyRequest",
@@ -313,6 +314,13 @@ class CreateDeploymentPolicyRequest(BaseRequestModel):
         default=None,
         description="Promotion settings for blue-green rollouts (auto_promote, promote_delay_seconds); required when strategy is BLUE_GREEN, ignored otherwise",
     )
+
+
+class SearchDeploymentPoliciesRequest(BaseRequestModel):
+    """Request body for searching deployment policies with pagination."""
+
+    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
+    offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
 class UpdateDeploymentPolicyRequest(BaseRequestModel):
