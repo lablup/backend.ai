@@ -115,6 +115,10 @@ class AssignedUserAdapter(BaseFilterAdapter):
         ascending = order.direction == OrderDirection.ASC
 
         match order.field:
+            case AssignedUserOrderField.USERNAME:
+                return AssignedUserOrders.username(ascending=ascending)
+            case AssignedUserOrderField.EMAIL:
+                return AssignedUserOrders.email(ascending=ascending)
             case AssignedUserOrderField.GRANTED_AT:
                 return AssignedUserOrders.granted_at(ascending=ascending)
 

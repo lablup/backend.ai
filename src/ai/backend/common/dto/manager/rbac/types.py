@@ -45,6 +45,8 @@ class RoleOrderField(StrEnum):
 class AssignedUserOrderField(StrEnum):
     """Fields available for ordering assigned users."""
 
+    USERNAME = "username"
+    EMAIL = "email"
     GRANTED_AT = "granted_at"
 
 

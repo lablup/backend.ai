@@ -367,6 +367,18 @@ class AssignedUserOrders:
     """Query orders for assigned users."""
 
     @staticmethod
+    def username(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return UserRow.username.asc()
+        return UserRow.username.desc()
+
+    @staticmethod
+    def email(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return UserRow.email.asc()
+        return UserRow.email.desc()
+
+    @staticmethod
     def granted_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return UserRoleRow.granted_at.asc()
