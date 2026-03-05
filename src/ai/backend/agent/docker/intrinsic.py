@@ -80,10 +80,6 @@ pruned_disk_types = frozenset([
     "iso9660",  # cdrom
 ])
 
-# 100 Gbps in bytes/sec — physical ceiling for network rate outlier detection.
-# Rates exceeding this indicate erroneous readings (e.g., host namespace counters).
-_NET_RATE_CEILING = Decimal("12_500_000_000")
-
 
 def netstat_ns_work(ns_path: Path) -> dict[str, Any]:
     with nsenter(ns_path):
@@ -598,7 +594,6 @@ class MemoryPlugin(AbstractComputePlugin):
                 current_hook=lambda metric: metric.stats.rate,
                 per_node=Measurement(Decimal(net_rx_bytes)),
                 per_device={DeviceId("node"): Measurement(Decimal(net_rx_bytes))},
-                rate_ceiling=_NET_RATE_CEILING,
             ),
             NodeMeasurement(
                 MetricKey("net_tx"),
@@ -607,7 +602,6 @@ class MemoryPlugin(AbstractComputePlugin):
                 current_hook=lambda metric: metric.stats.rate,
                 per_node=Measurement(Decimal(net_tx_bytes)),
                 per_device={DeviceId("node"): Measurement(Decimal(net_tx_bytes))},
-                rate_ceiling=_NET_RATE_CEILING,
             ),
         ]
 
@@ -840,7 +834,6 @@ class MemoryPlugin(AbstractComputePlugin):
                 unit_hint="bps",
                 current_hook=lambda metric: metric.stats.rate,
                 per_container=per_container_net_rx_bytes,
-                rate_ceiling=_NET_RATE_CEILING,
             ),
             ContainerMeasurement(
                 MetricKey("net_tx"),
@@ -848,7 +841,6 @@ class MemoryPlugin(AbstractComputePlugin):
                 unit_hint="bps",
                 current_hook=lambda metric: metric.stats.rate,
                 per_container=per_container_net_tx_bytes,
-                rate_ceiling=_NET_RATE_CEILING,
             ),
             ContainerMeasurement(
                 MetricKey("io_scratch_size"),

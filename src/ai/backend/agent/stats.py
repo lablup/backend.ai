@@ -153,7 +153,6 @@ class NodeMeasurement:
     stats_filter: frozenset[str] = attrs.Factory(frozenset)
     current_hook: Callable[[Metric], Decimal] | None = None
     unit_hint: str = "count"
-    rate_ceiling: Decimal | None = None
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -168,7 +167,6 @@ class ContainerMeasurement:
     stats_filter: frozenset[str] = attrs.Factory(frozenset)
     current_hook: Callable[[Metric], Decimal] | None = None
     unit_hint: str = "count"
-    rate_ceiling: Decimal | None = None
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -205,7 +203,6 @@ class MovingStatistics:
         "_last",
         "_max",
         "_min",
-        "_rate_ceiling",
         "_sum",
     )
     _sum: Decimal
@@ -213,16 +210,9 @@ class MovingStatistics:
     _min: Decimal
     _max: Decimal
     _last: list[tuple[Decimal, float]]
-    _rate_ceiling: Decimal | None
 
-    def __init__(
-        self,
-        initial_value: Decimal | None = None,
-        *,
-        rate_ceiling: Decimal | None = None,
-    ) -> None:
+    def __init__(self, initial_value: Decimal | None = None) -> None:
         self._last = []
-        self._rate_ceiling = rate_ceiling
         if initial_value is None:
             self._sum = Decimal(0)
             self._min = Decimal("inf")
@@ -278,15 +268,7 @@ class MovingStatistics:
             delta = self._last[-1][0] - self._last[-2][0]
             if delta < 0:  # Counter reset (e.g., container restart)
                 return Decimal(0)
-            computed_rate = delta / Decimal(self._last[-1][1] - self._last[-2][1])
-            if self._rate_ceiling is not None and computed_rate > self._rate_ceiling:
-                log.warning(
-                    "Rate {} exceeds ceiling {}, clamping to 0 (likely erroneous reading)",
-                    computed_rate,
-                    self._rate_ceiling,
-                )
-                return Decimal(0)
-            return computed_rate
+            return delta / Decimal(self._last[-1][1] - self._last[-2][1])
         return Decimal(0)
 
     def to_serializable_dict(self) -> MovingStatValue:
@@ -321,7 +303,6 @@ class Metric:
     current: Decimal
     capacity: Decimal | None = None
     current_hook: Callable[[Metric], Decimal] | None = None
-    rate_ceiling: Decimal | None = None
 
     def update(self, value: Measurement) -> None:
         if value.capacity is not None:
@@ -550,13 +531,9 @@ class StatContext:
                         current=per_node.value,
                         capacity=per_node.capacity,
                         unit_hint=node_measure.unit_hint,
-                        stats=MovingStatistics(
-                            per_node.value,
-                            rate_ceiling=node_measure.rate_ceiling,
-                        ),
+                        stats=MovingStatistics(per_node.value),
                         stats_filter=frozenset(node_measure.stats_filter),
                         current_hook=node_measure.current_hook,
-                        rate_ceiling=node_measure.rate_ceiling,
                     )
                 else:
                     self.node_metrics[metric_key].update(per_node)
@@ -577,13 +554,9 @@ class StatContext:
                             current=measure.value,
                             capacity=measure.capacity,
                             unit_hint=node_measure.unit_hint,
-                            stats=MovingStatistics(
-                                measure.value,
-                                rate_ceiling=node_measure.rate_ceiling,
-                            ),
+                            stats=MovingStatistics(measure.value),
                             stats_filter=frozenset(node_measure.stats_filter),
                             current_hook=node_measure.current_hook,
-                            rate_ceiling=node_measure.rate_ceiling,
                         )
                     else:
                         self.device_metrics[metric_key][dev_id].update(measure)
@@ -809,13 +782,9 @@ class StatContext:
                             current=measure.value,
                             capacity=measure.capacity or measure.value,
                             unit_hint=ctnr_measure.unit_hint,
-                            stats=MovingStatistics(
-                                measure.value,
-                                rate_ceiling=ctnr_measure.rate_ceiling,
-                            ),
+                            stats=MovingStatistics(measure.value),
                             stats_filter=frozenset(ctnr_measure.stats_filter),
                             current_hook=ctnr_measure.current_hook,
-                            rate_ceiling=ctnr_measure.rate_ceiling,
                         )
                     else:
                         self.kernel_metrics[kernel_id][metric_key].update(measure)
