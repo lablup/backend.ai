@@ -9,20 +9,11 @@ from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_libc: ctypes.CDLL | None = None
-CLONE_NEWNET = 1 << 30
-
-
-def _get_libc() -> ctypes.CDLL:
-    global _libc
-    if _libc is None:
-        libc_path = ctypes.util.find_library("c")
-        _libc = ctypes.CDLL(libc_path, use_errno=True)
-    return _libc
-
 
 def setns(fd: int) -> None:
-    libc = _get_libc()
+    libc_path = ctypes.util.find_library("c")
+    libc = ctypes.CDLL(libc_path, use_errno=True)
+    CLONE_NEWNET = 1 << 30
     ret = libc.setns(fd, CLONE_NEWNET)
     if ret == -1:
         errno = ctypes.get_errno()
