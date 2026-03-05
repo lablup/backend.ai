@@ -26,19 +26,20 @@ from ai.backend.common.types import SessionId
 
 class TestCreateSessionResponse:
     def test_empty_result(self) -> None:
-        resp = CreateSessionResponse()
-        assert resp.result == {}
+        resp = CreateSessionResponse({})
+        assert resp.root == {}
 
     def test_with_data(self) -> None:
         resp = CreateSessionResponse.model_validate({
-            "result": {"sessionId": str(uuid4()), "status": "PENDING"},
+            "sessionId": str(uuid4()),
+            "status": "PENDING",
         })
-        assert "sessionId" in resp.result
+        assert "sessionId" in resp.root
 
     def test_json_serialization(self) -> None:
-        resp = CreateSessionResponse(result={"key": "value"})
+        resp = CreateSessionResponse({"key": "value"})
         data = resp.model_dump(mode="json")
-        assert data["result"] == {"key": "value"}
+        assert data == {"key": "value"}
 
 
 class TestStartServiceResponse:
@@ -56,14 +57,14 @@ class TestStartServiceResponse:
 
 class TestGetCommitStatusResponse:
     def test_empty(self) -> None:
-        resp = GetCommitStatusResponse()
-        assert resp.result == {}
+        resp = GetCommitStatusResponse({})
+        assert resp.root == {}
 
 
 class TestGetAbusingReportResponse:
     def test_empty(self) -> None:
-        resp = GetAbusingReportResponse()
-        assert resp.result == {}
+        resp = GetAbusingReportResponse({})
+        assert resp.root == {}
 
 
 class TestTransitSessionStatusResponse:
@@ -98,8 +99,8 @@ class TestTransitSessionStatusResponse:
 
 class TestCommitSessionResponse:
     def test_with_result(self) -> None:
-        resp = CommitSessionResponse(result={"commit_id": "abc"})
-        assert resp.result["commit_id"] == "abc"
+        resp = CommitSessionResponse({"commit_id": "abc"})
+        assert resp.root["commit_id"] == "abc"
 
 
 class TestConvertSessionToImageResponse:
@@ -110,8 +111,8 @@ class TestConvertSessionToImageResponse:
 
 class TestDestroySessionResponse:
     def test_empty(self) -> None:
-        resp = DestroySessionResponse()
-        assert resp.result == {}
+        resp = DestroySessionResponse({})
+        assert resp.root == {}
 
 
 class TestGetSessionInfoResponse:
@@ -123,8 +124,8 @@ class TestGetSessionInfoResponse:
 
 class TestGetDirectAccessInfoResponse:
     def test_empty(self) -> None:
-        resp = GetDirectAccessInfoResponse()
-        assert resp.result == {}
+        resp = GetDirectAccessInfoResponse({})
+        assert resp.root == {}
 
 
 class TestMatchSessionsResponse:
@@ -139,35 +140,35 @@ class TestMatchSessionsResponse:
 
 class TestExecuteResponse:
     def test_with_result(self) -> None:
-        resp = ExecuteResponse(result={"status": "finished"})
-        assert resp.result["status"] == "finished"
+        resp = ExecuteResponse({"status": "finished"})
+        assert resp.root["status"] == "finished"
 
 
 class TestCompleteResponse:
     def test_empty(self) -> None:
-        resp = CompleteResponse()
-        assert resp.result == {}
+        resp = CompleteResponse({})
+        assert resp.root == {}
 
 
 class TestListFilesResponse:
     def test_with_result(self) -> None:
-        resp = ListFilesResponse(result={"files": ["a.txt"]})
-        assert resp.result["files"] == ["a.txt"]
+        resp = ListFilesResponse({"files": ["a.txt"]})
+        assert resp.root["files"] == ["a.txt"]
 
 
 class TestGetContainerLogsResponse:
     def test_with_result(self) -> None:
-        resp = GetContainerLogsResponse(result={"log": "hello world"})
-        assert resp.result["log"] == "hello world"
+        resp = GetContainerLogsResponse({"log": "hello world"})
+        assert resp.root["log"] == "hello world"
 
 
 class TestGetStatusHistoryResponse:
     def test_with_result(self) -> None:
-        resp = GetStatusHistoryResponse(result={"RUNNING": "2025-01-01"})
-        assert "RUNNING" in resp.result
+        resp = GetStatusHistoryResponse({"RUNNING": "2025-01-01"})
+        assert "RUNNING" in resp.root
 
 
 class TestGetDependencyGraphResponse:
     def test_empty(self) -> None:
-        resp = GetDependencyGraphResponse()
-        assert resp.result == {}
+        resp = GetDependencyGraphResponse({})
+        assert resp.root == {}
