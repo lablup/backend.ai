@@ -37,6 +37,7 @@ class UserUpdaterSpec(UpdaterSpec[UserRow]):
     container_main_gid: TriState[int] = field(default_factory=TriState.nop)
     container_gids: TriState[list[int]] = field(default_factory=TriState.nop)
     group_ids: OptionalState[list[str]] = field(default_factory=OptionalState.nop)
+    login_security_policy: OptionalState[dict[str, Any]] = field(default_factory=OptionalState.nop)
 
     @property
     @override

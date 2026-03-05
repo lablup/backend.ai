@@ -5,6 +5,7 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from pydantic import Field
@@ -81,6 +82,9 @@ class UpdateUserRequest(BaseRequestModel):
         default=None, description="Updated container additional GIDs"
     )
     group_ids: list[str] | None = Field(default=None, description="Updated group IDs")
+    login_security_policy: dict[str, Any] | None = Field(
+        default=None, description="Login security policy settings (e.g. max_concurrent_logins)"
+    )
 
 
 class UserFilter(BaseRequestModel):

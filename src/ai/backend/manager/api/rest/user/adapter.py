@@ -90,6 +90,7 @@ class UserAdapter(BaseFilterAdapter):
         container_main_gid = TriState[int].nop()
         container_gids = TriState[list[int]].nop()
         group_ids = OptionalState[list[str]].nop()
+        login_security_policy: OptionalState[dict] = OptionalState.nop()
 
         if request.username is not None:
             username = OptionalState.update(request.username)
@@ -125,6 +126,8 @@ class UserAdapter(BaseFilterAdapter):
             container_gids = TriState.update(request.container_gids)
         if request.group_ids is not None:
             group_ids = OptionalState.update(request.group_ids)
+        if request.login_security_policy is not None:
+            login_security_policy = OptionalState.update(request.login_security_policy)
 
         updater_spec = UserUpdaterSpec(
             username=username,
@@ -144,6 +147,7 @@ class UserAdapter(BaseFilterAdapter):
             container_main_gid=container_main_gid,
             container_gids=container_gids,
             group_ids=group_ids,
+            login_security_policy=login_security_policy,
         )
         return Updater(
             spec=updater_spec, pk_value=UUID(int=0)
