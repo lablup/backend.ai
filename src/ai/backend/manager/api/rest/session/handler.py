@@ -356,9 +356,7 @@ class SessionHandler:
                 keypair_resource_policy=request["keypair"]["resource_policy"],
             )
         )
-        return APIResponse.build(
-            HTTPStatus.CREATED, CreateSessionResponse(result=dict(result.result))
-        )
+        return APIResponse.build(HTTPStatus.CREATED, CreateSessionResponse(dict(result.result)))
 
     # ------------------------------------------------------------------
     # create_from_params (POST / and POST /_/create)
@@ -447,9 +445,7 @@ class SessionHandler:
                 keypair_resource_policy=request["keypair"]["resource_policy"],
             )
         )
-        return APIResponse.build(
-            HTTPStatus.CREATED, CreateSessionResponse(result=dict(result.result))
-        )
+        return APIResponse.build(HTTPStatus.CREATED, CreateSessionResponse(dict(result.result)))
 
     # ------------------------------------------------------------------
     # create_cluster (POST /_/create-cluster)
@@ -499,9 +495,7 @@ class SessionHandler:
                 keypair_resource_policy=request["keypair"]["resource_policy"],
             )
         )
-        return APIResponse.build(
-            HTTPStatus.CREATED, CreateSessionResponse(result=dict(result.result))
-        )
+        return APIResponse.build(HTTPStatus.CREATED, CreateSessionResponse(dict(result.result)))
 
     # ------------------------------------------------------------------
     # match_sessions (GET /_/match)
@@ -567,7 +561,7 @@ class SessionHandler:
         await self._agent.sync_agent_registry.wait_for_complete(
             SyncAgentRegistryAction(agent_id=agent_id)
         )
-        return APIResponse.build(HTTPStatus.OK, CreateSessionResponse(result={}))
+        return APIResponse.build(HTTPStatus.OK, CreateSessionResponse({}))
 
     # ------------------------------------------------------------------
     # check_and_transit_status (POST /_/transit-status)
@@ -737,7 +731,7 @@ class SessionHandler:
                 recursive=params.recursive,
             )
         )
-        return APIResponse.build(HTTPStatus.OK, DestroySessionResponse(result=result.result))
+        return APIResponse.build(HTTPStatus.OK, DestroySessionResponse(result.result))
 
     # ------------------------------------------------------------------
     # execute (POST /{session_name})
@@ -780,7 +774,7 @@ class SessionHandler:
                 ),
             )
         )
-        return APIResponse.build(HTTPStatus.OK, ExecuteResponse(result=result.result))
+        return APIResponse.build(HTTPStatus.OK, ExecuteResponse(result.result))
 
     # ------------------------------------------------------------------
     # interrupt (POST /{session_name}/interrupt)
@@ -854,7 +848,7 @@ class SessionHandler:
         )
         return APIResponse.build(
             HTTPStatus.OK,
-            CompleteResponse(result=action_result.result.as_dict()),
+            CompleteResponse(action_result.result.as_dict()),
         )
 
     # ------------------------------------------------------------------
@@ -1077,7 +1071,7 @@ class SessionHandler:
                 owner_access_key=owner_access_key,
             )
         )
-        return APIResponse.build(HTTPStatus.OK, ListFilesResponse(result=dict(result.result)))
+        return APIResponse.build(HTTPStatus.OK, ListFilesResponse(dict(result.result)))
 
     # ------------------------------------------------------------------
     # rename_session (POST /{session_name}/rename)
@@ -1153,7 +1147,7 @@ class SessionHandler:
         )
         return APIResponse.build(
             HTTPStatus.CREATED,
-            CommitSessionResponse(result=dict(action_result.commit_result)),
+            CommitSessionResponse(dict(action_result.commit_result)),
         )
 
     # ------------------------------------------------------------------
@@ -1238,7 +1232,7 @@ class SessionHandler:
         )
         return APIResponse.build(
             HTTPStatus.OK,
-            GetCommitStatusResponse(result=result.commit_info.asdict()),
+            GetCommitStatusResponse(result.commit_info.asdict()),
         )
 
     # ------------------------------------------------------------------
@@ -1276,7 +1270,7 @@ class SessionHandler:
         return APIResponse.build(
             HTTPStatus.OK,
             GetAbusingReportResponse(
-                result=cast(dict[str, Any], result.abuse_report) if result.abuse_report else {}
+                cast(dict[str, Any], result.abuse_report) if result.abuse_report else {}
             ),
         )
 
@@ -1315,7 +1309,7 @@ class SessionHandler:
         )
         return APIResponse.build(
             HTTPStatus.OK,
-            GetStatusHistoryResponse(result=result.status_history),
+            GetStatusHistoryResponse(result.status_history),
         )
 
     # ------------------------------------------------------------------
@@ -1342,7 +1336,7 @@ class SessionHandler:
         )
         return APIResponse.build(
             HTTPStatus.OK,
-            GetDirectAccessInfoResponse(result=result.result),
+            GetDirectAccessInfoResponse(result.result),
         )
 
     # ------------------------------------------------------------------
@@ -1393,7 +1387,7 @@ class SessionHandler:
             raise
         return APIResponse.build(
             HTTPStatus.OK,
-            GetContainerLogsResponse(result=result.result),
+            GetContainerLogsResponse(result.result),
         )
 
     # ------------------------------------------------------------------
@@ -1458,5 +1452,5 @@ class SessionHandler:
         )
         return APIResponse.build(
             HTTPStatus.OK,
-            GetDependencyGraphResponse(result=result.result),
+            GetDependencyGraphResponse(result.result),
         )
