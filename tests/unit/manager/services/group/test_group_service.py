@@ -149,7 +149,9 @@ class TestCreateGroup:
         mock_group_repository: MagicMock,
     ) -> None:
         """Same-domain duplicate name raises IntegrityError from repository."""
-        mock_group_repository.create = AsyncMock(side_effect=IntegrityError("duplicate", {}, None))
+        mock_group_repository.create = AsyncMock(
+            side_effect=IntegrityError("duplicate", {}, Exception("duplicate key"))
+        )
 
         creator = Creator(spec=GroupCreatorSpec(name="existing", domain_name="default"))
         action = CreateGroupAction(creator=creator)

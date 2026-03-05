@@ -34,8 +34,11 @@ class InMemoryQuotaService(AbstractPerProjectContainerRegistryQuotaService):
     async def create_quota(self, scope_id: ProjectScope, quota: int) -> None:
         self._store[scope_id.project_id] = quota
 
-    async def read_quota(self, scope_id: ProjectScope) -> int | None:
-        return self._store.get(scope_id.project_id)
+    async def read_quota(self, scope_id: ProjectScope) -> int:
+        value = self._store.get(scope_id.project_id)
+        if value is None:
+            raise KeyError(f"No quota found for project {scope_id.project_id}")
+        return value
 
     async def update_quota(self, scope_id: ProjectScope, quota: int) -> None:
         self._store[scope_id.project_id] = quota

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -778,7 +779,7 @@ class TestPurgeUser:
     def service(self, mock_user_repository: MagicMock) -> UserService:
         return _make_service(mock_user_repository)
 
-    def _make_purge_action(self, email: str = "user@example.com", **kwargs) -> PurgeUserAction:
+    def _make_purge_action(self, email: str = "user@example.com", **kwargs: Any) -> PurgeUserAction:
         return PurgeUserAction(
             user_info_ctx=UserInfoContext(
                 uuid=uuid.uuid4(),
@@ -871,12 +872,13 @@ class TestPurgeUser:
         mock_session = MagicMock()
         mock_session.id = uuid.uuid4()
         mock_user_repository.retrieve_active_sessions = AsyncMock(return_value=[mock_session])
-        service._agent_registry.destroy_session = AsyncMock(return_value=None)
+        mock_agent_registry = cast(MagicMock, service._agent_registry)
+        mock_agent_registry.destroy_session = AsyncMock(return_value=None)
 
         action = self._make_purge_action()
         await service.purge_user(action)
 
-        service._agent_registry.destroy_session.assert_called_once()
+        mock_agent_registry.destroy_session.assert_called_once()
         mock_user_repository.purge_user.assert_called_once_with("user@example.com")
 
 
@@ -906,7 +908,7 @@ class TestBulkPurgeUser:
         )
         mock_user_repository.get_user_by_uuid = AsyncMock(return_value=admin_user)
 
-        async def mock_check_vfolder(user_uuid):
+        async def mock_check_vfolder(user_uuid: uuid.UUID) -> bool:
             return user_uuid == user_uuids[1]
 
         mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
