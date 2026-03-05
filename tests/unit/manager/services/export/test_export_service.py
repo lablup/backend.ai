@@ -190,7 +190,7 @@ class TestExportUsersCSVAction:
     ) -> None:
         async def empty_iter() -> AsyncIterator[Sequence[Sequence[Any]]]:
             return
-            yield  # noqa: unreachable
+            yield  # make this function an async generator
 
         query = _make_query("email", "username")
         mock_repository.execute_export = MagicMock(return_value=empty_iter())
@@ -272,7 +272,7 @@ class TestExportProjectsCSVAction:
     ) -> None:
         async def empty_iter() -> AsyncIterator[Sequence[Sequence[Any]]]:
             return
-            yield  # noqa: unreachable
+            yield  # make this function an async generator
 
         query = _make_query("name")
         mock_repository.execute_export = MagicMock(return_value=empty_iter())
