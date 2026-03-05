@@ -4,14 +4,14 @@ import asyncio
 import ctypes
 import ctypes.util
 import os
-import secrets
+import shutil
+import subprocess
 import sys
-from collections.abc import AsyncIterator
+import time
+from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor
-from typing import Any
 from unittest.mock import MagicMock, patch
 
-import aiodocker
 import psutil
 import pytest
 
@@ -51,7 +51,7 @@ def _read_host_counters() -> tuple[int, int]:
 
 
 def _read_counters_after_valid_setns(pid: int) -> tuple[int, int]:
-    """Enter container netns via valid fd, read counters, then restore."""
+    """Enter a different netns via valid fd, read counters, then restore."""
     libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
     CLONE_NEWNET = 1 << 30
     self_ns = os.open("/proc/self/ns/net", os.O_RDONLY)
@@ -81,57 +81,53 @@ def _read_counters_after_invalid_setns() -> tuple[int, int]:
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Network namespaces require Linux")
+@pytest.mark.skipif(not shutil.which("unshare"), reason="unshare command not found")
 class TestSetnsNamespaceIsolation:
-    """Verify that failed setns() causes psutil to read host-level counters."""
+    """Verify that failed setns() causes psutil to read host-level counters.
+
+    Uses ``unshare --net`` to create an isolated network namespace without
+    requiring Docker.
+    """
 
     @pytest.fixture
-    async def docker(self) -> AsyncIterator[aiodocker.Docker]:
-        docker = aiodocker.Docker()
-        try:
-            yield docker
-        finally:
-            await docker.close()
-
-    @pytest.fixture
-    async def running_container(self, docker: aiodocker.Docker) -> AsyncIterator[dict[str, Any]]:
-        name = f"test-netns-{secrets.token_urlsafe(4)}"
-        container = await docker.containers.create_or_replace(
-            config={"Image": "alpine:3.8", "Cmd": ["sleep", "60"]},
-            name=name,
+    def netns_process(self) -> Iterator[subprocess.Popen[bytes]]:
+        """Spawn a sleep process in a new network namespace via unshare."""
+        proc = subprocess.Popen(
+            ["unshare", "--net", "sleep", "30"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
-        await container.start()
-        info = await container.show()
+        time.sleep(0.3)
         try:
-            yield info
+            yield proc
         finally:
-            await container.delete(force=True)
+            proc.terminate()
+            proc.wait()
 
     async def test_failed_setns_reads_host_counters(
-        self, running_container: dict[str, Any]
+        self, netns_process: subprocess.Popen[bytes]
     ) -> None:
         """When setns() fails and the return value is not checked,
-        psutil reads host namespace counters instead of the container's."""
-        pid = running_container["State"]["Pid"]
+        psutil reads host namespace counters instead of the isolated namespace's."""
+        pid = netns_process.pid
         loop = asyncio.get_event_loop()
 
         with ProcessPoolExecutor(max_workers=1) as pool:
             host_rx, host_tx = await loop.run_in_executor(pool, _read_host_counters)
         with ProcessPoolExecutor(max_workers=1) as pool:
-            container_rx, container_tx = await loop.run_in_executor(
-                pool, _read_counters_after_valid_setns, pid
-            )
+            ns_rx, ns_tx = await loop.run_in_executor(pool, _read_counters_after_valid_setns, pid)
         with ProcessPoolExecutor(max_workers=1) as pool:
             failed_rx, failed_tx = await loop.run_in_executor(
                 pool, _read_counters_after_invalid_setns
             )
 
-        # A freshly started container has near-zero network traffic.
+        # A freshly created network namespace has zero traffic.
         # Host has accumulated traffic across all interfaces.
-        assert host_rx + host_tx > container_rx + container_tx, (
-            "Host counters should be larger than container counters"
+        assert host_rx + host_tx > ns_rx + ns_tx, (
+            "Host counters should be larger than isolated namespace counters"
         )
         # After failed setns, we remain in the host namespace —
         # this is the root cause of the stat spike bug.
-        assert failed_rx + failed_tx > container_rx + container_tx, (
-            "Failed setns should read host-level counters, not container counters"
+        assert failed_rx + failed_tx > ns_rx + ns_tx, (
+            "Failed setns should read host-level counters, not namespace counters"
         )
