@@ -96,6 +96,8 @@ def build_api_routes(
     from .health.registry import register_health_routes
     from .image.handler import ImageHandler
     from .image.registry import register_image_routes
+    from .login_session.handler import LoginSessionHandler
+    from .login_session.registry import register_login_session_routes
     from .manager.handler import ManagerHandler
     from .manager.registry import register_manager_api_routes
     from .notification.handler import NotificationHandler
@@ -144,6 +146,7 @@ def build_api_routes(
     )
 
     # 2. Build all handlers
+    login_session_handler = LoginSessionHandler()
     acl_handler = AclHandler()
     auth_handler = AuthHandler(auth=processors.auth)
     agent_handler = AgentHandler(agent=processors.agent)
@@ -348,4 +351,5 @@ def build_api_routes(
         register_export_routes(export_handler, route_deps),
         register_agent_routes(agent_handler, route_deps),
         register_resource_slot_routes(resource_slot_handler, route_deps),
+        register_login_session_routes(login_session_handler, route_deps),
     ]
