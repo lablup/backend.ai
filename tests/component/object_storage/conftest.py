@@ -4,7 +4,6 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -17,8 +16,19 @@ from ai.backend.manager.api.rest.object_storage.handler import ObjectStorageHand
 from ai.backend.manager.api.rest.object_storage.registry import register_object_storage_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.object_storage import ObjectStorageRow
+from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
+from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
+from ai.backend.manager.services.object_storage.service import ObjectStorageService
+from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
+from ai.backend.manager.services.storage_namespace.service import StorageNamespaceService
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -32,15 +42,49 @@ StorageNamespaceFactory = Callable[..., Coroutine[Any, Any, StorageNamespaceFixt
 
 
 @pytest.fixture()
-def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
+def object_storage_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    storage_manager: StorageSessionManager,
+    config_provider: ManagerConfigProvider,
+) -> ObjectStorageProcessors:
+    artifact_repository = ArtifactRepository(database_engine)
+    object_storage_repository = ObjectStorageRepository(database_engine)
+    storage_namespace_repository = StorageNamespaceRepository(database_engine)
+    service = ObjectStorageService(
+        artifact_repository=artifact_repository,
+        object_storage_repository=object_storage_repository,
+        storage_namespace_repository=storage_namespace_repository,
+        storage_manager=storage_manager,
+        config_provider=config_provider,
+    )
+    return ObjectStorageProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def storage_namespace_processors(
+    database_engine: ExtendedAsyncSAEngine,
+) -> StorageNamespaceProcessors:
+    storage_namespace_repository = StorageNamespaceRepository(database_engine)
+    service = StorageNamespaceService(
+        storage_namespace_repository=storage_namespace_repository,
+    )
+    return StorageNamespaceProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    auth_processors: AuthProcessors,
+    object_storage_processors: ObjectStorageProcessors,
+    storage_namespace_processors: StorageNamespaceProcessors,
+) -> list[RouteRegistry]:
     """Load only the modules required for object-storage-domain tests."""
-    mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_object_storage_routes(
             ObjectStorageHandler(
-                object_storage=mock_processors.object_storage,
-                storage_namespace=mock_processors.storage_namespace,
+                object_storage=object_storage_processors,
+                storage_namespace=storage_namespace_processors,
             ),
             route_deps,
         ),

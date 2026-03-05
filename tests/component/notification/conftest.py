@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 import pytest
 
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
@@ -10,15 +8,34 @@ from ai.backend.manager.api.rest.notification.handler import NotificationHandler
 from ai.backend.manager.api.rest.notification.registry import register_notification_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.notification.notification_center import NotificationCenter
+from ai.backend.manager.repositories.notification.repository import NotificationRepository
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.notification.processors import NotificationProcessors
+from ai.backend.manager.services.notification.service import NotificationService
 
 
 @pytest.fixture()
-def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
+def notification_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    notification_center: NotificationCenter,
+) -> NotificationProcessors:
+    repo = NotificationRepository(database_engine)
+    service = NotificationService(repo, notification_center)
+    return NotificationProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    auth_processors: AuthProcessors,
+    notification_processors: NotificationProcessors,
+) -> list[RouteRegistry]:
     """Load only the modules required for notification-domain tests."""
-    mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_notification_routes(
-            NotificationHandler(notification=mock_processors.notification), route_deps
+            NotificationHandler(notification=notification_processors), route_deps
         ),
     ]

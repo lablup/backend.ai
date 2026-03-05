@@ -6,13 +6,15 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
@@ -21,10 +23,17 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.stream.handler import StreamHandler
 from ai.backend.manager.api.rest.stream.registry import register_stream_routes
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.stream.repository import StreamRepository
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.stream.processors import StreamProcessors
+from ai.backend.manager.services.stream.service import StreamService
 
 _STREAMING_SERVER_SUBAPP_MODULES = (_auth_api,)
 
@@ -51,20 +60,43 @@ class SessionSeedData:
 
 
 @pytest.fixture()
-def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
+def stream_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    valkey_clients: ValkeyClients,
+    async_etcd: AsyncEtcd,
+) -> StreamProcessors:
+    """Real StreamProcessors with real StreamService and StreamRepository."""
+    repo = StreamRepository(database_engine)
+    service = StreamService(
+        repository=repo,
+        registry=AsyncMock(),
+        valkey_live=valkey_clients.live,
+        idle_checker_host=AsyncMock(),
+        etcd=async_etcd,
+    )
+    return StreamProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    auth_processors: AuthProcessors,
+    stream_processors: StreamProcessors,
+    config_provider: ManagerConfigProvider,
+    error_monitor: ErrorPluginContext,
+) -> list[RouteRegistry]:
     """Load only the modules required for streaming component tests."""
-    mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_stream_routes(
             StreamHandler(
                 private_ctx=MagicMock(),
-                stream_processors=MagicMock(),
-                config_provider=MagicMock(),
-                error_monitor=MagicMock(),
+                stream_processors=stream_processors,
+                config_provider=config_provider,
+                error_monitor=error_monitor,
             ),
             route_deps,
-            stream_processors=MagicMock(),
+            stream_processors=stream_processors,
             stream_cleanup_handler=MagicMock(),
         ),
     ]

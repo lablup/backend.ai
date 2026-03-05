@@ -4,7 +4,6 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
@@ -29,6 +28,11 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.userconfig.handler import UserConfigHandler
 from ai.backend.manager.api.rest.userconfig.registry import register_userconfig_routes
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.dotfile.repository import DotfileRepository
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.dotfile.processors import DotfileProcessors
+from ai.backend.manager.services.dotfile.service import DotfileService
 
 UserDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
 GroupDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
@@ -36,21 +40,27 @@ DomainDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
 
 
 @pytest.fixture()
-def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
+def dotfile_processors(database_engine: ExtendedAsyncSAEngine) -> DotfileProcessors:
+    repo = DotfileRepository(database_engine)
+    service = DotfileService(repo)
+    return DotfileProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    auth_processors: AuthProcessors,
+    dotfile_processors: DotfileProcessors,
+) -> list[RouteRegistry]:
     """Load only the modules required for config-domain tests."""
-    mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
-        register_groupconfig_routes(
-            GroupConfigHandler(dotfile=mock_processors.dotfile), route_deps
-        ),
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
+        register_groupconfig_routes(GroupConfigHandler(dotfile=dotfile_processors), route_deps),
         register_userconfig_routes(
-            UserConfigHandler(auth=mock_processors.auth, dotfile=mock_processors.dotfile),
+            UserConfigHandler(auth=auth_processors, dotfile=dotfile_processors),
             route_deps,
         ),
-        register_domainconfig_routes(
-            DomainConfigHandler(dotfile=mock_processors.dotfile), route_deps
-        ),
+        register_domainconfig_routes(DomainConfigHandler(dotfile=dotfile_processors), route_deps),
     ]
 
 

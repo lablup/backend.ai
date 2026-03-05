@@ -19,22 +19,48 @@ from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.rbac.handler import RBACHandler
+from ai.backend.manager.api.rest.rbac.registry import register_rbac_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.permission_controller.repository import (
+    PermissionControllerRepository,
+)
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.permission_contoller.processors import (
+    PermissionControllerProcessors,
+)
+from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
 
 RoleFactory = Callable[..., Coroutine[Any, Any, CreateRoleResponse]]
 
 
 @pytest.fixture()
-def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
+def permission_controller_processors(
+    database_engine: ExtendedAsyncSAEngine,
+) -> PermissionControllerProcessors:
+    repo = PermissionControllerRepository(database_engine)
+    service = PermissionControllerService(repo)
+    return PermissionControllerProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    auth_processors: AuthProcessors,
+    permission_controller_processors: PermissionControllerProcessors,
+) -> list[RouteRegistry]:
     """Load only the modules required for RBAC-domain tests."""
-    mock_processors = MagicMock()
+    rbac_registry = register_rbac_routes(
+        RBACHandler(permission_controller=permission_controller_processors), route_deps
+    )
     return [
-        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_admin_routes(
             AdminHandler(gql_schema=MagicMock(), gql_deps=MagicMock()),
             route_deps,
-            sub_registries=[],
+            sub_registries=[rbac_registry],
         ),
     ]
 

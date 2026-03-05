@@ -6,13 +6,15 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
 
 # Statically imported so that Pants includes these modules in the test PEX.
@@ -29,6 +31,13 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.session.repository import SessionRepository
+from ai.backend.manager.services.agent.processors import AgentProcessors
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.session.processors import SessionProcessors
+from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 
 
 @dataclass
@@ -53,19 +62,60 @@ class SessionSeedData:
 
 
 @pytest.fixture()
+async def session_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    agent_registry: AsyncMock,
+    background_task_manager: BackgroundTaskManager,
+    error_monitor: ErrorPluginContext,
+    appproxy_client_pool: AsyncMock,
+) -> SessionProcessors:
+    """Real SessionProcessors with real SessionService and SessionRepository."""
+    session_repo = SessionRepository(database_engine)
+    args = SessionServiceArgs(
+        agent_registry=agent_registry,
+        event_fetcher=AsyncMock(),
+        background_task_manager=background_task_manager,
+        event_hub=AsyncMock(),
+        error_monitor=error_monitor,
+        idle_checker_host=AsyncMock(),
+        session_repository=session_repo,
+        scheduling_controller=AsyncMock(),
+        appproxy_client_pool=appproxy_client_pool,
+    )
+    service = SessionService(args)
+    return SessionProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def agent_processors_mock() -> AgentProcessors:
+    """AgentProcessors with a mocked AgentService."""
+    return AgentProcessors(service=AsyncMock(), action_monitors=[])
+
+
+@pytest.fixture()
+def vfolder_processors_mock() -> VFolderProcessors:
+    """VFolderProcessors with a mocked VFolderService."""
+    return VFolderProcessors(service=AsyncMock(), action_monitors=[])
+
+
+@pytest.fixture()
 def server_module_registries(
-    route_deps: RouteDeps, config_provider: ManagerConfigProvider
+    route_deps: RouteDeps,
+    config_provider: ManagerConfigProvider,
+    auth_processors: AuthProcessors,
+    session_processors: SessionProcessors,
+    agent_processors_mock: AgentProcessors,
+    vfolder_processors_mock: VFolderProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for session component tests."""
-    mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_session_routes(
             SessionHandler(
-                auth=mock_processors.auth,
-                session=mock_processors.session,
-                agent=mock_processors.agent,
-                vfolder=mock_processors.vfolder,
+                auth=auth_processors,
+                session=session_processors,
+                agent=agent_processors_mock,
+                vfolder=vfolder_processors_mock,
                 config_provider=config_provider,
             ),
             route_deps,

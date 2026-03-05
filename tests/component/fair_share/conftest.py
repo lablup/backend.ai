@@ -3,7 +3,6 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator
-from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -17,19 +16,58 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.scaling_group import sgroups_for_groups
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
+from ai.backend.manager.repositories.resource_usage_history.repository import (
+    ResourceUsageHistoryRepository,
+)
+from ai.backend.manager.repositories.scaling_group.repository import ScalingGroupRepository
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.fair_share.processors import FairShareProcessors
+from ai.backend.manager.services.fair_share.service import FairShareService
+from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
+from ai.backend.manager.services.resource_usage.service import ResourceUsageService
+from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
+from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 
 
 @pytest.fixture()
-def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
+def fair_share_processors(database_engine: ExtendedAsyncSAEngine) -> FairShareProcessors:
+    repo = FairShareRepository(database_engine)
+    service = FairShareService(repo)
+    return FairShareProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def resource_usage_processors(database_engine: ExtendedAsyncSAEngine) -> ResourceUsageProcessors:
+    repo = ResourceUsageHistoryRepository(database_engine)
+    service = ResourceUsageService(repo)
+    return ResourceUsageProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def scaling_group_processors(database_engine: ExtendedAsyncSAEngine) -> ScalingGroupProcessors:
+    repo = ScalingGroupRepository(database_engine)
+    service = ScalingGroupService(repo, appproxy_client_pool=None)
+    return ScalingGroupProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    auth_processors: AuthProcessors,
+    fair_share_processors: FairShareProcessors,
+    resource_usage_processors: ResourceUsageProcessors,
+    scaling_group_processors: ScalingGroupProcessors,
+) -> list[RouteRegistry]:
     """Load only the modules required for fair-share-domain tests."""
-    mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_fair_share_routes(
             FairShareAPIHandler(
-                fair_share=mock_processors.fair_share,
-                resource_usage=mock_processors.resource_usage,
-                scaling_group=mock_processors.scaling_group,
+                fair_share=fair_share_processors,
+                resource_usage=resource_usage_processors,
+                scaling_group=scaling_group_processors,
             ),
             route_deps,
         ),

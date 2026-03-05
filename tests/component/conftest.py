@@ -13,26 +13,67 @@ from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
 
 import asyncpg
 import pytest
 import sqlalchemy as sa
 import yarl
 from aiohttp import web
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
-from sqlalchemy.ext.asyncio.engine import create_async_engine
 
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
+from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
+from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
+    ValkeyContainerLogClient,
+)
+from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
+from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.defs import (
+    REDIS_BGTASK_DB,
+    REDIS_CONTAINER_LOG,
+    REDIS_IMAGE_DB,
+    REDIS_LIVE_DB,
+    REDIS_RATE_LIMIT_DB,
+    REDIS_STATISTICS_DB,
+    REDIS_STREAM_DB,
+    RedisRole,
+)
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.message_queue.redis_queue.queue import RedisMQArgs, RedisQueue
+from ai.backend.common.plugin.hook import HookPluginContext
+from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
+from ai.backend.common.types import (
+    AgentId,
+    DefaultForUnspecified,
+    HostPortPair,
+    RedisTarget,
+    ResourceSlot,
+    SlotName,
+    SlotTypes,
+    VFolderHostPermissionMap,
+    current_resource_slots,
+)
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
+from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.rest.middleware import build_auth_middleware, build_exception_middleware
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -46,6 +87,8 @@ from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import (
@@ -56,6 +99,7 @@ from ai.backend.manager.config.unified import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import GroupRow, association_groups_users
@@ -73,9 +117,19 @@ from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import users
-from ai.backend.manager.models.utils import connect_database
+from ai.backend.manager.models.utils import (
+    ExtendedAsyncSAEngine,
+    connect_database,
+    create_async_engine,
+)
 from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.notification.notification_center import NotificationCenter
+from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.server import build_root_app, mount_registries
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
@@ -461,6 +515,16 @@ async def db_engine(
 
 
 @pytest.fixture()
+async def database_engine(
+    bootstrap_config: BootstrapConfig,
+    database: None,
+) -> AsyncIterator[ExtendedAsyncSAEngine]:
+    """Provide a function-scoped ExtendedAsyncSAEngine for repository/service fixtures."""
+    async with connect_database(bootstrap_config.db) as db:
+        yield db
+
+
+@pytest.fixture()
 async def domain_fixture(
     db_engine: SAEngine,
 ) -> AsyncIterator[str]:
@@ -530,8 +594,11 @@ async def resource_policy_fixture(
         )
         # The user-creation flow always assigns new keypairs to the "default"
         # keypair resource policy (DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME).
+        # Uses on_conflict_do_nothing() for idempotency in case alembic
+        # migrations already seeded the row.
         await conn.execute(
-            sa.insert(keypair_resource_policies).values(
+            pg_insert(keypair_resource_policies)
+            .values(
                 name=default_policy_name,
                 default_for_unspecified=DefaultForUnspecified.UNLIMITED,
                 total_resource_slots=ResourceSlot(),
@@ -541,16 +608,19 @@ async def resource_policy_fixture(
                 idle_timeout=3600,
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
             )
+            .on_conflict_do_nothing()
         )
         # The signup flow always assigns "default" as the user's resource_policy.
         await conn.execute(
-            sa.insert(UserResourcePolicyRow.__table__).values(
+            pg_insert(UserResourcePolicyRow.__table__)
+            .values(
                 name=default_policy_name,
                 max_vfolder_count=0,
                 max_quota_scope_size=-1,
                 max_session_count_per_model_session=10,
                 max_customized_image_count=3,
             )
+            .on_conflict_do_nothing()
         )
     yield policy_name
     async with db_engine.begin() as conn:
@@ -780,6 +850,11 @@ async def regular_user_fixture(
         )
     yield data
     async with db_engine.begin() as conn:
+        # Clean side-effect tables that tests may populate via the running server
+        await conn.execute(
+            session_templates.delete().where(session_templates.c.user_uuid == str(data.user_uuid))
+        )
+        # Clean fixture data
         await conn.execute(
             association_groups_users.delete().where(
                 association_groups_users.c.user_id == str(data.user_uuid)
@@ -818,7 +893,25 @@ class _TestConfigProvider(ManagerConfigProvider):
         mock_etcd_loader = MagicMock()
         mock_etcd_loader.get_manager_status = AsyncMock(return_value=ManagerStatus.RUNNING)
         mock_etcd_loader.get_allowed_origins = AsyncMock(return_value=None)
+        mock_etcd_loader.get_vfolder_types = AsyncMock(return_value=["user"])
+        mock_etcd_loader.get_resource_slots = AsyncMock(
+            return_value={
+                SlotName("cpu"): SlotTypes("count"),
+                SlotName("mem"): SlotTypes("bytes"),
+            }
+        )
+        mock_etcd_loader.update_manager_status = AsyncMock()
+        mock_etcd_loader.get_manager_nodes_info = AsyncMock(return_value={})
+        mock_etcd_loader.register_myself = AsyncMock()
+        mock_etcd_loader.deregister_myself = AsyncMock()
         self._legacy_etcd_config_loader = mock_etcd_loader
+        # Set the current_resource_slots ContextVar so that ResourceSlot
+        # operations (e.g. normalize_slots) work without hitting etcd.
+        _slots = {
+            SlotName("cpu"): SlotTypes("count"),
+            SlotName("mem"): SlotTypes("bytes"),
+        }
+        current_resource_slots.set(_slots)
 
 
 @pytest.fixture()
@@ -860,6 +953,245 @@ def config_provider(
     return _TestConfigProvider(unified_config)
 
 
+# ---------------------------------------------------------------------------
+# Real infrastructure fixtures (Valkey, events, plugins, etc.)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+async def valkey_clients(
+    config_provider: ManagerConfigProvider,
+) -> AsyncIterator[ValkeyClients]:
+    """Real Valkey clients — mirrors ValkeyDependency.provide()."""
+    valkey_profile_target = config_provider.config.redis.to_valkey_profile_target()
+    clients = ValkeyClients(
+        artifact=await ValkeyArtifactDownloadTrackingClient.create(
+            valkey_profile_target.profile_target(RedisRole.STATISTICS),
+            db_id=REDIS_STATISTICS_DB,
+            human_readable_name="test_artifact",
+        ),
+        container_log=await ValkeyContainerLogClient.create(
+            valkey_profile_target.profile_target(RedisRole.CONTAINER_LOG),
+            db_id=REDIS_CONTAINER_LOG,
+            human_readable_name="test_container_log",
+        ),
+        live=await ValkeyLiveClient.create(
+            valkey_profile_target.profile_target(RedisRole.LIVE),
+            db_id=REDIS_LIVE_DB,
+            human_readable_name="test_live",
+        ),
+        stat=await ValkeyStatClient.create(
+            valkey_profile_target.profile_target(RedisRole.STATISTICS),
+            db_id=REDIS_STATISTICS_DB,
+            human_readable_name="test_stat",
+        ),
+        image=await ValkeyImageClient.create(
+            valkey_profile_target.profile_target(RedisRole.IMAGE),
+            db_id=REDIS_IMAGE_DB,
+            human_readable_name="test_image",
+        ),
+        stream=await ValkeyStreamClient.create(
+            valkey_profile_target.profile_target(RedisRole.STREAM),
+            db_id=REDIS_STREAM_DB,
+            human_readable_name="test_stream",
+        ),
+        schedule=await ValkeyScheduleClient.create(
+            valkey_profile_target.profile_target(RedisRole.STREAM),
+            db_id=REDIS_LIVE_DB,
+            human_readable_name="test_schedule",
+        ),
+        bgtask=await ValkeyBgtaskClient.create(
+            valkey_profile_target.profile_target(RedisRole.BGTASK),
+            db_id=REDIS_BGTASK_DB,
+            human_readable_name="test_bgtask",
+        ),
+        rate_limit=await ValkeyRateLimitClient.create(
+            valkey_profile_target.profile_target(RedisRole.RATE_LIMIT),
+            db_id=REDIS_RATE_LIMIT_DB,
+            human_readable_name="test_ratelimit",
+        ),
+    )
+    try:
+        yield clients
+    finally:
+        await clients.close()
+
+
+@pytest.fixture()
+async def event_producer(
+    valkey_clients: ValkeyClients,
+    config_provider: ManagerConfigProvider,
+) -> AsyncIterator[EventProducer]:
+    """Real EventProducer that publishes to Valkey streams."""
+    redis_config = config_provider.config.redis
+    assert redis_config.addr is not None
+    redis_target = RedisTarget(
+        addr=HostPortPair(host=redis_config.addr.host, port=redis_config.addr.port),
+        redis_helper_config={},
+    )
+    queue = await RedisQueue.create(
+        redis_target,
+        RedisMQArgs(
+            anycast_stream_key="events",
+            broadcast_channel="events_all",
+            consume_stream_keys={"events"},
+            subscribe_channels={"events_all"},
+            group_name=f"test_mq_{uuid4()}",
+            node_id=f"test_node_{uuid4()}",
+            db=REDIS_STREAM_DB,
+        ),
+    )
+    producer = EventProducer(queue, source=AgentId(f"test-mgr-{uuid4()}"))
+    try:
+        yield producer
+    finally:
+        await producer.close()
+        await queue.close()
+
+
+@pytest.fixture()
+async def background_task_manager(
+    event_producer: EventProducer,
+    valkey_clients: ValkeyClients,
+) -> AsyncIterator[BackgroundTaskManager]:
+    """Real BackgroundTaskManager backed by Valkey."""
+    mgr = BackgroundTaskManager(
+        event_producer,
+        valkey_client=valkey_clients.bgtask,
+        server_id=f"test-server-{uuid4()}",
+    )
+    yield mgr
+    await mgr.shutdown()
+
+
+def _make_async_etcd(bootstrap_config: BootstrapConfig) -> AsyncEtcd:
+    """Create an AsyncEtcd instance from bootstrap config."""
+    etcd_config = bootstrap_config.etcd
+    etcd_addr = etcd_config.addr
+    addrs: HostPortPair | list[HostPortPair]
+    if isinstance(etcd_addr, list):
+        addrs = [HostPortPair(host=a.host, port=a.port) for a in etcd_addr]
+    else:
+        addrs = HostPortPair(host=etcd_addr.host, port=etcd_addr.port)
+    return AsyncEtcd(
+        addrs=addrs,
+        namespace=etcd_config.namespace,
+        scope_prefix_map={
+            ConfigScopes.GLOBAL: "global",
+            ConfigScopes.SGROUP: "sgroup/default",
+            ConfigScopes.NODE: "node/test",
+        },
+    )
+
+
+@pytest.fixture()
+def async_etcd(
+    bootstrap_config: BootstrapConfig,
+    etcd_fixture: None,
+) -> AsyncEtcd:
+    """Real AsyncEtcd client for tests that need direct etcd access."""
+    return _make_async_etcd(bootstrap_config)
+
+
+@pytest.fixture()
+def hook_plugin_ctx(
+    bootstrap_config: BootstrapConfig,
+    etcd_fixture: None,
+) -> HookPluginContext:
+    """Real HookPluginContext with no plugins loaded."""
+    return HookPluginContext(_make_async_etcd(bootstrap_config), {})
+
+
+@pytest.fixture()
+def network_plugin_ctx(
+    bootstrap_config: BootstrapConfig,
+    etcd_fixture: None,
+) -> NetworkPluginContext:
+    """Real NetworkPluginContext with no plugins loaded."""
+    return NetworkPluginContext(_make_async_etcd(bootstrap_config), {})
+
+
+@pytest.fixture()
+def error_monitor(
+    bootstrap_config: BootstrapConfig,
+    etcd_fixture: None,
+) -> ErrorPluginContext:
+    """Real ErrorPluginContext with no plugins loaded."""
+    return ErrorPluginContext(_make_async_etcd(bootstrap_config), {})
+
+
+@pytest.fixture()
+def stats_monitor(
+    bootstrap_config: BootstrapConfig,
+    etcd_fixture: None,
+) -> StatsPluginContext:
+    """Real StatsPluginContext with no plugins loaded."""
+    return StatsPluginContext(_make_async_etcd(bootstrap_config), {})
+
+
+@pytest.fixture()
+async def notification_center() -> AsyncIterator[NotificationCenter]:
+    """Real NotificationCenter."""
+    nc = NotificationCenter()
+    yield nc
+    await nc.close()
+
+
+# ---------------------------------------------------------------------------
+# External component mocks (talk to separate Backend.AI processes)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def storage_manager() -> StorageSessionManager:
+    """Mock — talks to Storage Proxy (external component)."""
+    return AsyncMock(spec=StorageSessionManager)
+
+
+@pytest.fixture()
+def agent_registry() -> AgentRegistry:
+    """Mock — talks to Agent nodes (external component)."""
+    return AsyncMock(spec=AgentRegistry)
+
+
+@pytest.fixture()
+def agent_cache() -> AgentRPCCache:
+    """Mock — talks to Agent RPC (external component)."""
+    return AsyncMock(spec=AgentRPCCache)
+
+
+@pytest.fixture()
+def appproxy_client_pool() -> AppProxyClientPool:
+    """Mock — talks to AppProxy (external component)."""
+    return AsyncMock(spec=AppProxyClientPool)
+
+
+# ---------------------------------------------------------------------------
+# Shared auth_processors fixture (used by many domain conftests)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def auth_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+    hook_plugin_ctx: HookPluginContext,
+) -> AuthProcessors:
+    """Real AuthProcessors wired with real AuthService and AuthRepository."""
+    repo = AuthRepository(database_engine)
+    service = AuthService(
+        hook_plugin_ctx=hook_plugin_ctx,
+        auth_repository=repo,
+        config_provider=config_provider,
+    )
+    return AuthProcessors(service=service, action_monitors=[])
+
+
+# ---------------------------------------------------------------------------
+# Server fixture
+# ---------------------------------------------------------------------------
+
+
 @pytest.fixture()
 async def server(
     bootstrap_config: BootstrapConfig,
@@ -867,8 +1199,12 @@ async def server(
     database_fixture: None,
     server_module_registries: list[RouteRegistry],
     config_provider: ManagerConfigProvider,
+    error_monitor: ErrorPluginContext,
+    stats_monitor: StatsPluginContext,
+    valkey_clients: ValkeyClients,
+    hook_plugin_ctx: HookPluginContext,
 ) -> AsyncIterator[ServerInfo]:
-    """Start a test server with real DB (for auth middleware) and mock monitors."""
+    """Start a test server with real DB, real plugin contexts, and real Valkey."""
     app = build_root_app(
         0,
         bootstrap_config,
@@ -878,20 +1214,10 @@ async def server(
 
     # Real DB connection for HMAC auth middleware
     async with connect_database(cp.config.db) as db:
-        # Mocks for exception middleware
-        error_monitor = MagicMock()
-        error_monitor.capture_exception = AsyncMock()
-        stats_monitor = MagicMock()
-        stats_monitor.report_metric = AsyncMock()
-
-        # Mocks for auth middleware
-        valkey_stat = MagicMock()
-        valkey_stat.increment_keypair_query_count = AsyncMock()
-        hook_plugin_ctx = MagicMock()
-        hook_plugin_ctx.dispatch = AsyncMock(return_value=MagicMock())
+        # JWT validator mock — HMAC auth only, JWT not called in tests
         jwt_validator = MagicMock()
 
-        # Insert DI-based middlewares
+        # Insert DI-based middlewares with real plugin contexts
         app.middlewares.insert(
             1,
             build_exception_middleware(
@@ -905,7 +1231,7 @@ async def server(
             build_auth_middleware(
                 db=db,
                 jwt_validator=jwt_validator,
-                valkey_stat=valkey_stat,
+                valkey_stat=valkey_clients.stat,
                 hook_plugin_ctx=hook_plugin_ctx,
             ),
         )

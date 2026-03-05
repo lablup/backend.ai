@@ -3,13 +3,13 @@ from __future__ import annotations
 import secrets
 from collections.abc import AsyncIterator
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.types import HostPortPair, ResourceSlot
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.error_log.handler import ErrorLogHandler
@@ -18,19 +18,76 @@ from ai.backend.manager.api.rest.manager.handler import ManagerHandler
 from ai.backend.manager.api.rest.manager.registry import register_manager_api_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.config.bootstrap import BootstrapConfig
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.error_logs import error_logs
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.error_log.repository import ErrorLogRepository
+from ai.backend.manager.repositories.manager_admin.repository import ManagerAdminRepository
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
+from ai.backend.manager.services.error_log.service import ErrorLogService
+from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
+from ai.backend.manager.services.manager_admin.service import ManagerAdminService
 
 
 @pytest.fixture()
-def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
+def error_log_processors(database_engine: ExtendedAsyncSAEngine) -> ErrorLogProcessors:
+    repo = ErrorLogRepository(database_engine)
+    service = ErrorLogService(repo)
+    return ErrorLogProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def manager_admin_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+    bootstrap_config: BootstrapConfig,
+    valkey_clients: ValkeyClients,
+) -> ManagerAdminProcessors:
+    etcd_config = bootstrap_config.etcd
+    etcd_addr = etcd_config.addr
+    if isinstance(etcd_addr, list):
+        addrs: HostPortPair | list[HostPortPair] = [
+            HostPortPair(host=a.host, port=a.port) for a in etcd_addr
+        ]
+    else:
+        addrs = HostPortPair(host=etcd_addr.host, port=etcd_addr.port)
+    etcd = AsyncEtcd(
+        addrs=addrs,
+        namespace=etcd_config.namespace,
+        scope_prefix_map={
+            ConfigScopes.GLOBAL: "global",
+            ConfigScopes.SGROUP: "sgroup/default",
+            ConfigScopes.NODE: "node/test",
+        },
+    )
+    repo = ManagerAdminRepository(database_engine)
+    service = ManagerAdminService(
+        repository=repo,
+        config_provider=config_provider,
+        etcd=etcd,
+        db=database_engine,
+        valkey_stat=valkey_clients.stat,
+    )
+    return ManagerAdminProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    auth_processors: AuthProcessors,
+    error_log_processors: ErrorLogProcessors,
+    manager_admin_processors: ManagerAdminProcessors,
+) -> list[RouteRegistry]:
     """Load only the modules required for operations-domain tests."""
-    mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
-        register_error_log_routes(ErrorLogHandler(error_log=mock_processors.error_log), route_deps),
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
+        register_error_log_routes(ErrorLogHandler(error_log=error_log_processors), route_deps),
         register_manager_api_routes(
-            ManagerHandler(manager_admin=mock_processors.manager_admin), route_deps
+            ManagerHandler(manager_admin=manager_admin_processors), route_deps
         ),
     ]
 

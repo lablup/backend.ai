@@ -13,23 +13,49 @@ from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.image.handler import ImageHandler
+from ai.backend.manager.api.rest.image.registry import register_image_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
+from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.image.repository import ImageRepository
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.image.processors import ImageProcessors
+from ai.backend.manager.services.image.service import ImageService
 
 
 @pytest.fixture()
-def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
+def image_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    valkey_clients: ValkeyClients,
+    config_provider: ManagerConfigProvider,
+    agent_registry: AgentRegistry,
+) -> ImageProcessors:
+    repo = ImageRepository(database_engine, valkey_clients.image, config_provider)
+    service = ImageService(agent_registry, repo, config_provider)
+    return ImageProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    auth_processors: AuthProcessors,
+    image_processors: ImageProcessors,
+) -> list[RouteRegistry]:
     """Load only the modules required for image-domain tests."""
-    mock_processors = MagicMock()
+    image_registry = register_image_routes(ImageHandler(image=image_processors), route_deps)
     return [
-        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_admin_routes(
             AdminHandler(gql_schema=MagicMock(), gql_deps=MagicMock()),
             route_deps,
-            sub_registries=[],
+            sub_registries=[image_registry],
         ),
     ]
 

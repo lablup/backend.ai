@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
-from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -18,16 +17,35 @@ from ai.backend.manager.api.rest.container_registry.registry import (
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.container_registry.repository import (
+    ContainerRegistryRepository,
+)
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
+from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 
 
 @pytest.fixture()
-def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
+def container_registry_processors(
+    database_engine: ExtendedAsyncSAEngine,
+) -> ContainerRegistryProcessors:
+    repo = ContainerRegistryRepository(database_engine)
+    service = ContainerRegistryService(database_engine, repo)
+    return ContainerRegistryProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    auth_processors: AuthProcessors,
+    container_registry_processors: ContainerRegistryProcessors,
+) -> list[RouteRegistry]:
     """Load only the modules required for container-registry-domain tests."""
-    mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_container_registry_routes(
-            ContainerRegistryHandler(container_registry=mock_processors.container_registry),
+            ContainerRegistryHandler(container_registry=container_registry_processors),
             route_deps,
         ),
     ]

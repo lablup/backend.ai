@@ -5,7 +5,6 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -31,6 +30,7 @@ from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.user import users
+from ai.backend.manager.services.auth.processors import AuthProcessors
 
 _AUTH_SERVER_SUBAPP_MODULES = (_auth_api,)
 
@@ -48,11 +48,12 @@ class AuthUserFixtureData:
 
 
 @pytest.fixture()
-def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
+def server_module_registries(
+    route_deps: RouteDeps, auth_processors: AuthProcessors
+) -> list[RouteRegistry]:
     """Load only the auth module for auth-domain tests."""
-    mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
     ]
 
 

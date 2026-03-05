@@ -4,25 +4,44 @@ import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from dataclasses import dataclass
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.manager.api.rest.artifact.handler import ArtifactHandler
 from ai.backend.manager.api.rest.artifact.registry import register_artifact_routes
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactStatus,
     ArtifactType,
 )
+from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.artifact.row import ArtifactRow
 from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
+from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
+from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
+from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
+from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.manager.repositories.reservoir_registry.repository import (
+    ReservoirRegistryRepository,
+)
+from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
+from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
+from ai.backend.manager.services.artifact.processors import ArtifactProcessors
+from ai.backend.manager.services.artifact.service import ArtifactService
+from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
+from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
+from ai.backend.manager.services.auth.processors import AuthProcessors
 
 
 @dataclass
@@ -36,15 +55,77 @@ ArtifactFactory = Callable[..., Coroutine[Any, Any, ArtifactFixtureData]]
 
 
 @pytest.fixture()
-def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
+def artifact_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    storage_manager: StorageSessionManager,
+    config_provider: ManagerConfigProvider,
+) -> ArtifactProcessors:
+    artifact_repository = ArtifactRepository(database_engine)
+    artifact_registry_repository = ArtifactRegistryRepository(database_engine)
+    object_storage_repository = ObjectStorageRepository(database_engine)
+    vfs_storage_repository = VFSStorageRepository(database_engine)
+    huggingface_repository = HuggingFaceRepository(database_engine)
+    reservoir_repository = ReservoirRegistryRepository(database_engine)
+    service = ArtifactService(
+        artifact_repository=artifact_repository,
+        artifact_registry_repository=artifact_registry_repository,
+        object_storage_repository=object_storage_repository,
+        vfs_storage_repository=vfs_storage_repository,
+        huggingface_registry_repository=huggingface_repository,
+        reservoir_registry_repository=reservoir_repository,
+        storage_manager=storage_manager,
+        config_provider=config_provider,
+    )
+    return ArtifactProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def artifact_revision_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    storage_manager: StorageSessionManager,
+    config_provider: ManagerConfigProvider,
+    valkey_clients: ValkeyClients,
+    background_task_manager: BackgroundTaskManager,
+) -> ArtifactRevisionProcessors:
+    artifact_repository = ArtifactRepository(database_engine)
+    artifact_registry_repository = ArtifactRegistryRepository(database_engine)
+    object_storage_repository = ObjectStorageRepository(database_engine)
+    vfs_storage_repository = VFSStorageRepository(database_engine)
+    storage_namespace_repository = StorageNamespaceRepository(database_engine)
+    huggingface_repository = HuggingFaceRepository(database_engine)
+    reservoir_repository = ReservoirRegistryRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine)
+    service = ArtifactRevisionService(
+        artifact_repository=artifact_repository,
+        artifact_registry_repository=artifact_registry_repository,
+        object_storage_repository=object_storage_repository,
+        vfs_storage_repository=vfs_storage_repository,
+        storage_namespace_repository=storage_namespace_repository,
+        huggingface_registry_repository=huggingface_repository,
+        reservoir_registry_repository=reservoir_repository,
+        vfolder_repository=vfolder_repository,
+        storage_manager=storage_manager,
+        config_provider=config_provider,
+        valkey_artifact_client=valkey_clients.artifact,
+        background_task_manager=background_task_manager,
+    )
+    return ArtifactRevisionProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    auth_processors: AuthProcessors,
+    artifact_processors: ArtifactProcessors,
+    artifact_revision_processors: ArtifactRevisionProcessors,
+) -> list[RouteRegistry]:
     """Load only the modules required for artifact-domain tests."""
-    mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_artifact_routes(
             ArtifactHandler(
-                artifact=mock_processors.artifact,
-                artifact_revision=mock_processors.artifact_revision,
+                artifact=artifact_processors,
+                artifact_revision=artifact_revision_processors,
             ),
             route_deps,
         ),

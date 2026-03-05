@@ -22,23 +22,58 @@ from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.api.rest.user.handler import UserHandler
+from ai.backend.manager.api.rest.user.registry import register_user_routes
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import users
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.user.processors import UserProcessors
+from ai.backend.manager.services.user.service import UserService
 
 UserFactory = Callable[..., Coroutine[Any, Any, CreateUserResponse]]
 
 
 @pytest.fixture()
-def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
+def user_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    storage_manager: StorageSessionManager,
+    agent_registry: AgentRegistry,
+    valkey_clients: Any,
+) -> UserProcessors:
+    user_repository = UserRepository(database_engine)
+    service = UserService(
+        storage_manager=storage_manager,
+        valkey_stat_client=valkey_clients.stat,
+        agent_registry=agent_registry,
+        user_repository=user_repository,
+    )
+    return UserProcessors(user_service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    auth_processors: AuthProcessors,
+    user_processors: UserProcessors,
+    config_provider: ManagerConfigProvider,
+) -> list[RouteRegistry]:
     """Load only the modules required for user-domain tests."""
-    mock_processors = MagicMock()
+    user_registry = register_user_routes(
+        UserHandler(user=user_processors, config_provider=config_provider),
+        route_deps,
+    )
     return [
-        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_admin_routes(
             AdminHandler(gql_schema=MagicMock(), gql_deps=MagicMock()),
             route_deps,
-            sub_registries=[],
+            sub_registries=[user_registry],
         ),
     ]
 

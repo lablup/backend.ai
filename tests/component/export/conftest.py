@@ -10,15 +10,34 @@ from ai.backend.manager.api.rest.export.handler import ExportHandler
 from ai.backend.manager.api.rest.export.registry import register_export_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.export.db_source.db_source import ExportDBSource
+from ai.backend.manager.repositories.export.registry.base import ExportReportRegistry
+from ai.backend.manager.repositories.export.repository import ExportRepository
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.export.processors import ExportProcessors
+from ai.backend.manager.services.export.service import ExportService
 
 
 @pytest.fixture()
-def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
+def export_processors(database_engine: ExtendedAsyncSAEngine) -> ExportProcessors:
+    db_source = ExportDBSource(database_engine)
+    registry = ExportReportRegistry.create_default()
+    repo = ExportRepository(db_source, registry)
+    service = ExportService(repo)
+    return ExportProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    auth_processors: AuthProcessors,
+    export_processors: ExportProcessors,
+) -> list[RouteRegistry]:
     """Load only the modules required for export-domain tests."""
-    mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_export_routes(
-            ExportHandler(export=mock_processors.export, export_config=MagicMock()), route_deps
+            ExportHandler(export=export_processors, export_config=MagicMock()), route_deps
         ),
     ]

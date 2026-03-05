@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -16,12 +16,20 @@ from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.auto_scaling_rule.handler import AutoScalingRuleHandler
+from ai.backend.manager.api.rest.auto_scaling_rule.registry import register_auto_scaling_rule_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.data.image.types import ImageType
+from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.deployment.processors import DeploymentProcessors
+from ai.backend.manager.services.deployment.service import DeploymentService
 
 
 @dataclass
@@ -38,15 +46,40 @@ class UserFixtureData:
 
 
 @pytest.fixture()
-def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
+def deployment_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    storage_manager: AsyncMock,
+    valkey_clients: ValkeyClients,
+) -> DeploymentProcessors:
+    """Real DeploymentProcessors for auto-scaling-rule tests."""
+    repo = DeploymentRepository(
+        database_engine,
+        storage_manager,
+        valkey_clients.stat,
+        valkey_clients.live,
+        valkey_clients.schedule,
+    )
+    deployment_controller = AsyncMock()
+    service = DeploymentService(deployment_controller, repo)
+    return DeploymentProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    auth_processors: AuthProcessors,
+    deployment_processors: DeploymentProcessors,
+) -> list[RouteRegistry]:
     """Load only the modules required for auto-scaling-rule-domain tests."""
-    mock_processors = MagicMock()
+    auto_scaling_rule_registry = register_auto_scaling_rule_routes(
+        AutoScalingRuleHandler(deployment=deployment_processors), route_deps
+    )
     return [
-        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_admin_routes(
             AdminHandler(gql_schema=MagicMock(), gql_deps=MagicMock()),
             route_deps,
-            sub_registries=[],
+            sub_registries=[auto_scaling_rule_registry],
         ),
     ]
 
