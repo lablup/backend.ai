@@ -10,17 +10,22 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import TemplateType, session_templates
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -53,12 +58,17 @@ class TestTemplateRepository:
             database_connection,
             [
                 DomainRow,
+                ScalingGroupRow,
+                AgentRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                ProjectResourcePolicyRow,
                 UserRow,
                 KeyPairRow,
                 GroupRow,
                 AssocGroupUserRow,
+                SessionRow,
+                KernelRow,
                 session_templates,
             ],
         ):
@@ -112,15 +122,13 @@ class TestTemplateRepository:
         async with db_with_cleanup.begin_session() as session:
             policy = KeyPairResourcePolicyRow(
                 name=policy_name,
-                default_for_unspecified="UNLIMITED",
-                total_resource_slots={},
+                default_for_unspecified=DefaultForUnspecified.UNLIMITED,
+                total_resource_slots=ResourceSlot(),
                 max_session_lifetime=0,
                 max_concurrent_sessions=30,
                 max_concurrent_sftp_sessions=5,
                 max_containers_per_session=1,
                 idle_timeout=1800,
-                allowed_vfolder_hosts={"local:volume1": ["create-vfolder"]},
-                max_network_count=3,
             )
             session.add(policy)
             await session.commit()
@@ -205,10 +213,28 @@ class TestTemplateRepository:
         return access_key
 
     @pytest.fixture
+    async def test_project_resource_policy(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        policy_name = "default-project-policy"
+        async with db_with_cleanup.begin_session() as session:
+            policy = ProjectResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=100,
+                max_quota_scope_size=-1,
+                max_network_count=10,
+            )
+            session.add(policy)
+            await session.commit()
+        return policy_name
+
+    @pytest.fixture
     async def test_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: str,
+        test_project_resource_policy: str,
     ) -> tuple[uuid.UUID, str]:
         group_id = uuid.uuid4()
         group_name = f"test-group-{group_id.hex[:8]}"
@@ -221,6 +247,7 @@ class TestTemplateRepository:
                 domain_name=test_domain,
                 total_resource_slots=ResourceSlot.from_user_input({"cpu": "4", "mem": "8g"}, None),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                resource_policy=test_project_resource_policy,
             )
             session.add(group)
             await session.commit()
@@ -435,7 +462,7 @@ class TestTemplateRepository:
         entries = await template_repository.list_task_templates(test_user)
 
         assert len(entries) == 1
-        assert entries[0]["id"] == active_id
+        assert entries[0]["id"].hex == active_id
 
     async def test_update_task_template(
         self,
