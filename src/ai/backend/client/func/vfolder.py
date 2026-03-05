@@ -85,7 +85,8 @@ class VFolderByName(BaseFunction):
         })
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()
-            return result["item"]
+            item: dict[str, Any] = result["item"]
+            return item
 
     @api_function
     @classmethod
@@ -261,7 +262,8 @@ class VFolderByName(BaseFunction):
         rqst = Request("GET", f"/folders/{self.request_key}")
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()
-            return result["item"]
+            item: dict[str, Any] = result["item"]
+            return item
 
     @api_function
     async def delete(self) -> dict[str, Any]:
@@ -799,7 +801,8 @@ class VFolderByName(BaseFunction):
         })
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()
-            return result["item"]
+            item: dict[str, Any] = result["item"]
+            return item
 
     @api_function
     async def update_options(

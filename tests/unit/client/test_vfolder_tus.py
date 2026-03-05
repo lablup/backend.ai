@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import secrets
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from http import HTTPStatus
 from pathlib import Path
 from time import time
@@ -23,11 +23,14 @@ if TYPE_CHECKING:
     from ai.backend.client.config import APIConfig
 
 
-def build_url(config: APIConfig, path: str) -> URL:
+def build_url(config: APIConfig, path: str, params: Mapping[str, str | int] | None = None) -> URL:
     base_url = config.endpoint.path.rstrip("/")
     query_path = path.lstrip("/") if len(path) > 0 else ""
     path = f"{base_url}/{query_path}"
-    return config.endpoint.with_path(path)
+    canonical_url = config.endpoint.with_path(path)
+    if params:
+        canonical_url = canonical_url.with_query(params)
+    return canonical_url
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -164,9 +167,13 @@ async def test_vfolder_download(mocker: object) -> None:
             }
             source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
             m.get(
-                build_url(session.config, "/folders/_/id"),
+                build_url(
+                    session.config,
+                    "/folders/_/id",
+                    params={"vfolder_name": vfolder_name},
+                ),
                 status=HTTPStatus.OK,
-                payload={"id": source_vfolder_uuid.hex},
+                payload={"item": {"id": source_vfolder_uuid.hex}},
             )
             # 1. Client to Manager throught Request
             m.post(

@@ -32,26 +32,34 @@ def api_version() -> Iterator[None]:
 
 def test_create_vfolder() -> None:
     with Session() as session, aioresponses() as m:
-        payload = {
+        expected = {
             "id": "fake-vfolder-id",
             "name": "fake-vfolder-name",
             "host": "local",
         }
-        m.post(build_url(session.config, "/folders"), status=HTTPStatus.CREATED, payload=payload)
+        m.post(
+            build_url(session.config, "/folders"),
+            status=HTTPStatus.CREATED,
+            payload={"item": expected},
+        )
         resp = session.VFolder.create("fake-vfolder-name")
-        assert resp == payload  # type: ignore[comparison-overlap]
+        assert resp == expected  # type: ignore[comparison-overlap]
 
 
 def test_create_vfolder_in_other_host() -> None:
     with Session() as session, aioresponses() as m:
-        payload = {
+        expected = {
             "id": "fake-vfolder-id",
             "name": "fake-vfolder-name",
             "host": "fake-vfolder-host",
         }
-        m.post(build_url(session.config, "/folders"), status=HTTPStatus.CREATED, payload=payload)
+        m.post(
+            build_url(session.config, "/folders"),
+            status=HTTPStatus.CREATED,
+            payload={"item": expected},
+        )
         resp = session.VFolder.create("fake-vfolder-name", "fake-vfolder-host")
-        assert resp == payload  # type: ignore[comparison-overlap]
+        assert resp == expected  # type: ignore[comparison-overlap]
 
 
 def test_list_vfolders() -> None:
@@ -82,9 +90,9 @@ def test_delete_vfolder() -> None:
         vfolder_name = "fake-vfolder-name"
         source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
         m.get(
-            build_url(session.config, "/folders/_/id"),
+            build_url(session.config, "/folders/_/id", params={"vfolder_name": vfolder_name}),
             status=HTTPStatus.OK,
-            payload={"id": source_vfolder_uuid.hex},
+            payload={"item": {"id": source_vfolder_uuid.hex}},
         )
         m.delete(build_url(session.config, "/folders"), status=HTTPStatus.NO_CONTENT)
         resp = session.VFolder(vfolder_name).delete()
@@ -94,7 +102,7 @@ def test_delete_vfolder() -> None:
 def test_vfolder_get_info() -> None:
     with Session() as session, aioresponses() as m:
         vfolder_name = "fake-vfolder-name"
-        payload = {
+        expected = {
             "name": vfolder_name,
             "id": "fake-vfolder-id",
             "host": "fake-vfolder-host",
@@ -105,17 +113,17 @@ def test_vfolder_get_info() -> None:
         }
         source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
         m.get(
-            build_url(session.config, "/folders/_/id"),
+            build_url(session.config, "/folders/_/id", params={"vfolder_name": vfolder_name}),
             status=HTTPStatus.OK,
-            payload={"id": source_vfolder_uuid.hex},
+            payload={"item": {"id": source_vfolder_uuid.hex}},
         )
         m.get(
             build_url(session.config, f"/folders/{source_vfolder_uuid.hex}"),
             status=HTTPStatus.OK,
-            payload=payload,
+            payload={"item": expected},
         )
         resp = session.VFolder(vfolder_name).info()
-        assert resp == payload  # type: ignore[comparison-overlap]
+        assert resp == expected  # type: ignore[comparison-overlap]
 
 
 def test_vfolder_delete_files() -> None:
@@ -124,9 +132,9 @@ def test_vfolder_delete_files() -> None:
         files = ["fake-file1", "fake-file2"]
         source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
         m.get(
-            build_url(session.config, "/folders/_/id"),
+            build_url(session.config, "/folders/_/id", params={"vfolder_name": vfolder_name}),
             status=HTTPStatus.OK,
-            payload={"id": source_vfolder_uuid.hex},
+            payload={"item": {"id": source_vfolder_uuid.hex}},
         )
         m.delete(
             build_url(session.config, f"/folders/{source_vfolder_uuid.hex}/delete-files"),
@@ -163,9 +171,9 @@ def test_vfolder_list_files() -> None:
         }
         source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
         m.get(
-            build_url(session.config, "/folders/_/id"),
+            build_url(session.config, "/folders/_/id", params={"vfolder_name": vfolder_name}),
             status=HTTPStatus.OK,
-            payload={"id": source_vfolder_uuid.hex},
+            payload={"item": {"id": source_vfolder_uuid.hex}},
         )
         m.get(
             build_url(
@@ -187,9 +195,9 @@ def test_vfolder_invite() -> None:
         payload = {"invited_ids": user_ids}
         source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
         m.get(
-            build_url(session.config, "/folders/_/id"),
+            build_url(session.config, "/folders/_/id", params={"vfolder_name": vfolder_name}),
             status=HTTPStatus.OK,
-            payload={"id": source_vfolder_uuid.hex},
+            payload={"item": {"id": source_vfolder_uuid.hex}},
         )
         m.post(
             build_url(session.config, f"/folders/{source_vfolder_uuid.hex}/invite"),
@@ -251,7 +259,7 @@ def test_vfolder_clone() -> None:
     with Session() as session, aioresponses() as m:
         source_vfolder_name = "fake-source-vfolder-name"
         target_vfolder_name = "fake-target-vfolder-name"
-        payload = {
+        expected = {
             "target_name": target_vfolder_name,
             "target_host": "local",
             "permission": "rw",
@@ -259,26 +267,30 @@ def test_vfolder_clone() -> None:
         }
         source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
         m.get(
-            build_url(session.config, "/folders/_/id"),
+            build_url(
+                session.config,
+                "/folders/_/id",
+                params={"vfolder_name": source_vfolder_name},
+            ),
             status=HTTPStatus.OK,
-            payload={"id": source_vfolder_uuid.hex},
+            payload={"item": {"id": source_vfolder_uuid.hex}},
         )
         m.post(
             build_url(session.config, f"/folders/{source_vfolder_uuid.hex}/clone"),
             status=HTTPStatus.CREATED,
-            payload=payload,
+            payload={"item": expected},
         )
         resp = session.VFolder(source_vfolder_name).clone(target_vfolder_name)
-        assert resp == payload  # type: ignore[comparison-overlap]
+        assert resp == expected  # type: ignore[comparison-overlap]
 
 
 def test_vfolder_force_delete() -> None:
     with Session() as session, aioresponses() as m:
         vfolder_uuid = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
         m.get(
-            build_url(session.config, "/folders/_/id"),
+            build_url(session.config, "/folders/_/id", params={"vfolder_name": ""}),
             status=HTTPStatus.OK,
-            payload={"id": vfolder_uuid.hex},
+            payload={"item": {"id": vfolder_uuid.hex}},
         )
         m.delete(
             build_url(session.config, f"/folders/{vfolder_uuid.hex}/force"),
