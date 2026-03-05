@@ -19,6 +19,7 @@ from . import (  # noqa
     keypair,
     license,  # noqa: A004
     manager,
+    prometheus_query_preset,
     resource,
     resource_policy,
     scaling_group,
