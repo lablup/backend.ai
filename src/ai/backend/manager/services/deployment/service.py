@@ -558,14 +558,25 @@ class DeploymentService:
         Loads the service definition from the model vfolder and merges
         environ and resource_slots. The creator's values take precedence
         over service definition defaults.
+
+        If loading the service definition fails (e.g. network error, malformed file),
+        the creator is returned as-is since service definitions are optional defaults.
         """
         generator = self._revision_generator_registry.get(
             revision_creator.execution.runtime_variant
         )
-        service_def = await generator.load_service_definition(
-            vfolder_id=revision_creator.mounts.model_vfolder_id,
-            runtime_variant=revision_creator.execution.runtime_variant.value,
-        )
+        try:
+            service_def = await generator.load_service_definition(
+                vfolder_id=revision_creator.mounts.model_vfolder_id,
+                runtime_variant=revision_creator.execution.runtime_variant.value,
+            )
+        except Exception:
+            log.warning(
+                "Failed to load service definition for vfolder {}, proceeding without it",
+                revision_creator.mounts.model_vfolder_id,
+                exc_info=True,
+            )
+            return revision_creator
         if service_def is None:
             return revision_creator
 
@@ -596,18 +607,19 @@ class DeploymentService:
         deployment_id: UUID,
         revision_creator: ModelRevisionCreator,
     ) -> ModelRevisionData:
-        """Build and create a revision from the given creator."""
+        """Build and create a revision from the given creator.
+
+        Uses an atomic read-then-write operation for revision_number
+        assignment to prevent race conditions from concurrent requests.
+        The revision_number placeholder (0) is replaced atomically
+        inside the repository.
+        """
         endpoint_info = await self._deployment_repository.get_endpoint_info(deployment_id)
-        latest_revision_number = await self._deployment_repository.get_latest_revision_number(
-            deployment_id
-        )
-        next_revision_number = (latest_revision_number or 0) + 1
 
         merged_creator = await self._merge_service_definition(revision_creator)
 
         spec = DeploymentRevisionCreatorSpec(
             endpoint_id=deployment_id,
-            revision_number=next_revision_number,
             image_id=merged_creator.image_id,
             resource_group=endpoint_info.metadata.resource_group,
             resource_slots=ResourceSlot(merged_creator.resource_spec.resource_slots),
@@ -632,7 +644,9 @@ class DeploymentService:
             extra_mounts=(),
         )
         creator: Creator[DeploymentRevisionRow] = Creator(spec=spec)
-        return await self._deployment_repository.create_revision(creator)
+        return await self._deployment_repository.create_revision_with_next_number(
+            creator, deployment_id
+        )
 
     async def add_model_revision(
         self, action: AddModelRevisionAction
