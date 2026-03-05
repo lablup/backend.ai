@@ -90,37 +90,6 @@ def netstat_ns_work(ns_path: Path) -> dict[str, Any]:
         return psutil.net_io_counters(pernic=True)
 
 
-def _netstat_ns_subprocess(ns_path: Path) -> dict[str, Any]:
-    """Run netstat_ns_work in a forked child process.
-
-    This is used as a fallback when ProcessPoolExecutor cannot be used
-    (e.g., in daemon processes that cannot spawn children via the default
-    multiprocessing context). Using fork context bypasses the daemon check.
-    """
-    ctx = multiprocessing.get_context("fork")
-    parent_conn, child_conn = ctx.Pipe()
-    p = ctx.Process(target=_netstat_ns_child, args=(ns_path, child_conn))
-    p.start()
-    child_conn.close()
-    result = parent_conn.recv()
-    p.join(timeout=10)
-    parent_conn.close()
-    if isinstance(result, BaseException):
-        raise result
-    return cast(dict[str, Any], result)
-
-
-def _netstat_ns_child(ns_path: Path, conn: Any) -> None:
-    """Child process entry point for namespace-isolated net stats."""
-    try:
-        result = netstat_ns_work(ns_path)
-        conn.send(result)
-    except BaseException as e:
-        conn.send(e)
-    finally:
-        conn.close()
-
-
 async def netstat_ns(ns_path: Path) -> dict[str, Any]:
     loop = asyncio.get_running_loop()
     # Linux namespace is per-thread state. Therefore we need to ensure
@@ -130,6 +99,13 @@ async def netstat_ns(ns_path: Path) -> dict[str, Any]:
     # Unfortunately, CPython drops GIL while running IO and does not
     # provide any similar functionality. Therefore we execute namespace
     # dependent operation in the new process.
+    #
+    # NOTE: The agent worker runs as a daemon process (spawned by
+    # aiotools.start_server with daemon=True), so ProcessPoolExecutor
+    # cannot be used (multiprocessing forbids daemon processes from
+    # creating children). We fall back to the thread pool, where setns()
+    # is per-thread and works correctly. The setns() return-value check
+    # in netns.py ensures failures are detected and raised as OSError.
 
     # Check if we're already in a daemon process
     current_process = multiprocessing.current_process()
@@ -139,16 +115,12 @@ async def netstat_ns(ns_path: Path) -> dict[str, Any]:
         is_daemon = False
 
     if is_daemon:
-        # Daemon processes cannot use ProcessPoolExecutor (which internally
-        # checks the daemon flag). Use a direct fork-based subprocess instead.
-        return await loop.run_in_executor(None, _netstat_ns_subprocess, ns_path)
+        return await loop.run_in_executor(None, netstat_ns_work, ns_path)
     try:
         with ProcessPoolExecutor(max_workers=1) as executor:
             result = await loop.run_in_executor(executor, netstat_ns_work, ns_path)
     except AssertionError:
-        # Fallback: if ProcessPoolExecutor fails for any reason,
-        # use direct fork-based subprocess.
-        result = await loop.run_in_executor(None, _netstat_ns_subprocess, ns_path)
+        result = await loop.run_in_executor(None, netstat_ns_work, ns_path)
     return result
 
 
