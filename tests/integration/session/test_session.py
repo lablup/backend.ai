@@ -58,7 +58,7 @@ class TestSessionLifecycle:
         # 5. status_history
         history_result = await admin_registry.session.get_status_history(new_name)
         assert isinstance(history_result, GetStatusHistoryResponse)
-        assert isinstance(history_result.result, dict)
+        assert isinstance(history_result.root, dict)
 
         # 6. destroy (forced, since no real agent to handle graceful shutdown)
         destroy_result = await admin_registry.session.destroy(
