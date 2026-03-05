@@ -13,12 +13,35 @@ from ai.backend.manager.api.rest.group.registry import register_group_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
+from ai.backend.manager.service.container_registry.harbor import (
+    AbstractPerProjectContainerRegistryQuotaService,
+)
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
+
+
+class InMemoryQuotaService(AbstractPerProjectContainerRegistryQuotaService):
+    """In-memory quota service for component tests."""
+
+    def __init__(self) -> None:
+        self._store: dict[uuid.UUID, int] = {}
+
+    async def create_quota(self, scope_id: ProjectScope, quota: int) -> None:
+        self._store[scope_id.project_id] = quota
+
+    async def read_quota(self, scope_id: ProjectScope) -> int | None:
+        return self._store.get(scope_id.project_id)
+
+    async def update_quota(self, scope_id: ProjectScope, quota: int) -> None:
+        self._store[scope_id.project_id] = quota
+
+    async def delete_quota(self, scope_id: ProjectScope) -> None:
+        self._store.pop(scope_id.project_id, None)
 
 
 @pytest.fixture()
@@ -26,7 +49,8 @@ def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine)
-    service = ContainerRegistryService(database_engine, repo)
+    quota_service = InMemoryQuotaService()
+    service = ContainerRegistryService(database_engine, repo, quota_service=quota_service)
     return ContainerRegistryProcessors(service=service, action_monitors=[])
 
 
