@@ -99,13 +99,6 @@ async def netstat_ns(ns_path: Path) -> dict[str, Any]:
     # Unfortunately, CPython drops GIL while running IO and does not
     # provide any similar functionality. Therefore we execute namespace
     # dependent operation in the new process.
-    #
-    # NOTE: The agent worker runs as a daemon process (spawned by
-    # aiotools.start_server with daemon=True), so ProcessPoolExecutor
-    # cannot be used (multiprocessing forbids daemon processes from
-    # creating children). We fall back to the thread pool, where setns()
-    # is per-thread and works correctly. The setns() return-value check
-    # in netns.py ensures failures are detected and raised as OSError.
 
     # Check if we're already in a daemon process
     current_process = multiprocessing.current_process()
