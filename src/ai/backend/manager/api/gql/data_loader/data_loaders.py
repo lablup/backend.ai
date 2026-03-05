@@ -287,9 +287,7 @@ class DataLoaders:
         self,
     ) -> DataLoader[uuid.UUID, DeploymentPolicyData | None]:
         return DataLoader(
-            load_fn=partial(
-                load_deployment_policies_by_endpoint_ids, self._processors.deployment
-            )
+            load_fn=partial(load_deployment_policies_by_endpoint_ids, self._processors.deployment)
         )
 
     @cached_property
