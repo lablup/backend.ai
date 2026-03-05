@@ -19,6 +19,7 @@ from ai.backend.manager.api.gql.rbac.types import (
     PermissionOrderBy,
     RBACElementTypeGQL,
     ScopeEntityCombinationGQL,
+    UpdatePermissionInput,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -26,6 +27,9 @@ from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.services.permission_contoller.actions.permission import (
     CreatePermissionAction,
     DeletePermissionAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.update_permission import (
+    UpdatePermissionAction,
 )
 
 # ==================== Query Resolvers ====================
@@ -85,6 +89,19 @@ async def admin_create_permission(
     action_result = (
         await info.context.processors.permission_controller.create_permission.wait_for_complete(
             CreatePermissionAction(creator=input.to_creator())
+        )
+    )
+    return PermissionGQL.from_dataclass(action_result.data)
+
+
+@strawberry.mutation(description="Added in 26.3.0. Update a scoped permission (admin only).")  # type: ignore[misc]
+async def admin_update_permission(
+    info: Info[StrawberryGQLContext],
+    input: UpdatePermissionInput,
+) -> PermissionGQL:
+    action_result = (
+        await info.context.processors.permission_controller.update_permission.wait_for_complete(
+            UpdatePermissionAction(updater=input.to_updater())
         )
     )
     return PermissionGQL.from_dataclass(action_result.data)

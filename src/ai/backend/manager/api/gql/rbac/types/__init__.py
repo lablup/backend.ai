@@ -22,6 +22,7 @@ from .permission import (
     PermissionOrderField,
     RBACElementTypeGQL,
     ScopeEntityCombinationGQL,
+    UpdatePermissionInput,
 )
 from .role import (
     AssignRoleInput,
@@ -79,6 +80,7 @@ __all__ = [
     "EntityOrderBy",
     # Inputs
     "CreatePermissionInput",
+    "UpdatePermissionInput",
     "DeletePermissionInput",
     "CreateRoleInput",
     "UpdateRoleInput",

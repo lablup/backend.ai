@@ -179,6 +179,7 @@ from .rbac import (
     admin_role,
     admin_role_assignments,
     admin_roles,
+    admin_update_permission,
     admin_update_role,
     my_roles,
     rbac_scope_entity_combinations,
@@ -479,6 +480,7 @@ class Mutation:
     admin_delete_role = admin_delete_role
     admin_purge_role = admin_purge_role
     admin_create_permission = admin_create_permission
+    admin_update_permission = admin_update_permission
     admin_delete_permission = admin_delete_permission
     admin_assign_role = admin_assign_role
     admin_revoke_role = admin_revoke_role
