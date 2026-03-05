@@ -59,7 +59,7 @@ class LegacyEndpointCreatorSpec(CreatorSpec[EndpointRow]):
     resource_opts: Mapping[str, Any] | None
 
     # Model revision fields - mounts (from MountMetadata)
-    model: UUID
+    model: UUID | None
     model_mount_destination: str
     model_definition_path: str | None
     extra_mounts: Sequence[VFolderMount]

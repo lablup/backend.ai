@@ -33,7 +33,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     resource_opts: Mapping[str, Any]
     cluster_mode: str
     cluster_size: int
-    model_id: uuid.UUID
+    model_id: uuid.UUID | None
     model_mount_destination: str
     model_definition_path: str | None
     model_definition: Mapping[str, Any] | None

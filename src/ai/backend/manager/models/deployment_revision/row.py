@@ -91,7 +91,7 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     image: Mapped[uuid.UUID] = mapped_column("image", GUID, nullable=False)
 
     # Model configuration
-    model: Mapped[uuid.UUID] = mapped_column("model", GUID, nullable=False)
+    model: Mapped[uuid.UUID | None] = mapped_column("model", GUID, nullable=True)
     model_mount_destination: Mapped[str] = mapped_column(
         "model_mount_destination",
         sa.String(length=1024),

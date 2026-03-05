@@ -83,7 +83,7 @@ class DeploymentMountFields:
     Corresponds to VFolderMountsCreator in data layer.
     """
 
-    model_vfolder_id: uuid.UUID
+    model_vfolder_id: uuid.UUID | None
     model_mount_destination: str = "/models"
     model_definition_path: str | None = None
     extra_mounts: Sequence[VFolderMount] = ()
