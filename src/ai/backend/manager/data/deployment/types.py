@@ -470,7 +470,7 @@ class ModelRuntimeConfigData:
 @dataclass
 class ModelMountConfigData:
     vfolder_id: UUID | None
-    mount_destination: str | None
+    mount_destination: str
     definition_path: str
 
 
@@ -521,7 +521,7 @@ class ModelDeploymentData:
     replica_state: ReplicaStateData
     default_deployment_strategy: DeploymentStrategy
     created_user_id: UUID
-    access_token_ids: UUID | None = None
+    access_token_ids: list[UUID] | None = None
 
 
 class DeploymentOrderField(enum.StrEnum):

@@ -115,7 +115,7 @@ class ModelMountConfig:
 
     @classmethod
     def from_dataclass(cls, data: ModelMountConfigData) -> ModelMountConfig | None:
-        if data.vfolder_id is None or data.mount_destination is None:
+        if data.vfolder_id is None:
             return None
         return cls(
             _vfolder_id=data.vfolder_id,
@@ -487,7 +487,7 @@ class ModelMountConfigInput:
 @strawberry.input(description="Added in 25.19.0")
 class ExtraVFolderMountInput:
     vfolder_id: ID
-    mount_destination: str | None
+    mount_destination: str
 
 
 @strawberry.input(
@@ -515,11 +515,7 @@ class CreateRevisionInput:
             extra_mounts = [
                 MountInfo(
                     vfolder_id=UUID(str(extra_mount.vfolder_id)),
-                    kernel_path=PurePosixPath(
-                        extra_mount.mount_destination
-                        if extra_mount.mount_destination is not None
-                        else ""
-                    ),
+                    kernel_path=PurePosixPath(extra_mount.mount_destination),
                 )
                 for extra_mount in self.extra_mounts
             ]
@@ -574,11 +570,7 @@ class AddRevisionInput:
             extra_mounts = [
                 MountInfo(
                     vfolder_id=UUID(str(extra_mount.vfolder_id)),
-                    kernel_path=PurePosixPath(
-                        extra_mount.mount_destination
-                        if extra_mount.mount_destination is not None
-                        else ""
-                    ),
+                    kernel_path=PurePosixPath(extra_mount.mount_destination),
                 )
                 for extra_mount in self.extra_mounts
             ]

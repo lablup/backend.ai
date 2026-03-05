@@ -257,7 +257,7 @@ class ExtraVFolderMountInput(BaseRequestModel):
     """Extra vfolder mount input."""
 
     vfolder_id: UUID = Field(description="VFolder ID to mount")
-    mount_destination: str | None = Field(default=None, description="Mount destination path")
+    mount_destination: str = Field(description="Mount destination path")
 
 
 class RevisionInput(BaseRequestModel):

@@ -65,6 +65,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     ExecutionSpec,
     ModelDeploymentData,
+    ModelMountConfigData,
     ModelRevisionData,
     MountInfo,
     ReplicaSpec,
@@ -78,6 +79,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.deployment import IncompleteRevisionData
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -224,15 +226,19 @@ class RevisionAdapter(BaseFilterAdapter):
             model_runtime_config=ModelRuntimeConfigDTO(
                 runtime_variant=data.model_runtime_config.runtime_variant,
             ),
-            model_mount_config=ModelMountConfigDTO(
-                # TODO: Generating a random UUID when vfolder_id is None creates a reference to a non-existent vfolder. Should raise an error instead.
-                vfolder_id=data.model_mount_config.vfolder_id or uuid4(),
-                # TODO: Empty string is not a valid path when mount_destination is None. Should make it a required field or assign a sensible default path.
-                mount_destination=data.model_mount_config.mount_destination or "",
-                definition_path=data.model_mount_config.definition_path,
-            ),
+            model_mount_config=self._convert_model_mount_config(data.model_mount_config),
             created_at=data.created_at,
             image_id=data.image_id,
+        )
+
+    @staticmethod
+    def _convert_model_mount_config(config: ModelMountConfigData) -> ModelMountConfigDTO:
+        if config.vfolder_id is None:
+            raise IncompleteRevisionData("model_mount_config.vfolder_id is required but was None")
+        return ModelMountConfigDTO(
+            vfolder_id=config.vfolder_id,
+            mount_destination=config.mount_destination,
+            definition_path=config.definition_path,
         )
 
     def build_querier(self, request: SearchRevisionsRequest) -> BatchQuerier:
@@ -390,8 +396,7 @@ def build_revision_creator(revision_input: RevisionInput) -> ModelRevisionCreato
         extra_mounts = [
             MountInfo(
                 vfolder_id=mount.vfolder_id,
-                # TODO: Empty string is not a valid path when mount_destination is None. Should make it a required field or assign a sensible default path.
-                kernel_path=PurePosixPath(mount.mount_destination or ""),
+                kernel_path=PurePosixPath(mount.mount_destination),
             )
             for mount in revision_input.extra_mounts
         ]
