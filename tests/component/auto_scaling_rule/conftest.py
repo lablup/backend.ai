@@ -60,7 +60,8 @@ def deployment_processors(
         valkey_clients.schedule,
     )
     deployment_controller = AsyncMock()
-    service = DeploymentService(deployment_controller, repo)
+    revision_generator_registry = MagicMock()
+    service = DeploymentService(deployment_controller, repo, revision_generator_registry)
     return DeploymentProcessors(service=service, action_monitors=[])
 
 
