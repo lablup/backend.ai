@@ -2291,6 +2291,39 @@ class ScheduleDBSource:
             result = await db_sess.execute(stmt)
             return cast(CursorResult[Any], result).rowcount
 
+    async def get_agent_ids_for_sessions(
+        self, session_ids: list[SessionId]
+    ) -> dict[SessionId, list[AgentId]]:
+        """
+        Get agent IDs assigned to kernels for the given sessions.
+
+        This is used before resetting kernels to PENDING to record
+        which agents failed, so the scheduler can deprioritize them on retry.
+
+        :param session_ids: List of session IDs to look up
+        :return: Mapping of session ID to list of assigned agent IDs
+        """
+        if not session_ids:
+            return {}
+
+        async with self._begin_readonly_read_committed() as db_conn:
+            stmt = sa.select(
+                KernelRow.session_id,
+                KernelRow.agent,
+            ).where(
+                sa.and_(
+                    KernelRow.session_id.in_(session_ids),
+                    KernelRow.agent.isnot(None),
+                    KernelRow.status.in_(KernelStatus.retriable_statuses()),
+                )
+            )
+            rows = (await db_conn.execute(stmt)).fetchall()
+
+        result: dict[SessionId, list[AgentId]] = defaultdict(list)
+        for row in rows:
+            result[row.session_id].append(AgentId(row.agent))
+        return dict(result)
+
     async def update_kernels_to_creating_for_sessions(
         self, session_ids: list[SessionId], reason: str
     ) -> int:

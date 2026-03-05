@@ -106,3 +106,5 @@ class SessionWorkload:
     # Kernel counts at endpoint for each agent (for inference session spreading)
     # Only populated for inference sessions with enforce_spreading_endpoint_replica
     kernel_counts_at_endpoint: dict[AgentId, int] | None = None
+    # Agents that previously failed for this session (populated from Valkey during scheduling)
+    failed_agent_ids: frozenset[AgentId] = frozenset()
