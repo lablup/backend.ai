@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import pytest
 
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.notification.handler import NotificationHandler
 from ai.backend.manager.api.rest.notification.registry import register_notification_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -11,7 +9,6 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.repositories.notification.repository import NotificationRepository
-from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.notification.processors import NotificationProcessors
 from ai.backend.manager.services.notification.service import NotificationService
 
@@ -29,12 +26,10 @@ def notification_processors(
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
-    auth_processors: AuthProcessors,
     notification_processors: NotificationProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for notification-domain tests."""
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_notification_routes(
             NotificationHandler(notification=notification_processors), route_deps
         ),

@@ -12,8 +12,6 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.manager.api.rest.artifact.handler import ArtifactHandler
 from ai.backend.manager.api.rest.artifact.registry import register_artifact_routes
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -41,7 +39,6 @@ from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
-from ai.backend.manager.services.auth.processors import AuthProcessors
 
 
 @dataclass
@@ -115,13 +112,11 @@ def artifact_revision_processors(
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
-    auth_processors: AuthProcessors,
     artifact_processors: ArtifactProcessors,
     artifact_revision_processors: ArtifactRevisionProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for artifact-domain tests."""
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_artifact_routes(
             ArtifactHandler(
                 artifact=artifact_processors,

@@ -12,8 +12,6 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.etcd.handler import EtcdHandler
 from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
@@ -40,7 +38,6 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
-from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
@@ -160,7 +157,6 @@ def scaling_group_processors(
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
-    auth_processors: AuthProcessors,
     container_registry_processors: ContainerRegistryProcessors,
     etcd_config_processors: EtcdConfigProcessors,
     resource_preset_processors: ResourcePresetProcessors,
@@ -172,7 +168,6 @@ def server_module_registries(
 ) -> list[RouteRegistry]:
     """Load only the modules required for infra-domain tests."""
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_etcd_routes(
             EtcdHandler(
                 container_registry=container_registry_processors,

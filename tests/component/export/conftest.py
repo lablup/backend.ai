@@ -4,8 +4,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.export.handler import ExportHandler
 from ai.backend.manager.api.rest.export.registry import register_export_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -14,7 +12,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.export.db_source.db_source import ExportDBSource
 from ai.backend.manager.repositories.export.registry.base import ExportReportRegistry
 from ai.backend.manager.repositories.export.repository import ExportRepository
-from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.export.service import ExportService
 
@@ -31,12 +28,10 @@ def export_processors(database_engine: ExtendedAsyncSAEngine) -> ExportProcessor
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
-    auth_processors: AuthProcessors,
     export_processors: ExportProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for export-domain tests."""
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_export_routes(
             ExportHandler(export=export_processors, export_config=MagicMock()), route_deps
         ),

@@ -8,8 +8,6 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.fair_share.handler import FairShareAPIHandler
 from ai.backend.manager.api.rest.fair_share.registry import register_fair_share_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -22,7 +20,6 @@ from ai.backend.manager.repositories.resource_usage_history.repository import (
     ResourceUsageHistoryRepository,
 )
 from ai.backend.manager.repositories.scaling_group.repository import ScalingGroupRepository
-from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
 from ai.backend.manager.services.fair_share.service import FairShareService
 from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
@@ -55,14 +52,12 @@ def scaling_group_processors(database_engine: ExtendedAsyncSAEngine) -> ScalingG
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
-    auth_processors: AuthProcessors,
     fair_share_processors: FairShareProcessors,
     resource_usage_processors: ResourceUsageProcessors,
     scaling_group_processors: ScalingGroupProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for fair-share-domain tests."""
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_fair_share_routes(
             FairShareAPIHandler(
                 fair_share=fair_share_processors,

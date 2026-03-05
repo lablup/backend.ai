@@ -6,8 +6,6 @@ import pytest
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.service.handler import ServiceHandler
 from ai.backend.manager.api.rest.service.registry import register_service_routes
@@ -110,7 +108,6 @@ def server_module_registries(
 ) -> list[RouteRegistry]:
     """Load only the modules required for model-serving tests."""
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_service_routes(
             ServiceHandler(
                 auth=auth_processors,

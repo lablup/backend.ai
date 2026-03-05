@@ -7,9 +7,6 @@ from urllib.parse import urlencode
 import pytest
 from aioresponses import aioresponses
 
-# Explicitly import to ensure Pants includes this module in the test build
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.group.handler import GroupHandler
 from ai.backend.manager.api.rest.group.registry import register_group_routes
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -66,7 +63,6 @@ async def test_harbor_create_project_quota(
             register_group_routes(
                 GroupHandler(container_registry=mock_processors.container_registry), route_deps
             ),
-            register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
         ],
     )
 
@@ -150,7 +146,6 @@ async def test_harbor_read_project_quota(
             register_group_routes(
                 GroupHandler(container_registry=mock_processors.container_registry), route_deps
             ),
-            register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
         ],
     )
 
@@ -227,7 +222,6 @@ async def test_harbor_update_project_quota(
             register_group_routes(
                 GroupHandler(container_registry=mock_processors.container_registry), route_deps
             ),
-            register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
         ],
     )
 
@@ -311,7 +305,6 @@ async def test_harbor_delete_project_quota(
             register_group_routes(
                 GroupHandler(container_registry=mock_processors.container_registry), route_deps
             ),
-            register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
         ],
     )
 

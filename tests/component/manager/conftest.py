@@ -45,8 +45,7 @@ from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.app import build_root_app, mount_registries
 from ai.backend.manager.api.rest.compute_sessions.handler import ComputeSessionsHandler
 from ai.backend.manager.api.rest.compute_sessions.registry import register_compute_sessions_routes
 from ai.backend.manager.api.rest.etcd.handler import EtcdHandler
@@ -106,7 +105,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, connect_datab
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.server import build_root_app, mount_registries
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
@@ -945,7 +943,6 @@ async def prepare_kernel(
                 route_deps,
                 event_hub=MagicMock(),
             ),
-            register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
             register_vfolder_routes(
                 VFolderHandler(
                     auth=mock_processors.auth,

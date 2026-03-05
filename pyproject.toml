@@ -282,6 +282,9 @@ split-on-trailing-comma = true
 # - REST handler shims use lazy imports to break circular dependencies with handler modules
 "src/ai/backend/manager/api/manager.py" = ["PLC0415"]
 "src/ai/backend/manager/api/resource.py" = ["PLC0415"]
+# - server.py and setup.py use lazy imports to decouple test dependency graph from tree.py
+"src/ai/backend/manager/server.py" = ["PLC0415"]
+"src/ai/backend/manager/api/rest/setup.py" = ["PLC0415"]
 # - REST API module registries use lazy imports to avoid circular dependencies
 "src/ai/backend/manager/api/rest/tree.py" = ["PLC0415"]
 "src/ai/backend/manager/api/rest/*/registry.py" = ["PLC0415"]

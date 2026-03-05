@@ -8,8 +8,6 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.container_registry.handler import ContainerRegistryHandler
 from ai.backend.manager.api.rest.container_registry.registry import (
     register_container_registry_routes,
@@ -21,7 +19,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
-from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 
@@ -38,12 +35,10 @@ def container_registry_processors(
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
-    auth_processors: AuthProcessors,
     container_registry_processors: ContainerRegistryProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for container-registry-domain tests."""
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_container_registry_routes(
             ContainerRegistryHandler(container_registry=container_registry_processors),
             route_deps,

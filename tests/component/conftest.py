@@ -75,6 +75,7 @@ from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.api import ManagerStatus
+from ai.backend.manager.api.rest.app import build_root_app, mount_registries
 from ai.backend.manager.api.rest.middleware import build_auth_middleware, build_exception_middleware
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.server_status import (
@@ -127,7 +128,6 @@ from ai.backend.manager.notification.notification_center import NotificationCent
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.auth.repository import AuthRepository
-from ai.backend.manager.server import build_root_app, mount_registries
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.testutils.bootstrap import (  # noqa: F401

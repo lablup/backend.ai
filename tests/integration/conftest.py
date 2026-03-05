@@ -34,7 +34,9 @@ from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolder
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
+from ai.backend.manager.api.rest.app import build_root_app
 from ai.backend.manager.api.rest.middleware import build_auth_middleware, build_exception_middleware
+from ai.backend.manager.api.rest.setup import setup_api
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
@@ -66,11 +68,7 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.vfolder import vfolders
-from ai.backend.manager.server import (
-    _setup_api,
-    build_root_app,
-    webapp_plugin_ctx,
-)
+from ai.backend.manager.server import webapp_plugin_ctx
 from ai.backend.testutils.pants import get_parallel_slot
 
 # Import testcontainer fixtures (etcd_container, redis_container, postgres_container)
@@ -815,7 +813,7 @@ async def server_factory(
         )
 
         # Build and mount the API module tree
-        _setup_api(root_app, r, 0)
+        setup_api(root_app, r, 0)
 
         # Plugin webapps
         await init_stack.enter_async_context(webapp_plugin_ctx(root_app, dep_resources=r, pidx=0))

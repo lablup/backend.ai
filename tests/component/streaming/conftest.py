@@ -16,8 +16,6 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.stream.handler import StreamHandler
@@ -31,7 +29,6 @@ from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.stream.repository import StreamRepository
-from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.stream.processors import StreamProcessors
 from ai.backend.manager.services.stream.service import StreamService
 
@@ -80,14 +77,12 @@ def stream_processors(
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
-    auth_processors: AuthProcessors,
     stream_processors: StreamProcessors,
     config_provider: ManagerConfigProvider,
     error_monitor: ErrorPluginContext,
 ) -> list[RouteRegistry]:
     """Load only the modules required for streaming component tests."""
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_stream_routes(
             StreamHandler(
                 private_ctx=MagicMock(),

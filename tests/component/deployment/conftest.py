@@ -4,8 +4,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.deployment.handler import DeploymentAPIHandler
 from ai.backend.manager.api.rest.deployment.registry import register_deployment_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -13,7 +11,6 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
-from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 
@@ -40,12 +37,10 @@ def deployment_processors(
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
-    auth_processors: AuthProcessors,
     deployment_processors: DeploymentProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for deployment-domain tests."""
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_deployment_routes(
             DeploymentAPIHandler(deployment=deployment_processors), route_deps
         ),

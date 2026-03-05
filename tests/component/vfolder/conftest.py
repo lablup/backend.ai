@@ -23,8 +23,6 @@ from ai.backend.common.types import (
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -168,7 +166,6 @@ def server_module_registries(
 ) -> list[RouteRegistry]:
     """Load only the modules required for vfolder-domain tests."""
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_vfolder_routes(
             VFolderHandler(
                 auth=auth_processors,

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import pytest
 
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.object_storage.handler import ObjectStorageHandler
 from ai.backend.manager.api.rest.object_storage.registry import register_object_storage_routes
@@ -18,7 +16,6 @@ from ai.backend.manager.repositories.artifact.repository import ArtifactReposito
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
-from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
 from ai.backend.manager.services.object_storage.service import ObjectStorageService
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
@@ -78,14 +75,12 @@ def vfs_storage_processors(
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
-    auth_processors: AuthProcessors,
     object_storage_processors: ObjectStorageProcessors,
     storage_namespace_processors: StorageNamespaceProcessors,
     vfs_storage_processors: VFSStorageProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for storage-domain tests."""
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_object_storage_routes(
             ObjectStorageHandler(
                 object_storage=object_storage_processors,

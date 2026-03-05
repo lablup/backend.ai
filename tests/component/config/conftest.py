@@ -18,8 +18,6 @@ from ai.backend.common.dto.manager.config import (
     DeleteGroupDotfileRequest,
     DeleteUserDotfileRequest,
 )
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.domainconfig.handler import DomainConfigHandler
 from ai.backend.manager.api.rest.domainconfig.registry import register_domainconfig_routes
 from ai.backend.manager.api.rest.groupconfig.handler import GroupConfigHandler
@@ -54,7 +52,6 @@ def server_module_registries(
 ) -> list[RouteRegistry]:
     """Load only the modules required for config-domain tests."""
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_groupconfig_routes(GroupConfigHandler(dotfile=dotfile_processors), route_deps),
         register_userconfig_routes(
             UserConfigHandler(auth=auth_processors, dotfile=dotfile_processors),

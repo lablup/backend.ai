@@ -10,8 +10,6 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair, ResourceSlot
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.error_log.handler import ErrorLogHandler
 from ai.backend.manager.api.rest.error_log.registry import register_error_log_routes
 from ai.backend.manager.api.rest.manager.handler import ManagerHandler
@@ -26,7 +24,6 @@ from ai.backend.manager.models.error_logs import error_logs
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.error_log.repository import ErrorLogRepository
 from ai.backend.manager.repositories.manager_admin.repository import ManagerAdminRepository
-from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.error_log.service import ErrorLogService
 from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
@@ -78,13 +75,11 @@ def manager_admin_processors(
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
-    auth_processors: AuthProcessors,
     error_log_processors: ErrorLogProcessors,
     manager_admin_processors: ManagerAdminProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for operations-domain tests."""
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_error_log_routes(ErrorLogHandler(error_log=error_log_processors), route_deps),
         register_manager_api_routes(
             ManagerHandler(manager_admin=manager_admin_processors), route_deps
