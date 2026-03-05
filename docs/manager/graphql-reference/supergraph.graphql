@@ -10359,6 +10359,9 @@ type Role implements Node
 
   """Permissions associated with this role."""
   permissions(filter: PermissionFilter = null, orderBy: PermissionOrderBy = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection!
+
+  """Users assigned to this role."""
+  users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
 }
 
 """Added in 26.3.0. RBAC role assignment (user-role association)"""
