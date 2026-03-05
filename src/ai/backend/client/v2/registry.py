@@ -3,9 +3,7 @@ from __future__ import annotations
 from functools import cached_property
 from typing import TYPE_CHECKING
 
-from ai.backend.client.config import get_config as get_v1_config
-
-from .auth import AuthStrategy, HMACAuth
+from .auth import AuthStrategy
 from .base_client import BackendAIAnonymousClient, BackendAIAuthClient
 from .config import ClientConfig
 
@@ -67,19 +65,6 @@ class BackendAIClientRegistry:
         client = await BackendAIAuthClient.create(config, auth)
         anon_client = await BackendAIAnonymousClient.create(config)
         return cls(client, anon_client)
-
-    @classmethod
-    async def from_v1_config(cls) -> BackendAIClientRegistry:
-        """Create a registry from the V1 SDK API configuration."""
-        api_config = get_v1_config()
-        v2_config = ClientConfig(
-            endpoint=api_config.endpoint,
-            skip_ssl_verification=api_config.skip_sslcert_validation,
-            connection_timeout=api_config.connection_timeout,
-            read_timeout=api_config.read_timeout,
-        )
-        auth = HMACAuth(api_config.access_key, api_config.secret_key)
-        return await cls.create(v2_config, auth)
 
     async def close(self) -> None:
         await self._client.close()

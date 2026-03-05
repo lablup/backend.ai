@@ -11,7 +11,10 @@ from uuid import UUID
 import click
 
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.config import get_config
 from ai.backend.client.session import Session
+from ai.backend.client.v2.auth import HMACAuth
+from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy, RouteTrafficStatus
 from ai.backend.common.dto.manager.deployment import (
@@ -384,7 +387,10 @@ def info_policy_cmd(ctx: CLIContext, deployment_id: str) -> None:
     """Display the deployment policy."""
 
     async def _run() -> None:
-        registry = await BackendAIClientRegistry.from_v1_config()
+        api_config = get_config()
+        v2_config = ClientConfig.from_v1_config(api_config)
+        auth = HMACAuth(api_config.access_key, api_config.secret_key)
+        registry = await BackendAIClientRegistry.create(v2_config, auth)
         try:
             result = await registry.deployment.get_policy(UUID(deployment_id))
             print(
@@ -488,7 +494,10 @@ def create_policy_cmd(
             )
 
     async def _run() -> None:
-        registry = await BackendAIClientRegistry.from_v1_config()
+        api_config = get_config()
+        v2_config = ClientConfig.from_v1_config(api_config)
+        auth = HMACAuth(api_config.access_key, api_config.secret_key)
+        registry = await BackendAIClientRegistry.create(v2_config, auth)
         try:
             request = CreateDeploymentPolicyRequest(
                 strategy=strategy_enum,
@@ -599,7 +608,10 @@ def update_policy_cmd(
         )
 
     async def _run() -> None:
-        registry = await BackendAIClientRegistry.from_v1_config()
+        api_config = get_config()
+        v2_config = ClientConfig.from_v1_config(api_config)
+        auth = HMACAuth(api_config.access_key, api_config.secret_key)
+        registry = await BackendAIClientRegistry.create(v2_config, auth)
         try:
             request = UpdateDeploymentPolicyRequest(
                 strategy=strategy_enum,
