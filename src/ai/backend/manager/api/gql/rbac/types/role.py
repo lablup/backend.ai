@@ -47,7 +47,8 @@ if TYPE_CHECKING:
         PermissionFilter,
         PermissionOrderBy,
     )
-    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
+    from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
+    from ai.backend.manager.api.gql.user.types.node import UserV2Connection, UserV2GQL
 
 # ==================== Enums ====================
 
@@ -169,6 +170,49 @@ class RoleGQL(Node):
             info,
             filter=combined_filter,
             order_by=[order_by] if order_by is not None else None,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+        )
+
+    @strawberry.field(description="Users assigned to this role.")  # type: ignore[misc]
+    async def users(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            UserFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.filters"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                UserOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.user.types.filters"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Annotated[
+        UserV2Connection,
+        strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+    ]:
+        from ai.backend.manager.api.gql.user.fetcher.user import fetch_role_users
+        from ai.backend.manager.repositories.user.types import RoleUserSearchScope
+
+        scope = RoleUserSearchScope(role_id=uuid.UUID(self.id))
+        return await fetch_role_users(
+            info=info,
+            scope=scope,
+            filter=filter,
+            order_by=order_by,
             before=before,
             after=after,
             first=first,
