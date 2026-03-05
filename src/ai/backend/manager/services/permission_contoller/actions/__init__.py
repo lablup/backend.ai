@@ -18,6 +18,7 @@ from .search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
     SearchUsersAssignedToRoleActionResult,
 )
+from .update_permission import UpdatePermissionAction, UpdatePermissionActionResult
 from .update_role import UpdateRoleAction, UpdateRoleActionResult
 from .update_role_permissions import (
     UpdateRolePermissionsAction,
@@ -47,6 +48,8 @@ __all__ = [
     "SearchPermissionsActionResult",
     "SearchUsersAssignedToRoleAction",
     "SearchUsersAssignedToRoleActionResult",
+    "UpdatePermissionAction",
+    "UpdatePermissionActionResult",
     "UpdateRoleAction",
     "UpdateRoleActionResult",
     "UpdateRolePermissionsAction",
