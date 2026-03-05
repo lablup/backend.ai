@@ -136,7 +136,7 @@ class TestRBACRoleLifecycle:
         with pytest.raises(NotFoundError):
             await admin_registry.rbac.get_role(role_id)
 
-    async def test_soft_deleted_role_excluded_from_search(
+    async def test_soft_deleted_role_excluded_from_active_search(
         self,
         admin_registry: BackendAIClientRegistry,
         role_factory: RoleFactory,
@@ -147,20 +147,41 @@ class TestRBACRoleLifecycle:
         created = await role_factory(name=marker)
         role_id = created.role.id
 
-        # Confirm it appears in search
+        # Confirm it appears when filtering for ACTIVE roles
         before = await admin_registry.rbac.search_roles(
-            SearchRolesRequest(filter=RoleFilter(name=StringFilter(contains=marker)))
+            SearchRolesRequest(
+                filter=RoleFilter(
+                    name=StringFilter(contains=marker),
+                    statuses=[RoleStatus.ACTIVE],
+                ),
+            )
         )
         assert any(r.id == role_id for r in before.roles)
 
-        # Soft delete
+        # Soft delete (sets status to DELETED)
         await admin_registry.rbac.delete_role(DeleteRoleRequest(role_id=role_id))
 
-        # Confirm it no longer appears
+        # Confirm it no longer appears when filtering for ACTIVE roles
         after = await admin_registry.rbac.search_roles(
-            SearchRolesRequest(filter=RoleFilter(name=StringFilter(contains=marker)))
+            SearchRolesRequest(
+                filter=RoleFilter(
+                    name=StringFilter(contains=marker),
+                    statuses=[RoleStatus.ACTIVE],
+                ),
+            )
         )
         assert not any(r.id == role_id for r in after.roles)
+
+        # Confirm it does appear when filtering for DELETED roles
+        deleted_search = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(
+                filter=RoleFilter(
+                    name=StringFilter(contains=marker),
+                    statuses=[RoleStatus.DELETED],
+                ),
+            )
+        )
+        assert any(r.id == role_id for r in deleted_search.roles)
 
 
 class TestRoleAssignmentAudit:
