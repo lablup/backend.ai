@@ -3,6 +3,7 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator
+from typing import cast
 
 import pytest
 import sqlalchemy as sa
@@ -25,8 +26,14 @@ from ai.backend.manager.services.container_registry.processors import ContainerR
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 
 
-class InMemoryQuotaService(AbstractPerProjectContainerRegistryQuotaService):
-    """In-memory quota service for component tests."""
+class InMemoryQuotaService:
+    """In-memory quota service for component tests (duck-typed).
+
+    Does not inherit AbstractPerProjectContainerRegistryQuotaService because
+    the abstract read_quota() returns int, but the API response model
+    (ReadRegistryQuotaResponse.result) is int | None. This fixture mirrors
+    the expected API behaviour: None when no quota is configured.
+    """
 
     def __init__(self) -> None:
         self._store: dict[uuid.UUID, int] = {}
@@ -34,11 +41,8 @@ class InMemoryQuotaService(AbstractPerProjectContainerRegistryQuotaService):
     async def create_quota(self, scope_id: ProjectScope, quota: int) -> None:
         self._store[scope_id.project_id] = quota
 
-    async def read_quota(self, scope_id: ProjectScope) -> int:
-        value = self._store.get(scope_id.project_id)
-        if value is None:
-            raise KeyError(f"No quota found for project {scope_id.project_id}")
-        return value
+    async def read_quota(self, scope_id: ProjectScope) -> int | None:
+        return self._store.get(scope_id.project_id)
 
     async def update_quota(self, scope_id: ProjectScope, quota: int) -> None:
         self._store[scope_id.project_id] = quota
@@ -52,7 +56,7 @@ def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine)
-    quota_service = InMemoryQuotaService()
+    quota_service = cast(AbstractPerProjectContainerRegistryQuotaService, InMemoryQuotaService())
     service = ContainerRegistryService(database_engine, repo, quota_service=quota_service)
     return ContainerRegistryProcessors(service=service, action_monitors=[])
 
