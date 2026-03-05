@@ -357,6 +357,7 @@ class UpdateRoleInput:
     id: uuid.UUID
     name: str | None = None
     description: str | None = None
+    status: RoleStatusGQL | None = None
 
     def to_updater(self) -> Updater[RoleRow]:
         spec = RoleUpdaterSpec(
@@ -365,6 +366,11 @@ class UpdateRoleInput:
                 TriState.update(self.description)
                 if self.description is not None
                 else TriState.nop()
+            ),
+            status=(
+                OptionalState.update(self.status.to_internal())
+                if self.status is not None
+                else OptionalState.nop()
             ),
         )
         return Updater(spec=spec, pk_value=self.id)

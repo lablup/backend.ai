@@ -227,6 +227,9 @@ def test_provisioner(
     """Create SessionProvisioner with mock dependencies."""
     valkey_schedule = MagicMock()
     valkey_schedule.set_pending_queue = AsyncMock(return_value=None)
+    valkey_schedule.get_multiple_session_failed_agents = AsyncMock(
+        side_effect=lambda session_ids: [frozenset() for _ in session_ids]
+    )
 
     return SessionProvisioner(
         SessionProvisionerArgs(

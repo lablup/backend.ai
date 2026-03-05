@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Mapping, Sequence
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import datetime
@@ -1258,6 +1258,8 @@ class ScheduleCoordinator:
 
         When sessions exceed max retries, they go back to PENDING for re-scheduling.
         This also resets their kernels to PENDING and clears agent assignments.
+        Before resetting, records the current agent assignments as failed agents
+        so the scheduler can deprioritize them on retry.
 
         Args:
             handler_name: Name of the handler for logging
@@ -1265,6 +1267,28 @@ class ScheduleCoordinator:
         """
         if not session_ids:
             return
+
+        # Record current agent assignments before they are cleared by the reset.
+        # This is best-effort: Valkey issues must not block kernel resets.
+        agent_ids_by_session = await self._repository.get_agent_ids_for_sessions(session_ids)
+        record_sessions: list[SessionId] = []
+        record_tasks: list[Awaitable[None]] = []
+        for session_id, agent_ids in agent_ids_by_session.items():
+            if agent_ids:
+                record_sessions.append(session_id)
+                record_tasks.append(
+                    self._valkey_schedule.record_session_failed_agents(session_id, agent_ids)
+                )
+        if record_tasks:
+            results = await asyncio.gather(*record_tasks, return_exceptions=True)
+            for session_id, result in zip(record_sessions, results, strict=True):
+                if isinstance(result, Exception):
+                    log.warning(
+                        "{}: Failed to record failed agents for session {}: {}",
+                        handler_name,
+                        session_id,
+                        result,
+                    )
 
         reset_count = await self._kernel_state_engine.reset_kernels_to_pending_for_sessions(
             session_ids,

@@ -10,8 +10,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.types import AccessKey, AgentSelectionStrategy, ResourceSlot, SessionTypes
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupData,
     ScalingGroupDriverConfig,
@@ -39,6 +41,10 @@ from ai.backend.manager.registry import check_scaling_group
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.purger import BatchPurger
+from ai.backend.manager.repositories.base.rbac.scope_binder import (
+    RBACScopeBinder,
+    RBACScopeBindingPair,
+)
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.repositories.scaling_group.creators import (
@@ -48,9 +54,11 @@ from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupForProjectCreatorSpec,
 )
 from ai.backend.manager.repositories.scaling_group.purgers import (
-    create_scaling_group_for_domain_purger,
     create_scaling_group_for_keypairs_purger,
-    create_scaling_group_for_project_purger,
+)
+from ai.backend.manager.repositories.scaling_group.scope_binders import (
+    ResourceGroupDomainEntityUnbinder,
+    ResourceGroupProjectEntityUnbinder,
 )
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupMetadataUpdaterSpec,
@@ -419,19 +427,23 @@ class TestScalingGroupService:
         """Test associating a scaling group with domains"""
         mock_repository.associate_scaling_group_with_domains = AsyncMock(return_value=None)
 
-        bulk_creator: BulkCreator[ScalingGroupForDomainRow] = BulkCreator(
-            specs=[
-                ScalingGroupForDomainCreatorSpec(
-                    scaling_group="test-sgroup",
-                    domain="test-domain",
+        binder: RBACScopeBinder[ScalingGroupForDomainRow] = RBACScopeBinder(
+            pairs=[
+                RBACScopeBindingPair(
+                    spec=ScalingGroupForDomainCreatorSpec(
+                        scaling_group="test-sgroup",
+                        domain="test-domain",
+                    ),
+                    entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, "test-sgroup"),
+                    scope_ref=RBACElementRef(RBACElementType.DOMAIN, "test-domain"),
                 )
             ]
         )
-        action = AssociateScalingGroupWithDomainsAction(bulk_creator=bulk_creator)
+        action = AssociateScalingGroupWithDomainsAction(binder=binder)
         result = await scaling_group_service.associate_scaling_group_with_domains(action)
 
         assert result is not None
-        mock_repository.associate_scaling_group_with_domains.assert_called_once_with(bulk_creator)
+        mock_repository.associate_scaling_group_with_domains.assert_called_once_with(binder)
 
     # Disassociate with Domain Tests
 
@@ -443,15 +455,15 @@ class TestScalingGroupService:
         """Test disassociating a scaling group from domains"""
         mock_repository.disassociate_scaling_group_with_domains = AsyncMock(return_value=None)
 
-        purger = create_scaling_group_for_domain_purger(
-            scaling_group="test-sgroup",
+        unbinder = ResourceGroupDomainEntityUnbinder(
+            scaling_groups=["test-sgroup"],
             domain="test-domain",
         )
-        action = DisassociateScalingGroupWithDomainsAction(purger=purger)
+        action = DisassociateScalingGroupWithDomainsAction(unbinder=unbinder)
         result = await scaling_group_service.disassociate_scaling_group_with_domains(action)
 
         assert result is not None
-        mock_repository.disassociate_scaling_group_with_domains.assert_called_once_with(purger)
+        mock_repository.disassociate_scaling_group_with_domains.assert_called_once_with(unbinder)
 
     # Associate/Disassociate with Keypair Tests
 
@@ -514,21 +526,23 @@ class TestScalingGroupService:
         scaling_group_name = "test-scaling-group"
         project_id = uuid.uuid4()
 
-        bulk_creator: BulkCreator[ScalingGroupForProjectRow] = BulkCreator(
-            specs=[
-                ScalingGroupForProjectCreatorSpec(
-                    scaling_group=scaling_group_name,
-                    project=project_id,
+        binder: RBACScopeBinder[ScalingGroupForProjectRow] = RBACScopeBinder(
+            pairs=[
+                RBACScopeBindingPair(
+                    spec=ScalingGroupForProjectCreatorSpec(
+                        scaling_group=scaling_group_name,
+                        project=project_id,
+                    ),
+                    entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, scaling_group_name),
+                    scope_ref=RBACElementRef(RBACElementType.PROJECT, str(project_id)),
                 )
             ]
         )
-        action = AssociateScalingGroupWithUserGroupsAction(bulk_creator=bulk_creator)
+        action = AssociateScalingGroupWithUserGroupsAction(binder=binder)
         result = await scaling_group_service.associate_scaling_group_with_user_groups(action)
 
         assert result is not None
-        mock_repository.associate_scaling_group_with_user_groups.assert_called_once_with(
-            bulk_creator
-        )
+        mock_repository.associate_scaling_group_with_user_groups.assert_called_once_with(binder)
 
     async def test_disassociate_scaling_group_with_user_group_success(
         self,
@@ -536,20 +550,22 @@ class TestScalingGroupService:
         mock_repository: MagicMock,
     ) -> None:
         """Test disassociating a scaling group from a user group (project)"""
-        mock_repository.disassociate_scaling_group_with_user_group = AsyncMock(return_value=None)
+        mock_repository.disassociate_scaling_group_with_user_groups = AsyncMock(return_value=None)
 
         scaling_group_name = "test-scaling-group"
         project_id = uuid.uuid4()
 
-        purger: BatchPurger[ScalingGroupForProjectRow] = create_scaling_group_for_project_purger(
-            scaling_group=scaling_group_name,
+        unbinder = ResourceGroupProjectEntityUnbinder(
+            scaling_groups=[scaling_group_name],
             project=project_id,
         )
-        action = DisassociateScalingGroupWithUserGroupsAction(purger=purger)
+        action = DisassociateScalingGroupWithUserGroupsAction(unbinder=unbinder)
         result = await scaling_group_service.disassociate_scaling_group_with_user_groups(action)
 
         assert result is not None
-        mock_repository.disassociate_scaling_group_with_user_groups.assert_called_once_with(purger)
+        mock_repository.disassociate_scaling_group_with_user_groups.assert_called_once_with(
+            unbinder
+        )
 
 
 class TestCheckScalingGroup:
