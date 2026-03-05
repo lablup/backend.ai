@@ -16,6 +16,7 @@ from ai.backend.client.session import Session
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.cli import EnumChoice
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy, RouteTrafficStatus
 from ai.backend.common.dto.manager.deployment import (
     BlueGreenConfigInput,
@@ -424,8 +425,8 @@ def list_policies_cmd(
 
 @policy.command("info")
 @pass_ctx_obj
-@click.argument("deployment_id", type=str)
-def info_policy_cmd(ctx: CLIContext, deployment_id: str) -> None:
+@click.argument("deployment_id", type=click.UUID)
+def info_policy_cmd(ctx: CLIContext, deployment_id: UUID) -> None:
     """Display the deployment policy."""
 
     async def _run() -> None:
@@ -434,7 +435,7 @@ def info_policy_cmd(ctx: CLIContext, deployment_id: str) -> None:
         auth = HMACAuth(api_config.access_key, api_config.secret_key)
         registry = await BackendAIClientRegistry.create(v2_config, auth)
         try:
-            result = await registry.deployment.get_policy(UUID(deployment_id))
+            result = await registry.deployment.get_policy(deployment_id)
             print(
                 json.dumps(result.deployment_policy.model_dump(mode="json"), indent=2, default=str)
             )
@@ -450,10 +451,10 @@ def info_policy_cmd(ctx: CLIContext, deployment_id: str) -> None:
 
 @policy.command("create")
 @pass_ctx_obj
-@click.argument("deployment_id", type=str)
+@click.argument("deployment_id", type=click.UUID)
 @click.option(
     "--strategy",
-    type=click.Choice(["ROLLING", "BLUE_GREEN"], case_sensitive=False),
+    type=EnumChoice(DeploymentStrategy),
     required=True,
     help=(
         "Rollout strategy for new revisions. "
@@ -488,9 +489,9 @@ def info_policy_cmd(ctx: CLIContext, deployment_id: str) -> None:
     ),
 )
 @click.option(
-    "--auto-promote",
+    "--auto-promote/--no-auto-promote",
     is_flag=True,
-    default=False,
+    default=None,
     help=(
         "Automatically promote the new (green) environment to receive production traffic "
         "after the promote delay. Only applicable when --strategy is BLUE_GREEN."
@@ -502,40 +503,45 @@ def info_policy_cmd(ctx: CLIContext, deployment_id: str) -> None:
     default=None,
     help=(
         "Number of seconds to wait before auto-promoting the new environment. "
-        "Only applicable when --strategy is BLUE_GREEN and --auto-promote is set. [default: 0]"
+        "Only applicable when --strategy is BLUE_GREEN and --auto-promote is set."
     ),
 )
 def create_policy_cmd(
     ctx: CLIContext,
-    deployment_id: str,
-    strategy: str,
+    deployment_id: UUID,
+    strategy: DeploymentStrategy,
     rollback_on_failure: bool,
     max_surge: int | None,
     max_unavailable: int | None,
-    auto_promote: bool,
+    auto_promote: bool | None,
     promote_delay: int | None,
 ) -> None:
     """Create a deployment policy."""
-    strategy_enum = DeploymentStrategy(strategy)
     rolling_update = None
     blue_green = None
 
-    if strategy_enum == DeploymentStrategy.ROLLING:
-        if max_surge is None or max_unavailable is None:
-            raise click.UsageError(
-                "--max-surge and --max-unavailable are required when --strategy is ROLLING"
+    match strategy:
+        case DeploymentStrategy.ROLLING:
+            if max_surge is None or max_unavailable is None:
+                raise click.UsageError(
+                    "--max-surge and --max-unavailable are required when --strategy is ROLLING"
+                )
+            rolling_update = RollingUpdateConfigInput(
+                max_surge=max_surge,
+                max_unavailable=max_unavailable,
             )
-        rolling_update = RollingUpdateConfigInput(
-            max_surge=max_surge,
-            max_unavailable=max_unavailable,
-        )
-    elif strategy_enum == DeploymentStrategy.BLUE_GREEN:
-        if promote_delay is None:
-            raise click.UsageError("--promote-delay is required when --strategy is BLUE_GREEN")
-        blue_green = BlueGreenConfigInput(
-            auto_promote=auto_promote,
-            promote_delay_seconds=promote_delay,
-        )
+        case DeploymentStrategy.BLUE_GREEN:
+            if auto_promote is None or promote_delay is None:
+                raise click.UsageError(
+                    "--auto-promote/--no-auto-promote and --promote-delay are required "
+                    "when --strategy is BLUE_GREEN"
+                )
+            blue_green = BlueGreenConfigInput(
+                auto_promote=auto_promote,
+                promote_delay_seconds=promote_delay,
+            )
+        case _:
+            raise click.UsageError(f"Unsupported strategy: {strategy}")
 
     async def _run() -> None:
         api_config = get_config()
@@ -544,12 +550,12 @@ def create_policy_cmd(
         registry = await BackendAIClientRegistry.create(v2_config, auth)
         try:
             request = CreateDeploymentPolicyRequest(
-                strategy=strategy_enum,
+                strategy=strategy,
                 rollback_on_failure=rollback_on_failure,
                 rolling_update=rolling_update,
                 blue_green=blue_green,
             )
-            result = await registry.deployment.create_policy(UUID(deployment_id), request)
+            result = await registry.deployment.create_policy(deployment_id, request)
             print_done(f"Deployment policy created for: {deployment_id}")
             print(
                 json.dumps(result.deployment_policy.model_dump(mode="json"), indent=2, default=str)
@@ -566,10 +572,10 @@ def create_policy_cmd(
 
 @policy.command("update")
 @pass_ctx_obj
-@click.argument("deployment_id", type=str)
+@click.argument("deployment_id", type=click.UUID)
 @click.option(
     "--strategy",
-    type=click.Choice(["ROLLING", "BLUE_GREEN"], case_sensitive=False),
+    type=EnumChoice(DeploymentStrategy),
     default=None,
     help=(
         "Change the rollout strategy. "
@@ -606,9 +612,9 @@ def create_policy_cmd(
     ),
 )
 @click.option(
-    "--auto-promote",
+    "--auto-promote/--no-auto-promote",
     is_flag=True,
-    default=False,
+    default=None,
     help=(
         "Automatically promote the new (green) environment to receive production traffic "
         "after the promote delay. Only applicable when strategy is BLUE_GREEN."
@@ -625,16 +631,15 @@ def create_policy_cmd(
 )
 def update_policy_cmd(
     ctx: CLIContext,
-    deployment_id: str,
-    strategy: str | None,
+    deployment_id: UUID,
+    strategy: DeploymentStrategy | None,
     rollback_on_failure: bool | None,
     max_surge: int | None,
     max_unavailable: int | None,
-    auto_promote: bool,
+    auto_promote: bool | None,
     promote_delay: int | None,
 ) -> None:
     """Update a deployment policy. Only provided fields are updated."""
-    strategy_enum = DeploymentStrategy(strategy) if strategy else None
     rolling_update = None
     blue_green = None
 
@@ -647,9 +652,11 @@ def update_policy_cmd(
             max_surge=max_surge,
             max_unavailable=max_unavailable,
         )
-    if auto_promote or promote_delay is not None:
-        if promote_delay is None:
-            raise click.UsageError("--promote-delay is required when --auto-promote is set")
+    if auto_promote is not None or promote_delay is not None:
+        if auto_promote is None or promote_delay is None:
+            raise click.UsageError(
+                "--auto-promote/--no-auto-promote and --promote-delay must both be provided together"
+            )
         blue_green = BlueGreenConfigInput(
             auto_promote=auto_promote,
             promote_delay_seconds=promote_delay,
@@ -662,12 +669,12 @@ def update_policy_cmd(
         registry = await BackendAIClientRegistry.create(v2_config, auth)
         try:
             request = UpdateDeploymentPolicyRequest(
-                strategy=strategy_enum,
+                strategy=strategy,
                 rollback_on_failure=rollback_on_failure,
                 rolling_update=rolling_update,
                 blue_green=blue_green,
             )
-            result = await registry.deployment.update_policy(UUID(deployment_id), request)
+            result = await registry.deployment.update_policy(deployment_id, request)
             print_done(f"Deployment policy updated for: {deployment_id}")
             print(
                 json.dumps(result.deployment_policy.model_dump(mode="json"), indent=2, default=str)
