@@ -1315,7 +1315,12 @@ class ScheduleDBSource:
                     element_type=RBACElementType.USER,
                     element_id=str(session_data.user_uuid),
                 ),
-                additional_scope_refs=[],
+                additional_scope_refs=[
+                    RBACElementRef(
+                        element_type=RBACElementType.PROJECT,
+                        element_id=str(session_data.group_id),
+                    )
+                ],
             )
             await execute_rbac_entity_creator(db_sess, rbac_creator)
 
