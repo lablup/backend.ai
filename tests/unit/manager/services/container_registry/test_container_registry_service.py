@@ -25,7 +25,11 @@ from ai.backend.manager.data.image.types import (
     ImageStatus,
     ImageType,
 )
-from ai.backend.manager.errors.image import ContainerRegistryNotFound
+from ai.backend.manager.errors.image import (
+    ContainerRegistryNotFound,
+    ContainerRegistryWebhookAuthorizationFailed,
+    HarborWebhookContainerRegistryRowNotFound,
+)
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -35,6 +39,10 @@ from ai.backend.manager.repositories.container_registry.repository import (
 from ai.backend.manager.services.container_registry.actions.clear_images import ClearImagesAction
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
+)
+from ai.backend.manager.services.container_registry.actions.handle_harbor_webhook import (
+    HandleHarborWebhookAction,
+    HarborWebhookResourceInput,
 )
 from ai.backend.manager.services.container_registry.actions.load_all_container_registries import (
     LoadAllContainerRegistriesAction,
@@ -839,3 +847,203 @@ class TestSearchContainerRegistries:
 
         assert result.data == [sample_registry_data]
         assert result.total_count == 1
+
+
+# ==================== HandleHarborWebhook Tests ====================
+
+
+class TestHandleHarborWebhook:
+    """Test cases for ContainerRegistryService.handle_harbor_webhook"""
+
+    async def test_push_artifact_with_valid_auth_triggers_scan(
+        self,
+        container_registry_service: ContainerRegistryService,
+        mock_container_registry_repository: MagicMock,
+        sample_registry_row: MagicMock,
+    ) -> None:
+        """PUSH_ARTIFACT with valid auth triggers image scan."""
+        sample_registry_row.extra = {"webhook_auth_header": "Bearer secret123"}
+        sample_registry_row.registry_name = "registry.example.com"
+        mock_container_registry_repository.get_registry_by_url_and_project = AsyncMock(
+            return_value=sample_registry_row
+        )
+
+        action = HandleHarborWebhookAction(
+            event_type="PUSH_ARTIFACT",
+            resources=[
+                HarborWebhookResourceInput(
+                    resource_url="registry.example.com/test-project/python", tag="3.9"
+                )
+            ],
+            project="test-project",
+            img_name="python",
+            auth_header="Bearer secret123",
+        )
+
+        with patch(
+            "ai.backend.manager.services.container_registry.service.HarborRegistry_v2"
+        ) as mock_scanner_cls:
+            mock_scanner = AsyncMock()
+            mock_scanner_cls.return_value = mock_scanner
+
+            result = await container_registry_service.handle_harbor_webhook(action)
+
+            assert result is not None
+            mock_scanner.scan_single_ref.assert_called_once_with("test-project/python:3.9")
+
+    async def test_no_auth_header_proceeds_when_not_required(
+        self,
+        container_registry_service: ContainerRegistryService,
+        mock_container_registry_repository: MagicMock,
+        sample_registry_row: MagicMock,
+    ) -> None:
+        """No auth header proceeds if auth is not required."""
+        sample_registry_row.extra = {}
+        sample_registry_row.registry_name = "registry.example.com"
+        mock_container_registry_repository.get_registry_by_url_and_project = AsyncMock(
+            return_value=sample_registry_row
+        )
+
+        action = HandleHarborWebhookAction(
+            event_type="PUSH_ARTIFACT",
+            resources=[
+                HarborWebhookResourceInput(
+                    resource_url="registry.example.com/test-project/python", tag="3.9"
+                )
+            ],
+            project="test-project",
+            img_name="python",
+            auth_header=None,
+        )
+
+        with patch(
+            "ai.backend.manager.services.container_registry.service.HarborRegistry_v2"
+        ) as mock_scanner_cls:
+            mock_scanner = AsyncMock()
+            mock_scanner_cls.return_value = mock_scanner
+
+            result = await container_registry_service.handle_harbor_webhook(action)
+
+            assert result is not None
+            mock_scanner.scan_single_ref.assert_called_once()
+
+    async def test_invalid_auth_raises_authorization_failed(
+        self,
+        container_registry_service: ContainerRegistryService,
+        mock_container_registry_repository: MagicMock,
+        sample_registry_row: MagicMock,
+    ) -> None:
+        """Invalid auth header raises ContainerRegistryWebhookAuthorizationFailed."""
+        sample_registry_row.extra = {"webhook_auth_header": "Bearer correct-token"}
+        sample_registry_row.registry_name = "registry.example.com"
+        mock_container_registry_repository.get_registry_by_url_and_project = AsyncMock(
+            return_value=sample_registry_row
+        )
+
+        action = HandleHarborWebhookAction(
+            event_type="PUSH_ARTIFACT",
+            resources=[
+                HarborWebhookResourceInput(
+                    resource_url="registry.example.com/project/img", tag="latest"
+                )
+            ],
+            project="project",
+            img_name="img",
+            auth_header="Bearer wrong-token",
+        )
+
+        with pytest.raises(ContainerRegistryWebhookAuthorizationFailed):
+            await container_registry_service.handle_harbor_webhook(action)
+
+    async def test_non_push_artifact_event_ignored(
+        self,
+        container_registry_service: ContainerRegistryService,
+        mock_container_registry_repository: MagicMock,
+        sample_registry_row: MagicMock,
+    ) -> None:
+        """Non-PUSH_ARTIFACT events are ignored (log only)."""
+        sample_registry_row.extra = {}
+        sample_registry_row.registry_name = "registry.example.com"
+        mock_container_registry_repository.get_registry_by_url_and_project = AsyncMock(
+            return_value=sample_registry_row
+        )
+
+        action = HandleHarborWebhookAction(
+            event_type="DELETE_ARTIFACT",
+            resources=[
+                HarborWebhookResourceInput(
+                    resource_url="registry.example.com/project/img", tag="latest"
+                )
+            ],
+            project="project",
+            img_name="img",
+            auth_header=None,
+        )
+
+        result = await container_registry_service.handle_harbor_webhook(action)
+
+        assert result is not None
+
+    async def test_nonexistent_registry_raises_not_found(
+        self,
+        container_registry_service: ContainerRegistryService,
+        mock_container_registry_repository: MagicMock,
+    ) -> None:
+        """Non-existent registry URL raises HarborWebhookContainerRegistryRowNotFound."""
+        mock_container_registry_repository.get_registry_by_url_and_project = AsyncMock(
+            return_value=None
+        )
+
+        action = HandleHarborWebhookAction(
+            event_type="PUSH_ARTIFACT",
+            resources=[
+                HarborWebhookResourceInput(
+                    resource_url="unknown.registry.com/project/img", tag="latest"
+                )
+            ],
+            project="project",
+            img_name="img",
+        )
+
+        with pytest.raises(HarborWebhookContainerRegistryRowNotFound):
+            await container_registry_service.handle_harbor_webhook(action)
+
+    async def test_multiple_resources_processed_sequentially(
+        self,
+        container_registry_service: ContainerRegistryService,
+        mock_container_registry_repository: MagicMock,
+        sample_registry_row: MagicMock,
+    ) -> None:
+        """Multiple resources are processed sequentially."""
+        sample_registry_row.extra = {}
+        sample_registry_row.registry_name = "registry.example.com"
+        mock_container_registry_repository.get_registry_by_url_and_project = AsyncMock(
+            return_value=sample_registry_row
+        )
+
+        action = HandleHarborWebhookAction(
+            event_type="PUSH_ARTIFACT",
+            resources=[
+                HarborWebhookResourceInput(
+                    resource_url="registry.example.com/project/img", tag="v1"
+                ),
+                HarborWebhookResourceInput(
+                    resource_url="registry.example.com/project/img", tag="v2"
+                ),
+            ],
+            project="project",
+            img_name="img",
+            auth_header=None,
+        )
+
+        with patch(
+            "ai.backend.manager.services.container_registry.service.HarborRegistry_v2"
+        ) as mock_scanner_cls:
+            mock_scanner = AsyncMock()
+            mock_scanner_cls.return_value = mock_scanner
+
+            await container_registry_service.handle_harbor_webhook(action)
+
+            assert mock_scanner.scan_single_ref.call_count == 2
+            mock_scanner.scan_single_ref.assert_any_call("project/img:v1")
+            mock_scanner.scan_single_ref.assert_any_call("project/img:v2")

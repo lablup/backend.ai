@@ -25,6 +25,7 @@ from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupStatus,
     SchedulerType,
 )
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import (
     ScalingGroupNotFound,
     ScalingGroupSessionTypeNotAllowed,
@@ -83,6 +84,12 @@ from ai.backend.manager.services.scaling_group.actions.disassociate_with_keypair
 )
 from ai.backend.manager.services.scaling_group.actions.disassociate_with_user_group import (
     DisassociateScalingGroupWithUserGroupsAction,
+)
+from ai.backend.manager.services.scaling_group.actions.get_wsproxy_version import (
+    GetWsproxyVersionAction,
+)
+from ai.backend.manager.services.scaling_group.actions.list_allowed import (
+    ListAllowedScalingGroupsAction,
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
@@ -651,3 +658,266 @@ class TestCheckScalingGroup:
                     group_id="test-group-id",
                 )
             assert exc_info.value.status_code == 404
+
+
+class TestGetWsproxyVersion:
+    """Tests for ScalingGroupService.get_wsproxy_version"""
+
+    @pytest.fixture
+    def mock_repository(self) -> MagicMock:
+        return MagicMock(spec=ScalingGroupRepository)
+
+    @pytest.fixture
+    def mock_appproxy_client_pool(self) -> MagicMock:
+        return MagicMock()
+
+    @pytest.fixture
+    def scaling_group_service(
+        self,
+        mock_repository: MagicMock,
+        mock_appproxy_client_pool: MagicMock,
+    ) -> ScalingGroupService:
+        return ScalingGroupService(
+            repository=mock_repository,
+            appproxy_client_pool=mock_appproxy_client_pool,
+        )
+
+    @pytest.fixture
+    def sample_sgroup_with_wsproxy(self) -> ScalingGroupData:
+        return ScalingGroupData(
+            name="gpu-group",
+            status=ScalingGroupStatus(is_active=True, is_public=True),
+            metadata=ScalingGroupMetadata(
+                description="GPU group",
+                created_at=datetime.now(tz=UTC),
+            ),
+            network=ScalingGroupNetworkConfig(
+                wsproxy_addr="http://wsproxy:5000",
+                wsproxy_api_token="test-token",
+                use_host_network=False,
+            ),
+            driver=ScalingGroupDriverConfig(name="static", options={}),
+            scheduler=ScalingGroupSchedulerConfig(
+                name=SchedulerType.FIFO,
+                options=ScalingGroupSchedulerOptions(
+                    allowed_session_types=[SessionTypes.INTERACTIVE],
+                    pending_timeout=timedelta(seconds=0),
+                    config={},
+                    agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
+                    agent_selector_config={},
+                    enforce_spreading_endpoint_replica=False,
+                    allow_fractional_resource_fragmentation=True,
+                    route_cleanup_target_statuses=["unhealthy"],
+                ),
+            ),
+            fair_share_spec=FairShareScalingGroupSpec(
+                half_life_days=7,
+                lookback_days=28,
+                decay_unit_days=1,
+                default_weight=Decimal("1.0"),
+                resource_weights=ResourceSlot(),
+            ),
+        )
+
+    async def test_accessible_scaling_group_returns_version(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+        mock_appproxy_client_pool: MagicMock,
+        sample_sgroup_with_wsproxy: ScalingGroupData,
+    ) -> None:
+        """Accessible scaling group returns wsproxy version string."""
+        mock_repository.list_allowed_sgroups = AsyncMock(return_value=[sample_sgroup_with_wsproxy])
+        mock_client = AsyncMock()
+        mock_status = MagicMock()
+        mock_status.api_version = "v2.0.0"
+        mock_client.fetch_status = AsyncMock(return_value=mock_status)
+        mock_appproxy_client_pool.load_client.return_value = mock_client
+
+        action = GetWsproxyVersionAction(
+            scaling_group_name="gpu-group",
+            domain_name="default",
+            group="default",
+            access_key="AKTEST123",
+        )
+
+        result = await scaling_group_service.get_wsproxy_version(action)
+
+        assert result.wsproxy_version == "v2.0.0"
+        mock_appproxy_client_pool.load_client.assert_called_once_with(
+            "http://wsproxy:5000", "test-token"
+        )
+
+    async def test_non_allowed_group_raises_object_not_found(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Non-allowed scaling group raises ObjectNotFound."""
+        mock_repository.list_allowed_sgroups = AsyncMock(return_value=[])
+
+        action = GetWsproxyVersionAction(
+            scaling_group_name="nonexistent-group",
+            domain_name="default",
+            group="default",
+            access_key="AKTEST123",
+        )
+
+        with pytest.raises(ObjectNotFound):
+            await scaling_group_service.get_wsproxy_version(action)
+
+    async def test_wsproxy_addr_not_set_raises_object_not_found(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+        sample_sgroup_with_wsproxy: ScalingGroupData,
+    ) -> None:
+        """wsproxy_addr not set raises ObjectNotFound."""
+        no_wsproxy = ScalingGroupData(
+            name="gpu-group",
+            status=sample_sgroup_with_wsproxy.status,
+            metadata=sample_sgroup_with_wsproxy.metadata,
+            network=ScalingGroupNetworkConfig(
+                wsproxy_addr="",
+                wsproxy_api_token="",
+                use_host_network=False,
+            ),
+            driver=sample_sgroup_with_wsproxy.driver,
+            scheduler=sample_sgroup_with_wsproxy.scheduler,
+            fair_share_spec=sample_sgroup_with_wsproxy.fair_share_spec,
+        )
+        mock_repository.list_allowed_sgroups = AsyncMock(return_value=[no_wsproxy])
+
+        action = GetWsproxyVersionAction(
+            scaling_group_name="gpu-group",
+            domain_name="default",
+            group="default",
+            access_key="AKTEST123",
+        )
+
+        with pytest.raises(ObjectNotFound):
+            await scaling_group_service.get_wsproxy_version(action)
+
+    async def test_appproxy_pool_none_raises_object_not_found(
+        self,
+        mock_repository: MagicMock,
+    ) -> None:
+        """AppProxy client pool not available raises ObjectNotFound."""
+        service = ScalingGroupService(repository=mock_repository, appproxy_client_pool=None)
+
+        action = GetWsproxyVersionAction(
+            scaling_group_name="gpu-group",
+            domain_name="default",
+            group="default",
+            access_key="AKTEST123",
+        )
+
+        with pytest.raises(ObjectNotFound):
+            await service.get_wsproxy_version(action)
+
+
+class TestListAllowedScalingGroups:
+    """Tests for ScalingGroupService.list_allowed_sgroups"""
+
+    @pytest.fixture
+    def mock_repository(self) -> MagicMock:
+        return MagicMock(spec=ScalingGroupRepository)
+
+    @pytest.fixture
+    def scaling_group_service(self, mock_repository: MagicMock) -> ScalingGroupService:
+        return ScalingGroupService(repository=mock_repository)
+
+    def _make_sgroup(self, name: str, *, is_public: bool = True) -> ScalingGroupData:
+        return ScalingGroupData(
+            name=name,
+            status=ScalingGroupStatus(is_active=True, is_public=is_public),
+            metadata=ScalingGroupMetadata(
+                description=f"{name} group",
+                created_at=datetime.now(tz=UTC),
+            ),
+            network=ScalingGroupNetworkConfig(
+                wsproxy_addr="", wsproxy_api_token="", use_host_network=False
+            ),
+            driver=ScalingGroupDriverConfig(name="static", options={}),
+            scheduler=ScalingGroupSchedulerConfig(
+                name=SchedulerType.FIFO,
+                options=ScalingGroupSchedulerOptions(
+                    allowed_session_types=[SessionTypes.INTERACTIVE],
+                    pending_timeout=timedelta(seconds=0),
+                    config={},
+                    agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
+                    agent_selector_config={},
+                    enforce_spreading_endpoint_replica=False,
+                    allow_fractional_resource_fragmentation=True,
+                    route_cleanup_target_statuses=["unhealthy"],
+                ),
+            ),
+            fair_share_spec=FairShareScalingGroupSpec(
+                half_life_days=7,
+                lookback_days=28,
+                decay_unit_days=1,
+                default_weight=Decimal("1.0"),
+                resource_weights=ResourceSlot(),
+            ),
+        )
+
+    async def test_admin_returns_all_groups(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Admin returns all groups including private."""
+        public_sg = self._make_sgroup("public-group", is_public=True)
+        private_sg = self._make_sgroup("private-group", is_public=False)
+        mock_repository.list_allowed_sgroups = AsyncMock(return_value=[public_sg, private_sg])
+
+        action = ListAllowedScalingGroupsAction(
+            domain_name="default",
+            group="default",
+            access_key="AKTEST123",
+            is_admin=True,
+        )
+
+        result = await scaling_group_service.list_allowed_sgroups(action)
+
+        assert set(result.scaling_group_names) == {"public-group", "private-group"}
+
+    async def test_non_admin_returns_public_only(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Non-admin returns only public groups."""
+        public_sg = self._make_sgroup("public-group", is_public=True)
+        private_sg = self._make_sgroup("private-group", is_public=False)
+        mock_repository.list_allowed_sgroups = AsyncMock(return_value=[public_sg, private_sg])
+
+        action = ListAllowedScalingGroupsAction(
+            domain_name="default",
+            group="default",
+            access_key="AKTEST123",
+            is_admin=False,
+        )
+
+        result = await scaling_group_service.list_allowed_sgroups(action)
+
+        assert result.scaling_group_names == ["public-group"]
+
+    async def test_no_allowed_groups_returns_empty(
+        self,
+        scaling_group_service: ScalingGroupService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """No allowed groups returns empty list."""
+        mock_repository.list_allowed_sgroups = AsyncMock(return_value=[])
+
+        action = ListAllowedScalingGroupsAction(
+            domain_name="default",
+            group="default",
+            access_key="AKTEST123",
+            is_admin=False,
+        )
+
+        result = await scaling_group_service.list_allowed_sgroups(action)
+
+        assert result.scaling_group_names == []
