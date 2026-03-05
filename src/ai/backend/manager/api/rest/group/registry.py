@@ -7,17 +7,16 @@ from typing import TYPE_CHECKING
 from ai.backend.manager.api.rest.middleware.auth import superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
+from .handler import GroupHandler
+
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_group_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_group_routes(handler: GroupHandler, route_deps: RouteDeps) -> RouteRegistry:
     """Build the group sub-application."""
-    # Import handler inside function to avoid circular imports
-    from .handler import GroupHandler
 
-    reg = RouteRegistry.create("group", deps.cors_options)
-    handler = GroupHandler(processors=deps.processors)
+    reg = RouteRegistry.create("group", route_deps.cors_options)
 
     reg.add(
         "POST",

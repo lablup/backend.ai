@@ -54,6 +54,8 @@ from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.error_log.service import ErrorLogService
 from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
 from ai.backend.manager.services.etcd_config.service import EtcdConfigService
+from ai.backend.manager.services.events.processors import EventsProcessors
+from ai.backend.manager.services.events.service import EventsService
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.export.service import ExportService
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
@@ -116,6 +118,8 @@ from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
 from ai.backend.manager.services.storage_namespace.service import StorageNamespaceService
+from ai.backend.manager.services.stream.processors import StreamProcessors
+from ai.backend.manager.services.stream.service import StreamService
 from ai.backend.manager.services.template.processors import TemplateProcessors
 from ai.backend.manager.services.template.service import TemplateService
 from ai.backend.manager.services.user.processors import UserProcessors
@@ -215,6 +219,8 @@ class Services:
     scheduling_history: SchedulingHistoryService
     service_catalog: ServiceCatalogService
     template: TemplateService
+    stream: StreamService
+    events: EventsService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -433,6 +439,17 @@ class Services:
         template_service = TemplateService(
             repository=repositories.template.repository,
         )
+        stream_service = StreamService(
+            repository=repositories.stream.repository,
+            registry=args.agent_registry,
+            valkey_live=args.valkey_live,
+            idle_checker_host=args.idle_checker_host,
+            etcd=args.etcd,
+        )
+        events_service = EventsService(
+            repository=repositories.events.repository,
+            db=args.db,
+        )
 
         return cls(
             agent=agent_service,
@@ -478,12 +495,16 @@ class Services:
             scheduling_history=scheduling_history_service,
             service_catalog=service_catalog_service,
             template=template_service,
+            stream=stream_service,
+            events=events_service,
         )
 
 
 @dataclass
 class ProcessorArgs:
     service_args: ServiceArgs
+    event_hub: EventHub
+    event_fetcher: EventFetcher
 
 
 @dataclass
@@ -531,6 +552,8 @@ class Processors(AbstractProcessorPackage):
     scheduling_history: SchedulingHistoryProcessors
     service_catalog: ServiceCatalogProcessors
     template: TemplateProcessors
+    stream: StreamProcessors
+    events: EventsProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -616,6 +639,13 @@ class Processors(AbstractProcessorPackage):
             services.service_catalog, action_monitors
         )
         template_processors = TemplateProcessors(services.template, action_monitors)
+        stream_processors = StreamProcessors(services.stream, action_monitors)
+        events_processors = EventsProcessors(
+            services.events,
+            action_monitors,
+            event_hub=args.event_hub,
+            event_fetcher=args.event_fetcher,
+        )
 
         return cls(
             agent=agent_processors,
@@ -661,6 +691,8 @@ class Processors(AbstractProcessorPackage):
             scheduling_history=scheduling_history_processors,
             service_catalog=service_catalog_processors,
             template=template_processors,
+            stream=stream_processors,
+            events=events_processors,
         )
 
     @override
@@ -709,4 +741,6 @@ class Processors(AbstractProcessorPackage):
             *self.scheduling_history.supported_actions(),
             *self.service_catalog.supported_actions(),
             *self.template.supported_actions(),
+            *self.stream.supported_actions(),
+            *self.events.supported_actions(),
         ]

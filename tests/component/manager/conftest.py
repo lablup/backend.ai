@@ -13,11 +13,9 @@ import tempfile
 import textwrap
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Mapping, Sequence
-from contextlib import AbstractAsyncContextManager
-from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from decimal import Decimal
-from functools import partial, update_wrapper
+from functools import partial
 from pathlib import Path
 from typing import Any, Protocol
 from unittest.mock import AsyncMock, MagicMock
@@ -36,17 +34,7 @@ from sqlalchemy.ext.asyncio.engine import create_async_engine
 
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError
-from ai.backend.common.configs.loader import (
-    ConfigOverrider,
-    EtcdConfigLoader,
-    EtcdConfigWatcher,
-    LoaderChain,
-    TomlConfigLoader,
-)
-from ai.backend.common.configs.loader.types import AbstractConfigLoader
-from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.typed_validators import HostPortPair
@@ -55,30 +43,41 @@ from ai.backend.common.types import ResourceSlot, SessionId
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
+from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.compute_sessions.handler import ComputeSessionsHandler
 from ai.backend.manager.api.rest.compute_sessions.registry import register_compute_sessions_routes
+from ai.backend.manager.api.rest.etcd.handler import EtcdHandler
 from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
+from ai.backend.manager.api.rest.events.handler import EventsHandler
 from ai.backend.manager.api.rest.events.registry import register_events_routes
+from ai.backend.manager.api.rest.manager.handler import ManagerHandler
 from ai.backend.manager.api.rest.manager.registry import register_manager_api_routes
 from ai.backend.manager.api.rest.ratelimit.registry import register_ratelimit_routes
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.server_status import (
+    ALL_ALLOWED,
+    READ_ALLOWED,
+    server_status_required,
+)
+from ai.backend.manager.api.rest.stream.handler import StreamHandler
 from ai.backend.manager.api.rest.stream.registry import register_stream_routes
-from ai.backend.manager.api.rest.types import ModuleDeps, ModuleRegistrar
+from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.api.rest.vfolder.handler import VFolderHandler
 from ai.backend.manager.api.rest.vfolder.registry import register_vfolder_routes
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
 from ai.backend.manager.config.bootstrap import BootstrapConfig
-from ai.backend.manager.config.loader.legacy_etcd_loader import (
-    LegacyEtcdLoader,
-    LegacyEtcdVolumesLoader,
-)
+from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import StreamCleanupEventHandler
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.base import (
     pgsql_connect_opts,
@@ -107,7 +106,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, connect_datab
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.server import build_root_app, register_modules
+from ai.backend.manager.server import build_root_app, mount_registries
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
@@ -116,63 +115,6 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
 from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger(__name__)
-
-
-@actxmgr
-async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncIterator[None]:
-    async with AsyncEtcd.create_from_config(etcd_config) as etcd:
-        root_ctx.etcd = etcd
-        yield
-
-
-@actxmgr
-async def config_provider_ctx(
-    root_ctx: RootContext,
-    log_level: LogLevel,
-    config_path: Path | None = None,
-    extra_config: Mapping[str, Any] | None = None,
-) -> AsyncIterator[ManagerConfigProvider]:
-    loaders: list[AbstractConfigLoader] = []
-
-    if config_path:
-        toml_config_loader = TomlConfigLoader(config_path, "manager")
-        loaders.append(toml_config_loader)
-    else:
-        log.warning("No config file path specified. Skipped loading toml config file...")
-
-    legacy_etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
-    loaders.append(legacy_etcd_loader)
-    loaders.append(LegacyEtcdVolumesLoader(root_ctx.etcd))
-    loaders.append(EtcdConfigLoader(root_ctx.etcd, prefix="ai/backend/config/common"))
-    loaders.append(EtcdConfigLoader(root_ctx.etcd, prefix="ai/backend/config/manager"))
-
-    overrides: list[tuple[tuple[str, ...], Any]] = [
-        (("debug", "enabled"), log_level == LogLevel.DEBUG),
-    ]
-    if log_level != LogLevel.NOTSET:
-        overrides += [
-            (("logging", "level"), log_level),
-            (("logging", "pkg-ns", "ai.backend"), log_level),
-        ]
-
-    loaders.append(ConfigOverrider(overrides))
-
-    unified_config_loader = LoaderChain(loaders, base_config=extra_config)
-    etcd_watcher = EtcdConfigWatcher(root_ctx.etcd)
-
-    config_provider: ManagerConfigProvider | None = None
-    config_provider = await ManagerConfigProvider.create(
-        unified_config_loader,
-        etcd_watcher,
-        legacy_etcd_loader,
-    )
-    root_ctx.config_provider = config_provider
-
-    try:
-        yield root_ctx.config_provider
-    finally:
-        if config_provider:
-            await config_provider.terminate()
 
 
 def create_test_password_info(password: str = "test_password") -> PasswordInfo:
@@ -195,9 +137,8 @@ class AppBuilder(Protocol):
 
     async def __call__(
         self,
-        cleanup_contexts: Sequence[Callable[[RootContext], AbstractAsyncContextManager[None]]]
-        | None = None,
-        registrars: Sequence[ModuleRegistrar] | None = None,
+        *,
+        registries: Sequence[RouteRegistry] | None = None,
         scheduler_opts: Mapping[str, Any] | None = None,
     ) -> tuple[web.Application, Client]: ...
 
@@ -384,42 +325,53 @@ def bootstrap_config(
         pass
 
 
-@pytest.fixture(scope="session")
-def mock_etcd_ctx(
+class _TestConfigProvider(ManagerConfigProvider):
+    """Test-only subclass that provides a ManagerUnifiedConfig directly,
+    bypassing the production LoaderChain / TOML parsing / etcd watcher pipeline.
+
+    Only the ``config`` property is functional; production-only attributes
+    (_loader, _etcd_watcher, _legacy_etcd_config_loader) are not initialized.
+    """
+
+    def __init__(self, config: ManagerUnifiedConfig) -> None:
+        # Intentionally skip super().__init__() to avoid requiring
+        # LoaderChain, EtcdConfigWatcher, and LegacyEtcdLoader dependencies
+        # that are irrelevant in the test environment.
+        self._config = config
+        self._etcd_watcher_task = None
+        mock_etcd_loader = MagicMock()
+        mock_etcd_loader.get_manager_status = AsyncMock(return_value=ManagerStatus.RUNNING)
+        mock_etcd_loader.get_allowed_origins = AsyncMock(return_value=None)
+        self._legacy_etcd_config_loader = mock_etcd_loader
+
+
+@pytest.fixture()
+def config_provider(
     bootstrap_config: BootstrapConfig,
-) -> Any:
-    argument_binding_ctx = partial(etcd_ctx, etcd_config=bootstrap_config.etcd.to_dataclass())
-    update_wrapper(argument_binding_ctx, etcd_ctx)
-    return argument_binding_ctx
+    redis_container: Any,  # noqa: F811
+) -> _TestConfigProvider:
+    """Provide a ManagerConfigProvider for tests without the full LoaderChain pipeline."""
+    redis_addr = redis_container[1]
+    unified_config = ManagerUnifiedConfig.model_validate({
+        "db": bootstrap_config.db,
+        "etcd": bootstrap_config.etcd,
+        "manager": bootstrap_config.manager,
+        "logging": bootstrap_config.logging,
+        "pyroscope": bootstrap_config.pyroscope,
+        "debug": bootstrap_config.debug,
+        "redis": {"addr": {"host": redis_addr.host, "port": redis_addr.port}},
+    })
+    return _TestConfigProvider(unified_config)
 
 
-@pytest.fixture
-def event_dispatcher_test_ctx() -> Callable[[RootContext], AbstractAsyncContextManager[None]]:
-    # TODO: Remove this fixture when the root context is refactored
-    @actxmgr
-    async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-        root_ctx.event_dispatcher = EventDispatcher(
-            root_ctx.message_queue,
-            log_events=root_ctx.config_provider.config.debug.log_events,
-            event_observer=root_ctx.metrics.event,
-        )
-        await root_ctx.event_dispatcher.start()
-        yield
-        await root_ctx.event_dispatcher.close()
-
-    return event_dispatcher_ctx
-
-
-@pytest.fixture(scope="session")
-def mock_config_provider_ctx(
-    bootstrap_config: BootstrapConfig,
-) -> Any:
-    base_cfg = bootstrap_config.model_dump()
-    argument_binding_ctx = partial(
-        config_provider_ctx, log_level=LogLevel.DEBUG, config_path=None, extra_config=base_cfg
+@pytest.fixture()
+def route_deps(config_provider: _TestConfigProvider) -> RouteDeps:
+    """Shared routing context for test registrar calls."""
+    return RouteDeps(
+        cors_options={},
+        read_status_mw=server_status_required(READ_ALLOWED, config_provider),
+        all_status_mw=server_status_required(ALL_ALLOWED, config_provider),
     )
-    update_wrapper(argument_binding_ctx, config_provider_ctx)
-    return argument_binding_ctx
 
 
 @pytest.fixture(scope="session")
@@ -506,12 +458,10 @@ def local_config(bootstrap_config: BootstrapConfig) -> dict[str, Any]:
 
 @pytest.fixture
 async def unified_config(
-    app: web.Application, bootstrap_config: BootstrapConfig, etcd_fixture: None
+    bootstrap_config: BootstrapConfig, etcd_fixture: None
 ) -> AsyncIterator[ManagerUnifiedConfig]:
-    root_ctx: RootContext = app["_root.context"]
     async with AsyncEtcd.create_from_config(bootstrap_config.etcd.to_dataclass()) as etcd:
-        root_ctx.etcd = etcd
-        etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
+        etcd_loader = LegacyEtcdLoader(etcd)
         raw_config = await etcd_loader.load()
         merged_config = {**bootstrap_config.model_dump(), **raw_config}
         unified_config = ManagerUnifiedConfig(**merged_config)
@@ -808,87 +758,54 @@ async def app(bootstrap_config: BootstrapConfig) -> web.Application:
     return build_root_app(
         0,
         bootstrap_config,
-        cleanup_contexts=[],
-        subapp_pkgs=[],
     )
 
 
 @pytest.fixture
 async def create_app_and_client(
     bootstrap_config: BootstrapConfig,
-    server_module_deps_factory: Callable[[RootContext], ModuleDeps],
+    config_provider: _TestConfigProvider,
 ) -> AsyncIterator[AppBuilder]:
     client: Client | None = None
     client_session: aiohttp.ClientSession | None = None
     runner: web.BaseRunner | None = None
-    _outer_ctxs: list[AbstractAsyncContextManager[Any, Any]] = []
 
     async def app_builder(
-        cleanup_contexts: Sequence[Callable[[RootContext], AbstractAsyncContextManager[None]]]
-        | None = None,
-        registrars: Sequence[ModuleRegistrar] | None = None,
+        *,
+        registries: Sequence[RouteRegistry] | None = None,
         scheduler_opts: Mapping[str, Any] | None = None,
     ) -> tuple[web.Application, Client]:
         nonlocal client, client_session, runner
-        nonlocal _outer_ctxs
 
         if scheduler_opts is None:
             scheduler_opts = {}
 
-        all_registrars = list(registrars or [])
-
-        _cleanup_ctxs: list[Callable[[RootContext], AbstractAsyncContextManager[None]]] = []
-        _outer_ctx_classes: list[type[AbstractAsyncContextManager[Any, Any]]] = []
-        if cleanup_contexts is not None:
-            for ctx in cleanup_contexts:
-                # if isinstance(ctx, AbstractAsyncContextManager):
-                if ctx.__name__ in ["webapp_plugins_ctx"]:
-                    _outer_ctx_classes.append(ctx)  # type: ignore
-                else:
-                    _cleanup_ctxs.append(ctx)
-
         app = build_root_app(
             0,
             bootstrap_config,
-            cleanup_contexts=[],
-            subapp_pkgs=[],
             scheduler_opts={
                 "close_timeout": 10,
                 **scheduler_opts,
             },
         )
-        root_ctx: RootContext = app["_root.context"]
-        for octx_cls in _outer_ctx_classes:
-            octx = octx_cls(root_ctx)  # type: ignore
-            _outer_ctxs.append(octx)
-            await octx.__aenter__()
 
-        # Run cleanup contexts manually (before router freeze).
-        for cctx in _cleanup_ctxs:
-            octx = cctx(root_ctx)
-            _outer_ctxs.append(octx)
-            await octx.__aenter__()
-
-        # Register all requested modules using the unified dispatch.
-        # Not all cleanup-context combinations set every RootContext attr
-        # (e.g. processors_ctx is often omitted), so fall back to MagicMock
-        # for deps that the test's cleanup contexts did not initialise.
-        if all_registrars:
-            deps = server_module_deps_factory(root_ctx)
-            register_modules(app, all_registrars, deps=deps)
+        # Mount pre-built registries.
+        all_registries = list(registries or [])
+        if all_registries:
+            mount_registries(app, all_registries)
 
         runner = web.AppRunner(app, handle_signals=False)
         await runner.setup()
+        service_addr = config_provider.config.manager.service_addr
         site = web.TCPSite(
             runner,
-            root_ctx.config_provider.config.manager.service_addr.host,
-            root_ctx.config_provider.config.manager.service_addr.port,
+            service_addr.host,
+            service_addr.port,
             reuse_port=True,
         )
         await site.start()
-        port = root_ctx.config_provider.config.manager.service_addr.port
         client_session = aiohttp.ClientSession()
-        client = Client(client_session, f"http://127.0.0.1:{port}")
+        client = Client(client_session, f"http://127.0.0.1:{service_addr.port}")
         return app, client
 
     yield app_builder
@@ -897,8 +814,6 @@ async def create_app_and_client(
         await client_session.close()
     if runner is not None:
         await runner.cleanup()
-    for octx in reversed(_outer_ctxs):
-        await octx.__aexit__(None, None, None)
 
 
 @pytest.fixture
@@ -1004,28 +919,63 @@ def get_headers(
 async def prepare_kernel(
     request: Any,
     create_app_and_client: AppBuilder,
+    route_deps: RouteDeps,
+    config_provider: _TestConfigProvider,
     get_headers: Callable[..., dict[str, str]],
     default_keypair: dict[str, str],
 ) -> AsyncIterator[
     tuple[web.Application, Client, Callable[[str, str | None], Awaitable[dict[str, Any]]]]
 ]:
+    mock_processors = MagicMock()
+
     sess_id = f"test-kernel-session-{secrets.token_hex(8)}"
     app, client = await create_app_and_client(
-        cleanup_contexts=None,
-        registrars=[
-            register_etcd_routes,
-            register_events_routes,
-            register_auth_routes,
-            register_vfolder_routes,
-            register_admin_routes,
-            register_ratelimit_routes,
-            register_compute_sessions_routes,
-            register_stream_routes,
-            register_manager_api_routes,
+        registries=[
+            register_etcd_routes(
+                EtcdHandler(
+                    container_registry=mock_processors.container_registry,
+                    etcd_config=mock_processors.etcd_config,
+                ),
+                route_deps,
+                pidx=0,
+                config_provider=config_provider,
+            ),
+            register_events_routes(
+                MagicMock(spec=EventsHandler),
+                route_deps,
+                event_hub=MagicMock(),
+            ),
+            register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+            register_vfolder_routes(
+                VFolderHandler(
+                    auth=mock_processors.auth,
+                    vfolder=mock_processors.vfolder,
+                    vfolder_file=mock_processors.vfolder_file,
+                    vfolder_invite=mock_processors.vfolder_invite,
+                    vfolder_sharing=mock_processors.vfolder_sharing,
+                ),
+                route_deps,
+                vfolder_processors=mock_processors.vfolder,
+            ),
+            register_admin_routes(MagicMock(), route_deps, sub_registries=[]),
+            register_ratelimit_routes(route_deps, valkey_rate_limit=None),
+            register_compute_sessions_routes(
+                ComputeSessionsHandler(session=mock_processors.session),
+                route_deps,
+            ),
+            register_stream_routes(
+                MagicMock(spec=StreamHandler),
+                route_deps,
+                stream_processors=MagicMock(),
+                stream_cleanup_handler=StreamCleanupEventHandler(MagicMock()),
+            ),
+            register_manager_api_routes(
+                ManagerHandler(manager_admin=mock_processors.manager_admin),
+                route_deps,
+            ),
         ],
         scheduler_opts=None,
     )
-    root_ctx: RootContext = app["_root.context"]
 
     async def create_kernel(
         image: str = "lua:5.3-alpine", tag: str | None = None
@@ -1044,18 +994,8 @@ async def prepare_kernel(
 
     yield app, client, create_kernel
 
-    try:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                sess_id,
-            )
-            await root_ctx.registry.destroy_session(
-                session,
-                forced=True,
-            )
-    except Exception:
-        pass
+    # Session cleanup is handled by the database teardown fixtures.
+    # TODO: Use proper service-layer cleanup once AgentRegistry is decoupled.
 
 
 class DummyEtcd:

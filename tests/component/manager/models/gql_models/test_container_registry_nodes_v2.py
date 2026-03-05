@@ -14,7 +14,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
-from ai.backend.manager.server import database_ctx
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 from ai.backend.manager.services.processors import Processors
@@ -491,25 +490,13 @@ async def test_delete_container_registry(
 )
 async def test_associate_container_registry_with_group(
     client: Client,
-    mock_etcd_ctx: Any,
-    mock_config_provider_ctx: Any,
     database_fixture: None,
     extra_fixtures: dict[str, Any],
     test_case: dict[str, Any],
-    create_app_and_client: Any,
+    database_engine: ExtendedAsyncSAEngine,
     processors: Processors,
 ) -> None:
-    test_app, _ = await create_app_and_client(
-        [
-            mock_etcd_ctx,
-            mock_config_provider_ctx,
-            database_ctx,
-        ],
-        [],
-    )
-
-    root_ctx = test_app["_root.context"]
-    context = get_graphquery_context(root_ctx.db, processors)
+    context = get_graphquery_context(database_engine, processors)
 
     query = """
         mutation ($id: String!, $props: ModifyContainerRegistryNodeInputV2!) {
@@ -563,25 +550,13 @@ async def test_associate_container_registry_with_group(
 )
 async def test_disassociate_container_registry_with_group(
     client: Client,
-    mock_etcd_ctx: Any,
-    mock_config_provider_ctx: Any,
     database_fixture: None,
     extra_fixtures: dict[str, Any],
     test_case: dict[str, Any],
-    create_app_and_client: Any,
+    database_engine: ExtendedAsyncSAEngine,
     processors: Processors,
 ) -> None:
-    test_app, _ = await create_app_and_client(
-        [
-            mock_etcd_ctx,
-            mock_config_provider_ctx,
-            database_ctx,
-        ],
-        [],
-    )
-
-    root_ctx = test_app["_root.context"]
-    context = get_graphquery_context(root_ctx.db, processors)
+    context = get_graphquery_context(database_engine, processors)
 
     query = """
         mutation ($id: String!, $props: ModifyContainerRegistryNodeInputV2!) {

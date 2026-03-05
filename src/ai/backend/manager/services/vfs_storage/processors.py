@@ -3,6 +3,9 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
+    StorageProxyManagerFacingClient,
+)
 from ai.backend.manager.services.vfs_storage.actions.create import (
     CreateVFSStorageAction,
     CreateVFSStorageActionResult,
@@ -59,6 +62,7 @@ class VFSStorageProcessors(AbstractProcessorPackage):
     unset_quota_scope: ActionProcessor[UnsetQuotaScopeAction, UnsetQuotaScopeActionResult]
 
     def __init__(self, service: VFSStorageService, action_monitors: list[ActionMonitor]) -> None:
+        self._service = service
         self.create = ActionProcessor(service.create, action_monitors)
         self.update = ActionProcessor(service.update, action_monitors)
         self.delete = ActionProcessor(service.delete, action_monitors)
@@ -69,6 +73,14 @@ class VFSStorageProcessors(AbstractProcessorPackage):
         self.search_quota_scopes = ActionProcessor(service.search_quota_scopes, action_monitors)
         self.set_quota_scope = ActionProcessor(service.set_quota_scope, action_monitors)
         self.unset_quota_scope = ActionProcessor(service.unset_quota_scope, action_monitors)
+
+    def get_manager_facing_client(self, proxy_name: str) -> StorageProxyManagerFacingClient:
+        """Get a storage proxy client for the given proxy name.
+
+        Delegates to the underlying service's storage_manager.
+        """
+        storage_manager = self._service._ensure_storage_manager()
+        return storage_manager.get_manager_facing_client(proxy_name)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:

@@ -10,13 +10,12 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from .handler import ImageHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_image_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_image_routes(handler: ImageHandler, route_deps: RouteDeps) -> RouteRegistry:
     """Build the image sub-registry (child of admin)."""
-    reg = RouteRegistry.create("images", deps.cors_options)
-    handler = ImageHandler(processors=deps.processors)
+    reg = RouteRegistry.create("images", route_deps.cors_options)
 
     _mw = [auth_required, superadmin_required]
 

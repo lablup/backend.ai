@@ -50,7 +50,7 @@ from ai.backend.common.dto.manager.deployment.types import (
     RouteOrderField,
 )
 from ai.backend.common.types import ClusterMode, RuntimeVariant
-from ai.backend.manager.api.adapter import BaseFilterAdapter
+from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.deployment.creator import (
     DeploymentPolicyConfig,
     DeploymentPolicyCreator,

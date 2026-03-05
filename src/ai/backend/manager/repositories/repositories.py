@@ -17,6 +17,7 @@ from ai.backend.manager.repositories.domain.repositories import DomainRepositori
 from ai.backend.manager.repositories.dotfile.repositories import DotfileRepositories
 from ai.backend.manager.repositories.error_log.repositories import ErrorLogRepositories
 from ai.backend.manager.repositories.etcd_config.repositories import EtcdConfigRepositories
+from ai.backend.manager.repositories.events.repositories import EventsRepositories
 from ai.backend.manager.repositories.export.repositories import ExportRepositories
 from ai.backend.manager.repositories.fair_share.repositories import FairShareRepositories
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
@@ -58,6 +59,7 @@ from ai.backend.manager.repositories.session.repositories import SessionReposito
 from ai.backend.manager.repositories.storage_namespace.repositories import (
     StorageNamespaceRepositories,
 )
+from ai.backend.manager.repositories.stream.repositories import StreamRepositories
 from ai.backend.manager.repositories.template.repositories import TemplateRepositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.repositories.user.repositories import UserRepositories
@@ -108,6 +110,8 @@ class Repositories:
     huggingface_registry: HuggingFaceRegistryRepositories
     artifact: ArtifactRepositories
     artifact_registry: ArtifactRegistryRepositories
+    stream: StreamRepositories
+    events: EventsRepositories
     storage_namespace: StorageNamespaceRepositories
     audit_log: AuditLogRepositories
 
@@ -151,6 +155,8 @@ class Repositories:
         artifact_repositories = ArtifactRepositories.create(args)
         huggingface_registry_repositories = HuggingFaceRegistryRepositories.create(args)
         artifact_registries = ArtifactRegistryRepositories.create(args)
+        stream_repositories = StreamRepositories.create(args)
+        events_repositories = EventsRepositories.create(args)
         storage_namespace_repositories = StorageNamespaceRepositories.create(args)
         audit_log_repositories = AuditLogRepositories.create(args)
 
@@ -193,6 +199,8 @@ class Repositories:
             huggingface_registry=huggingface_registry_repositories,
             artifact=artifact_repositories,
             artifact_registry=artifact_registries,
+            stream=stream_repositories,
+            events=events_repositories,
             storage_namespace=storage_namespace_repositories,
             audit_log=audit_log_repositories,
         )

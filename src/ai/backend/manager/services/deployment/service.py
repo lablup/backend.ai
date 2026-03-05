@@ -411,8 +411,13 @@ class DeploymentService:
 
         Returns:
             DestroyDeploymentActionResult: Result indicating success or failure
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist
         """
         log.info("Destroying deployment with ID: {}", action.endpoint_id)
+        # Validate endpoint exists before attempting destruction
+        await self._deployment_repository.get_endpoint_info(action.endpoint_id)
         success = await self._deployment_controller.destroy_deployment(action.endpoint_id)
         await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.DESTROYING)
         return DestroyDeploymentActionResult(success=success)

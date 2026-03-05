@@ -7,25 +7,19 @@ from typing import TYPE_CHECKING
 from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
+from .handler import ServiceHandler
+
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_service_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_service_routes(handler: ServiceHandler, route_deps: RouteDeps) -> RouteRegistry:
     """Build the service (model serving) sub-application."""
-    from ai.backend.manager.api.service import (
-        PrivateContext as ServicePrivateContext,
-    )
-    from ai.backend.manager.api.service import (
-        init as service_init,
-    )
-    from ai.backend.manager.api.service import (
-        shutdown as service_shutdown,
-    )
+    from .lifecycle import PrivateContext as ServicePrivateContext
+    from .lifecycle import init as service_init
+    from .lifecycle import shutdown as service_shutdown
 
-    from .handler import ServiceHandler
-
-    reg = RouteRegistry.create("services", deps.cors_options)
+    reg = RouteRegistry.create("services", route_deps.cors_options)
     ctx = ServicePrivateContext()
 
     # Store ctx on app dict for backward compatibility (lifecycle functions
@@ -35,9 +29,6 @@ def register_service_routes(deps: ModuleDeps) -> RouteRegistry:
     # Wire lifecycle hooks
     reg.app.on_startup.append(service_init)
     reg.app.on_shutdown.append(service_shutdown)
-    handler = ServiceHandler(
-        processors=deps.processors,
-    )
 
     # Service list & create (root)
     reg.add("GET", "", handler.list_serve, middlewares=[auth_required])

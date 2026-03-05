@@ -1,7 +1,7 @@
 """Container registry handler using the new ApiHandler pattern.
 
 All handlers use typed parameters (``BodyParam``, ``PathParam``,
-``RequestCtx``, ``ProcessorsCtx``) that are automatically extracted by
+``RequestCtx``) that are automatically extracted by
 ``_wrap_api_handler``, and responses are returned as ``APIResponse``
 objects.
 """
@@ -20,7 +20,7 @@ from ai.backend.common.container_registry import (
 )
 from ai.backend.common.dto.manager.registry.request import HarborWebhookRequestModel
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.dto.context import ProcessorsCtx, RequestCtx
+from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
@@ -32,6 +32,7 @@ from ai.backend.manager.services.container_registry.actions.handle_harbor_webhoo
 from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
     ModifyContainerRegistryAction,
 )
+from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -46,10 +47,11 @@ class RegistryIdPath(BaseRequestModel):
 class ContainerRegistryHandler:
     """Container registry API handler.
 
-    Dependencies are resolved at request time via middleware parameters
-    because the handler is instantiated inside ``create_app()`` before
-    ``RootContext`` is available.
+    Dependencies are injected via constructor at registrar time.
     """
+
+    def __init__(self, *, container_registry: ContainerRegistryProcessors) -> None:
+        self._container_registry = container_registry
 
     # ------------------------------------------------------------------
     # PATCH /container-registries/{registry_id}
@@ -59,12 +61,10 @@ class ContainerRegistryHandler:
         self,
         body: BodyParam[PatchContainerRegistryRequestModel],
         path: PathParam[RegistryIdPath],
-        proc_ctx: ProcessorsCtx,
     ) -> APIResponse:
         registry_id = path.parsed.registry_id
         log.info("PATCH_CONTAINER_REGISTRY (registry:{})", registry_id)
         params = body.parsed
-        processors = proc_ctx.processors
 
         updater_spec = ContainerRegistryUpdaterSpec(
             url=OptionalState.update(params.url) if params.url is not None else OptionalState.nop(),
@@ -104,7 +104,7 @@ class ContainerRegistryHandler:
                 else TriState.nop()
             ),
         )
-        result = await processors.container_registry.modify_container_registry.wait_for_complete(
+        result = await self._container_registry.modify_container_registry.wait_for_complete(
             ModifyContainerRegistryAction(updater=Updater(spec=updater_spec, pk_value=registry_id))
         )
 
@@ -130,7 +130,6 @@ class ContainerRegistryHandler:
         self,
         body: BodyParam[HarborWebhookRequestModel],
         ctx: RequestCtx,
-        procs: ProcessorsCtx,
     ) -> APIResponse:
         auth_header = ctx.request.headers.get("Authorization", None)
         params = body.parsed
@@ -154,5 +153,5 @@ class ContainerRegistryHandler:
             img_name=img_name,
             auth_header=auth_header,
         )
-        await procs.processors.container_registry.handle_harbor_webhook.wait_for_complete(action)
+        await self._container_registry.handle_harbor_webhook.wait_for_complete(action)
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)

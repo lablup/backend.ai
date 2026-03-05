@@ -7,17 +7,16 @@ from typing import TYPE_CHECKING
 from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
+from .handler import ResourceHandler
+
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_resource_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_resource_routes(handler: ResourceHandler, route_deps: RouteDeps) -> RouteRegistry:
     """Build the resource sub-application."""
-    # Import handler inside function to avoid circular imports
-    from .handler import ResourceHandler
 
-    reg = RouteRegistry.create("resource", deps.cors_options)
-    handler = ResourceHandler(processors=deps.processors)
+    reg = RouteRegistry.create("resource", route_deps.cors_options)
 
     # Public preset listing (auth required)
     reg.add("GET", "/presets", handler.list_presets, middlewares=[auth_required])

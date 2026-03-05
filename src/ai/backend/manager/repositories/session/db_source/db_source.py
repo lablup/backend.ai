@@ -11,7 +11,6 @@ from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
-from ai.backend.manager.api.session import find_dependency_sessions
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
 from ai.backend.manager.data.kernel.types import KernelListResult
 from ai.backend.manager.data.session.types import SessionListResult
@@ -34,6 +33,7 @@ from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
 from ai.backend.manager.utils import query_userinfo
 
 

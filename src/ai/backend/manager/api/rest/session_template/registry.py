@@ -6,19 +6,19 @@ from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
-from ai.backend.manager.api.rest.server_status import READ_ALLOWED, server_status_required
 
 from .handler import SessionTemplateHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_session_template_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_session_template_routes(
+    handler: SessionTemplateHandler, route_deps: RouteDeps
+) -> RouteRegistry:
     """Build the session template sub-application."""
-    reg = RouteRegistry.create("session", deps.cors_options)
-    handler = SessionTemplateHandler(processors=deps.processors)
-    _middlewares = [server_status_required(READ_ALLOWED, deps.config_provider), auth_required]
+    reg = RouteRegistry.create("session", route_deps.cors_options)
+    _middlewares = [route_deps.read_status_mw, auth_required]
 
     reg.add("POST", "", handler.create, middlewares=_middlewares)
     reg.add("GET", "", handler.list_templates, middlewares=_middlewares)

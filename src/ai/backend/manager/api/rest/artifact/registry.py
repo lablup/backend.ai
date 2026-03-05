@@ -10,13 +10,12 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from .handler import ArtifactHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_artifact_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_artifact_routes(handler: ArtifactHandler, route_deps: RouteDeps) -> RouteRegistry:
     """Build the artifact sub-application."""
-    reg = RouteRegistry.create("artifacts", deps.cors_options)
-    handler = ArtifactHandler(processors=deps.processors)
+    reg = RouteRegistry.create("artifacts", route_deps.cors_options)
 
     reg.add(
         "POST",

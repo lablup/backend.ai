@@ -30,7 +30,7 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
-from ai.backend.manager.api.compute_sessions.adapter import ComputeSessionsAdapter
+from ai.backend.manager.api.rest.compute_sessions.adapter import ComputeSessionsAdapter
 from ai.backend.manager.data.kernel.types import (
     ClusterConfig,
     ImageInfo,

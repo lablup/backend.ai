@@ -46,7 +46,7 @@ from ai.backend.manager.services.manager_admin import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.services.processors import Processors
+    from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -147,8 +147,8 @@ class RedisConnectionMetricGroup(PromMetricGroup[RedisConnectionMetric]):
 class ManagerHandler:
     """Manager API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, manager_admin: ManagerAdminProcessors) -> None:
+        self._manager_admin = manager_admin
 
     # ------------------------------------------------------------------
     # fetch_manager_status (GET /manager/status)
@@ -158,7 +158,7 @@ class ManagerHandler:
         log.info("MANAGER.FETCH_MANAGER_STATUS ()")
         try:
             action = FetchManagerStatusAction()
-            result = await self._processors.manager_admin.fetch_status.wait_for_complete(action)
+            result = await self._manager_admin.fetch_status.wait_for_complete(action)
             nodes = [
                 {
                     "id": result.manager_id,
@@ -201,7 +201,7 @@ class ManagerHandler:
             status=params.status,
             force_kill=params.force_kill,
         )
-        await self._processors.manager_admin.update_status.wait_for_complete(action)
+        await self._manager_admin.update_status.wait_for_complete(action)
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
@@ -210,7 +210,7 @@ class ManagerHandler:
 
     async def get_announcement(self) -> APIResponse:
         action = GetAnnouncementAction()
-        result = await self._processors.manager_admin.get_announcement.wait_for_complete(action)
+        result = await self._manager_admin.get_announcement.wait_for_complete(action)
         resp = AnnouncementResponse(enabled=result.enabled, message=result.message)
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -228,7 +228,7 @@ class ManagerHandler:
             enabled=params.enabled,
             message=params.message,
         )
-        await self._processors.manager_admin.update_announcement.wait_for_complete(action)
+        await self._manager_admin.update_announcement.wait_for_complete(action)
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
@@ -255,7 +255,7 @@ class ManagerHandler:
                 agent_ids=args,
                 schedulable=schedulable,
             )
-            await self._processors.manager_admin.perform_scheduler_ops.wait_for_complete(action)
+            await self._manager_admin.perform_scheduler_ops.wait_for_complete(action)
         else:
             raise GenericBadRequest("Unknown scheduler operation")
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
@@ -280,7 +280,7 @@ class ManagerHandler:
 
     async def get_manager_status_for_prom(self) -> web.StreamResponse:
         action = GetDbCxnStatusAction()
-        result = await self._processors.manager_admin.get_db_cxn_status.wait_for_complete(action)
+        result = await self._manager_admin.get_db_cxn_status.wait_for_complete(action)
         status = result.cxn_infos
 
         total_cxn_metrics: list[SQLAlchemyConnectionMetric] = []

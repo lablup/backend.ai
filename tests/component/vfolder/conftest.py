@@ -3,15 +3,16 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
-from contextlib import asynccontextmanager
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import (
+    HostPortPair,
     QuotaScopeID,
     QuotaScopeType,
     VFolderHostPermission,
@@ -22,150 +23,163 @@ from ai.backend.common.types import (
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
-from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import vfolder as _vfolder_api
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
-from ai.backend.manager.api.rest.types import ModuleRegistrar
+from ai.backend.manager.api.rest.middleware import auth as _auth_api
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.api.rest.vfolder.handler import VFolderHandler
 from ai.backend.manager.api.rest.vfolder.registry import register_vfolder_routes
-from ai.backend.manager.api.types import CleanupContext
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
+from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
+from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     vfolder_invitations,
     vfolder_permissions,
     vfolders,
 )
-from ai.backend.manager.repositories.repositories import Repositories
-from ai.backend.manager.repositories.types import RepositoryArgs
-from ai.backend.manager.server import (
-    background_task_ctx,
-    database_ctx,
-    event_hub_ctx,
-    event_producer_ctx,
-    message_queue_ctx,
-    monitoring_ctx,
-    redis_ctx,
-    storage_manager_ctx,
-)
-from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
+from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
+from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
+from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
+from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
+from ai.backend.manager.services.vfolder.services.file import VFolderFileService
+from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService
+from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingService
+from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 
-_VFOLDER_SERVER_SUBAPP_MODULES = (_auth_api, _vfolder_api)
+_VFOLDER_SERVER_SUBAPP_MODULES = (_auth_api,)
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
 
 
-@asynccontextmanager
-async def _vfolder_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    """Set up repositories and processors for vfolder-domain component tests.
-
-    Relies on the preceding cleanup contexts having already initialized:
-    - redis_ctx      → root_ctx.valkey_* (all 8 clients)
-    - database_ctx   → root_ctx.db
-    - monitoring_ctx → root_ctx.error_monitor / stats_monitor
-    - storage_manager_ctx  → root_ctx.storage_manager
-    - message_queue_ctx    → root_ctx.message_queue
-    - event_producer_ctx   → root_ctx.event_producer / event_fetcher
-    - event_hub_ctx        → root_ctx.event_hub
-    - background_task_ctx  → root_ctx.background_task_manager
-
-    Only agent_registry is left as MagicMock because it requires live gRPC
-    connections to real agents, which are not available in component tests.
-    """
-    # _TestConfigProvider skips super().__init__() so _legacy_etcd_config_loader
-    # is never set.  The @server_status_required decorator (used by all vfolder
-    # handlers) calls config_provider.legacy_etcd_config_loader.get_manager_status()
-    # which is async.  Inject a MagicMock with AsyncMock methods so the checks pass.
-    mock_legacy_loader = MagicMock()
-    mock_legacy_loader.get_manager_status = AsyncMock(return_value=ManagerStatus.RUNNING)
-    mock_legacy_loader.get_vfolder_types = AsyncMock(return_value=["user", "group"])
-    root_ctx.config_provider._legacy_etcd_config_loader = mock_legacy_loader
-
-    root_ctx.repositories = Repositories.create(
-        RepositoryArgs(
-            db=root_ctx.db,
-            storage_manager=root_ctx.storage_manager,
-            config_provider=root_ctx.config_provider,
-            valkey_stat_client=root_ctx.valkey_stat,
-            valkey_schedule_client=root_ctx.valkey_schedule,
-            valkey_image_client=root_ctx.valkey_image,
-            valkey_live_client=root_ctx.valkey_live,
-        )
+@pytest.fixture()
+def async_etcd(
+    bootstrap_config: Any,
+) -> AsyncEtcd:
+    etcd_config = bootstrap_config.etcd
+    etcd_addr = etcd_config.addr
+    if isinstance(etcd_addr, list):
+        addrs: HostPortPair | list[HostPortPair] = [
+            HostPortPair(host=a.host, port=a.port) for a in etcd_addr
+        ]
+    else:
+        addrs = HostPortPair(host=etcd_addr.host, port=etcd_addr.port)
+    return AsyncEtcd(
+        addrs=addrs,
+        namespace=etcd_config.namespace,
+        scope_prefix_map={
+            ConfigScopes.GLOBAL: "global",
+            ConfigScopes.SGROUP: "sgroup/default",
+            ConfigScopes.NODE: "node/test",
+        },
     )
-    root_ctx.processors = Processors.create(
-        ProcessorArgs(
-            service_args=ServiceArgs(
-                db=root_ctx.db,
-                repositories=root_ctx.repositories,
-                etcd=root_ctx.etcd,
-                config_provider=root_ctx.config_provider,
-                storage_manager=root_ctx.storage_manager,
-                valkey_stat_client=root_ctx.valkey_stat,
-                valkey_live=root_ctx.valkey_live,
-                valkey_artifact_client=root_ctx.valkey_artifact,
-                error_monitor=root_ctx.error_monitor,
-                event_fetcher=root_ctx.event_fetcher,
-                background_task_manager=root_ctx.background_task_manager,
-                event_hub=root_ctx.event_hub,
-                event_producer=root_ctx.event_producer,
-                # agent_registry requires gRPC connections to real agents — not feasible
-                # in the component test environment; kept as MagicMock.
-                agent_registry=MagicMock(),
-                idle_checker_host=MagicMock(),
-                event_dispatcher=MagicMock(),
-                hook_plugin_ctx=MagicMock(),
-                scheduling_controller=MagicMock(),
-                deployment_controller=MagicMock(),
-                revision_generator_registry=MagicMock(),
-                agent_cache=MagicMock(),
-                notification_center=MagicMock(),
-                appproxy_client_pool=MagicMock(),
-                prometheus_client=MagicMock(),
-            ),
-        ),
-        [],
-    )
-    yield
 
 
 @pytest.fixture()
-def server_module_registrars() -> list[ModuleRegistrar]:
+def vfolder_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+    async_etcd: AsyncEtcd,
+    storage_manager: StorageSessionManager,
+    background_task_manager: BackgroundTaskManager,
+    valkey_clients: ValkeyClients,
+) -> VFolderProcessors:
+    vfolder_repository = VfolderRepository(database_engine)
+    user_repository = UserRepository(database_engine)
+    service = VFolderService(
+        config_provider=config_provider,
+        etcd=async_etcd,
+        storage_manager=storage_manager,
+        background_task_manager=background_task_manager,
+        vfolder_repository=vfolder_repository,
+        user_repository=user_repository,
+        valkey_stat_client=valkey_clients.stat,
+    )
+    return VFolderProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def vfolder_file_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+    storage_manager: StorageSessionManager,
+) -> VFolderFileProcessors:
+    vfolder_repository = VfolderRepository(database_engine)
+    user_repository = UserRepository(database_engine)
+    service = VFolderFileService(
+        config_provider=config_provider,
+        storage_manager=storage_manager,
+        vfolder_repository=vfolder_repository,
+        user_repository=user_repository,
+    )
+    return VFolderFileProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def vfolder_invite_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> VFolderInviteProcessors:
+    vfolder_repository = VfolderRepository(database_engine)
+    user_repository = UserRepository(database_engine)
+    service = VFolderInviteService(
+        config_provider=config_provider,
+        vfolder_repository=vfolder_repository,
+        user_repository=user_repository,
+    )
+    return VFolderInviteProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def vfolder_sharing_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> VFolderSharingProcessors:
+    vfolder_repository = VfolderRepository(database_engine)
+    user_repository = UserRepository(database_engine)
+    service = VFolderSharingService(
+        config_provider=config_provider,
+        vfolder_repository=vfolder_repository,
+        user_repository=user_repository,
+    )
+    return VFolderSharingProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    auth_processors: AuthProcessors,
+    vfolder_processors: VFolderProcessors,
+    vfolder_file_processors: VFolderFileProcessors,
+    vfolder_invite_processors: VFolderInviteProcessors,
+    vfolder_sharing_processors: VFolderSharingProcessors,
+) -> list[RouteRegistry]:
     """Load only the modules required for vfolder-domain tests."""
-    return [register_auth_routes, register_vfolder_routes]
-
-
-@pytest.fixture()
-def server_cleanup_contexts() -> list[CleanupContext]:
-    """Provide cleanup contexts for vfolder-domain component tests.
-
-    Uses production contexts from server.py for real infrastructure:
-    - redis_ctx: all 8 Valkey clients
-    - database_ctx: real database connection
-    - monitoring_ctx: real (empty-plugin) error and stats monitors
-    - storage_manager_ctx: real StorageSessionManager (empty proxy config)
-    - message_queue_ctx: real Redis-backed message queue
-    - event_producer_ctx: real EventProducer + EventFetcher
-    - event_hub_ctx: real EventHub
-    - background_task_ctx: real BackgroundTaskManager
-    - _vfolder_domain_ctx: repositories and processors wired with real clients
-    """
     return [
-        redis_ctx,
-        database_ctx,
-        monitoring_ctx,
-        storage_manager_ctx,
-        message_queue_ctx,
-        event_producer_ctx,
-        event_hub_ctx,
-        background_task_ctx,
-        _vfolder_domain_ctx,
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
+        register_vfolder_routes(
+            VFolderHandler(
+                auth=auth_processors,
+                vfolder=vfolder_processors,
+                vfolder_file=vfolder_file_processors,
+                vfolder_invite=vfolder_invite_processors,
+                vfolder_sharing=vfolder_sharing_processors,
+            ),
+            route_deps,
+            vfolder_processors=vfolder_processors,
+        ),
     ]
 
 

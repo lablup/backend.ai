@@ -2,180 +2,199 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.types import ResourceSlot, SlotName, SlotTypes, current_resource_slots
-
-# Statically imported so that Pants includes these modules in the test PEX.
-# build_root_app() loads them at runtime via importlib.import_module(),
-# which Pants cannot trace statically.
-from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import etcd as _etcd_api
-from ai.backend.manager.api import resource as _resource_api
-from ai.backend.manager.api.context import RootContext
+from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.plugin.hook import HookPluginContext
+from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.etcd.handler import EtcdHandler
 from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
+from ai.backend.manager.api.rest.resource.handler import ResourceHandler
 from ai.backend.manager.api.rest.resource.registry import register_resource_routes
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.scaling_group.handler import ScalingGroupHandler
 from ai.backend.manager.api.rest.scaling_group.registry import register_scaling_group_routes
-from ai.backend.manager.api.rest.types import ModuleRegistrar
-from ai.backend.manager.api.types import CleanupContext
+from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
-from ai.backend.manager.repositories.repositories import Repositories
-from ai.backend.manager.repositories.types import RepositoryArgs
-from ai.backend.manager.server import (
-    background_task_ctx,
-    database_ctx,
-    event_hub_ctx,
-    event_producer_ctx,
-    message_queue_ctx,
-    monitoring_ctx,
-    redis_ctx,
-    storage_manager_ctx,
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.agent.repository import AgentRepository
+from ai.backend.manager.repositories.container_registry.repository import (
+    ContainerRegistryRepository,
 )
-from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
-
-_INFRA_SERVER_SUBAPP_MODULES = (_auth_api, _etcd_api, _resource_api)
-
-
-def _make_mock_agent_registry() -> MagicMock:
-    """Create a MagicMock agent_registry with awaitable async stubs."""
-    mock = MagicMock()
-    mock.recalc_resource_usage = AsyncMock(return_value=None)
-    return mock
-
-
-@asynccontextmanager
-async def _infra_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    """Set up repositories and processors for infra-domain component tests.
-
-    Relies on the preceding cleanup contexts having already initialized:
-    - redis_ctx      → root_ctx.valkey_* (all 8 clients)
-    - database_ctx   → root_ctx.db
-    - monitoring_ctx → root_ctx.error_monitor / stats_monitor
-    - storage_manager_ctx  → root_ctx.storage_manager
-    - message_queue_ctx    → root_ctx.message_queue
-    - event_producer_ctx   → root_ctx.event_producer / event_fetcher
-    - event_hub_ctx        → root_ctx.event_hub
-    - background_task_ctx  → root_ctx.background_task_manager
-
-    Only agent_registry is left as MagicMock because it requires live gRPC
-    connections to real agents, which are not available in component tests.
-    """
-    # _TestConfigProvider skips super().__init__() so _legacy_etcd_config_loader
-    # is never set.  The @server_status_required decorator calls
-    # config_provider.legacy_etcd_config_loader.get_manager_status() which is
-    # async.  Inject a MagicMock with an AsyncMock method so the check passes.
-    mock_legacy_loader = MagicMock()
-    mock_legacy_loader.get_manager_status = AsyncMock(return_value=ManagerStatus.RUNNING)
-    # Read-only etcd endpoints call these methods on legacy_etcd_config_loader;
-    # return minimal valid data so the endpoints respond successfully.
-    mock_legacy_loader.get_resource_slots = AsyncMock(return_value={"cpu": "count", "mem": "bytes"})
-    mock_legacy_loader.get_vfolder_types = AsyncMock(return_value=["user", "group"])
-    mock_legacy_loader.register_myself = AsyncMock(return_value=None)
-    mock_legacy_loader.deregister_myself = AsyncMock(return_value=None)
-    # check_presets reads group_resource_visibility via get_raw(); return None
-    # so the repository treats it as "no visibility restriction".
-    mock_legacy_loader.get_raw = AsyncMock(return_value=None)
-    root_ctx.config_provider._legacy_etcd_config_loader = mock_legacy_loader
-
-    # ResourceSlot.normalize_slots() reads this ContextVar; set it so that
-    # list_presets / check_presets do not raise LookupError.
-    current_resource_slots.set({
-        SlotName("cpu"): SlotTypes("count"),
-        SlotName("mem"): SlotTypes("bytes"),
-    })
-
-    root_ctx.repositories = Repositories.create(
-        RepositoryArgs(
-            db=root_ctx.db,
-            storage_manager=root_ctx.storage_manager,
-            config_provider=root_ctx.config_provider,
-            valkey_stat_client=root_ctx.valkey_stat,
-            valkey_schedule_client=root_ctx.valkey_schedule,
-            valkey_image_client=root_ctx.valkey_image,
-            valkey_live_client=root_ctx.valkey_live,
-        )
-    )
-    root_ctx.processors = Processors.create(
-        ProcessorArgs(
-            service_args=ServiceArgs(
-                db=root_ctx.db,
-                repositories=root_ctx.repositories,
-                etcd=root_ctx.etcd,
-                config_provider=root_ctx.config_provider,
-                storage_manager=root_ctx.storage_manager,
-                valkey_stat_client=root_ctx.valkey_stat,
-                valkey_live=root_ctx.valkey_live,
-                valkey_artifact_client=root_ctx.valkey_artifact,
-                error_monitor=root_ctx.error_monitor,
-                event_fetcher=root_ctx.event_fetcher,
-                background_task_manager=root_ctx.background_task_manager,
-                event_hub=root_ctx.event_hub,
-                event_producer=root_ctx.event_producer,
-                # agent_registry requires gRPC connections to real agents — not feasible
-                # in the component test environment; kept as MagicMock with async stubs
-                # for methods that are awaited (e.g. recalculate_usage).
-                agent_registry=_make_mock_agent_registry(),
-                idle_checker_host=MagicMock(),
-                event_dispatcher=MagicMock(),
-                hook_plugin_ctx=MagicMock(),
-                scheduling_controller=MagicMock(),
-                deployment_controller=MagicMock(),
-                revision_generator_registry=MagicMock(),
-                agent_cache=MagicMock(),
-                notification_center=MagicMock(),
-                appproxy_client_pool=MagicMock(),
-                prometheus_client=MagicMock(),
-            ),
-        ),
-        [],
-    )
-    yield
+from ai.backend.manager.repositories.etcd_config.repository import EtcdConfigRepository
+from ai.backend.manager.repositories.group.repositories import GroupRepositories
+from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
+from ai.backend.manager.repositories.scaling_group.repository import ScalingGroupRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.services.agent.processors import AgentProcessors
+from ai.backend.manager.services.agent.service import AgentService
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
+from ai.backend.manager.services.container_registry.service import ContainerRegistryService
+from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
+from ai.backend.manager.services.etcd_config.service import EtcdConfigService
+from ai.backend.manager.services.group.processors import GroupProcessors
+from ai.backend.manager.services.group.service import GroupService
+from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
+from ai.backend.manager.services.resource_preset.service import ResourcePresetService
+from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
+from ai.backend.manager.services.scaling_group.service import ScalingGroupService
+from ai.backend.manager.services.user.processors import UserProcessors
+from ai.backend.manager.services.user.service import UserService
 
 
 @pytest.fixture()
-def server_module_registrars() -> list[ModuleRegistrar]:
+def container_registry_processors(
+    database_engine: ExtendedAsyncSAEngine,
+) -> ContainerRegistryProcessors:
+    repo = ContainerRegistryRepository(database_engine)
+    service = ContainerRegistryService(database_engine, repo)
+    return ContainerRegistryProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def etcd_config_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+    async_etcd: AsyncEtcd,
+    valkey_clients: ValkeyClients,
+) -> EtcdConfigProcessors:
+    repo = EtcdConfigRepository(database_engine)
+    service = EtcdConfigService(
+        repository=repo,
+        config_provider=config_provider,
+        etcd=async_etcd,
+        valkey_stat=valkey_clients.stat,
+    )
+    return EtcdConfigProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def resource_preset_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+    valkey_clients: ValkeyClients,
+) -> ResourcePresetProcessors:
+    repo = ResourcePresetRepository(database_engine, valkey_clients.stat, config_provider)
+    service = ResourcePresetService(repo)
+    return ResourcePresetProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def agent_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    async_etcd: AsyncEtcd,
+    config_provider: ManagerConfigProvider,
+    hook_plugin_ctx: HookPluginContext,
+    event_producer: EventProducer,
+    valkey_clients: ValkeyClients,
+) -> AgentProcessors:
+    agent_repo = AgentRepository(
+        database_engine,
+        valkey_clients.image,
+        valkey_clients.live,
+        valkey_clients.stat,
+        config_provider,
+    )
+    scheduler_repo = SchedulerRepository(database_engine, valkey_clients.stat, config_provider)
+    service = AgentService(
+        etcd=async_etcd,
+        agent_registry=AsyncMock(),
+        config_provider=config_provider,
+        agent_repository=agent_repo,
+        scheduler_repository=scheduler_repo,
+        hook_plugin_ctx=hook_plugin_ctx,
+        event_producer=event_producer,
+        agent_cache=AsyncMock(),
+    )
+    return AgentProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def group_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+    valkey_clients: ValkeyClients,
+    storage_manager: AsyncMock,
+) -> GroupProcessors:
+    group_repo = GroupRepository(
+        database_engine, config_provider, valkey_clients.stat, storage_manager
+    )
+    group_repos = GroupRepositories(repository=group_repo)
+    service = GroupService(storage_manager, config_provider, valkey_clients.stat, group_repos)
+    return GroupProcessors(group_service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def user_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    valkey_clients: ValkeyClients,
+    storage_manager: AsyncMock,
+) -> UserProcessors:
+    user_repo = UserRepository(database_engine)
+    service = UserService(storage_manager, valkey_clients.stat, AsyncMock(), user_repo)
+    return UserProcessors(user_service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def scaling_group_processors(
+    database_engine: ExtendedAsyncSAEngine,
+) -> ScalingGroupProcessors:
+    repo = ScalingGroupRepository(database_engine)
+    service = ScalingGroupService(repo, appproxy_client_pool=AsyncMock())
+    return ScalingGroupProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    auth_processors: AuthProcessors,
+    container_registry_processors: ContainerRegistryProcessors,
+    etcd_config_processors: EtcdConfigProcessors,
+    resource_preset_processors: ResourcePresetProcessors,
+    agent_processors: AgentProcessors,
+    group_processors: GroupProcessors,
+    user_processors: UserProcessors,
+    scaling_group_processors: ScalingGroupProcessors,
+    config_provider: ManagerConfigProvider,
+) -> list[RouteRegistry]:
     """Load only the modules required for infra-domain tests."""
     return [
-        register_auth_routes,
-        register_etcd_routes,
-        register_resource_routes,
-        register_scaling_group_routes,
-    ]
-
-
-@pytest.fixture()
-def server_cleanup_contexts() -> list[CleanupContext]:
-    """Provide cleanup contexts for infra-domain component tests.
-
-    Uses production contexts from server.py for real infrastructure:
-    - redis_ctx: all 8 Valkey clients
-    - database_ctx: real database connection
-    - monitoring_ctx: real (empty-plugin) error and stats monitors
-    - storage_manager_ctx: real StorageSessionManager (empty proxy config)
-    - message_queue_ctx: real Redis-backed message queue
-    - event_producer_ctx: real EventProducer + EventFetcher
-    - event_hub_ctx: real EventHub
-    - background_task_ctx: real BackgroundTaskManager
-    - _infra_domain_ctx: repositories and processors wired with real clients
-    """
-    return [
-        redis_ctx,
-        database_ctx,
-        monitoring_ctx,
-        storage_manager_ctx,
-        message_queue_ctx,
-        event_producer_ctx,
-        event_hub_ctx,
-        background_task_ctx,
-        _infra_domain_ctx,
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
+        register_etcd_routes(
+            EtcdHandler(
+                container_registry=container_registry_processors,
+                etcd_config=etcd_config_processors,
+            ),
+            route_deps,
+            pidx=0,
+            config_provider=config_provider,
+        ),
+        register_resource_routes(
+            ResourceHandler(
+                resource_preset=resource_preset_processors,
+                agent=agent_processors,
+                group=group_processors,
+                user=user_processors,
+                container_registry=container_registry_processors,
+            ),
+            route_deps,
+        ),
+        register_scaling_group_routes(
+            ScalingGroupHandler(scaling_group=scaling_group_processors), route_deps
+        ),
     ]
 
 

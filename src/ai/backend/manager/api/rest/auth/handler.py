@@ -58,7 +58,7 @@ from ai.backend.manager.services.auth.actions.update_password_no_auth import (
     UpdatePasswordNoAuthAction,
 )
 from ai.backend.manager.services.auth.actions.upload_ssh_keypair import UploadSSHKeypairAction
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.auth.processors import AuthProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -66,8 +66,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class AuthHandler:
     """Auth API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, auth: AuthProcessors) -> None:
+        self._auth = auth
 
     # ------------------------------------------------------------------
     # test_get (GET /auth, /auth/test)
@@ -106,7 +106,7 @@ class AuthHandler:
             is_superadmin=ctx.is_superadmin,
             is_admin=ctx.is_admin,
         )
-        result = await self._processors.auth.get_role.wait_for_complete(action)
+        result = await self._auth.get_role.wait_for_complete(action)
         resp = GetRoleResponse(
             global_role=result.global_role,
             domain_role=result.domain_role,
@@ -136,7 +136,7 @@ class AuthHandler:
             password=params.password,
             stoken=params.stoken,
         )
-        result = await self._processors.auth.authorize.wait_for_complete(action)
+        result = await self._auth.authorize.wait_for_complete(action)
 
         if result.stream_response is not None:
             return result.stream_response
@@ -170,7 +170,7 @@ class AuthHandler:
             full_name=params.full_name,
             description=params.description,
         )
-        result = await self._processors.auth.signup.wait_for_complete(action)
+        result = await self._auth.signup.wait_for_complete(action)
         resp = SignupResponse(
             access_key=result.access_key,
             secret_key=result.secret_key,
@@ -184,7 +184,7 @@ class AuthHandler:
     async def signout(self, body: BodyParam[SignoutRequest], ctx: UserContext) -> APIResponse:
         params = body.parsed
         log.info("AUTH.SIGNOUT(d:{}, email:{})", ctx.user_domain, params.email)
-        await self._processors.auth.signout.wait_for_complete(
+        await self._auth.signout.wait_for_complete(
             SignoutAction(
                 user_id=ctx.user_uuid,
                 domain_name=ctx.user_domain,
@@ -204,7 +204,7 @@ class AuthHandler:
     ) -> APIResponse:
         params = body.parsed
         log.info("AUTH.UPDATE_FULL_NAME(d:{}, email:{})", ctx.user_domain, ctx.user_email)
-        await self._processors.auth.update_full_name.wait_for_complete(
+        await self._auth.update_full_name.wait_for_complete(
             UpdateFullNameAction(
                 user_id=str(ctx.user_uuid),
                 full_name=params.full_name,
@@ -235,7 +235,7 @@ class AuthHandler:
             new_password=params.new_password,
             new_password_confirm=params.new_password2,
         )
-        result = await self._processors.auth.update_password.wait_for_complete(action)
+        result = await self._auth.update_password.wait_for_complete(action)
         if not result.success:
             resp = UpdatePasswordResponse(error_msg="new password mismatch")
             return APIResponse.build(HTTPStatus.BAD_REQUEST, resp)
@@ -261,7 +261,7 @@ class AuthHandler:
             current_password=params.current_password,
             new_password=params.new_password,
         )
-        result = await self._processors.auth.update_password_no_auth.wait_for_complete(action)
+        result = await self._auth.update_password_no_auth.wait_for_complete(action)
         resp = UpdatePasswordNoAuthResponse(
             password_changed_at=result.password_changed_at.isoformat(),
         )
@@ -273,7 +273,7 @@ class AuthHandler:
 
     async def get_ssh_keypair(self, ctx: UserContext) -> APIResponse:
         log.info("AUTH.GET_SSH_KEYPAIR(d:{}, ak:{})", ctx.user_domain, ctx.access_key)
-        result = await self._processors.auth.get_ssh_keypair.wait_for_complete(
+        result = await self._auth.get_ssh_keypair.wait_for_complete(
             GetSSHKeypairAction(
                 user_id=ctx.user_uuid,
                 access_key=ctx.access_key,
@@ -288,7 +288,7 @@ class AuthHandler:
 
     async def generate_ssh_keypair(self, ctx: UserContext) -> APIResponse:
         log.info("AUTH.REFRESH_SSH_KEYPAIR(d:{}, ak:{})", ctx.user_domain, ctx.access_key)
-        result = await self._processors.auth.generate_ssh_keypair.wait_for_complete(
+        result = await self._auth.generate_ssh_keypair.wait_for_complete(
             GenerateSSHKeypairAction(
                 user_id=ctx.user_uuid,
                 access_key=ctx.access_key,
@@ -311,7 +311,7 @@ class AuthHandler:
         pubkey = f"{params.pubkey.rstrip()}\n"
         privkey = f"{params.privkey.rstrip()}\n"
         log.info("AUTH.SAVE_SSH_KEYPAIR(d:{}, ak:{})", ctx.user_domain, ctx.access_key)
-        result = await self._processors.auth.upload_ssh_keypair.wait_for_complete(
+        result = await self._auth.upload_ssh_keypair.wait_for_complete(
             UploadSSHKeypairAction(
                 user_id=ctx.user_uuid,
                 public_key=pubkey,

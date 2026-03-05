@@ -15,9 +15,9 @@ from ai.backend.common.dto.manager.compute_session import (
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import UserContext
-from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
+from ai.backend.manager.services.session.processors import SessionProcessors
 
 from .adapter import ComputeSessionsAdapter
 
@@ -27,8 +27,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ComputeSessionsHandler:
     """Compute sessions API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, session: SessionProcessors) -> None:
+        self._session = session
         self._adapter = ComputeSessionsAdapter()
 
     async def search_sessions(
@@ -41,7 +41,7 @@ class ComputeSessionsHandler:
 
         # Step 1: Search sessions
         session_querier = self._adapter.build_session_querier(body.parsed)
-        session_result = await self._processors.session.search_sessions.wait_for_complete(
+        session_result = await self._session.search_sessions.wait_for_complete(
             SearchSessionsAction(querier=session_querier)
         )
 
@@ -50,7 +50,7 @@ class ComputeSessionsHandler:
         kernels_by_session = {}
         if session_ids:
             kernel_querier = self._adapter.build_kernel_querier_for_sessions(session_ids)
-            kernel_result = await self._processors.session.search_kernels.wait_for_complete(
+            kernel_result = await self._session.search_kernels.wait_for_complete(
                 SearchKernelsAction(querier=kernel_querier)
             )
             kernels_by_session = self._adapter.group_kernels_by_session(kernel_result.data)

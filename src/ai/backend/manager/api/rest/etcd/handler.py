@@ -11,8 +11,6 @@ import logging
 from http import HTTPStatus
 from typing import Final
 
-from aiohttp import web
-
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
 from ai.backend.common.dto.manager.etcd.request import (
     DeleteConfigRequest,
@@ -27,9 +25,13 @@ from ai.backend.common.dto.manager.etcd.response import (
     ResourceSlotsResponse,
     VfolderTypesResponse,
 )
+from ai.backend.common.dto.manager.resource.response import ContainerRegistriesResponse
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.resource import get_container_registries
-from ai.backend.manager.dto.context import RequestCtx, UserContext
+from ai.backend.manager.dto.context import UserContext
+from ai.backend.manager.services.container_registry.actions.get_container_registries import (
+    GetContainerRegistriesAction,
+)
+from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.etcd_config import (
     DeleteConfigAction,
     GetConfigAction,
@@ -38,7 +40,7 @@ from ai.backend.manager.services.etcd_config import (
     GetVfolderTypesAction,
     SetConfigAction,
 )
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -46,8 +48,14 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class EtcdHandler:
     """Etcd configuration API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(
+        self,
+        *,
+        container_registry: ContainerRegistryProcessors,
+        etcd_config: EtcdConfigProcessors,
+    ) -> None:
+        self._container_registry = container_registry
+        self._etcd_config = etcd_config
 
     # ------------------------------------------------------------------
     # GET /config/resource-slots
@@ -56,7 +64,7 @@ class EtcdHandler:
     async def get_resource_slots(self) -> APIResponse:
         log.info("ETCD.GET_RESOURCE_SLOTS ()")
         action = GetResourceSlotsAction()
-        result = await self._processors.etcd_config.get_resource_slots.wait_for_complete(action)
+        result = await self._etcd_config.get_resource_slots.wait_for_complete(action)
         resp = ResourceSlotsResponse(root=result.slots)
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -71,7 +79,7 @@ class EtcdHandler:
         params = query.parsed
         log.info("ETCD.GET_RESOURCE_METADATA (sg:{})", params.sgroup)
         action = GetResourceMetadataAction(sgroup=params.sgroup)
-        result = await self._processors.etcd_config.get_resource_metadata.wait_for_complete(action)
+        result = await self._etcd_config.get_resource_metadata.wait_for_complete(action)
         resp = ResourceMetadataResponse(root=result.metadata)
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -82,7 +90,7 @@ class EtcdHandler:
     async def get_vfolder_types(self) -> APIResponse:
         log.info("ETCD.GET_VFOLDER_TYPES ()")
         action = GetVfolderTypesAction()
-        result = await self._processors.etcd_config.get_vfolder_types.wait_for_complete(action)
+        result = await self._etcd_config.get_vfolder_types.wait_for_complete(action)
         resp = VfolderTypesResponse(root=result.types)
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -90,13 +98,16 @@ class EtcdHandler:
     # GET /config/docker-registries  (deprecated)
     # ------------------------------------------------------------------
 
-    async def get_docker_registries(self, ctx: RequestCtx) -> web.StreamResponse:
+    async def get_docker_registries(self, ctx: UserContext) -> APIResponse:
         log.info("ETCD.GET_DOCKER_REGISTRIES ()")
         log.warning(
             "ETCD.GET_DOCKER_REGISTRIES has been deprecated because it no longer uses etcd."
             " Use /resource/container-registries API instead."
         )
-        return await get_container_registries(ctx.request)
+        result = await self._container_registry.get_container_registries.wait_for_complete(
+            GetContainerRegistriesAction()
+        )
+        return APIResponse.build(HTTPStatus.OK, ContainerRegistriesResponse(root=result.registries))
 
     # ------------------------------------------------------------------
     # POST /config/get  (superadmin)
@@ -122,7 +133,7 @@ class EtcdHandler:
             params.prefix,
         )
         action = GetConfigAction(key=params.key, prefix=params.prefix)
-        result = await self._processors.etcd_config.get_config.wait_for_complete(action)
+        result = await self._etcd_config.get_config.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, ConfigResultResponse(result=result.result))
 
     # ------------------------------------------------------------------
@@ -143,7 +154,7 @@ class EtcdHandler:
             params.value,
         )
         action = SetConfigAction(key=params.key, value=params.value)
-        await self._processors.etcd_config.set_config.wait_for_complete(action)
+        await self._etcd_config.set_config.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, OkResultResponse())
 
     # ------------------------------------------------------------------
@@ -170,5 +181,5 @@ class EtcdHandler:
             params.prefix,
         )
         action = DeleteConfigAction(key=params.key, prefix=params.prefix)
-        await self._processors.etcd_config.delete_config.wait_for_complete(action)
+        await self._etcd_config.delete_config.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, OkResultResponse())

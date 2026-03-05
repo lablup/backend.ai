@@ -6,23 +6,21 @@ from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
-from ai.backend.manager.api.rest.server_status import ALL_ALLOWED, server_status_required
 
 from .handler import AclHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_acl_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_acl_routes(handler: AclHandler, route_deps: RouteDeps) -> RouteRegistry:
     """Build the ACL sub-application."""
-    reg = RouteRegistry.create("acl", deps.cors_options)
-    handler = AclHandler()
+    reg = RouteRegistry.create("acl", route_deps.cors_options)
 
     reg.add(
         "GET",
         "",
         handler.get_permission,
-        middlewares=[auth_required, server_status_required(ALL_ALLOWED, deps.config_provider)],
+        middlewares=[auth_required, route_deps.all_status_mw],
     )
     return reg

@@ -48,7 +48,7 @@ from ai.backend.manager.services.domain.actions.search_domains import SearchDoma
 from .adapter import DomainAdapter
 
 if TYPE_CHECKING:
-    from ai.backend.manager.services.processors import Processors
+    from ai.backend.manager.services.domain.processors import DomainProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -56,8 +56,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class DomainHandler:
     """Domain API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, domain: DomainProcessors) -> None:
+        self._domain = domain
         self._adapter = DomainAdapter()
 
     # ------------------------------------------------------------------
@@ -91,7 +91,7 @@ class DomainHandler:
             domain_name=ctx.user_domain,
         )
 
-        action_result = await self._processors.domain.create_domain.wait_for_complete(
+        action_result = await self._domain.create_domain.wait_for_complete(
             CreateDomainAction(creator=creator, user_info=user_info)
         )
 
@@ -108,7 +108,7 @@ class DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         log.info("GET_DOMAIN (ak:{}, d:{})", ctx.access_key, path.parsed.domain_name)
-        action_result = await self._processors.domain.get_domain.wait_for_complete(
+        action_result = await self._domain.get_domain.wait_for_complete(
             GetDomainAction(domain_name=path.parsed.domain_name)
         )
 
@@ -127,7 +127,7 @@ class DomainHandler:
         log.info("SEARCH_DOMAINS (ak:{})", ctx.access_key)
         querier = self._adapter.build_querier(body.parsed)
 
-        action_result = await self._processors.domain.search_domains.wait_for_complete(
+        action_result = await self._domain.search_domains.wait_for_complete(
             SearchDomainsAction(querier=querier)
         )
 
@@ -160,7 +160,7 @@ class DomainHandler:
             domain_name=ctx.user_domain,
         )
 
-        action_result = await self._processors.domain.modify_domain.wait_for_complete(
+        action_result = await self._domain.modify_domain.wait_for_complete(
             ModifyDomainAction(user_info=user_info, updater=updater)
         )
 
@@ -183,7 +183,7 @@ class DomainHandler:
             domain_name=ctx.user_domain,
         )
 
-        await self._processors.domain.delete_domain.wait_for_complete(
+        await self._domain.delete_domain.wait_for_complete(
             DeleteDomainAction(name=body.parsed.name, user_info=user_info)
         )
 
@@ -206,7 +206,7 @@ class DomainHandler:
             domain_name=ctx.user_domain,
         )
 
-        await self._processors.domain.purge_domain.wait_for_complete(
+        await self._domain.purge_domain.wait_for_complete(
             PurgeDomainAction(name=body.parsed.name, user_info=user_info)
         )
 

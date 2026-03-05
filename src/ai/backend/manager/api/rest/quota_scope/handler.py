@@ -29,7 +29,7 @@ from ai.backend.manager.services.vfs_storage.actions.set_quota_scope import SetQ
 from ai.backend.manager.services.vfs_storage.actions.unset_quota_scope import UnsetQuotaScopeAction
 
 if TYPE_CHECKING:
-    from ai.backend.manager.services.processors import Processors
+    from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -37,8 +37,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class QuotaScopeHandler:
     """Quota scope API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, vfs_storage: VFSStorageProcessors) -> None:
+        self._vfs_storage = vfs_storage
 
     async def get(
         self,
@@ -47,7 +47,7 @@ class QuotaScopeHandler:
     ) -> APIResponse:
         """Get a single quota scope by storage host and scope ID."""
         log.info("GET (ak:{})", ctx.access_key)
-        result = await self._processors.vfs_storage.get_quota_scope.wait_for_complete(
+        result = await self._vfs_storage.get_quota_scope.wait_for_complete(
             GetQuotaScopeAction(
                 storage_host_name=path.parsed.storage_host_name,
                 quota_scope_id=path.parsed.quota_scope_id,
@@ -70,7 +70,7 @@ class QuotaScopeHandler:
     ) -> APIResponse:
         """Search all quota scopes across all volumes."""
         log.info("SEARCH (ak:{})", ctx.access_key)
-        result = await self._processors.vfs_storage.search_quota_scopes.wait_for_complete(
+        result = await self._vfs_storage.search_quota_scopes.wait_for_complete(
             SearchQuotaScopesAction()
         )
         quota_scopes = [
@@ -104,7 +104,7 @@ class QuotaScopeHandler:
     ) -> APIResponse:
         """Set quota limit for a scope."""
         log.info("SET_QUOTA (ak:{})", ctx.access_key)
-        result = await self._processors.vfs_storage.set_quota_scope.wait_for_complete(
+        result = await self._vfs_storage.set_quota_scope.wait_for_complete(
             SetQuotaScopeAction(
                 storage_host_name=body.parsed.storage_host_name,
                 quota_scope_id=body.parsed.quota_scope_id,
@@ -128,7 +128,7 @@ class QuotaScopeHandler:
     ) -> APIResponse:
         """Unset (remove) quota limit for a scope."""
         log.info("UNSET_QUOTA (ak:{})", ctx.access_key)
-        result = await self._processors.vfs_storage.unset_quota_scope.wait_for_complete(
+        result = await self._vfs_storage.unset_quota_scope.wait_for_complete(
             UnsetQuotaScopeAction(
                 storage_host_name=body.parsed.storage_host_name,
                 quota_scope_id=body.parsed.quota_scope_id,

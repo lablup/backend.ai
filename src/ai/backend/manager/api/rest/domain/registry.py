@@ -10,13 +10,12 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from .handler import DomainHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_domain_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_domain_routes(handler: DomainHandler, route_deps: RouteDeps) -> RouteRegistry:
     """Build the domain sub-registry (child of admin)."""
-    reg = RouteRegistry.create("domains", deps.cors_options)
-    handler = DomainHandler(processors=deps.processors)
+    reg = RouteRegistry.create("domains", route_deps.cors_options)
 
     reg.add("POST", "", handler.create, middlewares=[superadmin_required])
     reg.add(

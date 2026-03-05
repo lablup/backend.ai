@@ -76,6 +76,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
     VFolderPermission,
     VFolderPermissionRow,
+    VFolderPermissionSetAlias,
     VFolderRow,
     VFolderStatusSet,
     delete_vfolder_relation_rows,
@@ -1578,6 +1579,62 @@ class VfolderRepository:
         if len(entries) == 0:
             raise VFolderNotFound(extra_data=vfolder_id)
         return True
+
+    @vfolder_repository_resilience.apply()
+    async def get_accessible_rows(
+        self,
+        user_uuid: uuid.UUID,
+        user_role: UserRole,
+        domain_name: str,
+        is_admin: bool,
+        allowed_vfolder_types: Sequence[str],
+        perm: VFolderPermissionSetAlias | VFolderPermission,
+        folder_id_or_name: str | uuid.UUID,
+        *,
+        allowed_status_set: VFolderStatusSet | None = None,
+        allow_privileged_access: bool = False,
+    ) -> Sequence[Mapping[str, Any]]:
+        """
+        Build permission conditions and query accessible vfolders.
+
+        This is the repository-layer replacement for the legacy
+        ``resolve_vfolder_rows()`` that previously lived in the API layer.
+        """
+        vf_user_cond = None
+        vf_group_cond: sa.ColumnElement[bool] | None = None
+
+        match perm:
+            case VFolderPermissionSetAlias():
+                invited_perm_cond = vfolder_permissions.c.permission.in_(list(perm.value))
+                if not is_admin:
+                    vf_group_cond = vfolders.c.permission.in_(list(perm.value))
+            case _:
+                invited_perm_cond = vfolder_permissions.c.permission == perm
+                if not is_admin:
+                    vf_group_cond = vfolders.c.permission == perm
+
+        match folder_id_or_name:
+            case str():
+                extra_vf_conds = vfolders.c.name == folder_id_or_name
+            case uuid.UUID():
+                extra_vf_conds = vfolders.c.id == folder_id_or_name
+            case _:
+                raise RuntimeError(f"Unsupported VFolder index type {type(folder_id_or_name)}")
+
+        async with self._db.begin_readonly() as conn:
+            return await query_accessible_vfolders(
+                conn,
+                user_uuid,
+                allow_privileged_access=allow_privileged_access,
+                user_role=user_role,
+                domain_name=domain_name,
+                allowed_vfolder_types=allowed_vfolder_types,
+                extra_vf_conds=extra_vf_conds,
+                extra_invited_vf_conds=invited_perm_cond,
+                extra_vf_user_conds=vf_user_cond,
+                extra_vf_group_conds=vf_group_cond,
+                allowed_status_set=allowed_status_set,
+            )
 
     @vfolder_repository_resilience.apply()
     async def update_vfolder_max_size(
