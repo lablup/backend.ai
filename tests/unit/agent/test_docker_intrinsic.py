@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-import shutil
+import ctypes
+import ctypes.util
+import os
 import subprocess
 import sys
 import time
@@ -235,16 +237,27 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
             mock_docker_cls.assert_not_called()
 
 
+CLONE_NEWNET = 1 << 30
+
+
+def _unshare_newnet() -> None:
+    """preexec_fn: create a new network namespace via libc unshare()."""
+    libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
+    if libc.unshare(CLONE_NEWNET) == -1:
+        errno = ctypes.get_errno()
+        raise OSError(errno, os.strerror(errno))
+
+
 @pytest.mark.skipif(sys.platform != "linux", reason="Network namespaces require Linux")
-@pytest.mark.skipif(not shutil.which("unshare"), reason="unshare command not found")
 class TestNetstatNsWork:
     """Tests for netstat_ns_work with real namespace switching."""
 
     @pytest.fixture
     def netns_process(self) -> Iterator[subprocess.Popen[bytes]]:
-        """Spawn a sleep process in a new network namespace via unshare."""
+        """Spawn a sleep process in a new network namespace."""
         proc = subprocess.Popen(
-            ["unshare", "--net", "sleep", "30"],
+            ["sleep", "30"],
+            preexec_fn=_unshare_newnet,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
