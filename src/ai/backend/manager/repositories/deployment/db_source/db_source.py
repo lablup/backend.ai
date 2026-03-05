@@ -1020,7 +1020,10 @@ class DeploymentDBSource:
             DeploymentInfoSearchResult with items, total_count, and pagination info
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(EndpointRow).options(selectinload(EndpointRow.revisions))
+            query = sa.select(EndpointRow).options(
+                selectinload(EndpointRow.image_row),
+                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
+            )
 
             result = await execute_batch_querier(
                 db_sess,
