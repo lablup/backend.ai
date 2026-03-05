@@ -350,21 +350,21 @@ class AssignedUserConditions:
 
         return inner
 
+    @staticmethod
+    def exists_user_combined(user_conditions: list[QueryCondition]) -> QueryCondition:
+        """Combine multiple user conditions into single EXISTS subquery."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(UserRow.uuid == UserRoleRow.user_id)
+            for cond in user_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
+
+        return inner
+
 
 class AssignedUserOrders:
     """Query orders for assigned users."""
-
-    @staticmethod
-    def username(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return UserRow.username.asc()
-        return UserRow.username.desc()
-
-    @staticmethod
-    def email(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return UserRow.email.asc()
-        return UserRow.email.desc()
 
     @staticmethod
     def granted_at(ascending: bool = True) -> QueryOrder:

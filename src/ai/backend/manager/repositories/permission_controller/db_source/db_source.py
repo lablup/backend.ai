@@ -638,13 +638,7 @@ class PermissionDBSource:
     ) -> AssignedUserListResult:
         """Searches users assigned to a specific role with pagination and filtering."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(UserRow, UserRoleRow).select_from(
-                sa.join(
-                    UserRow,
-                    UserRoleRow,
-                    UserRoleRow.user_id == UserRow.uuid,
-                )
-            )
+            query = sa.select(UserRoleRow)
             result = await execute_batch_querier(
                 db_sess,
                 query,
@@ -654,7 +648,7 @@ class PermissionDBSource:
             items = [
                 AssignedUserData(
                     id=row.UserRoleRow.id,
-                    user_id=row.UserRow.uuid,
+                    user_id=row.UserRoleRow.user_id,
                     role_id=row.UserRoleRow.role_id,
                     granted_by=row.UserRoleRow.granted_by,
                     granted_at=row.UserRoleRow.granted_at,
