@@ -355,7 +355,11 @@ class AssignedUserConditions:
         """Combine multiple user conditions into single EXISTS subquery."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subq = sa.select(sa.literal(1)).where(UserRow.uuid == UserRoleRow.user_id)
+            subq = (
+                sa.select(sa.literal(1))
+                .where(UserRow.uuid == UserRoleRow.user_id)
+                .correlate(UserRoleRow)
+            )
             for cond in user_conditions:
                 subq = subq.where(cond())
             return sa.exists(subq)
