@@ -14,14 +14,10 @@ from ai.backend.common.dto.storage.response import FileDeleteAsyncResponse
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
-    VFolderHostPermission,
-    VFolderID,
 )
-from ai.backend.manager.data.vfolder.types import ValidatedVFolderInfo
 from ai.backend.manager.errors.storage import VFolderInvalidParameter
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.file import (
-    CreateArchiveDownloadSessionAction,
     CreateDownloadSessionAction,
     CreateUploadSessionAction,
     DeleteFilesAction,
@@ -51,9 +47,7 @@ def mock_vfolder_repository() -> MagicMock:
 @pytest.fixture
 def mock_config_provider() -> MagicMock:
     provider = MagicMock()
-    provider.legacy_etcd_config_loader.get_vfolder_types = AsyncMock(
-        return_value=["user", "group"]
-    )
+    provider.legacy_etcd_config_loader.get_vfolder_types = AsyncMock(return_value=["user", "group"])
     return provider
 
 
@@ -90,7 +84,9 @@ def mock_storage_manager() -> MagicMock:
     )
     mock_client.mkdir = AsyncMock(return_value={"results": [{"path": "newdir", "success": True}]})
     manager.get_manager_facing_client.return_value = mock_client
-    manager.get_client_api_url.return_value = MagicMock(__truediv__=lambda self, path: f"http://storage:6021/{path}")
+    manager.get_client_api_url.return_value = MagicMock(
+        __truediv__=lambda self, path: f"http://storage:6021/{path}"
+    )
     return manager
 
 
