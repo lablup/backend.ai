@@ -10,9 +10,13 @@ from ai.backend.logging import BraceStyleAdapter
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def setns(fd: int) -> None:
+def _get_libc() -> ctypes.CDLL:
     libc_path = ctypes.util.find_library("c")
-    libc = ctypes.CDLL(libc_path, use_errno=True)
+    return ctypes.CDLL(libc_path, use_errno=True)
+
+
+def setns(fd: int) -> None:
+    libc = _get_libc()
     CLONE_NEWNET = 1 << 30
     ret = libc.setns(fd, CLONE_NEWNET)
     if ret == -1:
