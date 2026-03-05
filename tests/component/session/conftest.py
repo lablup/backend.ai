@@ -20,8 +20,6 @@ from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.session.handler import SessionHandler
 from ai.backend.manager.api.rest.session.registry import register_session_routes
@@ -109,7 +107,6 @@ def server_module_registries(
 ) -> list[RouteRegistry]:
     """Load only the modules required for session component tests."""
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_session_routes(
             SessionHandler(
                 auth=auth_processors,

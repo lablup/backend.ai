@@ -3,8 +3,6 @@ from __future__ import annotations
 import asyncio
 import functools
 import grp
-import importlib
-import importlib.resources
 import logging
 import os
 import pwd
@@ -25,12 +23,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import (
-    TYPE_CHECKING,
     Any,
     Final,
 )
 
-import aiohttp_cors
 import aiomonitor
 import aiotools
 import click
@@ -49,11 +45,7 @@ from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import build_prometheus_metrics_handler
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.multiprocess import cleanup_prometheus_multiprocess_dir
-from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.common.types import (
-    AgentSelectionStrategy,
-)
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import (
@@ -63,150 +55,18 @@ from ai.backend.logging.otel import (
 
 from . import __version__
 from .api import ManagerStatus
-from .api.rest import build_api_routes
 from .api.rest.middleware import (
-    build_api_metric_middleware,
     build_auth_middleware,
     build_exception_middleware,
-    request_id_middleware,
 )
-from .api.rest.routing import RouteRegistry
-from .api.rest.types import CORSOptions, GQLContextDeps
 from .config.bootstrap import BootstrapConfig
 from .config.unified import EventLoopType
 from .dependencies import DependencyInput, DependencyResources, ManagerDependencyComposer
-from .errors.common import (
-    GenericBadRequest,
-    InternalServerError,
-    ServerMisconfiguredError,
-)
 from .plugin.webapp import WebappPluginContext
-
-if TYPE_CHECKING:
-    from .api.rest.types import WebRequestHandler
-
-VALID_VERSIONS: Final = frozenset([
-    # 'v1.20160915',  # deprecated
-    # 'v2.20170315',  # deprecated
-    # 'v3.20170615',  # deprecated
-    # authentication changed not to use request bodies
-    "v4.20181215",
-    # added & enabled streaming-execute API
-    "v4.20190115",
-    # changed resource/image formats
-    "v4.20190315",
-    # added user mgmt and ID/password authentication
-    # added domain/group/scaling-group
-    # added domain/group/scaling-group ref. fields to user/keypair/vfolder objects
-    "v4.20190615",
-    # added mount_map parameter when creating kernel
-    # changed GraphQL query structures for multi-container bundled sessions
-    "v5.20191215",
-    # rewrote vfolder upload/download APIs to migrate to external storage proxies
-    "v6.20200815",
-    # added standard-compliant /admin/gql endpoint
-    # deprecated /admin/graphql endpoint (still present for backward compatibility)
-    # added "groups_by_name" GQL query
-    # added "filter" and "order" arg to all paginated GQL queries with their own expression mini-langs
-    # removed "order_key" and "order_asc" arguments from all paginated GQL queries (never used!)
-    "v6.20210815",
-    # added session dependencies and state callback URLs configs when creating sessions
-    # added session event webhook option to session creation API
-    # added architecture option when making image aliases
-    "v6.20220315",
-    # added payload encryption / decryption on selected transfer
-    "v6.20220615",
-    # added config/resource-slots/details, model mgmt & serving APIs
-    "v6.20230315",
-    # added quota scopes (per-user/per-project quota configs)
-    # added user & project resource policies
-    # deprecated per-vfolder quota configs (BREAKING)
-    "v7.20230615",
-    # added /vfolders API set to replace name-based refs to ID-based refs to work with vfolders
-    # set pending deprecation for the legacy /folders API set
-    # added vfolder trash bin APIs
-    # changed the image registry management API to allow per-project registry configs (BREAKING)
-    "v8.20240315",
-    # added session priority and Relay-compliant ComputeSessioNode, KernelNode queries
-    # added dependents/dependees/graph query fields to ComputeSessioNode
-    "v8.20240915",
-    # added explicit attach_network option to session creation config
-    "v9.20250722",
-    # added model_ids, model_id_map options to session creation config
-    # <future>
-    # TODO: replaced keypair-based resource policies to user-based resource policies
-    # TODO: began SSO support using per-external-service keypairs (e.g., for FastTrack)
-    # TODO: added an initial version of RBAC for projects and vfolders
-])
-LATEST_REV_DATES: Final = {
-    1: "20160915",
-    2: "20170915",
-    3: "20181215",
-    4: "20190615",
-    5: "20191215",
-    6: "20230315",
-    7: "20230615",
-    8: "20240915",
-    9: "20250722",
-}
-LATEST_API_VERSION: Final = "v9.20250722"
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
-
-
-async def hello(_request: web.Request) -> web.Response:
-    """
-    Returns the API version number.
-    """
-    return web.json_response({
-        "version": LATEST_API_VERSION,
-        "manager": __version__,
-    })
-
-
-async def on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
-    response.headers["Server"] = "BackendAI"
-
-
-@web.middleware
-async def api_middleware(request: web.Request, handler: WebRequestHandler) -> web.StreamResponse:
-    _handler = handler
-    method_override = request.headers.get("X-Method-Override", None)
-    if method_override:
-        request = request.clone(method=method_override)
-        new_match_info = await request.app.router.resolve(request)
-        if new_match_info is None:
-            raise InternalServerError("No matching method handler found")
-        _handler = new_match_info.handler
-        request._match_info = new_match_info
-    ex = request.match_info.http_exception
-    if ex is not None:
-        # handled by exception_middleware
-        raise ex
-    new_api_version = request.headers.get("X-BackendAI-Version")
-    legacy_api_version = request.headers.get("X-Sorna-Version")
-    api_version = new_api_version or legacy_api_version
-    try:
-        if api_version is None:
-            path_major_version = int(request.match_info.get("version", 5))
-            revision_date = LATEST_REV_DATES[path_major_version]
-            request["api_version"] = (path_major_version, revision_date)
-        elif api_version in VALID_VERSIONS:
-            hdr_major_version, revision_date = api_version.split(".", maxsplit=1)
-            request["api_version"] = (int(hdr_major_version[1:]), revision_date)
-        else:
-            return GenericBadRequest("Unsupported API version.")
-    except (ValueError, KeyError):
-        return GenericBadRequest("Unsupported API version.")
-    return await _handler(request)
-
-
-# exception_middleware and auth_middleware are now created via factory functions
-# (build_exception_middleware / build_auth_middleware) in the middleware package.
-# They are inserted into the root application middleware list in server_main()
-# after all dependencies are initialized.
 
 
 @asynccontextmanager
@@ -284,6 +144,8 @@ def _init_subapp(
     subapp: web.Application,
     global_middlewares: Iterable[Middleware],
 ) -> None:
+    from .api.rest.app import on_prepare
+
     subapp.on_response_prepare.append(on_prepare)
 
     async def _set_root_app(subapp: web.Application) -> None:
@@ -296,180 +158,6 @@ def _init_subapp(
     prefix = subapp["prefix"]
     root_app.add_subapp("/" + prefix, subapp)
     root_app.middlewares.extend(global_middlewares)
-
-
-def _mount_registry_tree(
-    root_app: web.Application,
-    root_registry: RouteRegistry,
-    pidx: int = 0,
-) -> None:
-    """Flatten the registry tree and mount all subapps on *root_app*."""
-
-    async def _bridge_root_app(subapp: web.Application) -> None:
-        subapp["_root_app"] = root_app
-
-    for prefix, app, _reg in root_registry.collect_apps():
-        if pidx == 0:
-            log.info("Loading module: {}", prefix)
-        app["_registry_prefix"] = prefix
-        app.on_startup.insert(0, _bridge_root_app)
-        root_app.add_subapp("/" + prefix, app)
-
-
-def _setup_api(
-    root_app: web.Application,
-    dep_resources: DependencyResources,
-    pidx: int,
-) -> None:
-    """Build the full API module tree and mount it on *root_app*.
-
-    Must be called **after** the Composer has run (so that
-    ``dep_resources.processing.processors`` is available) but **before**
-    ``runner.setup()`` freezes the application router.
-    """
-    r = dep_resources
-    gql_context_deps = GQLContextDeps(
-        config_provider=r.bootstrap.config_provider,
-        etcd=r.bootstrap.etcd,
-        db=r.infrastructure.db,
-        valkey_stat=r.infrastructure.valkey.stat,
-        valkey_image=r.infrastructure.valkey.image,
-        valkey_live=r.infrastructure.valkey.live,
-        valkey_schedule=r.infrastructure.valkey.schedule,
-        network_plugin_ctx=r.plugins.network_plugin_ctx,
-        background_task_manager=r.system.background_task_manager,
-        services_ctx=r.domain.services_ctx,
-        storage_manager=r.components.storage_manager,
-        registry=r.agents.registry,
-        idle_checker_host=r.orchestration.idle_checker_host,
-        metric_observer=r.system.metrics.gql,
-        processors=r.processing.processors,
-        scheduler_repository=r.domain.repositories.scheduler.repository,
-        user_repository=r.domain.repositories.user.repository,
-        agent_repository=r.domain.repositories.agent.repository,
-    )
-
-    # 1. Build API module tree
-    root_registry = RouteRegistry.create("", r.system.cors_options)
-    for sub in build_api_routes(
-        processors=r.processing.processors,
-        cors_options=r.system.cors_options,
-        config_provider=r.bootstrap.config_provider,
-        error_monitor=r.monitoring.error_monitor,
-        gql_context_deps=gql_context_deps,
-        valkey_rate_limit=r.infrastructure.valkey.rate_limit,
-        health_probe=r.system.health_probe,
-        root_app=root_app,
-        stream_cleanup_handler=r.processing.stream_cleanup_handler,
-        pidx=pidx,
-    ):
-        root_registry.add_subregistry(sub)
-
-    # 2. Flatten and mount all on root_app
-    _mount_registry_tree(root_app, root_registry, pidx)
-
-    # 3. Root middleware — only registered here, never from modules
-    rlim_reg = root_registry.find_subregistry("ratelimit")
-    if rlim_reg is not None and rlim_reg.rlim_middleware is not None:
-        root_app.middlewares.append(rlim_reg.rlim_middleware)
-
-
-def mount_registries(
-    root_app: web.Application,
-    registries: Sequence[RouteRegistry],
-    *,
-    cors_options: CORSOptions | None = None,
-) -> None:
-    """Mount pre-built registries on *root_app*.
-
-    Public API used by ``tests/component/conftest.py`` to mount only
-    the modules needed for a particular test.
-    """
-    root_registry = RouteRegistry.create("", cors_options or {})
-    for reg in registries:
-        root_registry.add_subregistry(reg)
-    _mount_registry_tree(root_app, root_registry)
-
-    # Install ratelimit middleware on root app if the module is present
-    rlim_reg = root_registry.find_subregistry("ratelimit")
-    if rlim_reg is not None and rlim_reg.rlim_middleware is not None:
-        root_app.middlewares.append(rlim_reg.rlim_middleware)
-
-
-def build_root_app(
-    pidx: int,
-    bootstrap_config: BootstrapConfig,
-    *,
-    scheduler_opts: Mapping[str, Any] | None = None,
-) -> web.Application:
-    if bootstrap_config.pyroscope.enabled:
-        if (
-            not bootstrap_config.pyroscope.app_name
-            or not bootstrap_config.pyroscope.server_addr
-            or not bootstrap_config.pyroscope.sample_rate
-        ):
-            raise ValueError("Pyroscope configuration is incomplete.")
-
-        Profiler(
-            pyroscope_args=PyroscopeArgs(
-                enabled=bootstrap_config.pyroscope.enabled,
-                application_name=bootstrap_config.pyroscope.app_name,
-                server_address=bootstrap_config.pyroscope.server_addr,
-                sample_rate=bootstrap_config.pyroscope.sample_rate,
-            )
-        )
-
-    metrics = CommonMetricRegistry.instance()
-    cors_options = {
-        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
-            allow_credentials=False, expose_headers="*", allow_headers="*"
-        ),
-    }
-    app = web.Application(
-        middlewares=[
-            request_id_middleware,
-            # exception_middleware and auth_middleware are inserted later
-            # in server_main() after dependencies are available.
-            api_middleware,
-            build_api_metric_middleware(metrics.api),
-        ]
-    )
-    global_exception_handler = functools.partial(handle_loop_error)
-    loop = asyncio.get_running_loop()
-    loop.set_exception_handler(global_exception_handler)
-
-    # If the request path starts with the following route, the auth_middleware is bypassed.
-    # In this case, all authentication flags are turned off.
-    # Used in special cases where the request headers cannot be modified.
-    app["auth_middleware_allowlist"] = [
-        "/container-registries/webhook",
-    ]
-
-    app["_pidx"] = pidx
-    app["_cors_options"] = cors_options
-    app["_metrics"] = metrics
-    default_scheduler_opts = {
-        "limit": 2048,
-        "close_timeout": 30,
-        "exception_handler": global_exception_handler,
-        "agent_selection_strategy": AgentSelectionStrategy.DISPERSED,
-    }
-    app["scheduler_opts"] = {
-        **default_scheduler_opts,
-        **(scheduler_opts if scheduler_opts is not None else {}),
-    }
-    app.on_response_prepare.append(on_prepare)
-
-    cors = aiohttp_cors.setup(app, defaults=cors_options)
-    # should be done in create_app() in other modules.
-    cors.add(app.router.add_route("GET", r"", hello))
-    cors.add(app.router.add_route("GET", r"/", hello))
-
-    vendor_path = importlib.resources.files("ai.backend.manager.vendor")
-    if not isinstance(vendor_path, Path):
-        raise ServerMisconfiguredError("vendor_path must be a Path instance")
-    app.router.add_static("/static/vendor", path=vendor_path, name="static")
-    return app
 
 
 def build_prometheus_service_discovery_handler(
@@ -610,7 +298,13 @@ async def server_main(
 
     await manager_init_stack.__aenter__()
     try:
-        root_app = build_root_app(pidx, boostrap_config)
+        from .api.rest.app import build_root_app
+
+        root_app = build_root_app(
+            pidx,
+            boostrap_config,
+            loop_error_handler=functools.partial(handle_loop_error),
+        )
 
         await manager_init_stack.enter_async_context(aiomonitor_ctx())
 
@@ -653,7 +347,9 @@ async def server_main(
 
         # Build and mount the API module tree.
         # Must happen before runner.setup() which freezes the application router.
-        _setup_api(root_app, dep_resources, pidx)
+        from .api.rest.setup import setup_api
+
+        setup_api(root_app, dep_resources, pidx)
 
         # Manager status check
         config_provider = dep_resources.bootstrap.config_provider

@@ -15,8 +15,6 @@ from ai.backend.common.types import HostPortPair, ResourceSlot
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.api.rest.agent.handler import AgentHandler
 from ai.backend.manager.api.rest.agent.registry import register_agent_routes
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -28,7 +26,6 @@ from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
-from ai.backend.manager.services.auth.processors import AuthProcessors
 
 
 @pytest.fixture()
@@ -93,12 +90,10 @@ def agent_processors(
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
-    auth_processors: AuthProcessors,
     agent_processors: AgentProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for agent-api-domain tests."""
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_agent_routes(AgentHandler(agent=agent_processors), route_deps),
     ]
 

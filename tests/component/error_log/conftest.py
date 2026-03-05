@@ -7,8 +7,6 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.error_log.handler import ErrorLogHandler
 from ai.backend.manager.api.rest.error_log.registry import register_error_log_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -16,7 +14,6 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.models.error_logs import error_logs
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.error_log.repository import ErrorLogRepository
-from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.error_log.service import ErrorLogService
 
@@ -31,12 +28,10 @@ def error_log_processors(database_engine: ExtendedAsyncSAEngine) -> ErrorLogProc
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
-    auth_processors: AuthProcessors,
     error_log_processors: ErrorLogProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for error-log domain tests."""
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_error_log_routes(ErrorLogHandler(error_log=error_log_processors), route_deps),
     ]
 

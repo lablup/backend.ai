@@ -11,8 +11,6 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.image.handler import ImageHandler
 from ai.backend.manager.api.rest.image.registry import register_image_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -25,7 +23,6 @@ from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.image.repository import ImageRepository
-from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
 
@@ -45,13 +42,11 @@ def image_processors(
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
-    auth_processors: AuthProcessors,
     image_processors: ImageProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for image-domain tests."""
     image_registry = register_image_routes(ImageHandler(image=image_processors), route_deps)
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_admin_routes(
             AdminHandler(gql_schema=MagicMock(), gql_deps=MagicMock()),
             route_deps,

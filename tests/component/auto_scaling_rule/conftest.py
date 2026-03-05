@@ -14,8 +14,6 @@ from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
-from ai.backend.manager.api.rest.auth.handler import AuthHandler
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 from ai.backend.manager.api.rest.auto_scaling_rule.handler import AutoScalingRuleHandler
 from ai.backend.manager.api.rest.auto_scaling_rule.registry import register_auto_scaling_rule_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -27,7 +25,6 @@ from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
-from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 
@@ -68,7 +65,6 @@ def deployment_processors(
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
-    auth_processors: AuthProcessors,
     deployment_processors: DeploymentProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for auto-scaling-rule-domain tests."""
@@ -76,7 +72,6 @@ def server_module_registries(
         AutoScalingRuleHandler(deployment=deployment_processors), route_deps
     )
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
         register_admin_routes(
             AdminHandler(gql_schema=MagicMock(), gql_deps=MagicMock()),
             route_deps,
