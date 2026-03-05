@@ -1,3 +1,4 @@
+from .all_slot_types import AllSlotTypesAction, AllSlotTypesResult
 from .get_agent_resources import GetAgentResourcesAction, GetAgentResourcesResult
 from .get_domain_resource_overview import (
     GetDomainResourceOverviewAction,
@@ -17,6 +18,8 @@ from .search_resource_allocations import (
 from .search_resource_slot_types import SearchResourceSlotTypesAction, SearchResourceSlotTypesResult
 
 __all__ = (
+    "AllSlotTypesAction",
+    "AllSlotTypesResult",
     "GetAgentResourcesAction",
     "GetAgentResourcesResult",
     "GetDomainResourceOverviewAction",

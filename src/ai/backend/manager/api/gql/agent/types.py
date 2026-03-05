@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         KernelV2FilterGQL,
         KernelV2OrderByGQL,
     )
+    from ai.backend.manager.api.gql.resource_slot.types import AgentResourceConnectionGQL
     from ai.backend.manager.api.gql.session.types import (
         SessionV2ConnectionGQL,
         SessionV2FilterGQL,
@@ -488,6 +489,21 @@ class AgentV2GQL(Node):
             offset=offset,
             base_conditions=[SessionConditions.by_agent_id(self._agent_id)],
         )
+
+    @strawberry.field(  # type: ignore[misc]
+        description="Added in 26.4.0. Per-slot resource capacity and usage for this agent."
+    )
+    async def resource_slots(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> Annotated[
+        AgentResourceConnectionGQL,
+        strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
+    ]:
+        """Fetch per-slot resource capacity and usage for this agent."""
+        from ai.backend.manager.api.gql.resource_slot.fetcher import fetch_agent_resources
+
+        return await fetch_agent_resources(info=info, agent_id=str(self._agent_id))
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def

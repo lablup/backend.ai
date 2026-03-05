@@ -17,6 +17,7 @@ from ai.backend.common.types import AgentId, KernelId, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.resource_slot.types import ResourceAllocationConnectionGQL
     from ai.backend.manager.api.gql.session.types import SessionV2GQL
     from ai.backend.manager.repositories.base import QueryCondition
 
@@ -463,6 +464,21 @@ class KernelV2GQL(Node):
         | None
     ):
         raise NotImplementedError
+
+    @strawberry.field(  # type: ignore[misc]
+        description="Added in 26.4.0. Per-slot resource allocation for this kernel."
+    )
+    async def resource_allocations(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> Annotated[
+        ResourceAllocationConnectionGQL,
+        strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
+    ]:
+        """Fetch per-slot resource allocation for this kernel."""
+        from ai.backend.manager.api.gql.resource_slot.fetcher import fetch_kernel_allocations
+
+        return await fetch_kernel_allocations(info=info, kernel_id=str(self.id))
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
