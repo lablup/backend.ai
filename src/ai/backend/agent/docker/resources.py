@@ -40,10 +40,12 @@ async def load_resources(
     if "cpu" not in compute_plugin_ctx.plugins:
         cpu_config = await etcd.get_prefix("config/plugins/cpu")
         cpu_plugin = CPUPlugin(cpu_config, local_config)
+        await cpu_plugin.init()
         compute_plugin_ctx.attach_intrinsic_device(cpu_plugin)
     if "mem" not in compute_plugin_ctx.plugins:
         memory_config = await etcd.get_prefix("config/plugins/memory")
         memory_plugin = MemoryPlugin(memory_config, local_config)
+        await memory_plugin.init()
         compute_plugin_ctx.attach_intrinsic_device(memory_plugin)
     for plugin_name, plugin_instance in compute_plugin_ctx.plugins.items():
         if not all(
