@@ -38,6 +38,7 @@ from ai.backend.common.dto.manager.deployment import (
     RouteDTO,
     RouteFilter,
     RouteOrder,
+    SearchDeploymentPoliciesRequest,
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
@@ -543,6 +544,11 @@ class DeploymentPolicyAdapter:
             created_at=data.created_at,
             updated_at=data.updated_at,
         )
+
+    def build_querier(self, request: SearchDeploymentPoliciesRequest) -> BatchQuerier:
+        """Build a BatchQuerier for deployment policies from search request."""
+        pagination = OffsetPagination(limit=request.limit, offset=request.offset)
+        return BatchQuerier(conditions=[], orders=[], pagination=pagination)
 
     def build_creator(
         self, request: CreateDeploymentPolicyRequest, deployment_id: UUID

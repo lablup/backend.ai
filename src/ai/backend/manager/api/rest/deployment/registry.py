@@ -61,7 +61,13 @@ def register_deployment_routes(deps: ModuleDeps) -> RouteRegistry:
         middlewares=[auth_required],
     )
 
-    # Policy routes (nested under deployment)
+    # Policy routes
+    reg.add(
+        "POST",
+        "/policies/search",
+        handler.search_deployment_policies,
+        middlewares=[auth_required],
+    )
     reg.add(
         "POST",
         "/{deployment_id}/policy",

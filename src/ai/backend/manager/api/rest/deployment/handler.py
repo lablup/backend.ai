@@ -27,6 +27,7 @@ from ai.backend.common.dto.manager.deployment import (
     GetDeploymentPolicyResponse,
     GetDeploymentResponse,
     GetRevisionResponse,
+    ListDeploymentPoliciesResponse,
     ListDeploymentsResponse,
     ListRevisionsResponse,
     ListRoutesResponse,
@@ -35,6 +36,7 @@ from ai.backend.common.dto.manager.deployment import (
     RevisionPathParam,
     RouteFilter,
     RoutePathParam,
+    SearchDeploymentPoliciesRequest,
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
@@ -62,6 +64,9 @@ from ai.backend.manager.services.deployment.actions.deployment_policy.create_dep
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy.get_deployment_policy import (
     GetDeploymentPolicyAction,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.search_deployment_policies import (
+    SearchDeploymentPoliciesAction,
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy.update_deployment_policy import (
     UpdateDeploymentPolicyAction,
@@ -454,6 +459,31 @@ class DeploymentAPIHandler:
 
         resp = UpdateDeploymentPolicyResponse(
             deployment_policy=self._policy_adapter.convert_to_dto(action_result.data)
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    async def search_deployment_policies(
+        self,
+        body: BodyParam[SearchDeploymentPoliciesRequest],
+    ) -> APIResponse:
+        """Search deployment policies with pagination."""
+        deployment_processors = self._get_deployment_processors()
+
+        querier = self._policy_adapter.build_querier(body.parsed)
+
+        action_result = await deployment_processors.search_deployment_policies.wait_for_complete(
+            SearchDeploymentPoliciesAction(querier=querier)
+        )
+
+        resp = ListDeploymentPoliciesResponse(
+            deployment_policies=[
+                self._policy_adapter.convert_to_dto(policy) for policy in action_result.data
+            ],
+            pagination=PaginationInfo(
+                total=action_result.total_count,
+                offset=body.parsed.offset,
+                limit=body.parsed.limit,
+            ),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
