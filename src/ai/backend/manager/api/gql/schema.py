@@ -170,6 +170,8 @@ from .project_v2 import (
 )
 from .rbac import (
     admin_assign_role,
+    admin_bulk_assign_role,
+    admin_bulk_revoke_role,
     admin_create_permission,
     admin_create_role,
     admin_delete_permission,
@@ -486,6 +488,8 @@ class Mutation:
     admin_delete_permission = admin_delete_permission
     admin_assign_role = admin_assign_role
     admin_revoke_role = admin_revoke_role
+    admin_bulk_assign_role = admin_bulk_assign_role
+    admin_bulk_revoke_role = admin_bulk_revoke_role
 
 
 @strawberry.type
