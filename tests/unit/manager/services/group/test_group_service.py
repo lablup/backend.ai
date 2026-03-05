@@ -1,5 +1,6 @@
 """
-Unit tests for GroupService search/get/usage actions:
+Unit tests for GroupService actions:
+CreateGroup, ModifyGroup, DeleteGroup, PurgeGroup,
 SearchProjects, SearchProjectsByDomain, SearchProjectsByUser, GetProject,
 UsagePerMonth, UsagePerPeriod.
 """
@@ -11,14 +12,18 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.group import ProjectType
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.group.types import (
@@ -26,6 +31,11 @@ from ai.backend.manager.repositories.group.types import (
     GroupSearchResult,
     UserProjectSearchScope,
 )
+from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
+from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
+from ai.backend.manager.services.group.actions.delete_group import DeleteGroupAction
+from ai.backend.manager.services.group.actions.modify_group import ModifyGroupAction
+from ai.backend.manager.services.group.actions.purge_group import PurgeGroupAction
 from ai.backend.manager.services.group.actions.search_projects import (
     GetProjectAction,
     SearchProjectsAction,
@@ -39,6 +49,7 @@ from ai.backend.manager.services.group.actions.usage_per_period import (
     UsagePerPeriodAction,
 )
 from ai.backend.manager.services.group.service import GroupService
+from ai.backend.manager.types import OptionalState
 
 
 def _make_group_data(
@@ -74,6 +85,275 @@ def _make_service(mock_repo: MagicMock) -> GroupService:
         valkey_stat_client=MagicMock(),
         group_repositories=group_repositories,
     )
+
+
+class TestCreateGroup:
+    """Tests for GroupService.create_group"""
+
+    @pytest.fixture
+    def mock_group_repository(self) -> MagicMock:
+        return MagicMock(spec=GroupRepository)
+
+    @pytest.fixture
+    def service(self, mock_group_repository: MagicMock) -> GroupService:
+        return _make_service(mock_group_repository)
+
+    async def test_create_returns_group_data(
+        self,
+        service: GroupService,
+        mock_group_repository: MagicMock,
+    ) -> None:
+        """name/description/domain_name returns GroupData (is_active=true)."""
+        group = _make_group_data(name="new-project", domain_name="default")
+        mock_group_repository.create = AsyncMock(return_value=group)
+
+        creator = Creator(
+            spec=GroupCreatorSpec(name="new-project", domain_name="default", description="desc")
+        )
+        action = CreateGroupAction(creator=creator)
+
+        result = await service.create_group(action)
+
+        assert result.data is not None
+        assert result.data.name == "new-project"
+        assert result.data.is_active is True
+        mock_group_repository.create.assert_called_once_with(creator)
+
+    async def test_create_with_resource_slots(
+        self,
+        service: GroupService,
+        mock_group_repository: MagicMock,
+    ) -> None:
+        """total_resource_slots JSON parsed correctly."""
+        slots = ResourceSlot.from_user_input({"cpu": "4", "mem": "8g"}, None)
+        group = _make_group_data(name="gpu-project")
+        mock_group_repository.create = AsyncMock(return_value=group)
+
+        creator = Creator(
+            spec=GroupCreatorSpec(
+                name="gpu-project",
+                domain_name="default",
+                total_resource_slots=slots,
+            )
+        )
+        action = CreateGroupAction(creator=creator)
+
+        result = await service.create_group(action)
+
+        assert result.data is not None
+        mock_group_repository.create.assert_called_once_with(creator)
+
+    async def test_duplicate_name_raises_conflict(
+        self,
+        service: GroupService,
+        mock_group_repository: MagicMock,
+    ) -> None:
+        """Same-domain duplicate name raises IntegrityError from repository."""
+        mock_group_repository.create = AsyncMock(side_effect=IntegrityError("duplicate", {}, None))
+
+        creator = Creator(spec=GroupCreatorSpec(name="existing", domain_name="default"))
+        action = CreateGroupAction(creator=creator)
+
+        with pytest.raises(IntegrityError):
+            await service.create_group(action)
+
+
+class TestModifyGroup:
+    """Tests for GroupService.modify_group"""
+
+    @pytest.fixture
+    def mock_group_repository(self) -> MagicMock:
+        return MagicMock(spec=GroupRepository)
+
+    @pytest.fixture
+    def service(self, mock_group_repository: MagicMock) -> GroupService:
+        return _make_service(mock_group_repository)
+
+    async def test_name_only_change_preserves_other_fields(
+        self,
+        service: GroupService,
+        mock_group_repository: MagicMock,
+    ) -> None:
+        """Name-only change preserves other fields."""
+        group = _make_group_data(name="renamed-project")
+        mock_group_repository.modify_validated = AsyncMock(return_value=group)
+
+        group_id = uuid.uuid4()
+        updater = Updater(
+            spec=GroupUpdaterSpec(name=OptionalState.update("renamed-project")),
+            pk_value=group_id,
+        )
+        action = ModifyGroupAction(updater=updater)
+
+        result = await service.modify_group(action)
+
+        assert result.data is not None
+        assert result.data.name == "renamed-project"
+        mock_group_repository.modify_validated.assert_called_once_with(updater, None, None)
+
+    async def test_add_user_members(
+        self,
+        service: GroupService,
+        mock_group_repository: MagicMock,
+    ) -> None:
+        """user_update_mode='add' + user_uuids adds members."""
+        group = _make_group_data(name="project")
+        mock_group_repository.modify_validated = AsyncMock(return_value=group)
+
+        user_uuids = [str(uuid.uuid4()), str(uuid.uuid4())]
+        group_id = uuid.uuid4()
+        updater = Updater(spec=GroupUpdaterSpec(), pk_value=group_id)
+        action = ModifyGroupAction(
+            updater=updater,
+            user_update_mode=OptionalState.update("add"),
+            user_uuids=OptionalState.update(user_uuids),
+        )
+
+        await service.modify_group(action)
+
+        call_args = mock_group_repository.modify_validated.call_args
+        assert call_args[0][1] == "add"
+        assert len(call_args[0][2]) == 2
+
+    async def test_remove_user_members(
+        self,
+        service: GroupService,
+        mock_group_repository: MagicMock,
+    ) -> None:
+        """user_update_mode='remove' removes members."""
+        group = _make_group_data(name="project")
+        mock_group_repository.modify_validated = AsyncMock(return_value=group)
+
+        user_uuids = [str(uuid.uuid4())]
+        group_id = uuid.uuid4()
+        updater = Updater(spec=GroupUpdaterSpec(), pk_value=group_id)
+        action = ModifyGroupAction(
+            updater=updater,
+            user_update_mode=OptionalState.update("remove"),
+            user_uuids=OptionalState.update(user_uuids),
+        )
+
+        await service.modify_group(action)
+
+        call_args = mock_group_repository.modify_validated.call_args
+        assert call_args[0][1] == "remove"
+
+    async def test_nonexistent_group_raises_not_found(
+        self,
+        service: GroupService,
+        mock_group_repository: MagicMock,
+    ) -> None:
+        """Non-existent group raises ProjectNotFound."""
+        mock_group_repository.modify_validated = AsyncMock(
+            side_effect=ProjectNotFound("Project not found")
+        )
+
+        updater = Updater(
+            spec=GroupUpdaterSpec(name=OptionalState.update("new-name")),
+            pk_value=uuid.uuid4(),
+        )
+        action = ModifyGroupAction(updater=updater)
+
+        with pytest.raises(ProjectNotFound):
+            await service.modify_group(action)
+
+
+class TestDeleteGroup:
+    """Tests for GroupService.delete_group"""
+
+    @pytest.fixture
+    def mock_group_repository(self) -> MagicMock:
+        return MagicMock(spec=GroupRepository)
+
+    @pytest.fixture
+    def service(self, mock_group_repository: MagicMock) -> GroupService:
+        return _make_service(mock_group_repository)
+
+    async def test_soft_delete_succeeds(
+        self,
+        service: GroupService,
+        mock_group_repository: MagicMock,
+    ) -> None:
+        """UUID soft delete sets is_active=false."""
+        group_id = uuid.uuid4()
+        mock_group_repository.mark_inactive = AsyncMock(return_value=None)
+
+        action = DeleteGroupAction(group_id=group_id)
+        result = await service.delete_group(action)
+
+        assert result.group_id == group_id
+        mock_group_repository.mark_inactive.assert_called_once_with(group_id)
+
+    async def test_already_inactive_is_idempotent(
+        self,
+        service: GroupService,
+        mock_group_repository: MagicMock,
+    ) -> None:
+        """Already inactive is idempotent."""
+        group_id = uuid.uuid4()
+        mock_group_repository.mark_inactive = AsyncMock(return_value=None)
+
+        action = DeleteGroupAction(group_id=group_id)
+        result = await service.delete_group(action)
+
+        assert result.group_id == group_id
+
+    async def test_nonexistent_group_raises_not_found(
+        self,
+        service: GroupService,
+        mock_group_repository: MagicMock,
+    ) -> None:
+        """Non-existent group raises ProjectNotFound."""
+        mock_group_repository.mark_inactive = AsyncMock(
+            side_effect=ProjectNotFound("Project not found")
+        )
+
+        action = DeleteGroupAction(group_id=uuid.uuid4())
+
+        with pytest.raises(ProjectNotFound):
+            await service.delete_group(action)
+
+
+class TestPurgeGroup:
+    """Tests for GroupService.purge_group"""
+
+    @pytest.fixture
+    def mock_group_repository(self) -> MagicMock:
+        return MagicMock(spec=GroupRepository)
+
+    @pytest.fixture
+    def service(self, mock_group_repository: MagicMock) -> GroupService:
+        return _make_service(mock_group_repository)
+
+    async def test_purge_succeeds(
+        self,
+        service: GroupService,
+        mock_group_repository: MagicMock,
+    ) -> None:
+        """Hard delete + membership/quota cleanup."""
+        group_id = uuid.uuid4()
+        mock_group_repository.purge_group = AsyncMock(return_value=True)
+
+        action = PurgeGroupAction(group_id=group_id)
+        result = await service.purge_group(action)
+
+        assert result.group_id == group_id
+        mock_group_repository.purge_group.assert_called_once_with(group_id)
+
+    async def test_nonexistent_group_raises_not_found(
+        self,
+        service: GroupService,
+        mock_group_repository: MagicMock,
+    ) -> None:
+        """Non-existent group raises ProjectNotFound."""
+        mock_group_repository.purge_group = AsyncMock(
+            side_effect=ProjectNotFound("Project not found")
+        )
+
+        action = PurgeGroupAction(group_id=uuid.uuid4())
+
+        with pytest.raises(ProjectNotFound):
+            await service.purge_group(action)
 
 
 class TestSearchProjects:
