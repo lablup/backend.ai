@@ -11,10 +11,14 @@ from .actions import (
     GetAgentResourcesResult,
     GetKernelAllocationsAction,
     GetKernelAllocationsResult,
+    GetResourceSlotTypeAction,
+    GetResourceSlotTypeResult,
     SearchAgentResourcesAction,
     SearchAgentResourcesResult,
     SearchResourceAllocationsAction,
     SearchResourceAllocationsResult,
+    SearchResourceSlotTypesAction,
+    SearchResourceSlotTypesResult,
 )
 from .service import ResourceSlotService
 
@@ -25,6 +29,10 @@ class ResourceSlotProcessors(AbstractProcessorPackage):
     get_kernel_allocations: ActionProcessor[GetKernelAllocationsAction, GetKernelAllocationsResult]
     search_resource_allocations: ActionProcessor[
         SearchResourceAllocationsAction, SearchResourceAllocationsResult
+    ]
+    get_resource_slot_type: ActionProcessor[GetResourceSlotTypeAction, GetResourceSlotTypeResult]
+    search_resource_slot_types: ActionProcessor[
+        SearchResourceSlotTypesAction, SearchResourceSlotTypesResult
     ]
 
     def __init__(self, service: ResourceSlotService, action_monitors: list[ActionMonitor]) -> None:
@@ -38,6 +46,12 @@ class ResourceSlotProcessors(AbstractProcessorPackage):
         self.search_resource_allocations = ActionProcessor(
             service.search_resource_allocations, action_monitors
         )
+        self.get_resource_slot_type = ActionProcessor(
+            service.get_resource_slot_type, action_monitors
+        )
+        self.search_resource_slot_types = ActionProcessor(
+            service.search_resource_slot_types, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -46,4 +60,6 @@ class ResourceSlotProcessors(AbstractProcessorPackage):
             SearchAgentResourcesAction.spec(),
             GetKernelAllocationsAction.spec(),
             SearchResourceAllocationsAction.spec(),
+            GetResourceSlotTypeAction.spec(),
+            SearchResourceSlotTypesAction.spec(),
         ]

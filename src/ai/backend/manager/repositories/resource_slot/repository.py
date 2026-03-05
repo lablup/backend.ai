@@ -17,6 +17,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.resource_slot.types import (
     AgentResourceSearchResult,
     ResourceAllocationSearchResult,
+    ResourceSlotTypeSearchResult,
 )
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
@@ -74,6 +75,11 @@ class ResourceSlotRepository:
     async def get_slot_type(self, slot_name: str) -> ResourceSlotTypeRow:
         """Get a specific resource slot type by name."""
         return await self._db_source.get_slot_type(slot_name)
+
+    @resource_slot_repository_resilience.apply()
+    async def search_slot_types(self, querier: BatchQuerier) -> ResourceSlotTypeSearchResult:
+        """Paginated search across resource slot types."""
+        return await self._db_source.search_slot_types(querier)
 
     # ==================== agent_resources ====================
 
