@@ -35,6 +35,7 @@ __all__ = (
     # Create requests
     "CreateDeploymentRequest",
     "CreateDeploymentPolicyRequest",
+    "AddRevisionRequest",
     # Update requests
     "UpdateDeploymentRequest",
     "UpdateDeploymentPolicyRequest",
@@ -348,3 +349,9 @@ class DeploymentPolicyPathParam(BaseRequestModel):
     deployment_id: UUID = Field(
         description="UUID of the deployment whose policy is being read or modified"
     )
+
+
+class AddRevisionRequest(BaseRequestModel):
+    """Request to add a new revision to an existing deployment."""
+
+    revision: RevisionInput = Field(description="Revision configuration")

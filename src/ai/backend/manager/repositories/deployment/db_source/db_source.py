@@ -1952,6 +1952,45 @@ class DeploymentDBSource:
             await db_sess.flush()
             return row.to_data()
 
+    async def create_revision_with_next_number(
+        self,
+        creator: Creator[DeploymentRevisionRow],
+        endpoint_id: uuid.UUID,
+    ) -> ModelRevisionData:
+        """Atomically read the latest revision number and create a new revision.
+
+        Combines get_latest_revision_number and create_revision in a single
+        transaction to prevent race conditions where concurrent requests
+        could read the same latest revision number.
+
+        Locks the parent EndpointRow with SELECT ... FOR UPDATE to
+        serialize concurrent revision creation for the same endpoint.
+
+        TODO: Implement revision history pruning (similar to K8s revisionHistoryLimit).
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            # Lock the parent endpoint row to serialize revision creation.
+            # Locking the endpoint (not revision rows) ensures correctness
+            # even when no revisions exist yet (first revision case).
+            lock_query = (
+                sa.select(EndpointRow.id).where(EndpointRow.id == endpoint_id).with_for_update()
+            )
+            await db_sess.execute(lock_query)
+
+            max_query = sa.select(sa.func.max(DeploymentRevisionRow.revision_number)).where(
+                DeploymentRevisionRow.endpoint == endpoint_id
+            )
+            result = await db_sess.execute(max_query)
+            latest_revision_number = result.scalar()
+            next_revision_number = (latest_revision_number or 0) + 1
+
+            spec = cast(DeploymentRevisionCreatorSpec, creator.spec)
+            spec = spec.with_revision_number(next_revision_number)
+            row = spec.build_row()
+            db_sess.add(row)
+            await db_sess.flush()
+            return row.to_data()
+
     async def get_revision(
         self,
         revision_id: uuid.UUID,
