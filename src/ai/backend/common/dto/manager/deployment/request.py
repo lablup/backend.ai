@@ -323,7 +323,6 @@ class SearchDeploymentPoliciesRequest(BaseRequestModel):
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
-
 class DeploymentPolicyPathParam(BaseRequestModel):
     """Path parameters for deployment policy endpoints.
 

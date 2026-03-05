@@ -46,6 +46,7 @@ from ai.backend.common.dto.manager.deployment import (
 )
 from ai.backend.manager.data.deployment.types import RouteTrafficStatus as ManagerRouteTrafficStatus
 from ai.backend.manager.dto.context import UserContext
+from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment.updaters import (
@@ -437,8 +438,6 @@ class DeploymentAPIHandler:
         If a policy already exists for the deployment, it is updated;
         otherwise a new one is created.
         """
-        from ai.backend.manager.errors.service import DeploymentPolicyNotFound
-
         deployment_processors = self._get_deployment_processors()
 
         try:
@@ -452,23 +451,23 @@ class DeploymentAPIHandler:
             creator = self._policy_adapter.build_creator_from_upsert(
                 body.parsed, deployment_id=path.parsed.deployment_id
             )
-            action_result = await deployment_processors.create_deployment_policy.wait_for_complete(
+            create_result = await deployment_processors.create_deployment_policy.wait_for_complete(
                 CreateDeploymentPolicyAction(creator=creator)
             )
             resp = UpsertDeploymentPolicyResponse(
-                deployment_policy=self._policy_adapter.convert_to_dto(action_result.data),
+                deployment_policy=self._policy_adapter.convert_to_dto(create_result.data),
                 created=True,
             )
             return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
         modifier = self._policy_adapter.build_modifier_from_upsert(body.parsed)
-        action_result = await deployment_processors.update_deployment_policy.wait_for_complete(
+        update_result = await deployment_processors.update_deployment_policy.wait_for_complete(
             UpdateDeploymentPolicyAction(
                 policy_id=policy_result.data.id,
                 modifier=modifier,
             )
         )
         resp = UpsertDeploymentPolicyResponse(
-            deployment_policy=self._policy_adapter.convert_to_dto(action_result.data),
+            deployment_policy=self._policy_adapter.convert_to_dto(update_result.data),
             created=False,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
