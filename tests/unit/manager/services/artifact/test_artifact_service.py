@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from aiohttp.client_exceptions import ClientConnectorError
@@ -482,7 +482,7 @@ class TestUpsertArtifactsAction:
         data1 = self._make_artifact_with_revisions(name="model-a", num_revisions=2)
         data2 = self._make_artifact_with_revisions(name="model-b", num_revisions=1)
 
-        def upsert_artifacts_side_effect(artifacts: list) -> list[ArtifactData]:
+        def upsert_artifacts_side_effect(artifacts: list[ArtifactData]) -> list[ArtifactData]:
             a = artifacts[0]
             return [
                 ArtifactData(
@@ -605,14 +605,14 @@ class TestScanArtifactsAction:
         )
 
     @pytest.fixture
-    def registry_id(self) -> object:
+    def registry_id(self) -> UUID:
         return uuid4()
 
     @pytest.fixture
-    def hf_registry_meta(self, registry_id: object) -> ArtifactRegistryData:
+    def hf_registry_meta(self, registry_id: UUID) -> ArtifactRegistryData:
         return ArtifactRegistryData(
             id=uuid4(),
-            registry_id=registry_id,  # type: ignore[arg-type]
+            registry_id=registry_id,
             name="huggingface-default",
             type=ArtifactRegistryType.HUGGINGFACE,
         )
@@ -624,7 +624,7 @@ class TestScanArtifactsAction:
         mock_object_storage_repository: MagicMock,
         mock_storage_manager: MagicMock,
         mock_huggingface_repository: MagicMock,
-        registry_id: object,
+        registry_id: UUID,
         hf_registry_meta: ArtifactRegistryData,
     ) -> None:
         """HuggingFace without limit/order raises ArtifactRegistryBadScanRequestError"""
@@ -641,7 +641,7 @@ class TestScanArtifactsAction:
 
         action = ScanArtifactsAction(
             artifact_type=ArtifactType.MODEL,
-            registry_id=registry_id,  # type: ignore[arg-type]
+            registry_id=registry_id,
             limit=None,
             order=None,
             search=None,
@@ -657,7 +657,7 @@ class TestScanArtifactsAction:
         mock_object_storage_repository: MagicMock,
         mock_storage_manager: MagicMock,
         mock_huggingface_repository: MagicMock,
-        registry_id: object,
+        registry_id: UUID,
         hf_registry_meta: ArtifactRegistryData,
     ) -> None:
         """Valid limit/order upserts scanned models"""
@@ -680,8 +680,8 @@ class TestScanArtifactsAction:
                 name="model-1",
                 type=ArtifactType.MODEL,
                 description=None,
-                registry_id=registry_id,  # type: ignore[arg-type]
-                source_registry_id=registry_id,  # type: ignore[arg-type]
+                registry_id=registry_id,
+                source_registry_id=registry_id,
                 registry_type=ArtifactRegistryType.HUGGINGFACE,
                 source_registry_type=ArtifactRegistryType.HUGGINGFACE,
                 availability=ArtifactAvailability.ALIVE,
@@ -703,7 +703,7 @@ class TestScanArtifactsAction:
 
         action = ScanArtifactsAction(
             artifact_type=ArtifactType.MODEL,
-            registry_id=registry_id,  # type: ignore[arg-type]
+            registry_id=registry_id,
             limit=10,
             order=ModelSortKey.LAST_MODIFIED,
             search=None,
@@ -1214,6 +1214,7 @@ class TestRetrieveModelsAction:
         mock_artifact_repository: MagicMock,
         mock_artifact_registry_repository: MagicMock,
         mock_huggingface_repository: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Multiple HuggingFace models batch retrieval + upsert"""
         now = datetime.now(UTC)
@@ -1237,8 +1238,10 @@ class TestRetrieveModelsAction:
         resp = MagicMock()
         resp.models = [MagicMock(), MagicMock()]
         mock_storage_client.retrieve_huggingface_models = AsyncMock(return_value=resp)
-        artifact_service._storage_manager.get_manager_facing_client = MagicMock(
-            return_value=mock_storage_client
+        monkeypatch.setattr(
+            artifact_service._storage_manager,
+            "get_manager_facing_client",
+            MagicMock(return_value=mock_storage_client),
         )
 
         expected = [
