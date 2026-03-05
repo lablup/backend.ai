@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ai.backend.agent.docker.intrinsic import CPUPlugin, MemoryPlugin
+from ai.backend.agent.docker.intrinsic import CPUPlugin, MemoryPlugin, netstat_ns_work
 from ai.backend.agent.stats import StatModes
 
 
@@ -227,3 +228,22 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
         with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
             await memory_plugin.gather_container_measures(memory_cgroup_context, container_ids)
             mock_docker_cls.assert_not_called()
+
+
+class TestNetstatNsWork:
+    """Tests for netstat_ns_work and setns failure handling."""
+
+    def test_netstat_ns_work_propagates_setns_oserror(self) -> None:
+        """When setns() fails (raises OSError), netstat_ns_work should propagate it."""
+        with patch(
+            "ai.backend.agent.docker.intrinsic.nsenter",
+        ) as mock_nsenter:
+            mock_ctx = MagicMock()
+            mock_ctx.__enter__ = MagicMock(
+                side_effect=OSError(1, "setns() failed: Operation not permitted")
+            )
+            mock_ctx.__exit__ = MagicMock(return_value=False)
+            mock_nsenter.return_value = mock_ctx
+
+            with pytest.raises(OSError, match="setns\\(\\) failed"):
+                netstat_ns_work(Path("/var/run/docker/netns/fake"))

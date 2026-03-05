@@ -80,10 +80,45 @@ pruned_disk_types = frozenset([
     "iso9660",  # cdrom
 ])
 
+# 100 Gbps in bytes/sec — physical ceiling for network rate outlier detection.
+# Rates exceeding this indicate erroneous readings (e.g., host namespace counters).
+_NET_RATE_CEILING = Decimal("12_500_000_000")
+
 
 def netstat_ns_work(ns_path: Path) -> dict[str, Any]:
     with nsenter(ns_path):
         return psutil.net_io_counters(pernic=True)
+
+
+def _netstat_ns_subprocess(ns_path: Path) -> dict[str, Any]:
+    """Run netstat_ns_work in a forked child process.
+
+    This is used as a fallback when ProcessPoolExecutor cannot be used
+    (e.g., in daemon processes that cannot spawn children via the default
+    multiprocessing context). Using fork context bypasses the daemon check.
+    """
+    ctx = multiprocessing.get_context("fork")
+    parent_conn, child_conn = ctx.Pipe()
+    p = ctx.Process(target=_netstat_ns_child, args=(ns_path, child_conn))
+    p.start()
+    child_conn.close()
+    result = parent_conn.recv()
+    p.join(timeout=10)
+    parent_conn.close()
+    if isinstance(result, BaseException):
+        raise result
+    return cast(dict[str, Any], result)
+
+
+def _netstat_ns_child(ns_path: Path, conn: Any) -> None:
+    """Child process entry point for namespace-isolated net stats."""
+    try:
+        result = netstat_ns_work(ns_path)
+        conn.send(result)
+    except BaseException as e:
+        conn.send(e)
+    finally:
+        conn.close()
 
 
 async def netstat_ns(ns_path: Path) -> dict[str, Any]:
@@ -104,13 +139,16 @@ async def netstat_ns(ns_path: Path) -> dict[str, Any]:
         is_daemon = False
 
     if is_daemon:
-        return await loop.run_in_executor(None, netstat_ns_work, ns_path)
+        # Daemon processes cannot use ProcessPoolExecutor (which internally
+        # checks the daemon flag). Use a direct fork-based subprocess instead.
+        return await loop.run_in_executor(None, _netstat_ns_subprocess, ns_path)
     try:
         with ProcessPoolExecutor(max_workers=1) as executor:
             result = await loop.run_in_executor(executor, netstat_ns_work, ns_path)
     except AssertionError:
-        # We're in a daemon process, run directly in thread pool
-        result = await loop.run_in_executor(None, netstat_ns_work, ns_path)
+        # Fallback: if ProcessPoolExecutor fails for any reason,
+        # use direct fork-based subprocess.
+        result = await loop.run_in_executor(None, _netstat_ns_subprocess, ns_path)
     return result
 
 
@@ -594,6 +632,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 current_hook=lambda metric: metric.stats.rate,
                 per_node=Measurement(Decimal(net_rx_bytes)),
                 per_device={DeviceId("node"): Measurement(Decimal(net_rx_bytes))},
+                rate_ceiling=_NET_RATE_CEILING,
             ),
             NodeMeasurement(
                 MetricKey("net_tx"),
@@ -602,6 +641,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 current_hook=lambda metric: metric.stats.rate,
                 per_node=Measurement(Decimal(net_tx_bytes)),
                 per_device={DeviceId("node"): Measurement(Decimal(net_tx_bytes))},
+                rate_ceiling=_NET_RATE_CEILING,
             ),
         ]
 
@@ -715,7 +755,15 @@ class MemoryPlugin(AbstractComputePlugin):
             sandbox_key = data["NetworkSettings"]["SandboxKey"]
             net_rx_bytes = 0
             net_tx_bytes = 0
-            nstat = await netstat_ns(sandbox_key)
+            try:
+                nstat = await netstat_ns(sandbox_key)
+            except OSError as e:
+                log.warning(
+                    "MemoryPlugin: cannot read net stats for container {0}: {1!r}",
+                    container_id[:7],
+                    e,
+                )
+                return None
             for name, net_stat in nstat.items():
                 if name == "lo":
                     continue
@@ -826,6 +874,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 unit_hint="bps",
                 current_hook=lambda metric: metric.stats.rate,
                 per_container=per_container_net_rx_bytes,
+                rate_ceiling=_NET_RATE_CEILING,
             ),
             ContainerMeasurement(
                 MetricKey("net_tx"),
@@ -833,6 +882,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 unit_hint="bps",
                 current_hook=lambda metric: metric.stats.rate,
                 per_container=per_container_net_tx_bytes,
+                rate_ceiling=_NET_RATE_CEILING,
             ),
             ContainerMeasurement(
                 MetricKey("io_scratch_size"),
