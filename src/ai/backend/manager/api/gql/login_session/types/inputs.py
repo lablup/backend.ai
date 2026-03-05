@@ -23,3 +23,7 @@ class UpdateLoginSecurityPolicyInputGQL:
             "Zero and negative values are rejected."
         ),
     )
+
+    def __post_init__(self) -> None:
+        if self.max_concurrent_logins is not None and self.max_concurrent_logins <= 0:
+            raise ValueError("max_concurrent_logins must be a positive integer or None")

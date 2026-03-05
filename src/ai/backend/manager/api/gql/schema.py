@@ -124,6 +124,11 @@ from .image import (
     image_v2,
 )
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
+from .login_session.resolver import (
+    my_login_sessions,
+    revoke_login_session,
+    update_user_login_security_policy,
+)
 from .notification import (
     admin_create_notification_channel,
     admin_create_notification_rule,
@@ -360,6 +365,8 @@ class Query:
     session_scheduling_histories = session_scheduling_histories
     deployment_histories = deployment_histories
     route_histories = route_histories
+    # Login Session APIs (added in 26.3.0)
+    my_login_sessions = my_login_sessions
     # User V2 APIs
     admin_user_v2 = admin_user_v2
     admin_users_v2 = admin_users_v2
@@ -482,6 +489,9 @@ class Mutation:
     admin_delete_permission = admin_delete_permission
     admin_assign_role = admin_assign_role
     admin_revoke_role = admin_revoke_role
+    # Login Session APIs (added in 26.3.0)
+    update_user_login_security_policy = update_user_login_security_policy
+    revoke_login_session = revoke_login_session
 
 
 @strawberry.type
