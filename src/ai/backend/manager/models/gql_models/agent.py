@@ -112,10 +112,14 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
 GPU_ALLOC_MAP_CACHE_PERIOD: Final[int] = 3600 * 24
 
 
+def _strip_gpu_prefix(alloc_map: dict[str, float]) -> dict[str, float]:
+    return {k.removeprefix("GPU-"): v for k, v in alloc_map.items()}
+
+
 async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> dict[str, float]:
     raw_alloc_map = await ctx.valkey_stat.get_gpu_allocation_map(str(agent_id))
     if raw_alloc_map:
-        return UUIDFloatMap.parse_value({k: float(v) for k, v in raw_alloc_map.items()})
+        return UUIDFloatMap.parse_value(_strip_gpu_prefix(raw_alloc_map))
     return {}
 
 
