@@ -258,7 +258,10 @@ class DeploymentDBSource:
             stmt = (
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint.id)
-                .options(selectinload(EndpointRow.image_row))
+                .options(
+                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.deployment_policy),
+                )
             )
             result = await db_sess.execute(stmt)
             endpoint_result: EndpointRow = result.scalar_one()
@@ -297,7 +300,10 @@ class DeploymentDBSource:
             stmt = (
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint.id)
-                .options(selectinload(EndpointRow.image_row))
+                .options(
+                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.deployment_policy),
+                )
             )
             result = await db_sess.execute(stmt)
             endpoint_result: EndpointRow = result.scalar_one()
@@ -2124,6 +2130,7 @@ class DeploymentDBSource:
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
+                    selectinload(EndpointRow.deployment_policy),
                 )
             )
             query_result = await db_sess.execute(query)

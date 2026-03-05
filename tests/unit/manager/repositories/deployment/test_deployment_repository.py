@@ -1195,6 +1195,7 @@ class TestDeploymentRevisionOperations:
                 EndpointRow,
                 EntityFieldRow,  # DeploymentRevisionRow relationship dependency
                 DeploymentRevisionRow,
+                DeploymentPolicyRow,
             ],
         ):
             yield database_connection
@@ -3269,6 +3270,7 @@ class TestDeploymentRepositoryDuplicateName:
                 ImageRow,
                 EndpointRow,
                 AssociationScopesEntitiesRow,
+                DeploymentPolicyRow,
             ],
         ):
             yield database_connection
