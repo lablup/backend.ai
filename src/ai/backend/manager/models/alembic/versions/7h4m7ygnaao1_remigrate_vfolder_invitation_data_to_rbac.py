@@ -6,6 +6,8 @@ Create Date: 2026-03-05 00:00:00.000000
 
 """
 
+import uuid
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.engine import Connection
@@ -39,7 +41,7 @@ def _upsert_ref_edges_for_invitations(db_conn: Connection) -> None:
     - Existing REF entries (from runtime): no-op
     """
     entity_type = EntityType.VFOLDER.value
-    last_id = 0
+    last_id = uuid.UUID(int=0)
 
     while True:
         # Query vfolder_permissions in batches using keyset pagination
@@ -87,7 +89,7 @@ def _insert_entity_as_scope_permissions_for_invitations(db_conn: Connection) -> 
     3. Insert into permissions with scope_type='vfolder', scope_id=vfolder_id
     """
     entity_type = EntityType.VFOLDER.value
-    last_id = 0
+    last_id = uuid.UUID(int=0)
 
     while True:
         # Query vfolder_permissions with role_id using keyset pagination
@@ -146,7 +148,7 @@ def _revert_ref_edges_to_auto(db_conn: Connection) -> None:
     This is a batched operation to handle large datasets.
     """
     entity_type = EntityType.VFOLDER.value
-    last_id = 0
+    last_id = uuid.UUID(int=0)
 
     while True:
         # Query invitation-derived REF edges in batches using keyset pagination
@@ -192,7 +194,7 @@ def _remove_entity_as_scope_permissions(db_conn: Connection) -> None:
     Batched operation to handle large datasets.
     """
     entity_type = EntityType.VFOLDER.value
-    last_id = 0
+    last_id = uuid.UUID(int=0)
 
     while True:
         # Fetch a batch of vfolder invitation records from vfolder_permissions
