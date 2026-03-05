@@ -8,7 +8,6 @@ from .request import (
     AddRevisionRequest,
     BlueGreenConfigInput,
     ClusterConfigInput,
-    CreateDeploymentPolicyRequest,
     CreateDeploymentRequest,
     DeploymentFilter,
     DeploymentMetadataInput,
@@ -31,15 +30,14 @@ from .request import (
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
-    UpdateDeploymentPolicyRequest,
     UpdateDeploymentRequest,
     UpdateRouteTrafficStatusRequest,
+    UpsertDeploymentPolicyRequest,
 )
 from .response import (
     ActivateRevisionResponse,
     AddRevisionResponse,
     ClusterConfigDTO,
-    CreateDeploymentPolicyResponse,
     CreateDeploymentResponse,
     CursorPaginationInfo,
     DeactivateRevisionResponse,
@@ -61,9 +59,9 @@ from .response import (
     ResourceConfigDTO,
     RevisionDTO,
     RouteDTO,
-    UpdateDeploymentPolicyResponse,
     UpdateDeploymentResponse,
     UpdateRouteTrafficStatusResponse,
+    UpsertDeploymentPolicyResponse,
 )
 from .types import (
     DeploymentOrder,
@@ -113,10 +111,9 @@ __all__ = (
     "RevisionInput",
     # Request DTOs - Create/Update requests
     "CreateDeploymentRequest",
-    "CreateDeploymentPolicyRequest",
+    "UpsertDeploymentPolicyRequest",
     "AddRevisionRequest",
     "UpdateDeploymentRequest",
-    "UpdateDeploymentPolicyRequest",
     "UpdateRouteTrafficStatusRequest",
     # Response DTOs - Data
     "DeploymentDTO",
@@ -131,14 +128,13 @@ __all__ = (
     "ReplicaStateDTO",
     # Response DTOs - Create responses
     "CreateDeploymentResponse",
-    "CreateDeploymentPolicyResponse",
+    "UpsertDeploymentPolicyResponse",
     # Response DTOs - Get/List responses
     "GetDeploymentResponse",
     "GetDeploymentPolicyResponse",
     "ListDeploymentPoliciesResponse",
     "ListDeploymentsResponse",
     "UpdateDeploymentResponse",
-    "UpdateDeploymentPolicyResponse",
     "DestroyDeploymentResponse",
     "GetRevisionResponse",
     "AddRevisionResponse",

@@ -18,7 +18,6 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.dto.manager.deployment import (
     ClusterConfigDTO,
-    CreateDeploymentPolicyRequest,
     CreateDeploymentRequest,
     DeploymentDTO,
     DeploymentFilter,
@@ -40,7 +39,7 @@ from ai.backend.common.dto.manager.deployment import (
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
-    UpdateDeploymentPolicyRequest,
+    UpsertDeploymentPolicyRequest,
 )
 from ai.backend.common.dto.manager.deployment.types import (
     DeploymentOrderField,
@@ -557,10 +556,10 @@ class DeploymentPolicyAdapter:
             updated_at=data.updated_at,
         )
 
-    def build_creator(
-        self, request: CreateDeploymentPolicyRequest, deployment_id: UUID
+    def build_creator_from_upsert(
+        self, request: UpsertDeploymentPolicyRequest, deployment_id: UUID
     ) -> DeploymentPolicyCreator:
-        """Build DeploymentPolicyCreator from create request."""
+        """Build DeploymentPolicyCreator from upsert request."""
         strategy = request.strategy
 
         strategy_spec: RollingUpdateSpec | BlueGreenSpec
@@ -591,30 +590,41 @@ class DeploymentPolicyAdapter:
             rollback_on_failure=request.rollback_on_failure,
         )
 
-    def build_modifier(self, request: UpdateDeploymentPolicyRequest) -> DeploymentPolicyModifier:
-        """Build DeploymentPolicyModifier from update request."""
-        strategy: OptionalState[DeploymentStrategy] = OptionalState.nop()
-        strategy_spec: OptionalState[RollingUpdateSpec | BlueGreenSpec] = OptionalState.nop()
-        rollback_on_failure: OptionalState[bool] = OptionalState.nop()
+    def build_modifier_from_upsert(
+        self, request: UpsertDeploymentPolicyRequest
+    ) -> DeploymentPolicyModifier:
+        """Build DeploymentPolicyModifier from upsert request for updating an existing policy."""
+        strategy = OptionalState.update(request.strategy)
+        rollback_on_failure = OptionalState.update(request.rollback_on_failure)
 
-        if request.strategy is not None:
-            strategy = OptionalState.update(request.strategy)
-        if request.rollback_on_failure is not None:
-            rollback_on_failure = OptionalState.update(request.rollback_on_failure)
-        if request.rolling_update is not None:
-            strategy_spec = OptionalState.update(
-                RollingUpdateSpec(
-                    max_surge=request.rolling_update.max_surge,
-                    max_unavailable=request.rolling_update.max_unavailable,
-                )
-            )
-        elif request.blue_green is not None:
-            strategy_spec = OptionalState.update(
-                BlueGreenSpec(
-                    auto_promote=request.blue_green.auto_promote,
-                    promote_delay_seconds=request.blue_green.promote_delay_seconds,
-                )
-            )
+        strategy_spec: OptionalState[RollingUpdateSpec | BlueGreenSpec]
+        match request.strategy:
+            case DeploymentStrategy.ROLLING:
+                if request.rolling_update is not None:
+                    strategy_spec = OptionalState.update(
+                        RollingUpdateSpec(
+                            max_surge=request.rolling_update.max_surge,
+                            max_unavailable=request.rolling_update.max_unavailable,
+                        )
+                    )
+                else:
+                    strategy_spec = OptionalState.update(
+                        RollingUpdateSpec(max_surge=1, max_unavailable=0)
+                    )
+            case DeploymentStrategy.BLUE_GREEN:
+                if request.blue_green is not None:
+                    strategy_spec = OptionalState.update(
+                        BlueGreenSpec(
+                            auto_promote=request.blue_green.auto_promote,
+                            promote_delay_seconds=request.blue_green.promote_delay_seconds,
+                        )
+                    )
+                else:
+                    strategy_spec = OptionalState.update(
+                        BlueGreenSpec(auto_promote=False, promote_delay_seconds=0)
+                    )
+            case _:
+                raise InvalidAPIParameters(f"Unsupported deployment strategy: {request.strategy}")
 
         return DeploymentPolicyModifier(
             strategy=strategy,

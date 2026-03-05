@@ -34,13 +34,12 @@ __all__ = (
     "ReplicaStateDTO",
     # Responses
     "CreateDeploymentResponse",
-    "CreateDeploymentPolicyResponse",
+    "UpsertDeploymentPolicyResponse",
     "GetDeploymentResponse",
     "GetDeploymentPolicyResponse",
     "ListDeploymentPoliciesResponse",
     "ListDeploymentsResponse",
     "UpdateDeploymentResponse",
-    "UpdateDeploymentPolicyResponse",
     "DestroyDeploymentResponse",
     "GetRevisionResponse",
     "AddRevisionResponse",
@@ -266,17 +265,12 @@ class DeploymentPolicyDTO(BaseModel):
     )
 
 
-class CreateDeploymentPolicyResponse(BaseResponseModel):
-    """Response for creating a deployment policy."""
+class UpsertDeploymentPolicyResponse(BaseResponseModel):
+    """Response for creating or updating a deployment policy."""
 
-    deployment_policy: DeploymentPolicyDTO = Field(description="Newly created deployment policy")
-
-
-class UpdateDeploymentPolicyResponse(BaseResponseModel):
-    """Response for updating a deployment policy."""
-
-    deployment_policy: DeploymentPolicyDTO = Field(
-        description="Deployment policy after applying the requested updates"
+    deployment_policy: DeploymentPolicyDTO = Field(description="The deployment policy")
+    created: bool = Field(
+        description="True if a new policy was created, False if an existing one was updated"
     )
 
 

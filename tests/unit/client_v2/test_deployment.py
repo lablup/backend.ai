@@ -17,8 +17,6 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
-    CreateDeploymentPolicyRequest,
-    CreateDeploymentPolicyResponse,
     CreateDeploymentResponse,
     DeactivateRevisionResponse,
     DestroyDeploymentResponse,
@@ -31,11 +29,11 @@ from ai.backend.common.dto.manager.deployment import (
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
-    UpdateDeploymentPolicyRequest,
-    UpdateDeploymentPolicyResponse,
     UpdateDeploymentRequest,
     UpdateDeploymentResponse,
     UpdateRouteTrafficStatusResponse,
+    UpsertDeploymentPolicyRequest,
+    UpsertDeploymentPolicyResponse,
 )
 from ai.backend.common.dto.manager.deployment.request import (
     ClusterConfigInput,
@@ -393,38 +391,45 @@ class TestDeploymentPolicyOperations:
         assert method == "GET"
         assert f"/deployments/{_SAMPLE_DEPLOYMENT_ID}/policy" in url
 
-    async def test_create_policy(self) -> None:
-        resp = _json_response({"deployment_policy": _SAMPLE_POLICY_DTO}, status=201)
+    async def test_upsert_policy(self) -> None:
+        resp = _json_response(
+            {"deployment_policy": _SAMPLE_POLICY_DTO, "created": True}, status=201
+        )
         mock_session = _make_request_session(resp)
         dc = _make_deployment_client(mock_session)
 
-        request = CreateDeploymentPolicyRequest(
+        request = UpsertDeploymentPolicyRequest(
             strategy=DeploymentStrategy.ROLLING,
             rollback_on_failure=False,
         )
-        result = await dc.create_policy(_SAMPLE_DEPLOYMENT_ID, request)
+        result = await dc.upsert_policy(_SAMPLE_DEPLOYMENT_ID, request)
 
-        assert isinstance(result, CreateDeploymentPolicyResponse)
+        assert isinstance(result, UpsertDeploymentPolicyResponse)
         assert result.deployment_policy.strategy == DeploymentStrategy.ROLLING
+        assert result.created is True
         method, url, body = _last_request_call(mock_session)
-        assert method == "POST"
+        assert method == "PUT"
         assert f"/deployments/{_SAMPLE_DEPLOYMENT_ID}/policy" in url
         assert body is not None
         assert body["strategy"] == "ROLLING"
 
-    async def test_update_policy(self) -> None:
+    async def test_upsert_policy_update_existing(self) -> None:
         updated_dto = {**_SAMPLE_POLICY_DTO, "rollback_on_failure": True}
-        resp = _json_response({"deployment_policy": updated_dto})
+        resp = _json_response({"deployment_policy": updated_dto, "created": False})
         mock_session = _make_request_session(resp)
         dc = _make_deployment_client(mock_session)
 
-        request = UpdateDeploymentPolicyRequest(rollback_on_failure=True)
-        result = await dc.update_policy(_SAMPLE_DEPLOYMENT_ID, request)
+        request = UpsertDeploymentPolicyRequest(
+            strategy=DeploymentStrategy.ROLLING,
+            rollback_on_failure=True,
+        )
+        result = await dc.upsert_policy(_SAMPLE_DEPLOYMENT_ID, request)
 
-        assert isinstance(result, UpdateDeploymentPolicyResponse)
+        assert isinstance(result, UpsertDeploymentPolicyResponse)
         assert result.deployment_policy.rollback_on_failure is True
+        assert result.created is False
         method, url, body = _last_request_call(mock_session)
-        assert method == "PATCH"
+        assert method == "PUT"
         assert f"/deployments/{_SAMPLE_DEPLOYMENT_ID}/policy" in url
         assert body is not None
         assert body["rollback_on_failure"] is True

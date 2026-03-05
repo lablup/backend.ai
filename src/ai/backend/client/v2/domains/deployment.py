@@ -5,8 +5,6 @@ import uuid
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
-    CreateDeploymentPolicyRequest,
-    CreateDeploymentPolicyResponse,
     CreateDeploymentRequest,
     CreateDeploymentResponse,
     DeactivateRevisionResponse,
@@ -22,12 +20,12 @@ from ai.backend.common.dto.manager.deployment import (
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
-    UpdateDeploymentPolicyRequest,
-    UpdateDeploymentPolicyResponse,
     UpdateDeploymentRequest,
     UpdateDeploymentResponse,
     UpdateRouteTrafficStatusRequest,
     UpdateRouteTrafficStatusResponse,
+    UpsertDeploymentPolicyRequest,
+    UpsertDeploymentPolicyResponse,
 )
 
 
@@ -195,26 +193,14 @@ class DeploymentClient(BaseDomainClient):
             response_model=GetDeploymentPolicyResponse,
         )
 
-    async def create_policy(
+    async def upsert_policy(
         self,
         deployment_id: uuid.UUID,
-        request: CreateDeploymentPolicyRequest,
-    ) -> CreateDeploymentPolicyResponse:
+        request: UpsertDeploymentPolicyRequest,
+    ) -> UpsertDeploymentPolicyResponse:
         return await self._client.typed_request(
-            "POST",
+            "PUT",
             f"{self.API_PREFIX}/{deployment_id}/policy",
             request=request,
-            response_model=CreateDeploymentPolicyResponse,
-        )
-
-    async def update_policy(
-        self,
-        deployment_id: uuid.UUID,
-        request: UpdateDeploymentPolicyRequest,
-    ) -> UpdateDeploymentPolicyResponse:
-        return await self._client.typed_request(
-            "PATCH",
-            f"{self.API_PREFIX}/{deployment_id}/policy",
-            request=request,
-            response_model=UpdateDeploymentPolicyResponse,
+            response_model=UpsertDeploymentPolicyResponse,
         )

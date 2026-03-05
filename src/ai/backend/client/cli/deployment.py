@@ -20,7 +20,6 @@ from ai.backend.common.cli import EnumChoice
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy, RouteTrafficStatus
 from ai.backend.common.dto.manager.deployment import (
     BlueGreenConfigInput,
-    CreateDeploymentPolicyRequest,
     CreateDeploymentRequest,
     DeploymentFilter,
     RollingUpdateConfigInput,
@@ -28,9 +27,9 @@ from ai.backend.common.dto.manager.deployment import (
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
-    UpdateDeploymentPolicyRequest,
     UpdateDeploymentRequest,
     UpdateRouteTrafficStatusRequest,
+    UpsertDeploymentPolicyRequest,
 )
 
 from .extensions import pass_ctx_obj
@@ -449,7 +448,7 @@ def info_policy_cmd(ctx: CLIContext, deployment_id: UUID) -> None:
         sys.exit(ExitCode.FAILURE)
 
 
-@policy.command("create")
+@policy.command("update")
 @pass_ctx_obj
 @click.argument("deployment_id", type=click.UUID)
 @click.option(
@@ -506,7 +505,7 @@ def info_policy_cmd(ctx: CLIContext, deployment_id: UUID) -> None:
         "Only applicable when --strategy is BLUE_GREEN and --auto-promote is set."
     ),
 )
-def create_policy_cmd(
+def update_policy_cmd(
     ctx: CLIContext,
     deployment_id: UUID,
     strategy: DeploymentStrategy,
@@ -516,7 +515,7 @@ def create_policy_cmd(
     auto_promote: bool | None,
     promote_delay: int | None,
 ) -> None:
-    """Create a deployment policy."""
+    """Update the deployment policy. Creates one if it does not exist yet."""
     rolling_update = None
     blue_green = None
 
@@ -549,133 +548,17 @@ def create_policy_cmd(
         auth = HMACAuth(api_config.access_key, api_config.secret_key)
         registry = await BackendAIClientRegistry.create(v2_config, auth)
         try:
-            request = CreateDeploymentPolicyRequest(
+            request = UpsertDeploymentPolicyRequest(
                 strategy=strategy,
                 rollback_on_failure=rollback_on_failure,
                 rolling_update=rolling_update,
                 blue_green=blue_green,
             )
-            result = await registry.deployment.create_policy(deployment_id, request)
-            print_done(f"Deployment policy created for: {deployment_id}")
-            print(
-                json.dumps(result.deployment_policy.model_dump(mode="json"), indent=2, default=str)
-            )
-        finally:
-            await registry.close()
-
-    try:
-        asyncio.run(_run())
-    except Exception as e:
-        ctx.output.print_error(e)
-        sys.exit(ExitCode.FAILURE)
-
-
-@policy.command("update")
-@pass_ctx_obj
-@click.argument("deployment_id", type=click.UUID)
-@click.option(
-    "--strategy",
-    type=EnumChoice(DeploymentStrategy),
-    default=None,
-    help=(
-        "Change the rollout strategy. "
-        "ROLLING replaces replicas gradually with configurable concurrency limits. "
-        "BLUE_GREEN runs two parallel environments and switches traffic atomically. "
-        "Changing the strategy resets any strategy-specific configuration."
-    ),
-)
-@click.option(
-    "--rollback-on-failure/--no-rollback-on-failure",
-    is_flag=True,
-    default=None,
-    help=(
-        "Enable or disable automatic rollback. When enabled, the system reverts to "
-        "the previous stable revision if health checks fail during rollout."
-    ),
-)
-@click.option(
-    "--max-surge",
-    type=int,
-    default=None,
-    help=(
-        "Maximum number of extra replicas that can be created beyond the desired count "
-        "during a rolling update. Only applicable when strategy is ROLLING."
-    ),
-)
-@click.option(
-    "--max-unavailable",
-    type=int,
-    default=None,
-    help=(
-        "Maximum number of replicas that can be unavailable during a rolling update. "
-        "Only applicable when strategy is ROLLING."
-    ),
-)
-@click.option(
-    "--auto-promote/--no-auto-promote",
-    is_flag=True,
-    default=None,
-    help=(
-        "Automatically promote the new (green) environment to receive production traffic "
-        "after the promote delay. Only applicable when strategy is BLUE_GREEN."
-    ),
-)
-@click.option(
-    "--promote-delay",
-    type=int,
-    default=None,
-    help=(
-        "Number of seconds to wait before auto-promoting the new environment. "
-        "Only applicable when strategy is BLUE_GREEN and --auto-promote is set."
-    ),
-)
-def update_policy_cmd(
-    ctx: CLIContext,
-    deployment_id: UUID,
-    strategy: DeploymentStrategy | None,
-    rollback_on_failure: bool | None,
-    max_surge: int | None,
-    max_unavailable: int | None,
-    auto_promote: bool | None,
-    promote_delay: int | None,
-) -> None:
-    """Update a deployment policy. Only provided fields are updated."""
-    rolling_update = None
-    blue_green = None
-
-    if max_surge is not None or max_unavailable is not None:
-        if max_surge is None or max_unavailable is None:
-            raise click.UsageError(
-                "--max-surge and --max-unavailable must both be provided together"
-            )
-        rolling_update = RollingUpdateConfigInput(
-            max_surge=max_surge,
-            max_unavailable=max_unavailable,
-        )
-    if auto_promote is not None or promote_delay is not None:
-        if auto_promote is None or promote_delay is None:
-            raise click.UsageError(
-                "--auto-promote/--no-auto-promote and --promote-delay must both be provided together"
-            )
-        blue_green = BlueGreenConfigInput(
-            auto_promote=auto_promote,
-            promote_delay_seconds=promote_delay,
-        )
-
-    async def _run() -> None:
-        api_config = get_config()
-        v2_config = ClientConfig.from_v1_config(api_config)
-        auth = HMACAuth(api_config.access_key, api_config.secret_key)
-        registry = await BackendAIClientRegistry.create(v2_config, auth)
-        try:
-            request = UpdateDeploymentPolicyRequest(
-                strategy=strategy,
-                rollback_on_failure=rollback_on_failure,
-                rolling_update=rolling_update,
-                blue_green=blue_green,
-            )
-            result = await registry.deployment.update_policy(deployment_id, request)
-            print_done(f"Deployment policy updated for: {deployment_id}")
+            result = await registry.deployment.upsert_policy(deployment_id, request)
+            if result.created:
+                print_done(f"Deployment policy created for: {deployment_id}")
+            else:
+                print_done(f"Deployment policy updated for: {deployment_id}")
             print(
                 json.dumps(result.deployment_policy.model_dump(mode="json"), indent=2, default=str)
             )
