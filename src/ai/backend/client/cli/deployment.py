@@ -474,24 +474,23 @@ def create_policy_cmd(
     promote_delay: int | None,
 ) -> None:
     """Create a deployment policy."""
-    rolling_update = None
-    blue_green = None
     strategy_enum = DeploymentStrategy(strategy)
-
-    if strategy_enum == DeploymentStrategy.ROLLING:
-        rolling_kwargs: dict[str, int] = {}
-        if max_surge is not None:
-            rolling_kwargs["max_surge"] = max_surge
-        if max_unavailable is not None:
-            rolling_kwargs["max_unavailable"] = max_unavailable
-        if rolling_kwargs:
-            rolling_update = RollingUpdateConfigInput(**rolling_kwargs)
-    elif strategy_enum == DeploymentStrategy.BLUE_GREEN:
-        if auto_promote or promote_delay is not None:
-            blue_green = BlueGreenConfigInput(
-                auto_promote=auto_promote,
-                promote_delay_seconds=promote_delay if promote_delay is not None else 0,
-            )
+    rolling_update = (
+        RollingUpdateConfigInput(
+            max_surge=max_surge if max_surge is not None else 1,
+            max_unavailable=max_unavailable if max_unavailable is not None else 0,
+        )
+        if strategy_enum == DeploymentStrategy.ROLLING
+        else None
+    )
+    blue_green = (
+        BlueGreenConfigInput(
+            auto_promote=auto_promote,
+            promote_delay_seconds=promote_delay if promote_delay is not None else 0,
+        )
+        if strategy_enum == DeploymentStrategy.BLUE_GREEN
+        else None
+    )
 
     async def _run() -> None:
         api_config = get_config()
@@ -591,21 +590,22 @@ def update_policy_cmd(
 ) -> None:
     """Update a deployment policy. Only provided fields are updated."""
     strategy_enum = DeploymentStrategy(strategy) if strategy else None
-
-    rolling_update = None
-    blue_green = None
-    if max_surge is not None or max_unavailable is not None:
-        rolling_kwargs: dict[str, int] = {}
-        if max_surge is not None:
-            rolling_kwargs["max_surge"] = max_surge
-        if max_unavailable is not None:
-            rolling_kwargs["max_unavailable"] = max_unavailable
-        rolling_update = RollingUpdateConfigInput(**rolling_kwargs)
-    if auto_promote or promote_delay is not None:
-        blue_green = BlueGreenConfigInput(
+    rolling_update = (
+        RollingUpdateConfigInput(
+            max_surge=max_surge if max_surge is not None else 1,
+            max_unavailable=max_unavailable if max_unavailable is not None else 0,
+        )
+        if max_surge is not None or max_unavailable is not None
+        else None
+    )
+    blue_green = (
+        BlueGreenConfigInput(
             auto_promote=auto_promote,
             promote_delay_seconds=promote_delay if promote_delay is not None else 0,
         )
+        if auto_promote or promote_delay is not None
+        else None
+    )
 
     async def _run() -> None:
         api_config = get_config()
