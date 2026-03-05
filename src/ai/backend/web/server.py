@@ -236,7 +236,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
     }
 
     try:
-        registry: BackendAIClientRegistry = request.app["client_registry"]
+        registry: BackendAIClientRegistry = request.app["no_auth_client_registry"]
         resp = await registry.auth.update_password_no_auth(
             UpdatePasswordNoAuthRequest(
                 domain=config.api.domain,
@@ -761,7 +761,7 @@ async def client_ctx(
 
 
 @asynccontextmanager
-async def client_registry_ctx(
+async def no_auth_client_registry_ctx(
     config: WebServerUnifiedConfig,
 ) -> AsyncGenerator[BackendAIClientRegistry]:
     client_config = V2ClientConfig(
@@ -956,8 +956,8 @@ async def server_main(
         app["config"] = config
         app["stats"] = WebStats()
         app["client_pool"] = await web_init_stack.enter_async_context(client_ctx(config, app))
-        app["client_registry"] = await web_init_stack.enter_async_context(
-            client_registry_ctx(config)
+        app["no_auth_client_registry"] = await web_init_stack.enter_async_context(
+            no_auth_client_registry_ctx(config)
         )
         await web_init_stack.enter_async_context(redis_ctx(config, app, pidx))
 
