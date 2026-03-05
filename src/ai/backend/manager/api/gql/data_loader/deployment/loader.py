@@ -14,7 +14,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionData,
     RouteInfo,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier, NoPagination, OffsetPagination
 from ai.backend.manager.repositories.deployment.options import (
     AccessTokenConditions,
     AutoScalingRuleConditions,
@@ -215,7 +215,7 @@ async def load_deployment_policies_by_endpoint_ids(
         return []
 
     querier = BatchQuerier(
-        pagination=OffsetPagination(limit=len(endpoint_ids)),
+        pagination=NoPagination(),
         conditions=[DeploymentPolicyConditions.by_endpoint_ids(endpoint_ids)],
     )
 
