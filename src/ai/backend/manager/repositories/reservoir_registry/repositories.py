@@ -13,7 +13,7 @@ class ReservoirRegistryRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = ReservoirRegistryRepository(args.db)
+        repository = ReservoirRegistryRepository(args.db, args.valkey_artifact_registry_client)
 
         return cls(
             repository=repository,
