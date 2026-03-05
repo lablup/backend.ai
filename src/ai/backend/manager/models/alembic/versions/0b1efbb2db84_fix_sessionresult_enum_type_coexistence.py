@@ -1,7 +1,7 @@
 """fix sessionresult enum type when both singular and plural coexist
 
 Revision ID: 0b1efbb2db84
-Revises: 3f5c20f7bb07
+Revises: 7h4m7ygnaao1
 Create Date: 2026-03-05 00:00:00.000000
 
 """
@@ -10,7 +10,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0b1efbb2db84"
-down_revision = "3f5c20f7bb07"
+down_revision = "7h4m7ygnaao1"
 branch_labels = None
 depends_on = None
 
