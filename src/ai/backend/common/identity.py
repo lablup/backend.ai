@@ -22,6 +22,7 @@ import aiohttp
 import ifaddr
 import psutil
 
+from .exception import CloudDetectionError
 from .networking import curl
 
 __all__ = (
@@ -62,7 +63,9 @@ async def _detect_aws(session: aiohttp.ClientSession) -> CloudProvider:
         body = await resp.text()
         # ref: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html
         if "instance-id" not in body:
-            raise ValueError("Not an AWS metadata response")
+            raise CloudDetectionError(
+                f"AWS detection failed with status {resp.status}", extra_data=f"{body[:200]!r}"
+            )
         return CloudProvider.AWS
 
 
@@ -75,10 +78,17 @@ async def _detect_azure(session: aiohttp.ClientSession) -> CloudProvider:
         try:
             data = await resp.json()
         except json.JSONDecodeError:
-            raise ValueError("Not an Azure metadata response") from None
+            body = await resp.text()
+            raise CloudDetectionError(
+                f"Azure detection failed with status {resp.status}", extra_data=f"{body[:200]!r}"
+            ) from None
         # ref: https://learn.microsoft.com/azure/virtual-machines/instance-metadata-service?tabs=linux
         if not isinstance(data, dict) or "vmId" not in data:
-            raise ValueError("Not an Azure metadata response")
+            body = await resp.text()
+            raise CloudDetectionError(
+                f"Azure detection failed with status {resp.status}",
+                extra_data=f"missing vmId key (body={body[:200]!r}) ",
+            ) from None
         return CloudProvider.AZURE
 
 
@@ -92,7 +102,10 @@ async def _detect_gcp(session: aiohttp.ClientSession) -> CloudProvider:
             # ref: https://docs.cloud.google.com/compute/docs/metadata/predefined-metadata-keys
             int(body.strip())
         except ValueError:
-            raise ValueError("Not a GCP metadata response") from None
+            raise CloudDetectionError(
+                f"GCP detection failed with status {resp.status}",
+                extra_data=f"non-numeric body (body={body[:64]!r})",
+            ) from None
         return CloudProvider.GCP
 
 

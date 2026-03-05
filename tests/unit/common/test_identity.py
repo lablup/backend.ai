@@ -14,6 +14,7 @@ import pytest
 from aioresponses import aioresponses
 
 import ai.backend.common.identity
+from ai.backend.common.exception import CloudDetectionError
 from ai.backend.common.identity import (
     CloudProvider,
     _detect_aws,
@@ -265,7 +266,7 @@ class DetectCloudServiceTest:
         body: str,
     ) -> None:
         mock_responses.get(aws_metadata_url, body=body)
-        with pytest.raises(ValueError, match="Not an AWS metadata response"):
+        with pytest.raises(CloudDetectionError, match="Not a AWS metadata response"):
             await _detect_aws(client_session)
 
     @pytest.fixture
@@ -302,7 +303,7 @@ class DetectCloudServiceTest:
         body: str,
     ) -> None:
         mock_responses.get(azure_metadata_url, body=body)
-        with pytest.raises(ValueError, match="Not an Azure metadata response"):
+        with pytest.raises(CloudDetectionError, match="Not a Azure metadata response"):
             await _detect_azure(client_session)
 
     @pytest.fixture
@@ -332,7 +333,7 @@ class DetectCloudServiceTest:
         body: str,
     ) -> None:
         mock_responses.get(gcp_metadata_url, body=body)
-        with pytest.raises(ValueError, match="Not a GCP metadata response"):
+        with pytest.raises(CloudDetectionError, match="Not a GCP metadata response"):
             await _detect_gcp(client_session)
 
 
