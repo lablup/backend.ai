@@ -14,9 +14,11 @@ from ai.backend.common.dto.manager.deployment import (
     GetDeploymentPolicyResponse,
     GetDeploymentResponse,
     GetRevisionResponse,
+    ListDeploymentPoliciesResponse,
     ListDeploymentsResponse,
     ListRevisionsResponse,
     ListRoutesResponse,
+    SearchDeploymentPoliciesRequest,
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
@@ -171,6 +173,17 @@ class DeploymentClient(BaseDomainClient):
     # ---------------------------------------------------------------------------
     # Policy operations
     # ---------------------------------------------------------------------------
+
+    async def search_policies(
+        self,
+        request: SearchDeploymentPoliciesRequest,
+    ) -> ListDeploymentPoliciesResponse:
+        return await self._client.typed_request(
+            "POST",
+            f"{self.API_PREFIX}/policies/search",
+            request=request,
+            response_model=ListDeploymentPoliciesResponse,
+        )
 
     async def get_policy(
         self,
