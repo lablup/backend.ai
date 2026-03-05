@@ -16,6 +16,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.exception import InvalidAPIParameters, UnknownImageReference
 from ai.backend.common.types import (
+    AbuseReport,
     AccessKey,
     ClusterMode,
     KernelId,
@@ -1287,7 +1288,7 @@ class TestGetAbusingReport:
             sample_session_id, sample_access_key, sample_user_id, sample_group_id, sample_kernel_id
         )
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
-        mock_report = {"cpu_util": 0.95, "mem_util": 0.80}
+        mock_report: AbuseReport = {"kernel": str(sample_kernel_id), "abuse_report": "detected"}
         mock_agent_registry.get_abusing_report = AsyncMock(return_value=mock_report)
 
         action = GetAbusingReportAction(

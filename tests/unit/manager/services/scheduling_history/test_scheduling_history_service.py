@@ -6,7 +6,7 @@ Tests the service layer with mocked repositories.
 from __future__ import annotations
 
 from datetime import datetime
-from unittest.mock import AsyncMock, create_autospec
+from unittest.mock import MagicMock, create_autospec
 from uuid import uuid4
 
 import pytest
@@ -56,12 +56,13 @@ _NOW = datetime.now(tz=tzutc())
 
 
 @pytest.fixture
-def mock_repository() -> AsyncMock:
-    return create_autospec(SchedulingHistoryRepository, instance=True)
+def mock_repository() -> MagicMock:
+    mock: MagicMock = create_autospec(SchedulingHistoryRepository, instance=True)
+    return mock
 
 
 @pytest.fixture
-def service(mock_repository: AsyncMock) -> SchedulingHistoryService:
+def service(mock_repository: MagicMock) -> SchedulingHistoryService:
     return SchedulingHistoryService(repository=mock_repository)
 
 
@@ -126,7 +127,7 @@ class TestSearchSessionHistoryAction:
     async def test_returns_histories_with_pagination(
         self,
         service: SchedulingHistoryService,
-        mock_repository: AsyncMock,
+        mock_repository: MagicMock,
         querier: BatchQuerier,
     ) -> None:
         history_item = _make_session_history()
@@ -149,7 +150,7 @@ class TestSearchSessionHistoryAction:
     async def test_empty_result(
         self,
         service: SchedulingHistoryService,
-        mock_repository: AsyncMock,
+        mock_repository: MagicMock,
         querier: BatchQuerier,
     ) -> None:
         mock_repository.search_session_history.return_value = SessionSchedulingHistoryListResult(
@@ -170,7 +171,7 @@ class TestSearchDeploymentHistoryAction:
     async def test_returns_deployment_histories(
         self,
         service: SchedulingHistoryService,
-        mock_repository: AsyncMock,
+        mock_repository: MagicMock,
         querier: BatchQuerier,
     ) -> None:
         history_item = _make_deployment_history()
@@ -194,7 +195,7 @@ class TestSearchDeploymentScopedHistoryAction:
     async def test_scope_filters_by_deployment_id(
         self,
         service: SchedulingHistoryService,
-        mock_repository: AsyncMock,
+        mock_repository: MagicMock,
         querier: BatchQuerier,
     ) -> None:
         deployment_id = uuid4()
@@ -220,7 +221,7 @@ class TestSearchSessionScopedHistoryAction:
     async def test_scope_filters_by_session_id(
         self,
         service: SchedulingHistoryService,
-        mock_repository: AsyncMock,
+        mock_repository: MagicMock,
         querier: BatchQuerier,
     ) -> None:
         session_id = uuid4()
@@ -248,7 +249,7 @@ class TestSearchRouteHistoryAction:
     async def test_returns_route_histories(
         self,
         service: SchedulingHistoryService,
-        mock_repository: AsyncMock,
+        mock_repository: MagicMock,
         querier: BatchQuerier,
     ) -> None:
         history_item = _make_route_history()
@@ -272,7 +273,7 @@ class TestSearchRouteScopedHistoryAction:
     async def test_scope_filters_by_route_id(
         self,
         service: SchedulingHistoryService,
-        mock_repository: AsyncMock,
+        mock_repository: MagicMock,
         querier: BatchQuerier,
     ) -> None:
         route_id = uuid4()
