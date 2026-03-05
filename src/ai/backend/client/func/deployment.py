@@ -7,13 +7,10 @@ from uuid import UUID
 from ai.backend.client.request import Request
 from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
-    CreateDeploymentPolicyRequest,
-    CreateDeploymentPolicyResponse,
     CreateDeploymentRequest,
     CreateDeploymentResponse,
     DeactivateRevisionResponse,
     DestroyDeploymentResponse,
-    GetDeploymentPolicyResponse,
     GetDeploymentResponse,
     GetRevisionResponse,
     ListDeploymentsResponse,
@@ -22,8 +19,6 @@ from ai.backend.common.dto.manager.deployment import (
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
-    UpdateDeploymentPolicyRequest,
-    UpdateDeploymentPolicyResponse,
     UpdateDeploymentRequest,
     UpdateDeploymentResponse,
     UpdateRouteTrafficStatusRequest,
@@ -192,45 +187,3 @@ class Deployment(BaseFunction):
         async with rqst.fetch() as resp:
             data = await resp.json()
             return UpdateRouteTrafficStatusResponse.model_validate(data)
-
-    # Policy operations
-
-    @api_function
-    @classmethod
-    async def get_policy(
-        cls,
-        deployment_id: UUID,
-    ) -> GetDeploymentPolicyResponse:
-        """Get the deployment policy."""
-        rqst = Request("GET", f"/deployments/{deployment_id}/policy")
-        async with rqst.fetch() as resp:
-            data = await resp.json()
-            return GetDeploymentPolicyResponse.model_validate(data)
-
-    @api_function
-    @classmethod
-    async def create_policy(
-        cls,
-        deployment_id: UUID,
-        request: CreateDeploymentPolicyRequest,
-    ) -> CreateDeploymentPolicyResponse:
-        """Create a deployment policy."""
-        rqst = Request("POST", f"/deployments/{deployment_id}/policy")
-        rqst.set_json(request.model_dump(mode="json"))
-        async with rqst.fetch() as resp:
-            data = await resp.json()
-            return CreateDeploymentPolicyResponse.model_validate(data)
-
-    @api_function
-    @classmethod
-    async def update_policy(
-        cls,
-        deployment_id: UUID,
-        request: UpdateDeploymentPolicyRequest,
-    ) -> UpdateDeploymentPolicyResponse:
-        """Update a deployment policy."""
-        rqst = Request("PATCH", f"/deployments/{deployment_id}/policy")
-        rqst.set_json(request.model_dump(mode="json", exclude_none=True))
-        async with rqst.fetch() as resp:
-            data = await resp.json()
-            return UpdateDeploymentPolicyResponse.model_validate(data)
