@@ -395,13 +395,18 @@ class TestVFSStorageServiceQuotaScope:
             storage_manager=None,
         )
 
+    @staticmethod
     def _setup_proxy_and_client(
-        self,
+        monkeypatch: pytest.MonkeyPatch,
         mock_storage_manager: MagicMock,
         mock_manager_client: AsyncMock,
     ) -> None:
         """Helper to mock get_proxy_and_volume and get_manager_facing_client."""
-        StorageSessionManager.get_proxy_and_volume = MagicMock(return_value=("proxy1", "volume1"))
+        monkeypatch.setattr(
+            StorageSessionManager,
+            "get_proxy_and_volume",
+            MagicMock(return_value=("proxy1", "volume1")),
+        )
         mock_storage_manager.get_manager_facing_client.return_value = mock_manager_client
 
     # =========================================================================
@@ -410,12 +415,13 @@ class TestVFSStorageServiceQuotaScope:
 
     async def test_get_quota_scope(
         self,
+        monkeypatch: pytest.MonkeyPatch,
         service_with_storage_manager: VFSStorageService,
         mock_storage_manager: MagicMock,
         mock_manager_client: AsyncMock,
     ) -> None:
         """Test valid storage_host_name/quota_scope_id returns usage/limit."""
-        self._setup_proxy_and_client(mock_storage_manager, mock_manager_client)
+        self._setup_proxy_and_client(monkeypatch, mock_storage_manager, mock_manager_client)
         mock_manager_client.get_quota_scope.return_value = {
             "used_bytes": 1024,
             "limit_bytes": 4096,
@@ -435,12 +441,13 @@ class TestVFSStorageServiceQuotaScope:
 
     async def test_get_quota_scope_negative_usage_bytes_converted_to_none(
         self,
+        monkeypatch: pytest.MonkeyPatch,
         service_with_storage_manager: VFSStorageService,
         mock_storage_manager: MagicMock,
         mock_manager_client: AsyncMock,
     ) -> None:
         """Test negative usage_bytes converted to None."""
-        self._setup_proxy_and_client(mock_storage_manager, mock_manager_client)
+        self._setup_proxy_and_client(monkeypatch, mock_storage_manager, mock_manager_client)
         mock_manager_client.get_quota_scope.return_value = {
             "used_bytes": -1,
             "limit_bytes": 4096,
@@ -474,12 +481,13 @@ class TestVFSStorageServiceQuotaScope:
 
     async def test_set_quota_scope(
         self,
+        monkeypatch: pytest.MonkeyPatch,
         service_with_storage_manager: VFSStorageService,
         mock_storage_manager: MagicMock,
         mock_manager_client: AsyncMock,
     ) -> None:
         """Test hard_limit_bytes updates storage proxy + returns updated state."""
-        self._setup_proxy_and_client(mock_storage_manager, mock_manager_client)
+        self._setup_proxy_and_client(monkeypatch, mock_storage_manager, mock_manager_client)
         mock_manager_client.update_quota_scope = AsyncMock()
         mock_manager_client.get_quota_scope.return_value = {
             "used_bytes": 512,
@@ -500,12 +508,13 @@ class TestVFSStorageServiceQuotaScope:
 
     async def test_set_quota_scope_negative_usage_bytes_converted_to_none(
         self,
+        monkeypatch: pytest.MonkeyPatch,
         service_with_storage_manager: VFSStorageService,
         mock_storage_manager: MagicMock,
         mock_manager_client: AsyncMock,
     ) -> None:
         """Test negative usage_bytes converted to None after set."""
-        self._setup_proxy_and_client(mock_storage_manager, mock_manager_client)
+        self._setup_proxy_and_client(monkeypatch, mock_storage_manager, mock_manager_client)
         mock_manager_client.update_quota_scope = AsyncMock()
         mock_manager_client.get_quota_scope.return_value = {
             "used_bytes": -1,
@@ -528,12 +537,13 @@ class TestVFSStorageServiceQuotaScope:
 
     async def test_unset_quota_scope(
         self,
+        monkeypatch: pytest.MonkeyPatch,
         service_with_storage_manager: VFSStorageService,
         mock_storage_manager: MagicMock,
         mock_manager_client: AsyncMock,
     ) -> None:
         """Test quota deletion returns quota_scope_id."""
-        self._setup_proxy_and_client(mock_storage_manager, mock_manager_client)
+        self._setup_proxy_and_client(monkeypatch, mock_storage_manager, mock_manager_client)
         mock_manager_client.delete_quota_scope_quota = AsyncMock()
 
         action = UnsetQuotaScopeAction(
@@ -566,12 +576,13 @@ class TestVFSStorageServiceQuotaScope:
 
     async def test_search_quota_scopes(
         self,
+        monkeypatch: pytest.MonkeyPatch,
         service_with_storage_manager: VFSStorageService,
         mock_storage_manager: MagicMock,
         mock_manager_client: AsyncMock,
     ) -> None:
         """Test aggregates volumes across all storage hosts."""
-        self._setup_proxy_and_client(mock_storage_manager, mock_manager_client)
+        self._setup_proxy_and_client(monkeypatch, mock_storage_manager, mock_manager_client)
         mock_storage_manager.get_all_volumes = AsyncMock(
             return_value=[
                 ("proxy1:volume1", {"some": "info"}),
@@ -597,12 +608,13 @@ class TestVFSStorageServiceQuotaScope:
 
     async def test_search_quota_scopes_error_handled(
         self,
+        monkeypatch: pytest.MonkeyPatch,
         service_with_storage_manager: VFSStorageService,
         mock_storage_manager: MagicMock,
         mock_manager_client: AsyncMock,
     ) -> None:
         """Test storage proxy error handled via try/except — errored volumes skipped."""
-        self._setup_proxy_and_client(mock_storage_manager, mock_manager_client)
+        self._setup_proxy_and_client(monkeypatch, mock_storage_manager, mock_manager_client)
         mock_storage_manager.get_all_volumes = AsyncMock(
             return_value=[
                 ("proxy1:volume1", {}),
@@ -622,12 +634,13 @@ class TestVFSStorageServiceQuotaScope:
 
     async def test_search_quota_scopes_negative_usage_bytes_converted_to_none(
         self,
+        monkeypatch: pytest.MonkeyPatch,
         service_with_storage_manager: VFSStorageService,
         mock_storage_manager: MagicMock,
         mock_manager_client: AsyncMock,
     ) -> None:
         """Test negative usage_bytes converted to None in search results."""
-        self._setup_proxy_and_client(mock_storage_manager, mock_manager_client)
+        self._setup_proxy_and_client(monkeypatch, mock_storage_manager, mock_manager_client)
         mock_storage_manager.get_all_volumes = AsyncMock(return_value=[("proxy1:volume1", {})])
         mock_manager_client.get_quota_scope.return_value = {
             "used_bytes": -1,

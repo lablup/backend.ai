@@ -13,11 +13,11 @@ from typing import Any
 import pytest
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.dto.manager.storage.request import VFSListFilesReq
 from ai.backend.common.dto.manager.storage.response import (
     GetVFSStorageResponse,
     ListVFSStorageResponse,
 )
-from ai.backend.common.dto.storage.request import VFSListFilesReq
 
 VFSStorageFixtureData = dict[str, Any]
 VFSStorageFactory = Callable[..., Coroutine[Any, Any, VFSStorageFixtureData]]
