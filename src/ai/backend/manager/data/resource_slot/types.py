@@ -6,19 +6,29 @@ from decimal import Decimal
 
 
 @dataclass(frozen=True)
+class NumberFormatData:
+    binary: bool = False
+    round_length: int = 0
+
+
+@dataclass(frozen=True)
 class ResourceSlotTypeData:
     slot_name: str
     slot_type: str
     display_name: str
     description: str
+    display_unit: str
+    display_icon: str
+    number_format: NumberFormatData
     rank: int
-    # TODO: add remaining fields from ResourceSlotTypeRow
 
 
 @dataclass(frozen=True)
 class ResourceSlotTypeSearchResult:
     items: list[ResourceSlotTypeData]
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
 
 @dataclass(frozen=True)
