@@ -30,9 +30,11 @@ from ai.backend.manager.models.base import (
     Base,
     EnumValueType,
     IPColumn,
+    PydanticColumn,
 )
 from ai.backend.manager.models.hasher import PasswordHasherFactory
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordColumn, PasswordInfo
+from ai.backend.manager.models.login_session.types import LoginSecurityPolicy
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -237,6 +239,9 @@ class UserRow(Base):  # type: ignore[misc]
     container_gids: Mapped[list[int] | None] = mapped_column(
         "container_gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null()
     )
+    login_security_policy: Mapped[LoginSecurityPolicy | None] = mapped_column(
+        "login_security_policy", PydanticColumn(LoginSecurityPolicy), nullable=True
+    )
 
     # Relationships
     sessions: Mapped[list[SessionRow]] = relationship(
@@ -431,6 +436,9 @@ class UserRow(Base):  # type: ignore[misc]
             container_uid=self.container_uid,
             container_main_gid=self.container_main_gid,
             container_gids=self.container_gids,
+            login_security_policy=self.login_security_policy.model_dump()
+            if self.login_security_policy is not None
+            else None,
         )
 
 
