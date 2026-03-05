@@ -247,6 +247,8 @@ class TestNetstatNsWork:
             stderr=subprocess.DEVNULL,
         )
         time.sleep(0.3)
+        if proc.poll() is not None:
+            pytest.skip("unshare --net failed (insufficient privileges)")
         try:
             yield proc
         finally:
