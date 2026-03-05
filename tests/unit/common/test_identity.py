@@ -1,16 +1,25 @@
 from __future__ import annotations
 
+import json
 import random
 import secrets
 import socket
+from collections.abc import AsyncGenerator, Generator
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiodns
+import aiohttp
 import pytest
 from aioresponses import aioresponses
 
 import ai.backend.common.identity
+from ai.backend.common.identity import (
+    CloudProvider,
+    _detect_aws,
+    _detect_azure,
+    _detect_gcp,
+)
 
 
 def test_is_containerized() -> None:
@@ -211,3 +220,224 @@ async def test_get_instance_type(provider: str | None) -> None:
         elif provider is None:
             ret = await ai.backend.common.identity.get_instance_type()
             assert ret == "default"
+
+
+class DetectCloudServiceTest:
+    @pytest.fixture
+    def mock_responses(self) -> Generator[aioresponses, None, None]:
+        with aioresponses() as m:
+            yield m
+
+    @pytest.fixture
+    async def client_session(
+        self, mock_responses: aioresponses
+    ) -> AsyncGenerator[aiohttp.ClientSession, None]:
+        async with aiohttp.ClientSession(raise_for_status=True) as session:
+            yield session
+
+    @pytest.fixture
+    def aws_metadata_url(self) -> str:
+        return "http://169.254.169.254/latest/meta-data/"
+
+    async def test_valid_aws_metadata(
+        self,
+        mock_responses: aioresponses,
+        client_session: aiohttp.ClientSession,
+        aws_metadata_url: str,
+    ) -> None:
+        mock_responses.get(
+            aws_metadata_url,
+            body="ami-id\nami-launch-index\ninstance-id\ninstance-type\nlocal-hostname",
+        )
+        result = await _detect_aws(client_session)
+        assert result == CloudProvider.AWS
+
+    @pytest.mark.parametrize(
+        "body",
+        ["<html>Cloud metadata</html>", ""],
+        ids=["non_aws_body", "empty_body"],
+    )
+    async def test_rejects_non_aws_response(
+        self,
+        mock_responses: aioresponses,
+        client_session: aiohttp.ClientSession,
+        aws_metadata_url: str,
+        body: str,
+    ) -> None:
+        mock_responses.get(aws_metadata_url, body=body)
+        with pytest.raises(ValueError, match="Not an AWS metadata response"):
+            await _detect_aws(client_session)
+
+    @pytest.fixture
+    def azure_metadata_url(self) -> str:
+        return "http://169.254.169.254/metadata/instance/compute?api-version=2021-02-01"
+
+    async def test_valid_azure_metadata(
+        self,
+        mock_responses: aioresponses,
+        client_session: aiohttp.ClientSession,
+        azure_metadata_url: str,
+    ) -> None:
+        mock_responses.get(
+            azure_metadata_url,
+            body=json.dumps({"vmId": "abc-123", "name": "myvm", "vmSize": "Standard_D2s_v3"}),
+        )
+        result = await _detect_azure(client_session)
+        assert result == CloudProvider.AZURE
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            "not json at all",
+            json.dumps({"someOtherKey": "value"}),
+            "",
+        ],
+        ids=["non_json", "json_without_vmid", "empty_body"],
+    )
+    async def test_rejects_non_azure_response(
+        self,
+        mock_responses: aioresponses,
+        client_session: aiohttp.ClientSession,
+        azure_metadata_url: str,
+        body: str,
+    ) -> None:
+        mock_responses.get(azure_metadata_url, body=body)
+        with pytest.raises(ValueError, match="Not an Azure metadata response"):
+            await _detect_azure(client_session)
+
+    @pytest.fixture
+    def gcp_metadata_url(self) -> str:
+        return "http://169.254.169.254/computeMetadata/v1/instance/id"
+
+    async def test_valid_gcp_metadata(
+        self,
+        mock_responses: aioresponses,
+        client_session: aiohttp.ClientSession,
+        gcp_metadata_url: str,
+    ) -> None:
+        mock_responses.get(gcp_metadata_url, body="1234567890123456")
+        result = await _detect_gcp(client_session)
+        assert result == CloudProvider.GCP
+
+    @pytest.mark.parametrize(
+        "body",
+        ["not-a-number", ""],
+        ids=["non_numeric", "empty_body"],
+    )
+    async def test_rejects_non_gcp_response(
+        self,
+        mock_responses: aioresponses,
+        client_session: aiohttp.ClientSession,
+        gcp_metadata_url: str,
+        body: str,
+    ) -> None:
+        mock_responses.get(gcp_metadata_url, body=body)
+        with pytest.raises(ValueError, match="Not a GCP metadata response"):
+            await _detect_gcp(client_session)
+
+
+class TestIdentityFunctions:
+    @pytest.fixture
+    def mock_curl(self) -> Generator[AsyncMock, None, None]:
+        mock = AsyncMock()
+        with patch("ai.backend.common.identity.curl", mock):
+            yield mock
+
+    @pytest.fixture
+    def mock_hostname(self) -> Generator[None, None, None]:
+        with patch("socket.gethostname", return_value="testhost"):
+            yield
+
+    @pytest.fixture
+    def aws_provider(self) -> None:
+        ai.backend.common.identity.current_provider = CloudProvider.AWS
+        ai.backend.common.identity._defined = False
+        ai.backend.common.identity._define_functions()
+        return
+
+    @pytest.mark.parametrize(
+        ("curl_return", "expected"),
+        [
+            (json.dumps({"region": "us-east-1"}), "amazon/us-east-1"),
+            ("not json", "amazon/unknown"),
+            (json.dumps({"otherKey": "value"}), "amazon/unknown"),
+            ("", "amazon/unknown"),
+        ],
+        ids=["valid_json", "invalid_json", "missing_key", "empty_response"],
+    )
+    async def test_get_instance_region(
+        self, mock_curl: AsyncMock, aws_provider: None, curl_return: str, expected: str
+    ) -> None:
+        mock_curl.return_value = curl_return
+        result = await ai.backend.common.identity.get_instance_region()
+        assert result == expected
+
+    @pytest.fixture
+    def azure_provider(self) -> None:
+        ai.backend.common.identity.current_provider = CloudProvider.AZURE
+        ai.backend.common.identity._defined = False
+        ai.backend.common.identity._define_functions()
+        return
+
+    async def test_get_instance_id_with_invalid_json(
+        self, mock_curl: AsyncMock, mock_hostname: None, azure_provider: None
+    ) -> None:
+        mock_curl.return_value = "not json"
+        result = await ai.backend.common.identity.get_instance_id()
+        assert result == "i-testhost"
+
+    @pytest.mark.parametrize(
+        ("curl_return", "expected"),
+        [
+            ("not json", "127.0.0.1"),
+            ("", "127.0.0.1"),
+        ],
+        ids=["invalid_json", "empty_response"],
+    )
+    async def test_get_instance_ip_fallback(
+        self, mock_curl: AsyncMock, azure_provider: None, curl_return: str, expected: str
+    ) -> None:
+        mock_curl.return_value = curl_return
+        result = await ai.backend.common.identity.get_instance_ip(None)
+        assert result == expected
+
+    async def test_get_instance_type_with_invalid_json(
+        self, mock_curl: AsyncMock, azure_provider: None
+    ) -> None:
+        mock_curl.return_value = "not json"
+        result = await ai.backend.common.identity.get_instance_type()
+        assert result == "unknown"
+
+    @pytest.mark.parametrize(
+        ("curl_return", "expected"),
+        [
+            ("not json", "azure/unknown"),
+            (json.dumps({"compute": {"otherKey": "val"}}), "azure/unknown"),
+        ],
+        ids=["invalid_json", "missing_key"],
+    )
+    async def test_get_instance_region_fallback(
+        self, mock_curl: AsyncMock, azure_provider: None, curl_return: str, expected: str
+    ) -> None:
+        mock_curl.return_value = curl_return
+        result = await ai.backend.common.identity.get_instance_region()
+        assert result == expected
+
+    @pytest.fixture
+    def gcp_provider(self) -> None:
+        ai.backend.common.identity.current_provider = CloudProvider.GCP
+        ai.backend.common.identity._defined = False
+        ai.backend.common.identity._define_functions()
+        return
+
+    @pytest.mark.parametrize(
+        "curl_return",
+        ["not-a-number", ""],
+        ids=["non_numeric", "empty"],
+    )
+    async def test_get_instance_id_fallback(
+        self, mock_curl: AsyncMock, mock_hostname: None, gcp_provider: None, curl_return: str
+    ) -> None:
+        mock_curl.return_value = curl_return
+        result = await ai.backend.common.identity.get_instance_id()
+        assert result == "i-testhost"
