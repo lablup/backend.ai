@@ -489,7 +489,7 @@ class TestSearchRoles:
         service: PermissionControllerService,
         mock_repository: MagicMock,
     ) -> None:
-        mock_result = SearchResult(
+        mock_result: SearchResult[RoleData] = SearchResult(
             items=[],
             total_count=0,
             has_next_page=False,
@@ -572,7 +572,7 @@ class TestSearchUsersAssignedToRole:
         service: PermissionControllerService,
         mock_repository: MagicMock,
     ) -> None:
-        mock_result = SearchResult(
+        mock_result: SearchResult[AssignedUserData] = SearchResult(
             items=[],
             total_count=0,
             has_next_page=False,
@@ -725,7 +725,7 @@ class TestSearchPermissions:
         service: PermissionControllerService,
         mock_repository: MagicMock,
     ) -> None:
-        mock_result = SearchResult(
+        mock_result: SearchResult[PermissionData] = SearchResult(
             items=[],
             total_count=50,
             has_next_page=True,
@@ -852,7 +852,7 @@ class TestSearchObjectPermissions:
         service: PermissionControllerService,
         mock_repository: MagicMock,
     ) -> None:
-        mock_result = SearchResult(
+        mock_result: SearchResult[ObjectPermissionData] = SearchResult(
             items=[],
             total_count=25,
             has_next_page=True,
@@ -967,7 +967,7 @@ class TestSearchEntities:
         service: PermissionControllerService,
         mock_repository: MagicMock,
     ) -> None:
-        mock_result = SearchResult(
+        mock_result: SearchResult[EntityData] = SearchResult(
             items=[],
             total_count=100,
             has_next_page=True,
@@ -1027,7 +1027,7 @@ class TestSearchElementAssociations:
         service: PermissionControllerService,
         mock_repository: MagicMock,
     ) -> None:
-        mock_result = SearchResult(
+        mock_result: SearchResult[AssociationScopesEntitiesData] = SearchResult(
             items=[],
             total_count=30,
             has_next_page=True,
