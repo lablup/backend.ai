@@ -385,6 +385,7 @@ class DeploymentDBSource:
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
+                    selectinload(EndpointRow.deployment_policy),
                 )
             )
             result = await db_sess.execute(query)
@@ -1023,6 +1024,7 @@ class DeploymentDBSource:
             query = sa.select(EndpointRow).options(
                 selectinload(EndpointRow.image_row),
                 selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
+                selectinload(EndpointRow.deployment_policy),
             )
 
             result = await execute_batch_querier(

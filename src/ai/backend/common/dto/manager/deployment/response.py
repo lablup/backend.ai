@@ -138,6 +138,9 @@ class DeploymentDTO(BaseModel):
     current_revision: RevisionDTO | None = Field(
         default=None, description="Current active revision"
     )
+    deployment_policy: DeploymentPolicyDTO | None = Field(
+        default=None, description="Deployment rollout policy"
+    )
 
 
 class CreateDeploymentResponse(BaseResponseModel):
@@ -248,6 +251,7 @@ class DeploymentPolicyDTO(BaseModel):
     """
 
     id: UUID = Field(description="Unique identifier of this deployment policy")
+    deployment_id: UUID = Field(description="UUID of the deployment this policy belongs to")
     strategy: DeploymentStrategy = Field(
         description="Configured rollout strategy type (ROLLING for gradual replacement, BLUE_GREEN for parallel environment switching)"
     )

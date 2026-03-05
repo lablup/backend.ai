@@ -116,6 +116,11 @@ class DeploymentAdapter(BaseFilterAdapter):
             revision_adapter = RevisionAdapter()
             current_revision = revision_adapter.convert_to_dto(data.revision)
 
+        deployment_policy = None
+        if data.policy:
+            policy_adapter = DeploymentPolicyAdapter()
+            deployment_policy = policy_adapter.convert_to_dto(data.policy)
+
         return DeploymentDTO(
             id=data.id,
             name=data.metadata.name,
@@ -137,6 +142,7 @@ class DeploymentAdapter(BaseFilterAdapter):
             ),
             default_deployment_strategy=data.default_deployment_strategy,
             current_revision=current_revision,
+            deployment_policy=deployment_policy,
         )
 
     def build_querier(self, request: SearchDeploymentsRequest) -> BatchQuerier:
@@ -549,6 +555,7 @@ class DeploymentPolicyAdapter:
         """Convert DeploymentPolicyData to DTO."""
         return DeploymentPolicyDTO(
             id=data.id,
+            deployment_id=data.endpoint,
             strategy=data.strategy,
             strategy_spec=data.strategy_spec.model_dump(),
             rollback_on_failure=data.rollback_on_failure,

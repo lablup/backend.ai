@@ -23,7 +23,6 @@ from ai.backend.common.dto.manager.deployment import (
     CreateDeploymentRequest,
     DeploymentFilter,
     RollingUpdateConfigInput,
-    SearchDeploymentPoliciesRequest,
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
@@ -135,6 +134,15 @@ def list_deployments_cmd(
                 print(f"Status: {dep.status}")
                 print(f"Project: {dep.project_id}")
                 print(f"Replicas: {dep.replica_state.desired_replica_count}")
+                if dep.deployment_policy:
+                    pol = dep.deployment_policy
+                    print(f"Policy Strategy: {pol.strategy}")
+                    print(f"Policy Rollback on Failure: {pol.rollback_on_failure}")
+                    if pol.strategy_spec:
+                        for key, value in pol.strategy_spec.items():
+                            print(f"  {key}: {value}")
+                else:
+                    print("Policy: N/A")
                 print(f"Created: {dep.created_at}")
                 print("---")
         except Exception as e:
@@ -379,47 +387,6 @@ def policy() -> None:
     A policy defines the rollout strategy (rolling update or blue-green),
     concurrency limits, and automatic rollback behavior.
     """
-
-
-@policy.command("list")
-@pass_ctx_obj
-@click.option("--limit", type=int, default=50, help="Maximum items to return")
-@click.option("--offset", type=int, default=0, help="Number of items to skip")
-def list_policies_cmd(
-    ctx: CLIContext,
-    limit: int,
-    offset: int,
-) -> None:
-    """List all deployment policies."""
-
-    async def _run() -> None:
-        api_config = get_config()
-        v2_config = ClientConfig.from_v1_config(api_config)
-        auth = HMACAuth(api_config.access_key, api_config.secret_key)
-        registry = await BackendAIClientRegistry.create(v2_config, auth)
-        try:
-            request = SearchDeploymentPoliciesRequest(limit=limit, offset=offset)
-            result = await registry.deployment.search_policies(request)
-
-            policies = result.deployment_policies
-            if not policies:
-                print("No deployment policies found")
-                return
-
-            for pol in policies:
-                print(f"ID: {pol.id}")
-                print(f"Strategy: {pol.strategy}")
-                print(f"Rollback on Failure: {pol.rollback_on_failure}")
-                print(f"Created: {pol.created_at}")
-                print("---")
-        finally:
-            await registry.close()
-
-    try:
-        asyncio.run(_run())
-    except Exception as e:
-        ctx.output.print_error(e)
-        sys.exit(ExitCode.FAILURE)
 
 
 @policy.command("info")

@@ -245,6 +245,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
         ),
         default_deployment_strategy=DeploymentStrategy.ROLLING,
         created_user_id=info.metadata.created_user,
+        policy=info.policy,
     )
 
 

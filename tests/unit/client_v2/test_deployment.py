@@ -369,6 +369,7 @@ _SAMPLE_POLICY_ID = uuid4()
 
 _SAMPLE_POLICY_DTO: dict[str, Any] = {
     "id": str(_SAMPLE_POLICY_ID),
+    "deployment_id": str(_SAMPLE_DEPLOYMENT_ID),
     "strategy": "ROLLING",
     "strategy_spec": {"max_surge": 1, "max_unavailable": 0},
     "rollback_on_failure": False,
