@@ -149,6 +149,55 @@ class UserRoleRevocationData:
 
 
 @dataclass(frozen=True)
+class BulkUserRoleAssignmentInput:
+    """Input for bulk assigning a role to multiple users."""
+
+    role_id: uuid.UUID
+    user_ids: list[uuid.UUID]
+    granted_by: uuid.UUID | None = None
+
+
+@dataclass(frozen=True)
+class BulkRoleAssignmentFailure:
+    """Failure information for a single user in bulk role assignment."""
+
+    user_id: uuid.UUID
+    message: str
+
+
+@dataclass(frozen=True)
+class BulkRoleAssignmentResultData:
+    """Result of bulk role assignment."""
+
+    successes: list[UserRoleAssignmentData] = field(default_factory=list)
+    failures: list[BulkRoleAssignmentFailure] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class BulkUserRoleRevocationInput:
+    """Input for bulk revoking a role from multiple users."""
+
+    role_id: uuid.UUID
+    user_ids: list[uuid.UUID]
+
+
+@dataclass(frozen=True)
+class BulkRoleRevocationFailure:
+    """Failure information for a single user in bulk role revocation."""
+
+    user_id: uuid.UUID
+    message: str
+
+
+@dataclass(frozen=True)
+class BulkRoleRevocationResultData:
+    """Result of bulk role revocation."""
+
+    successes: list[UserRoleRevocationData] = field(default_factory=list)
+    failures: list[BulkRoleRevocationFailure] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class RoleListResult(SearchResult[RoleData]):
     """Result of role search with pagination info."""
 
