@@ -101,6 +101,7 @@ class BackendAIAuthClient:
         *,
         json: Any | None = None,
         params: dict[str, str] | None = None,
+        extra_headers: Mapping[str, str] | None = None,
     ) -> dict[str, Any] | list[Any] | None:
         session = self._session
         content_type = "application/json"
@@ -108,7 +109,9 @@ class BackendAIAuthClient:
         if params:
             qs = "&".join(f"{k}={v}" for k, v in params.items())
             rel_url = f"{rel_url}?{qs}"
-        headers = self._sign(method, rel_url, content_type)
+        headers = {**self._sign(method, rel_url, content_type)}
+        if extra_headers:
+            headers.update(extra_headers)
         url = self._build_url(path)
         async with session.request(
             method,
@@ -136,11 +139,14 @@ class BackendAIAuthClient:
         request: BaseRequestModel | None = None,
         response_model: type[ResponseT],
         params: dict[str, str] | None = None,
+        extra_headers: Mapping[str, str] | None = None,
     ) -> ResponseT:
         json_body = (
             request.model_dump(mode="json", exclude_none=True) if request is not None else None
         )
-        data = await self._request(method, path, json=json_body, params=params)
+        data = await self._request(
+            method, path, json=json_body, params=params, extra_headers=extra_headers
+        )
         if data is None:
             raise BackendAPIError(
                 204,

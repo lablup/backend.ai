@@ -49,6 +49,7 @@ from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
+from ai.backend.common.dto.manager.auth.request import UpdatePasswordNoAuthRequest
 from ai.backend.common.dto.manager.auth.types import (
     AuthSuccessResponse,
     RequireTwoFactorAuthResponse,
@@ -72,7 +73,7 @@ from ai.backend.web.config.unified import EventLoopType, ServiceMode, WebServerU
 from ai.backend.web.security import SecurityPolicy, security_policy_middleware
 
 from . import __version__, user_agent
-from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
+from .auth import build_forwarding_headers, fill_forwarding_hdrs_to_api_session, get_client_ip
 from .errors import InvalidAPIConfigurationError
 from .proxy import (
     decrypt_payload,
@@ -235,31 +236,22 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
     }
 
     try:
-        anon_api_config = APIConfig(
-            domain=config.api.domain,
-            endpoint=str(config.api.endpoint[0]),
-            access_key="",
-            secret_key="",  # anonymous session
-            user_agent=user_agent,
-            skip_sslcert_validation=not config.api.ssl_verify,
+        registry: BackendAIClientRegistry = request.app["client_registry"]
+        resp = await registry.auth.update_password_no_auth(
+            UpdatePasswordNoAuthRequest(
+                domain=config.api.domain,
+                username=creds["username"],
+                current_password=creds["current_password"],
+                new_password=creds["new_password"],
+            ),
+            extra_headers=build_forwarding_headers(request),
         )
-        if not anon_api_config.is_anonymous:
-            raise InvalidAPIConfigurationError(
-                "Anonymous API configuration is not properly initialized."
-            )
-        async with APISession(config=anon_api_config) as api_session:
-            fill_forwarding_hdrs_to_api_session(request, api_session)
-            result = await api_session.Auth.update_password_no_auth(
-                config.api.domain,
-                creds["username"],
-                creds["current_password"],
-                creds["new_password"],
-            )
-            log.info(
-                "UPDATE_PASSWORD_NO_AUTH: Authorization succeeded for (email:{}, ip:{})",
-                creds["username"],
-                client_ip,
-            )
+        result["password_changed_at"] = resp.password_changed_at
+        log.info(
+            "UPDATE_PASSWORD_NO_AUTH: Authorization succeeded for (email:{}, ip:{})",
+            creds["username"],
+            client_ip,
+        )
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         return web.HTTPBadGateway(
