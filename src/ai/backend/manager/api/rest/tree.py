@@ -109,6 +109,8 @@ def build_api_routes(
     from .rbac.registry import register_rbac_routes
     from .resource.handler import ResourceHandler
     from .resource.registry import register_resource_routes
+    from .resource_slot.handler import ResourceSlotHandler
+    from .resource_slot.registry import register_resource_slot_routes
     from .scaling_group.handler import ScalingGroupHandler
     from .scaling_group.registry import register_scaling_group_routes
     from .scheduling_history.handler import SchedulingHistoryHandler
@@ -145,6 +147,7 @@ def build_api_routes(
     acl_handler = AclHandler()
     auth_handler = AuthHandler(auth=processors.auth)
     agent_handler = AgentHandler(agent=processors.agent)
+    resource_slot_handler = ResourceSlotHandler(resource_slot=processors.resource_slot)
     artifact_handler = ArtifactHandler(
         artifact=processors.artifact,
         artifact_revision=processors.artifact_revision,
@@ -344,4 +347,5 @@ def build_api_routes(
         register_fair_share_routes(fair_share_handler, route_deps),
         register_export_routes(export_handler, route_deps),
         register_agent_routes(agent_handler, route_deps),
+        register_resource_slot_routes(resource_slot_handler, route_deps),
     ]
