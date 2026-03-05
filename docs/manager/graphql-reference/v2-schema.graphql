@@ -5950,7 +5950,6 @@ type RoleAssignmentEdge {
 input RoleAssignmentFilter {
   roleId: UUID = null
   role: RoleAssignmentRoleNestedFilter = null
-  user: RoleAssignmentUserNestedFilter = null
 }
 
 """Added in 26.3.0. Order by specification for role assignments"""
@@ -5971,14 +5970,6 @@ input RoleAssignmentRoleNestedFilter {
   name: StringFilter = null
   source: [RoleSource!] = null
   status: [RoleStatus!] = null
-}
-
-"""
-Added in 26.3.0. Nested filter for users within a role assignment. Filters assignments that have a user matching all specified conditions.
-"""
-input RoleAssignmentUserNestedFilter {
-  username: StringFilter = null
-  email: StringFilter = null
 }
 
 """Added in 26.3.0. Role connection"""
