@@ -123,13 +123,11 @@ class CreateVFSStorageInput:
 @strawberry.input(description="Added in 25.16.0. Input for updating VFS storage")
 class UpdateVFSStorageInput:
     id: ID
-    name: str | None = UNSET
     host: str | None = UNSET
     base_path: str | None = UNSET
 
     def to_updater(self) -> Updater[VFSStorageRow]:
         spec = VFSStorageUpdaterSpec(
-            name=OptionalState[str].from_graphql(self.name),
             host=OptionalState[str].from_graphql(self.host),
             base_path=OptionalState[str].from_graphql(self.base_path),
         )

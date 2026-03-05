@@ -178,7 +178,6 @@ class CreateObjectStorageInput:
 @strawberry.input(description="Added in 25.14.0")
 class UpdateObjectStorageInput:
     id: ID
-    name: str | None = UNSET
     host: str | None = UNSET
     access_key: str | None = UNSET
     secret_key: str | None = UNSET
@@ -187,7 +186,6 @@ class UpdateObjectStorageInput:
 
     def to_updater(self) -> Updater[ObjectStorageRow]:
         spec = ObjectStorageUpdaterSpec(
-            name=OptionalState[str].from_graphql(self.name),
             host=OptionalState[str].from_graphql(self.host),
             access_key=OptionalState[str].from_graphql(self.access_key),
             secret_key=OptionalState[str].from_graphql(self.secret_key),

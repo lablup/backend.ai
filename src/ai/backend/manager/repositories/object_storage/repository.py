@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 
 from ai.backend.common.exception import (
@@ -57,7 +59,10 @@ class ObjectStorageRepository:
         return await self._db_source.create(creator)
 
     @object_storage_repository_resilience.apply()
-    async def update(self, updater: Updater[ObjectStorageRow]) -> ObjectStorageData:
+    async def update(
+        self,
+        updater: Updater[ObjectStorageRow],
+    ) -> ObjectStorageData:
         return await self._db_source.update(updater)
 
     @object_storage_repository_resilience.apply()

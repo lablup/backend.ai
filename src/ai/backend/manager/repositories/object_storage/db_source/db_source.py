@@ -14,7 +14,7 @@ from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.base.updater import Updater
 
 
 class ObjectStorageDBSource:
@@ -53,7 +53,7 @@ class ObjectStorageDBSource:
 
     async def get_by_namespace_id(self, storage_namespace_id: uuid.UUID) -> ObjectStorageData:
         """
-        Get an existing object storage configuration from the database by ID.
+        Get an existing object storage configuration from the database by namespace ID.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             query = (
@@ -76,26 +76,41 @@ class ObjectStorageDBSource:
     async def create(self, creator: Creator[ObjectStorageRow]) -> ObjectStorageData:
         """
         Create a new object storage configuration in the database.
+        JTI handles inserting into both artifact_storages and object_storages.
         """
         async with self._db.begin_session() as db_session:
             creator_result = await execute_creator(db_session, creator)
             return creator_result.row.to_dataclass()
 
-    async def update(self, updater: Updater[ObjectStorageRow]) -> ObjectStorageData:
+    async def update(
+        self,
+        updater: Updater[ObjectStorageRow],
+    ) -> ObjectStorageData:
         """
         Update an existing object storage configuration in the database.
+        Uses plain UPDATE + SELECT instead of execute_updater's RETURNING+from_statement,
+        which is incompatible with JTI (RETURNING only includes child table columns).
         """
         async with self._db.begin_session() as db_session:
-            result = await execute_updater(db_session, updater)
-            if result is None:
-                raise ObjectStorageNotFoundError(
-                    f"Object storage with ID {updater.pk_value} not found."
-                )
-            return result.row.to_dataclass()
+            storage_id = uuid.UUID(str(updater.pk_value))
+            values = updater.spec.build_values()
+            if values:
+                table = ObjectStorageRow.__table__
+                pk_col = list(table.primary_key.columns)[0]
+                update_stmt = sa.update(table).values(values).where(pk_col == storage_id)
+                await db_session.execute(update_stmt)
+
+            query = sa.select(ObjectStorageRow).where(ObjectStorageRow.id == storage_id)
+            row_result = await db_session.execute(query)
+            row = row_result.scalar_one_or_none()
+            if row is None:
+                raise ObjectStorageNotFoundError(f"Object storage with ID {storage_id} not found.")
+            return row.to_dataclass()
 
     async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:
         """
         Delete an existing object storage configuration from the database.
+        FK cascade handles deleting the ArtifactStorageRow.
         """
         async with self._db.begin_session() as db_session:
             delete_query = (

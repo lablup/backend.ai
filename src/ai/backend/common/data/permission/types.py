@@ -103,6 +103,7 @@ class EntityType(enum.StrEnum):
     NETWORK = "network"
     NOTIFICATION = "notification"
     OBJECT_PERMISSION = "object_permission"
+    ARTIFACT_STORAGE = "artifact_storage"
     OBJECT_STORAGE = "object_storage"
     PERMISSION = "permission"
     AGENT_RESOURCE = "agent_resource"

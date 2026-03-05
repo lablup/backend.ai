@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 
+from ai.backend.common.data.storage.types import ArtifactStorageData
 from ai.backend.common.dto.manager.response import ObjectStorageResponse
 
 
@@ -16,10 +16,8 @@ class ObjectStorageListResult:
     has_previous_page: bool
 
 
-@dataclass
-class ObjectStorageData:
-    id: uuid.UUID
-    name: str
+@dataclass(frozen=True)
+class ObjectStorageData(ArtifactStorageData):
     host: str
     access_key: str
     secret_key: str

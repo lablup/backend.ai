@@ -12,7 +12,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.base.updater import Updater
 
 
 class VFSStorageDBSource:
@@ -50,24 +50,41 @@ class VFSStorageDBSource:
     async def create(self, creator: Creator[VFSStorageRow]) -> VFSStorageData:
         """
         Create a new VFS storage configuration in the database.
+        JTI handles inserting into both artifact_storages and vfs_storages.
         """
         async with self._db.begin_session() as db_session:
             creator_result = await execute_creator(db_session, creator)
             return creator_result.row.to_dataclass()
 
-    async def update(self, updater: Updater[VFSStorageRow]) -> VFSStorageData:
+    async def update(
+        self,
+        updater: Updater[VFSStorageRow],
+    ) -> VFSStorageData:
         """
         Update an existing VFS storage configuration in the database.
+        Uses plain UPDATE + SELECT instead of execute_updater's RETURNING+from_statement,
+        which is incompatible with JTI (RETURNING only includes child table columns).
         """
         async with self._db.begin_session() as db_session:
-            result = await execute_updater(db_session, updater)
-            if result is None:
-                raise VFSStorageNotFoundError(f"VFS storage with ID {updater.pk_value} not found.")
-            return result.row.to_dataclass()
+            storage_id = uuid.UUID(str(updater.pk_value))
+            values = updater.spec.build_values()
+            if values:
+                table = VFSStorageRow.__table__
+                pk_col = list(table.primary_key.columns)[0]
+                update_stmt = sa.update(table).values(values).where(pk_col == storage_id)
+                await db_session.execute(update_stmt)
+
+            query = sa.select(VFSStorageRow).where(VFSStorageRow.id == storage_id)
+            row_result = await db_session.execute(query)
+            row = row_result.scalar_one_or_none()
+            if row is None:
+                raise VFSStorageNotFoundError(f"VFS storage with ID {storage_id} not found.")
+            return row.to_dataclass()
 
     async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:
         """
         Delete an existing VFS storage configuration from the database.
+        FK cascade handles deleting the ArtifactStorageRow.
         """
         async with self._db.begin_session() as db_session:
             delete_query = (

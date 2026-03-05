@@ -11,6 +11,8 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.storage.types import ArtifactStorageType
+from ai.backend.common.types import ArtifactStorageId
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData, VFSStorageListResult
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
@@ -40,8 +42,9 @@ class TestVFSStorageService:
     def sample_vfs_storage_data(self) -> VFSStorageData:
         """Create sample VFS storage data"""
         return VFSStorageData(
-            id=uuid4(),
+            id=ArtifactStorageId(uuid4()),
             name="test-vfs-storage",
+            type=ArtifactStorageType.VFS_STORAGE,
             host="localhost",
             base_path=Path("/mnt/vfs/test"),
         )

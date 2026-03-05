@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 
 from ai.backend.common.exception import BackendAIError
@@ -51,7 +53,10 @@ class VFSStorageRepository:
         return await self._db_source.create(creator)
 
     @vfs_storage_repository_resilience.apply()
-    async def update(self, updater: Updater[VFSStorageRow]) -> VFSStorageData:
+    async def update(
+        self,
+        updater: Updater[VFSStorageRow],
+    ) -> VFSStorageData:
         return await self._db_source.update(updater)
 
     @vfs_storage_repository_resilience.apply()

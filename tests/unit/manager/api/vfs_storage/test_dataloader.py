@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
+from ai.backend.common.types import ArtifactStorageId
 from ai.backend.manager.api.gql.data_loader.vfs_storage.loader import load_vfs_storages_by_ids
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 
@@ -13,7 +14,7 @@ class TestLoadVFSStoragesByIds:
     """Tests for load_vfs_storages_by_ids function."""
 
     @staticmethod
-    def create_mock_storage(storage_id: uuid.UUID) -> MagicMock:
+    def create_mock_storage(storage_id: ArtifactStorageId) -> MagicMock:
         return MagicMock(spec=VFSStorageData, id=storage_id)
 
     @staticmethod
@@ -39,7 +40,11 @@ class TestLoadVFSStoragesByIds:
 
     async def test_returns_storages_in_request_order(self) -> None:
         # Given
-        id1, id2, id3 = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        id1, id2, id3 = (
+            ArtifactStorageId(uuid.uuid4()),
+            ArtifactStorageId(uuid.uuid4()),
+            ArtifactStorageId(uuid.uuid4()),
+        )
         storage1 = self.create_mock_storage(id1)
         storage2 = self.create_mock_storage(id2)
         storage3 = self.create_mock_storage(id3)
@@ -55,8 +60,8 @@ class TestLoadVFSStoragesByIds:
 
     async def test_returns_none_for_missing_ids(self) -> None:
         # Given
-        existing_id = uuid.uuid4()
-        missing_id = uuid.uuid4()
+        existing_id = ArtifactStorageId(uuid.uuid4())
+        missing_id = ArtifactStorageId(uuid.uuid4())
         existing_storage = self.create_mock_storage(existing_id)
         mock_processor = self.create_mock_processor([existing_storage])
 
