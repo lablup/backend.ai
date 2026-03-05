@@ -82,7 +82,9 @@ def mock_storage_manager() -> MagicMock:
     mock_client.delete_files_async = AsyncMock(
         return_value=FileDeleteAsyncResponse(bgtask_id=TaskID(uuid.uuid4()))
     )
-    mock_client.mkdir = AsyncMock(return_value={"results": [{"path": "newdir", "success": True}]})
+    mock_client.mkdir = AsyncMock(
+        return_value={"results": {"success": [{"item": "newdir", "msg": None}], "failed": []}}
+    )
     manager.get_manager_facing_client.return_value = mock_client
     manager.get_client_api_url.return_value = MagicMock(
         __truediv__=lambda self, path: f"http://storage:6021/{path}"
@@ -497,7 +499,7 @@ class TestMkdirAction:
 
         assert result.vfolder_uuid == vfolder_uuid
         assert result.storage_resp_status == 200
-        assert result.results == [{"path": "newdir", "success": True}]
+        assert result.results == {"success": [{"item": "newdir", "msg": None}], "failed": []}
 
     async def test_parents_true_creates_intermediate_dirs(
         self,
