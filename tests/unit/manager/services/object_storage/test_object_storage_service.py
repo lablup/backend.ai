@@ -11,6 +11,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
@@ -118,8 +119,8 @@ class TestObjectStorageService:
             description="test artifact",
             registry_id=uuid4(),
             source_registry_id=uuid4(),
-            registry_type="reservoir",
-            source_registry_type="reservoir",
+            registry_type=ArtifactRegistryType.RESERVOIR,
+            source_registry_type=ArtifactRegistryType.RESERVOIR,
             availability=ArtifactAvailability.ALIVE,
             scanned_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
@@ -551,8 +552,8 @@ class TestObjectStorageService:
             description="readonly",
             registry_id=uuid4(),
             source_registry_id=uuid4(),
-            registry_type="reservoir",
-            source_registry_type="reservoir",
+            registry_type=ArtifactRegistryType.RESERVOIR,
+            source_registry_type=ArtifactRegistryType.RESERVOIR,
             availability=ArtifactAvailability.ALIVE,
             scanned_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
