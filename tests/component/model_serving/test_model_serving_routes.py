@@ -38,10 +38,10 @@ class TestCreateService:
         """Creating a service with a non-existent image raises BackendAPIError."""
         request = NewServiceRequestModel(
             service_name="test-service-create",
-            desired_session_count=1,
+            replicas=1,
             image="cr.backend.ai/nonexistent/image:latest",
-            group="default",
-            domain="default",
+            group_name="default",
+            domain_name="default",
             config=ServiceConfigModel(
                 model="nonexistent-model-vfolder",
                 model_definition_path="model-definition.yaml",
@@ -58,10 +58,10 @@ class TestCreateService:
         """Regular user creating a service with non-existent resources raises error."""
         request = NewServiceRequestModel(
             service_name="test-user-service",
-            desired_session_count=1,
+            replicas=1,
             image="cr.backend.ai/nonexistent/image:latest",
-            group="default",
-            domain="default",
+            group_name="default",
+            domain_name="default",
             config=ServiceConfigModel(
                 model="nonexistent-model",
                 model_definition_path="model-definition.yaml",
