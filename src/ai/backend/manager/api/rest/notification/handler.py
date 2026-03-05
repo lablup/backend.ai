@@ -68,7 +68,7 @@ from ai.backend.manager.services.notification.actions import (
     ValidateChannelAction,
     ValidateRuleAction,
 )
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.notification.processors import NotificationProcessors
 
 from .adapter import NotificationChannelAdapter, NotificationRuleAdapter
 
@@ -78,8 +78,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class NotificationHandler:
     """Notification API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, notification: NotificationProcessors) -> None:
+        self._notification = notification
         self._channel_adapter = NotificationChannelAdapter()
         self._rule_adapter = NotificationRuleAdapter()
 
@@ -104,7 +104,7 @@ class NotificationHandler:
             element_type=RBACElementType.NOTIFICATION_CHANNEL,
             scope_ref=RBACElementRef(RBACElementType.USER, str(ctx.user_uuid)),
         )
-        action_result = await self._processors.notification.create_channel.wait_for_complete(
+        action_result = await self._notification.create_channel.wait_for_complete(
             CreateChannelAction(creator=creator)
         )
         resp = CreateNotificationChannelResponse(
@@ -117,7 +117,7 @@ class NotificationHandler:
         body: BodyParam[SearchNotificationChannelsRequest],
     ) -> APIResponse:
         querier = self._channel_adapter.build_querier(body.parsed)
-        action_result = await self._processors.notification.search_channels.wait_for_complete(
+        action_result = await self._notification.search_channels.wait_for_complete(
             SearchChannelsAction(querier=querier)
         )
         resp = ListNotificationChannelsResponse(
@@ -134,7 +134,7 @@ class NotificationHandler:
         self,
         path: PathParam[GetNotificationChannelPathParam],
     ) -> APIResponse:
-        action_result = await self._processors.notification.get_channel.wait_for_complete(
+        action_result = await self._notification.get_channel.wait_for_complete(
             GetChannelAction(channel_id=path.parsed.channel_id)
         )
         resp = GetNotificationChannelResponse(
@@ -148,7 +148,7 @@ class NotificationHandler:
         body: BodyParam[UpdateNotificationChannelRequest],
     ) -> APIResponse:
         channel_id = path.parsed.channel_id
-        action_result = await self._processors.notification.update_channel.wait_for_complete(
+        action_result = await self._notification.update_channel.wait_for_complete(
             UpdateChannelAction(
                 updater=self._channel_adapter.build_updater(body.parsed, channel_id)
             )
@@ -162,7 +162,7 @@ class NotificationHandler:
         self,
         path: PathParam[DeleteNotificationChannelPathParam],
     ) -> APIResponse:
-        action_result = await self._processors.notification.delete_channel.wait_for_complete(
+        action_result = await self._notification.delete_channel.wait_for_complete(
             DeleteChannelAction(channel_id=path.parsed.channel_id)
         )
         resp = DeleteNotificationChannelResponse(deleted=action_result.deleted)
@@ -173,7 +173,7 @@ class NotificationHandler:
         path: PathParam[ValidateNotificationChannelPathParam],
         body: BodyParam[ValidateNotificationChannelRequest],
     ) -> APIResponse:
-        await self._processors.notification.validate_channel.wait_for_complete(
+        await self._notification.validate_channel.wait_for_complete(
             ValidateChannelAction(
                 channel_id=path.parsed.channel_id,
                 test_message=body.parsed.test_message,
@@ -224,7 +224,7 @@ class NotificationHandler:
                 RBACElementType.NOTIFICATION_CHANNEL, str(body.parsed.channel_id)
             ),
         )
-        action_result = await self._processors.notification.create_rule.wait_for_complete(
+        action_result = await self._notification.create_rule.wait_for_complete(
             CreateRuleAction(creator=creator)
         )
         resp = CreateNotificationRuleResponse(
@@ -237,7 +237,7 @@ class NotificationHandler:
         body: BodyParam[SearchNotificationRulesRequest],
     ) -> APIResponse:
         querier = self._rule_adapter.build_querier(body.parsed)
-        action_result = await self._processors.notification.search_rules.wait_for_complete(
+        action_result = await self._notification.search_rules.wait_for_complete(
             SearchRulesAction(querier=querier)
         )
         resp = ListNotificationRulesResponse(
@@ -254,7 +254,7 @@ class NotificationHandler:
         self,
         path: PathParam[GetNotificationRulePathParam],
     ) -> APIResponse:
-        action_result = await self._processors.notification.get_rule.wait_for_complete(
+        action_result = await self._notification.get_rule.wait_for_complete(
             GetRuleAction(rule_id=path.parsed.rule_id)
         )
         resp = GetNotificationRuleResponse(
@@ -268,7 +268,7 @@ class NotificationHandler:
         body: BodyParam[UpdateNotificationRuleRequest],
     ) -> APIResponse:
         rule_id = path.parsed.rule_id
-        action_result = await self._processors.notification.update_rule.wait_for_complete(
+        action_result = await self._notification.update_rule.wait_for_complete(
             UpdateRuleAction(updater=self._rule_adapter.build_updater(body.parsed, rule_id))
         )
         resp = UpdateNotificationRuleResponse(
@@ -280,7 +280,7 @@ class NotificationHandler:
         self,
         path: PathParam[DeleteNotificationRulePathParam],
     ) -> APIResponse:
-        action_result = await self._processors.notification.delete_rule.wait_for_complete(
+        action_result = await self._notification.delete_rule.wait_for_complete(
             DeleteRuleAction(rule_id=path.parsed.rule_id)
         )
         resp = DeleteNotificationRuleResponse(deleted=action_result.deleted)
@@ -291,7 +291,7 @@ class NotificationHandler:
         path: PathParam[ValidateNotificationRulePathParam],
         body: BodyParam[ValidateNotificationRuleRequest],
     ) -> APIResponse:
-        action_result = await self._processors.notification.validate_rule.wait_for_complete(
+        action_result = await self._notification.validate_rule.wait_for_complete(
             ValidateRuleAction(
                 rule_id=path.parsed.rule_id,
                 notification_data=body.parsed.notification_data,

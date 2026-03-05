@@ -15,9 +15,6 @@ from ai.backend.manager.models.vfolder import (
     VFolderID,
     is_mount_duplicate,
 )
-from ai.backend.manager.server import (
-    database_ctx,
-)
 
 
 def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQueryContext:
@@ -201,22 +198,10 @@ FIXTURES = [
 )
 async def test_batch_load_by_id(
     test_case: dict[str, Any],
-    mock_etcd_ctx: Any,
-    mock_config_provider_ctx: Any,
     database_fixture: None,
-    create_app_and_client: Any,
+    database_engine: ExtendedAsyncSAEngine,
 ) -> None:
-    test_app, _ = await create_app_and_client(
-        [
-            mock_etcd_ctx,
-            mock_config_provider_ctx,
-            database_ctx,
-        ],
-        [],
-    )
-
-    root_ctx = test_app["_root.context"]
-    context = get_graphquery_context(root_ctx.db)
+    context = get_graphquery_context(database_engine)
 
     vfolder_ids = test_case["vfolder_ids"]
     user_id = test_case["user_id"]

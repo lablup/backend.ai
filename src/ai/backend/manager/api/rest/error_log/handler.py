@@ -28,7 +28,7 @@ from ai.backend.manager.repositories.error_log.creators import ErrorLogCreatorSp
 from ai.backend.manager.services.error_log.actions import CreateErrorLogAction
 from ai.backend.manager.services.error_log.actions.list import ListErrorLogsAction
 from ai.backend.manager.services.error_log.actions.mark_cleared import MarkClearedErrorLogAction
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -36,8 +36,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ErrorLogHandler:
     """Error log API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, error_log: ErrorLogProcessors) -> None:
+        self._error_log = error_log
 
     async def append(
         self,
@@ -62,7 +62,7 @@ class ErrorLogHandler:
             )
         )
         action = CreateErrorLogAction(creator=creator)
-        await self._processors.error_log.create.wait_for_complete(action)
+        await self._error_log.create.wait_for_complete(action)
 
         return APIResponse.build(HTTPStatus.OK, AppendErrorLogResponse(success=True))
 
@@ -83,7 +83,7 @@ class ErrorLogHandler:
             page_size=params.page_size,
             mark_read=params.mark_read,
         )
-        result = await self._processors.error_log.list_logs.wait_for_complete(action)
+        result = await self._error_log.list_logs.wait_for_complete(action)
 
         is_admin = ctx.is_superadmin or ctx.is_admin
         log_items: list[ErrorLogDTO] = []
@@ -127,7 +127,7 @@ class ErrorLogHandler:
             is_superadmin=ctx.is_superadmin,
             is_admin=ctx.is_admin,
         )
-        await self._processors.error_log.mark_cleared.wait_for_complete(action)
+        await self._error_log.mark_cleared.wait_for_complete(action)
 
         return APIResponse.build(
             HTTPStatus.OK,

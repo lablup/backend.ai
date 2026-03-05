@@ -35,7 +35,9 @@ from ai.backend.manager.services.container_registry.actions.update_registry_quot
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.services.processors import Processors
+    from ai.backend.manager.services.container_registry.processors import (
+        ContainerRegistryProcessors,
+    )
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -43,8 +45,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class GroupHandler:
     """Group API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, container_registry: ContainerRegistryProcessors) -> None:
+        self._container_registry = container_registry
 
     # ------------------------------------------------------------------
     # create_registry_quota (POST /group/registry-quota)
@@ -57,7 +59,7 @@ class GroupHandler:
         params = body.parsed
         log.info("CREATE_REGISTRY_QUOTA (group:{})", params.group_id)
         scope_id = ProjectScope(project_id=uuid.UUID(params.group_id), domain_name=None)
-        await self._processors.container_registry.create_registry_quota.wait_for_complete(
+        await self._container_registry.create_registry_quota.wait_for_complete(
             CreateRegistryQuotaAction(scope_id=scope_id, quota=params.quota)
         )
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
@@ -73,7 +75,7 @@ class GroupHandler:
         params = query.parsed
         log.info("READ_REGISTRY_QUOTA (group:{})", params.group_id)
         scope_id = ProjectScope(project_id=uuid.UUID(params.group_id), domain_name=None)
-        result = await self._processors.container_registry.read_registry_quota.wait_for_complete(
+        result = await self._container_registry.read_registry_quota.wait_for_complete(
             ReadRegistryQuotaAction(scope_id=scope_id)
         )
         resp = ReadRegistryQuotaResponse(result=result.quota)
@@ -90,7 +92,7 @@ class GroupHandler:
         params = body.parsed
         log.info("UPDATE_REGISTRY_QUOTA (group:{})", params.group_id)
         scope_id = ProjectScope(project_id=uuid.UUID(params.group_id), domain_name=None)
-        await self._processors.container_registry.update_registry_quota.wait_for_complete(
+        await self._container_registry.update_registry_quota.wait_for_complete(
             UpdateRegistryQuotaAction(scope_id=scope_id, quota=params.quota)
         )
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
@@ -106,7 +108,7 @@ class GroupHandler:
         params = body.parsed
         log.info("DELETE_REGISTRY_QUOTA (group:{})", params.group_id)
         scope_id = ProjectScope(project_id=uuid.UUID(params.group_id), domain_name=None)
-        await self._processors.container_registry.delete_registry_quota.wait_for_complete(
+        await self._container_registry.delete_registry_quota.wait_for_complete(
             DeleteRegistryQuotaAction(scope_id=scope_id)
         )
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)

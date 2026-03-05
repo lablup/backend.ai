@@ -37,6 +37,7 @@ from ai.backend.manager.errors.common import Forbidden, InternalServerError, Obj
 from ai.backend.manager.errors.kernel import BackendAgentError
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
+    TooManyVFoldersFound,
     UnexpectedStorageProxyResponseError,
     VFolderAlreadyExists,
     VFolderBadRequest,
@@ -75,6 +76,8 @@ from ai.backend.manager.services.vfolder.actions.base import (
     DeleteForeverVFolderActionResult,
     ForceDeleteVFolderAction,
     ForceDeleteVFolderActionResult,
+    GetAccessibleVFolderAction,
+    GetAccessibleVFolderActionResult,
     GetTaskLogsAction,
     GetTaskLogsActionResult,
     GetVFolderAction,
@@ -1273,3 +1276,28 @@ class VFolderService:
             raise BackendAgentError("TIMEOUT", "Could not fetch fstab data from agent") from e
         except Exception as e:
             raise InternalServerError from e
+
+    async def get_accessible_vfolder(
+        self, action: GetAccessibleVFolderAction
+    ) -> GetAccessibleVFolderActionResult:
+        allowed_vfolder_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        )
+        entries = await self._vfolder_repository.get_accessible_rows(
+            user_uuid=action.user_uuid,
+            user_role=action.user_role,
+            domain_name=action.domain_name,
+            is_admin=action.is_admin,
+            allowed_vfolder_types=allowed_vfolder_types,
+            perm=action.perm,
+            folder_id_or_name=action.folder_id_or_name,
+            allow_privileged_access=action.allow_privileged_access,
+        )
+        if len(entries) == 0:
+            raise VFolderNotFound(extra_data=action.folder_id_or_name)
+        if len(entries) > 1:
+            raise TooManyVFoldersFound(entries)
+        row = entries[0]
+        if action.required_status is not None:
+            await _check_vfolder_status(row["status"], action.required_status)
+        return GetAccessibleVFolderActionResult(row=row)

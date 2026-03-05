@@ -37,7 +37,7 @@ from ai.backend.manager.services.dotfile import (
     ListOrGetDotfilesAction,
     UpdateDotfileAction,
 )
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.dotfile.processors import DotfileProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -45,8 +45,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class DomainConfigHandler:
     """Domain config (dotfile) API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, dotfile: DotfileProcessors) -> None:
+        self._dotfile = dotfile
 
     async def create(
         self,
@@ -64,7 +64,7 @@ class DomainConfigHandler:
             data=params.data,
             permission=params.permission,
         )
-        await self._processors.dotfile.create.wait_for_complete(action)
+        await self._dotfile.create.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, CreateDotfileResponse())
 
     async def list_or_get(
@@ -81,7 +81,7 @@ class DomainConfigHandler:
             entity_key=params.domain,
             path=params.path,
         )
-        result = await self._processors.dotfile.list_or_get.wait_for_complete(action)
+        result = await self._dotfile.list_or_get.wait_for_complete(action)
         if params.path:
             entry = result.entries[0]
             return APIResponse.build(
@@ -107,7 +107,7 @@ class DomainConfigHandler:
             data=params.data,
             permission=params.permission,
         )
-        await self._processors.dotfile.update.wait_for_complete(action)
+        await self._dotfile.update.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, UpdateDotfileResponse())
 
     async def delete(
@@ -124,5 +124,5 @@ class DomainConfigHandler:
             entity_key=params.domain,
             path=params.path,
         )
-        await self._processors.dotfile.delete.wait_for_complete(action)
+        await self._dotfile.delete.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, DeleteDotfileResponse(success=True))

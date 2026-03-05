@@ -17,9 +17,18 @@ from ai.backend.common.api_handlers import BodyParam, PathParam, QueryParam
 from ai.backend.common.json import pretty_json_str
 from ai.backend.manager import __version__
 from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api.session import UndefChecker
-from ai.backend.manager.api.utils import Undefined
+from ai.backend.manager.api.utils import Undefined, undefined
 from ai.backend.manager.models.vfolder import VFolderPermissionValidator
+
+
+class UndefChecker(t.Trafaret):
+    """Trafaret checker for the ``Undefined`` sentinel value."""
+
+    def check_and_return(self, value: Any) -> object:
+        if value == undefined:
+            return value
+        self._failure("Invalid Undef format", value=value)
+        raise AssertionError("unreachable")  # _failure always raises
 
 
 class ParseError(Exception):

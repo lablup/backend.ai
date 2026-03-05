@@ -50,7 +50,7 @@ from ai.backend.common.dto.manager.deployment.types import (
     RouteOrderField,
 )
 from ai.backend.common.types import ClusterMode, RuntimeVariant
-from ai.backend.manager.api.adapter import BaseFilterAdapter
+from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.deployment.creator import (
     DeploymentPolicyConfig,
     DeploymentPolicyCreator,
@@ -96,12 +96,14 @@ from ai.backend.manager.repositories.deployment.options import (
 from ai.backend.manager.types import OptionalState
 
 __all__ = (
+    "AddRevisionAdapter",
     "CreateDeploymentAdapter",
     "CreateRevisionAdapter",
     "DeploymentAdapter",
     "DeploymentPolicyAdapter",
     "RevisionAdapter",
     "RouteAdapter",
+    "build_revision_creator",
 )
 
 
@@ -223,7 +225,9 @@ class RevisionAdapter(BaseFilterAdapter):
                 runtime_variant=data.model_runtime_config.runtime_variant,
             ),
             model_mount_config=ModelMountConfigDTO(
+                # TODO: Generating a random UUID when vfolder_id is None creates a reference to a non-existent vfolder. Should raise an error instead.
                 vfolder_id=data.model_mount_config.vfolder_id or uuid4(),
+                # TODO: Empty string is not a valid path when mount_destination is None. Should make it a required field or assign a sensible default path.
                 mount_destination=data.model_mount_config.mount_destination or "",
                 definition_path=data.model_mount_config.definition_path,
             ),
@@ -364,6 +368,72 @@ class RouteAdapter(BaseFilterAdapter):
         return OffsetPagination(limit=limit, offset=offset)
 
 
+def build_revision_creator(revision_input: RevisionInput) -> ModelRevisionCreator:
+    """Build ModelRevisionCreator from RevisionInput.
+
+    Shared by AddRevisionAdapter and CreateDeploymentAdapter to avoid
+    duplicated conversion logic.
+    """
+    resource_spec = ResourceSpec(
+        cluster_mode=ClusterMode(revision_input.cluster_config.mode),
+        cluster_size=revision_input.cluster_config.size,
+        resource_slots=dict(revision_input.resource_config.resource_slots),
+        resource_opts=(
+            dict(revision_input.resource_config.resource_opts)
+            if revision_input.resource_config.resource_opts
+            else None
+        ),
+    )
+
+    extra_mounts: list[MountInfo] = []
+    if revision_input.extra_mounts:
+        extra_mounts = [
+            MountInfo(
+                vfolder_id=mount.vfolder_id,
+                # TODO: Empty string is not a valid path when mount_destination is None. Should make it a required field or assign a sensible default path.
+                kernel_path=PurePosixPath(mount.mount_destination or ""),
+            )
+            for mount in revision_input.extra_mounts
+        ]
+
+    mounts = VFolderMountsCreator(
+        model_vfolder_id=revision_input.model_mount_config.vfolder_id,
+        model_definition_path=revision_input.model_mount_config.definition_path,
+        model_mount_destination=revision_input.model_mount_config.mount_destination,
+        extra_mounts=extra_mounts,
+    )
+
+    execution = ExecutionSpec(
+        runtime_variant=RuntimeVariant(revision_input.model_runtime_config.runtime_variant),
+        inference_runtime_config=(
+            dict(revision_input.model_runtime_config.inference_runtime_config)
+            if revision_input.model_runtime_config.inference_runtime_config
+            else None
+        ),
+        environ=(
+            dict(revision_input.model_runtime_config.environ)
+            if revision_input.model_runtime_config.environ
+            else None
+        ),
+    )
+
+    return ModelRevisionCreator(
+        image_id=revision_input.image.id,
+        resource_spec=resource_spec,
+        mounts=mounts,
+        execution=execution,
+    )
+
+
+class AddRevisionAdapter:
+    """Adapter for converting add revision request to ModelRevisionCreator."""
+
+    @staticmethod
+    def build_revision_creator(revision_input: RevisionInput) -> ModelRevisionCreator:
+        """Build ModelRevisionCreator from revision input."""
+        return build_revision_creator(revision_input)
+
+
 class CreateDeploymentAdapter:
     """Adapter for converting create deployment request to creators."""
 
@@ -409,7 +479,7 @@ class CreateDeploymentAdapter:
         )
 
         # Build model revision creator
-        model_revision = self._build_revision_creator(request.initial_revision)
+        model_revision = build_revision_creator(request.initial_revision)
 
         # Build policy config
         policy = self._build_policy_config(request.default_deployment_strategy)
@@ -420,64 +490,6 @@ class CreateDeploymentAdapter:
             network=network,
             model_revision=model_revision,
             policy=policy,
-        )
-
-    def _build_revision_creator(
-        self,
-        revision_input: RevisionInput,
-    ) -> ModelRevisionCreator:
-        """Build ModelRevisionCreator from revision input."""
-        # Build resource spec
-        resource_spec = ResourceSpec(
-            cluster_mode=ClusterMode(revision_input.cluster_config.mode),
-            cluster_size=revision_input.cluster_config.size,
-            resource_slots=dict(revision_input.resource_config.resource_slots),
-            resource_opts=(
-                dict(revision_input.resource_config.resource_opts)
-                if revision_input.resource_config.resource_opts
-                else None
-            ),
-        )
-
-        # Build extra mounts
-        extra_mounts: list[MountInfo] = []
-        if revision_input.extra_mounts:
-            extra_mounts = [
-                MountInfo(
-                    vfolder_id=mount.vfolder_id,
-                    kernel_path=PurePosixPath(mount.mount_destination or ""),
-                )
-                for mount in revision_input.extra_mounts
-            ]
-
-        # Build vfolder mounts creator
-        mounts = VFolderMountsCreator(
-            model_vfolder_id=revision_input.model_mount_config.vfolder_id,
-            model_definition_path=revision_input.model_mount_config.definition_path,
-            model_mount_destination=revision_input.model_mount_config.mount_destination,
-            extra_mounts=extra_mounts,
-        )
-
-        # Build execution spec
-        execution = ExecutionSpec(
-            runtime_variant=RuntimeVariant(revision_input.model_runtime_config.runtime_variant),
-            inference_runtime_config=(
-                dict(revision_input.model_runtime_config.inference_runtime_config)
-                if revision_input.model_runtime_config.inference_runtime_config
-                else None
-            ),
-            environ=(
-                dict(revision_input.model_runtime_config.environ)
-                if revision_input.model_runtime_config.environ
-                else None
-            ),
-        )
-
-        return ModelRevisionCreator(
-            image_id=revision_input.image.id,
-            resource_spec=resource_spec,
-            mounts=mounts,
-            execution=execution,
         )
 
     def _build_policy_config(
@@ -526,8 +538,7 @@ class CreateRevisionAdapter:
         Returns:
             ModelRevisionCreator for service layer
         """
-        deployment_adapter = CreateDeploymentAdapter()
-        return deployment_adapter._build_revision_creator(request)
+        return build_revision_creator(request)
 
 
 class DeploymentPolicyAdapter:

@@ -14,7 +14,7 @@ from ai.backend.common.dto.manager.agent import (
     OrderDirection,
     SearchAgentsRequest,
 )
-from ai.backend.manager.api.adapter import BaseFilterAdapter
+from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
 from ai.backend.manager.repositories.base import (

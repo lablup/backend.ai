@@ -9,7 +9,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import AuthDBSource
 
@@ -71,6 +71,14 @@ class AuthRepository:
     @auth_repository_resilience.apply()
     async def update_ssh_keypair(self, access_key: str, public_key: str, private_key: str) -> None:
         await self._db_source.modify_ssh_keypair(access_key, public_key, private_key)
+
+    @auth_repository_resilience.apply()
+    async def get_delegation_target_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
+        return await self._db_source.fetch_user_info_by_access_key(access_key)
+
+    @auth_repository_resilience.apply()
+    async def get_delegation_target_by_email(self, email: str) -> tuple[UUID, UserRole, str]:
+        return await self._db_source.fetch_user_info_by_email(email)
 
     @auth_repository_resilience.apply()
     async def check_credential_with_migration(

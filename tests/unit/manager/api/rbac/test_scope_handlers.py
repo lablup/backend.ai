@@ -22,6 +22,7 @@ from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import ScopeData
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
     GetScopeTypesActionResult,
 )
@@ -30,9 +31,9 @@ from ai.backend.manager.services.permission_contoller.actions.search_scopes impo
 )
 
 
-def make_test_handler(mock_processors: MagicMock) -> RBACHandler:
-    """Create an RBACHandler with mock processors."""
-    return RBACHandler(processors=mock_processors)
+def make_test_handler(mock_permission_controller: MagicMock) -> RBACHandler:
+    """Create an RBACHandler with mock permission controller processors."""
+    return RBACHandler(permission_controller=mock_permission_controller)
 
 
 def make_test_superadmin_ctx() -> UserContext:
@@ -41,6 +42,7 @@ def make_test_superadmin_ctx() -> UserContext:
         user_uuid=uuid4(),
         user_email="admin@test.com",
         user_domain="default",
+        user_role=UserRole.SUPERADMIN,
         access_key="TESTKEY",
         is_admin=True,
         is_superadmin=True,
@@ -53,6 +55,7 @@ def make_test_user_ctx() -> UserContext:
         user_uuid=uuid4(),
         user_email="user@test.com",
         user_domain="default",
+        user_role=UserRole.USER,
         access_key="USERKEY",
         is_admin=False,
         is_superadmin=False,
@@ -66,24 +69,22 @@ class TestGetScopeTypesHandler:
     EXPECTED_SCOPE_TYPES_COUNT = len(ScopeType)
 
     @pytest.fixture
-    def mock_processors(self) -> MagicMock:
-        """Create mock processors with permission_controller."""
-        processors = MagicMock()
-        processors.permission_controller.get_scope_types = MagicMock()
-        processors.permission_controller.get_scope_types.wait_for_complete = AsyncMock()
-        return processors
+    def mock_permission_controller(self) -> MagicMock:
+        """Create mock permission controller processors."""
+        pc = MagicMock()
+        pc.get_scope_types = MagicMock()
+        pc.get_scope_types.wait_for_complete = AsyncMock()
+        return pc
 
     async def test_get_scope_types_returns_scope_types(
         self,
-        mock_processors: MagicMock,
+        mock_permission_controller: MagicMock,
     ) -> None:
         """Test get_scope_types returns all scope types for superadmin."""
-        handler = make_test_handler(mock_processors)
+        handler = make_test_handler(mock_permission_controller)
         ctx = make_test_superadmin_ctx()
         action_result = GetScopeTypesActionResult(scope_types=list(ScopeType))
-        mock_processors.permission_controller.get_scope_types.wait_for_complete.return_value = (
-            action_result
-        )
+        mock_permission_controller.get_scope_types.wait_for_complete.return_value = action_result
 
         response = await handler.get_scope_types(ctx=ctx)
 
@@ -95,10 +96,10 @@ class TestGetScopeTypesHandler:
 
     async def test_get_scope_types_rejects_non_superadmin(
         self,
-        mock_processors: MagicMock,
+        mock_permission_controller: MagicMock,
     ) -> None:
         """Test get_scope_types rejects non-superadmin users."""
-        handler = make_test_handler(mock_processors)
+        handler = make_test_handler(mock_permission_controller)
         ctx = make_test_user_ctx()
 
         with pytest.raises(NotEnoughPermission):
@@ -118,12 +119,12 @@ class TestSearchScopesHandler:
     PAGINATION_ITEMS_COUNT = 5
 
     @pytest.fixture
-    def mock_processors(self) -> MagicMock:
-        """Create mock processors with permission_controller."""
-        processors = MagicMock()
-        processors.permission_controller.search_scopes = MagicMock()
-        processors.permission_controller.search_scopes.wait_for_complete = AsyncMock()
-        return processors
+    def mock_permission_controller(self) -> MagicMock:
+        """Create mock permission controller processors."""
+        pc = MagicMock()
+        pc.search_scopes = MagicMock()
+        pc.search_scopes.wait_for_complete = AsyncMock()
+        return pc
 
     @staticmethod
     def _make_path_param(scope_type: ScopeType) -> PathParam[SearchScopesPathParam]:
@@ -191,13 +192,13 @@ class TestSearchScopesHandler:
 
     async def test_search_scopes_returns_results(
         self,
-        mock_processors: MagicMock,
+        mock_permission_controller: MagicMock,
         single_scope_result: SearchScopesActionResult,
     ) -> None:
         """Test search_scopes returns scope results for superadmin."""
-        handler = make_test_handler(mock_processors)
+        handler = make_test_handler(mock_permission_controller)
         ctx = make_test_superadmin_ctx()
-        mock_processors.permission_controller.search_scopes.wait_for_complete.return_value = (
+        mock_permission_controller.search_scopes.wait_for_complete.return_value = (
             single_scope_result
         )
         path = self._make_path_param(self.TEST_SCOPE_TYPE)
@@ -215,13 +216,13 @@ class TestSearchScopesHandler:
 
     async def test_search_scopes_with_pagination(
         self,
-        mock_processors: MagicMock,
+        mock_permission_controller: MagicMock,
         paginated_scope_result: SearchScopesActionResult,
     ) -> None:
         """Test search_scopes returns correct pagination info."""
-        handler = make_test_handler(mock_processors)
+        handler = make_test_handler(mock_permission_controller)
         ctx = make_test_superadmin_ctx()
-        mock_processors.permission_controller.search_scopes.wait_for_complete.return_value = (
+        mock_permission_controller.search_scopes.wait_for_complete.return_value = (
             paginated_scope_result
         )
         path = self._make_path_param(self.TEST_SCOPE_TYPE)
@@ -238,31 +239,29 @@ class TestSearchScopesHandler:
 
     async def test_search_scopes_calls_processor_with_action(
         self,
-        mock_processors: MagicMock,
+        mock_permission_controller: MagicMock,
         empty_scope_result: SearchScopesActionResult,
     ) -> None:
         """Test search_scopes calls processor with correct action."""
-        handler = make_test_handler(mock_processors)
+        handler = make_test_handler(mock_permission_controller)
         ctx = make_test_superadmin_ctx()
-        mock_processors.permission_controller.search_scopes.wait_for_complete.return_value = (
-            empty_scope_result
-        )
+        mock_permission_controller.search_scopes.wait_for_complete.return_value = empty_scope_result
         path = self._make_path_param(self.TEST_SCOPE_TYPE)
         body = self._make_body_param()
 
         await handler.search_scopes(path=path, body=body, ctx=ctx)
 
-        mock_processors.permission_controller.search_scopes.wait_for_complete.assert_called_once()
-        call_args = mock_processors.permission_controller.search_scopes.wait_for_complete.call_args
+        mock_permission_controller.search_scopes.wait_for_complete.assert_called_once()
+        call_args = mock_permission_controller.search_scopes.wait_for_complete.call_args
         action = call_args[0][0]
         assert action.scope_type == self.TEST_SCOPE_TYPE
 
     async def test_search_scopes_rejects_non_superadmin(
         self,
-        mock_processors: MagicMock,
+        mock_permission_controller: MagicMock,
     ) -> None:
         """Test search_scopes rejects non-superadmin users."""
-        handler = make_test_handler(mock_processors)
+        handler = make_test_handler(mock_permission_controller)
         ctx = make_test_user_ctx()
         path = self._make_path_param(self.TEST_SCOPE_TYPE)
         body = self._make_body_param()

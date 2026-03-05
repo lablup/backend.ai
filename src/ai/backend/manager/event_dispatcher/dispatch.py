@@ -52,6 +52,15 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     KernelTerminatedAnycastEvent,
     KernelTerminatingAnycastEvent,
 )
+from ai.backend.common.events.event_types.kernel.broadcast import (
+    KernelCancelledBroadcastEvent,
+    KernelCreatingBroadcastEvent,
+    KernelPreparingBroadcastEvent,
+    KernelPullingBroadcastEvent,
+    KernelStartedBroadcastEvent,
+    KernelTerminatedBroadcastEvent,
+    KernelTerminatingBroadcastEvent,
+)
 from ai.backend.common.events.event_types.log.anycast import DoLogCleanupEvent
 from ai.backend.common.events.event_types.model_serving.anycast import (
     ModelServiceStatusAnycastEvent,
@@ -90,6 +99,12 @@ from ai.backend.common.events.event_types.session.anycast import (
 )
 from ai.backend.common.events.event_types.session.broadcast import (
     SchedulingBroadcastEvent,
+    SessionCancelledBroadcastEvent,
+    SessionEnqueuedBroadcastEvent,
+    SessionFailureBroadcastEvent,
+    SessionSuccessBroadcastEvent,
+    SessionTerminatedBroadcastEvent,
+    SessionTerminatingBroadcastEvent,
 )
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderCloneFailureEvent,
@@ -127,6 +142,7 @@ from .handlers.model_serving import ModelServingEventHandler
 from .handlers.notification import NotificationEventHandler
 from .handlers.service_catalog import ServiceCatalogEventHandler
 from .handlers.session import SessionEventHandler
+from .handlers.stream_cleanup import StreamCleanupEventHandler
 from .handlers.vfolder import VFolderEventHandler
 from .reporters import EventLogger
 
@@ -170,6 +186,7 @@ class Dispatchers:
     _artifact_registry_event_handler: ArtifactRegistryEventHandler
     _service_catalog_event_handler: ServiceCatalogEventHandler
     _log_cleanup_event_handler: LogCleanupEventHandler
+    stream_cleanup_handler: StreamCleanupEventHandler
 
     def __init__(self, args: DispatcherArgs) -> None:
         """
@@ -230,6 +247,7 @@ class Dispatchers:
         )
         self._service_catalog_event_handler = ServiceCatalogEventHandler(args.db)
         self._log_cleanup_event_handler = LogCleanupEventHandler(args.etcd, args.db)
+        self.stream_cleanup_handler = StreamCleanupEventHandler(args.db)
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
         """
@@ -249,6 +267,8 @@ class Dispatchers:
         self._dispatch_artifact_registry_events(event_dispatcher)
         self._dispatch_service_catalog_events(event_dispatcher)
         self._dispatch_log_cleanup_events(event_dispatcher)
+        self._dispatch_session_broadcast_propagation(event_dispatcher)
+        self._dispatch_stream_cleanup_events(event_dispatcher)
 
     def _dispatch_bgtask_events(
         self,
@@ -634,4 +654,45 @@ class Dispatchers:
             None,
             self._log_cleanup_event_handler.handle_log_cleanup,
             name="log_cleanup",
+        )
+
+    def _dispatch_session_broadcast_propagation(
+        self,
+        event_dispatcher: EventDispatcher,
+    ) -> None:
+        """Subscribe to session/kernel broadcast events and propagate them via EventHub.
+
+        Previously these subscriptions lived in the events API module
+        (``events_app_ctx``).  Moving them here keeps ``event_dispatcher``
+        usage inside the ``event_dispatcher`` package.
+        """
+        handler = self._propagator_handler.propagate_event
+        event_dispatcher.subscribe(SessionEnqueuedBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(KernelPreparingBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(KernelPullingBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(KernelCreatingBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(KernelStartedBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(KernelTerminatingBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(KernelTerminatedBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(KernelCancelledBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(SessionTerminatingBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(SessionTerminatedBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(SessionCancelledBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(SessionSuccessBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(SessionFailureBroadcastEvent, None, handler)
+
+    def _dispatch_stream_cleanup_events(
+        self,
+        event_dispatcher: EventDispatcher,
+    ) -> None:
+        """Subscribe to KernelTerminatingBroadcastEvent for stream cleanup.
+
+        Previously this subscription lived in the stream API module
+        (``stream_app_ctx``).  Moving it here keeps ``event_dispatcher``
+        usage inside the ``event_dispatcher`` package.
+        """
+        event_dispatcher.subscribe(
+            KernelTerminatingBroadcastEvent,
+            None,
+            self.stream_cleanup_handler.handle_kernel_terminating_broadcast,
         )

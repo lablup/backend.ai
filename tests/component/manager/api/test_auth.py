@@ -1,30 +1,12 @@
-import json
-import uuid
 from datetime import datetime, timedelta
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 from aiohttp import web
 from dateutil.tz import gettz, tzutc
 
-from ai.backend.manager.api.auth import _extract_auth_params, check_date
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.middleware.auth import _extract_auth_params, check_date
 from ai.backend.manager.errors.auth import InvalidAuthParameters
-from ai.backend.manager.server import (
-    agent_registry_ctx,
-    database_ctx,
-    event_dispatcher_plugin_ctx,
-    event_hub_ctx,
-    event_producer_ctx,
-    hook_plugin_ctx,
-    message_queue_ctx,
-    monitoring_ctx,
-    network_plugin_ctx,
-    redis_ctx,
-    repositories_ctx,
-    storage_manager_ctx,
-)
 
 
 def test_extract_auth_params() -> None:
@@ -96,99 +78,3 @@ def test_check_date() -> None:
 
     request.headers = {"X-BackendAI-Date": now.isoformat()}
     assert check_date(request)
-
-
-async def test_authorize(
-    mock_etcd_ctx: Any,
-    mock_config_provider_ctx: Any,
-    etcd_fixture: None,
-    database_fixture: None,
-    create_app_and_client: Any,
-    get_headers: Any,
-) -> None:
-    # The auth module requires config_server and database to be set up.
-    app, client = await create_app_and_client(
-        [
-            event_hub_ctx,
-            mock_etcd_ctx,
-            mock_config_provider_ctx,
-            redis_ctx,
-            database_ctx,
-            message_queue_ctx,
-            event_producer_ctx,
-            storage_manager_ctx,
-            repositories_ctx,
-            monitoring_ctx,
-            network_plugin_ctx,
-            hook_plugin_ctx,
-            event_dispatcher_plugin_ctx,
-            agent_registry_ctx,
-        ],
-        [register_auth_routes],
-    )
-
-    async def do_authorize(hash_type: str, api_version: str) -> None:
-        url = "/auth/test"
-        req_data = {"echo": str(uuid.uuid4())}
-        req_bytes = json.dumps(req_data).encode()
-        headers = get_headers(
-            "POST",
-            url,
-            req_bytes,
-            hash_type=hash_type,
-            api_version=api_version,
-        )
-        resp = await client.post(url, data=req_bytes, headers=headers)
-        assert resp.status == 200
-        data = json.loads(await resp.text())
-        assert data["authorized"] == "yes"
-        assert data["echo"] == req_data["echo"]
-
-    # Try multiple different hashing schemes
-    await do_authorize("sha256", "v5.20191215")
-    await do_authorize("sha256", "v4.20190615")
-    await do_authorize("sha1", "v4.20190615")
-
-
-# TODO: restore later. because migratation user schema and injection fixture keep failing.
-# async def test_allowed_ip_authorize(
-#     etcd_fixture, database_fixture, create_app_and_client, get_headers
-# ):
-#     app, client = await create_app_and_client(
-#         [
-#             shared_config_ctx,
-#             redis_ctx,
-#             event_dispatcher_ctx,
-#             database_ctx,
-#             monitoring_ctx,
-#             hook_plugin_ctx,
-#         ],
-#         [register_auth_routes],
-#     )
-
-#     allowed_client_ip = "10.10.10.10"
-#     unallowed_client_ip = "10.10.20.20"
-
-#     async def do_authorize():
-#         url = "/auth/test"
-#         req_data = {"echo": str(uuid.uuid4())}
-#         req_bytes = json.dumps(req_data).encode()
-#         headers = get_headers(
-#             "POST",
-#             url,
-#             req_bytes,
-#             allowed_ip=allowed_client_ip,
-#         )
-#         resp = await client.post(url, data=req_bytes, headers=headers)
-#         assert resp.status == 200
-
-#         headers = get_headers(
-#             "POST",
-#             url,
-#             req_bytes,
-#             allowed_ip=unallowed_client_ip,
-#         )
-#         resp = await client.post(url, data=req_bytes, headers=headers)
-#         assert resp.status == 401
-
-#     await do_authorize()

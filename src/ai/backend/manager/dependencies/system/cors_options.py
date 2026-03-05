@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 import aiohttp_cors
 
-from ai.backend.manager.api.types import CORSOptions
+from ai.backend.manager.api.rest.types import CORSOptions
 
 from .base import SystemDependency
 

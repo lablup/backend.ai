@@ -1036,6 +1036,18 @@ class DeploymentRepository:
         return await self._db_source.create_revision(creator)
 
     @deployment_repository_resilience.apply()
+    async def create_revision_with_next_number(
+        self,
+        creator: Creator[DeploymentRevisionRow],
+        endpoint_id: uuid.UUID,
+    ) -> ModelRevisionData:
+        """Atomically read the latest revision number and create a new revision.
+
+        This avoids the race condition of separate read-then-write operations.
+        """
+        return await self._db_source.create_revision_with_next_number(creator, endpoint_id)
+
+    @deployment_repository_resilience.apply()
     async def get_revision(
         self,
         revision_id: uuid.UUID,

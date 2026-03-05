@@ -1,9 +1,14 @@
 """
 Tests for resource.py API handlers.
 
-TODO: Currently auth decorators (auth_required, superadmin_required) are bypassed
-      by mocking request.get(). This should be refactored to use proper middleware
-      integration for more realistic testing.
+Tests the new-style ResourceHandler (constructor DI) directly.
+
+Legacy wrapper handlers (list_presets, check_presets, recalculate_usage,
+usage_per_month, usage_per_period, user_month_stats, admin_month_stats,
+get_watcher_status, watcher_agent_start, watcher_agent_stop,
+watcher_agent_restart) have been removed along with their create_app()
+shim.  Only get_container_registries remains as a backward-compatible
+re-export used by rest/etcd/handler.py.
 """
 
 from __future__ import annotations
@@ -12,7 +17,7 @@ import json
 import uuid
 from decimal import Decimal
 from http import HTTPStatus
-from typing import Any, cast
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -27,24 +32,9 @@ from ai.backend.common.dto.manager.resource.request import (
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api.resource import (
-    admin_month_stats,
-    check_presets,
-    get_container_registries,
-    get_watcher_status,
-    list_presets,
-    recalculate_usage,
-    usage_per_month,
-    usage_per_period,
-    user_month_stats,
-    watcher_agent_restart,
-    watcher_agent_start,
-    watcher_agent_stop,
-)
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
 from ai.backend.manager.dto.context import RequestCtx, UserContext
-from ai.backend.manager.errors.auth import AuthorizationFailed
-from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.models.user import UserRole
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -70,7 +60,13 @@ def mock_processors() -> MagicMock:
 @pytest.fixture
 def handler(mock_processors: MagicMock) -> ResourceHandler:
     """ResourceHandler instance with mock processors."""
-    return ResourceHandler(processors=mock_processors)
+    return ResourceHandler(
+        resource_preset=mock_processors.resource_preset,
+        agent=mock_processors.agent,
+        group=mock_processors.group,
+        user=mock_processors.user,
+        container_registry=mock_processors.container_registry,
+    )
 
 
 @pytest.fixture
@@ -80,6 +76,7 @@ def superadmin_context() -> UserContext:
         user_uuid=uuid.uuid4(),
         user_email="admin@example.com",
         user_domain="default",
+        user_role=UserRole.SUPERADMIN,
         access_key="AKTEST",
         is_admin=True,
         is_superadmin=True,
@@ -144,264 +141,8 @@ def superadmin_request(mock_root_ctx: MagicMock) -> MagicMock:
 # ---------------------------------------------------------------------------
 
 
-class TestRecalculateUsage:
-    """Tests for recalculate_usage handler."""
-
-    async def test_calls_processor(
-        self,
-        superadmin_request: MagicMock,
-        mock_root_ctx: MagicMock,
-    ) -> None:
-        """Verify processor is called and returns empty dict."""
-        mock_root_ctx.processors.agent.recalculate_usage.wait_for_complete = AsyncMock()
-
-        response = await recalculate_usage(superadmin_request)
-
-        mock_root_ctx.processors.agent.recalculate_usage.wait_for_complete.assert_called_once()
-        assert response.status == HTTPStatus.OK
-        # Verify response body is empty dict
-        assert response._body is not None
-        response_body = json.loads(cast(bytes, response._body))
-        assert response_body == {}
-
-    async def test_rejects_non_superadmin_request(
-        self,
-        authorized_request: MagicMock,
-    ) -> None:
-        """Verify non-superadmin request is rejected."""
-        with pytest.raises(GenericForbidden):
-            await recalculate_usage(authorized_request)
-
-
-class TestAdminMonthStats:
-    """Tests for admin_month_stats handler."""
-
-    async def test_calls_processor_and_returns_stats(
-        self,
-        superadmin_request: MagicMock,
-        mock_root_ctx: MagicMock,
-    ) -> None:
-        """Verify processor is called and stats are returned."""
-        expected_stats = [{"date": "2024-01-01", "count": 10}]
-        mock_result = MagicMock()
-        mock_result.stats = expected_stats
-        mock_root_ctx.processors.user.admin_month_stats.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
-
-        response = await admin_month_stats(superadmin_request)
-
-        mock_root_ctx.processors.user.admin_month_stats.wait_for_complete.assert_called_once()
-        assert response.status == HTTPStatus.OK
-        # Verify response body contains expected stats
-        assert response._body is not None
-        response_body = json.loads(cast(bytes, response._body))
-        assert response_body == expected_stats
-
-    async def test_rejects_non_superadmin_request(
-        self,
-        authorized_request: MagicMock,
-    ) -> None:
-        """Verify non-superadmin request is rejected."""
-        with pytest.raises(GenericForbidden):
-            await admin_month_stats(authorized_request)
-
-
-class TestGetContainerRegistries:
-    """Tests for get_container_registries handler."""
-
-    async def test_returns_registries_from_result(
-        self,
-        superadmin_request: MagicMock,
-        mock_root_ctx: MagicMock,
-    ) -> None:
-        """Verify result.registries is returned as JSON response."""
-        expected_registries = {"docker.io": {"url": "https://docker.io"}}
-        mock_result = MagicMock()
-        mock_result.registries = expected_registries
-        mock_root_ctx.processors.container_registry.get_container_registries.wait_for_complete = (
-            AsyncMock(return_value=mock_result)
-        )
-
-        response = await get_container_registries(superadmin_request)
-
-        mock_root_ctx.processors.container_registry.get_container_registries.wait_for_complete.assert_called_once()
-        assert response.status == HTTPStatus.OK
-        # Verify response body contains expected registries
-        json_response = cast(web.Response, response)
-        assert json_response._body is not None
-        response_body = json.loads(cast(bytes, json_response._body))
-        assert response_body == expected_registries
-
-    async def test_rejects_non_superadmin_request(
-        self,
-        authorized_request: MagicMock,
-    ) -> None:
-        """Verify non-superadmin request is rejected."""
-        with pytest.raises(GenericForbidden):
-            await get_container_registries(authorized_request)
-
-
-class TestListPresets:
-    """Tests for list_presets handler."""
-
-    async def test_returns_presets_from_processor(
-        self,
-        authorized_request: MagicMock,
-        mock_root_ctx: MagicMock,
-    ) -> None:
-        """Verify processor result is returned as JSON response."""
-        authorized_request["keypair"] = {"access_key": "AKTEST"}
-        authorized_request.query = {}
-        expected_presets = [{"name": "small", "resource_slots": {}}]
-        mock_result = MagicMock()
-        mock_result.presets = expected_presets
-        mock_root_ctx.processors.resource_preset.list_presets.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
-
-        response = await list_presets(authorized_request)
-
-        mock_root_ctx.processors.resource_preset.list_presets.wait_for_complete.assert_called_once()
-        assert response.status == HTTPStatus.OK
-        # Verify response body contains presets wrapped in dict
-        json_response = cast(web.Response, response)
-        assert json_response._body is not None
-        response_body = json.loads(cast(bytes, json_response._body))
-        assert response_body == {"presets": expected_presets}
-
-    async def test_passes_scaling_group_from_query(
-        self,
-        authorized_request: MagicMock,
-        mock_root_ctx: MagicMock,
-    ) -> None:
-        """Verify scaling_group query param is passed to Action."""
-        authorized_request["keypair"] = {"access_key": "AKTEST"}
-        authorized_request.query = {"scaling_group": "sg-test"}
-        mock_result = MagicMock()
-        mock_result.presets = []
-        mock_root_ctx.processors.resource_preset.list_presets.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
-
-        await list_presets(authorized_request)
-
-        call_args = (
-            mock_root_ctx.processors.resource_preset.list_presets.wait_for_complete.call_args
-        )
-        action = call_args[0][0]
-        assert action.scaling_group == "sg-test"
-
-    async def test_rejects_unauthorized_request(
-        self,
-        unauthorized_request: MagicMock,
-    ) -> None:
-        """Verify unauthorized request is rejected."""
-        with pytest.raises(AuthorizationFailed):
-            await list_presets(unauthorized_request)
-
-
-class TestUserMonthStats:
-    """Tests for user_month_stats handler."""
-
-    async def test_passes_user_uuid_to_action_and_returns_stats(
-        self,
-        authorized_request: MagicMock,
-        mock_root_ctx: MagicMock,
-    ) -> None:
-        """Verify user_id is passed to Action and stats are returned."""
-        user_uuid = uuid.uuid4()
-        authorized_request["keypair"] = {"access_key": "AKTEST"}
-        authorized_request["user"] = {
-            "uuid": user_uuid,
-            "email": "test@example.com",
-            "domain_name": "default",
-        }
-        expected_stats = [{"date": "2024-01-15", "usage": 100}]
-        mock_result = MagicMock()
-        mock_result.stats = expected_stats
-        mock_root_ctx.processors.user.user_month_stats.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
-
-        response = await user_month_stats(authorized_request)
-
-        call_args = mock_root_ctx.processors.user.user_month_stats.wait_for_complete.call_args
-        action = call_args[0][0]
-        assert action.user_id == user_uuid
-        # Verify response body contains expected stats
-        assert response._body is not None
-        response_body = json.loads(cast(bytes, response._body))
-        assert response_body == expected_stats
-
-    async def test_rejects_unauthorized_request(
-        self,
-        unauthorized_request: MagicMock,
-    ) -> None:
-        """Verify unauthorized request is rejected."""
-        with pytest.raises(AuthorizationFailed):
-            await user_month_stats(unauthorized_request)
-
-
-class TestGetWatcherStatus:
-    """Tests for get_watcher_status handler."""
-
-    @pytest.fixture
-    def mock_request(self, mock_root_ctx: MagicMock) -> MagicMock:
-        """Mock GET request for superadmin user."""
-        req = MagicMock(spec=web.Request)
-        req.app = {"_root.context": mock_root_ctx}
-        storage: dict[str, Any] = {
-            "user": {"uuid": uuid.uuid4(), "email": "admin@example.com", "domain_name": "default"},
-            "keypair": {"access_key": "AKTEST"},
-            "is_admin": True,
-            "is_superadmin": True,
-        }
-        req.__getitem__ = lambda _, key: storage[key]
-        req.__setitem__ = lambda _, key, value: storage.__setitem__(key, value)
-        req.get = lambda k, default=None: {
-            "is_authorized": True,
-            "is_superadmin": True,
-        }.get(k, default)
-        req.method = "GET"
-        return req
-
-    async def test_passes_agent_id_to_action_and_returns_data(
-        self,
-        mock_request: MagicMock,
-        mock_root_ctx: MagicMock,
-    ) -> None:
-        """Verify agent_id is passed to Action and data is returned."""
-        mock_request.query = {"agent_id": "agent-001"}
-        expected_data = {"status": "running"}
-        mock_result = MagicMock()
-        mock_result.data = expected_data
-        mock_root_ctx.processors.agent.get_watcher_status.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
-
-        response = await get_watcher_status(mock_request)
-
-        call_args = mock_root_ctx.processors.agent.get_watcher_status.wait_for_complete.call_args
-        action = call_args[0][0]
-        assert action.agent_id == "agent-001"
-        assert response.status == HTTPStatus.OK
-        # Verify response body contains expected data
-        assert response._body is not None
-        response_body = json.loads(cast(bytes, response._body))
-        assert response_body == expected_data
-
-    async def test_rejects_non_superadmin_request(
-        self,
-        authorized_request: MagicMock,
-    ) -> None:
-        """Verify non-superadmin request is rejected."""
-        with pytest.raises(GenericForbidden):
-            await get_watcher_status(authorized_request)
-
-
 class TestWatcherAgentStart:
-    """Tests for watcher_agent_start handler."""
+    """Tests for watcher_agent_start handler (new-style)."""
 
     async def test_calls_processor_with_agent_id_and_returns_data(
         self,
@@ -427,17 +168,9 @@ class TestWatcherAgentStart:
         assert response.status_code == HTTPStatus.OK
         assert response.to_json == expected_data
 
-    async def test_rejects_non_superadmin_request(
-        self,
-        authorized_request: MagicMock,
-    ) -> None:
-        """Verify non-superadmin request is rejected."""
-        with pytest.raises(GenericForbidden):
-            await watcher_agent_start(authorized_request)
-
 
 class TestWatcherAgentStop:
-    """Tests for watcher_agent_stop handler."""
+    """Tests for watcher_agent_stop handler (new-style)."""
 
     async def test_calls_processor_with_agent_id_and_returns_data(
         self,
@@ -463,17 +196,9 @@ class TestWatcherAgentStop:
         assert response.status_code == HTTPStatus.OK
         assert response.to_json == expected_data
 
-    async def test_rejects_non_superadmin_request(
-        self,
-        authorized_request: MagicMock,
-    ) -> None:
-        """Verify non-superadmin request is rejected."""
-        with pytest.raises(GenericForbidden):
-            await watcher_agent_stop(authorized_request)
-
 
 class TestWatcherAgentRestart:
-    """Tests for watcher_agent_restart handler."""
+    """Tests for watcher_agent_restart handler (new-style)."""
 
     async def test_calls_processor_with_agent_id_and_returns_data(
         self,
@@ -499,129 +224,9 @@ class TestWatcherAgentRestart:
         assert response.status_code == HTTPStatus.OK
         assert response.to_json == expected_data
 
-    async def test_rejects_non_superadmin_request(
-        self,
-        authorized_request: MagicMock,
-    ) -> None:
-        """Verify non-superadmin request is rejected."""
-        with pytest.raises(GenericForbidden):
-            await watcher_agent_restart(authorized_request)
-
-
-class TestUsagePerMonth:
-    """Tests for usage_per_month handler."""
-
-    @pytest.fixture
-    def mock_request(self, mock_root_ctx: MagicMock) -> MagicMock:
-        """Mock GET request for superadmin user."""
-        req = MagicMock(spec=web.Request)
-        req.app = {"_root.context": mock_root_ctx}
-        storage: dict[str, Any] = {
-            "user": {"uuid": uuid.uuid4(), "email": "admin@example.com", "domain_name": "default"},
-            "keypair": {"access_key": "AKTEST"},
-            "is_admin": True,
-            "is_superadmin": True,
-        }
-        req.__getitem__ = lambda _, key: storage[key]
-        req.__setitem__ = lambda _, key, value: storage.__setitem__(key, value)
-        req.get = lambda k, default=None: {
-            "is_authorized": True,
-            "is_superadmin": True,
-        }.get(k, default)
-        req.method = "GET"
-        return req
-
-    async def test_passes_group_ids_and_month_to_action_and_returns_result(
-        self,
-        mock_request: MagicMock,
-        mock_root_ctx: MagicMock,
-    ) -> None:
-        """Verify group_ids and month are passed to Action and result is returned."""
-        group_id_1 = str(uuid.uuid4())
-        group_id_2 = str(uuid.uuid4())
-        mock_request.query = {"group_ids": [group_id_1, group_id_2], "month": "202401"}
-        expected_result = [{"group_id": group_id_1, "usage": 100}]
-        mock_result = MagicMock()
-        mock_result.result = expected_result
-        mock_root_ctx.processors.group.usage_per_month.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
-
-        response = await usage_per_month(mock_request)
-
-        call_args = mock_root_ctx.processors.group.usage_per_month.wait_for_complete.call_args
-        action = call_args[0][0]
-        assert len(action.group_ids) == 2
-        assert action.month == "202401"
-        assert response.status == HTTPStatus.OK
-        # Verify response body contains expected result
-        assert response._body is not None
-        response_body = json.loads(cast(bytes, response._body))
-        assert response_body == expected_result
-
-    async def test_rejects_non_superadmin_request(
-        self,
-        authorized_request: MagicMock,
-    ) -> None:
-        """Verify non-superadmin request is rejected."""
-        with pytest.raises(GenericForbidden):
-            await usage_per_month(authorized_request)
-
 
 class TestUsagePerPeriod:
-    """Tests for usage_per_period handler."""
-
-    @pytest.fixture
-    def mock_request(self, mock_root_ctx: MagicMock) -> MagicMock:
-        """Mock GET request for superadmin user."""
-        req = MagicMock(spec=web.Request)
-        req.app = {"_root.context": mock_root_ctx}
-        storage: dict[str, Any] = {
-            "user": {"uuid": uuid.uuid4(), "email": "admin@example.com", "domain_name": "default"},
-            "keypair": {"access_key": "AKTEST"},
-            "is_admin": True,
-            "is_superadmin": True,
-        }
-        req.__getitem__ = lambda _, key: storage[key]
-        req.__setitem__ = lambda _, key, value: storage.__setitem__(key, value)
-        req.get = lambda k, default=None: {
-            "is_authorized": True,
-            "is_superadmin": True,
-        }.get(k, default)
-        req.method = "GET"
-        return req
-
-    async def test_passes_dates_to_action_and_returns_result(
-        self,
-        mock_request: MagicMock,
-        mock_root_ctx: MagicMock,
-    ) -> None:
-        """Verify start_date and end_date are passed to Action and result is returned."""
-        project_id = str(uuid.uuid4())
-        mock_request.query = {
-            "project_id": project_id,
-            "start_date": "20240101",
-            "end_date": "20240131",
-        }
-        expected_result = [{"date": "20240115", "usage": 50}]
-        mock_result = MagicMock()
-        mock_result.result = expected_result
-        mock_root_ctx.processors.group.usage_per_period.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
-
-        response = await usage_per_period(mock_request)
-
-        call_args = mock_root_ctx.processors.group.usage_per_period.wait_for_complete.call_args
-        action = call_args[0][0]
-        assert str(action.project_id) == project_id
-        assert action.start_date == "20240101"
-        assert action.end_date == "20240131"
-        assert response.status == HTTPStatus.OK
-        # Verify response body contains expected result
-        assert response._body is not None
-        response_body = json.loads(cast(bytes, response._body))
-        assert response_body == expected_result
+    """Tests for usage_per_period handler (new-style)."""
 
     async def test_project_id_default_is_none(
         self,
@@ -647,17 +252,9 @@ class TestUsagePerPeriod:
         action = call_args[0][0]
         assert action.project_id is None
 
-    async def test_rejects_non_superadmin_request(
-        self,
-        authorized_request: MagicMock,
-    ) -> None:
-        """Verify non-superadmin request is rejected."""
-        with pytest.raises(GenericForbidden):
-            await usage_per_period(authorized_request)
-
 
 class TestCheckPresets:
-    """Tests for check_presets handler."""
+    """Tests for check_presets handler (new-style)."""
 
     def _create_mock_result(self) -> tuple[MagicMock, list[SlotQuantity]]:
         """Create a mock CheckResourcePresetsResult with SlotQuantity list."""
@@ -695,6 +292,7 @@ class TestCheckPresets:
             user_uuid=user_uuid,
             user_email="test@example.com",
             user_domain="default",
+            user_role=UserRole.USER,
             access_key="AKTEST",
             is_admin=False,
             is_superadmin=False,
@@ -747,6 +345,7 @@ class TestCheckPresets:
             user_uuid=user_uuid,
             user_email="test@example.com",
             user_domain="default",
+            user_role=UserRole.USER,
             access_key="AKTEST",
             is_admin=False,
             is_superadmin=False,
@@ -780,11 +379,3 @@ class TestCheckPresets:
             assert isinstance(response_body[field], str)
             parsed = json.loads(response_body[field])
             assert isinstance(parsed, dict)
-
-    async def test_rejects_unauthorized_request(
-        self,
-        unauthorized_request: MagicMock,
-    ) -> None:
-        """Verify unauthorized request is rejected."""
-        with pytest.raises(AuthorizationFailed):
-            await check_presets(unauthorized_request)

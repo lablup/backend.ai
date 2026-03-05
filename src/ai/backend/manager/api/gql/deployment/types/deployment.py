@@ -68,7 +68,6 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentMetadataInfo,
     ReplicaSpec,
 )
-from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base import (
@@ -93,9 +92,6 @@ from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentUpdaterSpec,
     ReplicaSpecUpdaterSpec,
     RevisionStateUpdaterSpec,
-)
-from ai.backend.manager.services.deployment.actions.deployment_policy import (
-    GetDeploymentPolicyAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -345,15 +341,12 @@ class ModelDeployment(Node):
         self, info: Info[StrawberryGQLContext]
     ) -> DeploymentPolicyGQL | None:
         """Get the deployment policy for this deployment."""
-        processor = info.context.processors.deployment
-
-        try:
-            result = await processor.get_deployment_policy.wait_for_complete(
-                GetDeploymentPolicyAction(endpoint_id=self._deployment_id)
-            )
-            return DeploymentPolicyGQL.from_data(result.data)
-        except DeploymentPolicyNotFound:
+        policy_data = await info.context.data_loaders.deployment_policy_by_endpoint_loader.load(
+            self._deployment_id
+        )
+        if policy_data is None:
             return None
+        return DeploymentPolicyGQL.from_data(policy_data)
 
     @strawberry.field
     async def revision_history(

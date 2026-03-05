@@ -7,35 +7,16 @@ from typing import TYPE_CHECKING
 from ai.backend.manager.api.rest.middleware.auth import superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
+from .handler import ManagerHandler
+
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_manager_api_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_manager_api_routes(handler: ManagerHandler, route_deps: RouteDeps) -> RouteRegistry:
     """Build the manager sub-application."""
-    from ai.backend.manager.api.manager import (
-        PrivateContext as ManagerApiPrivateContext,
-    )
-    from ai.backend.manager.api.manager import (
-        init as manager_api_init,
-    )
-    from ai.backend.manager.api.manager import (
-        shutdown as manager_api_shutdown,
-    )
 
-    from .handler import ManagerHandler
-
-    reg = RouteRegistry.create("manager", deps.cors_options)
-    ctx = ManagerApiPrivateContext()
-
-    # Store ctx on app dict for backward compatibility (lifecycle functions
-    # read from app["manager.context"]).
-    reg.app["manager.context"] = ctx
-
-    # Wire lifecycle hooks
-    reg.app.on_startup.append(manager_api_init)
-    reg.app.on_shutdown.append(manager_api_shutdown)
-    handler = ManagerHandler(processors=deps.processors)
+    reg = RouteRegistry.create("manager", route_deps.cors_options)
 
     # Public endpoints (no auth required)
     reg.add("GET", "/status", handler.fetch_manager_status)

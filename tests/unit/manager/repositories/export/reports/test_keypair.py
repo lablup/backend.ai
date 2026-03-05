@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from ai.backend.manager.api.export.adapter import ExportAdapter
+from ai.backend.manager.api.rest.export.adapter import ExportAdapter
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.scaling_group import ScalingGroupForKeypairsRow, ScalingGroupRow

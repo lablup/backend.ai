@@ -20,7 +20,7 @@ from ai.backend.common.dto.manager.compute_session import (
     SearchComputeSessionsRequest,
 )
 from ai.backend.common.types import SessionId
-from ai.backend.manager.api.adapter import BaseFilterAdapter
+from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.repositories.base import (

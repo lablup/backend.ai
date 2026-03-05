@@ -15,9 +15,7 @@ from ai.backend.logging import BraceStyleAdapter
 from .types import ApiHandler, CORSOptions, RouteMiddleware, WebRequestHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.ratelimit.registry import (
-        RatelimitContext as RatelimitPrivateContext,
-    )
+    from aiohttp.typedefs import Middleware
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -100,7 +98,7 @@ class RouteRegistry:
     _cors: aiohttp_cors.CorsConfig
     _middlewares: list[RouteMiddleware]
     _subregistries: dict[str, RouteRegistry]
-    ratelimit_ctx: RatelimitPrivateContext | None
+    rlim_middleware: Middleware | None
 
     def __init__(
         self,
@@ -115,7 +113,7 @@ class RouteRegistry:
         self._cors = aiohttp_cors.setup(app, defaults=cors_options)
         self._middlewares = list(middlewares or [])
         self._subregistries = {}
-        self.ratelimit_ctx = None
+        self.rlim_middleware = None
 
     @classmethod
     def create(

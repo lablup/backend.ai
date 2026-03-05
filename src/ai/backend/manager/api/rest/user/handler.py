@@ -48,7 +48,7 @@ from .adapter import UserAdapter
 
 if TYPE_CHECKING:
     from ai.backend.manager.config.provider import ManagerConfigProvider
-    from ai.backend.manager.services.processors import Processors
+    from ai.backend.manager.services.user.processors import UserProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -56,8 +56,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class UserHandler:
     """User admin API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors, config_provider: ManagerConfigProvider) -> None:
-        self._processors = processors
+    def __init__(self, *, user: UserProcessors, config_provider: ManagerConfigProvider) -> None:
+        self._user = user
         self._config_provider = config_provider
         self._adapter = UserAdapter()
 
@@ -101,7 +101,7 @@ class UserHandler:
             )
         )
 
-        action_result = await self._processors.user.create_user.wait_for_complete(
+        action_result = await self._user.create_user.wait_for_complete(
             CreateUserAction(creator=creator, group_ids=body.parsed.group_ids)
         )
 
@@ -118,7 +118,7 @@ class UserHandler:
         ctx: UserContext,
     ) -> APIResponse:
         log.info("GET_USER (ak:{}, u:{})", ctx.access_key, path.parsed.user_id)
-        action_result = await self._processors.user.get_user.wait_for_complete(
+        action_result = await self._user.get_user.wait_for_complete(
             GetUserAction(user_uuid=path.parsed.user_id)
         )
 
@@ -137,7 +137,7 @@ class UserHandler:
         log.info("SEARCH_USERS (ak:{})", ctx.access_key)
         querier = self._adapter.build_querier(body.parsed)
 
-        action_result = await self._processors.user.search_users.wait_for_complete(
+        action_result = await self._user.search_users.wait_for_complete(
             SearchUsersAction(querier=querier)
         )
 
@@ -164,7 +164,7 @@ class UserHandler:
         log.info("UPDATE_USER (ak:{}, u:{})", ctx.access_key, path.parsed.user_id)
 
         # First get the user to obtain email (required by ModifyUserAction)
-        get_result = await self._processors.user.get_user.wait_for_complete(
+        get_result = await self._user.get_user.wait_for_complete(
             GetUserAction(user_uuid=path.parsed.user_id)
         )
         email = get_result.user.email
@@ -181,7 +181,7 @@ class UserHandler:
 
         updater = self._adapter.build_updater(body.parsed, email, password_info)
 
-        action_result = await self._processors.user.modify_user.wait_for_complete(
+        action_result = await self._user.modify_user.wait_for_complete(
             ModifyUserAction(email=email, updater=updater)
         )
 
@@ -200,11 +200,11 @@ class UserHandler:
         log.info("DELETE_USER (ak:{}, u:{})", ctx.access_key, body.parsed.user_id)
 
         # Get user email from UUID
-        get_result = await self._processors.user.get_user.wait_for_complete(
+        get_result = await self._user.get_user.wait_for_complete(
             GetUserAction(user_uuid=body.parsed.user_id)
         )
 
-        await self._processors.user.delete_user.wait_for_complete(
+        await self._user.delete_user.wait_for_complete(
             DeleteUserAction(email=get_result.user.email)
         )
 
@@ -223,12 +223,12 @@ class UserHandler:
         log.info("PURGE_USER (ak:{}, u:{})", ctx.access_key, body.parsed.user_id)
 
         # Get user data for purge context
-        get_result = await self._processors.user.get_user.wait_for_complete(
+        get_result = await self._user.get_user.wait_for_complete(
             GetUserAction(user_uuid=body.parsed.user_id)
         )
 
         # Get caller's info for delegation context
-        caller_result = await self._processors.user.get_user.wait_for_complete(
+        caller_result = await self._user.get_user.wait_for_complete(
             GetUserAction(user_uuid=ctx.user_uuid)
         )
 
@@ -245,7 +245,7 @@ class UserHandler:
         if body.parsed.delegate_endpoint_ownership:
             delegate_endpoint = OptionalState.update(body.parsed.delegate_endpoint_ownership)
 
-        await self._processors.user.purge_user.wait_for_complete(
+        await self._user.purge_user.wait_for_complete(
             PurgeUserAction(
                 user_info_ctx=user_info_ctx,
                 email=get_result.user.email,

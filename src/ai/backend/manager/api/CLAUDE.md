@@ -13,9 +13,9 @@
 
 - Handlers MUST invoke services through a Processor, not directly:
   ```python
-  # CORRECT
-  await processors_ctx.processors.foo.wait_for_complete(FooAction(...))
-  # WRONG
+  # CORRECT — handler receives specific processor via constructor DI
+  await self._foo.wait_for_complete(FooAction(...))
+  # WRONG — never call service methods directly
   await self._foo_service.do_something(...)
   ```
 

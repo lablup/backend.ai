@@ -2,48 +2,46 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
-from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api import artifact as _artifact_api
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api.context import RootContext
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.manager.api.rest.artifact.handler import ArtifactHandler
 from ai.backend.manager.api.rest.artifact.registry import register_artifact_routes
+from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
-from ai.backend.manager.api.rest.types import ModuleRegistrar
-from ai.backend.manager.api.types import CleanupContext
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactStatus,
     ArtifactType,
 )
+from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.artifact.row import ArtifactRow
 from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
-from ai.backend.manager.repositories.repositories import Repositories
-from ai.backend.manager.repositories.types import RepositoryArgs
-from ai.backend.manager.server import (
-    background_task_ctx,
-    database_ctx,
-    event_hub_ctx,
-    event_producer_ctx,
-    message_queue_ctx,
-    monitoring_ctx,
-    redis_ctx,
-    storage_manager_ctx,
+from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
+from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
+from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
+from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.manager.repositories.reservoir_registry.repository import (
+    ReservoirRegistryRepository,
 )
-from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
-
-# Statically imported so that Pants includes these modules in the test PEX.
-# build_root_app() loads them at runtime via importlib.import_module(),
-# which Pants cannot trace statically.
-_ARTIFACT_SERVER_SUBAPP_MODULES = (_auth_api, _artifact_api)
+from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
+from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
+from ai.backend.manager.services.artifact.processors import ArtifactProcessors
+from ai.backend.manager.services.artifact.service import ArtifactService
+from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
+from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
+from ai.backend.manager.services.auth.processors import AuthProcessors
 
 
 @dataclass
@@ -56,76 +54,81 @@ class ArtifactFixtureData:
 ArtifactFactory = Callable[..., Coroutine[Any, Any, ArtifactFixtureData]]
 
 
-@asynccontextmanager
-async def _artifact_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    """Set up repositories and processors for artifact-domain component tests."""
-    _mock_loader = MagicMock()
-    _mock_loader.get_manager_status = AsyncMock(return_value=ManagerStatus.RUNNING)
-    root_ctx.config_provider._legacy_etcd_config_loader = _mock_loader
-    root_ctx.repositories = Repositories.create(
-        RepositoryArgs(
-            db=root_ctx.db,
-            storage_manager=root_ctx.storage_manager,
-            config_provider=root_ctx.config_provider,
-            valkey_stat_client=root_ctx.valkey_stat,
-            valkey_schedule_client=root_ctx.valkey_schedule,
-            valkey_image_client=root_ctx.valkey_image,
-            valkey_live_client=root_ctx.valkey_live,
-        )
+@pytest.fixture()
+def artifact_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    storage_manager: StorageSessionManager,
+    config_provider: ManagerConfigProvider,
+) -> ArtifactProcessors:
+    artifact_repository = ArtifactRepository(database_engine)
+    artifact_registry_repository = ArtifactRegistryRepository(database_engine)
+    object_storage_repository = ObjectStorageRepository(database_engine)
+    vfs_storage_repository = VFSStorageRepository(database_engine)
+    huggingface_repository = HuggingFaceRepository(database_engine)
+    reservoir_repository = ReservoirRegistryRepository(database_engine)
+    service = ArtifactService(
+        artifact_repository=artifact_repository,
+        artifact_registry_repository=artifact_registry_repository,
+        object_storage_repository=object_storage_repository,
+        vfs_storage_repository=vfs_storage_repository,
+        huggingface_registry_repository=huggingface_repository,
+        reservoir_registry_repository=reservoir_repository,
+        storage_manager=storage_manager,
+        config_provider=config_provider,
     )
-    root_ctx.processors = Processors.create(
-        ProcessorArgs(
-            service_args=ServiceArgs(
-                db=root_ctx.db,
-                repositories=root_ctx.repositories,
-                etcd=root_ctx.etcd,
-                config_provider=root_ctx.config_provider,
-                storage_manager=root_ctx.storage_manager,
-                valkey_stat_client=root_ctx.valkey_stat,
-                valkey_live=root_ctx.valkey_live,
-                valkey_artifact_client=root_ctx.valkey_artifact,
-                error_monitor=root_ctx.error_monitor,
-                event_fetcher=root_ctx.event_fetcher,
-                background_task_manager=root_ctx.background_task_manager,
-                event_hub=root_ctx.event_hub,
-                event_producer=root_ctx.event_producer,
-                agent_registry=MagicMock(),
-                idle_checker_host=MagicMock(),
-                event_dispatcher=MagicMock(),
-                hook_plugin_ctx=MagicMock(),
-                scheduling_controller=MagicMock(),
-                deployment_controller=MagicMock(),
-                revision_generator_registry=MagicMock(),
-                agent_cache=MagicMock(),
-                notification_center=MagicMock(),
-                appproxy_client_pool=MagicMock(),
-                prometheus_client=MagicMock(),
-            ),
-        ),
-        [],
-    )
-    yield
+    return ArtifactProcessors(service=service, action_monitors=[])
 
 
 @pytest.fixture()
-def server_module_registrars() -> list[ModuleRegistrar]:
+def artifact_revision_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    storage_manager: StorageSessionManager,
+    config_provider: ManagerConfigProvider,
+    valkey_clients: ValkeyClients,
+    background_task_manager: BackgroundTaskManager,
+) -> ArtifactRevisionProcessors:
+    artifact_repository = ArtifactRepository(database_engine)
+    artifact_registry_repository = ArtifactRegistryRepository(database_engine)
+    object_storage_repository = ObjectStorageRepository(database_engine)
+    vfs_storage_repository = VFSStorageRepository(database_engine)
+    storage_namespace_repository = StorageNamespaceRepository(database_engine)
+    huggingface_repository = HuggingFaceRepository(database_engine)
+    reservoir_repository = ReservoirRegistryRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine)
+    service = ArtifactRevisionService(
+        artifact_repository=artifact_repository,
+        artifact_registry_repository=artifact_registry_repository,
+        object_storage_repository=object_storage_repository,
+        vfs_storage_repository=vfs_storage_repository,
+        storage_namespace_repository=storage_namespace_repository,
+        huggingface_registry_repository=huggingface_repository,
+        reservoir_registry_repository=reservoir_repository,
+        vfolder_repository=vfolder_repository,
+        storage_manager=storage_manager,
+        config_provider=config_provider,
+        valkey_artifact_client=valkey_clients.artifact,
+        background_task_manager=background_task_manager,
+    )
+    return ArtifactRevisionProcessors(service=service, action_monitors=[])
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    auth_processors: AuthProcessors,
+    artifact_processors: ArtifactProcessors,
+    artifact_revision_processors: ArtifactRevisionProcessors,
+) -> list[RouteRegistry]:
     """Load only the modules required for artifact-domain tests."""
-    return [register_auth_routes, register_artifact_routes]
-
-
-@pytest.fixture()
-def server_cleanup_contexts() -> list[CleanupContext]:
-    """Provide cleanup contexts for artifact-domain component tests."""
     return [
-        redis_ctx,
-        database_ctx,
-        monitoring_ctx,
-        storage_manager_ctx,
-        message_queue_ctx,
-        event_producer_ctx,
-        event_hub_ctx,
-        background_task_ctx,
-        _artifact_domain_ctx,
+        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
+        register_artifact_routes(
+            ArtifactHandler(
+                artifact=artifact_processors,
+                artifact_revision=artifact_revision_processors,
+            ),
+            route_deps,
+        ),
     ]
 
 

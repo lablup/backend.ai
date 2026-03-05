@@ -7,13 +7,13 @@ from pathlib import Path
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.logging.types import LogLevel
+from ai.backend.manager.plugin.error_monitor import ErrorEventDispatcher
 from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
 
 from .agents import AgentsComposer, AgentsInput, AgentsResources
 from .bootstrap import BootstrapComposer, BootstrapInput, BootstrapResources
 from .components import ComponentsComposer, ComponentsInput, ComponentsResources
 from .domain import DomainComposer, DomainInput, DomainResources
-from .errors import DependencyInitializationError
 from .infrastructure import (
     InfrastructureComposer,
     InfrastructureInput,
@@ -48,8 +48,8 @@ class MonitoringResources:
     Initialized after DomainComposer so that error_log_repository is available.
     """
 
-    error_monitor: ManagerErrorPluginContext | None
-    stats_monitor: ManagerStatsPluginContext | None
+    error_monitor: ManagerErrorPluginContext
+    stats_monitor: ManagerStatsPluginContext
 
 
 @dataclass
@@ -179,6 +179,17 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
             ),
         )
 
+        # Stage 6.5: Re-initialize ErrorEventDispatcher plugin with repository.
+        # The plugin was disabled during Stage 4 (Plugins) because
+        # error_log_repository was not yet available.
+        for plugin_instance in plugins.event_dispatcher_plugin_ctx.plugins.values():
+            if isinstance(plugin_instance, ErrorEventDispatcher):
+                await plugin_instance.init(
+                    context={
+                        "error_log_repository": domain.repositories.error_log.repository,
+                    },
+                )
+
         # Stage 6.5: Monitoring (error_monitor, stats_monitor)
         # Must run after Domain so that error_log_repository is available.
         monitoring_input = MonitoringInput(
@@ -259,10 +270,6 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
         )
 
         # Stage 10: Processing (event dispatcher, processors, bgtask registry)
-        # error_monitor is required by ProcessingInput; raise if not initialized
-        # since the processing stage cannot function without it.
-        if monitoring.error_monitor is None:
-            raise DependencyInitializationError("error_monitor plugin failed to initialize")
         processing = await stack.enter_composer(
             ProcessingComposer(),
             ProcessingInput(
@@ -308,6 +315,9 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 agent_client_pool=agents.agent_client_pool,
                 # Log cleanup timer
                 distributed_lock_factory=domain.distributed_lock_factory,
+                # Lifecycle background tasks
+                stats_monitor=monitoring.stats_monitor,
+                pidx=setup_input.pidx,
             ),
         )
 

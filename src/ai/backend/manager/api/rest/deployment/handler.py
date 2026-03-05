@@ -8,13 +8,14 @@ wrapper, and return ``APIResponse`` objects.
 from __future__ import annotations
 
 from http import HTTPStatus
-from typing import TYPE_CHECKING
 
 from aiohttp import web
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
+    AddRevisionRequest,
+    AddRevisionResponse,
     CreateDeploymentPolicyRequest,
     CreateDeploymentPolicyResponse,
     CreateDeploymentRequest,
@@ -72,6 +73,9 @@ from ai.backend.manager.services.deployment.actions.destroy_deployment import (
 from ai.backend.manager.services.deployment.actions.get_deployment_by_id import (
     GetDeploymentByIdAction,
 )
+from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
+    AddModelRevisionAction,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
 )
@@ -95,6 +99,7 @@ from ai.backend.manager.services.deployment.processors import DeploymentProcesso
 from ai.backend.manager.types import OptionalState
 
 from .adapter import (
+    AddRevisionAdapter,
     CreateDeploymentAdapter,
     DeploymentAdapter,
     DeploymentPolicyAdapter,
@@ -102,40 +107,30 @@ from .adapter import (
     RouteAdapter,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.services.processors import Processors
-
 
 class DeploymentAPIHandler:
     """REST API handler class for deployment operations with constructor DI."""
 
-    def __init__(self, *, processors: Processors | None = None) -> None:
-        self._processors_ref = processors
+    def __init__(
+        self,
+        *,
+        deployment: DeploymentProcessors | None,
+    ) -> None:
+        self._deployment = deployment
         self._deployment_adapter = DeploymentAdapter()
         self._revision_adapter = RevisionAdapter()
         self._route_adapter = RouteAdapter()
         self._create_deployment_adapter = CreateDeploymentAdapter()
         self._policy_adapter = DeploymentPolicyAdapter()
-
-    def bind_processors(self, processors: Processors) -> None:
-        """Late-bind processors for backward-compatible create_app() usage."""
-        self._processors_ref = processors
-
-    @property
-    def _processors(self) -> Processors:
-        if self._processors_ref is None:
-            raise RuntimeError(
-                "Processors not bound. Pass processors= to __init__ or call bind_processors()."
-            )
-        return self._processors_ref
+        self._add_revision_adapter = AddRevisionAdapter()
 
     def _get_deployment_processors(self) -> DeploymentProcessors:
         """Get deployment processors, raising ServiceUnavailable if not available."""
-        if self._processors.deployment is None:
+        if self._deployment is None:
             raise web.HTTPServiceUnavailable(
                 reason="Deployment service is not available on this manager"
             )
-        return self._processors.deployment
+        return self._deployment
 
     # Deployment Endpoints
 
@@ -268,6 +263,31 @@ class DeploymentAPIHandler:
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     # Revision Endpoints
+
+    async def add_revision(
+        self,
+        path: PathParam[DeploymentPathParam],
+        body: BodyParam[AddRevisionRequest],
+    ) -> APIResponse:
+        """Add a new revision to an existing deployment."""
+        deployment_processors = self._get_deployment_processors()
+
+        # Build revision creator from request using adapter
+        revision_creator = self._add_revision_adapter.build_revision_creator(body.parsed.revision)
+
+        # Call service action
+        action_result = await deployment_processors.add_model_revision.wait_for_complete(
+            AddModelRevisionAction(
+                model_deployment_id=path.parsed.deployment_id,
+                adder=revision_creator,
+            )
+        )
+
+        # Build response
+        resp = AddRevisionResponse(
+            revision=self._revision_adapter.convert_to_dto(action_result.revision)
+        )
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
     async def search_revisions(
         self,

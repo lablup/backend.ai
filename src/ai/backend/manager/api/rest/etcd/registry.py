@@ -7,23 +7,27 @@ from typing import TYPE_CHECKING
 from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
+from .handler import EtcdHandler
+
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
+    from ai.backend.manager.config.provider import ManagerConfigProvider
 
 
-def register_etcd_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_etcd_routes(
+    handler: EtcdHandler,
+    route_deps: RouteDeps,
+    *,
+    pidx: int,
+    config_provider: ManagerConfigProvider,
+) -> RouteRegistry:
     """Build the etcd config sub-application."""
-    from ai.backend.manager.api.etcd import app_ctx as etcd_app_ctx
+    from .lifecycle import make_app_ctx
 
-    from .handler import EtcdHandler
+    reg = RouteRegistry.create("config", route_deps.cors_options)
 
-    reg = RouteRegistry.create("config", deps.cors_options)
-
-    # Wire lifecycle hook -- etcd_app_ctx reads root context directly,
-    # no PrivateContext needed.
-    reg.app.cleanup_ctx.append(etcd_app_ctx)
-
-    handler = EtcdHandler(processors=deps.processors)
+    # Wire lifecycle hook via factory closure
+    reg.app.cleanup_ctx.append(make_app_ctx(pidx, config_provider))
 
     # Public endpoints (auth_required only)
     reg.add("GET", "/resource-slots", handler.get_resource_slots, middlewares=[auth_required])

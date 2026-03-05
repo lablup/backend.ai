@@ -60,7 +60,7 @@ from ai.backend.manager.services.template.actions.update_task_template import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.services.processors import Processors
+    from ai.backend.manager.services.template.processors import TemplateProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -68,8 +68,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class SessionTemplateHandler:
     """Session template API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, template: TemplateProcessors) -> None:
+        self._template = template
 
     async def create(
         self,
@@ -114,7 +114,7 @@ class SessionTemplateHandler:
             owner_access_key=owner_access_key,
             items=items,
         )
-        result = await self._processors.template.create_task.wait_for_complete(action)
+        result = await self._template.create_task.wait_for_complete(action)
         resp = [CreateSessionTemplateItemDTO(id=item.id, user=item.user) for item in result.created]
         return APIResponse.build(
             HTTPStatus.OK,
@@ -130,7 +130,7 @@ class SessionTemplateHandler:
         log.info("SESSION_TEMPLATE.LIST (ak:{})", ctx.access_key)
 
         action = ListTaskTemplatesAction(user_uuid=ctx.user_uuid)
-        result = await self._processors.template.list_task.wait_for_complete(action)
+        result = await self._template.list_task.wait_for_complete(action)
 
         items = [
             SessionTemplateListItemDTO(
@@ -173,7 +173,7 @@ class SessionTemplateHandler:
 
         template_id = path.parsed.template_id
         action = GetTaskTemplateAction(template_id=template_id)
-        result = await self._processors.template.get_task.wait_for_complete(action)
+        result = await self._template.get_task.wait_for_complete(action)
         return APIResponse.build(
             HTTPStatus.OK,
             GetSessionTemplateResponse(
@@ -231,7 +231,7 @@ class SessionTemplateHandler:
             owner_access_key=owner_access_key,
             items=items,
         )
-        await self._processors.template.update_task.wait_for_complete(action)
+        await self._template.update_task.wait_for_complete(action)
         return APIResponse.build(
             HTTPStatus.OK,
             UpdateSessionTemplateResponse(success=True),
@@ -255,7 +255,7 @@ class SessionTemplateHandler:
         )
 
         action = DeleteTaskTemplateAction(template_id=template_id)
-        await self._processors.template.delete_task.wait_for_complete(action)
+        await self._template.delete_task.wait_for_complete(action)
         return APIResponse.build(
             HTTPStatus.OK,
             DeleteSessionTemplateResponse(success=True),

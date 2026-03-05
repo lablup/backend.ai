@@ -20,10 +20,10 @@ from ai.backend.common.api_handlers import (
     BodyParam,
     MiddlewareParam,
 )
-from ai.backend.manager.api.auth import (
+from ai.backend.manager.api.rest.middleware.auth import (
     admin_required,
-    auth_middleware,
     auth_required,
+    build_auth_middleware,
     superadmin_required,
 )
 from ai.backend.manager.api.rest.routing import (
@@ -258,10 +258,10 @@ class TestApplyRouteMiddlewares:
 
 
 class TestAuthMiddlewareImportability:
-    """Verify auth_middleware can be imported independently from create_app()."""
+    """Verify build_auth_middleware can be imported independently from create_app()."""
 
-    def test_auth_middleware_is_importable(self) -> None:
-        assert callable(auth_middleware)
+    def test_build_auth_middleware_is_importable(self) -> None:
+        assert callable(build_auth_middleware)
 
     def test_auth_decorators_are_importable(self) -> None:
         assert callable(auth_required)
