@@ -199,11 +199,85 @@ jobs:
       run: python scripts/check-alembic-revision.py ${{ steps.create-revision.outputs.REVISION_FILE }}
 
 
-  test:
+  test-unit:
     if: |
       !contains(github.event.pull_request.labels.*.name, 'skip:ci')
       && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
     runs-on: ubuntu-latest-8-cores
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && '["0/3","1/3","2/3"]' || '["0/1"]') }}
+    steps:
+    - name: Calculate the fetch depth
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
+        else
+          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
+        fi
+    - name: Check out the revision with minimal required history
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        lfs: false
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Set up remote cache backend (if applicable)
+      run: |
+        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
+      env:
+        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
+      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v10
+      with:
+        gha-cache-key: v0
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
+    - name: Test
+      timeout-minutes: 60
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "push" ] && [[ "$GITHUB_REF" == refs/tags/* ]]; then
+          pants test --shard='${{ matrix.shard }}' \
+            tests/unit/:: -- -v
+        else
+          if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+            git fetch --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+            BASE_REF="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_REF="HEAD~1"
+          fi
+          pants test --changed-since=$BASE_REF --changed-dependents=transitive \
+            --filter-address-regex='tests/unit/' -- -v
+        fi
+    - name: Upload pants log
+      uses: actions/upload-artifact@v5
+      with:
+        name: pants.test-unit.${{ strategy.job-index }}.log
+        path: .pants.d/workdir/pants.log
+      if: always()  # We want the log even on failures.
+
+
+  test-component:
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
+    runs-on: ubuntu-latest-8-cores
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && '["0/2","1/2"]' || '["0/1"]') }}
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -248,9 +322,9 @@ jobs:
         grep -q "127.0.0.1 node01" /etc/hosts || echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
         grep -q "127.0.0.1 node02" /etc/hosts || echo "127.0.0.1 node02" | sudo tee -a /etc/hosts
         grep -q "127.0.0.1 node03" /etc/hosts || echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
-        # Run full tests for release, otherwise run changed tests only
         if [ "$GITHUB_EVENT_NAME" == "push" ] && [[ "$GITHUB_REF" == refs/tags/* ]]; then
-          pants test :: -- -v
+          pants test --shard='${{ matrix.shard }}' \
+            tests/component/:: -- -v
         else
           if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
             git fetch --depth=1 origin "${{ github.event.pull_request.base.sha }}"
@@ -258,18 +332,94 @@ jobs:
           else
             BASE_REF="HEAD~1"
           fi
-          pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -v
+          pants test --changed-since=$BASE_REF --changed-dependents=transitive \
+            --filter-address-regex='tests/component/' -- -v
         fi
     - name: Upload pants log
       uses: actions/upload-artifact@v5
       with:
-        name: pants.test.log
+        name: pants.test-component.${{ strategy.job-index }}.log
+        path: .pants.d/workdir/pants.log
+      if: always()  # We want the log even on failures.
+
+
+  test-integration:
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
+    runs-on: ubuntu-latest-8-cores
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && '["0/2","1/2"]' || '["0/1"]') }}
+    steps:
+    - name: Calculate the fetch depth
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
+        else
+          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
+        fi
+    - name: Check out the revision with minimal required history
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        lfs: false
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Set up remote cache backend (if applicable)
+      run: |
+        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
+      env:
+        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
+      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v10
+      with:
+        gha-cache-key: v0
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
+    - name: Test
+      timeout-minutes: 60
+      run: |
+        # configure redis sentinel cluster hostnames for testing
+        grep -q "127.0.0.1 node01" /etc/hosts || echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
+        grep -q "127.0.0.1 node02" /etc/hosts || echo "127.0.0.1 node02" | sudo tee -a /etc/hosts
+        grep -q "127.0.0.1 node03" /etc/hosts || echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
+        # Release: run full integration suite; PR/push: only directly changed integration tests
+        if [ "$GITHUB_EVENT_NAME" == "push" ] && [[ "$GITHUB_REF" == refs/tags/* ]]; then
+          pants test --shard='${{ matrix.shard }}' \
+            tests/integration/:: -- -v
+        else
+          if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+            git fetch --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+            BASE_REF="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_REF="HEAD~1"
+          fi
+          pants test --changed-since=$BASE_REF \
+            --filter-address-regex='tests/integration/' -- -v
+        fi
+    - name: Upload pants log
+      uses: actions/upload-artifact@v5
+      with:
+        name: pants.test-integration.${{ strategy.job-index }}.log
         path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
 
   build-scies:
-    needs: [lint-and-typecheck, test, check-alembic-migrations]
+    needs: [lint-and-typecheck, test-unit, test-component, test-integration, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     strategy:
       fail-fast: false
@@ -336,7 +486,7 @@ jobs:
 
 
   build-wheels:
-    needs: [lint-and-typecheck, test, check-alembic-migrations]
+    needs: [lint-and-typecheck, test-unit, test-component, test-integration, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-22.04
     steps:
@@ -384,12 +534,12 @@ jobs:
 
 
   build-sbom:
-    needs: [lint-and-typecheck, test, check-alembic-migrations]
+    needs: [lint-and-typecheck, test-unit, test-component, test-integration, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/sbom.yml
 
   build-supergraph:
-    needs: [lint-and-typecheck, test, check-alembic-migrations]
+    needs: [lint-and-typecheck, test-unit, test-component, test-integration, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
