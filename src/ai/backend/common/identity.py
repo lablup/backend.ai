@@ -61,6 +61,10 @@ async def _detect_aws(session: aiohttp.ClientSession) -> CloudProvider:
         "http://169.254.169.254/latest/meta-data/",
     ) as resp:
         body = await resp.text()
+        if resp.status != 200:
+            raise CloudDetectionError(
+                f"AWS detection failed with status {resp.status}", extra_data=f"{body[:200]!r}"
+            )
         # ref: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html
         if "instance-id" not in body:
             raise CloudDetectionError(
@@ -75,9 +79,14 @@ async def _detect_azure(session: aiohttp.ClientSession) -> CloudProvider:
         params={"api-version": "2021-02-01"},
         headers={"Metadata": "true"},
     ) as resp:
+        body = await resp.text()
+        if resp.status != 200:
+            raise CloudDetectionError(
+                f"Azure detection failed with status {resp.status}", extra_data=f"{body[:200]!r})"
+            )
         try:
             data = await resp.json()
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, ValueError):
             body = await resp.text()
             raise CloudDetectionError(
                 f"Azure detection failed with status {resp.status}", extra_data=f"{body[:200]!r}"
@@ -98,6 +107,10 @@ async def _detect_gcp(session: aiohttp.ClientSession) -> CloudProvider:
         headers={"Metadata-Flavor": "Google"},
     ) as resp:
         body = await resp.text()
+        if resp.status != 200:
+            raise CloudDetectionError(
+                f"GCP detection failed with status {resp.status}", extra_data=f"{body[:64]!r})"
+            )
         try:
             # ref: https://docs.cloud.google.com/compute/docs/metadata/predefined-metadata-keys
             int(body.strip())
@@ -115,7 +128,6 @@ async def detect_cloud() -> CloudProvider | None:
     to get the fastest returning result from multiple metadata URL detectors.
     """
     async with aiohttp.ClientSession(
-        raise_for_status=True,
         timeout=aiohttp.ClientTimeout(total=1.0, connect=0.3, sock_read=0.5),
     ) as session:
         detection_tasks = [
