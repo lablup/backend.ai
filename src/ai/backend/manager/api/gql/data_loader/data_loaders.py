@@ -12,6 +12,7 @@ from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryDa
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryData,
+    DeploymentPolicyData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
@@ -50,6 +51,7 @@ from .container_registry import load_container_registries_by_ids
 from .deployment import (
     load_access_tokens_by_ids,
     load_auto_scaling_rules_by_ids,
+    load_deployment_policies_by_endpoint_ids,
     load_deployments_by_ids,
     load_replicas_by_ids,
     load_revisions_by_ids,
@@ -279,6 +281,14 @@ class DataLoaders:
         self,
     ) -> DataLoader[uuid.UUID, ModelDeploymentAccessTokenData | None]:
         return DataLoader(load_fn=partial(load_access_tokens_by_ids, self._processors.deployment))
+
+    @cached_property
+    def deployment_policy_by_endpoint_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, DeploymentPolicyData | None]:
+        return DataLoader(
+            load_fn=partial(load_deployment_policies_by_endpoint_ids, self._processors.deployment)
+        )
 
     @cached_property
     def session_history_loader(
