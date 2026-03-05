@@ -26,11 +26,11 @@ from ai.backend.manager.repositories.deployment.options import (
 from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
     SearchAccessTokensAction,
 )
-from ai.backend.manager.services.deployment.actions.deployment_policy.search_deployment_policies import (
-    SearchDeploymentPoliciesAction,
-)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.search_deployment_policies import (
+    SearchDeploymentPoliciesAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
     SearchRevisionsAction,
