@@ -4412,7 +4412,7 @@ input ExtraVFolderMountInput
   @join__type(graph: STRAWBERRY)
 {
   vfolderId: ID!
-  mountDestination: String!
+  mountDestination: String
 }
 
 """
