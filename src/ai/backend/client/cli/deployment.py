@@ -2,30 +2,38 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
 from uuid import UUID
 
 import click
 
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.config import get_config
 from ai.backend.client.session import Session
-from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.client.v2.auth import HMACAuth
+from ai.backend.client.v2.config import ClientConfig
+from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy, RouteTrafficStatus
 from ai.backend.common.dto.manager.deployment import (
     BlueGreenConfigInput,
     CreateDeploymentPolicyRequest,
+    CreateDeploymentRequest,
+    DeploymentFilter,
     RollingUpdateConfigInput,
+    SearchDeploymentsRequest,
+    SearchRevisionsRequest,
+    SearchRoutesRequest,
     UpdateDeploymentPolicyRequest,
+    UpdateDeploymentRequest,
+    UpdateRouteTrafficStatusRequest,
 )
 
 from .extensions import pass_ctx_obj
-from .pretty import print_done
+from .pretty import print_done, print_fail
 from .types import CLIContext
-
-if TYPE_CHECKING:
-    pass
 
 
 @click.group()
@@ -79,14 +87,6 @@ def create_deployment_cmd(
         }
     }
     """
-    import json
-
-    from ai.backend.cli.types import ExitCode
-    from ai.backend.client.session import Session
-    from ai.backend.common.dto.manager.deployment import CreateDeploymentRequest
-
-    from .pretty import print_done
-
     with Session() as session:
         try:
             config_file_path = Path(config_file)
@@ -114,15 +114,6 @@ def list_deployments_cmd(
     offset: int,
 ) -> None:
     """List all deployments."""
-    from uuid import UUID
-
-    from ai.backend.cli.types import ExitCode
-    from ai.backend.client.session import Session
-    from ai.backend.common.dto.manager.deployment import (
-        DeploymentFilter,
-        SearchDeploymentsRequest,
-    )
-
     with Session() as session:
         try:
             filter_cond = None
@@ -155,12 +146,6 @@ def list_deployments_cmd(
 @click.argument("deployment_id", type=str)
 def info_deployment_cmd(ctx: CLIContext, deployment_id: str) -> None:
     """Display detailed information of a deployment."""
-    import json
-    from uuid import UUID
-
-    from ai.backend.cli.types import ExitCode
-    from ai.backend.client.session import Session
-
     with Session() as session:
         try:
             result = session.Deployment.get(UUID(deployment_id))
@@ -183,15 +168,6 @@ def update_deployment_cmd(
     replicas: int | None,
 ) -> None:
     """Update a deployment."""
-    import json
-    from uuid import UUID
-
-    from ai.backend.cli.types import ExitCode
-    from ai.backend.client.session import Session
-    from ai.backend.common.dto.manager.deployment import UpdateDeploymentRequest
-
-    from .pretty import print_done
-
     with Session() as session:
         try:
             request = UpdateDeploymentRequest(name=name, desired_replicas=replicas)
@@ -209,13 +185,6 @@ def update_deployment_cmd(
 @click.confirmation_option(prompt="Are you sure you want to destroy this deployment?")
 def destroy_deployment_cmd(ctx: CLIContext, deployment_id: str) -> None:
     """Destroy a deployment."""
-    from uuid import UUID
-
-    from ai.backend.cli.types import ExitCode
-    from ai.backend.client.session import Session
-
-    from .pretty import print_done, print_fail
-
     with Session() as session:
         try:
             result = session.Deployment.destroy(UUID(deployment_id))
@@ -249,12 +218,6 @@ def list_revisions_cmd(
     offset: int,
 ) -> None:
     """List revisions for a deployment."""
-    from uuid import UUID
-
-    from ai.backend.cli.types import ExitCode
-    from ai.backend.client.session import Session
-    from ai.backend.common.dto.manager.deployment import SearchRevisionsRequest
-
     with Session() as session:
         try:
             request = SearchRevisionsRequest(limit=limit, offset=offset)
@@ -282,12 +245,6 @@ def list_revisions_cmd(
 @click.argument("revision_id", type=str)
 def info_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str) -> None:
     """Display detailed information of a revision."""
-    import json
-    from uuid import UUID
-
-    from ai.backend.cli.types import ExitCode
-    from ai.backend.client.session import Session
-
     with Session() as session:
         try:
             result = session.Deployment.get_revision(UUID(deployment_id), UUID(revision_id))
@@ -303,13 +260,6 @@ def info_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str) -> 
 @click.argument("revision_id", type=str)
 def activate_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str) -> None:
     """Activate a revision."""
-    from uuid import UUID
-
-    from ai.backend.cli.types import ExitCode
-    from ai.backend.client.session import Session
-
-    from .pretty import print_done, print_fail
-
     with Session() as session:
         try:
             result = session.Deployment.activate_revision(UUID(deployment_id), UUID(revision_id))
@@ -329,13 +279,6 @@ def activate_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str)
 @click.argument("revision_id", type=str)
 def deactivate_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str) -> None:
     """Deactivate a revision."""
-    from uuid import UUID
-
-    from ai.backend.cli.types import ExitCode
-    from ai.backend.client.session import Session
-
-    from .pretty import print_done, print_fail
-
     with Session() as session:
         try:
             result = session.Deployment.deactivate_revision(UUID(deployment_id), UUID(revision_id))
@@ -369,12 +312,6 @@ def list_routes_cmd(
     offset: int,
 ) -> None:
     """List routes for a deployment."""
-    from uuid import UUID
-
-    from ai.backend.cli.types import ExitCode
-    from ai.backend.client.session import Session
-    from ai.backend.common.dto.manager.deployment import SearchRoutesRequest
-
     with Session() as session:
         try:
             request = SearchRoutesRequest(limit=limit, offset=offset)
@@ -411,16 +348,6 @@ def update_route_traffic_cmd(
     traffic_status: str | None,
 ) -> None:
     """Update route traffic status."""
-    import json
-    from uuid import UUID
-
-    from ai.backend.cli.types import ExitCode
-    from ai.backend.client.session import Session
-    from ai.backend.common.data.model_deployment.types import RouteTrafficStatus
-    from ai.backend.common.dto.manager.deployment import UpdateRouteTrafficStatusRequest
-
-    from .pretty import print_done, print_fail
-
     if not traffic_status:
         print_fail("Must specify either --activate or --deactivate")
         sys.exit(ExitCode.FAILURE)
@@ -443,6 +370,19 @@ def update_route_traffic_cmd(
 # Policy commands
 
 
+async def _create_v2_registry() -> BackendAIClientRegistry:
+    """Create a V2 SDK client registry from V1 API config."""
+    api_config = get_config()
+    v2_config = ClientConfig(
+        endpoint=api_config.endpoint,
+        skip_ssl_verification=api_config.skip_sslcert_validation,
+        connection_timeout=api_config.connection_timeout,
+        read_timeout=api_config.read_timeout,
+    )
+    auth = HMACAuth(api_config.access_key, api_config.secret_key)
+    return await BackendAIClientRegistry.create(v2_config, auth)
+
+
 @deployment.group()
 def policy() -> None:
     """Manage deployment policies.
@@ -458,15 +398,22 @@ def policy() -> None:
 @click.argument("deployment_id", type=str)
 def info_policy_cmd(ctx: CLIContext, deployment_id: str) -> None:
     """Display the deployment policy."""
-    with Session() as session:
+
+    async def _run() -> None:
+        registry = await _create_v2_registry()
         try:
-            result = session.Deployment.get_policy(UUID(deployment_id))
+            result = await registry.deployment.get_policy(UUID(deployment_id))
             print(
                 json.dumps(result.deployment_policy.model_dump(mode="json"), indent=2, default=str)
             )
-        except Exception as e:
-            ctx.output.print_error(e)
-            sys.exit(ExitCode.FAILURE)
+        finally:
+            await registry.close()
+
+    try:
+        asyncio.run(_run())
+    except Exception as e:
+        ctx.output.print_error(e)
+        sys.exit(ExitCode.FAILURE)
 
 
 @policy.command("create")
@@ -550,15 +497,14 @@ def create_policy_cmd(
         if rolling_kwargs:
             rolling_update = RollingUpdateConfigInput(**rolling_kwargs)
     elif strategy_enum == DeploymentStrategy.BLUE_GREEN:
-        bg_kwargs: dict[str, int | bool] = {}
-        if auto_promote:
-            bg_kwargs["auto_promote"] = auto_promote
-        if promote_delay is not None:
-            bg_kwargs["promote_delay_seconds"] = promote_delay
-        if bg_kwargs:
-            blue_green = BlueGreenConfigInput(**bg_kwargs)
+        if auto_promote or promote_delay is not None:
+            blue_green = BlueGreenConfigInput(
+                auto_promote=auto_promote,
+                promote_delay_seconds=promote_delay if promote_delay is not None else 0,
+            )
 
-    with Session() as session:
+    async def _run() -> None:
+        registry = await _create_v2_registry()
         try:
             request = CreateDeploymentPolicyRequest(
                 strategy=strategy_enum,
@@ -566,14 +512,19 @@ def create_policy_cmd(
                 rolling_update=rolling_update,
                 blue_green=blue_green,
             )
-            result = session.Deployment.create_policy(UUID(deployment_id), request)
+            result = await registry.deployment.create_policy(UUID(deployment_id), request)
             print_done(f"Deployment policy created for: {deployment_id}")
             print(
                 json.dumps(result.deployment_policy.model_dump(mode="json"), indent=2, default=str)
             )
-        except Exception as e:
-            ctx.output.print_error(e)
-            sys.exit(ExitCode.FAILURE)
+        finally:
+            await registry.close()
+
+    try:
+        asyncio.run(_run())
+    except Exception as e:
+        ctx.output.print_error(e)
+        sys.exit(ExitCode.FAILURE)
 
 
 @policy.command("update")
@@ -658,14 +609,13 @@ def update_policy_cmd(
             rolling_kwargs["max_unavailable"] = max_unavailable
         rolling_update = RollingUpdateConfigInput(**rolling_kwargs)
     if auto_promote or promote_delay is not None:
-        bg_kwargs: dict[str, int | bool] = {}
-        if auto_promote:
-            bg_kwargs["auto_promote"] = auto_promote
-        if promote_delay is not None:
-            bg_kwargs["promote_delay_seconds"] = promote_delay
-        blue_green = BlueGreenConfigInput(**bg_kwargs)
+        blue_green = BlueGreenConfigInput(
+            auto_promote=auto_promote,
+            promote_delay_seconds=promote_delay if promote_delay is not None else 0,
+        )
 
-    with Session() as session:
+    async def _run() -> None:
+        registry = await _create_v2_registry()
         try:
             request = UpdateDeploymentPolicyRequest(
                 strategy=strategy_enum,
@@ -673,11 +623,16 @@ def update_policy_cmd(
                 rolling_update=rolling_update,
                 blue_green=blue_green,
             )
-            result = session.Deployment.update_policy(UUID(deployment_id), request)
+            result = await registry.deployment.update_policy(UUID(deployment_id), request)
             print_done(f"Deployment policy updated for: {deployment_id}")
             print(
                 json.dumps(result.deployment_policy.model_dump(mode="json"), indent=2, default=str)
             )
-        except Exception as e:
-            ctx.output.print_error(e)
-            sys.exit(ExitCode.FAILURE)
+        finally:
+            await registry.close()
+
+    try:
+        asyncio.run(_run())
+    except Exception as e:
+        ctx.output.print_error(e)
+        sys.exit(ExitCode.FAILURE)
