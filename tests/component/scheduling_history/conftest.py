@@ -23,8 +23,9 @@ def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the modules required for scheduling-history domain tests."""
     mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
         register_scheduling_history_routes(
-            SchedulingHistoryHandler(processors=mock_processors), route_deps
+            SchedulingHistoryHandler(scheduling_history=mock_processors.scheduling_history),
+            route_deps,
         ),
     ]

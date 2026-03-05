@@ -25,7 +25,7 @@ async def test_check_rlim_for_anonymous_query(
     mock_processors = MagicMock()
     app, client = await create_app_and_client(
         registries=[
-            register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+            register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
             register_ratelimit_routes(route_deps, valkey_rate_limit=None),
         ],
     )
@@ -47,7 +47,7 @@ async def test_check_rlim_for_authorized_query(
     mock_processors = MagicMock()
     app, client = await create_app_and_client(
         registries=[
-            register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+            register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
             register_ratelimit_routes(route_deps, valkey_rate_limit=None),
         ],
     )

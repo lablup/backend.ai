@@ -12,7 +12,7 @@ from ai.backend.common.dto.manager.agent.response import PaginationInfo, SearchA
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.agent.processors import AgentProcessors
 
 from .adapter import AgentAdapter
 
@@ -22,8 +22,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class AgentHandler:
     """Agent API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, agent: AgentProcessors) -> None:
+        self._agent = agent
         self._adapter = AgentAdapter()
 
     async def search_agents(
@@ -36,7 +36,7 @@ class AgentHandler:
 
         querier = self._adapter.build_querier(body.parsed)
 
-        action_result = await self._processors.agent.search_agents.wait_for_complete(
+        action_result = await self._agent.search_agents.wait_for_complete(
             SearchAgentsAction(querier=querier)
         )
 

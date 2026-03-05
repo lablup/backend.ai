@@ -48,7 +48,7 @@ from ai.backend.manager.services.export.actions import (
     GetReportAction,
     ListReportsAction,
 )
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.export.processors import ExportProcessors
 
 from .adapter import ExportAdapter
 
@@ -74,8 +74,8 @@ AUDIT_LOGS_REPORT_KEY = "audit-logs"
 class ExportHandler:
     """Export API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors, export_config: ExportConfig) -> None:
-        self._processors = processors
+    def __init__(self, *, export: ExportProcessors, export_config: ExportConfig) -> None:
+        self._export = export
         self._adapter = ExportAdapter()
         self._export_config = export_config
 
@@ -85,9 +85,7 @@ class ExportHandler:
 
     async def list_reports(self) -> APIResponse:
         """List available export reports."""
-        action_result = await self._processors.export.list_reports.wait_for_complete(
-            ListReportsAction()
-        )
+        action_result = await self._export.list_reports.wait_for_complete(ListReportsAction())
 
         reports = [
             ExportReportInfo(
@@ -119,7 +117,7 @@ class ExportHandler:
         path: PathParam[ExportPathParam],
     ) -> APIResponse:
         """Get a specific export report by key."""
-        action_result = await self._processors.export.get_report.wait_for_complete(
+        action_result = await self._export.get_report.wait_for_complete(
             GetReportAction(report_key=path.parsed.report_key)
         )
 
@@ -153,7 +151,7 @@ class ExportHandler:
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
         """Export user data as CSV."""
-        report_result = await self._processors.export.get_report.wait_for_complete(
+        report_result = await self._export.get_report.wait_for_complete(
             GetReportAction(report_key=USERS_REPORT_KEY)
         )
         query = self._adapter.build_user_query(
@@ -169,7 +167,7 @@ class ExportHandler:
             encoding=body.parsed.encoding,
             filename=header.parsed.filename,
         )
-        action_result = await self._processors.export.export_users_csv.wait_for_complete(action)
+        action_result = await self._export.export_users_csv.wait_for_complete(action)
         return await self._build_csv_stream_response(request_ctx.request, action_result)
 
     # ------------------------------------------------------------------
@@ -183,7 +181,7 @@ class ExportHandler:
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
         """Export session data as CSV."""
-        report_result = await self._processors.export.get_report.wait_for_complete(
+        report_result = await self._export.get_report.wait_for_complete(
             GetReportAction(report_key=SESSIONS_REPORT_KEY)
         )
         query = self._adapter.build_session_query(
@@ -199,7 +197,7 @@ class ExportHandler:
             encoding=body.parsed.encoding,
             filename=header.parsed.filename,
         )
-        action_result = await self._processors.export.export_sessions_csv.wait_for_complete(action)
+        action_result = await self._export.export_sessions_csv.wait_for_complete(action)
         return await self._build_csv_stream_response(request_ctx.request, action_result)
 
     # ------------------------------------------------------------------
@@ -213,7 +211,7 @@ class ExportHandler:
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
         """Export project data as CSV."""
-        report_result = await self._processors.export.get_report.wait_for_complete(
+        report_result = await self._export.get_report.wait_for_complete(
             GetReportAction(report_key=PROJECTS_REPORT_KEY)
         )
         query = self._adapter.build_project_query(
@@ -229,7 +227,7 @@ class ExportHandler:
             encoding=body.parsed.encoding,
             filename=header.parsed.filename,
         )
-        action_result = await self._processors.export.export_projects_csv.wait_for_complete(action)
+        action_result = await self._export.export_projects_csv.wait_for_complete(action)
         return await self._build_csv_stream_response(request_ctx.request, action_result)
 
     # ------------------------------------------------------------------
@@ -243,7 +241,7 @@ class ExportHandler:
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
         """Export keypair data as CSV."""
-        report_result = await self._processors.export.get_report.wait_for_complete(
+        report_result = await self._export.get_report.wait_for_complete(
             GetReportAction(report_key=KEYPAIRS_REPORT_KEY)
         )
         query = self._adapter.build_keypair_query(
@@ -259,7 +257,7 @@ class ExportHandler:
             encoding=body.parsed.encoding,
             filename=header.parsed.filename,
         )
-        action_result = await self._processors.export.export_keypairs_csv.wait_for_complete(action)
+        action_result = await self._export.export_keypairs_csv.wait_for_complete(action)
         return await self._build_csv_stream_response(request_ctx.request, action_result)
 
     # ------------------------------------------------------------------
@@ -273,7 +271,7 @@ class ExportHandler:
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
         """Export audit log data as CSV."""
-        report_result = await self._processors.export.get_report.wait_for_complete(
+        report_result = await self._export.get_report.wait_for_complete(
             GetReportAction(report_key=AUDIT_LOGS_REPORT_KEY)
         )
         query = self._adapter.build_audit_log_query(
@@ -289,9 +287,7 @@ class ExportHandler:
             encoding=body.parsed.encoding,
             filename=header.parsed.filename,
         )
-        action_result = await self._processors.export.export_audit_logs_csv.wait_for_complete(
-            action
-        )
+        action_result = await self._export.export_audit_logs_csv.wait_for_complete(action)
         return await self._build_csv_stream_response(request_ctx.request, action_result)
 
     # ------------------------------------------------------------------

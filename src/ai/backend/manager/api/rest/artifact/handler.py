@@ -66,7 +66,8 @@ from ai.backend.manager.services.artifact_revision.actions.reject import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.services.processors import Processors
+    from ai.backend.manager.services.artifact.processors import ArtifactProcessors
+    from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -74,20 +75,14 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ArtifactHandler:
     """Artifact API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors | None = None) -> None:
-        self._processors_ref = processors
-
-    def bind_processors(self, processors: Processors) -> None:
-        """Late-bind processors for backward-compatible create_app() usage."""
-        self._processors_ref = processors
-
-    @property
-    def _processors(self) -> Processors:
-        if self._processors_ref is None:
-            raise RuntimeError(
-                "Processors not bound. Pass processors= to __init__ or call bind_processors()."
-            )
-        return self._processors_ref
+    def __init__(
+        self,
+        *,
+        artifact: ArtifactProcessors,
+        artifact_revision: ArtifactRevisionProcessors,
+    ) -> None:
+        self._artifact = artifact
+        self._artifact_revision = artifact_revision
 
     async def cleanup_artifacts(
         self,
@@ -102,13 +97,13 @@ class ArtifactHandler:
 
         Use this operation to manage storage usage by removing unused artifacts.
         """
-        processors = self._processors
+
         cleaned_revisions = []
 
         # Process each artifact revision sequentially
         # TODO: Optimize with asyncio.gather() for parallel processing
         for artifact_revision_id in body.parsed.artifact_revision_ids:
-            action_result = await processors.artifact_revision.cleanup.wait_for_complete(
+            action_result = await self._artifact_revision.cleanup.wait_for_complete(
                 CleanupArtifactRevisionAction(
                     artifact_revision_id=artifact_revision_id,
                 )
@@ -133,8 +128,8 @@ class ArtifactHandler:
         Stops the download process for the specified artifact revision and
         reverts its status back to SCANNED. The partially downloaded data is cleaned up.
         """
-        processors = self._processors
-        action_result = await processors.artifact_revision.cancel_import.wait_for_complete(
+
+        action_result = await self._artifact_revision.cancel_import.wait_for_complete(
             CancelImportAction(
                 artifact_revision_id=body.parsed.artifact_revision_id,
             )
@@ -155,8 +150,8 @@ class ArtifactHandler:
         Admin-only operation to approve artifact revisions, typically used
         in environments with approval workflows for artifact deployment.
         """
-        processors = self._processors
-        action_result = await processors.artifact_revision.approve.wait_for_complete(
+
+        action_result = await self._artifact_revision.approve.wait_for_complete(
             ApproveArtifactRevisionAction(
                 artifact_revision_id=path.parsed.artifact_revision_id,
             )
@@ -177,8 +172,8 @@ class ArtifactHandler:
         Admin-only operation to reject artifact revisions, typically used
         in environments with approval workflows for artifact deployment.
         """
-        processors = self._processors
-        action_result = await processors.artifact_revision.reject.wait_for_complete(
+
+        action_result = await self._artifact_revision.reject.wait_for_complete(
             RejectArtifactRevisionAction(
                 artifact_revision_id=path.parsed.artifact_revision_id,
             )
@@ -202,7 +197,7 @@ class ArtifactHandler:
         Returns background tasks that can be monitored for import progress.
         Once AVAILABLE, artifacts can be used by users in their sessions.
         """
-        processors = self._processors
+
         imported_revisions = []
         tasks = []
 
@@ -212,7 +207,7 @@ class ArtifactHandler:
         for artifact_revision_id in body.parsed.artifact_revision_ids:
             # When using VFolderStorage (vfolder_id provided), store at root path
             storage_prefix = "/" if body.parsed.vfolder_id else None
-            action_result = await processors.artifact_revision.import_revision.wait_for_complete(
+            action_result = await self._artifact_revision.import_revision.wait_for_complete(
                 ImportArtifactRevisionAction(
                     artifact_revision_id=artifact_revision_id,
                     vfolder_id=body.parsed.vfolder_id,
@@ -244,8 +239,8 @@ class ArtifactHandler:
         Modifies artifact metadata such as readonly status and description.
         This operation does not affect the actual artifact files or revisions.
         """
-        processors = self._processors
-        action_result = await processors.artifact.update.wait_for_complete(
+
+        action_result = await self._artifact.update.wait_for_complete(
             UpdateArtifactAction(
                 updater=body.parsed.to_updater(path.parsed.artifact_id),
             )
@@ -266,8 +261,8 @@ class ArtifactHandler:
         Returns the README documentation associated with the artifact revision,
         which typically contains usage instructions and model information.
         """
-        processors = self._processors
-        action_result = await processors.artifact_revision.get_readme.wait_for_complete(
+
+        action_result = await self._artifact_revision.get_readme.wait_for_complete(
             GetArtifactRevisionReadmeAction(
                 artifact_revision_id=path.parsed.artifact_revision_id,
             )
@@ -288,12 +283,10 @@ class ArtifactHandler:
         Returns the verification result data associated with the artifact revision,
         which contains results from all verifiers that have been run on the artifact.
         """
-        processors = self._processors
-        action_result = (
-            await processors.artifact_revision.get_verification_result.wait_for_complete(
-                GetArtifactRevisionVerificationResultAction(
-                    artifact_revision_id=path.parsed.artifact_revision_id,
-                )
+
+        action_result = await self._artifact_revision.get_verification_result.wait_for_complete(
+            GetArtifactRevisionVerificationResultAction(
+                artifact_revision_id=path.parsed.artifact_revision_id,
             )
         )
 
@@ -313,8 +306,8 @@ class ArtifactHandler:
         and file-level progress data for the specified artifact revision.
         Supports both local and remote download progress when delegation is enabled.
         """
-        processors = self._processors
-        action_result = await processors.artifact_revision.get_download_progress.wait_for_complete(
+
+        action_result = await self._artifact_revision.get_download_progress.wait_for_complete(
             GetDownloadProgressAction(
                 artifact_revision_id=path.parsed.artifact_revision_id,
             )

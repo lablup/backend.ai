@@ -52,7 +52,7 @@ def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the auth module for auth-domain tests."""
     mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
     ]
 
 

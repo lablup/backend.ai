@@ -40,8 +40,14 @@ def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the modules required for artifact-domain tests."""
     mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
-        register_artifact_routes(ArtifactHandler(processors=mock_processors), route_deps),
+        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_artifact_routes(
+            ArtifactHandler(
+                artifact=mock_processors.artifact,
+                artifact_revision=mock_processors.artifact_revision,
+            ),
+            route_deps,
+        ),
     ]
 
 

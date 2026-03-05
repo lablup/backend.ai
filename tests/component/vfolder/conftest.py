@@ -52,9 +52,17 @@ def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the modules required for vfolder-domain tests."""
     mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
         register_vfolder_routes(
-            VFolderHandler(mock_processors), route_deps, processors=mock_processors
+            VFolderHandler(
+                auth=mock_processors.auth,
+                vfolder=mock_processors.vfolder,
+                vfolder_file=mock_processors.vfolder_file,
+                vfolder_invite=mock_processors.vfolder_invite,
+                vfolder_sharing=mock_processors.vfolder_sharing,
+            ),
+            route_deps,
+            vfolder_processors=mock_processors.vfolder,
         ),
     ]
 

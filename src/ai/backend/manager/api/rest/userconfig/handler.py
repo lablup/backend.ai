@@ -36,6 +36,7 @@ from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     ResolveAccessKeyScopeAction,
 )
+from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.dotfile import (
     CreateDotfileAction,
     DeleteDotfileAction,
@@ -44,7 +45,7 @@ from ai.backend.manager.services.dotfile import (
     UpdateBootstrapScriptAction,
     UpdateDotfileAction,
 )
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.dotfile.processors import DotfileProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -52,8 +53,9 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class UserConfigHandler:
     """User config (dotfile) API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, auth: AuthProcessors, dotfile: DotfileProcessors) -> None:
+        self._auth = auth
+        self._dotfile = dotfile
 
     async def create(
         self,
@@ -61,7 +63,7 @@ class UserConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=ctx.access_key,
                 requester_role=ctx.user_role,
@@ -86,7 +88,7 @@ class UserConfigHandler:
             permission=params.permission,
             user_uuid=ctx.user_uuid,
         )
-        await self._processors.dotfile.create.wait_for_complete(action)
+        await self._dotfile.create.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, CreateDotfileResponse())
 
     async def list_or_get(
@@ -95,7 +97,7 @@ class UserConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=ctx.access_key,
                 requester_role=ctx.user_role,
@@ -117,7 +119,7 @@ class UserConfigHandler:
             entity_key=owner_access_key,
             path=params.path,
         )
-        result = await self._processors.dotfile.list_or_get.wait_for_complete(action)
+        result = await self._dotfile.list_or_get.wait_for_complete(action)
         if params.path:
             entry = result.entries[0]
             return APIResponse.build(
@@ -133,7 +135,7 @@ class UserConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=ctx.access_key,
                 requester_role=ctx.user_role,
@@ -157,7 +159,7 @@ class UserConfigHandler:
             data=params.data,
             permission=params.permission,
         )
-        await self._processors.dotfile.update.wait_for_complete(action)
+        await self._dotfile.update.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, UpdateDotfileResponse())
 
     async def delete(
@@ -166,7 +168,7 @@ class UserConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=ctx.access_key,
                 requester_role=ctx.user_role,
@@ -188,7 +190,7 @@ class UserConfigHandler:
             entity_key=owner_access_key,
             path=params.path,
         )
-        await self._processors.dotfile.delete.wait_for_complete(action)
+        await self._dotfile.delete.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, DeleteDotfileResponse(success=True))
 
     async def update_bootstrap_script(
@@ -202,7 +204,7 @@ class UserConfigHandler:
             access_key=ctx.access_key,
             script=params.script,
         )
-        await self._processors.dotfile.update_bootstrap.wait_for_complete(action)
+        await self._dotfile.update_bootstrap.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, UpdateBootstrapScriptResponse())
 
     async def get_bootstrap_script(
@@ -211,7 +213,7 @@ class UserConfigHandler:
     ) -> APIResponse:
         log.info("USERCONFIG.GET_BOOTSTRAP_SCRIPT(ak:{})", ctx.access_key)
         action = GetBootstrapScriptAction(access_key=ctx.access_key)
-        result = await self._processors.dotfile.get_bootstrap.wait_for_complete(action)
+        result = await self._dotfile.get_bootstrap.wait_for_complete(action)
         return APIResponse.build(
             HTTPStatus.OK,
             GetBootstrapScriptResponse(script=result.script),

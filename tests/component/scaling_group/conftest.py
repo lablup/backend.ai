@@ -17,6 +17,8 @@ def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the modules required for scaling-group-domain tests."""
     mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
-        register_scaling_group_routes(ScalingGroupHandler(processors=mock_processors), route_deps),
+        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_scaling_group_routes(
+            ScalingGroupHandler(scaling_group=mock_processors.scaling_group), route_deps
+        ),
     ]

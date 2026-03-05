@@ -17,6 +17,8 @@ def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the modules required for deployment-domain tests."""
     mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
-        register_deployment_routes(DeploymentAPIHandler(processors=mock_processors), route_deps),
+        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_deployment_routes(
+            DeploymentAPIHandler(deployment=mock_processors.deployment), route_deps
+        ),
     ]

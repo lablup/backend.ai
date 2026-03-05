@@ -143,45 +143,88 @@ def build_api_routes(
 
     # 2. Build all handlers
     acl_handler = AclHandler()
-    auth_handler = AuthHandler(processors=processors)
-    agent_handler = AgentHandler(processors=processors)
-    artifact_handler = ArtifactHandler(processors=processors)
-    artifact_registry_handler = ArtifactRegistryHandler(processors=processors)
-    compute_sessions_handler = ComputeSessionsHandler(processors=processors)
-    container_registry_handler = ContainerRegistryHandler(processors=processors)
-    deployment_handler = DeploymentAPIHandler(processors=processors)
-    domainconfig_handler = DomainConfigHandler(processors=processors)
-    error_log_handler = ErrorLogHandler(processors=processors)
-    etcd_handler = EtcdHandler(processors=processors)
+    auth_handler = AuthHandler(auth=processors.auth)
+    agent_handler = AgentHandler(agent=processors.agent)
+    artifact_handler = ArtifactHandler(
+        artifact=processors.artifact,
+        artifact_revision=processors.artifact_revision,
+    )
+    artifact_registry_handler = ArtifactRegistryHandler(
+        artifact=processors.artifact,
+        artifact_revision=processors.artifact_revision,
+    )
+    compute_sessions_handler = ComputeSessionsHandler(session=processors.session)
+    container_registry_handler = ContainerRegistryHandler(
+        container_registry=processors.container_registry
+    )
+    deployment_handler = DeploymentAPIHandler(deployment=processors.deployment)
+    domainconfig_handler = DomainConfigHandler(dotfile=processors.dotfile)
+    error_log_handler = ErrorLogHandler(error_log=processors.error_log)
+    etcd_handler = EtcdHandler(
+        container_registry=processors.container_registry,
+        etcd_config=processors.etcd_config,
+    )
     export_handler = ExportHandler(
-        processors=processors,
+        export=processors.export,
         export_config=config_provider.config.export,
     )
-    fair_share_handler = FairShareAPIHandler(processors=processors)
-    group_handler = GroupHandler(processors=processors)
-    groupconfig_handler = GroupConfigHandler(processors=processors)
-    manager_handler = ManagerHandler(processors=processors)
-    notification_handler = NotificationHandler(processors=processors)
-    object_storage_handler = ObjectStorageHandler(processors=processors)
-    resource_handler = ResourceHandler(processors=processors)
-    scaling_group_handler = ScalingGroupHandler(processors=processors)
-    scheduling_history_handler = SchedulingHistoryHandler(processors=processors)
-    service_handler = ServiceHandler(processors=processors)
+    fair_share_handler = FairShareAPIHandler(
+        fair_share=processors.fair_share,
+        resource_usage=processors.resource_usage,
+        scaling_group=processors.scaling_group,
+    )
+    group_handler = GroupHandler(container_registry=processors.container_registry)
+    groupconfig_handler = GroupConfigHandler(dotfile=processors.dotfile)
+    manager_handler = ManagerHandler(manager_admin=processors.manager_admin)
+    notification_handler = NotificationHandler(notification=processors.notification)
+    object_storage_handler = ObjectStorageHandler(
+        object_storage=processors.object_storage,
+        storage_namespace=processors.storage_namespace,
+    )
+    resource_handler = ResourceHandler(
+        resource_preset=processors.resource_preset,
+        agent=processors.agent,
+        group=processors.group,
+        user=processors.user,
+        container_registry=processors.container_registry,
+    )
+    scaling_group_handler = ScalingGroupHandler(scaling_group=processors.scaling_group)
+    scheduling_history_handler = SchedulingHistoryHandler(
+        scheduling_history=processors.scheduling_history
+    )
+    service_handler = ServiceHandler(
+        auth=processors.auth,
+        deployment=processors.deployment,
+        model_serving=processors.model_serving,
+        model_serving_auto_scaling=processors.model_serving_auto_scaling,
+    )
     session_handler = SessionHandler(
-        processors=processors,
+        auth=processors.auth,
+        session=processors.session,
+        agent=processors.agent,
+        vfolder=processors.vfolder,
         config_provider=config_provider,
     )
-    userconfig_handler = UserConfigHandler(processors=processors)
-    vfolder_handler = VFolderHandler(processors)
-    vfs_storage_handler = VFSStorageHandler(processors=processors)
+    userconfig_handler = UserConfigHandler(
+        auth=processors.auth,
+        dotfile=processors.dotfile,
+    )
+    vfolder_handler = VFolderHandler(
+        auth=processors.auth,
+        vfolder=processors.vfolder,
+        vfolder_file=processors.vfolder_file,
+        vfolder_invite=processors.vfolder_invite,
+        vfolder_sharing=processors.vfolder_sharing,
+    )
+    vfs_storage_handler = VFSStorageHandler(vfs_storage=processors.vfs_storage)
 
     # Admin sub-registries
-    domain_handler = DomainHandler(processors=processors)
-    user_handler = UserHandler(processors=processors, config_provider=config_provider)
-    image_handler = ImageHandler(processors=processors)
-    rbac_handler = RBACHandler(processors=processors)
-    quota_scope_handler = QuotaScopeHandler(processors=processors)
-    auto_scaling_rule_handler = AutoScalingRuleHandler(processors=processors)
+    domain_handler = DomainHandler(domain=processors.domain)
+    user_handler = UserHandler(user=processors.user, config_provider=config_provider)
+    image_handler = ImageHandler(image=processors.image)
+    rbac_handler = RBACHandler(permission_controller=processors.permission_controller)
+    quota_scope_handler = QuotaScopeHandler(vfs_storage=processors.vfs_storage)
+    auto_scaling_rule_handler = AutoScalingRuleHandler(deployment=processors.deployment)
 
     domain_reg = register_domain_routes(domain_handler, route_deps)
     user_reg = register_user_routes(user_handler, route_deps)
@@ -195,8 +238,8 @@ def build_api_routes(
     admin_handler = AdminHandler(gql_schema=graphene_schema, gql_deps=gql_context_deps)
 
     # Template sub-registries
-    cluster_template_handler = ClusterTemplateHandler(processors=processors)
-    session_template_handler = SessionTemplateHandler(processors=processors)
+    cluster_template_handler = ClusterTemplateHandler(template=processors.template)
+    session_template_handler = SessionTemplateHandler(template=processors.template)
     cluster_template_reg = register_cluster_template_routes(cluster_template_handler, route_deps)
     session_template_reg = register_session_template_routes(session_template_handler, route_deps)
 
@@ -271,7 +314,7 @@ def build_api_routes(
         register_vfolder_routes(
             vfolder_handler,
             route_deps,
-            processors=processors,
+            vfolder_processors=processors.vfolder,
         ),
         register_spec_routes(
             spec_handler,

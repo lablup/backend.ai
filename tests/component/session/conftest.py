@@ -59,9 +59,16 @@ def server_module_registries(
     """Load only the modules required for session component tests."""
     mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
         register_session_routes(
-            SessionHandler(processors=mock_processors, config_provider=config_provider), route_deps
+            SessionHandler(
+                auth=mock_processors.auth,
+                session=mock_processors.session,
+                agent=mock_processors.agent,
+                vfolder=mock_processors.vfolder,
+                config_provider=config_provider,
+            ),
+            route_deps,
         ),
     ]
 

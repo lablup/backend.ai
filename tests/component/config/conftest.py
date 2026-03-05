@@ -40,10 +40,17 @@ def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the modules required for config-domain tests."""
     mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
-        register_groupconfig_routes(GroupConfigHandler(processors=mock_processors), route_deps),
-        register_userconfig_routes(UserConfigHandler(processors=mock_processors), route_deps),
-        register_domainconfig_routes(DomainConfigHandler(processors=mock_processors), route_deps),
+        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_groupconfig_routes(
+            GroupConfigHandler(dotfile=mock_processors.dotfile), route_deps
+        ),
+        register_userconfig_routes(
+            UserConfigHandler(auth=mock_processors.auth, dotfile=mock_processors.dotfile),
+            route_deps,
+        ),
+        register_domainconfig_routes(
+            DomainConfigHandler(dotfile=mock_processors.dotfile), route_deps
+        ),
     ]
 
 

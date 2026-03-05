@@ -17,6 +17,14 @@ def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the modules required for model-serving tests."""
     mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
-        register_service_routes(ServiceHandler(processors=mock_processors), route_deps),
+        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_service_routes(
+            ServiceHandler(
+                auth=mock_processors.auth,
+                deployment=mock_processors.deployment,
+                model_serving=mock_processors.model_serving,
+                model_serving_auto_scaling=mock_processors.model_serving_auto_scaling,
+            ),
+            route_deps,
+        ),
     ]

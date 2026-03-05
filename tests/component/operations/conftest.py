@@ -27,9 +27,11 @@ def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the modules required for operations-domain tests."""
     mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
-        register_error_log_routes(ErrorLogHandler(processors=mock_processors), route_deps),
-        register_manager_api_routes(ManagerHandler(processors=mock_processors), route_deps),
+        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_error_log_routes(ErrorLogHandler(error_log=mock_processors.error_log), route_deps),
+        register_manager_api_routes(
+            ManagerHandler(manager_admin=mock_processors.manager_admin), route_deps
+        ),
     ]
 
 

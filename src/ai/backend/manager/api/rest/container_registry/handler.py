@@ -32,7 +32,7 @@ from ai.backend.manager.services.container_registry.actions.handle_harbor_webhoo
 from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
     ModifyContainerRegistryAction,
 )
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -50,8 +50,8 @@ class ContainerRegistryHandler:
     Dependencies are injected via constructor at registrar time.
     """
 
-    def __init__(self, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, container_registry: ContainerRegistryProcessors) -> None:
+        self._container_registry = container_registry
 
     # ------------------------------------------------------------------
     # PATCH /container-registries/{registry_id}
@@ -65,7 +65,6 @@ class ContainerRegistryHandler:
         registry_id = path.parsed.registry_id
         log.info("PATCH_CONTAINER_REGISTRY (registry:{})", registry_id)
         params = body.parsed
-        processors = self._processors
 
         updater_spec = ContainerRegistryUpdaterSpec(
             url=OptionalState.update(params.url) if params.url is not None else OptionalState.nop(),
@@ -105,7 +104,7 @@ class ContainerRegistryHandler:
                 else TriState.nop()
             ),
         )
-        result = await processors.container_registry.modify_container_registry.wait_for_complete(
+        result = await self._container_registry.modify_container_registry.wait_for_complete(
             ModifyContainerRegistryAction(updater=Updater(spec=updater_spec, pk_value=registry_id))
         )
 
@@ -154,5 +153,5 @@ class ContainerRegistryHandler:
             img_name=img_name,
             auth_header=auth_header,
         )
-        await self._processors.container_registry.handle_harbor_webhook.wait_for_complete(action)
+        await self._container_registry.handle_harbor_webhook.wait_for_complete(action)
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)

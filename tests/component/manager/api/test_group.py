@@ -63,8 +63,10 @@ async def test_harbor_create_project_quota(
     mock_processors = MagicMock()
     app, client = await create_app_and_client(
         registries=[
-            register_group_routes(GroupHandler(processors=mock_processors), route_deps),
-            register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+            register_group_routes(
+                GroupHandler(container_registry=mock_processors.container_registry), route_deps
+            ),
+            register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
         ],
     )
 
@@ -145,8 +147,10 @@ async def test_harbor_read_project_quota(
     mock_processors = MagicMock()
     app, client = await create_app_and_client(
         registries=[
-            register_group_routes(GroupHandler(processors=mock_processors), route_deps),
-            register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+            register_group_routes(
+                GroupHandler(container_registry=mock_processors.container_registry), route_deps
+            ),
+            register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
         ],
     )
 
@@ -220,8 +224,10 @@ async def test_harbor_update_project_quota(
     mock_processors = MagicMock()
     app, client = await create_app_and_client(
         registries=[
-            register_group_routes(GroupHandler(processors=mock_processors), route_deps),
-            register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+            register_group_routes(
+                GroupHandler(container_registry=mock_processors.container_registry), route_deps
+            ),
+            register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
         ],
     )
 
@@ -302,8 +308,10 @@ async def test_harbor_delete_project_quota(
     mock_processors = MagicMock()
     app, client = await create_app_and_client(
         registries=[
-            register_group_routes(GroupHandler(processors=mock_processors), route_deps),
-            register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+            register_group_routes(
+                GroupHandler(container_registry=mock_processors.container_registry), route_deps
+            ),
+            register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
         ],
     )
 

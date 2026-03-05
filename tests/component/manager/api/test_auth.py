@@ -97,7 +97,7 @@ async def test_authorize(
     mock_processors = MagicMock()
     app, client = await create_app_and_client(
         registries=[
-            register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+            register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
         ],
     )
 

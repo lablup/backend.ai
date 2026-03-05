@@ -98,7 +98,6 @@ from ai.backend.manager.services.agent.actions.sync_agent_registry import (
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     ResolveAccessKeyScopeAction,
 )
-from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
 )
@@ -180,6 +179,10 @@ from ai.backend.manager.services.vfolder.actions.base import GetTaskLogsAction
 
 if TYPE_CHECKING:
     from ai.backend.manager.config.provider import ManagerConfigProvider
+    from ai.backend.manager.services.agent.processors import AgentProcessors
+    from ai.backend.manager.services.auth.processors import AuthProcessors
+    from ai.backend.manager.services.session.processors import SessionProcessors
+    from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -238,10 +241,16 @@ class SessionHandler:
     def __init__(
         self,
         *,
-        processors: Processors,
+        auth: AuthProcessors,
+        session: SessionProcessors,
+        agent: AgentProcessors,
+        vfolder: VFolderProcessors,
         config_provider: ManagerConfigProvider,
     ) -> None:
-        self._processors = processors
+        self._auth = auth
+        self._session = session
+        self._agent = agent
+        self._vfolder = vfolder
         self._config_provider = config_provider
 
     # ------------------------------------------------------------------
@@ -266,7 +275,7 @@ class SessionHandler:
             template=True,
         )
 
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -290,7 +299,7 @@ class SessionHandler:
         # (equivalent to the old Trafaret ``undefined`` sentinel).
         _set = params.model_fields_set
 
-        result = await self._processors.session.create_from_template.wait_for_complete(
+        result = await self._session.create_from_template.wait_for_complete(
             CreateFromTemplateAction(
                 params=CreateFromTemplateActionParams(
                     template_id=params.template_id or UUID(int=0),
@@ -382,7 +391,7 @@ class SessionHandler:
                 )
 
         domain_name = params.domain or request["user"]["domain_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -400,7 +409,7 @@ class SessionHandler:
         )
         architecture = params.architecture or DEFAULT_IMAGE_ARCH
 
-        result = await self._processors.session.create_from_params.wait_for_complete(
+        result = await self._session.create_from_params.wait_for_complete(
             CreateFromParamsAction(
                 params=CreateFromParamsActionParams(
                     session_name=params.session_name,
@@ -455,7 +464,7 @@ class SessionHandler:
         params = body.parsed
 
         domain_name = params.domain or request["user"]["domain_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -471,7 +480,7 @@ class SessionHandler:
             params.session_name,
         )
 
-        result = await self._processors.session.create_cluster.wait_for_complete(
+        result = await self._session.create_cluster.wait_for_complete(
             CreateClusterAction(
                 session_name=params.session_name,
                 user_id=request["user"]["uuid"],
@@ -505,7 +514,7 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         params = query.parsed
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -520,7 +529,7 @@ class SessionHandler:
             owner_access_key,
             params.id,
         )
-        result = await self._processors.session.match_sessions.wait_for_complete(
+        result = await self._session.match_sessions.wait_for_complete(
             MatchSessionsAction(
                 id_or_name_prefix=params.id,
                 owner_access_key=owner_access_key,
@@ -539,7 +548,7 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         params = body.parsed
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -555,7 +564,7 @@ class SessionHandler:
             owner_access_key,
             agent_id,
         )
-        await self._processors.agent.sync_agent_registry.wait_for_complete(
+        await self._agent.sync_agent_registry.wait_for_complete(
             SyncAgentRegistryAction(agent_id=agent_id)
         )
         return APIResponse.build(HTTPStatus.OK, CreateSessionResponse(result={}))
@@ -574,7 +583,7 @@ class SessionHandler:
         session_ids = [SessionId(id_) for id_ in params.ids]
         user_role = cast(UserRole, request["user"]["role"])
         user_id = cast(UUID, request["user"]["uuid"])
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -592,7 +601,7 @@ class SessionHandler:
 
         session_status_map: dict[SessionId, str] = {}
         for session_id in session_ids:
-            result = await self._processors.session.check_and_transit_status.wait_for_complete(
+            result = await self._session.check_and_transit_status.wait_for_complete(
                 CheckAndTransitStatusAction(
                     user_id=user_id,
                     user_role=user_role,
@@ -612,7 +621,7 @@ class SessionHandler:
     async def get_info(self, ctx: RequestCtx) -> APIResponse:
         request = ctx.request
         session_name = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -628,7 +637,7 @@ class SessionHandler:
             session_name,
         )
         try:
-            result = await self._processors.session.get_session_info.wait_for_complete(
+            result = await self._session.get_session_info.wait_for_complete(
                 GetSessionInfoAction(
                     session_name=session_name,
                     owner_access_key=owner_access_key,
@@ -655,7 +664,7 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -671,7 +680,7 @@ class SessionHandler:
             session_name,
         )
         try:
-            await self._processors.session.restart_session.wait_for_complete(
+            await self._session.restart_session.wait_for_complete(
                 RestartSessionAction(
                     session_name=session_name,
                     owner_access_key=owner_access_key,
@@ -695,7 +704,7 @@ class SessionHandler:
         params = query.parsed
         session_name = request.match_info["session_name"]
         user_role = cast(UserRole, request["user"]["role"])
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -719,7 +728,7 @@ class SessionHandler:
             params.recursive,
         )
 
-        result = await self._processors.session.destroy_session.wait_for_complete(
+        result = await self._session.destroy_session.wait_for_complete(
             DestroySessionAction(
                 session_name=session_name,
                 owner_access_key=owner_access_key,
@@ -742,7 +751,7 @@ class SessionHandler:
         request = ctx.request
         params = body.parsed
         session_name = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -758,7 +767,7 @@ class SessionHandler:
             session_name,
         )
 
-        result = await self._processors.session.execute_session.wait_for_complete(
+        result = await self._session.execute_session.wait_for_complete(
             ExecuteSessionAction(
                 session_name=session_name,
                 owner_access_key=owner_access_key,
@@ -780,7 +789,7 @@ class SessionHandler:
     async def interrupt(self, ctx: RequestCtx) -> web.Response:
         request = ctx.request
         session_name = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -796,7 +805,7 @@ class SessionHandler:
             session_name,
         )
         try:
-            await self._processors.session.interrupt.wait_for_complete(
+            await self._session.interrupt.wait_for_complete(
                 InterruptSessionAction(
                     session_name=session_name,
                     owner_access_key=owner_access_key,
@@ -819,7 +828,7 @@ class SessionHandler:
         request = ctx.request
         params = body.parsed
         session_name = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -835,7 +844,7 @@ class SessionHandler:
             session_name,
         )
 
-        action_result = await self._processors.session.complete.wait_for_complete(
+        action_result = await self._session.complete.wait_for_complete(
             CompleteAction(
                 session_name=session_name,
                 owner_access_key=owner_access_key,
@@ -864,7 +873,7 @@ class SessionHandler:
         myself = asyncio.current_task()
         if myself is None:
             raise NoCurrentTaskContext("No current task context")
-        result = await self._processors.session.start_service.wait_for_complete(
+        result = await self._session.start_service.wait_for_complete(
             StartServiceAction(
                 session_name=session_name,
                 access_key=access_key,
@@ -892,7 +901,7 @@ class SessionHandler:
         request = ctx.request
         params = body.parsed
         session_name = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -908,7 +917,7 @@ class SessionHandler:
             session_name,
         )
         try:
-            await self._processors.session.shutdown_service.wait_for_complete(
+            await self._session.shutdown_service.wait_for_complete(
                 ShutdownServiceAction(
                     session_name=session_name,
                     owner_access_key=owner_access_key,
@@ -928,7 +937,7 @@ class SessionHandler:
         request = ctx.request
         reader = await request.multipart()
         session_name = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -944,7 +953,7 @@ class SessionHandler:
             session_name,
         )
         try:
-            await self._processors.session.upload_files.wait_for_complete(
+            await self._session.upload_files.wait_for_complete(
                 UploadFilesAction(
                     session_name=session_name,
                     owner_access_key=owner_access_key,
@@ -968,7 +977,7 @@ class SessionHandler:
         request = ctx.request
         params = body.parsed
         session_name = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -984,7 +993,7 @@ class SessionHandler:
             session_name,
             params.files[0],
         )
-        result = await self._processors.session.download_files.wait_for_complete(
+        result = await self._session.download_files.wait_for_complete(
             DownloadFilesAction(
                 user_id=request["user"]["uuid"],
                 owner_access_key=owner_access_key,
@@ -1006,7 +1015,7 @@ class SessionHandler:
         request = ctx.request
         params = body.parsed
         session_name = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -1022,7 +1031,7 @@ class SessionHandler:
             session_name,
             params.file,
         )
-        result = await self._processors.session.download_file.wait_for_complete(
+        result = await self._session.download_file.wait_for_complete(
             DownloadFileAction(
                 user_id=request["user"]["uuid"],
                 session_name=session_name,
@@ -1044,7 +1053,7 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -1060,7 +1069,7 @@ class SessionHandler:
             session_name,
             params.path,
         )
-        result = await self._processors.session.list_files.wait_for_complete(
+        result = await self._session.list_files.wait_for_complete(
             ListFilesAction(
                 user_id=request["user"]["uuid"],
                 path=params.path,
@@ -1083,7 +1092,7 @@ class SessionHandler:
         params = query.parsed
         session_name = request.match_info["session_name"]
         new_name = params.session_name
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -1099,7 +1108,7 @@ class SessionHandler:
             session_name,
             new_name,
         )
-        await self._processors.session.rename_session.wait_for_complete(
+        await self._session.rename_session.wait_for_complete(
             RenameSessionAction(
                 session_name=session_name,
                 new_name=new_name,
@@ -1120,7 +1129,7 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name: str = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -1135,7 +1144,7 @@ class SessionHandler:
             owner_access_key,
             session_name,
         )
-        action_result = await self._processors.session.commit_session.wait_for_complete(
+        action_result = await self._session.commit_session.wait_for_complete(
             CommitSessionAction(
                 session_name=session_name,
                 owner_access_key=owner_access_key,
@@ -1159,7 +1168,7 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name: str = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -1174,7 +1183,7 @@ class SessionHandler:
             owner_access_key,
             session_name,
         )
-        result = await self._processors.session.convert_session_to_image.wait_for_complete(
+        result = await self._session.convert_session_to_image.wait_for_complete(
             ConvertSessionToImageAction(
                 session_name=session_name,
                 owner_access_key=owner_access_key,
@@ -1203,7 +1212,7 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         session_name: str = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -1221,7 +1230,7 @@ class SessionHandler:
             owner_access_key,
             session_name,
         )
-        result = await self._processors.session.get_commit_status.wait_for_complete(
+        result = await self._session.get_commit_status.wait_for_complete(
             GetCommitStatusAction(
                 session_name=session_name,
                 owner_access_key=owner_access_key,
@@ -1243,7 +1252,7 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         session_name: str = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -1258,7 +1267,7 @@ class SessionHandler:
             owner_access_key,
             session_name,
         )
-        result = await self._processors.session.get_abusing_report.wait_for_complete(
+        result = await self._session.get_abusing_report.wait_for_complete(
             GetAbusingReportAction(
                 session_name=session_name,
                 owner_access_key=owner_access_key,
@@ -1283,7 +1292,7 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name: str = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -1298,7 +1307,7 @@ class SessionHandler:
             owner_access_key,
             session_name,
         )
-        result = await self._processors.session.get_status_history.wait_for_complete(
+        result = await self._session.get_status_history.wait_for_complete(
             GetStatusHistoryAction(
                 session_name=session_name,
                 owner_access_key=request["keypair"]["access_key"],
@@ -1316,7 +1325,7 @@ class SessionHandler:
     async def get_direct_access_info(self, ctx: RequestCtx) -> APIResponse:
         request = ctx.request
         session_name = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -1325,7 +1334,7 @@ class SessionHandler:
             )
         )
         owner_access_key = scope.owner_access_key
-        result = await self._processors.session.get_direct_access_info.wait_for_complete(
+        result = await self._session.get_direct_access_info.wait_for_complete(
             GetDirectAccessInfoAction(
                 session_name=session_name,
                 owner_access_key=owner_access_key,
@@ -1348,7 +1357,7 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name: str = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -1366,7 +1375,7 @@ class SessionHandler:
             kernel_id,
         )
         try:
-            result = await self._processors.session.get_container_logs.wait_for_complete(
+            result = await self._session.get_container_logs.wait_for_complete(
                 GetContainerLogsAction(
                     session_name=session_name,
                     owner_access_key=owner_access_key,
@@ -1407,7 +1416,7 @@ class SessionHandler:
         user_role = request["user"]["role"]
         user_uuid = request["user"]["uuid"]
 
-        result = await self._processors.vfolder.get_task_logs.wait_for_complete(
+        result = await self._vfolder.get_task_logs.wait_for_complete(
             GetTaskLogsAction(
                 user_id=user_uuid,
                 domain_name=domain_name,
@@ -1426,7 +1435,7 @@ class SessionHandler:
     async def get_dependency_graph(self, ctx: RequestCtx) -> APIResponse:
         request = ctx.request
         root_session_name = request.match_info["session_name"]
-        scope = await self._processors.auth.resolve_access_key_scope.wait_for_complete(
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
@@ -1441,7 +1450,7 @@ class SessionHandler:
             owner_access_key,
             root_session_name,
         )
-        result = await self._processors.session.get_dependency_graph.wait_for_complete(
+        result = await self._session.get_dependency_graph.wait_for_complete(
             GetDependencyGraphAction(
                 root_session_name=root_session_name,
                 owner_access_key=owner_access_key,

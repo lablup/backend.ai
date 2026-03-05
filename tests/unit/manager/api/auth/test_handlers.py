@@ -66,7 +66,7 @@ def mock_processors() -> MagicMock:
 @pytest.fixture
 def handler(mock_processors: MagicMock) -> AuthHandler:
     """AuthHandler instance with mock processors."""
-    return AuthHandler(processors=mock_processors)
+    return AuthHandler(auth=mock_processors.auth)
 
 
 @pytest.fixture

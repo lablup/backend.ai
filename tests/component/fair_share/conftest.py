@@ -24,8 +24,15 @@ def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the modules required for fair-share-domain tests."""
     mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
-        register_fair_share_routes(FairShareAPIHandler(mock_processors), route_deps),
+        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_fair_share_routes(
+            FairShareAPIHandler(
+                fair_share=mock_processors.fair_share,
+                resource_usage=mock_processors.resource_usage,
+                scaling_group=mock_processors.scaling_group,
+            ),
+            route_deps,
+        ),
     ]
 
 

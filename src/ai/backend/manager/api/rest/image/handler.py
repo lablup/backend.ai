@@ -33,7 +33,7 @@ from ai.backend.manager.services.image.actions.get_images import GetImageByIdAct
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.scan_image import ScanImageAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.image.processors import ImageProcessors
 
 from .adapter import ImageAdapter
 
@@ -43,8 +43,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ImageHandler:
     """Image API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, image: ImageProcessors) -> None:
+        self._image = image
         self._adapter = ImageAdapter()
 
     async def search(
@@ -55,7 +55,7 @@ class ImageHandler:
         """Search images with filters, orders, and pagination."""
         log.info("SEARCH (ak:{})", ctx.access_key)
         querier = self._adapter.build_querier(body.parsed)
-        action_result = await self._processors.image.search_images.wait_for_complete(
+        action_result = await self._image.search_images.wait_for_complete(
             SearchImagesAction(querier=querier)
         )
         resp = SearchImagesResponse(
@@ -75,7 +75,7 @@ class ImageHandler:
     ) -> APIResponse:
         """Get a single image by ID."""
         log.info("GET (ak:{}, image_id:{})", ctx.access_key, path.parsed.image_id)
-        action_result = await self._processors.image.get_image_by_id.wait_for_complete(
+        action_result = await self._image.get_image_by_id.wait_for_complete(
             GetImageByIdAction(image_id=ImageID(path.parsed.image_id), image_status=None)
         )
         resp = GetImageResponse(
@@ -92,7 +92,7 @@ class ImageHandler:
     ) -> APIResponse:
         """Rescan an image from the registry."""
         log.info("RESCAN (ak:{})", ctx.access_key)
-        action_result = await self._processors.image.scan_image.wait_for_complete(
+        action_result = await self._image.scan_image.wait_for_complete(
             ScanImageAction(canonical=body.parsed.canonical, architecture=body.parsed.architecture)
         )
         resp = RescanImagesResponse(
@@ -108,7 +108,7 @@ class ImageHandler:
     ) -> APIResponse:
         """Create an image alias."""
         log.info("ALIAS (ak:{})", ctx.access_key)
-        action_result = await self._processors.image.alias_image_by_id.wait_for_complete(
+        action_result = await self._image.alias_image_by_id.wait_for_complete(
             AliasImageByIdAction(
                 image_id=ImageID(body.parsed.image_id),
                 alias=body.parsed.alias,
@@ -128,7 +128,7 @@ class ImageHandler:
     ) -> APIResponse:
         """Remove an image alias."""
         log.info("DEALIAS (ak:{})", ctx.access_key)
-        action_result = await self._processors.image.dealias_image.wait_for_complete(
+        action_result = await self._image.dealias_image.wait_for_complete(
             DealiasImageAction(alias=body.parsed.alias)
         )
         resp = AliasImageResponse(
@@ -145,7 +145,7 @@ class ImageHandler:
     ) -> APIResponse:
         """Forget (soft-delete) an image."""
         log.info("FORGET (ak:{})", ctx.access_key)
-        action_result = await self._processors.image.forget_image_by_id.wait_for_complete(
+        action_result = await self._image.forget_image_by_id.wait_for_complete(
             ForgetImageByIdAction(image_id=ImageID(body.parsed.image_id))
         )
         resp = ForgetImageResponse(
@@ -160,7 +160,7 @@ class ImageHandler:
     ) -> APIResponse:
         """Purge (hard-delete) an image."""
         log.info("PURGE (ak:{})", ctx.access_key)
-        action_result = await self._processors.image.purge_image_by_id.wait_for_complete(
+        action_result = await self._image.purge_image_by_id.wait_for_complete(
             PurgeImageByIdAction(image_id=ImageID(body.parsed.image_id))
         )
         resp = PurgeImageResponse(

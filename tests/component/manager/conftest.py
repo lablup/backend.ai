@@ -932,7 +932,10 @@ async def prepare_kernel(
     app, client = await create_app_and_client(
         registries=[
             register_etcd_routes(
-                EtcdHandler(processors=mock_processors),
+                EtcdHandler(
+                    container_registry=mock_processors.container_registry,
+                    etcd_config=mock_processors.etcd_config,
+                ),
                 route_deps,
                 pidx=0,
                 config_provider=config_provider,
@@ -942,16 +945,22 @@ async def prepare_kernel(
                 route_deps,
                 event_hub=MagicMock(),
             ),
-            register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+            register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
             register_vfolder_routes(
-                VFolderHandler(mock_processors),
+                VFolderHandler(
+                    auth=mock_processors.auth,
+                    vfolder=mock_processors.vfolder,
+                    vfolder_file=mock_processors.vfolder_file,
+                    vfolder_invite=mock_processors.vfolder_invite,
+                    vfolder_sharing=mock_processors.vfolder_sharing,
+                ),
                 route_deps,
-                processors=mock_processors,
+                vfolder_processors=mock_processors.vfolder,
             ),
             register_admin_routes(MagicMock(), route_deps, sub_registries=[]),
             register_ratelimit_routes(route_deps, valkey_rate_limit=None),
             register_compute_sessions_routes(
-                ComputeSessionsHandler(processors=mock_processors),
+                ComputeSessionsHandler(session=mock_processors.session),
                 route_deps,
             ),
             register_stream_routes(
@@ -961,7 +970,7 @@ async def prepare_kernel(
                 stream_cleanup_handler=StreamCleanupEventHandler(MagicMock()),
             ),
             register_manager_api_routes(
-                ManagerHandler(processors=mock_processors),
+                ManagerHandler(manager_admin=mock_processors.manager_admin),
                 route_deps,
             ),
         ],

@@ -60,7 +60,13 @@ def mock_processors() -> MagicMock:
 @pytest.fixture
 def handler(mock_processors: MagicMock) -> ResourceHandler:
     """ResourceHandler instance with mock processors."""
-    return ResourceHandler(processors=mock_processors)
+    return ResourceHandler(
+        resource_preset=mock_processors.resource_preset,
+        agent=mock_processors.agent,
+        group=mock_processors.group,
+        user=mock_processors.user,
+        container_registry=mock_processors.container_registry,
+    )
 
 
 @pytest.fixture

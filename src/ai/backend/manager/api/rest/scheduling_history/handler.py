@@ -18,12 +18,12 @@ from ai.backend.common.dto.manager.scheduling_history import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import UserContext
-from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.scheduling_history.actions import (
     SearchDeploymentHistoryAction,
     SearchRouteHistoryAction,
     SearchSessionHistoryAction,
 )
+from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
 
 from .adapter import SchedulingHistoryAdapter
 
@@ -33,8 +33,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class SchedulingHistoryHandler:
     """Scheduling history API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, scheduling_history: SchedulingHistoryProcessors) -> None:
+        self._scheduling_history = scheduling_history
         self._adapter = SchedulingHistoryAdapter()
 
     async def search_session_history(
@@ -47,10 +47,8 @@ class SchedulingHistoryHandler:
 
         querier = self._adapter.build_session_history_querier(body.parsed)
 
-        action_result = (
-            await self._processors.scheduling_history.search_session_history.wait_for_complete(
-                SearchSessionHistoryAction(querier=querier)
-            )
+        action_result = await self._scheduling_history.search_session_history.wait_for_complete(
+            SearchSessionHistoryAction(querier=querier)
         )
 
         resp = ListSessionHistoryResponse(
@@ -75,10 +73,8 @@ class SchedulingHistoryHandler:
 
         querier = self._adapter.build_deployment_history_querier(body.parsed)
 
-        action_result = (
-            await self._processors.scheduling_history.search_deployment_history.wait_for_complete(
-                SearchDeploymentHistoryAction(querier=querier)
-            )
+        action_result = await self._scheduling_history.search_deployment_history.wait_for_complete(
+            SearchDeploymentHistoryAction(querier=querier)
         )
 
         resp = ListDeploymentHistoryResponse(
@@ -103,10 +99,8 @@ class SchedulingHistoryHandler:
 
         querier = self._adapter.build_route_history_querier(body.parsed)
 
-        action_result = (
-            await self._processors.scheduling_history.search_route_history.wait_for_complete(
-                SearchRouteHistoryAction(querier=querier)
-            )
+        action_result = await self._scheduling_history.search_route_history.wait_for_complete(
+            SearchRouteHistoryAction(querier=querier)
         )
 
         resp = ListRouteHistoryResponse(

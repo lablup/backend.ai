@@ -39,7 +39,7 @@ from ai.backend.manager.services.dotfile import (
     ResolveGroupAction,
     UpdateDotfileAction,
 )
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.dotfile.processors import DotfileProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -47,8 +47,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class GroupConfigHandler:
     """Group config (dotfile) API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, dotfile: DotfileProcessors) -> None:
+        self._dotfile = dotfile
 
     async def create(
         self,
@@ -57,7 +57,7 @@ class GroupConfigHandler:
     ) -> APIResponse:
         params = body.parsed
         log.info("GROUPCONFIG.CREATE(group:{})", params.group)
-        resolve_result = await self._processors.dotfile.resolve_group.wait_for_complete(
+        resolve_result = await self._dotfile.resolve_group.wait_for_complete(
             ResolveGroupAction(
                 group_id_or_name=params.group,
                 group_domain=params.domain,
@@ -73,7 +73,7 @@ class GroupConfigHandler:
             data=params.data,
             permission=params.permission,
         )
-        await self._processors.dotfile.create.wait_for_complete(action)
+        await self._dotfile.create.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, CreateDotfileResponse())
 
     async def list_or_get(
@@ -83,7 +83,7 @@ class GroupConfigHandler:
     ) -> APIResponse:
         params = query.parsed
         log.info("GROUPCONFIG.LIST_OR_GET(group:{})", params.group)
-        resolve_result = await self._processors.dotfile.resolve_group.wait_for_complete(
+        resolve_result = await self._dotfile.resolve_group.wait_for_complete(
             ResolveGroupAction(
                 group_id_or_name=params.group,
                 group_domain=params.domain,
@@ -97,10 +97,8 @@ class GroupConfigHandler:
                         "Domain admins cannot access group dotfiles of other domains"
                     )
             else:
-                membership = (
-                    await self._processors.dotfile.check_group_membership.wait_for_complete(
-                        CheckGroupMembershipAction(user_uuid=ctx.user_uuid)
-                    )
+                membership = await self._dotfile.check_group_membership.wait_for_complete(
+                    CheckGroupMembershipAction(user_uuid=ctx.user_uuid)
                 )
                 if resolve_result.group_id not in membership.group_ids:
                     raise GenericForbidden("Users cannot access group dotfiles of other groups")
@@ -109,7 +107,7 @@ class GroupConfigHandler:
             entity_key=resolve_result.group_id,
             path=params.path,
         )
-        result = await self._processors.dotfile.list_or_get.wait_for_complete(action)
+        result = await self._dotfile.list_or_get.wait_for_complete(action)
         if params.path:
             entry = result.entries[0]
             return APIResponse.build(
@@ -126,7 +124,7 @@ class GroupConfigHandler:
     ) -> APIResponse:
         params = body.parsed
         log.info("GROUPCONFIG.UPDATE(group:{})", params.group)
-        resolve_result = await self._processors.dotfile.resolve_group.wait_for_complete(
+        resolve_result = await self._dotfile.resolve_group.wait_for_complete(
             ResolveGroupAction(
                 group_id_or_name=params.group,
                 group_domain=params.domain,
@@ -142,7 +140,7 @@ class GroupConfigHandler:
             data=params.data,
             permission=params.permission,
         )
-        await self._processors.dotfile.update.wait_for_complete(action)
+        await self._dotfile.update.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, UpdateDotfileResponse())
 
     async def delete(
@@ -152,7 +150,7 @@ class GroupConfigHandler:
     ) -> APIResponse:
         params = query.parsed
         log.info("GROUPCONFIG.DELETE(group:{})", params.group)
-        resolve_result = await self._processors.dotfile.resolve_group.wait_for_complete(
+        resolve_result = await self._dotfile.resolve_group.wait_for_complete(
             ResolveGroupAction(
                 group_id_or_name=params.group,
                 group_domain=params.domain,
@@ -166,5 +164,5 @@ class GroupConfigHandler:
             entity_key=resolve_result.group_id,
             path=params.path,
         )
-        await self._processors.dotfile.delete.wait_for_complete(action)
+        await self._dotfile.delete.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, DeleteDotfileResponse(success=True))

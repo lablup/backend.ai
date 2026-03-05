@@ -6,6 +6,7 @@ Uses constructor DI and RouteRegistry middleware for auth.
 from __future__ import annotations
 
 from http import HTTPStatus
+from typing import TYPE_CHECKING
 
 from aiohttp import web
 
@@ -99,7 +100,6 @@ from ai.backend.manager.services.fair_share.actions import (
     UpsertUserFairShareWeightAction,
     UserWeightInput,
 )
-from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.resource_usage.actions import (
     SearchDomainUsageBucketsAction,
     SearchProjectUsageBucketsAction,
@@ -115,12 +115,25 @@ from ai.backend.manager.services.scaling_group.actions.update_fair_share_spec im
 
 from .adapter import FairShareAdapter
 
+if TYPE_CHECKING:
+    from ai.backend.manager.services.fair_share.processors import FairShareProcessors
+    from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
+    from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
+
 
 class FairShareAPIHandler:
     """REST API handler class for fair share operations with constructor DI."""
 
-    def __init__(self, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(
+        self,
+        *,
+        fair_share: FairShareProcessors,
+        resource_usage: ResourceUsageProcessors,
+        scaling_group: ScalingGroupProcessors,
+    ) -> None:
+        self._fair_share = fair_share
+        self._resource_usage = resource_usage
+        self._scaling_group = scaling_group
         self._adapter = FairShareAdapter()
 
     # Domain Fair Share
@@ -130,9 +143,7 @@ class FairShareAPIHandler:
         path: PathParam[GetDomainFairSharePathParam],
     ) -> APIResponse:
         """Get a single domain fair share."""
-        processors = self._processors
-
-        action_result = await processors.fair_share.get_domain_fair_share.wait_for_complete(
+        action_result = await self._fair_share.get_domain_fair_share.wait_for_complete(
             GetDomainFairShareAction(
                 resource_group=path.parsed.resource_group, domain_name=path.parsed.domain_name
             )
@@ -150,11 +161,9 @@ class FairShareAPIHandler:
         body: BodyParam[SearchDomainFairSharesRequest],
     ) -> APIResponse:
         """Search domain fair shares."""
-        processors = self._processors
-
         querier = self._adapter.build_domain_fair_share_querier(body.parsed)
 
-        action_result = await processors.fair_share.search_domain_fair_shares.wait_for_complete(
+        action_result = await self._fair_share.search_domain_fair_shares.wait_for_complete(
             SearchDomainFairSharesAction(
                 pagination=querier.pagination,
                 conditions=querier.conditions,
@@ -181,9 +190,7 @@ class FairShareAPIHandler:
         path: PathParam[GetProjectFairSharePathParam],
     ) -> APIResponse:
         """Get a single project fair share."""
-        processors = self._processors
-
-        action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
+        action_result = await self._fair_share.get_project_fair_share.wait_for_complete(
             GetProjectFairShareAction(
                 resource_group=path.parsed.resource_group, project_id=path.parsed.project_id
             )
@@ -201,11 +208,9 @@ class FairShareAPIHandler:
         body: BodyParam[SearchProjectFairSharesRequest],
     ) -> APIResponse:
         """Search project fair shares."""
-        processors = self._processors
-
         querier = self._adapter.build_project_fair_share_querier(body.parsed)
 
-        action_result = await processors.fair_share.search_project_fair_shares.wait_for_complete(
+        action_result = await self._fair_share.search_project_fair_shares.wait_for_complete(
             SearchProjectFairSharesAction(
                 pagination=querier.pagination,
                 conditions=querier.conditions,
@@ -232,9 +237,7 @@ class FairShareAPIHandler:
         path: PathParam[GetUserFairSharePathParam],
     ) -> APIResponse:
         """Get a single user fair share."""
-        processors = self._processors
-
-        action_result = await processors.fair_share.get_user_fair_share.wait_for_complete(
+        action_result = await self._fair_share.get_user_fair_share.wait_for_complete(
             GetUserFairShareAction(
                 resource_group=path.parsed.resource_group,
                 project_id=path.parsed.project_id,
@@ -254,11 +257,9 @@ class FairShareAPIHandler:
         body: BodyParam[SearchUserFairSharesRequest],
     ) -> APIResponse:
         """Search user fair shares."""
-        processors = self._processors
-
         querier = self._adapter.build_user_fair_share_querier(body.parsed)
 
-        action_result = await processors.fair_share.search_user_fair_shares.wait_for_complete(
+        action_result = await self._fair_share.search_user_fair_shares.wait_for_complete(
             SearchUserFairSharesAction(
                 pagination=querier.pagination,
                 conditions=querier.conditions,
@@ -283,17 +284,13 @@ class FairShareAPIHandler:
         body: BodyParam[SearchDomainUsageBucketsRequest],
     ) -> APIResponse:
         """Search domain usage buckets."""
-        processors = self._processors
-
         querier = self._adapter.build_domain_usage_bucket_querier(body.parsed)
 
-        action_result = (
-            await processors.resource_usage.search_domain_usage_buckets.wait_for_complete(
-                SearchDomainUsageBucketsAction(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
-                )
+        action_result = await self._resource_usage.search_domain_usage_buckets.wait_for_complete(
+            SearchDomainUsageBucketsAction(
+                pagination=querier.pagination,
+                conditions=querier.conditions,
+                orders=querier.orders,
             )
         )
 
@@ -316,17 +313,13 @@ class FairShareAPIHandler:
         body: BodyParam[SearchProjectUsageBucketsRequest],
     ) -> APIResponse:
         """Search project usage buckets."""
-        processors = self._processors
-
         querier = self._adapter.build_project_usage_bucket_querier(body.parsed)
 
-        action_result = (
-            await processors.resource_usage.search_project_usage_buckets.wait_for_complete(
-                SearchProjectUsageBucketsAction(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
-                )
+        action_result = await self._resource_usage.search_project_usage_buckets.wait_for_complete(
+            SearchProjectUsageBucketsAction(
+                pagination=querier.pagination,
+                conditions=querier.conditions,
+                orders=querier.orders,
             )
         )
 
@@ -349,11 +342,9 @@ class FairShareAPIHandler:
         body: BodyParam[SearchUserUsageBucketsRequest],
     ) -> APIResponse:
         """Search user usage buckets."""
-        processors = self._processors
-
         querier = self._adapter.build_user_usage_bucket_querier(body.parsed)
 
-        action_result = await processors.resource_usage.search_user_usage_buckets.wait_for_complete(
+        action_result = await self._resource_usage.search_user_usage_buckets.wait_for_complete(
             SearchUserUsageBucketsAction(
                 pagination=querier.pagination,
                 conditions=querier.conditions,
@@ -379,7 +370,6 @@ class FairShareAPIHandler:
         body: BodyParam[SearchDomainUsageBucketsRequest],
     ) -> APIResponse:
         """Search domain usage buckets within resource group scope."""
-        processors = self._processors
 
         filter = body.parsed.filter
         if filter is None:
@@ -401,13 +391,11 @@ class FairShareAPIHandler:
 
         querier = self._adapter.build_domain_usage_bucket_querier(modified_request)
 
-        action_result = (
-            await processors.resource_usage.search_domain_usage_buckets.wait_for_complete(
-                SearchDomainUsageBucketsAction(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
-                )
+        action_result = await self._resource_usage.search_domain_usage_buckets.wait_for_complete(
+            SearchDomainUsageBucketsAction(
+                pagination=querier.pagination,
+                conditions=querier.conditions,
+                orders=querier.orders,
             )
         )
 
@@ -431,7 +419,6 @@ class FairShareAPIHandler:
         body: BodyParam[SearchProjectUsageBucketsRequest],
     ) -> APIResponse:
         """Search project usage buckets within resource group and domain scope."""
-        processors = self._processors
 
         filter = body.parsed.filter
         if filter is None:
@@ -459,13 +446,11 @@ class FairShareAPIHandler:
 
         querier = self._adapter.build_project_usage_bucket_querier(modified_request)
 
-        action_result = (
-            await processors.resource_usage.search_project_usage_buckets.wait_for_complete(
-                SearchProjectUsageBucketsAction(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
-                )
+        action_result = await self._resource_usage.search_project_usage_buckets.wait_for_complete(
+            SearchProjectUsageBucketsAction(
+                pagination=querier.pagination,
+                conditions=querier.conditions,
+                orders=querier.orders,
             )
         )
 
@@ -489,7 +474,6 @@ class FairShareAPIHandler:
         body: BodyParam[SearchUserUsageBucketsRequest],
     ) -> APIResponse:
         """Search user usage buckets within resource group, domain, and project scope."""
-        processors = self._processors
 
         filter = body.parsed.filter
         if filter is None:
@@ -523,7 +507,7 @@ class FairShareAPIHandler:
 
         querier = self._adapter.build_user_usage_bucket_querier(modified_request)
 
-        action_result = await processors.resource_usage.search_user_usage_buckets.wait_for_complete(
+        action_result = await self._resource_usage.search_user_usage_buckets.wait_for_complete(
             SearchUserUsageBucketsAction(
                 pagination=querier.pagination,
                 conditions=querier.conditions,
@@ -548,9 +532,7 @@ class FairShareAPIHandler:
         path: PathParam[RGDomainFairSharePathParam],
     ) -> APIResponse:
         """Get a single domain fair share within RG scope."""
-        processors = self._processors
-
-        action_result = await processors.fair_share.get_domain_fair_share.wait_for_complete(
+        action_result = await self._fair_share.get_domain_fair_share.wait_for_complete(
             GetDomainFairShareAction(
                 resource_group=path.parsed.resource_group, domain_name=path.parsed.domain_name
             )
@@ -569,12 +551,11 @@ class FairShareAPIHandler:
         body: BodyParam[SearchDomainFairSharesRequest],
     ) -> APIResponse:
         """Search domain fair shares within RG scope."""
-        processors = self._processors
 
         querier = self._adapter.build_domain_fair_share_querier_rg(body.parsed)
         scope = DomainFairShareSearchScope(resource_group=path.parsed.resource_group)
 
-        action_result = await processors.fair_share.search_rg_domain_fair_shares.wait_for_complete(
+        action_result = await self._fair_share.search_rg_domain_fair_shares.wait_for_complete(
             SearchRGDomainFairSharesAction(
                 scope=scope,
                 querier=querier,
@@ -600,9 +581,7 @@ class FairShareAPIHandler:
         path: PathParam[RGProjectFairSharePathParam],
     ) -> APIResponse:
         """Get a single project fair share within RG scope."""
-        processors = self._processors
-
-        action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
+        action_result = await self._fair_share.get_project_fair_share.wait_for_complete(
             GetProjectFairShareAction(
                 resource_group=path.parsed.resource_group, project_id=path.parsed.project_id
             )
@@ -621,7 +600,6 @@ class FairShareAPIHandler:
         body: BodyParam[SearchProjectFairSharesRequest],
     ) -> APIResponse:
         """Search project fair shares within RG scope."""
-        processors = self._processors
 
         querier = self._adapter.build_project_fair_share_querier_rg(body.parsed)
         scope = ProjectFairShareSearchScope(
@@ -629,7 +607,7 @@ class FairShareAPIHandler:
             domain_name=path.parsed.domain_name,
         )
 
-        action_result = await processors.fair_share.search_rg_project_fair_shares.wait_for_complete(
+        action_result = await self._fair_share.search_rg_project_fair_shares.wait_for_complete(
             SearchRGProjectFairSharesAction(
                 scope=scope,
                 querier=querier,
@@ -655,9 +633,7 @@ class FairShareAPIHandler:
         path: PathParam[RGUserFairSharePathParam],
     ) -> APIResponse:
         """Get a single user fair share within RG scope."""
-        processors = self._processors
-
-        action_result = await processors.fair_share.get_user_fair_share.wait_for_complete(
+        action_result = await self._fair_share.get_user_fair_share.wait_for_complete(
             GetUserFairShareAction(
                 resource_group=path.parsed.resource_group,
                 project_id=path.parsed.project_id,
@@ -678,7 +654,6 @@ class FairShareAPIHandler:
         body: BodyParam[SearchUserFairSharesRequest],
     ) -> APIResponse:
         """Search user fair shares within RG scope."""
-        processors = self._processors
 
         querier = self._adapter.build_user_fair_share_querier_rg(body.parsed)
         scope = UserFairShareSearchScope(
@@ -687,7 +662,7 @@ class FairShareAPIHandler:
             project_id=path.parsed.project_id,
         )
 
-        action_result = await processors.fair_share.search_rg_user_fair_shares.wait_for_complete(
+        action_result = await self._fair_share.search_rg_user_fair_shares.wait_for_complete(
             SearchRGUserFairSharesAction(
                 scope=scope,
                 querier=querier,
@@ -712,15 +687,11 @@ class FairShareAPIHandler:
         body: BodyParam[UpsertDomainFairShareWeightRequest],
     ) -> APIResponse:
         """Upsert domain fair share weight."""
-        processors = self._processors
-
-        action_result = (
-            await processors.fair_share.upsert_domain_fair_share_weight.wait_for_complete(
-                UpsertDomainFairShareWeightAction(
-                    resource_group=path.parsed.resource_group,
-                    domain_name=path.parsed.domain_name,
-                    weight=body.parsed.weight,
-                )
+        action_result = await self._fair_share.upsert_domain_fair_share_weight.wait_for_complete(
+            UpsertDomainFairShareWeightAction(
+                resource_group=path.parsed.resource_group,
+                domain_name=path.parsed.domain_name,
+                weight=body.parsed.weight,
             )
         )
 
@@ -736,16 +707,12 @@ class FairShareAPIHandler:
         body: BodyParam[UpsertProjectFairShareWeightRequest],
     ) -> APIResponse:
         """Upsert project fair share weight."""
-        processors = self._processors
-
-        action_result = (
-            await processors.fair_share.upsert_project_fair_share_weight.wait_for_complete(
-                UpsertProjectFairShareWeightAction(
-                    resource_group=path.parsed.resource_group,
-                    project_id=path.parsed.project_id,
-                    domain_name=body.parsed.domain_name,
-                    weight=body.parsed.weight,
-                )
+        action_result = await self._fair_share.upsert_project_fair_share_weight.wait_for_complete(
+            UpsertProjectFairShareWeightAction(
+                resource_group=path.parsed.resource_group,
+                project_id=path.parsed.project_id,
+                domain_name=body.parsed.domain_name,
+                weight=body.parsed.weight,
             )
         )
 
@@ -761,9 +728,7 @@ class FairShareAPIHandler:
         body: BodyParam[UpsertUserFairShareWeightRequest],
     ) -> APIResponse:
         """Upsert user fair share weight."""
-        processors = self._processors
-
-        action_result = await processors.fair_share.upsert_user_fair_share_weight.wait_for_complete(
+        action_result = await self._fair_share.upsert_user_fair_share_weight.wait_for_complete(
             UpsertUserFairShareWeightAction(
                 resource_group=path.parsed.resource_group,
                 project_id=path.parsed.project_id,
@@ -784,7 +749,6 @@ class FairShareAPIHandler:
         body: BodyParam[BulkUpsertDomainFairShareWeightRequest],
     ) -> APIResponse:
         """Bulk upsert domain fair share weights."""
-        processors = self._processors
 
         inputs = [
             DomainWeightInput(
@@ -795,7 +759,7 @@ class FairShareAPIHandler:
         ]
 
         action_result = (
-            await processors.fair_share.bulk_upsert_domain_fair_share_weight.wait_for_complete(
+            await self._fair_share.bulk_upsert_domain_fair_share_weight.wait_for_complete(
                 BulkUpsertDomainFairShareWeightAction(
                     resource_group=body.parsed.resource_group,
                     inputs=inputs,
@@ -813,7 +777,6 @@ class FairShareAPIHandler:
         body: BodyParam[BulkUpsertProjectFairShareWeightRequest],
     ) -> APIResponse:
         """Bulk upsert project fair share weights."""
-        processors = self._processors
 
         inputs = [
             ProjectWeightInput(
@@ -825,7 +788,7 @@ class FairShareAPIHandler:
         ]
 
         action_result = (
-            await processors.fair_share.bulk_upsert_project_fair_share_weight.wait_for_complete(
+            await self._fair_share.bulk_upsert_project_fair_share_weight.wait_for_complete(
                 BulkUpsertProjectFairShareWeightAction(
                     resource_group=body.parsed.resource_group,
                     inputs=inputs,
@@ -843,7 +806,6 @@ class FairShareAPIHandler:
         body: BodyParam[BulkUpsertUserFairShareWeightRequest],
     ) -> APIResponse:
         """Bulk upsert user fair share weights."""
-        processors = self._processors
 
         inputs = [
             UserWeightInput(
@@ -855,12 +817,10 @@ class FairShareAPIHandler:
             for entry in body.parsed.inputs
         ]
 
-        action_result = (
-            await processors.fair_share.bulk_upsert_user_fair_share_weight.wait_for_complete(
-                BulkUpsertUserFairShareWeightAction(
-                    resource_group=body.parsed.resource_group,
-                    inputs=inputs,
-                )
+        action_result = await self._fair_share.bulk_upsert_user_fair_share_weight.wait_for_complete(
+            BulkUpsertUserFairShareWeightAction(
+                resource_group=body.parsed.resource_group,
+                inputs=inputs,
             )
         )
 
@@ -874,7 +834,6 @@ class FairShareAPIHandler:
         path: PathParam[GetResourceGroupFairShareSpecPathParam],
     ) -> APIResponse:
         """Get resource group fair share spec."""
-        processors = self._processors
 
         name_spec = StringMatchSpec(
             value=path.parsed.resource_group,
@@ -885,7 +844,7 @@ class FairShareAPIHandler:
             pagination=NoPagination(),
             conditions=[ScalingGroupConditions.by_name_equals(name_spec)],
         )
-        search_result = await processors.scaling_group.search_scaling_groups.wait_for_complete(
+        search_result = await self._scaling_group.search_scaling_groups.wait_for_complete(
             SearchScalingGroupsAction(querier=querier)
         )
 
@@ -908,13 +867,12 @@ class FairShareAPIHandler:
         self,
     ) -> APIResponse:
         """Search all resource groups with their fair share specs."""
-        processors = self._processors
 
         querier = BatchQuerier(
             pagination=NoPagination(),
             conditions=[],
         )
-        search_result = await processors.scaling_group.search_scaling_groups.wait_for_complete(
+        search_result = await self._scaling_group.search_scaling_groups.wait_for_complete(
             SearchScalingGroupsAction(querier=querier)
         )
 
@@ -938,7 +896,6 @@ class FairShareAPIHandler:
         body: BodyParam[UpdateResourceGroupFairShareSpecRequest],
     ) -> APIResponse:
         """Update resource group fair share spec with partial update and validation."""
-        processors = self._processors
 
         resource_weights = None
         if body.parsed.resource_weights is not None:
@@ -959,7 +916,7 @@ class FairShareAPIHandler:
             resource_weights=resource_weights,
         )
 
-        result = await processors.scaling_group.update_fair_share_spec.wait_for_complete(action)
+        result = await self._scaling_group.update_fair_share_spec.wait_for_complete(action)
 
         resp = UpdateResourceGroupFairShareSpecResponse(
             resource_group=result.scaling_group.name,

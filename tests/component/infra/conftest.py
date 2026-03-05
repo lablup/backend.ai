@@ -31,15 +31,29 @@ def server_module_registries(
     """Load only the modules required for infra-domain tests."""
     mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
+        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
         register_etcd_routes(
-            EtcdHandler(processors=mock_processors),
+            EtcdHandler(
+                container_registry=mock_processors.container_registry,
+                etcd_config=mock_processors.etcd_config,
+            ),
             route_deps,
             pidx=0,
             config_provider=config_provider,
         ),
-        register_resource_routes(ResourceHandler(processors=mock_processors), route_deps),
-        register_scaling_group_routes(ScalingGroupHandler(processors=mock_processors), route_deps),
+        register_resource_routes(
+            ResourceHandler(
+                resource_preset=mock_processors.resource_preset,
+                agent=mock_processors.agent,
+                group=mock_processors.group,
+                user=mock_processors.user,
+                container_registry=mock_processors.container_registry,
+            ),
+            route_deps,
+        ),
+        register_scaling_group_routes(
+            ScalingGroupHandler(scaling_group=mock_processors.scaling_group), route_deps
+        ),
     ]
 
 

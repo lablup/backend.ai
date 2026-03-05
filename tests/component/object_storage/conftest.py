@@ -36,8 +36,14 @@ def server_module_registries(route_deps: RouteDeps) -> list[RouteRegistry]:
     """Load only the modules required for object-storage-domain tests."""
     mock_processors = MagicMock()
     return [
-        register_auth_routes(AuthHandler(processors=mock_processors), route_deps),
-        register_object_storage_routes(ObjectStorageHandler(mock_processors), route_deps),
+        register_auth_routes(AuthHandler(auth=mock_processors.auth), route_deps),
+        register_object_storage_routes(
+            ObjectStorageHandler(
+                object_storage=mock_processors.object_storage,
+                storage_namespace=mock_processors.storage_namespace,
+            ),
+            route_deps,
+        ),
     ]
 
 
