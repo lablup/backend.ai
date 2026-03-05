@@ -7,11 +7,18 @@ duplicating query logic.
 
 from __future__ import annotations
 
+import uuid as _uuid
+
 import strawberry
 from strawberry import Info
 
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.data.resource_slot.types import (
+    AgentResourceData,
+    ResourceAllocationData,
+    ResourceSlotTypeData,
+)
 from ai.backend.manager.errors.resource_slot import ResourceSlotTypeNotFound
 from ai.backend.manager.services.resource_slot.actions.all_slot_types import AllSlotTypesAction
 from ai.backend.manager.services.resource_slot.actions.get_agent_resources import (
@@ -134,11 +141,9 @@ async def fetch_kernel_allocations(
     kernel_id: str,
 ) -> ResourceAllocationConnectionGQL:
     """Fetch all per-slot allocation entries for a kernel (shared for KernelV2GQL connection)."""
-    import uuid
-
     action_result = (
         await info.context.processors.resource_slot.get_kernel_allocations.wait_for_complete(
-            GetKernelAllocationsAction(kernel_id=uuid.UUID(kernel_id))
+            GetKernelAllocationsAction(kernel_id=_uuid.UUID(kernel_id))
         )
     )
 
@@ -168,14 +173,76 @@ async def fetch_kernel_resource_allocation(
     slot_name: str,
 ) -> KernelResourceAllocationGQL | None:
     """Fetch a single per-slot allocation for a kernel (used by Node resolution)."""
-    import uuid
-
     action_result = (
         await info.context.processors.resource_slot.get_kernel_allocations.wait_for_complete(
-            GetKernelAllocationsAction(kernel_id=uuid.UUID(kernel_id_str))
+            GetKernelAllocationsAction(kernel_id=_uuid.UUID(kernel_id_str))
         )
     )
     for data in action_result.items:
         if data.slot_name == slot_name:
             return KernelResourceAllocationGQL.from_data(data)
+    return None
+
+
+# ========== Raw data helpers for Node.resolve_nodes ==========
+# These return raw data types so that resolve_nodes can call cls.from_data(),
+# which enables mypy to correctly infer the return type as Iterable[Self | None].
+
+
+async def load_resource_slot_type_data(
+    info: Info[StrawberryGQLContext],
+    slot_name: str,
+) -> ResourceSlotTypeData | None:
+    """Load raw ResourceSlotTypeData for a single slot_name (used by Node.resolve_nodes)."""
+    try:
+        action_result = (
+            await info.context.processors.resource_slot.get_resource_slot_type.wait_for_complete(
+                GetResourceSlotTypeAction(slot_name=slot_name)
+            )
+        )
+    except ResourceSlotTypeNotFound:
+        return None
+    return ResourceSlotTypeData(
+        slot_name=action_result.item.slot_name,
+        slot_type=action_result.item.slot_type,
+        display_name=action_result.item.display_name,
+        description=action_result.item.description,
+        display_unit=action_result.item.display_unit,
+        display_icon=action_result.item.display_icon,
+        number_format=action_result.item.number_format,
+        rank=action_result.item.rank,
+    )
+
+
+async def load_agent_resource_data(
+    info: Info[StrawberryGQLContext],
+    agent_id: str,
+    slot_name: str,
+) -> AgentResourceData | None:
+    """Load raw AgentResourceData for a single agent+slot (used by Node.resolve_nodes)."""
+    action_result = (
+        await info.context.processors.resource_slot.get_agent_resources.wait_for_complete(
+            GetAgentResourcesAction(agent_id=agent_id)
+        )
+    )
+    for data in action_result.items:
+        if data.slot_name == slot_name:
+            return data
+    return None
+
+
+async def load_kernel_allocation_data(
+    info: Info[StrawberryGQLContext],
+    kernel_id_str: str,
+    slot_name: str,
+) -> ResourceAllocationData | None:
+    """Load raw ResourceAllocationData for a single kernel+slot (used by Node.resolve_nodes)."""
+    action_result = (
+        await info.context.processors.resource_slot.get_kernel_allocations.wait_for_complete(
+            GetKernelAllocationsAction(kernel_id=_uuid.UUID(kernel_id_str))
+        )
+    )
+    for data in action_result.items:
+        if data.slot_name == slot_name:
+            return data
     return None

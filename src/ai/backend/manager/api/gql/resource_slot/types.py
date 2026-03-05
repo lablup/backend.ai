@@ -84,12 +84,12 @@ class ResourceSlotTypeGQL(Node):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        from ai.backend.manager.api.gql.resource_slot.fetcher import fetch_resource_slot_type
+        from ai.backend.manager.api.gql.resource_slot.fetcher import load_resource_slot_type_data
 
-        results = []
+        results: list[Self | None] = []
         for slot_name in node_ids:
-            node = await fetch_resource_slot_type(info, slot_name)
-            results.append(node)
+            data = await load_resource_slot_type_data(info, slot_name)
+            results.append(cls.from_data(data) if data is not None else None)
         return results
 
     @classmethod
@@ -155,15 +155,13 @@ class AgentResourceSlotGQL(Node):
         required: bool = False,
     ) -> Iterable[Self | None]:
         # Node ID format: "{agent_id}:{slot_name}"
-        results = []
+        from ai.backend.manager.api.gql.resource_slot.fetcher import load_agent_resource_data
+
+        results: list[Self | None] = []
         for node_id in node_ids:
             agent_id, _, slot_name = node_id.partition(":")
-            from ai.backend.manager.api.gql.resource_slot.fetcher import (
-                fetch_agent_resource_slot,
-            )
-
-            node = await fetch_agent_resource_slot(info, agent_id, slot_name)
-            results.append(node)
+            data = await load_agent_resource_data(info, agent_id, slot_name)
+            results.append(cls.from_data(data) if data is not None else None)
         return results
 
     @classmethod
@@ -225,15 +223,13 @@ class KernelResourceAllocationGQL(Node):
         required: bool = False,
     ) -> Iterable[Self | None]:
         # Node ID format: "{kernel_id}:{slot_name}"
-        results = []
+        from ai.backend.manager.api.gql.resource_slot.fetcher import load_kernel_allocation_data
+
+        results: list[Self | None] = []
         for node_id in node_ids:
             kernel_id_str, _, slot_name = node_id.partition(":")
-            from ai.backend.manager.api.gql.resource_slot.fetcher import (
-                fetch_kernel_resource_allocation,
-            )
-
-            node = await fetch_kernel_resource_allocation(info, kernel_id_str, slot_name)
-            results.append(node)
+            data = await load_kernel_allocation_data(info, kernel_id_str, slot_name)
+            results.append(cls.from_data(data) if data is not None else None)
         return results
 
     @classmethod
