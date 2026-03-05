@@ -109,7 +109,8 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
 async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> dict[str, float]:
     raw_alloc_map = await ctx.valkey_stat.get_gpu_allocation_map(str(agent_id))
     if raw_alloc_map:
-        return UUIDFloatMap.parse_value({k: float(v) for k, v in raw_alloc_map.items()})
+        stripped = {k.removeprefix("GPU-"): float(v) for k, v in raw_alloc_map.items()}
+        return UUIDFloatMap.parse_value(stripped)
     return {}
 
 

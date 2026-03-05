@@ -1244,10 +1244,7 @@ class AgentRPCServer(aobject):
         agent = self.runtime.get_agent(agent_id)
         scratch_root = agent.local_config.container.scratch_root
         result = await scan_gpu_alloc_map(list(agent.kernel_registry.keys()), scratch_root)
-        return {
-            (k.removeprefix("GPU-") if k.startswith("GPU-") else k): str(v)
-            for k, v in result.items()
-        }
+        return {k: str(v) for k, v in result.items()}
 
 
 @aiotools.server_context
