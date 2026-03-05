@@ -13,9 +13,8 @@ from typing import (
     override,
 )
 
-import attr
 import sqlalchemy as sa
-import trafaret as t
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -31,11 +30,8 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.sql.expression import true
 
-from ai.backend.common import validators as tx
-from ai.backend.common.config import agent_selector_config_iv
 from ai.backend.common.types import (
     AgentSelectionStrategy,
-    JSONSerializableMixin,
     SessionTypes,
 )
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
@@ -43,7 +39,6 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     PydanticColumn,
-    StructuredJSONObjectColumn,
 )
 from ai.backend.manager.models.group import resolve_group_name_or_id, resolve_groups
 from ai.backend.manager.models.rbac import (
@@ -84,22 +79,23 @@ __all__: Sequence[str] = (
 )
 
 
-@attr.define(slots=True)
-class ScalingGroupOpts(JSONSerializableMixin):
-    allowed_session_types: list[SessionTypes] = attr.Factory(
-        lambda: [
+class ScalingGroupOpts(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    allowed_session_types: list[SessionTypes] = Field(
+        default_factory=lambda: [
             SessionTypes.INTERACTIVE,
             SessionTypes.BATCH,
             SessionTypes.INFERENCE,
-        ],
+        ]
     )
     pending_timeout: timedelta = timedelta(seconds=0)
-    config: Mapping[str, Any] = attr.field(factory=dict)
+    config: dict[str, Any] = Field(default_factory=dict)
 
     # Scheduler has a dedicated database column to store its name,
     # but agent selector configuration is stored as a part of the scheduler_opts column.
     agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
-    agent_selector_config: Mapping[str, Any] = attr.field(factory=dict)
+    agent_selector_config: dict[str, Any] = Field(default_factory=dict)
 
     # Only used in the ConcentratedAgentSelector
     enforce_spreading_endpoint_replica: bool = False
@@ -107,44 +103,36 @@ class ScalingGroupOpts(JSONSerializableMixin):
     allow_fractional_resource_fragmentation: bool = True
     """If set to false, agent will refuse to start kernel when they are forced to fragment fractional resource request"""
 
-    route_cleanup_target_statuses: list[str] = attr.field(factory=lambda: ["unhealthy"])
+    route_cleanup_target_statuses: list[str] = Field(default_factory=lambda: ["unhealthy"])
     """List of route statuses that should be automatically cleaned up. Valid values: healthy, unhealthy, degraded"""
 
-    def to_json(self) -> dict[str, Any]:
-        return {
-            "allowed_session_types": [item.value for item in self.allowed_session_types],
-            "pending_timeout": self.pending_timeout.total_seconds(),
-            "config": self.config,
-            "agent_selection_strategy": self.agent_selection_strategy,
-            "agent_selector_config": self.agent_selector_config,
-            "enforce_spreading_endpoint_replica": self.enforce_spreading_endpoint_replica,
-            "allow_fractional_resource_fragmentation": self.allow_fractional_resource_fragmentation,
-            "route_cleanup_target_statuses": self.route_cleanup_target_statuses,
-        }
-
+    @field_validator("allowed_session_types", mode="before")
     @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> ScalingGroupOpts:
-        return cls(**cls.as_trafaret().check(obj))
+    def validate_allowed_session_types(cls, value: Any) -> list[SessionTypes]:
+        if not isinstance(value, list):
+            raise ValueError(f"Expected a list, got {type(value)}")
+        return [SessionTypes(v) if isinstance(v, str) else v for v in value]
 
+    @field_serializer("allowed_session_types", mode="plain")
+    def serialize_allowed_session_types(self, value: list[SessionTypes]) -> list[str]:
+        return [item.value for item in value]
+
+    @field_validator("pending_timeout", mode="before")
     @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict({
-            t.Key("allowed_session_types", default=["interactive", "batch"]): t.List(
-                tx.Enum(SessionTypes), min_length=1
-            ),
-            t.Key("pending_timeout", default=0): tx.TimeDuration(allow_negative=False),
-            # Each scheduler impl refers an additional "config" key.
-            t.Key("config", default={}): t.Mapping(t.String, t.Any),
-            t.Key("agent_selection_strategy", default=AgentSelectionStrategy.DISPERSED): tx.Enum(
-                AgentSelectionStrategy
-            ),
-            t.Key("agent_selector_config", default={}): agent_selector_config_iv,
-            t.Key("enforce_spreading_endpoint_replica", default=False): t.ToBool,
-            t.Key("allow_fractional_resource_fragmentation", default=True): t.ToBool,
-            t.Key("route_cleanup_target_statuses", default=["unhealthy"]): t.List(
-                t.Enum("healthy", "unhealthy", "degraded")
-            ),
-        }).allow_extra("*")
+    def validate_pending_timeout(cls, value: Any) -> timedelta:
+        if isinstance(value, (int, float)):
+            return timedelta(seconds=value)
+        if isinstance(value, timedelta):
+            return value
+        raise ValueError(f"Expected a number or timedelta, got {type(value)}")
+
+    @field_serializer("pending_timeout", mode="plain")
+    def serialize_pending_timeout(self, value: timedelta) -> float:
+        return value.total_seconds()
+
+    @field_serializer("agent_selection_strategy", mode="plain")
+    def serialize_agent_selection_strategy(self, value: AgentSelectionStrategy) -> str:
+        return value.value
 
 
 # When scheduling, we take the union of allowed scaling groups for
@@ -292,9 +280,9 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
     )
     scheduler_opts: Mapped[ScalingGroupOpts] = mapped_column(
         "scheduler_opts",
-        StructuredJSONObjectColumn(ScalingGroupOpts),
+        PydanticColumn(ScalingGroupOpts),
         nullable=False,
-        default={},
+        default=ScalingGroupOpts,
     )
     fair_share_spec: Mapped[FairShareScalingGroupSpec | None] = mapped_column(
         "fair_share_spec",
