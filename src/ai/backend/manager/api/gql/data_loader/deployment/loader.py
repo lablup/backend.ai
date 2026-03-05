@@ -6,6 +6,7 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.manager.data.deployment.types import (
+    DeploymentPolicyData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
@@ -18,11 +19,15 @@ from ai.backend.manager.repositories.deployment.options import (
     AccessTokenConditions,
     AutoScalingRuleConditions,
     DeploymentConditions,
+    DeploymentPolicyConditions,
     RevisionConditions,
     RouteConditions,
 )
 from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
     SearchAccessTokensAction,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.search_deployment_policies import (
+    SearchDeploymentPoliciesAction,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
@@ -196,3 +201,27 @@ async def load_access_tokens_by_ids(
 
     token_map = {token.id: token for token in action_result.data}
     return [token_map.get(token_id) for token_id in token_ids]
+
+
+async def load_deployment_policies_by_endpoint_ids(
+    processor: DeploymentProcessors,
+    endpoint_ids: Sequence[uuid.UUID],
+) -> list[DeploymentPolicyData | None]:
+    """Batch load deployment policies by endpoint IDs.
+
+    Each endpoint has at most one deployment policy (1:1 relationship).
+    """
+    if not endpoint_ids:
+        return []
+
+    querier = BatchQuerier(
+        pagination=OffsetPagination(limit=len(endpoint_ids)),
+        conditions=[DeploymentPolicyConditions.by_endpoint_ids(endpoint_ids)],
+    )
+
+    action_result = await processor.search_deployment_policies.wait_for_complete(
+        SearchDeploymentPoliciesAction(querier=querier)
+    )
+
+    policy_map = {policy.endpoint: policy for policy in action_result.data}
+    return [policy_map.get(endpoint_id) for endpoint_id in endpoint_ids]
