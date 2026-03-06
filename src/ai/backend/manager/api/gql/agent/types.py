@@ -20,7 +20,11 @@ if TYPE_CHECKING:
         KernelV2FilterGQL,
         KernelV2OrderByGQL,
     )
-    from ai.backend.manager.api.gql.resource_slot.types import AgentResourceConnectionGQL
+    from ai.backend.manager.api.gql.resource_slot.types import (
+        AgentResourceConnectionGQL,
+        AgentResourceSlotFilterGQL,
+        AgentResourceSlotOrderByGQL,
+    )
     from ai.backend.manager.api.gql.session.types import (
         SessionV2ConnectionGQL,
         SessionV2FilterGQL,
@@ -496,6 +500,18 @@ class AgentV2GQL(Node):
     async def resource_slots(
         self,
         info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            AgentResourceSlotFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                AgentResourceSlotOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
+            ]
+        ]
+        | None = None,
         first: int | None = None,
         after: str | None = None,
         last: int | None = None,
@@ -512,6 +528,8 @@ class AgentV2GQL(Node):
         return await fetch_agent_resources(
             info=info,
             agent_id=str(self._agent_id),
+            filter=filter,
+            order_by=order_by,
             first=first,
             after=after,
             last=last,

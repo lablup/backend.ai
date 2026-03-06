@@ -17,7 +17,11 @@ from ai.backend.common.types import AgentId, KernelId, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.gql.resource_slot.types import ResourceAllocationConnectionGQL
+    from ai.backend.manager.api.gql.resource_slot.types import (
+        KernelResourceAllocationFilterGQL,
+        KernelResourceAllocationOrderByGQL,
+        ResourceAllocationConnectionGQL,
+    )
     from ai.backend.manager.api.gql.session.types import SessionV2GQL
     from ai.backend.manager.repositories.base import QueryCondition
 
@@ -471,6 +475,18 @@ class KernelV2GQL(Node):
     async def resource_allocations(
         self,
         info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            KernelResourceAllocationFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                KernelResourceAllocationOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
+            ]
+        ]
+        | None = None,
         first: int | None = None,
         after: str | None = None,
         last: int | None = None,
@@ -487,6 +503,8 @@ class KernelV2GQL(Node):
         return await fetch_kernel_allocations(
             info=info,
             kernel_id=str(self.id),
+            filter=filter,
+            order_by=order_by,
             first=first,
             after=after,
             last=last,

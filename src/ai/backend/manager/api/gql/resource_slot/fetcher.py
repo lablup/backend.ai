@@ -56,9 +56,13 @@ from ai.backend.manager.services.resource_slot.actions.search_resource_slot_type
 from .types import (
     AgentResourceConnectionGQL,
     AgentResourceSlotEdgeGQL,
+    AgentResourceSlotFilterGQL,
     AgentResourceSlotGQL,
+    AgentResourceSlotOrderByGQL,
     KernelResourceAllocationEdgeGQL,
+    KernelResourceAllocationFilterGQL,
     KernelResourceAllocationGQL,
+    KernelResourceAllocationOrderByGQL,
     ResourceAllocationConnectionGQL,
     ResourceSlotTypeConnectionGQL,
     ResourceSlotTypeEdgeGQL,
@@ -164,6 +168,8 @@ async def fetch_resource_slot_type(
 async def fetch_agent_resources(
     info: Info[StrawberryGQLContext],
     agent_id: str,
+    filter: AgentResourceSlotFilterGQL | None = None,
+    order_by: list[AgentResourceSlotOrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -171,7 +177,7 @@ async def fetch_agent_resources(
     limit: int | None = None,
     offset: int | None = None,
 ) -> AgentResourceConnectionGQL:
-    """Fetch per-slot resource entries for a given agent with pagination."""
+    """Fetch per-slot resource entries for a given agent with pagination and filtering."""
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
             first=first,
@@ -182,6 +188,8 @@ async def fetch_agent_resources(
             offset=offset,
         ),
         pagination_spec=_get_agent_resource_pagination_spec(),
+        filter=filter,
+        order_by=order_by,
         base_conditions=[AgentResourceQueryConditions.by_agent_id(agent_id)],
     )
 
@@ -212,6 +220,8 @@ async def fetch_agent_resources(
 async def fetch_kernel_allocations(
     info: Info[StrawberryGQLContext],
     kernel_id: str,
+    filter: KernelResourceAllocationFilterGQL | None = None,
+    order_by: list[KernelResourceAllocationOrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -219,7 +229,7 @@ async def fetch_kernel_allocations(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ResourceAllocationConnectionGQL:
-    """Fetch per-slot allocation entries for a kernel with pagination."""
+    """Fetch per-slot allocation entries for a kernel with pagination and filtering."""
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
             first=first,
@@ -230,6 +240,8 @@ async def fetch_kernel_allocations(
             offset=offset,
         ),
         pagination_spec=_get_resource_allocation_pagination_spec(),
+        filter=filter,
+        order_by=order_by,
         base_conditions=[ResourceAllocationQueryConditions.by_kernel_id(_uuid.UUID(kernel_id))],
     )
 

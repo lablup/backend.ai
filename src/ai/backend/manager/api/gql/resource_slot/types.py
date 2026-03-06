@@ -27,7 +27,14 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceSlotTypeData,
 )
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
-from ai.backend.manager.repositories.resource_slot.query import QueryConditions, QueryOrders
+from ai.backend.manager.repositories.resource_slot.query import (
+    AgentResourceQueryConditions,
+    AgentResourceQueryOrders,
+    QueryConditions,
+    QueryOrders,
+    ResourceAllocationQueryConditions,
+    ResourceAllocationQueryOrders,
+)
 
 # ========== NumberFormat ==========
 
@@ -283,6 +290,61 @@ class AgentResourceConnectionGQL(Connection[AgentResourceSlotGQL]):
         self.count = count
 
 
+# ========== AgentResourceSlot Filter/OrderBy ==========
+
+
+@strawberry.enum(
+    name="AgentResourceSlotOrderField",
+    description="Added in 26.3.0. Fields available for ordering agent resource slots.",
+)
+class AgentResourceSlotOrderFieldGQL(StrEnum):
+    SLOT_NAME = "slot_name"
+    CAPACITY = "capacity"
+    USED = "used"
+
+
+@strawberry.input(
+    name="AgentResourceSlotFilter",
+    description="Added in 26.3.0. Filter criteria for querying agent resource slots.",
+)
+class AgentResourceSlotFilterGQL(GQLFilter):
+    slot_name: StringFilter | None = None
+
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if self.slot_name:
+            condition = self.slot_name.build_query_condition(
+                contains_factory=AgentResourceQueryConditions.by_slot_name_contains,
+                equals_factory=AgentResourceQueryConditions.by_slot_name_equals,
+                starts_with_factory=AgentResourceQueryConditions.by_slot_name_starts_with,
+                ends_with_factory=AgentResourceQueryConditions.by_slot_name_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+        return conditions
+
+
+@strawberry.input(
+    name="AgentResourceSlotOrderBy",
+    description="Added in 26.3.0. Ordering specification for agent resource slots.",
+)
+class AgentResourceSlotOrderByGQL(GQLOrderBy):
+    field: AgentResourceSlotOrderFieldGQL
+    direction: OrderDirection = OrderDirection.ASC
+
+    def to_query_order(self) -> QueryOrder:
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case AgentResourceSlotOrderFieldGQL.SLOT_NAME:
+                return AgentResourceQueryOrders.slot_name(ascending)
+            case AgentResourceSlotOrderFieldGQL.CAPACITY:
+                return AgentResourceQueryOrders.capacity(ascending)
+            case AgentResourceSlotOrderFieldGQL.USED:
+                return AgentResourceQueryOrders.used(ascending)
+            case _:
+                raise ValueError(f"Unhandled AgentResourceSlotOrderFieldGQL value: {self.field!r}")
+
+
 # ========== KernelResourceAllocationGQL (Node) ==========
 
 
@@ -341,6 +403,63 @@ class KernelResourceAllocationGQL(Node):
             requested=data.requested,
             used=data.used,
         )
+
+
+# ========== KernelResourceAllocation Filter/OrderBy ==========
+
+
+@strawberry.enum(
+    name="KernelResourceAllocationOrderField",
+    description="Added in 26.3.0. Fields available for ordering kernel resource allocations.",
+)
+class KernelResourceAllocationOrderFieldGQL(StrEnum):
+    SLOT_NAME = "slot_name"
+    REQUESTED = "requested"
+    USED = "used"
+
+
+@strawberry.input(
+    name="KernelResourceAllocationFilter",
+    description="Added in 26.3.0. Filter criteria for querying kernel resource allocations.",
+)
+class KernelResourceAllocationFilterGQL(GQLFilter):
+    slot_name: StringFilter | None = None
+
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if self.slot_name:
+            condition = self.slot_name.build_query_condition(
+                contains_factory=ResourceAllocationQueryConditions.by_slot_name_contains,
+                equals_factory=ResourceAllocationQueryConditions.by_slot_name_equals,
+                starts_with_factory=ResourceAllocationQueryConditions.by_slot_name_starts_with,
+                ends_with_factory=ResourceAllocationQueryConditions.by_slot_name_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+        return conditions
+
+
+@strawberry.input(
+    name="KernelResourceAllocationOrderBy",
+    description="Added in 26.3.0. Ordering specification for kernel resource allocations.",
+)
+class KernelResourceAllocationOrderByGQL(GQLOrderBy):
+    field: KernelResourceAllocationOrderFieldGQL
+    direction: OrderDirection = OrderDirection.ASC
+
+    def to_query_order(self) -> QueryOrder:
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case KernelResourceAllocationOrderFieldGQL.SLOT_NAME:
+                return ResourceAllocationQueryOrders.slot_name(ascending)
+            case KernelResourceAllocationOrderFieldGQL.REQUESTED:
+                return ResourceAllocationQueryOrders.requested(ascending)
+            case KernelResourceAllocationOrderFieldGQL.USED:
+                return ResourceAllocationQueryOrders.used(ascending)
+            case _:
+                raise ValueError(
+                    f"Unhandled KernelResourceAllocationOrderFieldGQL value: {self.field!r}"
+                )
 
 
 KernelResourceAllocationEdgeGQL = Edge[KernelResourceAllocationGQL]
