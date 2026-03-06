@@ -471,6 +471,12 @@ class KernelV2GQL(Node):
     async def resource_allocations(
         self,
         info: Info[StrawberryGQLContext],
+        first: int | None = None,
+        after: str | None = None,
+        last: int | None = None,
+        before: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> Annotated[
         ResourceAllocationConnectionGQL,
         strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
@@ -478,7 +484,16 @@ class KernelV2GQL(Node):
         """Fetch per-slot resource allocation for this kernel."""
         from ai.backend.manager.api.gql.resource_slot.fetcher import fetch_kernel_allocations
 
-        return await fetch_kernel_allocations(info=info, kernel_id=str(self.id))
+        return await fetch_kernel_allocations(
+            info=info,
+            kernel_id=str(self.id),
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def

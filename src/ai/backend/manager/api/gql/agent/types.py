@@ -496,6 +496,12 @@ class AgentV2GQL(Node):
     async def resource_slots(
         self,
         info: Info[StrawberryGQLContext],
+        first: int | None = None,
+        after: str | None = None,
+        last: int | None = None,
+        before: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> Annotated[
         AgentResourceConnectionGQL,
         strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
@@ -503,7 +509,16 @@ class AgentV2GQL(Node):
         """Fetch per-slot resource capacity and usage for this agent."""
         from ai.backend.manager.api.gql.resource_slot.fetcher import fetch_agent_resources
 
-        return await fetch_agent_resources(info=info, agent_id=str(self._agent_id))
+        return await fetch_agent_resources(
+            info=info,
+            agent_id=str(self._agent_id),
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def

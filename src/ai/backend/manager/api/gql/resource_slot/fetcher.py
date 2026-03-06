@@ -209,23 +209,6 @@ async def fetch_agent_resources(
     )
 
 
-async def fetch_agent_resource_slot(
-    info: Info[StrawberryGQLContext],
-    agent_id: str,
-    slot_name: str,
-) -> AgentResourceSlotGQL | None:
-    """Fetch a single per-slot resource entry for an agent (used by Node resolution)."""
-    from ai.backend.manager.errors.resource_slot import AgentResourceNotFound
-
-    try:
-        action_result = await info.context.processors.resource_slot.get_agent_resource_by_slot.wait_for_complete(
-            GetAgentResourceBySlotAction(agent_id=agent_id, slot_name=slot_name)
-        )
-    except AgentResourceNotFound:
-        return None
-    return AgentResourceSlotGQL.from_data(action_result.item)
-
-
 async def fetch_kernel_allocations(
     info: Info[StrawberryGQLContext],
     kernel_id: str,
@@ -274,25 +257,6 @@ async def fetch_kernel_allocations(
     )
 
 
-async def fetch_kernel_resource_allocation(
-    info: Info[StrawberryGQLContext],
-    kernel_id_str: str,
-    slot_name: str,
-) -> KernelResourceAllocationGQL | None:
-    """Fetch a single per-slot allocation for a kernel (used by Node resolution)."""
-    from ai.backend.manager.errors.resource_slot import ResourceAllocationNotFound
-
-    try:
-        action_result = await info.context.processors.resource_slot.get_kernel_allocation_by_slot.wait_for_complete(
-            GetKernelAllocationBySlotAction(
-                kernel_id=_uuid.UUID(kernel_id_str), slot_name=slot_name
-            )
-        )
-    except ResourceAllocationNotFound:
-        return None
-    return KernelResourceAllocationGQL.from_data(action_result.item)
-
-
 # ========== Raw data helpers for Node.resolve_nodes ==========
 # These return raw data types so that resolve_nodes can call cls.from_data(),
 # which enables mypy to correctly infer the return type as Iterable[Self | None].
@@ -308,16 +272,7 @@ async def load_resource_slot_type_data(
             GetResourceSlotTypeAction(slot_name=slot_name)
         )
     )
-    return ResourceSlotTypeData(
-        slot_name=action_result.item.slot_name,
-        slot_type=action_result.item.slot_type,
-        display_name=action_result.item.display_name,
-        description=action_result.item.description,
-        display_unit=action_result.item.display_unit,
-        display_icon=action_result.item.display_icon,
-        number_format=action_result.item.number_format,
-        rank=action_result.item.rank,
-    )
+    return action_result.item
 
 
 async def load_agent_resource_data(
