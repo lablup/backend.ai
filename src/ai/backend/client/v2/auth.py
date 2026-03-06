@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from datetime import datetime
+from typing import override
 
 from yarl import URL
 
@@ -29,6 +30,7 @@ class NoAuth(AuthStrategy):
     manager rather than crash internally.
     """
 
+    @override
     def sign(
         self,
         method: str,
@@ -52,6 +54,7 @@ class HMACAuth(AuthStrategy):
         self.secret_key: str = secret_key
         self.hash_type: str = hash_type
 
+    @override
     def sign(
         self,
         method: str,
