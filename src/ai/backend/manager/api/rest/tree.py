@@ -102,6 +102,8 @@ def build_api_routes(
     from .notification.registry import register_notification_routes
     from .object_storage.handler import ObjectStorageHandler
     from .object_storage.registry import register_object_storage_routes
+    from .prometheus_query_preset import PrometheusQueryPresetHandler
+    from .prometheus_query_preset.registry import register_prometheus_query_preset_routes
     from .quota_scope.handler import QuotaScopeHandler
     from .quota_scope.registry import register_quota_scope_routes
     from .ratelimit.registry import register_ratelimit_routes
@@ -276,6 +278,10 @@ def build_api_routes(
         error_monitor=error_monitor,
     )
 
+    # Prometheus query preset handler
+    prometheus_processor = processors.prometheus_query_preset
+    prometheus_query_preset_handler = PrometheusQueryPresetHandler(processor=prometheus_processor)
+
     # 3. Build all registries
     return [
         register_auth_routes(auth_handler, route_deps),
@@ -348,4 +354,5 @@ def build_api_routes(
         register_export_routes(export_handler, route_deps),
         register_agent_routes(agent_handler, route_deps),
         register_resource_slot_routes(resource_slot_handler, route_deps),
+        register_prometheus_query_preset_routes(prometheus_query_preset_handler, route_deps),
     ]
