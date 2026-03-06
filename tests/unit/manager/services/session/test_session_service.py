@@ -828,35 +828,41 @@ class TestGetSessionInfo:
         return session
 
     @pytest.mark.parametrize(
-        "mock_session",
+        ("mock_session", "expected_mount_paths"),
         [
-            [
-                VFolderMount(
-                    name="my-data",
-                    vfid=VFolderID(quota_scope_id=None, folder_id=uuid4()),
-                    vfsubpath=PurePosixPath("."),
-                    host_path=PurePosixPath("/data/vfolders/my-data"),
-                    kernel_path=PurePosixPath("/home/work/data"),
-                    mount_perm=MountPermission.READ_WRITE,
-                    usage_mode=VFolderUsageMode.GENERAL,
-                ),
-                VFolderMount(
-                    name="my-model",
-                    vfid=VFolderID(quota_scope_id=None, folder_id=uuid4()),
-                    vfsubpath=PurePosixPath("."),
-                    host_path=PurePosixPath("/data/vfolders/my-model"),
-                    kernel_path=PurePosixPath("/home/work/model"),
-                    mount_perm=MountPermission.READ_ONLY,
-                    usage_mode=VFolderUsageMode.MODEL,
-                ),
-            ],
+            pytest.param([], [], id="no_mounts"),
+            pytest.param(
+                [
+                    VFolderMount(
+                        name="my-data",
+                        vfid=VFolderID(quota_scope_id=None, folder_id=uuid4()),
+                        vfsubpath=PurePosixPath("."),
+                        host_path=PurePosixPath("/data/vfolders/my-data"),
+                        kernel_path=PurePosixPath("/home/work/data"),
+                        mount_perm=MountPermission.READ_WRITE,
+                        usage_mode=VFolderUsageMode.GENERAL,
+                    ),
+                    VFolderMount(
+                        name="my-model",
+                        vfid=VFolderID(quota_scope_id=None, folder_id=uuid4()),
+                        vfsubpath=PurePosixPath("."),
+                        host_path=PurePosixPath("/data/vfolders/my-model"),
+                        kernel_path=PurePosixPath("/home/work/model"),
+                        mount_perm=MountPermission.READ_ONLY,
+                        usage_mode=VFolderUsageMode.MODEL,
+                    ),
+                ],
+                ["/home/work/data", "/home/work/model"],
+                id="with_vfolder_mounts",
+            ),
         ],
-        indirect=True,
+        indirect=["mock_session"],
     )
-    async def test_success_with_vfolder_mounts(
+    async def test_persistent_mount_paths(
         self,
         session_service: SessionService,
         mock_session: MagicMock,
+        expected_mount_paths: list[str],
         sample_access_key: AccessKey,
     ) -> None:
         action = GetSessionInfoAction(
@@ -865,10 +871,7 @@ class TestGetSessionInfo:
         )
         result = await session_service.get_session_info(action)
 
-        assert result.session_info.persistent_mount_paths == [
-            "/home/work/data",
-            "/home/work/model",
-        ]
+        assert result.session_info.persistent_mount_paths == expected_mount_paths
 
     async def test_session_not_found(
         self,
