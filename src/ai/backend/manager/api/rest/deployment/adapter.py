@@ -230,7 +230,7 @@ class RevisionAdapter(BaseFilterAdapter):
             ),
             model_mount_config=ModelMountConfigDTO(
                 vfolder_id=mount_config.vfolder_id,
-                mount_destination=mount_config.mount_destination or "",
+                mount_destination=mount_config.mount_destination,
                 definition_path=mount_config.definition_path,
             ),
             created_at=data.created_at,
