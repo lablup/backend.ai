@@ -126,7 +126,7 @@ class RoleGQL(Node):
             deleted_at=data.deleted_at,
         )
 
-    @strawberry.field(description="Permissions associated with this role.")  # type: ignore[misc]
+    @strawberry.field(description="Added in 26.3.0. Permissions associated with this role.")  # type: ignore[misc]
     async def permissions(
         self,
         info: Info[StrawberryGQLContext],
@@ -135,9 +135,11 @@ class RoleGQL(Node):
             strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
         ]
         | None = None,
-        order_by: Annotated[
-            PermissionOrderBy,
-            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
+        order_by: list[
+            Annotated[
+                PermissionOrderBy,
+                strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
+            ]
         ]
         | None = None,
         before: str | None = None,
@@ -168,7 +170,7 @@ class RoleGQL(Node):
         return await fetch_permissions(
             info,
             filter=combined_filter,
-            order_by=[order_by] if order_by is not None else None,
+            order_by=order_by,
             before=before,
             after=after,
             first=first,
@@ -177,7 +179,7 @@ class RoleGQL(Node):
             offset=offset,
         )
 
-    @strawberry.field(description="Users assigned to this role.")  # type: ignore[misc]
+    @strawberry.field(description="Added in 26.3.0. Users assigned to this role.")  # type: ignore[misc]
     async def users(
         self,
         info: Info[StrawberryGQLContext],
