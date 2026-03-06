@@ -20,6 +20,7 @@ def setup_api(
     ``runner.setup()`` freezes the application router.
     """
     from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
+    from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 
     from .tree import build_api_routes
     from .types import GQLContextDeps
@@ -45,6 +46,7 @@ def setup_api(
         user_repository=r.domain.repositories.user.repository,
         agent_repository=r.domain.repositories.agent.repository,
         strawberry_gql_adapter=BaseGQLAdapter(),
+        strawberry_data_loaders=DataLoaders(r.processing.processors),
     )
 
     root_registry = RouteRegistry.create("", r.system.cors_options)
