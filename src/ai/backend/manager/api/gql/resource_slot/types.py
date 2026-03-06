@@ -30,7 +30,7 @@ from ai.backend.manager.data.resource_slot.types import (
 
 @strawberry.type(
     name="NumberFormat",
-    description="Added in 26.4.0. Display number format configuration for a resource slot type.",
+    description="Added in 26.3.0. Display number format configuration for a resource slot type.",
 )
 class NumberFormatGQL:
     binary: bool = strawberry.field(
@@ -49,7 +49,7 @@ class NumberFormatGQL:
 @strawberry.type(
     name="ResourceSlotType",
     description=dedent_strip("""
-        Added in 26.4.0. A registered resource slot type describing display metadata
+        Added in 26.3.0. A registered resource slot type describing display metadata
         and formatting rules for a specific resource (e.g., cpu, mem, cuda.device).
     """),
 )
@@ -117,7 +117,7 @@ ResourceSlotTypeEdgeGQL = Edge[ResourceSlotTypeGQL]
 
 @strawberry.type(
     name="ResourceSlotTypeConnection",
-    description="Added in 26.4.0. Relay-style connection for paginated resource slot types.",
+    description="Added in 26.3.0. Relay-style connection for paginated resource slot types.",
 )
 class ResourceSlotTypeConnectionGQL(Connection[ResourceSlotTypeGQL]):
     count: int
@@ -133,7 +133,7 @@ class ResourceSlotTypeConnectionGQL(Connection[ResourceSlotTypeGQL]):
 @strawberry.type(
     name="AgentResourceSlot",
     description=dedent_strip("""
-        Added in 26.4.0. Per-slot resource capacity and usage entry for an agent.
+        Added in 26.3.0. Per-slot resource capacity and usage entry for an agent.
         Represents one row from the agent_resources table.
     """),
 )
@@ -185,7 +185,7 @@ AgentResourceSlotEdgeGQL = Edge[AgentResourceSlotGQL]
 
 @strawberry.type(
     name="AgentResourceConnection",
-    description="Added in 26.4.0. Relay-style connection for per-slot agent resources.",
+    description="Added in 26.3.0. Relay-style connection for per-slot agent resources.",
 )
 class AgentResourceConnectionGQL(Connection[AgentResourceSlotGQL]):
     count: int
@@ -201,7 +201,7 @@ class AgentResourceConnectionGQL(Connection[AgentResourceSlotGQL]):
 @strawberry.type(
     name="KernelResourceAllocation",
     description=dedent_strip("""
-        Added in 26.4.0. Per-slot resource allocation entry for a kernel.
+        Added in 26.3.0. Per-slot resource allocation entry for a kernel.
         Represents one row from the resource_allocations table.
     """),
 )
@@ -253,7 +253,7 @@ KernelResourceAllocationEdgeGQL = Edge[KernelResourceAllocationGQL]
 
 @strawberry.type(
     name="ResourceAllocationConnection",
-    description="Added in 26.4.0. Relay-style connection for per-slot kernel resource allocations.",
+    description="Added in 26.3.0. Relay-style connection for per-slot kernel resource allocations.",
 )
 class ResourceAllocationConnectionGQL(Connection[KernelResourceAllocationGQL]):
     count: int

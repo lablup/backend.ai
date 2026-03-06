@@ -12,7 +12,7 @@ from .types import ResourceSlotTypeConnectionGQL, ResourceSlotTypeGQL
 
 
 @strawberry.field(
-    description="Added in 26.4.0. Returns a single resource slot type by slot_name, or null."
+    description="Added in 26.3.0. Returns a single resource slot type by slot_name, or null."
 )  # type: ignore[misc]
 async def resource_slot_type(
     info: Info[StrawberryGQLContext],
@@ -21,7 +21,7 @@ async def resource_slot_type(
     return await fetch_resource_slot_type(info, slot_name)
 
 
-@strawberry.field(description="Added in 26.4.0. Returns all registered resource slot types.")  # type: ignore[misc]
+@strawberry.field(description="Added in 26.3.0. Returns all registered resource slot types.")  # type: ignore[misc]
 async def resource_slot_types(
     info: Info[StrawberryGQLContext],
 ) -> ResourceSlotTypeConnectionGQL:

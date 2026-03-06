@@ -491,7 +491,7 @@ class AgentV2GQL(Node):
         )
 
     @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.4.0. Per-slot resource capacity and usage for this agent."
+        description="Added in 26.3.0. Per-slot resource capacity and usage for this agent."
     )
     async def resource_slots(
         self,

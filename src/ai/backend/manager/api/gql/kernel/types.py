@@ -466,7 +466,7 @@ class KernelV2GQL(Node):
         raise NotImplementedError
 
     @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.4.0. Per-slot resource allocation for this kernel."
+        description="Added in 26.3.0. Per-slot resource allocation for this kernel."
     )
     async def resource_allocations(
         self,
