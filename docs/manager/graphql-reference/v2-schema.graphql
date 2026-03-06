@@ -3940,6 +3940,9 @@ type Mutation {
   """Added in 26.3.0. Create a scoped permission (admin only)."""
   adminCreatePermission(input: CreatePermissionInput!): Permission!
 
+  """Added in 26.3.0. Update a scoped permission (admin only)."""
+  adminUpdatePermission(input: UpdatePermissionInput!): Permission!
+
   """Added in 26.3.0. Delete a scoped permission (admin only)."""
   adminDeletePermission(input: DeletePermissionInput!): DeletePermissionPayload!
 
@@ -7046,6 +7049,15 @@ input UpdateObjectStorageInput {
 """Added in 25.14.0"""
 type UpdateObjectStoragePayload {
   objectStorage: ObjectStorage!
+}
+
+"""Added in 26.3.0. Input for updating a scoped permission"""
+input UpdatePermissionInput {
+  id: UUID!
+  scopeType: RBACElementType = null
+  scopeId: String = null
+  entityType: RBACElementType = null
+  operation: OperationType = null
 }
 
 """Added in 25.14.0"""
