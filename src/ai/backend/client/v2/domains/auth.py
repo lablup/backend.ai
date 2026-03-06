@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from ai.backend.client.v2.base_client import BackendAIAnonymousClient, BackendAIAuthClient
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.auth.request import (
@@ -74,13 +76,17 @@ class AuthClient(BaseDomainClient):
         )
 
     async def update_password_no_auth(
-        self, request: UpdatePasswordNoAuthRequest
+        self,
+        request: UpdatePasswordNoAuthRequest,
+        *,
+        extra_headers: Mapping[str, str] | None = None,
     ) -> UpdatePasswordNoAuthResponse:
         return await self._anon_client.typed_request(
             "POST",
             "/auth/update-password-no-auth",
             request=request,
             response_model=UpdatePasswordNoAuthResponse,
+            extra_headers=extra_headers,
         )
 
     async def update_full_name(self, request: UpdateFullNameRequest) -> UpdateFullNameResponse:
