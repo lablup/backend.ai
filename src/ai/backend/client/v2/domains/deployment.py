@@ -5,6 +5,8 @@ import uuid
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
+    AddRevisionRequest,
+    AddRevisionResponse,
     CreateDeploymentRequest,
     CreateDeploymentResponse,
     DeactivateRevisionResponse,
@@ -93,6 +95,18 @@ class DeploymentClient(BaseDomainClient):
     # ---------------------------------------------------------------------------
     # Revision operations
     # ---------------------------------------------------------------------------
+
+    async def add_revision(
+        self,
+        deployment_id: uuid.UUID,
+        request: AddRevisionRequest,
+    ) -> AddRevisionResponse:
+        return await self._client.typed_request(
+            "POST",
+            f"{self.API_PREFIX}/{deployment_id}/revisions",
+            request=request,
+            response_model=AddRevisionResponse,
+        )
 
     async def search_revisions(
         self,
