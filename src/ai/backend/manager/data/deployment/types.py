@@ -388,7 +388,7 @@ class RouteInfo:
     session_id: SessionId | None
     status: RouteStatus
     traffic_ratio: float
-    created_at: datetime | None
+    created_at: datetime
     revision_id: UUID | None
     traffic_status: RouteTrafficStatus
     error_data: dict[str, Any] = field(default_factory=dict)

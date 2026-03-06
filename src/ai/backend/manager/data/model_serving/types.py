@@ -93,7 +93,7 @@ class RoutingData:
     session: uuid.UUID | None
     status: RouteStatus
     traffic_ratio: float
-    created_at: datetime | None
+    created_at: datetime
     error_data: dict[str, Any]
 
 

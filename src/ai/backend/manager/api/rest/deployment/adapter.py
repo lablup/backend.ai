@@ -6,7 +6,6 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from uuid import UUID, uuid4
 
@@ -301,7 +300,7 @@ class RouteAdapter(BaseFilterAdapter):
             session_id=str(data.session_id) if data.session_id else None,
             status=CommonRouteStatus(data.status.value),
             traffic_ratio=data.traffic_ratio,
-            created_at=data.created_at or datetime.now(tz=UTC),
+            created_at=data.created_at,
             revision_id=data.revision_id,
             traffic_status=CommonRouteTrafficStatus(data.traffic_status.value),
             error_data=data.error_data,
