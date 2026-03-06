@@ -339,6 +339,52 @@ type AgentResource
   free: JSON!
 }
 
+"""Added in 26.4.0. Relay-style connection for per-slot agent resources."""
+type AgentResourceConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AgentResourceSlotEdge!]!
+  count: Int!
+}
+
+"""
+Added in 26.4.0. Per-slot resource capacity and usage entry for an agent.
+Represents one row from the agent_resources table.
+"""
+type AgentResourceSlot implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."""
+  slotName: String!
+
+  """Total hardware resource capacity for this slot on the agent."""
+  capacity: Decimal!
+
+  """
+  Amount of this slot currently consumed by running and scheduled sessions.
+  """
+  used: Decimal!
+}
+
+"""An edge in a connection."""
+type AgentResourceSlotEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AgentResourceSlot!
+}
+
 """Added in 25.15.0"""
 type AgentStats
   @join__type(graph: STRAWBERRY)
@@ -525,6 +571,9 @@ type AgentV2 implements Node
   Added in 26.3.0. List of sessions running on this agent with pagination support.
   """
   sessions(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
+
+  """Added in 26.4.0. Per-slot resource capacity and usage for this agent."""
+  resourceSlots: AgentResourceConnection!
 }
 
 """
@@ -5517,6 +5566,38 @@ type KernelNode implements Node
 }
 
 """
+Added in 26.4.0. Per-slot resource allocation entry for a kernel.
+Represents one row from the resource_allocations table.
+"""
+type KernelResourceAllocation implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."""
+  slotName: String!
+
+  """Amount of this resource slot originally requested for the kernel."""
+  requested: Decimal!
+
+  """Amount currently used. May be null if not yet measured."""
+  used: Decimal
+}
+
+"""An edge in a connection."""
+type KernelResourceAllocationEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KernelResourceAllocation!
+}
+
+"""
 Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.
 """
 type KernelV2 implements Node
@@ -5564,6 +5645,9 @@ type KernelV2 implements Node
 
   """Added in 26.3.0. The session this kernel belongs to."""
   session: SessionV2
+
+  """Added in 26.4.0. Per-slot resource allocation for this kernel."""
+  resourceAllocations: ResourceAllocationConnection!
 }
 
 """
@@ -7822,6 +7906,21 @@ enum NotificationRuleType
   ENDPOINT_LIFECYCLE_CHANGED @join__enumValue(graph: STRAWBERRY)
 }
 
+"""
+Added in 26.4.0. Display number format configuration for a resource slot type.
+"""
+type NumberFormat
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Whether to use binary (1024-based) prefix instead of decimal (1000-based).
+  """
+  binary: Boolean!
+
+  """Number of decimal places to display."""
+  roundLength: Int!
+}
+
 """Added in 25.14.0"""
 type ObjectStorage implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -9468,6 +9567,14 @@ type Query
   adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection! @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.4.0. Returns a single resource slot type by slot_name, or null.
+  """
+  resourceSlotType(slotName: String!): ResourceSlotType @join__field(graph: STRAWBERRY)
+
+  """Added in 26.4.0. Returns all registered resource slot types."""
+  resourceSlotTypes: ResourceSlotTypeConnection! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.2.0.
   
   Query image aliases with optional filtering, ordering, and pagination.
@@ -9967,6 +10074,20 @@ type ResourceAllocation
   used: ResourceSlot
 }
 
+"""
+Added in 26.4.0. Relay-style connection for per-slot kernel resource allocations.
+"""
+type ResourceAllocationConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [KernelResourceAllocationEdge!]!
+  count: Int!
+}
+
 type ResourceConfig
   @join__type(graph: STRAWBERRY)
 {
@@ -10324,6 +10445,71 @@ input ResourceSlotInput
 {
   """List of resource allocations."""
   entries: [ResourceSlotEntryInput!]!
+}
+
+"""
+Added in 26.4.0. A registered resource slot type describing display metadata
+and formatting rules for a specific resource (e.g., cpu, mem, cuda.device).
+"""
+type ResourceSlotType implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """
+  Unique identifier for the resource slot (e.g., 'cpu', 'mem', 'cuda.device').
+  """
+  slotName: String!
+
+  """Category of the slot type (e.g., 'count', 'bytes', 'unique-count')."""
+  slotType: String!
+
+  """Human-readable name for display in UIs."""
+  displayName: String!
+
+  """Longer description of what this resource slot represents."""
+  description: String!
+
+  """
+  Unit label used when displaying resource amounts (e.g., 'GiB', 'cores').
+  """
+  displayUnit: String!
+
+  """Icon identifier for UI rendering (e.g., 'cpu', 'memory', 'gpu')."""
+  displayIcon: String!
+
+  """Number formatting rules (binary vs decimal prefix, rounding)."""
+  numberFormat: NumberFormat!
+
+  """Display ordering rank. Lower values appear first."""
+  rank: Int!
+}
+
+"""
+Added in 26.4.0. Relay-style connection for paginated resource slot types.
+"""
+type ResourceSlotTypeConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ResourceSlotTypeEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ResourceSlotTypeEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ResourceSlotType!
 }
 
 """
