@@ -3231,6 +3231,35 @@ enum LivenessStatus {
   DEGRADED
 }
 
+"""Added in 26.3.0. Login security policy settings for a user."""
+type LoginSecurityPolicyGQL {
+  """
+  Maximum number of concurrent login sessions allowed. None means unlimited.
+  """
+  maxConcurrentLogins: Int
+}
+
+"""Added in 26.3.0. Represents an active login session for a user."""
+type LoginSessionGQL {
+  """Unique identifier of the login session."""
+  id: UUID!
+
+  """Opaque session token."""
+  sessionToken: String!
+
+  """IP address of the client that created the session."""
+  clientIp: String
+
+  """Timestamp when the session was created."""
+  createdAt: DateTime!
+
+  """Timestamp when the session expires, or None if no expiry."""
+  expiredAt: DateTime
+
+  """Reason for session creation or revocation, if any."""
+  reason: String
+}
+
 type ModelDeployment implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -3943,6 +3972,16 @@ type Mutation {
 
   """Added in 26.3.0. Revoke a role from a user (admin only)."""
   adminRevokeRole(input: RevokeRoleInput!): RoleAssignment!
+
+  """
+  Added in 26.3.0. Update the login security policy for a user (admin only). Requires superadmin privileges.
+  """
+  updateUserLoginSecurityPolicy(userId: UUID!, input: UpdateLoginSecurityPolicyInput!): UpdateUserLoginSecurityPolicyPayload!
+
+  """
+  Added in 26.3.0. Revoke a specific login session. Users may revoke their own sessions; admins may revoke any session.
+  """
+  revokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload!
 }
 
 """An object with a Globally Unique ID"""
@@ -5245,6 +5284,11 @@ type Query {
   routeHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection @deprecated(reason: "Use admin_route_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
+  Added in 26.3.0. List all active login sessions for the currently authenticated user.
+  """
+  myLoginSessions: [LoginSessionGQL!]!
+
+  """
   Added in 26.2.0. Get a single user by UUID (admin only). Requires superadmin privileges. Returns an error if user is not found.
   """
   adminUserV2(userId: UUID!): UserV2
@@ -5884,6 +5928,12 @@ Contains the artifacts that were restored from soft-deleted state.
 """
 type RestoreArtifactsPayload {
   artifacts: [Artifact!]!
+}
+
+"""Added in 26.3.0. Payload for revokeLoginSession mutation."""
+type RevokeLoginSessionPayload {
+  """Whether the session was successfully revoked."""
+  success: Boolean!
 }
 
 """Added in 26.3.0. Input for revoking a role from a user"""
@@ -6999,6 +7049,16 @@ type UpdateHuggingFaceRegistryPayload {
   huggingfaceRegistry: HuggingFaceRegistry!
 }
 
+"""
+Added in 26.3.0. Input for updating a user's login security policy. max_concurrent_logins must be a positive integer or None (unlimited).
+"""
+input UpdateLoginSecurityPolicyInput {
+  """
+  Maximum number of concurrent login sessions allowed. Must be a positive integer (greater than 0), or None for unlimited. Zero and negative values are rejected.
+  """
+  maxConcurrentLogins: Int = null
+}
+
 """Input for updating a notification channel"""
 input UpdateNotificationChannelInput {
   id: ID!
@@ -7157,6 +7217,12 @@ input UpdateRouteTrafficStatusInput {
 type UpdateRouteTrafficStatusPayload {
   """The updated route."""
   route: Route!
+}
+
+"""Added in 26.3.0. Payload for updateUserLoginSecurityPolicy mutation."""
+type UpdateUserLoginSecurityPolicyPayload {
+  """The updated login security policy."""
+  loginSecurityPolicy: LoginSecurityPolicyGQL!
 }
 
 """

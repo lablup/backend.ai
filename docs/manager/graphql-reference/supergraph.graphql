@@ -5854,6 +5854,39 @@ enum LivenessStatus
   DEGRADED @join__enumValue(graph: STRAWBERRY)
 }
 
+"""Added in 26.3.0. Login security policy settings for a user."""
+type LoginSecurityPolicyGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Maximum number of concurrent login sessions allowed. None means unlimited.
+  """
+  maxConcurrentLogins: Int
+}
+
+"""Added in 26.3.0. Represents an active login session for a user."""
+type LoginSessionGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Unique identifier of the login session."""
+  id: UUID!
+
+  """Opaque session token."""
+  sessionToken: String!
+
+  """IP address of the client that created the session."""
+  clientIp: String
+
+  """Timestamp when the session was created."""
+  createdAt: DateTime!
+
+  """Timestamp when the session expires, or None if no expiry."""
+  expiredAt: DateTime
+
+  """Reason for session creation or revocation, if any."""
+  reason: String
+}
+
 """Added in 25.6.0. A pair of timestamp and value."""
 type MetricResultValue
   @join__type(graph: GRAPHENE)
@@ -7510,6 +7543,16 @@ type Mutation
 
   """Added in 26.3.0. Revoke a role from a user (admin only)."""
   adminRevokeRole(input: RevokeRoleInput!): RoleAssignment! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.3.0. Update the login security policy for a user (admin only). Requires superadmin privileges.
+  """
+  updateUserLoginSecurityPolicy(userId: UUID!, input: UpdateLoginSecurityPolicyInput!): UpdateUserLoginSecurityPolicyPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.3.0. Revoke a specific login session. Users may revoke their own sessions; admins may revoke any session.
+  """
+  revokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload! @join__field(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0."""
@@ -9518,6 +9561,11 @@ type Query
   routeHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_route_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
+  Added in 26.3.0. List all active login sessions for the currently authenticated user.
+  """
+  myLoginSessions: [LoginSessionGQL!]! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.2.0. Get a single user by UUID (admin only). Requires superadmin privileges. Returns an error if user is not found.
   """
   adminUserV2(userId: UUID!): UserV2 @join__field(graph: STRAWBERRY)
@@ -10243,6 +10291,14 @@ type RestoreArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
   artifacts: [Artifact!]!
+}
+
+"""Added in 26.3.0. Payload for revokeLoginSession mutation."""
+type RevokeLoginSessionPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Whether the session was successfully revoked."""
+  success: Boolean!
 }
 
 """Added in 26.3.0. Input for revoking a role from a user"""
@@ -11923,6 +11979,18 @@ type UpdateHuggingFaceRegistryPayload
   huggingfaceRegistry: HuggingFaceRegistry!
 }
 
+"""
+Added in 26.3.0. Input for updating a user's login security policy. max_concurrent_logins must be a positive integer or None (unlimited).
+"""
+input UpdateLoginSecurityPolicyInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Maximum number of concurrent login sessions allowed. Must be a positive integer (greater than 0), or None for unlimited. Zero and negative values are rejected.
+  """
+  maxConcurrentLogins: Int = null
+}
+
 """Input for updating a notification channel"""
 input UpdateNotificationChannelInput
   @join__type(graph: STRAWBERRY)
@@ -12111,6 +12179,14 @@ type UpdateRouteTrafficStatusPayload
 {
   """The updated route."""
   route: Route!
+}
+
+"""Added in 26.3.0. Payload for updateUserLoginSecurityPolicy mutation."""
+type UpdateUserLoginSecurityPolicyPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated login security policy."""
+  loginSecurityPolicy: LoginSecurityPolicyGQL!
 }
 
 """
