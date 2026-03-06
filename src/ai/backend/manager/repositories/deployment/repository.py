@@ -1187,14 +1187,6 @@ class DeploymentRepository:
         return await self._db_source.delete_auto_scaling_policy(purger)
 
     @deployment_repository_resilience.apply()
-    async def create_deployment_policy(
-        self,
-        creator: Creator[DeploymentPolicyRow],
-    ) -> DeploymentPolicyData:
-        """Create a new deployment policy for an endpoint."""
-        return await self._db_source.create_deployment_policy(creator)
-
-    @deployment_repository_resilience.apply()
     async def upsert_deployment_policy(
         self,
         upserter: Upserter[DeploymentPolicyRow],
@@ -1213,18 +1205,6 @@ class DeploymentRepository:
             DeploymentPolicyNotFound: If no policy exists for the endpoint.
         """
         return await self._db_source.get_deployment_policy(endpoint_id)
-
-    @deployment_repository_resilience.apply()
-    async def update_deployment_policy(
-        self,
-        updater: Updater[DeploymentPolicyRow],
-    ) -> DeploymentPolicyData:
-        """Update a deployment policy.
-
-        Raises:
-            DeploymentPolicyNotFound: If the policy does not exist.
-        """
-        return await self._db_source.update_deployment_policy(updater)
 
     @deployment_repository_resilience.apply()
     async def delete_deployment_policy(
