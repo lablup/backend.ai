@@ -42,6 +42,7 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
         if key not in self.circuits:
             log.warning("Tried to update an inactive slot: {}", key)
             return
+        self.circuits[key].route_info = new_routes
         await self.update_backend(self.backends[key], new_routes)
 
     async def break_circuit(self, circuit: Circuit) -> None:

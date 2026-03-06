@@ -85,42 +85,52 @@ async def gather_prometheus_inference_measures(
         )
         client_session = client_pool.load_client_session(client_key)
 
-        async with client_session.get(request_path) as resp:
-            resp.raise_for_status()
-            metrics_text = await resp.text()
-            metric_families = text_string_to_metric_families(metrics_text)
-            for metric_family in metric_families:
-                metric_name = metric_family.name
-                match metric_family.type:
-                    case "histogram":
-                        labels: list[str] = []
-                        values: list[Decimal] = []
-                        for sample in metric_family.samples:
-                            if sample.name.endswith("_bucket"):
-                                labels.append(sample.labels["le"])
-                                values.append(Decimal(sample.value))
-                            elif sample.name.endswith("_count"):
-                                histogram_count_metrics[metric_name][route.route_id] = int(
-                                    sample.value
-                                )
-                            elif sample.name.endswith("_sum"):
-                                histogram_sum_metrics[metric_name][route.route_id] = Decimal(
-                                    sample.value
-                                )
-                        histogram_metrics_labels[metric_name] = tuple(labels)
-                        histogram_bucket_metrics[metric_name][route.route_id] = tuple(values)
-                    case "gauge":
-                        try:
-                            value = metric_family.samples[0].value
-                        except IndexError:
-                            continue
-                        gauge_metrics[metric_name][route.route_id] = Decimal(value)
-                    case "counter":
-                        try:
-                            value = metric_family.samples[0].value
-                        except IndexError:
-                            continue
-                        counter_metrics[metric_name][route.route_id] = Decimal(value)
+        try:
+            async with client_session.get(request_path) as resp:
+                resp.raise_for_status()
+                metrics_text = await resp.text()
+        except Exception:
+            log.warning(
+                "Failed to collect metrics from route {} ({}:{}), skipping",
+                route.route_id,
+                route.current_kernel_host,
+                route.kernel_port,
+            )
+            continue
+
+        metric_families = text_string_to_metric_families(metrics_text)
+        for metric_family in metric_families:
+            metric_name = metric_family.name
+            match metric_family.type:
+                case "histogram":
+                    labels: list[str] = []
+                    values: list[Decimal] = []
+                    for sample in metric_family.samples:
+                        if sample.name.endswith("_bucket"):
+                            labels.append(sample.labels["le"])
+                            values.append(Decimal(sample.value))
+                        elif sample.name.endswith("_count"):
+                            histogram_count_metrics[metric_name][route.route_id] = int(
+                                sample.value
+                            )
+                        elif sample.name.endswith("_sum"):
+                            histogram_sum_metrics[metric_name][route.route_id] = Decimal(
+                                sample.value
+                            )
+                    histogram_metrics_labels[metric_name] = tuple(labels)
+                    histogram_bucket_metrics[metric_name][route.route_id] = tuple(values)
+                case "gauge":
+                    try:
+                        value = metric_family.samples[0].value
+                    except IndexError:
+                        continue
+                    gauge_metrics[metric_name][route.route_id] = Decimal(value)
+                case "counter":
+                    try:
+                        value = metric_family.samples[0].value
+                    except IndexError:
+                        continue
+                    counter_metrics[metric_name][route.route_id] = Decimal(value)
 
     measures: list[InferenceMeasurement[Measurement | HistogramMeasurement]] = []
     for metric_name, per_route_histogram_metrics in histogram_bucket_metrics.items():
