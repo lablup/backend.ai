@@ -65,7 +65,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     ExecutionSpec,
     ModelDeploymentData,
-    ModelMountConfigData,
     ModelRevisionData,
     MountInfo,
     ReplicaSpec,
@@ -212,6 +211,9 @@ class RevisionAdapter(BaseFilterAdapter):
 
     def convert_to_dto(self, data: ModelRevisionData) -> RevisionDTO:
         """Convert ModelRevisionData to DTO."""
+        mount_config = data.model_mount_config
+        if mount_config.vfolder_id is None or mount_config.mount_destination is None:
+            raise IncompleteRevisionData(f"Revision {data.id} has incomplete model mount config")
         return RevisionDTO(
             id=data.id,
             name=data.name,
@@ -226,19 +228,13 @@ class RevisionAdapter(BaseFilterAdapter):
             model_runtime_config=ModelRuntimeConfigDTO(
                 runtime_variant=data.model_runtime_config.runtime_variant,
             ),
-            model_mount_config=self._convert_model_mount_config(data.model_mount_config),
+            model_mount_config=ModelMountConfigDTO(
+                vfolder_id=mount_config.vfolder_id,
+                mount_destination=mount_config.mount_destination,
+                definition_path=mount_config.definition_path,
+            ),
             created_at=data.created_at,
             image_id=data.image_id,
-        )
-
-    @staticmethod
-    def _convert_model_mount_config(config: ModelMountConfigData) -> ModelMountConfigDTO:
-        if config.vfolder_id is None:
-            raise IncompleteRevisionData("model_mount_config.vfolder_id is required but was None")
-        return ModelMountConfigDTO(
-            vfolder_id=config.vfolder_id,
-            mount_destination=config.mount_destination,
-            definition_path=config.definition_path,
         )
 
     def build_querier(self, request: SearchRevisionsRequest) -> BatchQuerier:

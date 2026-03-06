@@ -115,7 +115,7 @@ class ModelMountConfig:
 
     @classmethod
     def from_dataclass(cls, data: ModelMountConfigData) -> ModelMountConfig | None:
-        if data.vfolder_id is None:
+        if data.vfolder_id is None or data.mount_destination is None:
             return None
         return cls(
             _vfolder_id=data.vfolder_id,

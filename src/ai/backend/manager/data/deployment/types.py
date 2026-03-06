@@ -470,7 +470,7 @@ class ModelRuntimeConfigData:
 @dataclass
 class ModelMountConfigData:
     vfolder_id: UUID | None
-    mount_destination: str
+    mount_destination: str | None
     definition_path: str
 
 
