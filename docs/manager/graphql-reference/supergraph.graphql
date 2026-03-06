@@ -573,7 +573,7 @@ type AgentV2 implements Node
   sessions(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
 
   """Added in 26.4.0. Per-slot resource capacity and usage for this agent."""
-  resourceSlots: AgentResourceConnection!
+  resourceSlots(first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AgentResourceConnection!
 }
 
 """
@@ -5647,7 +5647,7 @@ type KernelV2 implements Node
   session: SessionV2
 
   """Added in 26.3.0. Per-slot resource allocation for this kernel."""
-  resourceAllocations: ResourceAllocationConnection!
+  resourceAllocations(first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): ResourceAllocationConnection!
 }
 
 """
