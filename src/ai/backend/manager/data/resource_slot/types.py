@@ -4,6 +4,8 @@ import uuid
 from dataclasses import dataclass
 from decimal import Decimal
 
+from ai.backend.common.types import SlotQuantity
+
 
 @dataclass(frozen=True)
 class NumberFormatData:
@@ -61,3 +63,9 @@ class ResourceAllocationSearchResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+@dataclass(frozen=True)
+class ResourceOccupancy:
+    occupied_slots: list[SlotQuantity]
+    session_count: int
