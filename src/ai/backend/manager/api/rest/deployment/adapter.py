@@ -212,7 +212,7 @@ class RevisionAdapter(BaseFilterAdapter):
     def convert_to_dto(self, data: ModelRevisionData) -> RevisionDTO:
         """Convert ModelRevisionData to DTO."""
         mount_config = data.model_mount_config
-        if mount_config.vfolder_id is None or mount_config.mount_destination is None:
+        if mount_config.vfolder_id is None:
             raise IncompleteRevisionData(f"Revision {data.id} has incomplete model mount config")
         return RevisionDTO(
             id=data.id,
@@ -230,7 +230,7 @@ class RevisionAdapter(BaseFilterAdapter):
             ),
             model_mount_config=ModelMountConfigDTO(
                 vfolder_id=mount_config.vfolder_id,
-                mount_destination=mount_config.mount_destination,
+                mount_destination=mount_config.mount_destination or "",
                 definition_path=mount_config.definition_path,
             ),
             created_at=data.created_at,
