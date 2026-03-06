@@ -126,6 +126,22 @@ class PermissionControllerRepository:
         return row.to_data()
 
     @permission_controller_repository_resilience.apply()
+    async def update_permission(
+        self,
+        updater: Updater[PermissionRow],
+    ) -> PermissionData:
+        """
+        Update a permission in the database.
+
+        Returns the updated permission data.
+
+        Raises:
+            ObjectNotFound: If permission does not exist.
+        """
+        row = await self._db_source.update_permission(updater)
+        return row.to_data()
+
+    @permission_controller_repository_resilience.apply()
     async def create_object_permission(
         self,
         creator: Creator[ObjectPermissionRow],

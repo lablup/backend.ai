@@ -176,6 +176,28 @@ class PermissionDBSource:
                 raise ObjectNotFound(f"Permission with ID {purger.pk_value} does not exist.")
             return result.row
 
+    async def update_permission(
+        self,
+        updater: Updater[PermissionRow],
+    ) -> PermissionRow:
+        """
+        Update a permission.
+
+        Args:
+            updater: Updater with permission ID and fields to update
+
+        Returns:
+            Updated permission row
+
+        Raises:
+            ObjectNotFound: If permission does not exist
+        """
+        async with self._db.begin_session() as db_session:
+            result = await execute_updater(db_session, updater)
+            if result is None:
+                raise ObjectNotFound(f"Permission with ID {updater.pk_value} does not exist.")
+            return result.row
+
     async def delete_object_permission(
         self,
         purger: Purger[ObjectPermissionRow],

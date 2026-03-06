@@ -88,6 +88,10 @@ from ai.backend.manager.services.permission_contoller.actions.search_users_assig
     SearchUsersAssignedToRoleAction,
     SearchUsersAssignedToRoleActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.update_permission import (
+    UpdatePermissionAction,
+    UpdatePermissionActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.update_role import (
     UpdateRoleAction,
     UpdateRoleActionResult,
@@ -136,6 +140,15 @@ class PermissionControllerService:
         """
         result = await self._repository.delete_permission(action.purger)
         return DeletePermissionActionResult(data=result)
+
+    async def update_permission(
+        self, action: UpdatePermissionAction
+    ) -> UpdatePermissionActionResult:
+        """
+        Updates an existing permission in the repository.
+        """
+        result = await self._repository.update_permission(action.updater)
+        return UpdatePermissionActionResult(data=result)
 
     async def create_object_permission(
         self, action: CreateObjectPermissionAction

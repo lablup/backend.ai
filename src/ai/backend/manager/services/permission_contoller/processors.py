@@ -59,6 +59,10 @@ from .actions.search_scopes import (
     SearchScopesAction,
     SearchScopesActionResult,
 )
+from .actions.update_permission import (
+    UpdatePermissionAction,
+    UpdatePermissionActionResult,
+)
 from .service import PermissionControllerService
 
 
@@ -89,6 +93,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     ]
     search_permissions: ActionProcessor[SearchPermissionsAction, SearchPermissionsActionResult]
     create_permission: ActionProcessor[CreatePermissionAction, CreatePermissionActionResult]
+    update_permission: ActionProcessor[UpdatePermissionAction, UpdatePermissionActionResult]
     delete_permission: ActionProcessor[DeletePermissionAction, DeletePermissionActionResult]
 
     def __init__(
@@ -119,6 +124,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         )
         self.search_permissions = ActionProcessor(service.search_permissions, action_monitors)
         self.create_permission = ActionProcessor(service.create_permission, action_monitors)
+        self.update_permission = ActionProcessor(service.update_permission, action_monitors)
         self.delete_permission = ActionProcessor(service.delete_permission, action_monitors)
 
     @override
@@ -143,5 +149,6 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             SearchElementAssociationsAction.spec(),
             SearchPermissionsAction.spec(),
             CreatePermissionAction.spec(),
+            UpdatePermissionAction.spec(),
             DeletePermissionAction.spec(),
         ]
