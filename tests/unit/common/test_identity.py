@@ -273,7 +273,7 @@ class TestDetectCloudServices:
         body: str,
     ) -> None:
         mock_responses.get(aws_metadata_url, body=body)
-        with pytest.raises(CloudDetectionError, match="Not a AWS metadata response"):
+        with pytest.raises(CloudDetectionError, match="AWS detection failed"):
             await _detect_aws(client_session)
 
     @pytest.mark.parametrize("status", [404, 500, 503], ids=["404", "500", "503"])
@@ -285,7 +285,7 @@ class TestDetectCloudServices:
         status: int,
     ) -> None:
         mock_responses.get(aws_metadata_url, status=status, body="error")
-        with pytest.raises(CloudDetectionError, match=f"non-200 response.*status={status}"):
+        with pytest.raises(CloudDetectionError, match=f"AWS detection failed with status {status}"):
             await _detect_aws(client_session)
 
     @pytest.fixture
@@ -322,7 +322,7 @@ class TestDetectCloudServices:
         body: str,
     ) -> None:
         mock_responses.get(azure_metadata_url, body=body)
-        with pytest.raises(CloudDetectionError, match="Not a Azure metadata response"):
+        with pytest.raises(CloudDetectionError, match="Azure detection failed"):
             await _detect_azure(client_session)
 
     @pytest.mark.parametrize("status", [404, 500, 503], ids=["404", "500", "503"])
@@ -334,7 +334,9 @@ class TestDetectCloudServices:
         status: int,
     ) -> None:
         mock_responses.get(azure_metadata_url, status=status, body="error")
-        with pytest.raises(CloudDetectionError, match=f"non-200 response.*status={status}"):
+        with pytest.raises(
+            CloudDetectionError, match=f"Azure detection failed with status {status}"
+        ):
             await _detect_azure(client_session)
 
     @pytest.fixture
@@ -364,7 +366,7 @@ class TestDetectCloudServices:
         body: str,
     ) -> None:
         mock_responses.get(gcp_metadata_url, body=body)
-        with pytest.raises(CloudDetectionError, match="Not a GCP metadata response"):
+        with pytest.raises(CloudDetectionError, match="GCP detection failed"):
             await _detect_gcp(client_session)
 
     @pytest.mark.parametrize("status", [404, 500, 503], ids=["404", "500", "503"])
@@ -376,7 +378,7 @@ class TestDetectCloudServices:
         status: int,
     ) -> None:
         mock_responses.get(gcp_metadata_url, status=status, body="error")
-        with pytest.raises(CloudDetectionError, match=f"non-200 response.*status={status}"):
+        with pytest.raises(CloudDetectionError, match=f"GCP detection failed with status {status}"):
             await _detect_gcp(client_session)
 
 
