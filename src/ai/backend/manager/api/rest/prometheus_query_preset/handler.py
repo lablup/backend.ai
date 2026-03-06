@@ -25,9 +25,7 @@ from ai.backend.manager.data.prometheus_query_preset import (
 )
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
     Creator,
-    OffsetPagination,
     Updater,
 )
 from ai.backend.manager.repositories.prometheus_query_preset.creators import (
@@ -98,14 +96,8 @@ class PrometheusQueryPresetHandler:
         self,
         body: BodyParam[SearchPresetsRequest],
     ) -> APIResponse:
-        """Search presets with pagination."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(
-                offset=body.parsed.offset,
-                limit=body.parsed.limit,
-            ),
-            conditions=[],
-        )
+        """Search presets with filters, orders, and pagination."""
+        querier = self._adapter.build_querier(body.parsed)
         action_result = await self._processor.search_presets.wait_for_complete(
             SearchPresetsAction(querier=querier)
         )

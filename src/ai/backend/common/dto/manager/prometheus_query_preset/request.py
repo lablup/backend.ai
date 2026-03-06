@@ -13,15 +13,19 @@ from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.clients.prometheus.defs import PROMETHEUS_DURATION_PATTERN
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
+from ai.backend.common.dto.manager.query import StringFilter
+
+from .types import PresetOrder
 
 __all__ = (
+    "CreatePresetOptionsRequest",
     "CreatePresetRequest",
     "ExecutePresetOptionsRequest",
     "ExecutePresetRequest",
     "MetricLabelEntry",
     "ModifyCreatePresetOptionsRequest",
     "ModifyPresetRequest",
-    "CreatePresetOptionsRequest",
+    "PresetFilter",
     "SearchPresetsRequest",
 )
 
@@ -80,15 +84,24 @@ class ModifyPresetRequest(BaseRequestModel):
         return v
 
 
-class SearchPresetsRequest(BaseRequestModel):
-    """Request to search prometheus query presets."""
+class PresetFilter(BaseRequestModel):
+    """Filter for prometheus query preset search."""
 
-    offset: int = Field(default=0, ge=0, description="Pagination offset")
+    name: StringFilter | None = Field(default=None, description="Filter by preset name")
+    metric_name: StringFilter | None = Field(default=None, description="Filter by metric name")
+
+
+class SearchPresetsRequest(BaseRequestModel):
+    """Request body for searching prometheus query presets with filters, orders, and pagination."""
+
+    filter: PresetFilter | None = Field(default=None, description="Filter conditions")
+    order: list[PresetOrder] | None = Field(default=None, description="Order specifications")
+    offset: int = Field(default=0, ge=0, description="Number of items to skip")
     limit: int = Field(
         default=DEFAULT_PAGE_LIMIT,
         ge=1,
         le=MAX_PAGE_LIMIT,
-        description="Pagination limit",
+        description="Maximum items to return",
     )
 
 
