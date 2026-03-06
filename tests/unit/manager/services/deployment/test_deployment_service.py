@@ -27,6 +27,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
+    DeploymentPolicyUpsertResult,
     DeploymentState,
     ExecutionSpec,
     ModelMountConfigData,
@@ -37,13 +38,16 @@ from ai.backend.manager.data.deployment.types import (
     ResourceConfigData,
     ResourceSpec,
 )
+from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_policy import (
+    BlueGreenSpec,
     RollingUpdateSpec,
 )
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
     SearchDeploymentPoliciesAction,
+    UpsertDeploymentPolicyAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
@@ -113,6 +117,86 @@ class DeploymentServiceBaseFixtures:
     @pytest.fixture
     def policy_id(self) -> uuid.UUID:
         return uuid.uuid4()
+
+
+class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
+    """Tests for DeploymentService.upsert_deployment_policy"""
+
+    @pytest.fixture
+    def rolling_upserter(self, endpoint_id: uuid.UUID) -> DeploymentPolicyUpserter:
+        return DeploymentPolicyUpserter(
+            deployment_id=endpoint_id,
+            strategy=DeploymentStrategy.ROLLING,
+            strategy_spec=RollingUpdateSpec(max_surge=2, max_unavailable=1),
+            rollback_on_failure=True,
+        )
+
+    @pytest.fixture
+    def blue_green_upserter(self, endpoint_id: uuid.UUID) -> DeploymentPolicyUpserter:
+        return DeploymentPolicyUpserter(
+            deployment_id=endpoint_id,
+            strategy=DeploymentStrategy.BLUE_GREEN,
+            strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
+            rollback_on_failure=False,
+        )
+
+    @pytest.fixture
+    def blue_green_policy_data(self) -> DeploymentPolicyData:
+        return DeploymentPolicyData(
+            id=uuid.uuid4(),
+            endpoint=uuid.uuid4(),
+            strategy=DeploymentStrategy.BLUE_GREEN,
+            strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
+            rollback_on_failure=False,
+            created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
+            updated_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
+        )
+
+    async def test_upsert_deployment_policy_insert(
+        self,
+        processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
+        deployment_policy_data: DeploymentPolicyData,
+        endpoint_id: uuid.UUID,
+        rolling_upserter: DeploymentPolicyUpserter,
+    ) -> None:
+        """Upsert should create a new policy when none exists (created=True)."""
+        mock_deployment_repository.upsert_deployment_policy = AsyncMock(
+            return_value=DeploymentPolicyUpsertResult(data=deployment_policy_data, created=True)
+        )
+
+        action = UpsertDeploymentPolicyAction(upserter=rolling_upserter)
+
+        result = await processors.upsert_deployment_policy.wait_for_complete(action)
+
+        assert result.created is True
+        assert result.data == deployment_policy_data
+        mock_deployment_repository.upsert_deployment_policy.assert_called_once()
+        upserter_arg = mock_deployment_repository.upsert_deployment_policy.call_args[0][0]
+        spec = upserter_arg.spec
+        assert spec.endpoint_id == endpoint_id
+        assert spec.strategy == DeploymentStrategy.ROLLING
+        assert spec.rollback_on_failure is True
+
+    async def test_upsert_deployment_policy_update(
+        self,
+        processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
+        blue_green_upserter: DeploymentPolicyUpserter,
+        blue_green_policy_data: DeploymentPolicyData,
+    ) -> None:
+        """Upsert should update an existing policy (created=False)."""
+        mock_deployment_repository.upsert_deployment_policy = AsyncMock(
+            return_value=DeploymentPolicyUpsertResult(data=blue_green_policy_data, created=False)
+        )
+
+        action = UpsertDeploymentPolicyAction(upserter=blue_green_upserter)
+
+        result = await processors.upsert_deployment_policy.wait_for_complete(action)
+
+        assert result.created is False
+        assert result.data == blue_green_policy_data
+        assert result.data.strategy == DeploymentStrategy.BLUE_GREEN
 
 
 class TestSearchDeploymentPolicies(DeploymentServiceBaseFixtures):
