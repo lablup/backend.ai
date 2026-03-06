@@ -85,11 +85,16 @@ class ResourceSlotTypeGQL(Node):
         required: bool = False,
     ) -> Iterable[Self | None]:
         from ai.backend.manager.api.gql.resource_slot.fetcher import load_resource_slot_type_data
+        from ai.backend.manager.errors.resource_slot import ResourceSlotTypeNotFound
 
         results: list[Self | None] = []
         for slot_name in node_ids:
-            data = await load_resource_slot_type_data(info, slot_name)
-            results.append(cls.from_data(data) if data is not None else None)
+            try:
+                data = await load_resource_slot_type_data(info, slot_name)
+            except ResourceSlotTypeNotFound:
+                results.append(None)
+            else:
+                results.append(cls.from_data(data))
         return results
 
     @classmethod

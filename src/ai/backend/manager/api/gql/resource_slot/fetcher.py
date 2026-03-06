@@ -19,7 +19,6 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceAllocationData,
     ResourceSlotTypeData,
 )
-from ai.backend.manager.errors.resource_slot import ResourceSlotTypeNotFound
 from ai.backend.manager.services.resource_slot.actions.all_slot_types import AllSlotTypesAction
 from ai.backend.manager.services.resource_slot.actions.get_agent_resources import (
     GetAgentResourcesAction,
@@ -75,16 +74,13 @@ async def fetch_resource_slot_types(
 async def fetch_resource_slot_type(
     info: Info[StrawberryGQLContext],
     slot_name: str,
-) -> ResourceSlotTypeGQL | None:
+) -> ResourceSlotTypeGQL:
     """Fetch a single resource slot type by slot_name (used by Node resolution and root query)."""
-    try:
-        action_result = (
-            await info.context.processors.resource_slot.get_resource_slot_type.wait_for_complete(
-                GetResourceSlotTypeAction(slot_name=slot_name)
-            )
+    action_result = (
+        await info.context.processors.resource_slot.get_resource_slot_type.wait_for_complete(
+            GetResourceSlotTypeAction(slot_name=slot_name)
         )
-    except ResourceSlotTypeNotFound:
-        return None
+    )
     return ResourceSlotTypeGQL.from_data(action_result.item)
 
 
@@ -192,16 +188,13 @@ async def fetch_kernel_resource_allocation(
 async def load_resource_slot_type_data(
     info: Info[StrawberryGQLContext],
     slot_name: str,
-) -> ResourceSlotTypeData | None:
+) -> ResourceSlotTypeData:
     """Load raw ResourceSlotTypeData for a single slot_name (used by Node.resolve_nodes)."""
-    try:
-        action_result = (
-            await info.context.processors.resource_slot.get_resource_slot_type.wait_for_complete(
-                GetResourceSlotTypeAction(slot_name=slot_name)
-            )
+    action_result = (
+        await info.context.processors.resource_slot.get_resource_slot_type.wait_for_complete(
+            GetResourceSlotTypeAction(slot_name=slot_name)
         )
-    except ResourceSlotTypeNotFound:
-        return None
+    )
     return ResourceSlotTypeData(
         slot_name=action_result.item.slot_name,
         slot_type=action_result.item.slot_type,
