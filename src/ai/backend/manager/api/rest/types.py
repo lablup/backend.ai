@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.common.metrics.metric import GraphQLMetricObserver
+    from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
     from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.idle import IdleCheckerHost
@@ -77,6 +78,7 @@ class GQLContextDeps:
     scheduler_repository: SchedulerRepository
     user_repository: UserRepository
     agent_repository: AgentRepository
+    strawberry_gql_adapter: BaseGQLAdapter
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
