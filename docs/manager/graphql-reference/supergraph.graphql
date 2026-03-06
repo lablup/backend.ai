@@ -10361,7 +10361,7 @@ type Role implements Node
   permissions(filter: PermissionFilter = null, orderBy: PermissionOrderBy = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection!
 
   """Users assigned to this role."""
-  users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
+  users(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
 }
 
 """Added in 26.3.0. RBAC role assignment (user-role association)"""
@@ -10418,6 +10418,9 @@ input RoleAssignmentFilter
 {
   roleId: UUID = null
   role: RoleAssignmentRoleNestedFilter = null
+  username: StringFilter = null
+  email: StringFilter = null
+  grantedBy: UUID = null
 }
 
 """Added in 26.3.0. Order by specification for role assignments"""
@@ -10432,6 +10435,8 @@ input RoleAssignmentOrderBy
 enum RoleAssignmentOrderField
   @join__type(graph: STRAWBERRY)
 {
+  USERNAME @join__enumValue(graph: STRAWBERRY)
+  EMAIL @join__enumValue(graph: STRAWBERRY)
   GRANTED_AT @join__enumValue(graph: STRAWBERRY)
 }
 

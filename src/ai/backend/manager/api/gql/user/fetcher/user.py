@@ -23,7 +23,6 @@ from ai.backend.manager.repositories.user.options import UserConditions, UserOrd
 from ai.backend.manager.repositories.user.types import (
     DomainUserSearchScope,
     ProjectUserSearchScope,
-    RoleUserSearchScope,
 )
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.search_users import SearchUsersAction
@@ -32,9 +31,6 @@ from ai.backend.manager.services.user.actions.search_users_by_domain import (
 )
 from ai.backend.manager.services.user.actions.search_users_by_project import (
     SearchUsersByProjectAction,
-)
-from ai.backend.manager.services.user.actions.search_users_by_role import (
-    SearchUsersByRoleAction,
 )
 
 
@@ -264,55 +260,6 @@ async def fetch_project_users(
     )
 
     # Build connection
-    nodes = [UserV2GQL.from_data(data) for data in action_result.users]
-    edges = [UserV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
-
-    return UserV2Connection(
-        edges=edges,
-        page_info=PageInfo(
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        ),
-        count=action_result.total_count,
-    )
-
-
-async def fetch_role_users(
-    info: Info[StrawberryGQLContext],
-    scope: RoleUserSearchScope,
-    filter: UserFilterGQL | None = None,
-    order_by: list[UserOrderByGQL] | None = None,
-    before: str | None = None,
-    after: str | None = None,
-    first: int | None = None,
-    last: int | None = None,
-    limit: int | None = None,
-    offset: int | None = None,
-) -> UserV2Connection:
-    """Fetch users assigned to a specific role."""
-    processors = info.context.processors
-
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
-        get_user_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
-        base_conditions=None,
-    )
-
-    action_result = await processors.user.search_users_by_role.wait_for_complete(
-        SearchUsersByRoleAction(scope=scope, querier=querier)
-    )
-
     nodes = [UserV2GQL.from_data(data) for data in action_result.users]
     edges = [UserV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
 
