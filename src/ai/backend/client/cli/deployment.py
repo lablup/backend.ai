@@ -2,34 +2,17 @@
 
 from __future__ import annotations
 
-import asyncio
-import json
 import sys
-from pathlib import Path
-from uuid import UUID
+from typing import TYPE_CHECKING
 
 import click
 
+if TYPE_CHECKING:
+    from uuid import UUID
+
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.config import get_config
-from ai.backend.client.session import Session
-from ai.backend.client.v2.auth import HMACAuth
-from ai.backend.client.v2.config import ClientConfig
-from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.cli import EnumChoice
-from ai.backend.common.data.model_deployment.types import DeploymentStrategy, RouteTrafficStatus
-from ai.backend.common.dto.manager.deployment import (
-    BlueGreenConfigInput,
-    CreateDeploymentRequest,
-    DeploymentFilter,
-    RollingUpdateConfigInput,
-    SearchDeploymentsRequest,
-    SearchRevisionsRequest,
-    SearchRoutesRequest,
-    UpdateDeploymentRequest,
-    UpdateRouteTrafficStatusRequest,
-    UpsertDeploymentPolicyRequest,
-)
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 
 from .extensions import pass_ctx_obj
 from .pretty import print_done, print_fail
@@ -87,6 +70,12 @@ def create_deployment_cmd(
         }
     }
     """
+    import json
+    from pathlib import Path
+
+    from ai.backend.client.session import Session
+    from ai.backend.common.dto.manager.deployment import CreateDeploymentRequest
+
     with Session() as session:
         try:
             config_file_path = Path(config_file)
@@ -114,6 +103,14 @@ def list_deployments_cmd(
     offset: int,
 ) -> None:
     """List all deployments."""
+    from uuid import UUID
+
+    from ai.backend.client.session import Session
+    from ai.backend.common.dto.manager.deployment import (
+        DeploymentFilter,
+        SearchDeploymentsRequest,
+    )
+
     with Session() as session:
         try:
             filter_cond = None
@@ -155,6 +152,11 @@ def list_deployments_cmd(
 @click.argument("deployment_id", type=str)
 def info_deployment_cmd(ctx: CLIContext, deployment_id: str) -> None:
     """Display detailed information of a deployment."""
+    import json
+    from uuid import UUID
+
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             result = session.Deployment.get(UUID(deployment_id))
@@ -177,6 +179,12 @@ def update_deployment_cmd(
     replicas: int | None,
 ) -> None:
     """Update a deployment."""
+    import json
+    from uuid import UUID
+
+    from ai.backend.client.session import Session
+    from ai.backend.common.dto.manager.deployment import UpdateDeploymentRequest
+
     with Session() as session:
         try:
             request = UpdateDeploymentRequest(name=name, desired_replicas=replicas)
@@ -194,6 +202,10 @@ def update_deployment_cmd(
 @click.confirmation_option(prompt="Are you sure you want to destroy this deployment?")
 def destroy_deployment_cmd(ctx: CLIContext, deployment_id: str) -> None:
     """Destroy a deployment."""
+    from uuid import UUID
+
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             result = session.Deployment.destroy(UUID(deployment_id))
@@ -227,6 +239,11 @@ def list_revisions_cmd(
     offset: int,
 ) -> None:
     """List revisions for a deployment."""
+    from uuid import UUID
+
+    from ai.backend.client.session import Session
+    from ai.backend.common.dto.manager.deployment import SearchRevisionsRequest
+
     with Session() as session:
         try:
             request = SearchRevisionsRequest(limit=limit, offset=offset)
@@ -254,6 +271,11 @@ def list_revisions_cmd(
 @click.argument("revision_id", type=str)
 def info_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str) -> None:
     """Display detailed information of a revision."""
+    import json
+    from uuid import UUID
+
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             result = session.Deployment.get_revision(UUID(deployment_id), UUID(revision_id))
@@ -269,6 +291,10 @@ def info_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str) -> 
 @click.argument("revision_id", type=str)
 def activate_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str) -> None:
     """Activate a revision."""
+    from uuid import UUID
+
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             result = session.Deployment.activate_revision(UUID(deployment_id), UUID(revision_id))
@@ -288,6 +314,10 @@ def activate_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str)
 @click.argument("revision_id", type=str)
 def deactivate_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str) -> None:
     """Deactivate a revision."""
+    from uuid import UUID
+
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             result = session.Deployment.deactivate_revision(UUID(deployment_id), UUID(revision_id))
@@ -321,6 +351,11 @@ def list_routes_cmd(
     offset: int,
 ) -> None:
     """List routes for a deployment."""
+    from uuid import UUID
+
+    from ai.backend.client.session import Session
+    from ai.backend.common.dto.manager.deployment import SearchRoutesRequest
+
     with Session() as session:
         try:
             request = SearchRoutesRequest(limit=limit, offset=offset)
@@ -361,6 +396,13 @@ def update_route_traffic_cmd(
         print_fail("Must specify either --activate or --deactivate")
         sys.exit(ExitCode.FAILURE)
 
+    import json
+    from uuid import UUID
+
+    from ai.backend.client.session import Session
+    from ai.backend.common.data.model_deployment.types import RouteTrafficStatus
+    from ai.backend.common.dto.manager.deployment import UpdateRouteTrafficStatusRequest
+
     with Session() as session:
         try:
             request = UpdateRouteTrafficStatusRequest(
@@ -394,6 +436,13 @@ def policy() -> None:
 @click.argument("deployment_id", type=click.UUID)
 def info_policy_cmd(ctx: CLIContext, deployment_id: UUID) -> None:
     """Display the deployment policy."""
+    import asyncio
+    import json
+
+    from ai.backend.client.config import get_config
+    from ai.backend.client.v2.auth import HMACAuth
+    from ai.backend.client.v2.config import ClientConfig
+    from ai.backend.client.v2.registry import BackendAIClientRegistry
 
     async def _run() -> None:
         api_config = get_config()
@@ -483,6 +532,19 @@ def update_policy_cmd(
     promote_delay: int | None,
 ) -> None:
     """Update the deployment policy. Creates one if it does not exist yet."""
+    import asyncio
+    import json
+
+    from ai.backend.client.config import get_config
+    from ai.backend.client.v2.auth import HMACAuth
+    from ai.backend.client.v2.config import ClientConfig
+    from ai.backend.client.v2.registry import BackendAIClientRegistry
+    from ai.backend.common.dto.manager.deployment import (
+        BlueGreenConfigInput,
+        RollingUpdateConfigInput,
+        UpsertDeploymentPolicyRequest,
+    )
+
     rolling_update = None
     blue_green = None
 
