@@ -28,6 +28,9 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
     CreatePermissionAction,
     DeletePermissionAction,
 )
+from ai.backend.manager.services.permission_contoller.actions.update_permission import (
+    UpdatePermissionAction,
+)
 
 # ==================== Query Resolvers ====================
 
@@ -96,7 +99,12 @@ async def admin_update_permission(
     info: Info[StrawberryGQLContext],
     input: UpdatePermissionInput,
 ) -> PermissionGQL:
-    raise NotImplementedError
+    action_result = (
+        await info.context.processors.permission_controller.update_permission.wait_for_complete(
+            UpdatePermissionAction(updater=input.to_updater())
+        )
+    )
+    return PermissionGQL.from_dataclass(action_result.data)
 
 
 @strawberry.mutation(description="Added in 26.3.0. Delete a scoped permission (admin only).")  # type: ignore[misc]
