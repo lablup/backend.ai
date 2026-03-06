@@ -1,7 +1,7 @@
 """Make routings.created_at non-nullable
 
 Revision ID: b1009fe7f865
-Revises: 3f5c20f7bb07
+Revises: 0b1efbb2db84
 Create Date: 2026-03-06 04:11:09.336691
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "b1009fe7f865"
-down_revision = "3f5c20f7bb07"
+down_revision = "0b1efbb2db84"
 branch_labels = None
 depends_on = None
 
