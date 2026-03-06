@@ -16,8 +16,10 @@ from ai.backend.manager.api.gql.rbac.fetcher.role import (
 )
 from ai.backend.manager.api.gql.rbac.types import (
     AssignRoleInput,
+    BulkAssignRoleErrorGQL,
     BulkAssignRoleInput,
     BulkAssignRolePayloadGQL,
+    BulkRevokeRoleErrorGQL,
     BulkRevokeRoleInput,
     BulkRevokeRolePayloadGQL,
     CreateRoleInput,
@@ -44,6 +46,12 @@ from ai.backend.manager.repositories.permission_controller.options import Assign
 from ai.backend.manager.repositories.permission_controller.updaters import RoleUpdaterSpec
 from ai.backend.manager.services.permission_contoller.actions.assign_role import (
     AssignRoleAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
+    BulkAssignRoleAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role import (
+    BulkRevokeRoleAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.create_role import (
     CreateRoleAction,
@@ -252,7 +260,18 @@ async def admin_bulk_assign_role(
     info: Info[StrawberryGQLContext],
     input: BulkAssignRoleInput,
 ) -> BulkAssignRolePayloadGQL:
-    raise NotImplementedError
+    action_result = (
+        await info.context.processors.permission_controller.bulk_assign_role.wait_for_complete(
+            BulkAssignRoleAction(bulk_creator=input.to_bulk_creator())
+        )
+    )
+    return BulkAssignRolePayloadGQL(
+        assigned=[RoleAssignmentGQL.from_assignment_data(s) for s in action_result.data.successes],
+        failed=[
+            BulkAssignRoleErrorGQL(user_id=f.user_id, message=f.message)
+            for f in action_result.data.failures
+        ],
+    )
 
 
 @strawberry.mutation(
@@ -262,4 +281,15 @@ async def admin_bulk_revoke_role(
     info: Info[StrawberryGQLContext],
     input: BulkRevokeRoleInput,
 ) -> BulkRevokeRolePayloadGQL:
-    raise NotImplementedError
+    action_result = (
+        await info.context.processors.permission_controller.bulk_revoke_role.wait_for_complete(
+            BulkRevokeRoleAction(input=input.to_input())
+        )
+    )
+    return BulkRevokeRolePayloadGQL(
+        revoked=[RoleAssignmentGQL.from_revocation_data(s) for s in action_result.data.successes],
+        failed=[
+            BulkRevokeRoleErrorGQL(user_id=f.user_id, message=f.message)
+            for f in action_result.data.failures
+        ],
+    )
