@@ -1192,3 +1192,15 @@ class PrometheusQueryPresetInvalidLabel(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class CloudDetectionError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/cloud-detection-failed"
+    error_title = "Cloud Provider Detection Failed"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.EXTERNAL_SYSTEM,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )

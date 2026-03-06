@@ -16,7 +16,10 @@ from ai.backend.common.configs.loader import (
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.logging.types import LogLevel
-from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.config.loader.legacy_etcd_loader import (
+    LegacyEtcdLoader,
+    LegacyEtcdVolumesLoader,
+)
 from ai.backend.manager.config.provider import ManagerConfigProvider
 
 
@@ -67,6 +70,9 @@ class ConfigProviderDependency(
         # Add legacy etcd loader
         legacy_etcd_loader = LegacyEtcdLoader(setup_input.etcd)
         loaders.append(legacy_etcd_loader)
+
+        # Add legacy etcd volumes loader (volumes/ prefix)
+        loaders.append(LegacyEtcdVolumesLoader(setup_input.etcd))
 
         # Add etcd config loaders
         loaders.append(EtcdConfigLoader(setup_input.etcd, prefix="ai/backend/config/common"))

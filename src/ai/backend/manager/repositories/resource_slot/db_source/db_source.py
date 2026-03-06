@@ -7,18 +7,22 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
+from ai.backend.common.types import SlotQuantity
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.resource_slot.types import (
     AgentResourceData,
     AgentResourceSearchResult,
     NumberFormatData,
     ResourceAllocationData,
     ResourceAllocationSearchResult,
+    ResourceOccupancy,
     ResourceSlotTypeData,
     ResourceSlotTypeSearchResult,
 )
 from ai.backend.manager.errors.resource_slot import (
     ResourceSlotTypeNotFound,
 )
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
     ResourceAllocationRow,
@@ -189,3 +193,103 @@ class ResourceSlotDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    # ==================== Aggregation Queries ====================
+
+    async def aggregate_occupied_by_domain(self, domain_name: str) -> ResourceOccupancy:
+        """Aggregate active resource occupancy for a domain.
+
+        Joins resource_allocations → kernels → resource_slot_types.
+        Only includes kernels with resource-occupying/requesting statuses and free_at IS NULL.
+
+        Returns:
+            ResourceOccupancy with used_slots (sorted by rank) and session_count.
+        """
+        ra = ResourceAllocationRow.__table__
+        k = KernelRow.__table__
+        rst = ResourceSlotTypeRow.__table__
+        all_resource_statuses = (
+            KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
+        )
+        effective_amount = sa.func.coalesce(ra.c.used, ra.c.requested)
+        common_where = (
+            k.c.domain_name == domain_name,
+            k.c.status.in_(all_resource_statuses),
+            ra.c.free_at.is_(None),
+        )
+        slot_stmt = (
+            sa.select(
+                ra.c.slot_name,
+                sa.func.sum(effective_amount).label("total_amount"),
+                rst.c.rank,
+            )
+            .select_from(
+                ra.join(k, ra.c.kernel_id == k.c.id).join(rst, ra.c.slot_name == rst.c.slot_name)
+            )
+            .where(*common_where)
+            .group_by(ra.c.slot_name, rst.c.rank)
+        )
+        count_stmt = (
+            sa.select(sa.func.count(sa.distinct(k.c.session_id)).label("session_count"))
+            .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
+            .where(*common_where)
+        )
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            slot_rows = (await db_sess.execute(slot_stmt)).all()
+            (session_count,) = (await db_sess.execute(count_stmt)).one()
+
+        rank_map = {row.slot_name: row.rank for row in slot_rows}
+        used_slots = sorted(
+            [SlotQuantity(slot_name=row.slot_name, quantity=row.total_amount) for row in slot_rows],
+            key=lambda sq: rank_map.get(sq.slot_name, 9999),
+        )
+        return ResourceOccupancy(used_slots=used_slots, session_count=session_count)
+
+    async def aggregate_occupied_by_project(self, project_id: uuid.UUID) -> ResourceOccupancy:
+        """Aggregate active resource occupancy for a project (group).
+
+        Joins resource_allocations → kernels → resource_slot_types.
+        Only includes kernels with resource-occupying/requesting statuses and free_at IS NULL.
+
+        Returns:
+            ResourceOccupancy with used_slots (sorted by rank) and session_count.
+        """
+        ra = ResourceAllocationRow.__table__
+        k = KernelRow.__table__
+        rst = ResourceSlotTypeRow.__table__
+        all_resource_statuses = (
+            KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
+        )
+        effective_amount = sa.func.coalesce(ra.c.used, ra.c.requested)
+        common_where = (
+            k.c.group_id == project_id,
+            k.c.status.in_(all_resource_statuses),
+            ra.c.free_at.is_(None),
+        )
+        slot_stmt = (
+            sa.select(
+                ra.c.slot_name,
+                sa.func.sum(effective_amount).label("total_amount"),
+                rst.c.rank,
+            )
+            .select_from(
+                ra.join(k, ra.c.kernel_id == k.c.id).join(rst, ra.c.slot_name == rst.c.slot_name)
+            )
+            .where(*common_where)
+            .group_by(ra.c.slot_name, rst.c.rank)
+        )
+        count_stmt = (
+            sa.select(sa.func.count(sa.distinct(k.c.session_id)).label("session_count"))
+            .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
+            .where(*common_where)
+        )
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            slot_rows = (await db_sess.execute(slot_stmt)).all()
+            (session_count,) = (await db_sess.execute(count_stmt)).one()
+
+        rank_map = {row.slot_name: row.rank for row in slot_rows}
+        used_slots = sorted(
+            [SlotQuantity(slot_name=row.slot_name, quantity=row.total_amount) for row in slot_rows],
+            key=lambda sq: rank_map.get(sq.slot_name, 9999),
+        )
+        return ResourceOccupancy(used_slots=used_slots, session_count=session_count)
