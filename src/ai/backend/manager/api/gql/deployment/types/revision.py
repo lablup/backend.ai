@@ -515,7 +515,9 @@ class CreateRevisionInput:
             extra_mounts = [
                 MountInfo(
                     vfolder_id=UUID(str(extra_mount.vfolder_id)),
-                    kernel_path=PurePosixPath(extra_mount.mount_destination or ""),
+                    kernel_path=PurePosixPath(extra_mount.mount_destination)
+                    if extra_mount.mount_destination
+                    else None,
                 )
                 for extra_mount in self.extra_mounts
             ]
@@ -570,7 +572,9 @@ class AddRevisionInput:
             extra_mounts = [
                 MountInfo(
                     vfolder_id=UUID(str(extra_mount.vfolder_id)),
-                    kernel_path=PurePosixPath(extra_mount.mount_destination or ""),
+                    kernel_path=PurePosixPath(extra_mount.mount_destination)
+                    if extra_mount.mount_destination
+                    else None,
                 )
                 for extra_mount in self.extra_mounts
             ]

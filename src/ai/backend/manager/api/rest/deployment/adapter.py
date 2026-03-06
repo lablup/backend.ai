@@ -392,7 +392,9 @@ def build_revision_creator(revision_input: RevisionInput) -> ModelRevisionCreato
         extra_mounts = [
             MountInfo(
                 vfolder_id=mount.vfolder_id,
-                kernel_path=PurePosixPath(mount.mount_destination or ""),
+                kernel_path=PurePosixPath(mount.mount_destination)
+                if mount.mount_destination
+                else None,
             )
             for mount in revision_input.extra_mounts
         ]
