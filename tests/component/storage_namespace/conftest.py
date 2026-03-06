@@ -4,11 +4,13 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.object_storage.handler import ObjectStorageHandler
 from ai.backend.manager.api.rest.object_storage.registry import register_object_storage_routes
@@ -51,7 +53,9 @@ def object_storage_processors(
         storage_manager=storage_manager,
         config_provider=config_provider,
     )
-    return ObjectStorageProcessors(service=service, action_monitors=[])
+    return ObjectStorageProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
@@ -62,7 +66,9 @@ def storage_namespace_processors(
     service = StorageNamespaceService(
         storage_namespace_repository=storage_namespace_repository,
     )
-    return StorageNamespaceProcessors(service=service, action_monitors=[])
+    return StorageNamespaceProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()

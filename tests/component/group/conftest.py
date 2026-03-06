@@ -4,11 +4,13 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator
 from typing import cast
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.group.handler import GroupHandler
 from ai.backend.manager.api.rest.group.registry import register_group_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -58,7 +60,9 @@ def container_registry_processors(
     repo = ContainerRegistryRepository(database_engine)
     quota_service = cast(AbstractPerProjectContainerRegistryQuotaService, InMemoryQuotaService())
     service = ContainerRegistryService(database_engine, repo, quota_service=quota_service)
-    return ContainerRegistryProcessors(service=service, action_monitors=[])
+    return ContainerRegistryProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()

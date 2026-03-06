@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.etcd.handler import EtcdHandler
 from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -26,7 +29,9 @@ def container_registry_processors(
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine)
     service = ContainerRegistryService(database_engine, repo)
-    return ContainerRegistryProcessors(service=service, action_monitors=[])
+    return ContainerRegistryProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
@@ -43,7 +48,9 @@ def etcd_config_processors(
         etcd=async_etcd,
         valkey_stat=valkey_clients.stat,
     )
-    return EtcdConfigProcessors(service=service, action_monitors=[])
+    return EtcdConfigProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
