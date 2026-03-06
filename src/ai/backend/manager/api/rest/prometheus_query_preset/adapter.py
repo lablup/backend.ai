@@ -7,13 +7,13 @@ from ai.backend.common.dto.manager.prometheus_query_preset import (
     MetricLabelEntryDTO,
     MetricValueDTO,
     OrderDirection,
-    PresetDTO,
-    PresetFilter,
-    PresetMetricResult,
-    PresetOptionsDTO,
-    PresetOrder,
-    PresetOrderField,
-    SearchPresetsRequest,
+    QueryDefinitionDTO,
+    QueryDefinitionFilter,
+    QueryDefinitionMetricResult,
+    QueryDefinitionOptionsDTO,
+    QueryDefinitionOrder,
+    QueryDefinitionOrderField,
+    SearchQueryDefinitionsRequest,
 )
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
@@ -32,15 +32,15 @@ from ai.backend.manager.repositories.prometheus_query_preset.options import (
 class PrometheusQueryPresetAdapter(BaseFilterAdapter):
     """Adapter for converting between domain data and DTOs."""
 
-    def convert_to_dto(self, data: PrometheusQueryPresetData) -> PresetDTO:
+    def convert_to_dto(self, data: PrometheusQueryPresetData) -> QueryDefinitionDTO:
         """Convert domain data to DTO."""
-        return PresetDTO(
+        return QueryDefinitionDTO(
             id=data.id,
             name=data.name,
             metric_name=data.metric_name,
             query_template=data.query_template,
             time_window=data.time_window,
-            options=PresetOptionsDTO(
+            options=QueryDefinitionOptionsDTO(
                 filter_labels=data.filter_labels,
                 group_labels=data.group_labels,
             ),
@@ -48,16 +48,16 @@ class PrometheusQueryPresetAdapter(BaseFilterAdapter):
             updated_at=data.updated_at,
         )
 
-    def convert_metric_response(self, response: MetricResponse) -> PresetMetricResult:
-        """Convert a Prometheus MetricResponse to a PresetMetricResult DTO."""
+    def convert_metric_response(self, response: MetricResponse) -> QueryDefinitionMetricResult:
+        """Convert a Prometheus MetricResponse to a QueryDefinitionMetricResult DTO."""
         metric_labels = [
             MetricLabelEntryDTO(key=key, value=str(val))
             for key, val in response.metric.model_dump(exclude_none=True).items()
         ]
         values = [MetricValueDTO(timestamp=ts, value=v) for ts, v in response.values]
-        return PresetMetricResult(metric=metric_labels, values=values)
+        return QueryDefinitionMetricResult(metric=metric_labels, values=values)
 
-    def build_querier(self, request: SearchPresetsRequest) -> BatchQuerier:
+    def build_querier(self, request: SearchQueryDefinitionsRequest) -> BatchQuerier:
         """Build a BatchQuerier from search request."""
         conditions = self._convert_filter(request.filter) if request.filter else []
         orders = [self._convert_order(o) for o in request.order] if request.order else []
@@ -67,8 +67,8 @@ class PrometheusQueryPresetAdapter(BaseFilterAdapter):
             pagination=OffsetPagination(limit=request.limit, offset=request.offset),
         )
 
-    def _convert_filter(self, filter_req: PresetFilter) -> list[QueryCondition]:
-        """Convert preset filter to list of query conditions."""
+    def _convert_filter(self, filter_req: QueryDefinitionFilter) -> list[QueryCondition]:
+        """Convert query definition filter to list of query conditions."""
         conditions: list[QueryCondition] = []
         if filter_req.name is not None:
             condition = self.convert_string_filter(
@@ -89,13 +89,13 @@ class PrometheusQueryPresetAdapter(BaseFilterAdapter):
                 )
         return conditions
 
-    def _convert_order(self, order: PresetOrder) -> QueryOrder:
-        """Convert preset order specification to query order."""
+    def _convert_order(self, order: QueryDefinitionOrder) -> QueryOrder:
+        """Convert query definition order specification to query order."""
         ascending = order.direction == OrderDirection.ASC
-        if order.field == PresetOrderField.NAME:
+        if order.field == QueryDefinitionOrderField.NAME:
             return PrometheusQueryPresetOrders.name(ascending=ascending)
-        if order.field == PresetOrderField.CREATED_AT:
+        if order.field == QueryDefinitionOrderField.CREATED_AT:
             return PrometheusQueryPresetOrders.created_at(ascending=ascending)
-        if order.field == PresetOrderField.UPDATED_AT:
+        if order.field == QueryDefinitionOrderField.UPDATED_AT:
             return PrometheusQueryPresetOrders.updated_at(ascending=ascending)
         raise ValueError(f"Unknown order field: {order.field}")

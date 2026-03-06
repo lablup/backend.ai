@@ -1,5 +1,5 @@
 """
-Response DTOs for Prometheus Query Preset API endpoints.
+Response DTOs for Prometheus Query Definition API endpoints.
 Shared between Client SDK and Manager API.
 """
 
@@ -13,38 +13,38 @@ from pydantic import BaseModel, Field
 from ai.backend.common.api_handlers import BaseResponseModel
 
 __all__ = (
-    "CreatePresetResponse",
-    "DeletePresetResponse",
-    "ExecutePresetResponse",
-    "GetPresetResponse",
+    "CreateQueryDefinitionResponse",
+    "DeleteQueryDefinitionResponse",
+    "ExecuteQueryDefinitionResponse",
+    "GetQueryDefinitionResponse",
     "MetricLabelEntryDTO",
     "MetricValueDTO",
-    "ModifyPresetResponse",
+    "ModifyQueryDefinitionResponse",
     "PaginationInfo",
-    "PresetDTO",
-    "PresetExecuteData",
-    "PresetMetricResult",
-    "PresetOptionsDTO",
-    "SearchPresetsResponse",
+    "QueryDefinitionDTO",
+    "QueryDefinitionExecuteData",
+    "QueryDefinitionMetricResult",
+    "QueryDefinitionOptionsDTO",
+    "SearchQueryDefinitionsResponse",
 )
 
 
-class PresetOptionsDTO(BaseModel):
-    """Options DTO for a prometheus query preset."""
+class QueryDefinitionOptionsDTO(BaseModel):
+    """Options DTO for a prometheus query definition."""
 
     filter_labels: list[str] = Field(description="Allowed filter label keys")
     group_labels: list[str] = Field(description="Allowed group-by label keys")
 
 
-class PresetDTO(BaseModel):
-    """DTO for prometheus query preset data."""
+class QueryDefinitionDTO(BaseModel):
+    """DTO for prometheus query definition data."""
 
-    id: UUID = Field(description="Preset ID")
-    name: str = Field(description="Human-readable preset name")
+    id: UUID = Field(description="Query definition ID")
+    name: str = Field(description="Human-readable name")
     metric_name: str = Field(description="Prometheus metric name")
     query_template: str = Field(description="PromQL template")
     time_window: str | None = Field(default=None, description="Default time window")
-    options: PresetOptionsDTO = Field(description="Preset options")
+    options: QueryDefinitionOptionsDTO = Field(description="Query definition options")
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
 
@@ -57,35 +57,35 @@ class PaginationInfo(BaseModel):
     limit: int = Field(description="Current limit")
 
 
-class CreatePresetResponse(BaseResponseModel):
-    """Response for creating a preset."""
+class CreateQueryDefinitionResponse(BaseResponseModel):
+    """Response for creating a query definition."""
 
-    item: PresetDTO
-
-
-class GetPresetResponse(BaseResponseModel):
-    """Response for getting a preset by ID."""
-
-    item: PresetDTO
+    item: QueryDefinitionDTO
 
 
-class SearchPresetsResponse(BaseResponseModel):
-    """Response for searching presets."""
+class GetQueryDefinitionResponse(BaseResponseModel):
+    """Response for getting a query definition by ID."""
 
-    items: list[PresetDTO]
+    item: QueryDefinitionDTO
+
+
+class SearchQueryDefinitionsResponse(BaseResponseModel):
+    """Response for searching query definitions."""
+
+    items: list[QueryDefinitionDTO]
     pagination: PaginationInfo
 
 
-class ModifyPresetResponse(BaseResponseModel):
-    """Response for modifying a preset."""
+class ModifyQueryDefinitionResponse(BaseResponseModel):
+    """Response for modifying a query definition."""
 
-    item: PresetDTO
+    item: QueryDefinitionDTO
 
 
-class DeletePresetResponse(BaseResponseModel):
-    """Response for deleting a preset."""
+class DeleteQueryDefinitionResponse(BaseResponseModel):
+    """Response for deleting a query definition."""
 
-    id: UUID = Field(description="Deleted preset ID")
+    id: UUID = Field(description="Deleted query definition ID")
 
 
 class MetricLabelEntryDTO(BaseModel):
@@ -102,22 +102,22 @@ class MetricValueDTO(BaseModel):
     value: str
 
 
-class PresetMetricResult(BaseModel):
-    """A single metric result from preset execution."""
+class QueryDefinitionMetricResult(BaseModel):
+    """A single metric result from query definition execution."""
 
     metric: list[MetricLabelEntryDTO]
     values: list[MetricValueDTO]
 
 
-class PresetExecuteData(BaseModel):
+class QueryDefinitionExecuteData(BaseModel):
     """Data field of the execute response."""
 
     result_type: str
-    result: list[PresetMetricResult]
+    result: list[QueryDefinitionMetricResult]
 
 
-class ExecutePresetResponse(BaseResponseModel):
-    """Response for executing a preset."""
+class ExecuteQueryDefinitionResponse(BaseResponseModel):
+    """Response for executing a query definition."""
 
     status: str
-    data: PresetExecuteData
+    data: QueryDefinitionExecuteData

@@ -1,5 +1,5 @@
 """
-Request DTOs for Prometheus Query Preset API endpoints.
+Request DTOs for Prometheus Query Definition API endpoints.
 Shared between Client SDK and Manager API.
 """
 
@@ -15,42 +15,42 @@ from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import StringFilter
 
-from .types import PresetOrder
+from .types import QueryDefinitionOrder
 
 __all__ = (
-    "CreatePresetOptionsRequest",
-    "CreatePresetRequest",
-    "ExecutePresetOptionsRequest",
-    "ExecutePresetRequest",
+    "CreateQueryDefinitionOptionsRequest",
+    "CreateQueryDefinitionRequest",
+    "ExecuteQueryDefinitionOptionsRequest",
+    "ExecuteQueryDefinitionRequest",
     "MetricLabelEntry",
-    "ModifyCreatePresetOptionsRequest",
-    "ModifyPresetRequest",
-    "PresetFilter",
-    "SearchPresetsRequest",
+    "ModifyQueryDefinitionOptionsRequest",
+    "ModifyQueryDefinitionRequest",
+    "QueryDefinitionFilter",
+    "SearchQueryDefinitionsRequest",
 )
 
 
-class CreatePresetOptionsRequest(BaseRequestModel):
-    """Options for a prometheus query preset."""
+class CreateQueryDefinitionOptionsRequest(BaseRequestModel):
+    """Options for a prometheus query definition."""
 
     filter_labels: list[str] = Field(description="Allowed filter label keys")
     group_labels: list[str] = Field(description="Allowed group-by label keys")
 
 
-class CreatePresetRequest(BaseRequestModel):
-    """Request to create a prometheus query preset."""
+class CreateQueryDefinitionRequest(BaseRequestModel):
+    """Request to create a prometheus query definition."""
 
-    name: str = Field(description="Human-readable preset name")
+    name: str = Field(description="Human-readable name")
     metric_name: str = Field(description="Prometheus metric name")
     query_template: str = Field(description="PromQL template with placeholders")
     time_window: str | None = Field(
         default=None, pattern=PROMETHEUS_DURATION_PATTERN, description="Default time window"
     )
-    options: CreatePresetOptionsRequest = Field(description="Preset options")
+    options: CreateQueryDefinitionOptionsRequest = Field(description="Query definition options")
 
 
-class ModifyCreatePresetOptionsRequest(BaseRequestModel):
-    """Options for modifying a prometheus query preset.
+class ModifyQueryDefinitionOptionsRequest(BaseRequestModel):
+    """Options for modifying a prometheus query definition.
 
     Each field is optional — only provided fields are updated.
     """
@@ -59,21 +59,21 @@ class ModifyCreatePresetOptionsRequest(BaseRequestModel):
     group_labels: list[str] | None = Field(default=None, description="Allowed group-by label keys")
 
 
-class ModifyPresetRequest(BaseRequestModel):
-    """Request to modify a prometheus query preset.
+class ModifyQueryDefinitionRequest(BaseRequestModel):
+    """Request to modify a prometheus query definition.
 
     Only ``time_window`` uses ``Sentinel`` because it is the only nullable DB column;
     all other fields are non-nullable, so ``None`` simply means "do not update".
     """
 
-    name: str | None = Field(default=None, description="Human-readable preset name")
+    name: str | None = Field(default=None, description="Human-readable name")
     metric_name: str | None = Field(default=None, description="Prometheus metric name")
     query_template: str | None = Field(
         default=None, description="PromQL template with placeholders"
     )
     time_window: str | Sentinel | None = Field(default=SENTINEL, description="Default time window")
-    options: ModifyCreatePresetOptionsRequest | None = Field(
-        default=None, description="Preset options"
+    options: ModifyQueryDefinitionOptionsRequest | None = Field(
+        default=None, description="Query definition options"
     )
 
     @field_validator("time_window", mode="after")
@@ -84,18 +84,20 @@ class ModifyPresetRequest(BaseRequestModel):
         return v
 
 
-class PresetFilter(BaseRequestModel):
-    """Filter for prometheus query preset search."""
+class QueryDefinitionFilter(BaseRequestModel):
+    """Filter for prometheus query definition search."""
 
-    name: StringFilter | None = Field(default=None, description="Filter by preset name")
+    name: StringFilter | None = Field(default=None, description="Filter by name")
     metric_name: StringFilter | None = Field(default=None, description="Filter by metric name")
 
 
-class SearchPresetsRequest(BaseRequestModel):
-    """Request body for searching prometheus query presets with filters, orders, and pagination."""
+class SearchQueryDefinitionsRequest(BaseRequestModel):
+    """Request body for searching prometheus query definitions with filters, orders, and pagination."""
 
-    filter: PresetFilter | None = Field(default=None, description="Filter conditions")
-    order: list[PresetOrder] | None = Field(default=None, description="Order specifications")
+    filter: QueryDefinitionFilter | None = Field(default=None, description="Filter conditions")
+    order: list[QueryDefinitionOrder] | None = Field(
+        default=None, description="Order specifications"
+    )
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
     limit: int = Field(
         default=DEFAULT_PAGE_LIMIT,
@@ -106,14 +108,14 @@ class SearchPresetsRequest(BaseRequestModel):
 
 
 class MetricLabelEntry(BaseRequestModel):
-    """A key-value label entry for executing a preset."""
+    """A key-value label entry for executing a query definition."""
 
     key: str = Field(description="Label key")
     value: str = Field(description="Label value")
 
 
-class ExecutePresetOptionsRequest(BaseRequestModel):
-    """Execution options for a prometheus query preset."""
+class ExecuteQueryDefinitionOptionsRequest(BaseRequestModel):
+    """Execution options for a prometheus query definition."""
 
     filter_labels: list[MetricLabelEntry] = Field(
         default_factory=list,
@@ -125,11 +127,11 @@ class ExecutePresetOptionsRequest(BaseRequestModel):
     )
 
 
-class ExecutePresetRequest(BaseRequestModel):
-    """Request to execute a prometheus query preset."""
+class ExecuteQueryDefinitionRequest(BaseRequestModel):
+    """Request to execute a prometheus query definition."""
 
-    options: ExecutePresetOptionsRequest = Field(
-        default_factory=ExecutePresetOptionsRequest,
+    options: ExecuteQueryDefinitionOptionsRequest = Field(
+        default_factory=ExecuteQueryDefinitionOptionsRequest,
         description="Execution options (filter and group labels)",
     )
     window: str | None = Field(
