@@ -110,9 +110,7 @@ async def gather_prometheus_inference_measures(
                             labels.append(sample.labels["le"])
                             values.append(Decimal(sample.value))
                         elif sample.name.endswith("_count"):
-                            histogram_count_metrics[metric_name][route.route_id] = int(
-                                sample.value
-                            )
+                            histogram_count_metrics[metric_name][route.route_id] = int(sample.value)
                         elif sample.name.endswith("_sum"):
                             histogram_sum_metrics[metric_name][route.route_id] = Decimal(
                                 sample.value
