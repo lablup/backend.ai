@@ -385,6 +385,30 @@ type AgentResourceSlotEdge
   node: AgentResourceSlot!
 }
 
+"""Added in 26.3.0. Filter criteria for querying agent resource slots."""
+input AgentResourceSlotFilter
+  @join__type(graph: STRAWBERRY)
+{
+  slotName: StringFilter = null
+}
+
+"""Added in 26.3.0. Ordering specification for agent resource slots."""
+input AgentResourceSlotOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: AgentResourceSlotOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.3.0. Fields available for ordering agent resource slots."""
+enum AgentResourceSlotOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  SLOT_NAME @join__enumValue(graph: STRAWBERRY)
+  CAPACITY @join__enumValue(graph: STRAWBERRY)
+  USED @join__enumValue(graph: STRAWBERRY)
+}
+
 """Added in 25.15.0"""
 type AgentStats
   @join__type(graph: STRAWBERRY)
@@ -572,8 +596,8 @@ type AgentV2 implements Node
   """
   sessions(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
 
-  """Added in 26.4.0. Per-slot resource capacity and usage for this agent."""
-  resourceSlots(first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AgentResourceConnection!
+  """Added in 26.3.0. Per-slot resource capacity and usage for this agent."""
+  resourceSlots(filter: AgentResourceSlotFilter = null, orderBy: [AgentResourceSlotOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AgentResourceConnection!
 }
 
 """
@@ -5598,6 +5622,36 @@ type KernelResourceAllocationEdge
 }
 
 """
+Added in 26.3.0. Filter criteria for querying kernel resource allocations.
+"""
+input KernelResourceAllocationFilter
+  @join__type(graph: STRAWBERRY)
+{
+  slotName: StringFilter = null
+}
+
+"""
+Added in 26.3.0. Ordering specification for kernel resource allocations.
+"""
+input KernelResourceAllocationOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: KernelResourceAllocationOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.3.0. Fields available for ordering kernel resource allocations.
+"""
+enum KernelResourceAllocationOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  SLOT_NAME @join__enumValue(graph: STRAWBERRY)
+  REQUESTED @join__enumValue(graph: STRAWBERRY)
+  USED @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
 Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.
 """
 type KernelV2 implements Node
@@ -5647,7 +5701,7 @@ type KernelV2 implements Node
   session: SessionV2
 
   """Added in 26.3.0. Per-slot resource allocation for this kernel."""
-  resourceAllocations(first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): ResourceAllocationConnection!
+  resourceAllocations(filter: KernelResourceAllocationFilter = null, orderBy: [KernelResourceAllocationOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): ResourceAllocationConnection!
 }
 
 """
