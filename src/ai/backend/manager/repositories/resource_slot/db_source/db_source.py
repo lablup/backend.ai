@@ -234,7 +234,7 @@ class ResourceSlotDBSource:
 
         rank_map: dict[str, int] = {}
         slot_accum: dict[str, Decimal] = {}
-        session_ids: set = set()
+        session_ids: set[uuid.UUID] = set()
 
         for row in rows:
             rank_map[row.slot_name] = row.rank
@@ -285,7 +285,7 @@ class ResourceSlotDBSource:
 
         rank_map: dict[str, int] = {}
         slot_accum: dict[str, Decimal] = {}
-        session_ids: set = set()
+        session_ids: set[uuid.UUID] = set()
 
         for row in rows:
             rank_map[row.slot_name] = row.rank
