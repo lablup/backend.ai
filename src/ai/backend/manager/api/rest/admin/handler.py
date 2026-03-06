@@ -218,6 +218,9 @@ class AdminHandler:
     ) -> APIResponse:
         params = body.parsed
         gql_deps = self._gql_deps
+        manager_status = (
+            await gql_deps.config_provider.legacy_etcd_config_loader.get_manager_status()
+        )
         gql_ctx = StrawberryGQLContext(
             processors=gql_deps.processors,
             config_provider=gql_deps.config_provider,
@@ -225,6 +228,8 @@ class AdminHandler:
             event_fetcher=gql_deps.processors.events.event_fetcher,
             gql_adapter=gql_deps.strawberry_gql_adapter,
             data_loaders=gql_deps.strawberry_data_loaders,
+            manager_status=manager_status,
+            metric_observer=gql_deps.metric_observer,
         )
         result = await self._strawberry_schema.execute(
             params.query,
