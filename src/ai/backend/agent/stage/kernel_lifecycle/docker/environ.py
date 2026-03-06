@@ -16,12 +16,14 @@ from ai.backend.common.types import (
     DeviceName,
     KernelCreationConfig,
     SlotName,
+    VFolderMount,
 )
 
 LD_PRELOAD: Final[str] = "LD_PRELOAD"
 LOCAL_USER_ID: Final[str] = "LOCAL_USER_ID"
 LOCAL_GROUP_ID: Final[str] = "LOCAL_GROUP_ID"
 ADDITIONAL_GIDS: Final[str] = "ADDITIONAL_GIDS"
+BACKENDAI_PERSISTENT_PATHS: Final[str] = "BACKENDAI_PERSISTENT_PATHS"
 
 
 @dataclass
@@ -120,8 +122,13 @@ class EnvironProvisioner(Provisioner[EnvironSpec, EnvironResult]):
 
         hook_paths = await self._get_container_hooks(spec)
         device_environ = await self._get_device_environ(spec)
-        environ = environ.append_values(LD_PRELOAD, hook_paths, separator=":").update_always(
-            device_environ
+        environ = (
+            environ.append_values(LD_PRELOAD, hook_paths, separator=":")
+            .update_always(device_environ)
+            .set_value(
+                BACKENDAI_PERSISTENT_PATHS,
+                self._get_persistent_paths(spec),
+            )
         )
         return EnvironResult(environ=environ.to_dict())
 
@@ -158,6 +165,14 @@ class EnvironProvisioner(Provisioner[EnvironSpec, EnvironResult]):
             spec.kernel_info.resource_spec.allocations[DeviceName("cpu")][SlotName("cpu")]
         )
         return {k: str(cpu_core_count) for k in envs_corecount}
+
+    def _get_persistent_paths(self, spec: EnvironSpec) -> str | None:
+        vfolder_mounts = [
+            VFolderMount.from_json(item)
+            for item in spec.kernel_info.kernel_creation_config["mounts"]
+        ]
+        paths = [str(m.kernel_path) for m in vfolder_mounts]
+        return ":".join(paths) if paths else None
 
     async def _get_container_hooks(self, spec: EnvironSpec) -> set[str]:
         container_hook_path_set: set[str] = set()

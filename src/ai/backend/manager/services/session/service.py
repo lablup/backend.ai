@@ -1107,6 +1107,9 @@ class SessionService:
             num_queries_executed=sess.num_queries or 0,
             last_stat=sess.last_stat,
             idle_checks=await self._idle_checker_host.get_idle_check_report(sess.id),
+            persistent_mount_paths=[str(m.kernel_path) for m in sess.vfolder_mounts]
+            if sess.vfolder_mounts
+            else [],
         )
 
         # Resource limits collected from agent heartbeats were erased, as they were deprecated
