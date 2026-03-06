@@ -48,7 +48,9 @@ def server_module_registries(
     image_registry = register_image_routes(ImageHandler(image=image_processors), route_deps)
     return [
         register_admin_routes(
-            AdminHandler(gql_schema=MagicMock(), gql_deps=MagicMock(), strawberry_schema=MagicMock()),
+            AdminHandler(
+                gql_schema=MagicMock(), gql_deps=MagicMock(), strawberry_schema=MagicMock()
+            ),
             route_deps,
             sub_registries=[image_registry],
         ),

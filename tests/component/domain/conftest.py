@@ -47,7 +47,9 @@ def server_module_registries(
     domain_registry = register_domain_routes(DomainHandler(domain=domain_processors), route_deps)
     return [
         register_admin_routes(
-            AdminHandler(gql_schema=MagicMock(), gql_deps=MagicMock(), strawberry_schema=MagicMock()),
+            AdminHandler(
+                gql_schema=MagicMock(), gql_deps=MagicMock(), strawberry_schema=MagicMock()
+            ),
             route_deps,
             sub_registries=[domain_registry],
         ),
