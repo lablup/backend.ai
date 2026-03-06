@@ -11,7 +11,7 @@ from ai.backend.manager.data.resource_slot.types import ResourceOccupancy
 from .base import ResourceSlotAction
 
 
-@dataclass(frozen=True)
+@dataclass
 class GetDomainResourceOverviewAction(ResourceSlotAction):
     domain_name: str
 
@@ -30,7 +30,7 @@ class GetDomainResourceOverviewAction(ResourceSlotAction):
         return self.domain_name
 
 
-@dataclass(frozen=True)
+@dataclass
 class GetDomainResourceOverviewResult(BaseActionResult):
     item: ResourceOccupancy
 

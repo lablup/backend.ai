@@ -12,7 +12,7 @@ from ai.backend.manager.data.resource_slot.types import ResourceOccupancy
 from .base import ResourceSlotAction
 
 
-@dataclass(frozen=True)
+@dataclass
 class GetProjectResourceOverviewAction(ResourceSlotAction):
     project_id: uuid.UUID
 
@@ -31,7 +31,7 @@ class GetProjectResourceOverviewAction(ResourceSlotAction):
         return str(self.project_id)
 
 
-@dataclass(frozen=True)
+@dataclass
 class GetProjectResourceOverviewResult(BaseActionResult):
     item: ResourceOccupancy
 
