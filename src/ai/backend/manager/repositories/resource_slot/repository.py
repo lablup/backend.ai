@@ -17,6 +17,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.resource_slot.types import (
     AgentResourceSearchResult,
     ResourceAllocationSearchResult,
+    ResourceOccupancy,
     ResourceSlotTypeSearchResult,
 )
 from ai.backend.manager.models.resource_slot import (
@@ -104,3 +105,15 @@ class ResourceSlotRepository:
         self, querier: BatchQuerier
     ) -> ResourceAllocationSearchResult:
         return await self._db_source.search_resource_allocations(querier)
+
+    # ==================== Aggregation ====================
+
+    @resource_slot_repository_resilience.apply()
+    async def get_domain_resource_overview(self, domain_name: str) -> ResourceOccupancy:
+        """Get aggregated active resource occupancy for a domain."""
+        return await self._db_source.aggregate_occupied_by_domain(domain_name)
+
+    @resource_slot_repository_resilience.apply()
+    async def get_project_resource_overview(self, project_id: uuid.UUID) -> ResourceOccupancy:
+        """Get aggregated active resource occupancy for a project (group)."""
+        return await self._db_source.aggregate_occupied_by_project(project_id)
