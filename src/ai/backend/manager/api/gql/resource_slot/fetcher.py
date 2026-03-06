@@ -8,10 +8,12 @@ duplicating query logic.
 from __future__ import annotations
 
 import uuid as _uuid
+from functools import lru_cache
 
 import strawberry
 from strawberry import Info
 
+from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.resource_slot.types import (
@@ -19,7 +21,8 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceAllocationData,
     ResourceSlotTypeData,
 )
-from ai.backend.manager.services.resource_slot.actions.all_slot_types import AllSlotTypesAction
+from ai.backend.manager.models.resource_slot import ResourceSlotTypeRow
+from ai.backend.manager.repositories.resource_slot.query import CursorConditions, QueryOrders
 from ai.backend.manager.services.resource_slot.actions.get_agent_resources import (
     GetAgentResourcesAction,
 )
@@ -28,6 +31,9 @@ from ai.backend.manager.services.resource_slot.actions.get_kernel_allocations im
 )
 from ai.backend.manager.services.resource_slot.actions.get_resource_slot_type import (
     GetResourceSlotTypeAction,
+)
+from ai.backend.manager.services.resource_slot.actions.search_resource_slot_types import (
+    SearchResourceSlotTypesAction,
 )
 
 from .types import (
@@ -39,35 +45,67 @@ from .types import (
     ResourceAllocationConnectionGQL,
     ResourceSlotTypeConnectionGQL,
     ResourceSlotTypeEdgeGQL,
+    ResourceSlotTypeFilterGQL,
     ResourceSlotTypeGQL,
+    ResourceSlotTypeOrderByGQL,
 )
+
+
+@lru_cache(maxsize=1)
+def _get_slot_type_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=QueryOrders.slot_name(ascending=True),
+        backward_order=QueryOrders.slot_name(ascending=False),
+        forward_condition_factory=CursorConditions.by_cursor_forward,
+        backward_condition_factory=CursorConditions.by_cursor_backward,
+        tiebreaker_order=ResourceSlotTypeRow.slot_name.asc(),
+    )
 
 
 async def fetch_resource_slot_types(
     info: Info[StrawberryGQLContext],
+    filter: ResourceSlotTypeFilterGQL | None = None,
+    order_by: list[ResourceSlotTypeOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> ResourceSlotTypeConnectionGQL:
-    """Fetch all registered resource slot types (shared between root query and node resolver)."""
-    action_result = await info.context.processors.resource_slot.all_slot_types.wait_for_complete(
-        AllSlotTypesAction()
+    """Fetch resource slot types with pagination and filtering."""
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        pagination_spec=_get_slot_type_pagination_spec(),
+        filter=filter,
+        order_by=order_by,
     )
 
-    edges = []
-    for data in action_result.items:
-        node = ResourceSlotTypeGQL.from_data(data)
-        cursor = encode_cursor(data.slot_name)
-        edges.append(ResourceSlotTypeEdgeGQL(node=node, cursor=cursor))
-
-    page_info = strawberry.relay.PageInfo(
-        has_next_page=False,
-        has_previous_page=False,
-        start_cursor=edges[0].cursor if edges else None,
-        end_cursor=edges[-1].cursor if edges else None,
+    action_result = (
+        await info.context.processors.resource_slot.search_resource_slot_types.wait_for_complete(
+            SearchResourceSlotTypesAction(querier=querier)
+        )
     )
+
+    nodes = [ResourceSlotTypeGQL.from_data(data) for data in action_result.items]
+    edges = [ResourceSlotTypeEdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return ResourceSlotTypeConnectionGQL(
-        count=len(edges),
         edges=edges,
-        page_info=page_info,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=action_result.total_count,
     )
 
 

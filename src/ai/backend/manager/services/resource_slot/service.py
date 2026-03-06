@@ -10,7 +10,6 @@ from ai.backend.manager.data.resource_slot.types import (
 from ai.backend.manager.models.resource_slot import ResourceSlotTypeRow
 from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
 
-from .actions.all_slot_types import AllSlotTypesAction, AllSlotTypesResult
 from .actions.get_agent_resources import GetAgentResourcesAction, GetAgentResourcesResult
 from .actions.get_domain_resource_overview import (
     GetDomainResourceOverviewAction,
@@ -54,11 +53,6 @@ class ResourceSlotService:
 
     def __init__(self, repository: ResourceSlotRepository) -> None:
         self._repository = repository
-
-    async def all_slot_types(self, action: AllSlotTypesAction) -> AllSlotTypesResult:
-        rows = await self._repository.all_slot_types()
-        items = [_row_to_slot_type_data(row) for row in rows]
-        return AllSlotTypesResult(items=items)
 
     async def get_agent_resources(self, action: GetAgentResourcesAction) -> GetAgentResourcesResult:
         rows = await self._repository.get_agent_resources(action.agent_id)

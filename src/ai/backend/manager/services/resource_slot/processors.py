@@ -8,8 +8,6 @@ from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpe
 from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
-    AllSlotTypesAction,
-    AllSlotTypesResult,
     GetAgentResourcesAction,
     GetAgentResourcesResult,
     GetDomainResourceOverviewAction,
@@ -31,7 +29,6 @@ from .service import ResourceSlotService
 
 
 class ResourceSlotProcessors(AbstractProcessorPackage):
-    all_slot_types: ActionProcessor[AllSlotTypesAction, AllSlotTypesResult]
     get_agent_resources: ActionProcessor[GetAgentResourcesAction, GetAgentResourcesResult]
     search_agent_resources: ActionProcessor[SearchAgentResourcesAction, SearchAgentResourcesResult]
     get_kernel_allocations: ActionProcessor[GetKernelAllocationsAction, GetKernelAllocationsResult]
@@ -55,7 +52,6 @@ class ResourceSlotProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        self.all_slot_types = ActionProcessor(service.all_slot_types, action_monitors)
         self.get_agent_resources = ActionProcessor(service.get_agent_resources, action_monitors)
         self.search_agent_resources = ActionProcessor(
             service.search_agent_resources, action_monitors
@@ -82,7 +78,6 @@ class ResourceSlotProcessors(AbstractProcessorPackage):
     @override
     def supported_actions(self) -> list[ActionSpec]:
         return [
-            AllSlotTypesAction.spec(),
             GetAgentResourcesAction.spec(),
             SearchAgentResourcesAction.spec(),
             GetKernelAllocationsAction.spec(),

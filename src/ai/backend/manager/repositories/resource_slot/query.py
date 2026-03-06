@@ -183,3 +183,23 @@ class QueryOrders:
         if ascending:
             return ResourceSlotTypeRow.display_name.asc()
         return ResourceSlotTypeRow.display_name.desc()
+
+
+class CursorConditions:
+    @staticmethod
+    def by_cursor_forward(cursor_slot_name: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor). slot_name is the primary key."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ResourceSlotTypeRow.slot_name > cursor_slot_name
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_slot_name: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor). slot_name is the primary key."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ResourceSlotTypeRow.slot_name < cursor_slot_name
+
+        return inner

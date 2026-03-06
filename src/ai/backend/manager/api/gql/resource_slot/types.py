@@ -10,13 +10,15 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from decimal import Decimal
+from enum import StrEnum
 from typing import Any, Self
 
 import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.resource_slot.types import (
     AgentResourceData,
@@ -24,6 +26,8 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceAllocationData,
     ResourceSlotTypeData,
 )
+from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.resource_slot.query import QueryConditions, QueryOrders
 
 # ========== NumberFormat ==========
 
@@ -125,6 +129,81 @@ class ResourceSlotTypeConnectionGQL(Connection[ResourceSlotTypeGQL]):
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
+
+
+# ========== ResourceSlotType Filter/OrderBy ==========
+
+
+@strawberry.enum(
+    name="ResourceSlotTypeOrderField",
+    description="Added in 26.3.0. Fields available for ordering resource slot types.",
+)
+class ResourceSlotTypeOrderFieldGQL(StrEnum):
+    SLOT_NAME = "slot_name"
+    RANK = "rank"
+    DISPLAY_NAME = "display_name"
+
+
+@strawberry.input(
+    name="ResourceSlotTypeFilter",
+    description="Added in 26.3.0. Filter criteria for querying resource slot types.",
+)
+class ResourceSlotTypeFilterGQL(GQLFilter):
+    slot_name: StringFilter | None = None
+    slot_type: StringFilter | None = None
+    display_name: StringFilter | None = None
+
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if self.slot_name:
+            condition = self.slot_name.build_query_condition(
+                contains_factory=QueryConditions.by_slot_name_contains,
+                equals_factory=QueryConditions.by_slot_name_equals,
+                starts_with_factory=QueryConditions.by_slot_name_starts_with,
+                ends_with_factory=QueryConditions.by_slot_name_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+        if self.slot_type:
+            condition = self.slot_type.build_query_condition(
+                contains_factory=QueryConditions.by_slot_type_contains,
+                equals_factory=QueryConditions.by_slot_type_equals,
+                starts_with_factory=QueryConditions.by_slot_type_starts_with,
+                ends_with_factory=QueryConditions.by_slot_type_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+        if self.display_name:
+            condition = self.display_name.build_query_condition(
+                contains_factory=QueryConditions.by_display_name_contains,
+                equals_factory=QueryConditions.by_display_name_equals,
+                starts_with_factory=QueryConditions.by_display_name_starts_with,
+                ends_with_factory=QueryConditions.by_display_name_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+        return conditions
+
+
+@strawberry.input(
+    name="ResourceSlotTypeOrderBy",
+    description="Added in 26.3.0. Ordering specification for resource slot types.",
+)
+class ResourceSlotTypeOrderByGQL(GQLOrderBy):
+    field: ResourceSlotTypeOrderFieldGQL
+    direction: OrderDirection = OrderDirection.ASC
+
+    def to_query_order(self) -> QueryOrder:
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case ResourceSlotTypeOrderFieldGQL.SLOT_NAME:
+                return QueryOrders.slot_name(ascending)
+            case ResourceSlotTypeOrderFieldGQL.RANK:
+                return QueryOrders.rank(ascending)
+            case ResourceSlotTypeOrderFieldGQL.DISPLAY_NAME:
+                return QueryOrders.display_name(ascending)
+            case _:
+                raise ValueError(f"Unhandled ResourceSlotTypeOrderFieldGQL value: {self.field!r}")
 
 
 # ========== AgentResourceSlotGQL (Node) ==========
