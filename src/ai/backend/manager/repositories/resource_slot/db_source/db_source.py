@@ -20,6 +20,8 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceSlotTypeSearchResult,
 )
 from ai.backend.manager.errors.resource_slot import (
+    AgentResourceNotFound,
+    ResourceAllocationNotFound,
     ResourceSlotTypeNotFound,
 )
 from ai.backend.manager.models.kernel import KernelRow
@@ -135,6 +137,25 @@ class ResourceSlotDBSource:
             result = await db_sess.execute(stmt)
             return list(result.scalars().all())
 
+    async def get_agent_resource_by_slot(self, agent_id: str, slot_name: str) -> AgentResourceRow:
+        """Get a single slot capacity/usage row for a specific agent+slot combination.
+
+        Raises:
+            AgentResourceNotFound: If no entry exists for the given agent and slot.
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            stmt = sa.select(AgentResourceRow).where(
+                AgentResourceRow.agent_id == agent_id,
+                AgentResourceRow.slot_name == slot_name,
+            )
+            result = await db_sess.execute(stmt)
+            row = result.scalar_one_or_none()
+            if row is None:
+                raise AgentResourceNotFound(
+                    f"Agent resource not found for agent='{agent_id}', slot='{slot_name}'."
+                )
+            return row
+
     async def search_agent_resources(self, querier: BatchQuerier) -> AgentResourceSearchResult:
         # Paginated search across all agent_resources rows.
         # Caller injects conditions (e.g. by_slot_name, by_agent_id) via querier.
@@ -169,6 +190,27 @@ class ResourceSlotDBSource:
             )
             result = await db_sess.execute(stmt)
             return list(result.scalars().all())
+
+    async def get_kernel_allocation_by_slot(
+        self, kernel_id: uuid.UUID, slot_name: str
+    ) -> ResourceAllocationRow:
+        """Get a single allocation row for a specific kernel+slot combination.
+
+        Raises:
+            ResourceAllocationNotFound: If no entry exists for the given kernel and slot.
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            stmt = sa.select(ResourceAllocationRow).where(
+                ResourceAllocationRow.kernel_id == kernel_id,
+                ResourceAllocationRow.slot_name == slot_name,
+            )
+            result = await db_sess.execute(stmt)
+            row = result.scalar_one_or_none()
+            if row is None:
+                raise ResourceAllocationNotFound(
+                    f"Resource allocation not found for kernel='{kernel_id}', slot='{slot_name}'."
+                )
+            return row
 
     async def search_resource_allocations(
         self, querier: BatchQuerier

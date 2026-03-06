@@ -34,11 +34,11 @@ from ai.backend.manager.repositories.resource_slot.query import (
     ResourceAllocationQueryConditions,
     ResourceAllocationQueryOrders,
 )
-from ai.backend.manager.services.resource_slot.actions.get_agent_resources import (
-    GetAgentResourcesAction,
+from ai.backend.manager.services.resource_slot.actions.get_agent_resource_by_slot import (
+    GetAgentResourceBySlotAction,
 )
-from ai.backend.manager.services.resource_slot.actions.get_kernel_allocations import (
-    GetKernelAllocationsAction,
+from ai.backend.manager.services.resource_slot.actions.get_kernel_allocation_by_slot import (
+    GetKernelAllocationBySlotAction,
 )
 from ai.backend.manager.services.resource_slot.actions.get_resource_slot_type import (
     GetResourceSlotTypeAction,
@@ -215,15 +215,15 @@ async def fetch_agent_resource_slot(
     slot_name: str,
 ) -> AgentResourceSlotGQL | None:
     """Fetch a single per-slot resource entry for an agent (used by Node resolution)."""
-    action_result = (
-        await info.context.processors.resource_slot.get_agent_resources.wait_for_complete(
-            GetAgentResourcesAction(agent_id=agent_id)
+    from ai.backend.manager.errors.resource_slot import AgentResourceNotFound
+
+    try:
+        action_result = await info.context.processors.resource_slot.get_agent_resource_by_slot.wait_for_complete(
+            GetAgentResourceBySlotAction(agent_id=agent_id, slot_name=slot_name)
         )
-    )
-    for data in action_result.items:
-        if data.slot_name == slot_name:
-            return AgentResourceSlotGQL.from_data(data)
-    return None
+    except AgentResourceNotFound:
+        return None
+    return AgentResourceSlotGQL.from_data(action_result.item)
 
 
 async def fetch_kernel_allocations(
@@ -280,15 +280,17 @@ async def fetch_kernel_resource_allocation(
     slot_name: str,
 ) -> KernelResourceAllocationGQL | None:
     """Fetch a single per-slot allocation for a kernel (used by Node resolution)."""
-    action_result = (
-        await info.context.processors.resource_slot.get_kernel_allocations.wait_for_complete(
-            GetKernelAllocationsAction(kernel_id=_uuid.UUID(kernel_id_str))
+    from ai.backend.manager.errors.resource_slot import ResourceAllocationNotFound
+
+    try:
+        action_result = await info.context.processors.resource_slot.get_kernel_allocation_by_slot.wait_for_complete(
+            GetKernelAllocationBySlotAction(
+                kernel_id=_uuid.UUID(kernel_id_str), slot_name=slot_name
+            )
         )
-    )
-    for data in action_result.items:
-        if data.slot_name == slot_name:
-            return KernelResourceAllocationGQL.from_data(data)
-    return None
+    except ResourceAllocationNotFound:
+        return None
+    return KernelResourceAllocationGQL.from_data(action_result.item)
 
 
 # ========== Raw data helpers for Node.resolve_nodes ==========
@@ -324,15 +326,15 @@ async def load_agent_resource_data(
     slot_name: str,
 ) -> AgentResourceData | None:
     """Load raw AgentResourceData for a single agent+slot (used by Node.resolve_nodes)."""
-    action_result = (
-        await info.context.processors.resource_slot.get_agent_resources.wait_for_complete(
-            GetAgentResourcesAction(agent_id=agent_id)
+    from ai.backend.manager.errors.resource_slot import AgentResourceNotFound
+
+    try:
+        action_result = await info.context.processors.resource_slot.get_agent_resource_by_slot.wait_for_complete(
+            GetAgentResourceBySlotAction(agent_id=agent_id, slot_name=slot_name)
         )
-    )
-    for data in action_result.items:
-        if data.slot_name == slot_name:
-            return data
-    return None
+    except AgentResourceNotFound:
+        return None
+    return action_result.item
 
 
 async def load_kernel_allocation_data(
@@ -341,12 +343,14 @@ async def load_kernel_allocation_data(
     slot_name: str,
 ) -> ResourceAllocationData | None:
     """Load raw ResourceAllocationData for a single kernel+slot (used by Node.resolve_nodes)."""
-    action_result = (
-        await info.context.processors.resource_slot.get_kernel_allocations.wait_for_complete(
-            GetKernelAllocationsAction(kernel_id=_uuid.UUID(kernel_id_str))
+    from ai.backend.manager.errors.resource_slot import ResourceAllocationNotFound
+
+    try:
+        action_result = await info.context.processors.resource_slot.get_kernel_allocation_by_slot.wait_for_complete(
+            GetKernelAllocationBySlotAction(
+                kernel_id=_uuid.UUID(kernel_id_str), slot_name=slot_name
+            )
         )
-    )
-    for data in action_result.items:
-        if data.slot_name == slot_name:
-            return data
-    return None
+    except ResourceAllocationNotFound:
+        return None
+    return action_result.item
