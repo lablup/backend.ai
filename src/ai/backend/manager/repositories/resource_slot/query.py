@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import uuid
+
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.manager.models.resource_slot import ResourceSlotTypeRow
+from ai.backend.manager.models.resource_slot import (
+    AgentResourceRow,
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 
@@ -203,3 +209,65 @@ class CursorConditions:
             return ResourceSlotTypeRow.slot_name < cursor_slot_name
 
         return inner
+
+
+class AgentResourceQueryConditions:
+    @staticmethod
+    def by_agent_id(agent_id: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AgentResourceRow.agent_id == agent_id
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_slot_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AgentResourceRow.slot_name > cursor_slot_name
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_slot_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AgentResourceRow.slot_name < cursor_slot_name
+
+        return inner
+
+
+class AgentResourceQueryOrders:
+    @staticmethod
+    def slot_name(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return AgentResourceRow.slot_name.asc()
+        return AgentResourceRow.slot_name.desc()
+
+
+class ResourceAllocationQueryConditions:
+    @staticmethod
+    def by_kernel_id(kernel_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ResourceAllocationRow.kernel_id == kernel_id
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_slot_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ResourceAllocationRow.slot_name > cursor_slot_name
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_slot_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ResourceAllocationRow.slot_name < cursor_slot_name
+
+        return inner
+
+
+class ResourceAllocationQueryOrders:
+    @staticmethod
+    def slot_name(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return ResourceAllocationRow.slot_name.asc()
+        return ResourceAllocationRow.slot_name.desc()

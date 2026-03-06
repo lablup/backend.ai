@@ -21,8 +21,19 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceAllocationData,
     ResourceSlotTypeData,
 )
-from ai.backend.manager.models.resource_slot import ResourceSlotTypeRow
-from ai.backend.manager.repositories.resource_slot.query import CursorConditions, QueryOrders
+from ai.backend.manager.models.resource_slot import (
+    AgentResourceRow,
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
+from ai.backend.manager.repositories.resource_slot.query import (
+    AgentResourceQueryConditions,
+    AgentResourceQueryOrders,
+    CursorConditions,
+    QueryOrders,
+    ResourceAllocationQueryConditions,
+    ResourceAllocationQueryOrders,
+)
 from ai.backend.manager.services.resource_slot.actions.get_agent_resources import (
     GetAgentResourcesAction,
 )
@@ -31,6 +42,12 @@ from ai.backend.manager.services.resource_slot.actions.get_kernel_allocations im
 )
 from ai.backend.manager.services.resource_slot.actions.get_resource_slot_type import (
     GetResourceSlotTypeAction,
+)
+from ai.backend.manager.services.resource_slot.actions.search_agent_resources import (
+    SearchAgentResourcesAction,
+)
+from ai.backend.manager.services.resource_slot.actions.search_resource_allocations import (
+    SearchResourceAllocationsAction,
 )
 from ai.backend.manager.services.resource_slot.actions.search_resource_slot_types import (
     SearchResourceSlotTypesAction,
@@ -59,6 +76,28 @@ def _get_slot_type_pagination_spec() -> PaginationSpec:
         forward_condition_factory=CursorConditions.by_cursor_forward,
         backward_condition_factory=CursorConditions.by_cursor_backward,
         tiebreaker_order=ResourceSlotTypeRow.slot_name.asc(),
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_agent_resource_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=AgentResourceQueryOrders.slot_name(ascending=True),
+        backward_order=AgentResourceQueryOrders.slot_name(ascending=False),
+        forward_condition_factory=AgentResourceQueryConditions.by_cursor_forward,
+        backward_condition_factory=AgentResourceQueryConditions.by_cursor_backward,
+        tiebreaker_order=AgentResourceRow.slot_name.asc(),
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_resource_allocation_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=ResourceAllocationQueryOrders.slot_name(ascending=True),
+        backward_order=ResourceAllocationQueryOrders.slot_name(ascending=False),
+        forward_condition_factory=ResourceAllocationQueryConditions.by_cursor_forward,
+        backward_condition_factory=ResourceAllocationQueryConditions.by_cursor_backward,
+        tiebreaker_order=ResourceAllocationRow.slot_name.asc(),
     )
 
 
@@ -125,31 +164,48 @@ async def fetch_resource_slot_type(
 async def fetch_agent_resources(
     info: Info[StrawberryGQLContext],
     agent_id: str,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> AgentResourceConnectionGQL:
-    """Fetch all per-slot resource entries for a given agent (shared for AgentV2GQL connection)."""
+    """Fetch per-slot resource entries for a given agent with pagination."""
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        pagination_spec=_get_agent_resource_pagination_spec(),
+        base_conditions=[AgentResourceQueryConditions.by_agent_id(agent_id)],
+    )
+
     action_result = (
-        await info.context.processors.resource_slot.get_agent_resources.wait_for_complete(
-            GetAgentResourcesAction(agent_id=agent_id)
+        await info.context.processors.resource_slot.search_agent_resources.wait_for_complete(
+            SearchAgentResourcesAction(querier=querier)
         )
     )
 
     edges = []
     for data in action_result.items:
         node = AgentResourceSlotGQL.from_data(data)
-        cursor = encode_cursor(f"{data.agent_id}:{data.slot_name}")
+        cursor = encode_cursor(data.slot_name)
         edges.append(AgentResourceSlotEdgeGQL(node=node, cursor=cursor))
 
-    page_info = strawberry.relay.PageInfo(
-        has_next_page=False,
-        has_previous_page=False,
-        start_cursor=edges[0].cursor if edges else None,
-        end_cursor=edges[-1].cursor if edges else None,
-    )
-
     return AgentResourceConnectionGQL(
-        count=len(edges),
+        count=action_result.total_count,
         edges=edges,
-        page_info=page_info,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
     )
 
 
@@ -173,31 +229,48 @@ async def fetch_agent_resource_slot(
 async def fetch_kernel_allocations(
     info: Info[StrawberryGQLContext],
     kernel_id: str,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> ResourceAllocationConnectionGQL:
-    """Fetch all per-slot allocation entries for a kernel (shared for KernelV2GQL connection)."""
+    """Fetch per-slot allocation entries for a kernel with pagination."""
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        pagination_spec=_get_resource_allocation_pagination_spec(),
+        base_conditions=[ResourceAllocationQueryConditions.by_kernel_id(_uuid.UUID(kernel_id))],
+    )
+
     action_result = (
-        await info.context.processors.resource_slot.get_kernel_allocations.wait_for_complete(
-            GetKernelAllocationsAction(kernel_id=_uuid.UUID(kernel_id))
+        await info.context.processors.resource_slot.search_resource_allocations.wait_for_complete(
+            SearchResourceAllocationsAction(querier=querier)
         )
     )
 
     edges = []
     for data in action_result.items:
         node = KernelResourceAllocationGQL.from_data(data)
-        cursor = encode_cursor(f"{data.kernel_id}:{data.slot_name}")
+        cursor = encode_cursor(data.slot_name)
         edges.append(KernelResourceAllocationEdgeGQL(node=node, cursor=cursor))
 
-    page_info = strawberry.relay.PageInfo(
-        has_next_page=False,
-        has_previous_page=False,
-        start_cursor=edges[0].cursor if edges else None,
-        end_cursor=edges[-1].cursor if edges else None,
-    )
-
     return ResourceAllocationConnectionGQL(
-        count=len(edges),
+        count=action_result.total_count,
         edges=edges,
-        page_info=page_info,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
     )
 
 
