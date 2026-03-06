@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import logging
+import importlib
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
@@ -8,13 +8,14 @@ from graphql import OperationType
 from strawberry.extensions.base_extension import SchemaExtension
 from strawberry.utils.await_maybe import AwaitableOrValue
 
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.gql.schema import Mutation
-
 if TYPE_CHECKING:
     from graphql import GraphQLResolveInfo
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+def _get_mutation_class() -> type:
+    """Lazily import Mutation to avoid circular import with schema.py."""
+    mod = importlib.import_module("ai.backend.manager.api.gql.schema")
+    return mod.Mutation
 
 
 class GQLMutationPrivilegeCheckExtension(SchemaExtension):
@@ -25,11 +26,12 @@ class GQLMutationPrivilegeCheckExtension(SchemaExtension):
         _next: Callable[..., AwaitableOrValue[object]],
         root: Any,
         info: GraphQLResolveInfo,
-        *args: str,
+        *args: Any,
         **kwargs: Any,
     ) -> AwaitableOrValue[object]:
         if info.operation.operation == OperationType.MUTATION and info.path.prev is None:
-            mutation_field = getattr(Mutation, info.field_name, None)
+            mutation_cls_root = _get_mutation_class()
+            mutation_field = getattr(mutation_cls_root, info.field_name, None)
             if mutation_field is not None:
                 mutation_cls = getattr(mutation_field, "type", None)
                 allowed_roles = getattr(mutation_cls, "allowed_roles", None)
