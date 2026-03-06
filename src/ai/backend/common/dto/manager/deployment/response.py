@@ -94,7 +94,7 @@ class ModelMountConfigDTO(BaseModel):
     """Model mount configuration for revision."""
 
     vfolder_id: UUID = Field(description="VFolder ID for model")
-    mount_destination: str = Field(description="Mount destination path")
+    mount_destination: str | None = Field(description="Mount destination path")
     definition_path: str = Field(description="Model definition path")
 
 

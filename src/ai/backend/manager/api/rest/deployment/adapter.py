@@ -6,9 +6,7 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from pathlib import PurePosixPath
-from typing import Any
 from uuid import UUID, uuid4
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -26,6 +24,7 @@ from ai.backend.common.dto.manager.deployment import (
     DeploymentFilter,
     DeploymentOrder,
     DeploymentPolicyDTO,
+    DeploymentStrategyInput,
     ModelMountConfigDTO,
     ModelRuntimeConfigDTO,
     NetworkConfigDTO,
@@ -78,6 +77,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.deployment import IncompleteRevisionData
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -210,6 +210,9 @@ class RevisionAdapter(BaseFilterAdapter):
 
     def convert_to_dto(self, data: ModelRevisionData) -> RevisionDTO:
         """Convert ModelRevisionData to DTO."""
+        mount_config = data.model_mount_config
+        if mount_config.vfolder_id is None:
+            raise IncompleteRevisionData(f"Revision {data.id} has incomplete model mount config")
         return RevisionDTO(
             id=data.id,
             name=data.name,
@@ -225,11 +228,9 @@ class RevisionAdapter(BaseFilterAdapter):
                 runtime_variant=data.model_runtime_config.runtime_variant,
             ),
             model_mount_config=ModelMountConfigDTO(
-                # TODO: Generating a random UUID when vfolder_id is None creates a reference to a non-existent vfolder. Should raise an error instead.
-                vfolder_id=data.model_mount_config.vfolder_id or uuid4(),
-                # TODO: Empty string is not a valid path when mount_destination is None. Should make it a required field or assign a sensible default path.
-                mount_destination=data.model_mount_config.mount_destination or "",
-                definition_path=data.model_mount_config.definition_path,
+                vfolder_id=mount_config.vfolder_id,
+                mount_destination=mount_config.mount_destination,
+                definition_path=mount_config.definition_path,
             ),
             created_at=data.created_at,
             image_id=data.image_id,
@@ -299,7 +300,7 @@ class RouteAdapter(BaseFilterAdapter):
             session_id=str(data.session_id) if data.session_id else None,
             status=CommonRouteStatus(data.status.value),
             traffic_ratio=data.traffic_ratio,
-            created_at=data.created_at or datetime.now(tz=UTC),
+            created_at=data.created_at,
             revision_id=data.revision_id,
             traffic_status=CommonRouteTrafficStatus(data.traffic_status.value),
             error_data=data.error_data,
@@ -390,8 +391,9 @@ def build_revision_creator(revision_input: RevisionInput) -> ModelRevisionCreato
         extra_mounts = [
             MountInfo(
                 vfolder_id=mount.vfolder_id,
-                # TODO: Empty string is not a valid path when mount_destination is None. Should make it a required field or assign a sensible default path.
-                kernel_path=PurePosixPath(mount.mount_destination or ""),
+                kernel_path=PurePosixPath(mount.mount_destination)
+                if mount.mount_destination
+                else None,
             )
             for mount in revision_input.extra_mounts
         ]
@@ -494,7 +496,7 @@ class CreateDeploymentAdapter:
 
     def _build_policy_config(
         self,
-        strategy_input: Any,  # DeploymentStrategyInput
+        strategy_input: DeploymentStrategyInput,
     ) -> DeploymentPolicyConfig:
         """Build DeploymentPolicyConfig from strategy input."""
         strategy = DeploymentStrategy(strategy_input.type)
