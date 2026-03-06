@@ -236,7 +236,11 @@ class AdminHandler:
         if result.errors:
             for e in result.errors:
                 log.error("ADMIN.GQL.V2 Exception: {}", e.formatted)
-                log.debug("{}", "".join(traceback.format_exception(e)))
+                original = getattr(e, "original_error", None)
+                if original is not None:
+                    log.debug("{}", "".join(traceback.format_exception(original)))
+                else:
+                    log.debug("{}", str(e))
         resp = GraphQLResponse(
             data=result.data,
             errors=[dict(e.formatted) for e in result.errors] if result.errors else None,
