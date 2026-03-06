@@ -7,6 +7,7 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceOccupancy,
     ResourceSlotTypeData,
 )
+from ai.backend.manager.models.resource_slot import ResourceSlotTypeRow
 from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
 
 from .actions.all_slot_types import AllSlotTypesAction, AllSlotTypesResult
@@ -32,6 +33,22 @@ from .actions.search_resource_slot_types import (
 )
 
 
+def _row_to_slot_type_data(row: ResourceSlotTypeRow) -> ResourceSlotTypeData:
+    return ResourceSlotTypeData(
+        slot_name=row.slot_name,
+        slot_type=row.slot_type,
+        display_name=row.display_name,
+        description=row.description,
+        display_unit=row.display_unit,
+        display_icon=row.display_icon,
+        number_format=NumberFormatData(
+            binary=row.number_format.binary,
+            round_length=row.number_format.round_length,
+        ),
+        rank=row.rank,
+    )
+
+
 class ResourceSlotService:
     _repository: ResourceSlotRepository
 
@@ -40,22 +57,7 @@ class ResourceSlotService:
 
     async def all_slot_types(self, action: AllSlotTypesAction) -> AllSlotTypesResult:
         rows = await self._repository.all_slot_types()
-        items = [
-            ResourceSlotTypeData(
-                slot_name=row.slot_name,
-                slot_type=row.slot_type,
-                display_name=row.display_name,
-                description=row.description,
-                display_unit=row.display_unit,
-                display_icon=row.display_icon,
-                number_format=NumberFormatData(
-                    binary=row.number_format.binary,
-                    round_length=row.number_format.round_length,
-                ),
-                rank=row.rank,
-            )
-            for row in rows
-        ]
+        items = [_row_to_slot_type_data(row) for row in rows]
         return AllSlotTypesResult(items=items)
 
     async def get_agent_resources(self, action: GetAgentResourcesAction) -> GetAgentResourcesResult:
@@ -112,20 +114,7 @@ class ResourceSlotService:
         self, action: GetResourceSlotTypeAction
     ) -> GetResourceSlotTypeResult:
         row = await self._repository.get_slot_type(action.slot_name)
-        item = ResourceSlotTypeData(
-            slot_name=row.slot_name,
-            slot_type=row.slot_type,
-            display_name=row.display_name,
-            description=row.description,
-            display_unit=row.display_unit,
-            display_icon=row.display_icon,
-            number_format=NumberFormatData(
-                binary=row.number_format.binary,
-                round_length=row.number_format.round_length,
-            ),
-            rank=row.rank,
-        )
-        return GetResourceSlotTypeResult(item=item)
+        return GetResourceSlotTypeResult(item=_row_to_slot_type_data(row))
 
     async def search_resource_slot_types(
         self, action: SearchResourceSlotTypesAction
