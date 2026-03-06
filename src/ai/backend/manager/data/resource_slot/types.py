@@ -67,5 +67,5 @@ class ResourceAllocationSearchResult:
 
 @dataclass(frozen=True)
 class ResourceOccupancy:
-    occupied_slots: list[SlotQuantity]
+    used_slots: list[SlotQuantity]
     session_count: int
