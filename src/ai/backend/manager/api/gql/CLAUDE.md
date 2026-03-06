@@ -31,6 +31,16 @@
 
 - Resolvers MUST invoke services through a Processor — never call service methods directly.
 
+## Error Handling & Nullable Schema
+
+- When a query/resolver may fail to find an object, declare the return type as **nullable**
+  (`T | None`) in the GraphQL schema so the client can handle partial failures gracefully.
+- Do **NOT** catch domain exceptions (e.g., `NotFound`) in fetcher functions just to return `None`.
+  Let the exception propagate — GraphQL will return it as an `errors` entry alongside `data: null`,
+  giving the client both the null value and the error reason.
+- The only place where catching exceptions to produce `None` is acceptable is `resolve_nodes`,
+  which must return `Iterable[Self | None]` per the Relay spec.
+
 ## Legacy Code
 
 - Do NOT copy patterns from `gql_legacy/` (Graphene) — it is being migrated to Strawberry.
