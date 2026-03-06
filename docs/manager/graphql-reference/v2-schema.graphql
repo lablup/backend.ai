@@ -5264,8 +5264,10 @@ type Query {
   """
   resourceSlotType(slotName: String!): ResourceSlotType
 
-  """Added in 26.3.0. Returns all registered resource slot types."""
-  resourceSlotTypes: ResourceSlotTypeConnection!
+  """
+  Added in 26.3.0. Returns resource slot types with pagination and filtering.
+  """
+  resourceSlotTypes(filter: ResourceSlotTypeFilter = null, orderBy: [ResourceSlotTypeOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceSlotTypeConnection!
 
   """
   Added in 26.2.0.
@@ -6116,6 +6118,26 @@ type ResourceSlotTypeEdge {
 
   """The item at the end of the edge"""
   node: ResourceSlotType!
+}
+
+"""Added in 26.3.0. Filter criteria for querying resource slot types."""
+input ResourceSlotTypeFilter {
+  slotName: StringFilter = null
+  slotType: StringFilter = null
+  displayName: StringFilter = null
+}
+
+"""Added in 26.3.0. Ordering specification for resource slot types."""
+input ResourceSlotTypeOrderBy {
+  field: ResourceSlotTypeOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.3.0. Fields available for ordering resource slot types."""
+enum ResourceSlotTypeOrderField {
+  SLOT_NAME
+  RANK
+  DISPLAY_NAME
 }
 
 """

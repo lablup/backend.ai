@@ -9571,8 +9571,10 @@ type Query
   """
   resourceSlotType(slotName: String!): ResourceSlotType @join__field(graph: STRAWBERRY)
 
-  """Added in 26.3.0. Returns all registered resource slot types."""
-  resourceSlotTypes: ResourceSlotTypeConnection! @join__field(graph: STRAWBERRY)
+  """
+  Added in 26.3.0. Returns resource slot types with pagination and filtering.
+  """
+  resourceSlotTypes(filter: ResourceSlotTypeFilter = null, orderBy: [ResourceSlotTypeOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceSlotTypeConnection! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0.
@@ -10510,6 +10512,32 @@ type ResourceSlotTypeEdge
 
   """The item at the end of the edge"""
   node: ResourceSlotType!
+}
+
+"""Added in 26.3.0. Filter criteria for querying resource slot types."""
+input ResourceSlotTypeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  slotName: StringFilter = null
+  slotType: StringFilter = null
+  displayName: StringFilter = null
+}
+
+"""Added in 26.3.0. Ordering specification for resource slot types."""
+input ResourceSlotTypeOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: ResourceSlotTypeOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.3.0. Fields available for ordering resource slot types."""
+enum ResourceSlotTypeOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  SLOT_NAME @join__enumValue(graph: STRAWBERRY)
+  RANK @join__enumValue(graph: STRAWBERRY)
+  DISPLAY_NAME @join__enumValue(graph: STRAWBERRY)
 }
 
 """
