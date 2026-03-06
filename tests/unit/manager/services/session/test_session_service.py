@@ -777,70 +777,88 @@ class TestGetSessionInfo:
         mock_session_repository.get_session_validated.assert_called_once()
         mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
 
+    @pytest.fixture
+    def mock_kernel(self) -> MagicMock:
+        kernel = MagicMock()
+        kernel.image = "cr.backend.ai/stable/python:latest"
+        kernel.architecture = "x86_64"
+        kernel.registry = "cr.backend.ai"
+        kernel.container_id = str(uuid4())
+        kernel.occupied_slots = ResourceSlot({"cpu": 1, "mem": 1024})
+        kernel.occupied_shares = {}
+        return kernel
+
+    @pytest.fixture
+    def mock_session(
+        self,
+        request: pytest.FixtureRequest,
+        mock_kernel: MagicMock,
+        mock_session_repository: MagicMock,
+        mock_idle_checker_host: MagicMock,
+        sample_session_id: SessionId,
+        sample_session_data: SessionData,
+        sample_user_id: UUID,
+        sample_group_id: UUID,
+    ) -> MagicMock:
+        vfolder_mounts: list[VFolderMount] | None = getattr(request, "param", None)
+
+        session = MagicMock()
+        session.id = sample_session_id
+        session.domain_name = "default"
+        session.group_id = sample_group_id
+        session.user_uuid = sample_user_id
+        session.tag = None
+        session.main_kernel = mock_kernel
+        session.occupying_slots = ResourceSlot({"cpu": 1, "mem": 1024})
+        session.requested_slots = ResourceSlot({"cpu": 1, "mem": 1024})
+        session.environ = {}
+        session.resource_opts = {}
+        session.status = SessionStatus.RUNNING
+        session.status_info = None
+        session.status_data = None
+        session.created_at = datetime.now(tzutc())
+        session.terminated_at = None
+        session.num_queries = 0
+        session.last_stat = None
+        session.vfolder_mounts = vfolder_mounts
+        session.to_dataclass.return_value = sample_session_data
+
+        mock_session_repository.get_session_validated = AsyncMock(return_value=session)
+
+        return session
+
+    @pytest.mark.parametrize(
+        "mock_session",
+        [
+            [
+                VFolderMount(
+                    name="my-data",
+                    vfid=VFolderID(quota_scope_id=None, folder_id=uuid4()),
+                    vfsubpath=PurePosixPath("."),
+                    host_path=PurePosixPath("/data/vfolders/my-data"),
+                    kernel_path=PurePosixPath("/home/work/data"),
+                    mount_perm=MountPermission.READ_WRITE,
+                    usage_mode=VFolderUsageMode.GENERAL,
+                ),
+                VFolderMount(
+                    name="my-model",
+                    vfid=VFolderID(quota_scope_id=None, folder_id=uuid4()),
+                    vfsubpath=PurePosixPath("."),
+                    host_path=PurePosixPath("/data/vfolders/my-model"),
+                    kernel_path=PurePosixPath("/home/work/model"),
+                    mount_perm=MountPermission.READ_ONLY,
+                    usage_mode=VFolderUsageMode.MODEL,
+                ),
+            ],
+        ],
+        indirect=True,
+    )
     async def test_success_with_vfolder_mounts(
         self,
         session_service: SessionService,
-        mock_session_repository: MagicMock,
-        mock_agent_registry: MagicMock,
-        mock_idle_checker_host: MagicMock,
-        sample_session_data: SessionData,
-        sample_session_id: SessionId,
+        mock_session: MagicMock,
         sample_access_key: AccessKey,
-        sample_user_id: UUID,
-        sample_group_id: UUID,
     ) -> None:
-        """Test that persistent_mount_paths is populated from vfolder_mounts"""
-        mock_kernel = MagicMock()
-        mock_kernel.image = "cr.backend.ai/stable/python:latest"
-        mock_kernel.architecture = "x86_64"
-        mock_kernel.registry = "cr.backend.ai"
-        mock_kernel.container_id = str(uuid4())
-        mock_kernel.occupied_slots = ResourceSlot({"cpu": 1, "mem": 1024})
-        mock_kernel.occupied_shares = {}
-
-        mock_session = MagicMock()
-        mock_session.id = sample_session_id
-        mock_session.domain_name = "default"
-        mock_session.group_id = sample_group_id
-        mock_session.user_uuid = sample_user_id
-        mock_session.tag = None
-        mock_session.main_kernel = mock_kernel
-        mock_session.occupying_slots = ResourceSlot({"cpu": 1, "mem": 1024})
-        mock_session.requested_slots = ResourceSlot({"cpu": 1, "mem": 1024})
-        mock_session.environ = {}
-        mock_session.resource_opts = {}
-        mock_session.status = SessionStatus.RUNNING
-        mock_session.status_info = None
-        mock_session.status_data = None
-        mock_session.created_at = datetime.now(tzutc())
-        mock_session.terminated_at = None
-        mock_session.num_queries = 0
-        mock_session.last_stat = None
-        mock_session.vfolder_mounts = [
-            VFolderMount(
-                name="my-data",
-                vfid=VFolderID(quota_scope_id=None, folder_id=uuid4()),
-                vfsubpath=PurePosixPath("."),
-                host_path=PurePosixPath("/data/vfolders/my-data"),
-                kernel_path=PurePosixPath("/home/work/data"),
-                mount_perm=MountPermission.READ_WRITE,
-                usage_mode=VFolderUsageMode.GENERAL,
-            ),
-            VFolderMount(
-                name="my-model",
-                vfid=VFolderID(quota_scope_id=None, folder_id=uuid4()),
-                vfsubpath=PurePosixPath("."),
-                host_path=PurePosixPath("/data/vfolders/my-model"),
-                kernel_path=PurePosixPath("/home/work/model"),
-                mount_perm=MountPermission.READ_ONLY,
-                usage_mode=VFolderUsageMode.MODEL,
-            ),
-        ]
-        mock_session.to_dataclass.return_value = sample_session_data
-
-        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
-        mock_idle_checker_host.get_idle_check_report = AsyncMock(return_value={})
-
         action = GetSessionInfoAction(
             session_name="test-session",
             owner_access_key=sample_access_key,
