@@ -14,7 +14,7 @@ from typing import (
 )
 
 import sqlalchemy as sa
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -106,25 +106,9 @@ class ScalingGroupOpts(BaseModel):
     route_cleanup_target_statuses: list[str] = Field(default_factory=lambda: ["unhealthy"])
     """List of route statuses that should be automatically cleaned up. Valid values: healthy, unhealthy, degraded"""
 
-    @field_validator("allowed_session_types", mode="before")
-    @classmethod
-    def validate_allowed_session_types(cls, value: Any) -> list[SessionTypes]:
-        if not isinstance(value, list):
-            raise ValueError(f"Expected a list, got {type(value)}")
-        return [SessionTypes(v) if isinstance(v, str) else v for v in value]
-
     @field_serializer("allowed_session_types", mode="plain")
     def serialize_allowed_session_types(self, value: list[SessionTypes]) -> list[str]:
         return [item.value for item in value]
-
-    @field_validator("pending_timeout", mode="before")
-    @classmethod
-    def validate_pending_timeout(cls, value: Any) -> timedelta:
-        if isinstance(value, (int, float)):
-            return timedelta(seconds=value)
-        if isinstance(value, timedelta):
-            return value
-        raise ValueError(f"Expected a number or timedelta, got {type(value)}")
 
     @field_serializer("pending_timeout", mode="plain")
     def serialize_pending_timeout(self, value: timedelta) -> float:
