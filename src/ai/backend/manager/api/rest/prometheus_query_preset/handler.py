@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from http import HTTPStatus
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, Sentinel
+from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.prometheus_query_preset import (
     CreateQueryDefinitionRequest,
     CreateQueryDefinitionResponse,
@@ -26,13 +26,9 @@ from ai.backend.manager.data.prometheus_query_preset import (
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 from ai.backend.manager.repositories.base import (
     Creator,
-    Updater,
 )
 from ai.backend.manager.repositories.prometheus_query_preset.creators import (
     PrometheusQueryPresetCreatorSpec,
-)
-from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
-    PrometheusQueryPresetUpdaterSpec,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions.create import (
     CreatePresetAction,
@@ -55,7 +51,6 @@ from ai.backend.manager.services.prometheus_query_preset.actions.search import (
 from ai.backend.manager.services.prometheus_query_preset.processors import (
     PrometheusQueryPresetProcessors,
 )
-from ai.backend.manager.types import OptionalState, TriState
 
 from .adapter import PrometheusQueryPresetAdapter
 
@@ -132,42 +127,7 @@ class PrometheusQueryPresetHandler:
         body: BodyParam[ModifyQueryDefinitionRequest],
     ) -> APIResponse:
         """Modify a preset."""
-        parsed = body.parsed
-        updater_spec = PrometheusQueryPresetUpdaterSpec(
-            name=(
-                OptionalState.update(parsed.name)
-                if parsed.name is not None
-                else OptionalState.nop()
-            ),
-            metric_name=(
-                OptionalState.update(parsed.metric_name)
-                if parsed.metric_name is not None
-                else OptionalState.nop()
-            ),
-            query_template=(
-                OptionalState.update(parsed.query_template)
-                if parsed.query_template is not None
-                else OptionalState.nop()
-            ),
-            time_window=TriState.nop()
-            if isinstance(parsed.time_window, Sentinel)
-            else TriState.nullify()
-            if parsed.time_window is None
-            else TriState.update(parsed.time_window),
-            filter_labels=(
-                OptionalState.update(parsed.options.filter_labels)
-                if parsed.options is not None and parsed.options.filter_labels is not None
-                else OptionalState.nop()
-            ),
-            group_labels=(
-                OptionalState.update(parsed.options.group_labels)
-                if parsed.options is not None and parsed.options.group_labels is not None
-                else OptionalState.nop()
-            ),
-        )
-        updater: Updater[PrometheusQueryPresetRow] = Updater(
-            spec=updater_spec, pk_value=path.parsed.id
-        )
+        updater = self._adapter.build_updater(body.parsed, path.parsed.id)
         action_result = await self._processor.modify_preset.wait_for_complete(
             ModifyPresetAction(preset_id=path.parsed.id, updater=updater)
         )

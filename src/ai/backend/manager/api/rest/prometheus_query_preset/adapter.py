@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
+from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.dto.clients.prometheus.response import MetricResponse
 from ai.backend.common.dto.manager.prometheus_query_preset import (
     MetricLabelEntryDTO,
     MetricValueDTO,
+    ModifyQueryDefinitionRequest,
     OrderDirection,
     QueryDefinitionDTO,
     QueryDefinitionFilter,
@@ -17,16 +21,22 @@ from ai.backend.common.dto.manager.prometheus_query_preset import (
 )
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
+from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
     QueryCondition,
     QueryOrder,
+    Updater,
 )
 from ai.backend.manager.repositories.prometheus_query_preset.options import (
     PrometheusQueryPresetConditions,
     PrometheusQueryPresetOrders,
 )
+from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
+    PrometheusQueryPresetUpdaterSpec,
+)
+from ai.backend.manager.types import OptionalState, TriState
 
 
 class PrometheusQueryPresetAdapter(BaseFilterAdapter):
@@ -56,6 +66,44 @@ class PrometheusQueryPresetAdapter(BaseFilterAdapter):
         ]
         values = [MetricValueDTO(timestamp=ts, value=v) for ts, v in response.values]
         return QueryDefinitionMetricResult(metric=metric_labels, values=values)
+
+    def build_updater(
+        self, request: ModifyQueryDefinitionRequest, preset_id: UUID
+    ) -> Updater[PrometheusQueryPresetRow]:
+        """Build an Updater from a modify request."""
+        spec = PrometheusQueryPresetUpdaterSpec(
+            name=(
+                OptionalState.update(request.name)
+                if request.name is not None
+                else OptionalState.nop()
+            ),
+            metric_name=(
+                OptionalState.update(request.metric_name)
+                if request.metric_name is not None
+                else OptionalState.nop()
+            ),
+            query_template=(
+                OptionalState.update(request.query_template)
+                if request.query_template is not None
+                else OptionalState.nop()
+            ),
+            time_window=TriState.nop()
+            if isinstance(request.time_window, Sentinel)
+            else TriState.nullify()
+            if request.time_window is None
+            else TriState.update(request.time_window),
+            filter_labels=(
+                OptionalState.update(request.options.filter_labels)
+                if request.options is not None and request.options.filter_labels is not None
+                else OptionalState.nop()
+            ),
+            group_labels=(
+                OptionalState.update(request.options.group_labels)
+                if request.options is not None and request.options.group_labels is not None
+                else OptionalState.nop()
+            ),
+        )
+        return Updater(spec=spec, pk_value=preset_id)
 
     def build_querier(self, request: SearchQueryDefinitionsRequest) -> BatchQuerier:
         """Build a BatchQuerier from search request."""
