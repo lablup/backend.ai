@@ -37,6 +37,15 @@ from ai.backend.testutils.db import with_tables
 
 
 @dataclass
+class PermissionEntry:
+    """A single permission to create in permission_setup fixture."""
+
+    scope_key: str
+    operation: OperationType
+    entity_type: EntityType = EntityType.VFOLDER
+
+
+@dataclass
 class ScopeChainFixture:
     """Pre-built fixture data for scope chain tests."""
 
@@ -175,19 +184,16 @@ class TestCheckPermissionWithScopeChain:
             "user_scope": (ScopeType.USER, fixture_ids.user_scope_id),
         }
         for entry in request.param:
-            if len(entry) == 2:
-                scope_key, operation = entry
-                entity_type = EntityType.VFOLDER
-            else:
-                scope_key, operation, entity_type = entry
-            scope_type, scope_id = scope_map[scope_key]
+            if not isinstance(entry, PermissionEntry):
+                raise TypeError(f"Expected PermissionEntry, got {type(entry).__name__}: {entry!r}")
+            scope_type, scope_id = scope_map[entry.scope_key]
             async with db_with_rbac_tables.begin_session() as db_sess:
                 perm = PermissionRow(
                     role_id=fixture_ids.role_id,
                     scope_type=scope_type,
                     scope_id=scope_id,
-                    entity_type=entity_type,
-                    operation=operation,
+                    entity_type=entry.entity_type,
+                    operation=entry.operation,
                 )
                 db_sess.add(perm)
                 await db_sess.flush()
@@ -197,7 +203,7 @@ class TestCheckPermissionWithScopeChain:
         [
             pytest.param([], OperationType.READ, False, id="no-permission"),
             pytest.param(
-                [("project", OperationType.READ)],
+                [PermissionEntry("project", OperationType.READ)],
                 OperationType.READ,
                 True,
                 id="direct-scope-read",
@@ -230,7 +236,7 @@ class TestCheckPermissionWithScopeChain:
         ("permission_setup", "check_op", "expected"),
         [
             pytest.param(
-                [("domain", OperationType.UPDATE)],
+                [PermissionEntry("domain", OperationType.UPDATE)],
                 OperationType.UPDATE,
                 True,
                 id="parent-scope-update",
@@ -264,13 +270,13 @@ class TestCheckPermissionWithScopeChain:
         ("permission_setup", "check_op", "expected"),
         [
             pytest.param(
-                [("project", OperationType.READ)],
+                [PermissionEntry("project", OperationType.READ)],
                 OperationType.READ,
                 False,
                 id="ref-blocks-read",
             ),
             pytest.param(
-                [("project", OperationType.UPDATE)],
+                [PermissionEntry("project", OperationType.UPDATE)],
                 OperationType.UPDATE,
                 False,
                 id="ref-blocks-update",
@@ -303,7 +309,7 @@ class TestCheckPermissionWithScopeChain:
         ("permission_setup", "check_op", "expected"),
         [
             pytest.param(
-                [("domain", OperationType.READ)],
+                [PermissionEntry("domain", OperationType.READ)],
                 OperationType.READ,
                 False,
                 id="ref-stops-chain",
@@ -361,7 +367,7 @@ class TestCheckPermissionWithScopeChain:
     @pytest.mark.parametrize(
         ("permission_setup",),
         [
-            pytest.param([("project", OperationType.READ)], id="inactive-role-read"),
+            pytest.param([PermissionEntry("project", OperationType.READ)], id="inactive-role-read"),
         ],
         indirect=["permission_setup"],
     )
@@ -388,13 +394,13 @@ class TestCheckPermissionWithScopeChain:
         ("permission_setup", "check_op", "expected"),
         [
             pytest.param(
-                [("vfolder", OperationType.READ)],
+                [PermissionEntry("vfolder", OperationType.READ)],
                 OperationType.READ,
                 True,
                 id="self-scope-read",
             ),
             pytest.param(
-                [("vfolder", OperationType.UPDATE)],
+                [PermissionEntry("vfolder", OperationType.UPDATE)],
                 OperationType.UPDATE,
                 True,
                 id="self-scope-update",
@@ -427,7 +433,7 @@ class TestCheckPermissionWithScopeChain:
         ("permission_setup", "check_op", "expected"),
         [
             pytest.param(
-                [("vfolder", OperationType.READ)],
+                [PermissionEntry("vfolder", OperationType.READ)],
                 OperationType.READ,
                 True,
                 id="self-scope-no-assoc",
@@ -461,7 +467,7 @@ class TestCheckPermissionWithScopeChain:
         ("permission_setup", "check_op", "expected"),
         [
             pytest.param(
-                [("project", OperationType.READ)],
+                [PermissionEntry("project", OperationType.READ)],
                 OperationType.UPDATE,
                 False,
                 id="project-read-perm-check-update",
@@ -494,7 +500,7 @@ class TestCheckPermissionWithScopeChain:
         ("permission_setup", "check_op", "expected"),
         [
             pytest.param(
-                [("domain", OperationType.CREATE)],
+                [PermissionEntry("domain", OperationType.CREATE)],
                 OperationType.SOFT_DELETE,
                 False,
                 id="domain-create-perm-check-soft-delete",
@@ -554,7 +560,7 @@ class TestCheckPermissionWithScopeChain:
     @pytest.mark.parametrize(
         ("permission_setup",),
         [
-            pytest.param([("project", OperationType.READ)], id="deleted-role-read"),
+            pytest.param([PermissionEntry("project", OperationType.READ)], id="deleted-role-read"),
         ],
         indirect=["permission_setup"],
     )
@@ -757,7 +763,7 @@ class TestCheckPermissionWithScopeChain:
         ("permission_setup", "check_op", "expected"),
         [
             pytest.param(
-                [("domain", OperationType.READ)],
+                [PermissionEntry("domain", OperationType.READ)],
                 OperationType.READ,
                 False,
                 id="auto-then-ref-blocks-domain",
@@ -791,7 +797,7 @@ class TestCheckPermissionWithScopeChain:
         ("permission_setup", "check_op", "expected"),
         [
             pytest.param(
-                [("project", OperationType.READ)],
+                [PermissionEntry("project", OperationType.READ)],
                 OperationType.READ,
                 True,
                 id="auto-segment-before-ref-valid",
@@ -845,7 +851,7 @@ class TestCheckPermissionWithScopeChain:
         ("permission_setup", "check_op", "expected"),
         [
             pytest.param(
-                [("user_scope", OperationType.READ)],
+                [PermissionEntry("user_scope", OperationType.READ)],
                 OperationType.READ,
                 True,
                 id="three-level-auto-chain",
@@ -882,7 +888,7 @@ class TestCheckPermissionWithScopeChain:
         ("permission_setup", "check_op", "expected"),
         [
             pytest.param(
-                [("vfolder", OperationType.READ)],
+                [PermissionEntry("vfolder", OperationType.READ)],
                 OperationType.READ,
                 True,
                 id="self-scope-with-auto-edge",
@@ -973,8 +979,8 @@ class TestCheckPermissionWithScopeChain:
         [
             pytest.param(
                 [
-                    ("project", OperationType.READ),
-                    ("project", OperationType.UPDATE),
+                    PermissionEntry("project", OperationType.READ),
+                    PermissionEntry("project", OperationType.UPDATE),
                 ],
                 OperationType.READ,
                 True,
@@ -982,8 +988,8 @@ class TestCheckPermissionWithScopeChain:
             ),
             pytest.param(
                 [
-                    ("project", OperationType.READ),
-                    ("project", OperationType.UPDATE),
+                    PermissionEntry("project", OperationType.READ),
+                    PermissionEntry("project", OperationType.UPDATE),
                 ],
                 OperationType.SOFT_DELETE,
                 False,
@@ -1019,7 +1025,7 @@ class TestCheckPermissionWithScopeChain:
         ("permission_setup", "check_op", "expected"),
         [
             pytest.param(
-                [("project", OperationType.READ, EntityType.SESSION)],
+                [PermissionEntry("project", OperationType.READ, EntityType.SESSION)],
                 OperationType.READ,
                 False,
                 id="session-perm-vfolder-check",
