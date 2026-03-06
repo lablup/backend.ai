@@ -34,11 +34,11 @@ __all__ = (
     "SearchRoutesRequest",
     # Create requests
     "CreateDeploymentRequest",
-    "CreateDeploymentPolicyRequest",
+    "UpsertDeploymentPolicyRequest",
     "AddRevisionRequest",
+    "SearchDeploymentPoliciesRequest",
     # Update requests
     "UpdateDeploymentRequest",
-    "UpdateDeploymentPolicyRequest",
     "UpdateRouteTrafficStatusRequest",
     # Path params
     "DeploymentPathParam",
@@ -292,9 +292,10 @@ class CreateDeploymentRequest(BaseRequestModel):
 # ========== Deployment Policy Requests ==========
 
 
-class CreateDeploymentPolicyRequest(BaseRequestModel):
-    """Request to create a deployment policy that governs how new revisions are rolled out.
+class UpsertDeploymentPolicyRequest(BaseRequestModel):
+    """Request to create or update a deployment policy that governs how new revisions are rolled out.
 
+    If a policy already exists for the deployment, it is updated; otherwise a new one is created.
     Exactly one of rolling_update or blue_green must be provided depending on the chosen strategy.
     """
 
@@ -315,29 +316,11 @@ class CreateDeploymentPolicyRequest(BaseRequestModel):
     )
 
 
-class UpdateDeploymentPolicyRequest(BaseRequestModel):
-    """Request to partially update a deployment policy.
+class SearchDeploymentPoliciesRequest(BaseRequestModel):
+    """Request body for searching deployment policies with pagination."""
 
-    All fields are optional; only provided (non-null) fields are updated.
-    Omitted fields retain their current values.
-    """
-
-    strategy: DeploymentStrategy | None = Field(
-        default=None,
-        description="New rollout strategy type; changing strategy resets any strategy-specific configuration stored internally",
-    )
-    rollback_on_failure: bool | None = Field(
-        default=None,
-        description="New value for the automatic rollback flag; null to leave the current setting unchanged",
-    )
-    rolling_update: RollingUpdateConfigInput | None = Field(
-        default=None,
-        description="New rolling update parameters (max_surge, max_unavailable); null to clear existing rolling update configuration",
-    )
-    blue_green: BlueGreenConfigInput | None = Field(
-        default=None,
-        description="New blue-green deployment parameters (auto_promote, promote_delay_seconds); null to clear existing blue-green configuration",
-    )
+    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
+    offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
 class DeploymentPolicyPathParam(BaseRequestModel):

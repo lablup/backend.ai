@@ -49,6 +49,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfoWithAutoScalingRules,
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
+    DeploymentPolicyUpsertResult,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
@@ -82,6 +83,7 @@ from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import Purger, PurgerResult
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater, Updater
+from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
 from .db_source import DeploymentDBSource
@@ -1185,12 +1187,12 @@ class DeploymentRepository:
         return await self._db_source.delete_auto_scaling_policy(purger)
 
     @deployment_repository_resilience.apply()
-    async def create_deployment_policy(
+    async def upsert_deployment_policy(
         self,
-        creator: Creator[DeploymentPolicyRow],
-    ) -> DeploymentPolicyData:
-        """Create a new deployment policy for an endpoint."""
-        return await self._db_source.create_deployment_policy(creator)
+        upserter: Upserter[DeploymentPolicyRow],
+    ) -> DeploymentPolicyUpsertResult:
+        """Create or update a deployment policy using ON CONFLICT."""
+        return await self._db_source.upsert_deployment_policy(upserter)
 
     @deployment_repository_resilience.apply()
     async def get_deployment_policy(
@@ -1203,18 +1205,6 @@ class DeploymentRepository:
             DeploymentPolicyNotFound: If no policy exists for the endpoint.
         """
         return await self._db_source.get_deployment_policy(endpoint_id)
-
-    @deployment_repository_resilience.apply()
-    async def update_deployment_policy(
-        self,
-        updater: Updater[DeploymentPolicyRow],
-    ) -> DeploymentPolicyData:
-        """Update a deployment policy.
-
-        Raises:
-            DeploymentPolicyNotFound: If the policy does not exist.
-        """
-        return await self._db_source.update_deployment_policy(updater)
 
     @deployment_repository_resilience.apply()
     async def delete_deployment_policy(

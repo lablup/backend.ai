@@ -18,7 +18,6 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.dto.manager.deployment import (
     ClusterConfigDTO,
-    CreateDeploymentPolicyRequest,
     CreateDeploymentRequest,
     DeploymentDTO,
     DeploymentFilter,
@@ -40,7 +39,7 @@ from ai.backend.common.dto.manager.deployment import (
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
-    UpdateDeploymentPolicyRequest,
+    UpsertDeploymentPolicyRequest,
 )
 from ai.backend.common.dto.manager.deployment.types import (
     DeploymentOrderField,
@@ -52,12 +51,10 @@ from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.deployment.creator import (
     DeploymentPolicyConfig,
-    DeploymentPolicyCreator,
     ModelRevisionCreator,
     NewDeploymentCreator,
     VFolderMountsCreator,
 )
-from ai.backend.manager.data.deployment.modifier import DeploymentPolicyModifier
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
@@ -76,6 +73,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
+from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import IncompleteRevisionData
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
@@ -93,7 +91,6 @@ from ai.backend.manager.repositories.deployment.options import (
     RouteConditions,
     RouteOrders,
 )
-from ai.backend.manager.types import OptionalState
 
 __all__ = (
     "AddRevisionAdapter",
@@ -117,6 +114,11 @@ class DeploymentAdapter(BaseFilterAdapter):
             revision_adapter = RevisionAdapter()
             current_revision = revision_adapter.convert_to_dto(data.revision)
 
+        deployment_policy = None
+        if data.policy:
+            policy_adapter = DeploymentPolicyAdapter()
+            deployment_policy = policy_adapter.convert_to_dto(data.policy)
+
         return DeploymentDTO(
             id=data.id,
             name=data.metadata.name,
@@ -138,6 +140,7 @@ class DeploymentAdapter(BaseFilterAdapter):
             ),
             default_deployment_strategy=data.default_deployment_strategy,
             current_revision=current_revision,
+            deployment_policy=deployment_policy,
         )
 
     def build_querier(self, request: SearchDeploymentsRequest) -> BatchQuerier:
@@ -550,6 +553,7 @@ class DeploymentPolicyAdapter:
         """Convert DeploymentPolicyData to DTO."""
         return DeploymentPolicyDTO(
             id=data.id,
+            deployment_id=data.endpoint,
             strategy=data.strategy,
             strategy_spec=data.strategy_spec.model_dump(),
             rollback_on_failure=data.rollback_on_failure,
@@ -557,10 +561,10 @@ class DeploymentPolicyAdapter:
             updated_at=data.updated_at,
         )
 
-    def build_creator(
-        self, request: CreateDeploymentPolicyRequest, deployment_id: UUID
-    ) -> DeploymentPolicyCreator:
-        """Build DeploymentPolicyCreator from create request."""
+    def build_upserter(
+        self, request: UpsertDeploymentPolicyRequest, deployment_id: UUID
+    ) -> DeploymentPolicyUpserter:
+        """Build DeploymentPolicyUpserter from upsert request."""
         strategy = request.strategy
 
         strategy_spec: RollingUpdateSpec | BlueGreenSpec
@@ -584,40 +588,9 @@ class DeploymentPolicyAdapter:
             case _:
                 raise InvalidAPIParameters(f"Unsupported deployment strategy: {strategy}")
 
-        return DeploymentPolicyCreator(
+        return DeploymentPolicyUpserter(
             deployment_id=deployment_id,
             strategy=strategy,
             strategy_spec=strategy_spec,
             rollback_on_failure=request.rollback_on_failure,
-        )
-
-    def build_modifier(self, request: UpdateDeploymentPolicyRequest) -> DeploymentPolicyModifier:
-        """Build DeploymentPolicyModifier from update request."""
-        strategy: OptionalState[DeploymentStrategy] = OptionalState.nop()
-        strategy_spec: OptionalState[RollingUpdateSpec | BlueGreenSpec] = OptionalState.nop()
-        rollback_on_failure: OptionalState[bool] = OptionalState.nop()
-
-        if request.strategy is not None:
-            strategy = OptionalState.update(request.strategy)
-        if request.rollback_on_failure is not None:
-            rollback_on_failure = OptionalState.update(request.rollback_on_failure)
-        if request.rolling_update is not None:
-            strategy_spec = OptionalState.update(
-                RollingUpdateSpec(
-                    max_surge=request.rolling_update.max_surge,
-                    max_unavailable=request.rolling_update.max_unavailable,
-                )
-            )
-        elif request.blue_green is not None:
-            strategy_spec = OptionalState.update(
-                BlueGreenSpec(
-                    auto_promote=request.blue_green.auto_promote,
-                    promote_delay_seconds=request.blue_green.promote_delay_seconds,
-                )
-            )
-
-        return DeploymentPolicyModifier(
-            strategy=strategy,
-            strategy_spec=strategy_spec,
-            rollback_on_failure=rollback_on_failure,
         )

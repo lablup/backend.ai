@@ -34,12 +34,12 @@ __all__ = (
     "ReplicaStateDTO",
     # Responses
     "CreateDeploymentResponse",
-    "CreateDeploymentPolicyResponse",
+    "UpsertDeploymentPolicyResponse",
     "GetDeploymentResponse",
     "GetDeploymentPolicyResponse",
+    "ListDeploymentPoliciesResponse",
     "ListDeploymentsResponse",
     "UpdateDeploymentResponse",
-    "UpdateDeploymentPolicyResponse",
     "DestroyDeploymentResponse",
     "GetRevisionResponse",
     "AddRevisionResponse",
@@ -137,6 +137,9 @@ class DeploymentDTO(BaseModel):
     )
     current_revision: RevisionDTO | None = Field(
         default=None, description="Current active revision"
+    )
+    deployment_policy: DeploymentPolicyDTO | None = Field(
+        default=None, description="Deployment rollout policy"
     )
 
 
@@ -248,6 +251,7 @@ class DeploymentPolicyDTO(BaseModel):
     """
 
     id: UUID = Field(description="Unique identifier of this deployment policy")
+    deployment_id: UUID = Field(description="UUID of the deployment this policy belongs to")
     strategy: DeploymentStrategy = Field(
         description="Configured rollout strategy type (ROLLING for gradual replacement, BLUE_GREEN for parallel environment switching)"
     )
@@ -265,18 +269,22 @@ class DeploymentPolicyDTO(BaseModel):
     )
 
 
-class CreateDeploymentPolicyResponse(BaseResponseModel):
-    """Response for creating a deployment policy."""
+class UpsertDeploymentPolicyResponse(BaseResponseModel):
+    """Response for creating or updating a deployment policy."""
 
-    deployment_policy: DeploymentPolicyDTO = Field(description="Newly created deployment policy")
-
-
-class UpdateDeploymentPolicyResponse(BaseResponseModel):
-    """Response for updating a deployment policy."""
-
-    deployment_policy: DeploymentPolicyDTO = Field(
-        description="Deployment policy after applying the requested updates"
+    deployment_policy: DeploymentPolicyDTO = Field(description="The deployment policy")
+    created: bool = Field(
+        description="True if a new policy was created, False if an existing one was updated"
     )
+
+
+class ListDeploymentPoliciesResponse(BaseResponseModel):
+    """Response for listing deployment policies."""
+
+    deployment_policies: list[DeploymentPolicyDTO] = Field(
+        description="List of deployment policies"
+    )
+    pagination: PaginationInfo = Field(description="Pagination information")
 
 
 class GetDeploymentPolicyResponse(BaseResponseModel):

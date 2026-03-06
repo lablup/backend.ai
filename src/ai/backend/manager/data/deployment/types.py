@@ -353,6 +353,7 @@ class DeploymentInfo:
     network: DeploymentNetworkSpec
     model_revisions: list[ModelRevisionSpec]
     current_revision_id: UUID | None = None
+    policy: DeploymentPolicyData | None = None
 
     def target_revision(self) -> ModelRevisionSpec | None:
         if self.model_revisions:
@@ -521,6 +522,7 @@ class ModelDeploymentData:
     replica_state: ReplicaStateData
     default_deployment_strategy: DeploymentStrategy
     created_user_id: UUID
+    policy: DeploymentPolicyData | None = None
     access_token_ids: list[UUID] | None = None
 
 
@@ -677,6 +679,14 @@ class DeploymentPolicyData:
     rollback_on_failure: bool
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass
+class DeploymentPolicyUpsertResult:
+    """Result of upserting a deployment policy."""
+
+    data: DeploymentPolicyData
+    created: bool
 
 
 @dataclass

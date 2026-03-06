@@ -44,14 +44,12 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
     CreateLegacyDeploymentActionResult,
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
-    CreateDeploymentPolicyAction,
-    CreateDeploymentPolicyActionResult,
     GetDeploymentPolicyAction,
     GetDeploymentPolicyActionResult,
     SearchDeploymentPoliciesAction,
     SearchDeploymentPoliciesActionResult,
-    UpdateDeploymentPolicyAction,
-    UpdateDeploymentPolicyActionResult,
+    UpsertDeploymentPolicyAction,
+    UpsertDeploymentPolicyActionResult,
 )
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
@@ -126,11 +124,8 @@ class DeploymentProcessors(AbstractProcessorPackage):
     search_deployment_policies: ActionProcessor[
         SearchDeploymentPoliciesAction, SearchDeploymentPoliciesActionResult
     ]
-    create_deployment_policy: ActionProcessor[
-        CreateDeploymentPolicyAction, CreateDeploymentPolicyActionResult
-    ]
-    update_deployment_policy: ActionProcessor[
-        UpdateDeploymentPolicyAction, UpdateDeploymentPolicyActionResult
+    upsert_deployment_policy: ActionProcessor[
+        UpsertDeploymentPolicyAction, UpsertDeploymentPolicyActionResult
     ]
 
     # Revision operations
@@ -183,11 +178,8 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.search_deployment_policies = ActionProcessor(
             service.search_deployment_policies, action_monitors
         )
-        self.create_deployment_policy = ActionProcessor(
-            service.create_deployment_policy, action_monitors
-        )
-        self.update_deployment_policy = ActionProcessor(
-            service.update_deployment_policy, action_monitors
+        self.upsert_deployment_policy = ActionProcessor(
+            service.upsert_deployment_policy, action_monitors
         )
 
         # Revision operations
@@ -238,8 +230,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
             GetDeploymentByIdAction.spec(),
             GetDeploymentPolicyAction.spec(),
             SearchDeploymentPoliciesAction.spec(),
-            CreateDeploymentPolicyAction.spec(),
-            UpdateDeploymentPolicyAction.spec(),
+            UpsertDeploymentPolicyAction.spec(),
             # Revision operations
             AddModelRevisionAction.spec(),
             GetRevisionByIdAction.spec(),
