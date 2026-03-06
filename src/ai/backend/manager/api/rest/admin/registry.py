@@ -40,7 +40,7 @@ def register_admin_routes(
     )
     reg.add(
         "POST",
-        "/gql/v2",
+        "/gql/strawberry",
         handler.handle_gql_strawberry,
         middlewares=[auth_required],
     )

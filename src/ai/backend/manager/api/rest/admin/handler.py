@@ -1,7 +1,7 @@
 """Admin handler class using constructor dependency injection.
 
 Handles GraphQL endpoints (graphene legacy, graphene v1, strawberry v2).
-Strawberry v2 is served at ``POST /admin/gql/v2`` via ``handle_gql_strawberry()``.
+Strawberry v2 is served at ``POST /admin/gql/strawberry`` via ``handle_gql_strawberry()``.
 """
 
 from __future__ import annotations
@@ -208,7 +208,7 @@ class AdminHandler:
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
-    # handle_gql_strawberry (POST /admin/gql/v2)
+    # handle_gql_strawberry (POST /admin/gql/strawberry)
     # ------------------------------------------------------------------
 
     async def handle_gql_strawberry(
