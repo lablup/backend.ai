@@ -339,7 +339,7 @@ type AgentResource
   free: JSON!
 }
 
-"""Added in 26.4.0. Relay-style connection for per-slot agent resources."""
+"""Added in 26.3.0. Relay-style connection for per-slot agent resources."""
 type AgentResourceConnection
   @join__type(graph: STRAWBERRY)
 {
@@ -352,7 +352,7 @@ type AgentResourceConnection
 }
 
 """
-Added in 26.4.0. Per-slot resource capacity and usage entry for an agent.
+Added in 26.3.0. Per-slot resource capacity and usage entry for an agent.
 Represents one row from the agent_resources table.
 """
 type AgentResourceSlot implements Node
@@ -5566,7 +5566,7 @@ type KernelNode implements Node
 }
 
 """
-Added in 26.4.0. Per-slot resource allocation entry for a kernel.
+Added in 26.3.0. Per-slot resource allocation entry for a kernel.
 Represents one row from the resource_allocations table.
 """
 type KernelResourceAllocation implements Node
@@ -5646,7 +5646,7 @@ type KernelV2 implements Node
   """Added in 26.3.0. The session this kernel belongs to."""
   session: SessionV2
 
-  """Added in 26.4.0. Per-slot resource allocation for this kernel."""
+  """Added in 26.3.0. Per-slot resource allocation for this kernel."""
   resourceAllocations: ResourceAllocationConnection!
 }
 
@@ -7907,7 +7907,7 @@ enum NotificationRuleType
 }
 
 """
-Added in 26.4.0. Display number format configuration for a resource slot type.
+Added in 26.3.0. Display number format configuration for a resource slot type.
 """
 type NumberFormat
   @join__type(graph: STRAWBERRY)
@@ -9567,11 +9567,11 @@ type Query
   adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection! @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.4.0. Returns a single resource slot type by slot_name, or null.
+  Added in 26.3.0. Returns a single resource slot type by slot_name, or null.
   """
   resourceSlotType(slotName: String!): ResourceSlotType @join__field(graph: STRAWBERRY)
 
-  """Added in 26.4.0. Returns all registered resource slot types."""
+  """Added in 26.3.0. Returns all registered resource slot types."""
   resourceSlotTypes: ResourceSlotTypeConnection! @join__field(graph: STRAWBERRY)
 
   """
@@ -10075,7 +10075,7 @@ type ResourceAllocation
 }
 
 """
-Added in 26.4.0. Relay-style connection for per-slot kernel resource allocations.
+Added in 26.3.0. Relay-style connection for per-slot kernel resource allocations.
 """
 type ResourceAllocationConnection
   @join__type(graph: STRAWBERRY)
@@ -10448,7 +10448,7 @@ input ResourceSlotInput
 }
 
 """
-Added in 26.4.0. A registered resource slot type describing display metadata
+Added in 26.3.0. A registered resource slot type describing display metadata
 and formatting rules for a specific resource (e.g., cpu, mem, cuda.device).
 """
 type ResourceSlotType implements Node
@@ -10488,7 +10488,7 @@ type ResourceSlotType implements Node
 }
 
 """
-Added in 26.4.0. Relay-style connection for paginated resource slot types.
+Added in 26.3.0. Relay-style connection for paginated resource slot types.
 """
 type ResourceSlotTypeConnection
   @join__type(graph: STRAWBERRY)

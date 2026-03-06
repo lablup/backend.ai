@@ -170,7 +170,7 @@ type AgentResource {
   free: JSON!
 }
 
-"""Added in 26.4.0. Relay-style connection for per-slot agent resources."""
+"""Added in 26.3.0. Relay-style connection for per-slot agent resources."""
 type AgentResourceConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -181,7 +181,7 @@ type AgentResourceConnection {
 }
 
 """
-Added in 26.4.0. Per-slot resource capacity and usage entry for an agent.
+Added in 26.3.0. Per-slot resource capacity and usage entry for an agent.
 Represents one row from the agent_resources table.
 """
 type AgentResourceSlot implements Node {
@@ -3120,7 +3120,7 @@ The `JSON` scalar type represents JSON values as specified by [ECMA-404](https:/
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
 """
-Added in 26.4.0. Per-slot resource allocation entry for a kernel.
+Added in 26.3.0. Per-slot resource allocation entry for a kernel.
 Represents one row from the resource_allocations table.
 """
 type KernelResourceAllocation implements Node {
@@ -3192,7 +3192,7 @@ type KernelV2 implements Node {
   """Added in 26.3.0. The session this kernel belongs to."""
   session: SessionV2
 
-  """Added in 26.4.0. Per-slot resource allocation for this kernel."""
+  """Added in 26.3.0. Per-slot resource allocation for this kernel."""
   resourceAllocations: ResourceAllocationConnection!
 }
 
@@ -4233,7 +4233,7 @@ enum NotificationRuleType {
 }
 
 """
-Added in 26.4.0. Display number format configuration for a resource slot type.
+Added in 26.3.0. Display number format configuration for a resource slot type.
 """
 type NumberFormat {
   """
@@ -5260,11 +5260,11 @@ type Query {
   adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
 
   """
-  Added in 26.4.0. Returns a single resource slot type by slot_name, or null.
+  Added in 26.3.0. Returns a single resource slot type by slot_name, or null.
   """
   resourceSlotType(slotName: String!): ResourceSlotType
 
-  """Added in 26.4.0. Returns all registered resource slot types."""
+  """Added in 26.3.0. Returns all registered resource slot types."""
   resourceSlotTypes: ResourceSlotTypeConnection!
 
   """
@@ -5772,7 +5772,7 @@ type ResourceAllocation {
 }
 
 """
-Added in 26.4.0. Relay-style connection for per-slot kernel resource allocations.
+Added in 26.3.0. Relay-style connection for per-slot kernel resource allocations.
 """
 type ResourceAllocationConnection {
   """Pagination data for this connection"""
@@ -6061,7 +6061,7 @@ input ResourceSlotInput {
 }
 
 """
-Added in 26.4.0. A registered resource slot type describing display metadata
+Added in 26.3.0. A registered resource slot type describing display metadata
 and formatting rules for a specific resource (e.g., cpu, mem, cuda.device).
 """
 type ResourceSlotType implements Node {
@@ -6098,7 +6098,7 @@ type ResourceSlotType implements Node {
 }
 
 """
-Added in 26.4.0. Relay-style connection for paginated resource slot types.
+Added in 26.3.0. Relay-style connection for paginated resource slot types.
 """
 type ResourceSlotTypeConnection {
   """Pagination data for this connection"""
