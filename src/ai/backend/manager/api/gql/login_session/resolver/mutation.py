@@ -37,7 +37,7 @@ async def update_user_login_security_policy(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    check_admin_only(info)
+    check_admin_only()
     raise NotImplementedError("update_user_login_security_policy is not yet implemented")
 
 

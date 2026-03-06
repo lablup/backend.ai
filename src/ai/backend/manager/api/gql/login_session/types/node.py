@@ -17,7 +17,7 @@ class LoginSessionGQL:
 
     id: UUID = strawberry.field(description="Unique identifier of the login session.")
     session_token: str = strawberry.field(description="Opaque session token.")
-    client_ip: str = strawberry.field(
+    client_ip: str | None = strawberry.field(
         description="IP address of the client that created the session."
     )
     created_at: datetime = strawberry.field(description="Timestamp when the session was created.")

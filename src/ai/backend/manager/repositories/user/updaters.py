@@ -66,6 +66,7 @@ class UserUpdaterSpec(UpdaterSpec[UserRow]):
         self.container_uid.update_dict(to_update, "container_uid")
         self.container_main_gid.update_dict(to_update, "container_main_gid")
         self.container_gids.update_dict(to_update, "container_gids")
+        self.login_security_policy.update_dict(to_update, "login_security_policy")
         # Set status based on is_active if not explicitly set
         status = self.status.optional_value()
         if status is not None:

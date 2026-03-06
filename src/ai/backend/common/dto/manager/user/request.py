@@ -5,10 +5,9 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
-from typing import Any
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
@@ -18,12 +17,32 @@ from .types import OrderDirection, UserOrderField, UserRole, UserStatus
 __all__ = (
     "CreateUserRequest",
     "DeleteUserRequest",
+    "LoginSecurityPolicyRequest",
     "PurgeUserRequest",
     "SearchUsersRequest",
     "UpdateUserRequest",
     "UserFilter",
     "UserOrder",
 )
+
+
+class LoginSecurityPolicyRequest(BaseRequestModel):
+    """Login security policy settings for a user."""
+
+    max_concurrent_logins: int | None = Field(
+        default=None,
+        description=(
+            "Maximum number of concurrent login sessions allowed. "
+            "Must be a positive integer (greater than 0), or None for unlimited."
+        ),
+    )
+
+    @field_validator("max_concurrent_logins")
+    @classmethod
+    def validate_max_concurrent_logins(cls, v: int | None) -> int | None:
+        if v is not None and v <= 0:
+            raise ValueError("max_concurrent_logins must be a positive integer or None")
+        return v
 
 
 class CreateUserRequest(BaseRequestModel):
@@ -82,7 +101,7 @@ class UpdateUserRequest(BaseRequestModel):
         default=None, description="Updated container additional GIDs"
     )
     group_ids: list[str] | None = Field(default=None, description="Updated group IDs")
-    login_security_policy: dict[str, Any] | None = Field(
+    login_security_policy: LoginSecurityPolicyRequest | None = Field(
         default=None, description="Login security policy settings (e.g. max_concurrent_logins)"
     )
 

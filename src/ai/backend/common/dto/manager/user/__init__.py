@@ -7,6 +7,7 @@ from __future__ import annotations
 from .request import (
     CreateUserRequest,
     DeleteUserRequest,
+    LoginSecurityPolicyRequest,
     PurgeUserRequest,
     SearchUsersRequest,
     UpdateUserRequest,
@@ -38,6 +39,7 @@ __all__ = (
     "UserStatus",
     # Request DTOs
     "CreateUserRequest",
+    "LoginSecurityPolicyRequest",
     "UpdateUserRequest",
     "SearchUsersRequest",
     "DeleteUserRequest",

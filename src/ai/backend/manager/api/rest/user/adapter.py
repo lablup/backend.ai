@@ -6,6 +6,7 @@ as well as data-to-DTO conversion.
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from ai.backend.common.data.user.types import UserRole
@@ -90,7 +91,7 @@ class UserAdapter(BaseFilterAdapter):
         container_main_gid = TriState[int].nop()
         container_gids = TriState[list[int]].nop()
         group_ids = OptionalState[list[str]].nop()
-        login_security_policy: OptionalState[dict] = OptionalState.nop()
+        login_security_policy: OptionalState[dict[str, Any]] = OptionalState.nop()
 
         if request.username is not None:
             username = OptionalState.update(request.username)
@@ -127,7 +128,9 @@ class UserAdapter(BaseFilterAdapter):
         if request.group_ids is not None:
             group_ids = OptionalState.update(request.group_ids)
         if request.login_security_policy is not None:
-            login_security_policy = OptionalState.update(request.login_security_policy)
+            login_security_policy = OptionalState.update(
+                request.login_security_policy.model_dump(exclude_none=False)
+            )
 
         updater_spec = UserUpdaterSpec(
             username=username,
