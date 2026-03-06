@@ -324,16 +324,16 @@ async def load_agent_resource_data(
     info: Info[StrawberryGQLContext],
     agent_id: str,
     slot_name: str,
-) -> AgentResourceData | None:
-    """Load raw AgentResourceData for a single agent+slot (used by Node.resolve_nodes)."""
-    from ai.backend.manager.errors.resource_slot import AgentResourceNotFound
+) -> AgentResourceData:
+    """Load raw AgentResourceData for a single agent+slot (used by Node.resolve_nodes).
 
-    try:
-        action_result = await info.context.processors.resource_slot.get_agent_resource_by_slot.wait_for_complete(
+    Raises AgentResourceNotFound if the entry does not exist.
+    """
+    action_result = (
+        await info.context.processors.resource_slot.get_agent_resource_by_slot.wait_for_complete(
             GetAgentResourceBySlotAction(agent_id=agent_id, slot_name=slot_name)
         )
-    except AgentResourceNotFound:
-        return None
+    )
     return action_result.item
 
 
@@ -341,16 +341,16 @@ async def load_kernel_allocation_data(
     info: Info[StrawberryGQLContext],
     kernel_id_str: str,
     slot_name: str,
-) -> ResourceAllocationData | None:
-    """Load raw ResourceAllocationData for a single kernel+slot (used by Node.resolve_nodes)."""
-    from ai.backend.manager.errors.resource_slot import ResourceAllocationNotFound
+) -> ResourceAllocationData:
+    """Load raw ResourceAllocationData for a single kernel+slot (used by Node.resolve_nodes).
 
-    try:
-        action_result = await info.context.processors.resource_slot.get_kernel_allocation_by_slot.wait_for_complete(
+    Raises ResourceAllocationNotFound if the entry does not exist.
+    """
+    action_result = (
+        await info.context.processors.resource_slot.get_kernel_allocation_by_slot.wait_for_complete(
             GetKernelAllocationBySlotAction(
                 kernel_id=_uuid.UUID(kernel_id_str), slot_name=slot_name
             )
         )
-    except ResourceAllocationNotFound:
-        return None
+    )
     return action_result.item

@@ -96,6 +96,8 @@ class ResourceSlotTypeGQL(Node):
             try:
                 data = await load_resource_slot_type_data(info, slot_name)
             except ResourceSlotTypeNotFound:
+                if required:
+                    raise
                 results.append(None)
             else:
                 results.append(cls.from_data(data))
@@ -240,12 +242,19 @@ class AgentResourceSlotGQL(Node):
     ) -> Iterable[Self | None]:
         # Node ID format: "{agent_id}:{slot_name}"
         from ai.backend.manager.api.gql.resource_slot.fetcher import load_agent_resource_data
+        from ai.backend.manager.errors.resource_slot import AgentResourceNotFound
 
         results: list[Self | None] = []
         for node_id in node_ids:
             agent_id, _, slot_name = node_id.partition(":")
-            data = await load_agent_resource_data(info, agent_id, slot_name)
-            results.append(cls.from_data(data) if data is not None else None)
+            try:
+                data = await load_agent_resource_data(info, agent_id, slot_name)
+            except AgentResourceNotFound:
+                if required:
+                    raise
+                results.append(None)
+            else:
+                results.append(cls.from_data(data))
         return results
 
     @classmethod
@@ -308,12 +317,19 @@ class KernelResourceAllocationGQL(Node):
     ) -> Iterable[Self | None]:
         # Node ID format: "{kernel_id}:{slot_name}"
         from ai.backend.manager.api.gql.resource_slot.fetcher import load_kernel_allocation_data
+        from ai.backend.manager.errors.resource_slot import ResourceAllocationNotFound
 
         results: list[Self | None] = []
         for node_id in node_ids:
             kernel_id_str, _, slot_name = node_id.partition(":")
-            data = await load_kernel_allocation_data(info, kernel_id_str, slot_name)
-            results.append(cls.from_data(data) if data is not None else None)
+            try:
+                data = await load_kernel_allocation_data(info, kernel_id_str, slot_name)
+            except ResourceAllocationNotFound:
+                if required:
+                    raise
+                results.append(None)
+            else:
+                results.append(cls.from_data(data))
         return results
 
     @classmethod
