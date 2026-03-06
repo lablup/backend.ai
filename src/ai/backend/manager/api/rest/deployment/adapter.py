@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
-from typing import Any
 from uuid import UUID, uuid4
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -26,6 +25,7 @@ from ai.backend.common.dto.manager.deployment import (
     DeploymentFilter,
     DeploymentOrder,
     DeploymentPolicyDTO,
+    DeploymentStrategyInput,
     ModelMountConfigDTO,
     ModelRuntimeConfigDTO,
     NetworkConfigDTO,
@@ -497,7 +497,7 @@ class CreateDeploymentAdapter:
 
     def _build_policy_config(
         self,
-        strategy_input: Any,  # DeploymentStrategyInput
+        strategy_input: DeploymentStrategyInput,
     ) -> DeploymentPolicyConfig:
         """Build DeploymentPolicyConfig from strategy input."""
         strategy = DeploymentStrategy(strategy_input.type)
