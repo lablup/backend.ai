@@ -1,4 +1,4 @@
-"""Prometheus Query Preset module registrar."""
+"""Prometheus Query Definition module registrar."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 def register_prometheus_query_preset_routes(
     handler: PrometheusQueryPresetHandler, route_deps: RouteDeps
 ) -> RouteRegistry:
-    """Build the prometheus query preset sub-application."""
+    """Build the prometheus query definition sub-application."""
     reg = RouteRegistry.create("resource/prometheus-query-definitions", route_deps.cors_options)
 
     # CRUD endpoints (superadmin only)
@@ -27,6 +27,11 @@ def register_prometheus_query_preset_routes(
     reg.add("DELETE", "/{id}", handler.delete_preset, middlewares=[superadmin_required])
 
     # Execute endpoint (superadmin only)
-    reg.add("POST", "/{id}/execute", handler.execute_preset, middlewares=[superadmin_required])
+    reg.add(
+        "POST",
+        "/{id}/execute",
+        handler.execute_preset,
+        middlewares=[superadmin_required],
+    )
 
     return reg

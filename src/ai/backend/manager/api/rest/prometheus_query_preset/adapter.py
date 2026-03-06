@@ -1,4 +1,4 @@
-"""Adapter for converting Prometheus Query Preset domain data to DTOs."""
+"""Adapter for converting Prometheus Query Definition domain data to DTOs."""
 
 from __future__ import annotations
 
@@ -40,10 +40,10 @@ from ai.backend.manager.types import OptionalState, TriState
 
 
 class PrometheusQueryPresetAdapter(BaseFilterAdapter):
-    """Adapter for converting between domain data and DTOs."""
+    """Adapter for converting between query definition domain data and DTOs."""
 
     def convert_to_dto(self, data: PrometheusQueryPresetData) -> QueryDefinitionDTO:
-        """Convert domain data to DTO."""
+        """Convert domain data to query definition DTO."""
         return QueryDefinitionDTO(
             id=data.id,
             name=data.name,
@@ -129,12 +129,15 @@ class PrometheusQueryPresetAdapter(BaseFilterAdapter):
             if condition is not None:
                 conditions.append(condition)
         if filter_req.metric_name is not None:
-            if filter_req.metric_name.equals is not None:
-                conditions.append(
-                    PrometheusQueryPresetConditions.by_metric_name_equals(
-                        filter_req.metric_name.equals
-                    )
-                )
+            condition = self.convert_string_filter(
+                filter_req.metric_name,
+                contains_factory=PrometheusQueryPresetConditions.by_metric_name_contains,
+                equals_factory=PrometheusQueryPresetConditions.by_metric_name_equals,
+                starts_with_factory=PrometheusQueryPresetConditions.by_metric_name_starts_with,
+                ends_with_factory=PrometheusQueryPresetConditions.by_metric_name_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
         return conditions
 
     def _convert_order(self, order: QueryDefinitionOrder) -> QueryOrder:
