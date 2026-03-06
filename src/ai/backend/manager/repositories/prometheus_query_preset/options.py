@@ -73,60 +73,6 @@ class PrometheusQueryPresetConditions:
         return inner
 
     @staticmethod
-    def by_metric_name_contains(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = PrometheusQueryPresetRow.metric_name.ilike(f"%{spec.value}%")
-            else:
-                condition = PrometheusQueryPresetRow.metric_name.like(f"%{spec.value}%")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
-
-        return inner
-
-    @staticmethod
-    def by_metric_name_equals(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = (
-                    sa.func.lower(PrometheusQueryPresetRow.metric_name) == spec.value.lower()
-                )
-            else:
-                condition = PrometheusQueryPresetRow.metric_name == spec.value
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
-
-        return inner
-
-    @staticmethod
-    def by_metric_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = PrometheusQueryPresetRow.metric_name.ilike(f"{spec.value}%")
-            else:
-                condition = PrometheusQueryPresetRow.metric_name.like(f"{spec.value}%")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
-
-        return inner
-
-    @staticmethod
-    def by_metric_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = PrometheusQueryPresetRow.metric_name.ilike(f"%{spec.value}")
-            else:
-                condition = PrometheusQueryPresetRow.metric_name.like(f"%{spec.value}")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
-
-        return inner
-
-    @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         cursor_uuid = uuid.UUID(cursor_id)
 

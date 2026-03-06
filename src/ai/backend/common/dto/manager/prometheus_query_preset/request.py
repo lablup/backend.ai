@@ -88,7 +88,6 @@ class QueryDefinitionFilter(BaseRequestModel):
     """Filter for prometheus query definition search."""
 
     name: StringFilter | None = Field(default=None, description="Filter by name")
-    metric_name: StringFilter | None = Field(default=None, description="Filter by metric name")
 
 
 class SearchQueryDefinitionsRequest(BaseRequestModel):

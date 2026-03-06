@@ -128,16 +128,6 @@ class PrometheusQueryPresetAdapter(BaseFilterAdapter):
             )
             if condition is not None:
                 conditions.append(condition)
-        if filter_req.metric_name is not None:
-            condition = self.convert_string_filter(
-                filter_req.metric_name,
-                contains_factory=PrometheusQueryPresetConditions.by_metric_name_contains,
-                equals_factory=PrometheusQueryPresetConditions.by_metric_name_equals,
-                starts_with_factory=PrometheusQueryPresetConditions.by_metric_name_starts_with,
-                ends_with_factory=PrometheusQueryPresetConditions.by_metric_name_ends_with,
-            )
-            if condition is not None:
-                conditions.append(condition)
         return conditions
 
     def _convert_order(self, order: QueryDefinitionOrder) -> QueryOrder:
