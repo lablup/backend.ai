@@ -14,6 +14,7 @@ from ai.backend.manager.services.processors import Processors
 if TYPE_CHECKING:
     from ai.backend.common.events.fetcher import EventFetcher
     from ai.backend.common.events.hub.hub import EventHub
+    from ai.backend.manager.api import ManagerStatus
     from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
 
 
@@ -59,6 +60,7 @@ class StrawberryGQLContext:
     event_fetcher: EventFetcher
     gql_adapter: BaseGQLAdapter
     data_loaders: DataLoaders
+    manager_status: ManagerStatus
 
 
 # Scope input types for BEP-1041 Resource Group scoped APIs
