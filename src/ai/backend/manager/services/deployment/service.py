@@ -38,8 +38,9 @@ from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
-from ai.backend.manager.repositories.base import Creator, Updater
+from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
     DeploymentCreatorSpec,
@@ -53,10 +54,7 @@ from ai.backend.manager.repositories.deployment.creators import (
     EndpointTokenCreatorSpec,
     ModelRevisionFields,
 )
-from ai.backend.manager.repositories.deployment.creators.policy import (
-    DeploymentPolicyCreatorSpec,
-)
-from ai.backend.manager.repositories.deployment.updaters import DeploymentPolicyUpdaterSpec
+from ai.backend.manager.repositories.deployment.upserters import DeploymentPolicyUpserterSpec
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
@@ -94,14 +92,12 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
     CreateLegacyDeploymentActionResult,
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
-    CreateDeploymentPolicyAction,
-    CreateDeploymentPolicyActionResult,
     GetDeploymentPolicyAction,
     GetDeploymentPolicyActionResult,
     SearchDeploymentPoliciesAction,
     SearchDeploymentPoliciesActionResult,
-    UpdateDeploymentPolicyAction,
-    UpdateDeploymentPolicyActionResult,
+    UpsertDeploymentPolicyAction,
+    UpsertDeploymentPolicyActionResult,
 )
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
@@ -499,54 +495,20 @@ class DeploymentService:
             has_previous_page=result.has_previous_page,
         )
 
-    async def create_deployment_policy(
-        self, action: CreateDeploymentPolicyAction
-    ) -> CreateDeploymentPolicyActionResult:
-        """Create a new deployment policy for an endpoint.
-
-        Args:
-            action: Action containing the creator for the policy
-
-        Returns:
-            CreateDeploymentPolicyActionResult: Result containing the created policy data
-        """
-        creator = action.creator
-        spec = DeploymentPolicyCreatorSpec(
-            endpoint_id=creator.deployment_id,
-            strategy=creator.strategy,
-            strategy_spec=creator.strategy_spec,
-            rollback_on_failure=creator.rollback_on_failure,
+    async def upsert_deployment_policy(
+        self, action: UpsertDeploymentPolicyAction
+    ) -> UpsertDeploymentPolicyActionResult:
+        """Create or update a deployment policy using ON CONFLICT."""
+        policy_upserter = action.upserter
+        spec = DeploymentPolicyUpserterSpec(
+            endpoint_id=policy_upserter.deployment_id,
+            strategy=policy_upserter.strategy,
+            strategy_spec=policy_upserter.strategy_spec,
+            rollback_on_failure=policy_upserter.rollback_on_failure,
         )
-        repo_creator: Creator[DeploymentPolicyRow] = Creator(spec=spec)
-        data = await self._deployment_repository.create_deployment_policy(repo_creator)
-        return CreateDeploymentPolicyActionResult(data=data)
-
-    async def update_deployment_policy(
-        self, action: UpdateDeploymentPolicyAction
-    ) -> UpdateDeploymentPolicyActionResult:
-        """Update a deployment policy.
-
-        Args:
-            action: Action containing the policy ID and modifier
-
-        Returns:
-            UpdateDeploymentPolicyActionResult: Result containing the updated policy data
-
-        Raises:
-            DeploymentPolicyNotFound: If the policy does not exist
-        """
-        modifier = action.modifier
-        updater_spec = DeploymentPolicyUpdaterSpec(
-            strategy=modifier.strategy,
-            strategy_spec=modifier.strategy_spec,
-            rollback_on_failure=modifier.rollback_on_failure,
-        )
-        updater: Updater[DeploymentPolicyRow] = Updater(
-            spec=updater_spec,
-            pk_value=action.policy_id,
-        )
-        data = await self._deployment_repository.update_deployment_policy(updater)
-        return UpdateDeploymentPolicyActionResult(data=data)
+        repo_upserter: Upserter[DeploymentPolicyRow] = Upserter(spec=spec)
+        result = await self._deployment_repository.upsert_deployment_policy(repo_upserter)
+        return UpsertDeploymentPolicyActionResult(data=result.data, created=result.created)
 
     # ========== Revision Operations ==========
 

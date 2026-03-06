@@ -49,6 +49,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfoWithAutoScalingRules,
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
+    DeploymentPolicyUpsertResult,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
@@ -82,6 +83,7 @@ from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import Purger, PurgerResult
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater, Updater
+from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
 from .db_source import DeploymentDBSource
@@ -1191,6 +1193,14 @@ class DeploymentRepository:
     ) -> DeploymentPolicyData:
         """Create a new deployment policy for an endpoint."""
         return await self._db_source.create_deployment_policy(creator)
+
+    @deployment_repository_resilience.apply()
+    async def upsert_deployment_policy(
+        self,
+        upserter: Upserter[DeploymentPolicyRow],
+    ) -> DeploymentPolicyUpsertResult:
+        """Create or update a deployment policy using ON CONFLICT."""
+        return await self._db_source.upsert_deployment_policy(upserter)
 
     @deployment_repository_resilience.apply()
     async def get_deployment_policy(

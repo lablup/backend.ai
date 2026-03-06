@@ -51,12 +51,10 @@ from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.deployment.creator import (
     DeploymentPolicyConfig,
-    DeploymentPolicyCreator,
     ModelRevisionCreator,
     NewDeploymentCreator,
     VFolderMountsCreator,
 )
-from ai.backend.manager.data.deployment.modifier import DeploymentPolicyModifier
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
@@ -75,6 +73,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
+from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import IncompleteRevisionData
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
@@ -92,7 +91,6 @@ from ai.backend.manager.repositories.deployment.options import (
     RouteConditions,
     RouteOrders,
 )
-from ai.backend.manager.types import OptionalState
 
 __all__ = (
     "AddRevisionAdapter",
@@ -563,10 +561,10 @@ class DeploymentPolicyAdapter:
             updated_at=data.updated_at,
         )
 
-    def build_creator_from_upsert(
+    def build_upserter(
         self, request: UpsertDeploymentPolicyRequest, deployment_id: UUID
-    ) -> DeploymentPolicyCreator:
-        """Build DeploymentPolicyCreator from upsert request."""
+    ) -> DeploymentPolicyUpserter:
+        """Build DeploymentPolicyUpserter from upsert request."""
         strategy = request.strategy
 
         strategy_spec: RollingUpdateSpec | BlueGreenSpec
@@ -590,51 +588,9 @@ class DeploymentPolicyAdapter:
             case _:
                 raise InvalidAPIParameters(f"Unsupported deployment strategy: {strategy}")
 
-        return DeploymentPolicyCreator(
+        return DeploymentPolicyUpserter(
             deployment_id=deployment_id,
             strategy=strategy,
             strategy_spec=strategy_spec,
             rollback_on_failure=request.rollback_on_failure,
-        )
-
-    def build_modifier_from_upsert(
-        self, request: UpsertDeploymentPolicyRequest
-    ) -> DeploymentPolicyModifier:
-        """Build DeploymentPolicyModifier from upsert request for updating an existing policy."""
-        strategy = OptionalState.update(request.strategy)
-        rollback_on_failure = OptionalState.update(request.rollback_on_failure)
-
-        strategy_spec: OptionalState[RollingUpdateSpec | BlueGreenSpec]
-        match request.strategy:
-            case DeploymentStrategy.ROLLING:
-                if request.rolling_update is not None:
-                    strategy_spec = OptionalState.update(
-                        RollingUpdateSpec(
-                            max_surge=request.rolling_update.max_surge,
-                            max_unavailable=request.rolling_update.max_unavailable,
-                        )
-                    )
-                else:
-                    strategy_spec = OptionalState.update(
-                        RollingUpdateSpec(max_surge=1, max_unavailable=0)
-                    )
-            case DeploymentStrategy.BLUE_GREEN:
-                if request.blue_green is not None:
-                    strategy_spec = OptionalState.update(
-                        BlueGreenSpec(
-                            auto_promote=request.blue_green.auto_promote,
-                            promote_delay_seconds=request.blue_green.promote_delay_seconds,
-                        )
-                    )
-                else:
-                    strategy_spec = OptionalState.update(
-                        BlueGreenSpec(auto_promote=False, promote_delay_seconds=0)
-                    )
-            case _:
-                raise InvalidAPIParameters(f"Unsupported deployment strategy: {request.strategy}")
-
-        return DeploymentPolicyModifier(
-            strategy=strategy,
-            strategy_spec=strategy_spec,
-            rollback_on_failure=rollback_on_failure,
         )

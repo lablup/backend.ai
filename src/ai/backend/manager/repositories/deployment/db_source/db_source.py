@@ -44,6 +44,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfoWithAutoScalingRules,
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
+    DeploymentPolicyUpsertResult,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
@@ -122,6 +123,10 @@ from ai.backend.manager.repositories.base.updater import (
     Updater,
     execute_batch_updater,
     execute_updater,
+)
+from ai.backend.manager.repositories.base.upserter import (
+    Upserter,
+    execute_upserter,
 )
 from ai.backend.manager.repositories.deployment.creators import (
     DeploymentCreatorSpec,
@@ -2245,6 +2250,26 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             result = await execute_creator(db_sess, creator)
             return result.row.to_data()
+
+    async def upsert_deployment_policy(
+        self,
+        upserter: Upserter[DeploymentPolicyRow],
+    ) -> DeploymentPolicyUpsertResult:
+        """Create or update a deployment policy using ON CONFLICT.
+
+        Uses PostgreSQL's ON CONFLICT DO UPDATE on the unique endpoint constraint.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            result = await execute_upserter(
+                db_sess,
+                upserter,
+                index_elements=["endpoint"],
+            )
+            row = result.row
+            return DeploymentPolicyUpsertResult(
+                data=row.to_data(),
+                created=row.created_at == row.updated_at,
+            )
 
     async def get_deployment_policy(
         self,

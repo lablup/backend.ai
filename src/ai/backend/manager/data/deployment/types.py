@@ -682,6 +682,14 @@ class DeploymentPolicyData:
 
 
 @dataclass
+class DeploymentPolicyUpsertResult:
+    """Result of upserting a deployment policy."""
+
+    data: DeploymentPolicyData
+    created: bool
+
+
+@dataclass
 class DeploymentPolicySearchResult:
     """Search result with pagination for deployment policies."""
 
