@@ -1,4 +1,6 @@
 from .assign_role import AssignRoleAction, AssignRoleActionResult
+from .bulk_assign_role import BulkAssignRoleAction, BulkAssignRoleActionResult
+from .bulk_revoke_role import BulkRevokeRoleAction, BulkRevokeRoleActionResult
 from .check_permission import CheckPermissionAction, CheckPermissionActionResult
 from .create_role import CreateRoleAction, CreateRoleActionResult
 from .delete_role import DeleteRoleAction, DeleteRoleActionResult
@@ -27,6 +29,10 @@ from .update_role_permissions import (
 __all__ = [
     "AssignRoleAction",
     "AssignRoleActionResult",
+    "BulkAssignRoleAction",
+    "BulkAssignRoleActionResult",
+    "BulkRevokeRoleAction",
+    "BulkRevokeRoleActionResult",
     "CheckPermissionAction",
     "CheckPermissionActionResult",
     "CreateRoleAction",
