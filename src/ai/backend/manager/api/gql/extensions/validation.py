@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-import logging
 from collections.abc import Iterator
-from typing import Any, Final
+from typing import Any
 
 from graphql import GraphQLError, ValidationRule
 from strawberry.extensions.base_extension import SchemaExtension
 from strawberry.extensions.query_depth_limiter import create_validator as create_depth_validator
 
-from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class CustomIntrospectionRule(ValidationRule):
