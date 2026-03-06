@@ -575,7 +575,7 @@ class ModelServingRepository:
             query = (
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
-                .values({"replicas": replicas})
+                .values({"replicas": replicas, "desired_replicas": None})
             )
             await session.execute(query)
         return True
