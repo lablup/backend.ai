@@ -15,7 +15,7 @@ class MetricResponseInfo(BaseModel):
     owner_user_id: str | None = Field(default=None)
     session_id: str | None = Field(default=None)
 
-    model_config = ConfigDict(extra="allow", validate_by_name=True, validate_by_alias=True)
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
 
 type MetricResponseValue = tuple[float, str]  # (timestamp, value)
