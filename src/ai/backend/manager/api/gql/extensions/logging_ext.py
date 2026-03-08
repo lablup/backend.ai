@@ -21,7 +21,7 @@ class GQLLoggingExtension(SchemaExtension):
         _next: Callable[..., Any],
         root: Any,
         info: GraphQLResolveInfo,
-        *args: str,
+        *args: Any,
         **kwargs: Any,
     ) -> AwaitableOrValue[object]:
         if info.path.prev is None:
