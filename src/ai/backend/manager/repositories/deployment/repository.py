@@ -29,7 +29,6 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.api.gql_legacy.statistics import EndpointStatistics, KernelStatistics
 from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingRule,
@@ -61,6 +60,10 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.statistics import (
+    batch_load_endpoint_statistics,
+    batch_load_kernel_statistics,
+)
 from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
@@ -749,7 +752,7 @@ class DeploymentRepository:
         endpoint_statistics_by_id: dict[uuid.UUID, Mapping[str, Any] | None] = {}
 
         if metric_requested_kernels:
-            kernel_live_stats = await KernelStatistics.batch_load_by_kernel_impl(
+            kernel_live_stats = await batch_load_kernel_statistics(
                 self._valkey_stat,
                 cast(list[SessionId], metric_requested_kernels),
             )
@@ -761,7 +764,7 @@ class DeploymentRepository:
             }
 
         if metric_requested_endpoints:
-            endpoint_live_stats = await EndpointStatistics.batch_load_by_endpoint_impl(
+            endpoint_live_stats = await batch_load_endpoint_statistics(
                 self._valkey_stat,
                 metric_requested_endpoints,
             )
