@@ -17,6 +17,7 @@ from strawberry.types import get_object_definition, has_object_definition
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.data.common.types import IntFilterData, SearchResult, StringFilterData
+from ai.backend.manager.repositories.base import resolve_global_id as _resolve_global_id
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.base import QueryCondition
@@ -359,10 +360,7 @@ def to_global_id(
     return base64(f"{typename}:{local_id}")
 
 
-def resolve_global_id(global_id: str) -> tuple[str, str]:
-    unbased_global_id = unbase64(global_id)
-    type_, _, id_ = unbased_global_id.partition(":")
-    return type_, id_
+resolve_global_id = _resolve_global_id
 
 
 CURSOR_VERSION = "v1"

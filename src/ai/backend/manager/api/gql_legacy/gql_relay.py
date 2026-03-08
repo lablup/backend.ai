@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import enum
 import functools
 import re
 from collections.abc import (
@@ -29,6 +28,7 @@ from graphql_relay.utils import base64, unbase64
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.resource import DataTransformationFailed
+from ai.backend.manager.repositories.base import ConnectionPaginationOrder as ConnectionPaginationOrder
 
 
 def get_edge_class(
@@ -262,11 +262,6 @@ class Connection(graphene.ObjectType):  # type: ignore[misc]
 
         super().__init_subclass_with_meta__(_meta=_meta, **options)
         return
-
-
-class ConnectionPaginationOrder(enum.Enum):
-    FORWARD = "forward"
-    BACKWARD = "backward"
 
 
 class ConnectionResolverResult[T_Node: ObjectType](NamedTuple):

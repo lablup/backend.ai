@@ -3,6 +3,13 @@
 Re-exports all public APIs for backward compatibility.
 """
 
+from .connection import (
+    DEFAULT_PAGE_SIZE,
+    ConnectionArgs,
+    ConnectionPaginationOrder,
+    resolve_global_id,
+    validate_connection_args,
+)
 from .creator import (
     BulkCreator,
     BulkCreatorError,
@@ -166,6 +173,12 @@ __all__ = [
     "BatchPurger",
     "BatchPurgerResult",
     "execute_batch_purger",
+    # Connection / Pagination
+    "ConnectionArgs",
+    "ConnectionPaginationOrder",
+    "DEFAULT_PAGE_SIZE",
+    "resolve_global_id",
+    "validate_connection_args",
     # Utils
     "combine_conditions_or",
     "negate_conditions",

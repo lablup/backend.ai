@@ -12,13 +12,15 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import InvalidCursorTypeError
-from ai.backend.manager.api.gql.base import resolve_global_id
-from ai.backend.manager.api.gql_legacy.base import validate_connection_args
-from ai.backend.manager.api.gql_legacy.gql_relay import ConnectionPaginationOrder
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models.base import DEFAULT_PAGE_SIZE
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import (
+    DEFAULT_PAGE_SIZE,
+    ConnectionPaginationOrder,
+    resolve_global_id,
+    validate_connection_args,
+)
 from ai.backend.manager.types import PaginationOptions
 
 
