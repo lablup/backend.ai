@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Self
@@ -34,7 +33,7 @@ from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
+from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, KernelStatusInMatchSpec
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.scheduler.options import KernelConditions, KernelOrders
 
@@ -107,14 +106,6 @@ class KernelV2StatusGQL(StrEnum):
                 return KernelStatus.TERMINATED
             case KernelV2StatusGQL.CANCELLED:
                 return KernelStatus.CANCELLED
-
-
-@dataclass(frozen=True)
-class KernelStatusInMatchSpec:
-    """Specification for KernelStatus IN operations (IN, NOT IN)."""
-
-    values: list[KernelStatus]
-    negated: bool
 
 
 @strawberry.enum(
