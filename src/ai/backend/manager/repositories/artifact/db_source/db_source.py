@@ -174,19 +174,17 @@ class ArtifactRevisionFilterApplier(BaseFilterApplier[ArtifactRevisionFilterOpti
             elif filters.remote_status_filter.type == ArtifactRemoteStatusFilterType.EQUALS:
                 conditions.append(ArtifactRevisionRow.remote_status == remote_status_values[0])
 
-        # Handle StringFilter-based version filter
+        # Handle StringFilterData-based version filter
         if filters.version_filter is not None:
-            version_filter = filters.version_filter.to_dataclass()
-            version_condition = version_filter.apply_to_column(
+            version_condition = filters.version_filter.apply_to_column(
                 cast(sa.sql.elements.ColumnElement[str], ArtifactRevisionRow.version)
             )
             if version_condition is not None:
                 conditions.append(version_condition)
 
-        # Handle IntFilter-based size filter
+        # Handle IntFilterData-based size filter
         if filters.size_filter is not None:
-            size_filter = filters.size_filter.to_dataclass()
-            size_condition = size_filter.apply_to_column(
+            size_condition = filters.size_filter.apply_to_column(
                 cast(sa.sql.elements.ColumnElement[int], ArtifactRevisionRow.size)
             )
             if size_condition is not None:

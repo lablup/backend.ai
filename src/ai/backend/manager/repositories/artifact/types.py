@@ -2,12 +2,12 @@ import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 
-from ai.backend.manager.api.gql.base import IntFilter, StringFilter
 from ai.backend.manager.data.artifact.types import (
     ArtifactRemoteStatus,
     ArtifactRevisionOrderField,
     ArtifactStatus,
 )
+from ai.backend.manager.data.common.types import IntFilterData, StringFilterData
 
 
 @dataclass
@@ -52,8 +52,8 @@ class ArtifactRevisionFilterOptions:
     artifact_id: uuid.UUID | None = None
     status_filter: ArtifactStatusFilter | None = None
     remote_status_filter: ArtifactRemoteStatusFilter | None = None
-    version_filter: StringFilter | None = None
-    size_filter: IntFilter | None = None
+    version_filter: StringFilterData | None = None
+    size_filter: IntFilterData | None = None
 
     # Logical operations
     AND: list["ArtifactRevisionFilterOptions"] | None = None

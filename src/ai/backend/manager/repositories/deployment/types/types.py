@@ -10,7 +10,7 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
-from ai.backend.manager.api.gql.base import StringFilter
+from ai.backend.manager.data.common.types import StringFilterData
 from ai.backend.manager.data.deployment.types import (
     AccessTokenOrderField,
     DeploymentOrderField,
@@ -72,11 +72,11 @@ class DeploymentStatusFilter:
 class DeploymentFilterOptions:
     """Filtering options for deployments."""
 
-    name: StringFilter | None = None
+    name: StringFilterData | None = None
     status: DeploymentStatusFilter | None = None
     open_to_public: bool | None = None
-    tags: StringFilter | None = None
-    endpoint_url: StringFilter | None = None
+    tags: StringFilterData | None = None
+    endpoint_url: StringFilterData | None = None
     id: UUID | None = None
 
     # Logical operations
@@ -89,7 +89,7 @@ class DeploymentFilterOptions:
 class ModelRevisionFilterOptions:
     """Filtering options for model revisions."""
 
-    name: StringFilter | None = None
+    name: StringFilterData | None = None
     deployment_id: UUID | None = None
     id: UUID | None = None
     ids_in: list[UUID] | None = None
