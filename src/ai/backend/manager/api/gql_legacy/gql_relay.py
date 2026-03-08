@@ -28,7 +28,9 @@ from graphql_relay.utils import base64, unbase64
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.resource import DataTransformationFailed
-from ai.backend.manager.repositories.base import ConnectionPaginationOrder as ConnectionPaginationOrder
+from ai.backend.manager.repositories.base import (
+    ConnectionPaginationOrder as ConnectionPaginationOrder,
+)
 
 
 def get_edge_class(
