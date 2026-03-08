@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from functools import cached_property, partial
+from typing import TYPE_CHECKING
 
 from strawberry.dataloader import DataLoader
 
@@ -41,7 +42,9 @@ from ai.backend.manager.data.session.types import SessionData, SessionScheduling
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
-from ai.backend.manager.services.processors import Processors
+
+if TYPE_CHECKING:
+    from ai.backend.manager.services.processors import Processors  # pants: no-infer-dep
 
 from .agent import load_agents_by_ids, load_container_counts
 from .artifact import load_artifacts_by_ids

@@ -9,6 +9,7 @@ from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.services.factory import create_processors
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
 
 
@@ -26,7 +27,7 @@ class ProcessorsProviderInput:
 class ProcessorsDependency(NonMonitorableDependencyProvider[ProcessorsProviderInput, Processors]):
     """Provides Processors lifecycle management.
 
-    Creates the Processors instance via Processors.create() with
+    Creates the Processors instance via create_processors() with
     the given ServiceArgs and action monitors.
     """
 
@@ -36,7 +37,7 @@ class ProcessorsDependency(NonMonitorableDependencyProvider[ProcessorsProviderIn
 
     @asynccontextmanager
     async def provide(self, setup_input: ProcessorsProviderInput) -> AsyncIterator[Processors]:
-        processors = Processors.create(
+        processors = create_processors(
             ProcessorArgs(
                 service_args=setup_input.service_args,
                 event_hub=setup_input.event_hub,
