@@ -10,13 +10,14 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from .handler import DeploymentAPIHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_deployment_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_deployment_routes(
+    handler: DeploymentAPIHandler, route_deps: RouteDeps
+) -> RouteRegistry:
     """Build the deployment sub-application."""
-    reg = RouteRegistry.create("deployments", deps.cors_options)
-    handler = DeploymentAPIHandler(processors=deps.processors)
+    reg = RouteRegistry.create("deployments", route_deps.cors_options)
 
     # Deployment routes
     reg.add("POST", "/", handler.create_deployment, middlewares=[auth_required])
@@ -36,6 +37,12 @@ def register_deployment_routes(deps: ModuleDeps) -> RouteRegistry:
     )
 
     # Revision routes (nested under deployment)
+    reg.add(
+        "POST",
+        "/{deployment_id}/revisions",
+        handler.add_revision,
+        middlewares=[auth_required],
+    )
     reg.add(
         "POST",
         "/{deployment_id}/revisions/search",
@@ -63,15 +70,9 @@ def register_deployment_routes(deps: ModuleDeps) -> RouteRegistry:
 
     # Policy routes (nested under deployment)
     reg.add(
-        "POST",
+        "PUT",
         "/{deployment_id}/policy",
-        handler.create_deployment_policy,
-        middlewares=[auth_required],
-    )
-    reg.add(
-        "PATCH",
-        "/{deployment_id}/policy",
-        handler.update_deployment_policy,
+        handler.upsert_deployment_policy,
         middlewares=[auth_required],
     )
     reg.add(

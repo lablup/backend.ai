@@ -10,13 +10,12 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from .handler import QuotaScopeHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_quota_scope_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_quota_scope_routes(handler: QuotaScopeHandler, route_deps: RouteDeps) -> RouteRegistry:
     """Build the quota-scope sub-registry (child of admin)."""
-    reg = RouteRegistry.create("quota-scopes", deps.cors_options)
-    handler = QuotaScopeHandler(processors=deps.processors)
+    reg = RouteRegistry.create("quota-scopes", route_deps.cors_options)
 
     _mw = [auth_required, superadmin_required]
 

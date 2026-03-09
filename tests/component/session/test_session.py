@@ -105,7 +105,7 @@ class TestSessionGetStatusHistory:
         )
         assert isinstance(result, GetStatusHistoryResponse)
         # The result dict should contain status history entries
-        assert isinstance(result.result, dict)
+        assert isinstance(result.root, dict)
 
     async def test_get_status_history_nonexistent_session(
         self,
@@ -150,7 +150,7 @@ class TestSessionGetContainerLogs:
             terminated_session_seed.session_name,
         )
         assert isinstance(result, GetContainerLogsResponse)
-        assert isinstance(result.result, dict)
+        assert isinstance(result.root, dict)
 
     async def test_get_container_logs_nonexistent_session(
         self,

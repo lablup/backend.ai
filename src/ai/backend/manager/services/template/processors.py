@@ -5,6 +5,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions.create_cluster_template import (
     CreateClusterTemplateAction,
@@ -66,7 +67,12 @@ class TemplateProcessors(AbstractProcessorPackage):
     update_cluster: ActionProcessor[UpdateClusterTemplateAction, UpdateClusterTemplateActionResult]
     delete_cluster: ActionProcessor[DeleteClusterTemplateAction, DeleteClusterTemplateActionResult]
 
-    def __init__(self, service: TemplateService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: TemplateService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.create_task = ActionProcessor(service.create_task_template, action_monitors)
         self.list_task = ActionProcessor(service.list_task_templates, action_monitors)
         self.get_task = ActionProcessor(service.get_task_template, action_monitors)

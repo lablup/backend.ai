@@ -4,6 +4,14 @@ import uuid
 from dataclasses import dataclass
 from decimal import Decimal
 
+from ai.backend.common.types import SlotQuantity
+
+
+@dataclass(frozen=True)
+class NumberFormatData:
+    binary: bool = False
+    round_length: int = 0
+
 
 @dataclass(frozen=True)
 class ResourceSlotTypeData:
@@ -11,14 +19,18 @@ class ResourceSlotTypeData:
     slot_type: str
     display_name: str
     description: str
+    display_unit: str
+    display_icon: str
+    number_format: NumberFormatData
     rank: int
-    # TODO: add remaining fields from ResourceSlotTypeRow
 
 
 @dataclass(frozen=True)
 class ResourceSlotTypeSearchResult:
     items: list[ResourceSlotTypeData]
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
 
 @dataclass(frozen=True)
@@ -51,3 +63,9 @@ class ResourceAllocationSearchResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+@dataclass(frozen=True)
+class ResourceOccupancy:
+    used_slots: list[SlotQuantity]
+    session_count: int

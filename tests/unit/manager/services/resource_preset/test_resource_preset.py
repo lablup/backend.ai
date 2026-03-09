@@ -582,3 +582,167 @@ class TestResourcePresetServiceCompatibility:
         result = await resource_preset_service.modify_preset(action)
 
         assert result.resource_preset.shared_memory == BinarySize(BinarySize.from_str("4G"))
+
+    async def test_modify_preset_partial_slots_no_intrinsic_raises_error(
+        self,
+        resource_preset_service: ResourcePresetService,
+    ) -> None:
+        """Test modify fails when resource_slots provided without intrinsic slots."""
+        action = ModifyResourcePresetAction(
+            name="existing-preset",
+            id=None,
+            updater=Updater(
+                spec=ResourcePresetUpdaterSpec(
+                    resource_slots=OptionalState.update(ResourceSlot({"gpu": "1"}))
+                ),
+                pk_value="existing-preset",
+            ),
+        )
+
+        with pytest.raises(InvalidAPIParameters):
+            await resource_preset_service.modify_preset(action)
+
+    async def test_delete_preset_missing_identifiers(
+        self,
+        resource_preset_service: ResourcePresetService,
+    ) -> None:
+        """Test delete fails when neither name nor id provided."""
+        action = DeleteResourcePresetAction(name=None, id=None)
+
+        with pytest.raises(InvalidAPIParameters):
+            await resource_preset_service.delete_preset(action)
+
+    async def test_delete_preset_by_id(
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
+    ) -> None:
+        """Test delete by id returns ResourcePresetData."""
+        preset_id = uuid.uuid4()
+        mock_preset_data = ResourcePresetData(
+            id=preset_id,
+            name="to-delete",
+            resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
+            shared_memory=None,
+            scaling_group_name=None,
+        )
+
+        mock_dependencies["resource_preset_repository"].delete_preset_validated = AsyncMock(
+            return_value=mock_preset_data
+        )
+
+        action = DeleteResourcePresetAction(name=None, id=preset_id)
+
+        result = await resource_preset_service.delete_preset(action)
+
+        assert isinstance(result, DeleteResourcePresetActionResult)
+        assert result.resource_preset.id == preset_id
+
+    async def test_list_presets_filters_by_scaling_group(
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
+    ) -> None:
+        """Test list presets filters by specific scaling_group."""
+        gpu_preset = ResourcePresetData(
+            id=uuid.uuid4(),
+            name="gpu-standard",
+            resource_slots=ResourceSlot({
+                "cpu": Decimal("4"),
+                "mem": Decimal("17179869184"),
+                "gpu": Decimal("1"),
+            }),
+            shared_memory=None,
+            scaling_group_name="gpu-cluster",
+        )
+
+        mock_dependencies["resource_preset_repository"].list_presets = AsyncMock(
+            return_value=[gpu_preset]
+        )
+
+        action = ListResourcePresetsAction(
+            access_key="test-key",
+            scaling_group="gpu-cluster",
+        )
+
+        result = await resource_preset_service.list_presets(action)
+
+        assert len(result.presets) == 1
+        assert result.presets[0]["name"] == "gpu-standard"
+        mock_dependencies["resource_preset_repository"].list_presets.assert_called_once_with(
+            "gpu-cluster"
+        )
+
+    async def test_check_presets_keypair_and_group_limits(
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
+    ) -> None:
+        """Test check presets returns keypair/group limits/using/remaining details."""
+        preset_data = ResourcePresetData(
+            id=uuid.uuid4(),
+            name="test-preset",
+            resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
+            shared_memory=None,
+            scaling_group_name=None,
+        )
+
+        mock_check_result = CheckPresetsResult(
+            presets=[PresetAllocatabilityData(preset=preset_data, allocatable=True)],
+            keypair_limits=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("107374182400")),
+            ],
+            keypair_using=[
+                SlotQuantity("cpu", Decimal("10")),
+                SlotQuantity("mem", Decimal("10737418240")),
+            ],
+            keypair_remaining=[
+                SlotQuantity("cpu", Decimal("90")),
+                SlotQuantity("mem", Decimal("96636764160")),
+            ],
+            group_limits=[
+                SlotQuantity("cpu", Decimal("50")),
+                SlotQuantity("mem", Decimal("53687091200")),
+            ],
+            group_using=[
+                SlotQuantity("cpu", Decimal("5")),
+                SlotQuantity("mem", Decimal("5368709120")),
+            ],
+            group_remaining=[
+                SlotQuantity("cpu", Decimal("45")),
+                SlotQuantity("mem", Decimal("48318382080")),
+            ],
+            scaling_group_remaining=[
+                SlotQuantity("cpu", Decimal("1000")),
+                SlotQuantity("mem", Decimal("1073741824000")),
+            ],
+            scaling_groups={},
+        )
+
+        mock_dependencies["resource_preset_repository"].check_presets = AsyncMock(
+            return_value=mock_check_result
+        )
+
+        action = CheckResourcePresetsAction(
+            access_key=AccessKey("test-key"),
+            resource_policy={
+                "total_resource_slots": {"cpu": "100", "mem": "100G"},
+                "default_for_unspecified": "UNLIMITED",
+            },
+            domain_name="default",
+            group="default",
+            user_id=uuid.uuid4(),
+            scaling_group=None,
+        )
+
+        result = await resource_preset_service.check_presets(action)
+
+        assert isinstance(result, CheckResourcePresetsActionResult)
+        assert len(result.keypair_limits) == 2
+        assert len(result.keypair_using) == 2
+        assert len(result.keypair_remaining) == 2
+        assert len(result.group_limits) == 2
+        assert len(result.group_using) == 2
+        assert len(result.group_remaining) == 2
+        assert len(result.presets) == 1

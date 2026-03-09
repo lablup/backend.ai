@@ -1,3 +1,4 @@
+import logging
 import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -10,6 +11,7 @@ from sqlalchemy.orm import contains_eager, selectinload
 from ai.backend.common.data.permission.types import (
     RelationType,
 )
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.permission.entity import (
     ElementAssociationListResult,
     EntityData,
@@ -26,9 +28,13 @@ from ai.backend.manager.data.permission.permission import (
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
     AssignedUserListResult,
+    BulkRoleRevocationFailure,
+    BulkRoleRevocationResultData,
+    BulkUserRoleRevocationInput,
     RoleListResult,
     RolePermissionsUpdateInput,
     UserRoleAssignmentInput,
+    UserRoleRevocationData,
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.status import (
@@ -55,7 +61,13 @@ from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.creator import (
+    BulkCreator,
+    BulkCreatorResultWithFailures,
+    Creator,
+    execute_bulk_creator_partial,
+    execute_creator,
+)
 from ai.backend.manager.repositories.base.purger import Purger, execute_purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
@@ -68,6 +80,8 @@ from ai.backend.manager.repositories.permission_controller.types import (
     ObjectPermissionSearchScope,
     PermissionSearchScope,
 )
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -160,6 +174,28 @@ class PermissionDBSource:
             result = await execute_purger(db_session, purger)
             if result is None:
                 raise ObjectNotFound(f"Permission with ID {purger.pk_value} does not exist.")
+            return result.row
+
+    async def update_permission(
+        self,
+        updater: Updater[PermissionRow],
+    ) -> PermissionRow:
+        """
+        Update a permission.
+
+        Args:
+            updater: Updater with permission ID and fields to update
+
+        Returns:
+            Updated permission row
+
+        Raises:
+            ObjectNotFound: If permission does not exist
+        """
+        async with self._db.begin_session() as db_session:
+            result = await execute_updater(db_session, updater)
+            if result is None:
+                raise ObjectNotFound(f"Permission with ID {updater.pk_value} does not exist.")
             return result.row
 
     async def delete_object_permission(
@@ -978,3 +1014,50 @@ class PermissionDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_session:
             result = await db_session.scalar(combined_query)
             return result or False
+
+    async def bulk_assign_role(
+        self, bulk_creator: BulkCreator[UserRoleRow]
+    ) -> BulkCreatorResultWithFailures[UserRoleRow]:
+        async with self._db.begin_session() as db_session:
+            return await execute_bulk_creator_partial(db_session, bulk_creator)
+
+    async def bulk_revoke_role(
+        self, data: BulkUserRoleRevocationInput
+    ) -> BulkRoleRevocationResultData:
+        successes: list[UserRoleRevocationData] = []
+        failures: list[BulkRoleRevocationFailure] = []
+
+        async with self._db.begin_session() as db_session:
+            for user_id in data.user_ids:
+                try:
+                    async with db_session.begin_nested():
+                        stmt = (
+                            sa.select(UserRoleRow)
+                            .where(UserRoleRow.user_id == user_id)
+                            .where(UserRoleRow.role_id == data.role_id)
+                        )
+                        user_role_row = await db_session.scalar(stmt)
+                        if user_role_row is None:
+                            raise RoleNotAssigned(
+                                f"Role {data.role_id} is not assigned to user {user_id}."
+                            )
+                        user_role_id = user_role_row.id
+                        await db_session.delete(user_role_row)
+                        await db_session.flush()
+                        successes.append(
+                            UserRoleRevocationData(
+                                user_role_id=user_role_id,
+                                user_id=user_id,
+                                role_id=data.role_id,
+                            )
+                        )
+                except Exception as e:
+                    log.warning(
+                        "Failed to revoke role {} from user {}: {}",
+                        data.role_id,
+                        user_id,
+                        str(e),
+                    )
+                    failures.append(BulkRoleRevocationFailure(user_id=user_id, message=str(e)))
+
+        return BulkRoleRevocationResultData(successes=successes, failures=failures)

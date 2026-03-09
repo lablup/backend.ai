@@ -5,6 +5,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import CreateErrorLogAction, CreateErrorLogActionResult
 from .actions.list import ListErrorLogsAction, ListErrorLogsActionResult
@@ -23,7 +24,12 @@ class ErrorLogProcessors(AbstractProcessorPackage):
     list_logs: ActionProcessor[ListErrorLogsAction, ListErrorLogsActionResult]
     mark_cleared: ActionProcessor[MarkClearedErrorLogAction, MarkClearedErrorLogActionResult]
 
-    def __init__(self, service: ErrorLogService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: ErrorLogService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.create = ActionProcessor(service.create, action_monitors)
         self.search = ActionProcessor(service.search, action_monitors)
         self.list_logs = ActionProcessor(service.list_logs, action_monitors)

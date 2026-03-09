@@ -5,6 +5,7 @@ from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CloneVFolderActionResult,
@@ -14,6 +15,8 @@ from ai.backend.manager.services.vfolder.actions.base import (
     DeleteForeverVFolderActionResult,
     ForceDeleteVFolderAction,
     ForceDeleteVFolderActionResult,
+    GetAccessibleVFolderAction,
+    GetAccessibleVFolderActionResult,
     GetTaskLogsAction,
     GetTaskLogsActionResult,
     GetVFolderAction,
@@ -99,8 +102,16 @@ class VFolderProcessors(AbstractProcessorPackage):
     mount_host: ActionProcessor[MountHostAction, MountHostActionResult]
     umount_host: ActionProcessor[UmountHostAction, UmountHostActionResult]
     get_fstab_contents: ActionProcessor[GetFstabContentsAction, GetFstabContentsActionResult]
+    get_accessible_vfolder: ActionProcessor[
+        GetAccessibleVFolderAction, GetAccessibleVFolderActionResult
+    ]
 
-    def __init__(self, service: VFolderService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: VFolderService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.create_vfolder = ScopeActionProcessor(service.create, action_monitors)
         self.get_vfolder = SingleEntityActionProcessor(service.get, action_monitors)
         self.list_vfolder = ScopeActionProcessor(service.list, action_monitors)
@@ -139,6 +150,9 @@ class VFolderProcessors(AbstractProcessorPackage):
         self.mount_host = ActionProcessor(service.mount_host, action_monitors)
         self.umount_host = ActionProcessor(service.umount_host, action_monitors)
         self.get_fstab_contents = ActionProcessor(service.get_fstab_contents, action_monitors)
+        self.get_accessible_vfolder = ActionProcessor(
+            service.get_accessible_vfolder, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -167,4 +181,5 @@ class VFolderProcessors(AbstractProcessorPackage):
             MountHostAction.spec(),
             UmountHostAction.spec(),
             GetFstabContentsAction.spec(),
+            GetAccessibleVFolderAction.spec(),
         ]

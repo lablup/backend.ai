@@ -1,137 +1,103 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import object_storage as _object_storage_api
-from ai.backend.manager.api import vfs_storage as _vfs_storage_api
-from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.api.rest.middleware import auth as _auth_api
+from ai.backend.manager.api.rest.object_storage.handler import ObjectStorageHandler
 from ai.backend.manager.api.rest.object_storage.registry import register_object_storage_routes
-from ai.backend.manager.api.rest.types import ModuleRegistrar
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.api.rest.vfs_storage.handler import VFSStorageHandler
 from ai.backend.manager.api.rest.vfs_storage.registry import register_vfs_storage_routes
-from ai.backend.manager.api.types import CleanupContext
-from ai.backend.manager.repositories.repositories import Repositories
-from ai.backend.manager.repositories.types import RepositoryArgs
-from ai.backend.manager.server import (
-    background_task_ctx,
-    database_ctx,
-    event_hub_ctx,
-    event_producer_ctx,
-    message_queue_ctx,
-    monitoring_ctx,
-    redis_ctx,
-    storage_manager_ctx,
-)
-from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
+from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
+from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
+from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
+from ai.backend.manager.services.object_storage.service import ObjectStorageService
+from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
+from ai.backend.manager.services.storage_namespace.service import StorageNamespaceService
+from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
+from ai.backend.manager.services.vfs_storage.service import VFSStorageService
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
-_STORAGE_SERVER_SUBAPP_MODULES = (_auth_api, _object_storage_api, _vfs_storage_api)
-
-
-@asynccontextmanager
-async def _storage_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    """Set up repositories and processors for storage-domain component tests.
-
-    Relies on the preceding cleanup contexts having already initialized:
-    - redis_ctx      → root_ctx.valkey_* (all 8 clients)
-    - database_ctx   → root_ctx.db
-    - monitoring_ctx → root_ctx.error_monitor / stats_monitor
-    - storage_manager_ctx  → root_ctx.storage_manager
-    - message_queue_ctx    → root_ctx.message_queue
-    - event_producer_ctx   → root_ctx.event_producer / event_fetcher
-    - event_hub_ctx        → root_ctx.event_hub
-    - background_task_ctx  → root_ctx.background_task_manager
-
-    Only agent_registry is left as MagicMock because it requires live gRPC
-    connections to real agents, which are not available in component tests.
-    """
-    _mock_loader = MagicMock()
-    _mock_loader.get_manager_status = AsyncMock(return_value=ManagerStatus.RUNNING)
-    root_ctx.config_provider._legacy_etcd_config_loader = _mock_loader
-    root_ctx.repositories = Repositories.create(
-        RepositoryArgs(
-            db=root_ctx.db,
-            storage_manager=root_ctx.storage_manager,
-            config_provider=root_ctx.config_provider,
-            valkey_stat_client=root_ctx.valkey_stat,
-            valkey_schedule_client=root_ctx.valkey_schedule,
-            valkey_image_client=root_ctx.valkey_image,
-            valkey_live_client=root_ctx.valkey_live,
-        )
-    )
-    root_ctx.processors = Processors.create(
-        ProcessorArgs(
-            service_args=ServiceArgs(
-                db=root_ctx.db,
-                repositories=root_ctx.repositories,
-                etcd=root_ctx.etcd,
-                config_provider=root_ctx.config_provider,
-                storage_manager=root_ctx.storage_manager,
-                valkey_stat_client=root_ctx.valkey_stat,
-                valkey_live=root_ctx.valkey_live,
-                valkey_artifact_client=root_ctx.valkey_artifact,
-                error_monitor=root_ctx.error_monitor,
-                event_fetcher=root_ctx.event_fetcher,
-                background_task_manager=root_ctx.background_task_manager,
-                event_hub=root_ctx.event_hub,
-                event_producer=root_ctx.event_producer,
-                # agent_registry requires gRPC connections to real agents — not feasible
-                # in the component test environment; kept as MagicMock.
-                agent_registry=MagicMock(),
-                idle_checker_host=MagicMock(),
-                event_dispatcher=MagicMock(),
-                hook_plugin_ctx=MagicMock(),
-                scheduling_controller=MagicMock(),
-                deployment_controller=MagicMock(),
-                revision_generator_registry=MagicMock(),
-                agent_cache=MagicMock(),
-                notification_center=MagicMock(),
-                appproxy_client_pool=MagicMock(),
-                prometheus_client=MagicMock(),
-            ),
-        ),
-        [],
-    )
-    yield
+_STORAGE_SERVER_SUBAPP_MODULES = (_auth_api,)
 
 
 @pytest.fixture()
-def server_module_registrars() -> list[ModuleRegistrar]:
+def object_storage_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    storage_manager: StorageSessionManager,
+    config_provider: ManagerConfigProvider,
+) -> ObjectStorageProcessors:
+    artifact_repository = ArtifactRepository(database_engine)
+    object_storage_repository = ObjectStorageRepository(database_engine)
+    storage_namespace_repository = StorageNamespaceRepository(database_engine)
+    service = ObjectStorageService(
+        artifact_repository=artifact_repository,
+        object_storage_repository=object_storage_repository,
+        storage_namespace_repository=storage_namespace_repository,
+        storage_manager=storage_manager,
+        config_provider=config_provider,
+    )
+    return ObjectStorageProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
+
+
+@pytest.fixture()
+def storage_namespace_processors(
+    database_engine: ExtendedAsyncSAEngine,
+) -> StorageNamespaceProcessors:
+    storage_namespace_repository = StorageNamespaceRepository(database_engine)
+    service = StorageNamespaceService(
+        storage_namespace_repository=storage_namespace_repository,
+    )
+    return StorageNamespaceProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
+
+
+@pytest.fixture()
+def vfs_storage_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    storage_manager: StorageSessionManager,
+) -> VFSStorageProcessors:
+    vfs_storage_repository = VFSStorageRepository(database_engine)
+    service = VFSStorageService(
+        vfs_storage_repository=vfs_storage_repository,
+        storage_manager=storage_manager,
+    )
+    return VFSStorageProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    object_storage_processors: ObjectStorageProcessors,
+    storage_namespace_processors: StorageNamespaceProcessors,
+    vfs_storage_processors: VFSStorageProcessors,
+) -> list[RouteRegistry]:
     """Load only the modules required for storage-domain tests."""
-    return [register_auth_routes, register_object_storage_routes, register_vfs_storage_routes]
-
-
-@pytest.fixture()
-def server_cleanup_contexts() -> list[CleanupContext]:
-    """Provide cleanup contexts for storage-domain component tests.
-
-    Uses production contexts from server.py for real infrastructure:
-    - redis_ctx: all 8 Valkey clients
-    - database_ctx: real database connection
-    - monitoring_ctx: real (empty-plugin) error and stats monitors
-    - storage_manager_ctx: real StorageSessionManager (empty proxy config)
-    - message_queue_ctx: real Redis-backed message queue
-    - event_producer_ctx: real EventProducer + EventFetcher
-    - event_hub_ctx: real EventHub
-    - background_task_ctx: real BackgroundTaskManager
-    - _storage_domain_ctx: repositories and processors wired with real clients
-    """
     return [
-        redis_ctx,
-        database_ctx,
-        monitoring_ctx,
-        storage_manager_ctx,
-        message_queue_ctx,
-        event_producer_ctx,
-        event_hub_ctx,
-        background_task_ctx,
-        _storage_domain_ctx,
+        register_object_storage_routes(
+            ObjectStorageHandler(
+                object_storage=object_storage_processors,
+                storage_namespace=storage_namespace_processors,
+            ),
+            route_deps,
+        ),
+        register_vfs_storage_routes(
+            VFSStorageHandler(vfs_storage=vfs_storage_processors), route_deps
+        ),
     ]

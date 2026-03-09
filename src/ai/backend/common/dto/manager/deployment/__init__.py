@@ -5,9 +5,9 @@ Common DTOs for deployment system used by both Client SDK and Manager.
 from __future__ import annotations
 
 from .request import (
+    AddRevisionRequest,
     BlueGreenConfigInput,
     ClusterConfigInput,
-    CreateDeploymentPolicyRequest,
     CreateDeploymentRequest,
     DeploymentFilter,
     DeploymentMetadataInput,
@@ -26,17 +26,18 @@ from .request import (
     RollingUpdateConfigInput,
     RouteFilter,
     RoutePathParam,
+    SearchDeploymentPoliciesRequest,
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
-    UpdateDeploymentPolicyRequest,
     UpdateDeploymentRequest,
     UpdateRouteTrafficStatusRequest,
+    UpsertDeploymentPolicyRequest,
 )
 from .response import (
     ActivateRevisionResponse,
+    AddRevisionResponse,
     ClusterConfigDTO,
-    CreateDeploymentPolicyResponse,
     CreateDeploymentResponse,
     CursorPaginationInfo,
     DeactivateRevisionResponse,
@@ -46,6 +47,7 @@ from .response import (
     GetDeploymentPolicyResponse,
     GetDeploymentResponse,
     GetRevisionResponse,
+    ListDeploymentPoliciesResponse,
     ListDeploymentsResponse,
     ListRevisionsResponse,
     ListRoutesResponse,
@@ -57,9 +59,9 @@ from .response import (
     ResourceConfigDTO,
     RevisionDTO,
     RouteDTO,
-    UpdateDeploymentPolicyResponse,
     UpdateDeploymentResponse,
     UpdateRouteTrafficStatusResponse,
+    UpsertDeploymentPolicyResponse,
 )
 from .types import (
     DeploymentOrder,
@@ -90,6 +92,7 @@ __all__ = (
     "RevisionPathParam",
     "RoutePathParam",
     # Request DTOs - Search/List
+    "SearchDeploymentPoliciesRequest",
     "SearchDeploymentsRequest",
     "SearchRevisionsRequest",
     "SearchRoutesRequest",
@@ -108,9 +111,9 @@ __all__ = (
     "RevisionInput",
     # Request DTOs - Create/Update requests
     "CreateDeploymentRequest",
-    "CreateDeploymentPolicyRequest",
+    "UpsertDeploymentPolicyRequest",
+    "AddRevisionRequest",
     "UpdateDeploymentRequest",
-    "UpdateDeploymentPolicyRequest",
     "UpdateRouteTrafficStatusRequest",
     # Response DTOs - Data
     "DeploymentDTO",
@@ -125,15 +128,16 @@ __all__ = (
     "ReplicaStateDTO",
     # Response DTOs - Create responses
     "CreateDeploymentResponse",
-    "CreateDeploymentPolicyResponse",
+    "UpsertDeploymentPolicyResponse",
     # Response DTOs - Get/List responses
     "GetDeploymentResponse",
     "GetDeploymentPolicyResponse",
+    "ListDeploymentPoliciesResponse",
     "ListDeploymentsResponse",
     "UpdateDeploymentResponse",
-    "UpdateDeploymentPolicyResponse",
     "DestroyDeploymentResponse",
     "GetRevisionResponse",
+    "AddRevisionResponse",
     "ListRevisionsResponse",
     "ActivateRevisionResponse",
     "DeactivateRevisionResponse",

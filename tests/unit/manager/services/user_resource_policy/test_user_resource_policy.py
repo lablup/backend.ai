@@ -10,6 +10,7 @@ import pytest
 from ai.backend.common.exception import UserResourcePolicyNotFound
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -71,6 +72,7 @@ def processors(
     return UserResourcePolicyProcessors(
         service=service,
         action_monitors=[mock_action_monitor],
+        validators=MagicMock(spec=ActionValidators),
     )
 
 

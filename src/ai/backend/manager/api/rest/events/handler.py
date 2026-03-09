@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -17,7 +16,6 @@ from typing import (
 from weakref import WeakSet
 
 import attrs
-import sqlalchemy as sa
 from aiohttp import web
 from aiohttp_sse import sse_response
 
@@ -26,45 +24,28 @@ from ai.backend.common.dto.manager.events.request import (
     PushBackgroundTaskEventsRequest,
     PushSessionEventsRequest,
 )
-from ai.backend.common.events.dispatcher import EventDispatcher
-from ai.backend.common.events.event_types.kernel.broadcast import (
-    BaseKernelEvent,
-    KernelCancelledBroadcastEvent,
-    KernelCreatingBroadcastEvent,
-    KernelPreparingBroadcastEvent,
-    KernelPullingBroadcastEvent,
-    KernelStartedBroadcastEvent,
-    KernelTerminatedBroadcastEvent,
-    KernelTerminatingBroadcastEvent,
-)
-from ai.backend.common.events.event_types.session.broadcast import (
-    BaseSessionEvent,
-    SchedulingBroadcastEvent,
-    SessionCancelledBroadcastEvent,
-    SessionEnqueuedBroadcastEvent,
-    SessionFailureBroadcastEvent,
-    SessionSuccessBroadcastEvent,
-    SessionTerminatedBroadcastEvent,
-    SessionTerminatingBroadcastEvent,
-)
 from ai.backend.common.events.hub import WILDCARD
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.json import dump_json_str
-from ai.backend.common.types import AccessKey, AgentId
+from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.errors.kernel import SessionNotFound
-from ai.backend.manager.errors.resource import NoCurrentTaskContext, ProjectNotFound
-from ai.backend.manager.events.hub.propagators.session import SessionEventPropagator
+from ai.backend.manager.errors.resource import NoCurrentTaskContext
 from ai.backend.manager.exceptions import InvalidArgument
-from ai.backend.manager.models.group import groups
-from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.services.events.actions.resolve_group_for_events import (
+    ResolveGroupForEventsAction,
+)
+from ai.backend.manager.services.events.actions.resolve_session_for_events import (
+    ResolveSessionForEventsAction,
+)
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.context import RootContext
+    from ai.backend.common.events.fetcher import EventFetcher
+    from ai.backend.common.events.hub.hub import EventHub
+    from ai.backend.manager.services.events.processors import EventsProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -77,8 +58,18 @@ class PrivateContext:
 class EventsHandler:
     """Events API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, private_ctx: PrivateContext) -> None:
+    def __init__(
+        self,
+        *,
+        private_ctx: PrivateContext,
+        events_processors: EventsProcessors,
+        event_hub: EventHub,
+        event_fetcher: EventFetcher,
+    ) -> None:
         self._ctx = private_ctx
+        self._events = events_processors
+        self.event_hub = event_hub
+        self.event_fetcher = event_fetcher
 
     # ------------------------------------------------------------------
     # push_session_events (GET /events/session)
@@ -91,7 +82,6 @@ class EventsHandler:
         user_ctx: UserContext,
     ) -> web.StreamResponse:
         request = ctx.request
-        root_ctx: RootContext = request.app["_root.context"]
         params = query.parsed
         session_name = params.session_name
         session_id = params.session_id
@@ -126,28 +116,21 @@ class EventsHandler:
         if session_name == "*":
             resolved_session_id: Any = WILDCARD
         else:
-            async with root_ctx.db.begin_readonly_session(
-                isolation_level="READ COMMITTED"
-            ) as db_sess:
-                rows = await SessionRow.match_sessions(
-                    db_sess, session_name, AccessKey(access_key), allow_prefix=False
-                )
-                if not rows:
-                    raise SessionNotFound
-                resolved_session_id = rows[0].id
+            resolve_result = await self._events.resolve_session.wait_for_complete(
+                ResolveSessionForEventsAction(
+                    session_name=session_name, access_key=AccessKey(access_key)
+                ),
+            )
+            resolved_session_id = resolve_result.session_id
 
         # Resolve group name to group ID
         if group_name == "*":
             group_id: Any = WILDCARD
         else:
-            async with root_ctx.db.begin_readonly(isolation_level="READ COMMITTED") as conn:
-                result = await conn.execute(
-                    sa.select(groups.c.id).select_from(groups).where(groups.c.name == group_name)
-                )
-                row = result.first()
-                if row is None:
-                    raise ProjectNotFound
-                group_id = row.id
+            group_result = await self._events.resolve_group.wait_for_complete(
+                ResolveGroupForEventsAction(group_name=group_name),
+            )
+            group_id = group_result.group_id
 
         filters = {
             "user_role": user_role,
@@ -191,12 +174,12 @@ class EventsHandler:
                     except asyncio.CancelledError:
                         pass
 
-            propagator = SessionEventPropagator(resp, root_ctx.db, filters)
-            root_ctx.event_hub.register_event_propagator(propagator, aliases)
+            propagator = self._events.create_session_propagator(resp, filters)
+            self.event_hub.register_event_propagator(propagator, aliases)
             try:
                 await resp.wait()
             finally:
-                root_ctx.event_hub.unregister_event_propagator(propagator.id())
+                self.event_hub.unregister_event_propagator(propagator.id())
                 await propagator.close()
                 return resp
 
@@ -211,7 +194,6 @@ class EventsHandler:
         user_ctx: UserContext,
     ) -> web.StreamResponse:
         request = ctx.request
-        root_ctx: RootContext = request.app["_root.context"]
         priv_ctx = self._ctx
         task_id = query.parsed.task_id
         access_key = user_ctx.access_key
@@ -223,8 +205,8 @@ class EventsHandler:
             )
         priv_ctx.active_tasks.add(current_task)
         async with sse_response(request) as resp:
-            propagator = WithCachePropagator(root_ctx.event_fetcher)
-            root_ctx.event_hub.register_event_propagator(
+            propagator = WithCachePropagator(self.event_fetcher)
+            self.event_hub.register_event_propagator(
                 propagator, [(EventDomain.BGTASK, str(task_id))]
             )
             try:
@@ -250,7 +232,7 @@ class EventsHandler:
                         break
                 await resp.send(dump_json_str({}), event="server_close")
             finally:
-                root_ctx.event_hub.unregister_event_propagator(propagator.id())
+                self.event_hub.unregister_event_propagator(propagator.id())
         return resp
 
 
@@ -259,49 +241,14 @@ class EventsHandler:
 # ------------------------------------------------------------------
 
 
-async def _propagate_events(
-    app: web.Application,
-    _agent_id: AgentId,
-    event: BaseSessionEvent | BaseKernelEvent | SchedulingBroadcastEvent,
+async def events_shutdown(
+    _app: web.Application,
+    priv_ctx: PrivateContext,
+    *,
+    event_hub: EventHub,
 ) -> None:
-    """A private connector from EventDispatcher subscription to EventHub."""
-    root_ctx: RootContext = app["_root.context"]
-    log.trace("api.events._propagate_event({!r})", event)
-    await root_ctx.event_hub.propagate_event(event)
-
-
-async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
-    """Initialize events application context."""
-    root_ctx: RootContext = app["_root.context"]
-    event_dispatcher: EventDispatcher = root_ctx.event_dispatcher
-
-    event_dispatcher.subscribe(SessionEnqueuedBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(KernelPreparingBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(KernelPullingBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(KernelCreatingBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(KernelStartedBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(KernelTerminatingBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(KernelTerminatedBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(KernelCancelledBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(SessionTerminatingBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(SessionTerminatedBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(SessionCancelledBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(SessionSuccessBroadcastEvent, app, _propagate_events)
-    event_dispatcher.subscribe(SessionFailureBroadcastEvent, app, _propagate_events)
-
-    yield
-
-
-async def events_shutdown(app: web.Application, priv_ctx: PrivateContext | None = None) -> None:
-    """Shutdown handler for events app.
-
-    When *priv_ctx* is ``None`` (legacy call path), falls back to
-    ``app["events.context"]``.
-    """
-    root_ctx: RootContext = app["_root.context"]
-    if priv_ctx is None:
-        priv_ctx = app["events.context"]
-    await root_ctx.event_hub.shutdown()
+    """Shutdown handler for events app."""
+    await event_hub.shutdown()
     cancelled_tasks: list[asyncio.Task[Any]] = []
     for task in priv_ctx.active_tasks:
         if not task.done():

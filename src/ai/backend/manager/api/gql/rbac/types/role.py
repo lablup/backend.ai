@@ -42,6 +42,11 @@ from ai.backend.manager.repositories.permission_controller.updaters import RoleU
 from ai.backend.manager.types import OptionalState, TriState
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.rbac.types.permission import (
+        PermissionConnection,
+        PermissionFilter,
+        PermissionOrderBy,
+    )
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 # ==================== Enums ====================
@@ -119,6 +124,99 @@ class RoleGQL(Node):
             created_at=data.created_at,
             updated_at=data.updated_at,
             deleted_at=data.deleted_at,
+        )
+
+    @strawberry.field(description="Added in 26.3.0. Permissions associated with this role.")  # type: ignore[misc]
+    async def permissions(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            PermissionFilter,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                PermissionOrderBy,
+                strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Annotated[
+        PermissionConnection,
+        strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
+    ]:
+        from ai.backend.manager.api.gql.rbac.fetcher.permission import fetch_permissions
+        from ai.backend.manager.api.gql.rbac.types.permission import PermissionFilter
+
+        # Add role_id filter to scope permissions to this role
+        role_filter = PermissionFilter(role_id=uuid.UUID(self.id))
+        if filter is not None:
+            # Merge with user-provided filter
+            combined_filter = PermissionFilter(
+                role_id=role_filter.role_id,
+                scope_type=filter.scope_type,
+                entity_type=filter.entity_type,
+            )
+        else:
+            combined_filter = role_filter
+
+        return await fetch_permissions(
+            info,
+            filter=combined_filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+        )
+
+    @strawberry.field(description="Added in 26.3.0. Users assigned to this role.")  # type: ignore[misc]
+    async def users(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: RoleAssignmentFilter | None = None,
+        order_by: list[RoleAssignmentOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> RoleAssignmentConnection:
+        from ai.backend.manager.api.gql.rbac.fetcher.role import fetch_role_assignments
+
+        # Add role_id filter to scope assignments to this role
+        role_filter = RoleAssignmentFilter(role_id=uuid.UUID(self.id))
+        if filter is not None:
+            # Merge with user-provided filter
+            combined_filter = RoleAssignmentFilter(
+                role_id=role_filter.role_id,
+                role=filter.role,
+                username=filter.username,
+                email=filter.email,
+            )
+        else:
+            combined_filter = role_filter
+
+        return await fetch_role_assignments(
+            info,
+            filter=combined_filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
         )
 
 
@@ -280,6 +378,8 @@ class RoleAssignmentRoleNestedFilterGQL:
 class RoleAssignmentFilter(GQLFilter):
     role_id: uuid.UUID | None = None
     role: RoleAssignmentRoleNestedFilterGQL | None = None
+    username: StringFilter | None = None
+    email: StringFilter | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -290,6 +390,26 @@ class RoleAssignmentFilter(GQLFilter):
 
         if self.role:
             conditions.extend(self.role.build_conditions())
+
+        if self.username is not None:
+            condition = self.username.build_query_condition(
+                contains_factory=AssignedUserConditions.by_username_contains,
+                equals_factory=AssignedUserConditions.by_username_equals,
+                starts_with_factory=AssignedUserConditions.by_username_starts_with,
+                ends_with_factory=AssignedUserConditions.by_username_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+
+        if self.email is not None:
+            condition = self.email.build_query_condition(
+                contains_factory=AssignedUserConditions.by_email_contains,
+                equals_factory=AssignedUserConditions.by_email_equals,
+                starts_with_factory=AssignedUserConditions.by_email_starts_with,
+                ends_with_factory=AssignedUserConditions.by_email_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
 
         return conditions
 
@@ -316,6 +436,8 @@ class RoleOrderBy(GQLOrderBy):
 
 @strawberry.enum(description="Added in 26.3.0. Role assignment ordering field")
 class RoleAssignmentOrderField(StrEnum):
+    USERNAME = "username"
+    EMAIL = "email"
     GRANTED_AT = "granted_at"
 
 
@@ -328,6 +450,10 @@ class RoleAssignmentOrderBy(GQLOrderBy):
     def to_query_order(self) -> QueryOrder:
         ascending = self.direction == OrderDirection.ASC
         match self.field:
+            case RoleAssignmentOrderField.USERNAME:
+                return AssignedUserOrders.username(ascending)
+            case RoleAssignmentOrderField.EMAIL:
+                return AssignedUserOrders.email(ascending)
             case RoleAssignmentOrderField.GRANTED_AT:
                 return AssignedUserOrders.granted_at(ascending)
 

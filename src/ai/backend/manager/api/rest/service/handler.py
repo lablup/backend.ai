@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import uuid
 from http import HTTPStatus
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import yarl
 from aiohttp import web
@@ -58,7 +58,6 @@ from ai.backend.common.types import (
     RuntimeVariant,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.utils import get_access_key_scopes
 from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -78,6 +77,9 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceInfo,
 )
 from ai.backend.manager.dto.context import RequestCtx, UserContext
+from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
+    ResolveAccessKeyScopeAction,
+)
 from ai.backend.manager.services.deployment.actions.create_legacy_deployment import (
     CreateLegacyDeploymentAction,
     CreateLegacyDeploymentActionResult,
@@ -115,7 +117,16 @@ from ai.backend.manager.services.model_serving.actions.validate_model_service im
     ValidateModelServiceActionResult,
 )
 from ai.backend.manager.services.model_serving.adapter import ServiceSearchAdapter
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.model_serving.processors.auto_scaling import (
+    ModelServingAutoScalingProcessors,
+)
+from ai.backend.manager.services.model_serving.processors.model_serving import (
+    ModelServingProcessors,
+)
+
+if TYPE_CHECKING:
+    from ai.backend.manager.services.auth.processors import AuthProcessors
+    from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -176,9 +187,15 @@ class ServiceHandler:
     def __init__(
         self,
         *,
-        processors: Processors,
+        auth: AuthProcessors,
+        deployment: DeploymentProcessors,
+        model_serving: ModelServingProcessors,
+        model_serving_auto_scaling: ModelServingAutoScalingProcessors,
     ) -> None:
-        self._processors = processors
+        self._auth = auth
+        self._deployment = deployment
+        self._model_serving = model_serving
+        self._model_serving_auto_scaling = model_serving_auto_scaling
 
     # ------------------------------------------------------------------
     # list_serve (GET /services)
@@ -192,7 +209,7 @@ class ServiceHandler:
 
         action = ListModelServiceAction(session_owener_id=ctx.user_uuid, name=params.name)
         result: ListModelServiceActionResult = (
-            await self._processors.model_serving.list_model_service.wait_for_complete(action)
+            await self._model_serving.list_model_service.wait_for_complete(action)
         )
 
         items = [
@@ -232,7 +249,7 @@ class ServiceHandler:
             limit=params.limit,
         )
         result: SearchServicesActionResult = (
-            await self._processors.model_serving.search_services.wait_for_complete(action)
+            await self._model_serving.search_services.wait_for_complete(action)
         )
 
         resp = SearchServicesResponseModel(
@@ -273,7 +290,7 @@ class ServiceHandler:
 
         action = GetModelServiceInfoAction(service_id=params.service_id)
         result: GetModelServiceInfoActionResult = (
-            await self._processors.model_serving.get_model_service_info.wait_for_complete(action)
+            await self._model_serving.get_model_service_info.wait_for_complete(action)
         )
 
         resp = _serve_info_from_dto(result.data)
@@ -311,9 +328,7 @@ class ServiceHandler:
             )
         )
         deployment_result: CreateLegacyDeploymentActionResult = (
-            await self._processors.deployment.create_legacy_deployment.wait_for_complete(
-                deployment_action
-            )
+            await self._deployment.create_legacy_deployment.wait_for_complete(deployment_action)
         )
         resp = _serve_info_from_deployment_info(deployment_result.data)
         return APIResponse.build(HTTPStatus.CREATED, resp)
@@ -330,9 +345,7 @@ class ServiceHandler:
         validation_result = await self._run_validation(request, params)
 
         action = self._to_start_action(params, validation_result, request)
-        result = await self._processors.model_serving.dry_run_model_service.wait_for_complete(
-            action
-        )
+        result = await self._model_serving.dry_run_model_service.wait_for_complete(action)
 
         resp = TryStartResponseModel(task_id=str(result.task_id))
         return APIResponse.build(HTTPStatus.OK, resp)
@@ -368,9 +381,7 @@ class ServiceHandler:
 
         deployment_action = DestroyDeploymentAction(endpoint_id=params.service_id)
         deployment_result: DestroyDeploymentActionResult = (
-            await self._processors.deployment.destroy_deployment.wait_for_complete(
-                deployment_action
-            )
+            await self._deployment.destroy_deployment.wait_for_complete(deployment_action)
         )
         resp = SuccessResponseModel(success=deployment_result.success)
         return APIResponse.build(HTTPStatus.OK, resp)
@@ -389,7 +400,7 @@ class ServiceHandler:
         )
 
         action = ForceSyncAction(service_id=params.service_id)
-        result = await self._processors.model_serving.force_sync.wait_for_complete(action)
+        result = await self._model_serving.force_sync.wait_for_complete(action)
 
         resp = SuccessResponseModel(success=result.success)
         return APIResponse.build(HTTPStatus.OK, resp)
@@ -422,7 +433,7 @@ class ServiceHandler:
             to=params.to,
         )
 
-        result = await self._processors.model_serving_auto_scaling.scale_service_replicas.wait_for_complete(
+        result = await self._model_serving_auto_scaling.scale_service_replicas.wait_for_complete(
             action
         )
 
@@ -458,7 +469,7 @@ class ServiceHandler:
             traffic_ratio=params.traffic_ratio,
         )
 
-        result = await self._processors.model_serving.update_route.wait_for_complete(action)
+        result = await self._model_serving.update_route.wait_for_complete(action)
 
         resp = SuccessResponseModel(success=result.success)
         return APIResponse.build(HTTPStatus.OK, resp)
@@ -483,7 +494,7 @@ class ServiceHandler:
             route_id=path_params.route_id,
         )
 
-        result = await self._processors.model_serving.delete_route.wait_for_complete(action)
+        result = await self._model_serving.delete_route.wait_for_complete(action)
 
         resp = SuccessResponseModel(success=result.success)
         return APIResponse.build(HTTPStatus.OK, resp)
@@ -514,7 +525,7 @@ class ServiceHandler:
             expires_at=params.expires_at,
         )
 
-        result = await self._processors.model_serving.generate_token.wait_for_complete(action)
+        result = await self._model_serving.generate_token.wait_for_complete(action)
 
         resp = TokenResponseModel(token=result.data.token)
         return APIResponse.build(HTTPStatus.OK, resp)
@@ -535,7 +546,7 @@ class ServiceHandler:
         )
 
         action = ListErrorsAction(service_id=path_params.service_id)
-        result = await self._processors.model_serving.list_errors.wait_for_complete(action)
+        result = await self._model_serving.list_errors.wait_for_complete(action)
 
         resp = ErrorListResponseModel(
             errors=[
@@ -562,7 +573,7 @@ class ServiceHandler:
         )
 
         action = ClearErrorAction(service_id=path_params.service_id)
-        await self._processors.model_serving.clear_error.wait_for_complete(action)
+        await self._model_serving.clear_error.wait_for_complete(action)
 
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
@@ -575,8 +586,17 @@ class ServiceHandler:
         request: Any,
         params: NewServiceRequestModel,
     ) -> ValidateModelServiceActionResult:
-        requester_access_key, owner_access_key = await get_access_key_scopes(
-            request, {"owner_access_key": params.owner_access_key}
+        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
+            ResolveAccessKeyScopeAction(
+                requester_access_key=request["keypair"]["access_key"],
+                requester_role=request["user"]["role"],
+                requester_domain=request["user"]["domain_name"],
+                owner_access_key=params.owner_access_key,
+            )
+        )
+        requester_access_key, owner_access_key = (
+            scope.requester_access_key,
+            scope.owner_access_key,
         )
         action = ValidateModelServiceAction(
             requester_access_key=requester_access_key,
@@ -616,7 +636,7 @@ class ServiceHandler:
             if params.owner_access_key
             else None,
         )
-        return await self._processors.model_serving.validate_model_service.wait_for_complete(action)
+        return await self._model_serving.validate_model_service.wait_for_complete(action)
 
     @staticmethod
     def _to_model_revision(

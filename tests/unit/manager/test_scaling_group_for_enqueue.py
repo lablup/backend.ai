@@ -19,7 +19,7 @@ def _create_mock_sgroup(name: str, allowed_session_types: list[str]) -> MagicMoc
     """Create a mock scaling group with proper attribute access."""
     mock = MagicMock()
     mock.name = name
-    mock.scheduler_opts = ScalingGroupOpts.from_json({
+    mock.scheduler_opts = ScalingGroupOpts.model_validate({
         "allowed_session_types": allowed_session_types,
     })
     return mock

@@ -6,20 +6,18 @@ from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
-from ai.backend.manager.api.rest.server_status import READ_ALLOWED, server_status_required
+
+from .handler import UserConfigHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_userconfig_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_userconfig_routes(handler: UserConfigHandler, route_deps: RouteDeps) -> RouteRegistry:
     """Build the user config sub-application."""
-    # Import handler inside function to avoid circular imports
-    from .handler import UserConfigHandler
 
-    reg = RouteRegistry.create("user-config", deps.cors_options)
-    handler = UserConfigHandler(processors=deps.processors)
-    _status_readable = server_status_required(READ_ALLOWED, deps.config_provider)
+    reg = RouteRegistry.create("user-config", route_deps.cors_options)
+    _status_readable = route_deps.read_status_mw
 
     reg.add(
         "POST",

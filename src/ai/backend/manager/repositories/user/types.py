@@ -11,15 +11,19 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
 
 __all__ = (
     "DomainUserSearchScope",
     "ProjectUserSearchScope",
+    "RoleUserSearchScope",
 )
 
 
@@ -82,5 +86,36 @@ class ProjectUserSearchScope(SearchScope):
                 column=GroupRow.id,
                 value=self.project_id,
                 error=ProjectNotFound(str(self.project_id)),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class RoleUserSearchScope(SearchScope):
+    """Required scope for searching users assigned to a role.
+
+    Requires JOIN with user_roles table.
+    """
+
+    role_id: UUID
+    """Required. The role to search within."""
+
+    def to_condition(self) -> QueryCondition:
+        """Convert scope to a query condition for UserRoleRow."""
+        role_id = self.role_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRoleRow.role_id == role_id
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
+        """Return existence checks for scope validation."""
+        return [
+            ExistenceCheck(
+                column=RoleRow.id,
+                value=self.role_id,
+                error=RoleNotFound(str(self.role_id)),
             ),
         ]

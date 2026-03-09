@@ -66,7 +66,7 @@ def mock_processors() -> MagicMock:
 @pytest.fixture
 def handler(mock_processors: MagicMock) -> AuthHandler:
     """AuthHandler instance with mock processors."""
-    return AuthHandler(processors=mock_processors)
+    return AuthHandler(auth=mock_processors.auth)
 
 
 @pytest.fixture
@@ -76,6 +76,7 @@ def user_context() -> UserContext:
         user_uuid=uuid.uuid4(),
         user_email="test@example.com",
         user_domain="default",
+        user_role=UserRole.USER,
         access_key="AKTEST",
         is_admin=False,
         is_superadmin=False,
@@ -396,6 +397,7 @@ class TestGetRole:
             user_uuid=uuid.uuid4(),
             user_email="admin@example.com",
             user_domain="default",
+            user_role=UserRole.SUPERADMIN,
             access_key="AKADMIN",
             is_admin=True,
             is_superadmin=True,

@@ -1,148 +1,95 @@
 from __future__ import annotations
 
-import asyncio
 import secrets
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import logs as _logs_api
-from ai.backend.manager.api import manager as _manager_api
-from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.types import HostPortPair, ResourceSlot
+from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.api.rest.error_log.handler import ErrorLogHandler
 from ai.backend.manager.api.rest.error_log.registry import register_error_log_routes
+from ai.backend.manager.api.rest.manager.handler import ManagerHandler
 from ai.backend.manager.api.rest.manager.registry import register_manager_api_routes
-from ai.backend.manager.api.rest.types import ModuleRegistrar
-from ai.backend.manager.api.types import CleanupContext
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.config.bootstrap import BootstrapConfig
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.error_logs import error_logs
-from ai.backend.manager.repositories.repositories import Repositories
-from ai.backend.manager.repositories.types import RepositoryArgs
-from ai.backend.manager.server import (
-    background_task_ctx,
-    database_ctx,
-    distributed_lock_ctx,
-    event_hub_ctx,
-    event_producer_ctx,
-    message_queue_ctx,
-    monitoring_ctx,
-    redis_ctx,
-    storage_manager_ctx,
-)
-from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
-
-# Statically imported so that Pants includes these modules in the test PEX.
-# build_root_app() loads them at runtime via importlib.import_module(),
-# which Pants cannot trace statically.
-_OPERATIONS_SERVER_SUBAPP_MODULES = (_auth_api, _logs_api, _manager_api)
-
-
-async def _blocking_watch_manager_status() -> AsyncIterator[Any]:
-    """Async generator that blocks indefinitely; cancelled on server shutdown."""
-    try:
-        while True:
-            await asyncio.sleep(99999)
-            yield  # makes this an async generator but never reached
-    except (asyncio.CancelledError, GeneratorExit):
-        return
-
-
-@asynccontextmanager
-async def _operations_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    """Set up repositories and processors for operations-domain component tests.
-
-    Also mocks lifecycle dependencies needed by logs and manager subapp init():
-    - event_dispatcher: required by logs handler for GlobalTimer event consumption
-    - legacy_etcd_config_loader: required by server_status_required decorator
-      and manager handler's detect_status_update background task
-    """
-    _mock_loader = MagicMock()
-    _mock_loader.get_manager_status = AsyncMock(return_value=ManagerStatus.RUNNING)
-    _mock_loader.update_manager_status = AsyncMock()
-    _mock_loader.watch_manager_status = _blocking_watch_manager_status
-    root_ctx.config_provider._legacy_etcd_config_loader = _mock_loader
-
-    # Mock event_dispatcher (logs handler init calls event_dispatcher.consume())
-    root_ctx.event_dispatcher = MagicMock()
-
-    root_ctx.repositories = Repositories.create(
-        RepositoryArgs(
-            db=root_ctx.db,
-            storage_manager=root_ctx.storage_manager,
-            config_provider=root_ctx.config_provider,
-            valkey_stat_client=root_ctx.valkey_stat,
-            valkey_schedule_client=root_ctx.valkey_schedule,
-            valkey_image_client=root_ctx.valkey_image,
-            valkey_live_client=root_ctx.valkey_live,
-        )
-    )
-    root_ctx.processors = Processors.create(
-        ProcessorArgs(
-            service_args=ServiceArgs(
-                db=root_ctx.db,
-                repositories=root_ctx.repositories,
-                etcd=root_ctx.etcd,
-                config_provider=root_ctx.config_provider,
-                storage_manager=root_ctx.storage_manager,
-                valkey_stat_client=root_ctx.valkey_stat,
-                valkey_live=root_ctx.valkey_live,
-                valkey_artifact_client=root_ctx.valkey_artifact,
-                error_monitor=root_ctx.error_monitor,
-                event_fetcher=root_ctx.event_fetcher,
-                background_task_manager=root_ctx.background_task_manager,
-                event_hub=root_ctx.event_hub,
-                event_producer=root_ctx.event_producer,
-                agent_registry=MagicMock(),
-                idle_checker_host=MagicMock(),
-                event_dispatcher=MagicMock(),
-                hook_plugin_ctx=MagicMock(),
-                scheduling_controller=MagicMock(),
-                deployment_controller=MagicMock(),
-                revision_generator_registry=MagicMock(),
-                agent_cache=MagicMock(),
-                notification_center=MagicMock(),
-                appproxy_client_pool=MagicMock(),
-                prometheus_client=MagicMock(),
-            ),
-        ),
-        [],
-    )
-    yield
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.error_log.repository import ErrorLogRepository
+from ai.backend.manager.repositories.manager_admin.repository import ManagerAdminRepository
+from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
+from ai.backend.manager.services.error_log.service import ErrorLogService
+from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
+from ai.backend.manager.services.manager_admin.service import ManagerAdminService
 
 
 @pytest.fixture()
-def server_module_registrars() -> list[ModuleRegistrar]:
+def error_log_processors(database_engine: ExtendedAsyncSAEngine) -> ErrorLogProcessors:
+    repo = ErrorLogRepository(database_engine)
+    service = ErrorLogService(repo)
+    return ErrorLogProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
+
+
+@pytest.fixture()
+def manager_admin_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+    bootstrap_config: BootstrapConfig,
+    valkey_clients: ValkeyClients,
+) -> ManagerAdminProcessors:
+    etcd_config = bootstrap_config.etcd
+    etcd_addr = etcd_config.addr
+    if isinstance(etcd_addr, list):
+        addrs: HostPortPair | list[HostPortPair] = [
+            HostPortPair(host=a.host, port=a.port) for a in etcd_addr
+        ]
+    else:
+        addrs = HostPortPair(host=etcd_addr.host, port=etcd_addr.port)
+    etcd = AsyncEtcd(
+        addrs=addrs,
+        namespace=etcd_config.namespace,
+        scope_prefix_map={
+            ConfigScopes.GLOBAL: "global",
+            ConfigScopes.SGROUP: "sgroup/default",
+            ConfigScopes.NODE: "node/test",
+        },
+    )
+    repo = ManagerAdminRepository(database_engine)
+    service = ManagerAdminService(
+        repository=repo,
+        config_provider=config_provider,
+        etcd=etcd,
+        db=database_engine,
+        valkey_stat=valkey_clients.stat,
+    )
+    return ManagerAdminProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    error_log_processors: ErrorLogProcessors,
+    manager_admin_processors: ManagerAdminProcessors,
+) -> list[RouteRegistry]:
     """Load only the modules required for operations-domain tests."""
-    return [register_auth_routes, register_error_log_routes, register_manager_api_routes]
-
-
-@pytest.fixture()
-def server_cleanup_contexts() -> list[CleanupContext]:
-    """Provide cleanup contexts for operations-domain component tests.
-
-    Uses production contexts from server.py for real infrastructure plus
-    distributed_lock_ctx (needed by logs handler GlobalTimer) and
-    _operations_domain_ctx for repositories, processors, and lifecycle mocks.
-    """
     return [
-        redis_ctx,
-        database_ctx,
-        monitoring_ctx,
-        storage_manager_ctx,
-        message_queue_ctx,
-        event_producer_ctx,
-        event_hub_ctx,
-        background_task_ctx,
-        distributed_lock_ctx,
-        _operations_domain_ctx,
+        register_error_log_routes(ErrorLogHandler(error_log=error_log_processors), route_deps),
+        register_manager_api_routes(
+            ManagerHandler(manager_admin=manager_admin_processors), route_deps
+        ),
     ]
 
 

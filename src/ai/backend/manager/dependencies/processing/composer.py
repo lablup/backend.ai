@@ -23,16 +23,23 @@ from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.message_queue.abc.queue import AbstractMessageQueue
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.plugin.hook import HookPluginContext
-from ai.backend.common.plugin.monitor import ErrorPluginContext
+from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
+from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
+from ai.backend.manager.actions.validators.rbac.single_entity import (
+    SingleEntityActionRBACValidator,
+)
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.event_dispatcher.dispatch import DispatcherArgs, Dispatchers
+from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import StreamCleanupEventHandler
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.notification import NotificationCenter
@@ -56,10 +63,13 @@ from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import DistributedLockFactory, SMTPTriggerPolicy
 
+from .agent_lost_checker import AgentLostCheckerDependency, AgentLostCheckerInput
 from .bgtask_registry import BgtaskRegistryDependency, BgtaskRegistryInput
 from .event_dispatcher import EventDispatcherDependency, EventDispatcherInput
 from .log_cleanup_timer import LogCleanupTimerDependency, LogCleanupTimerInput
+from .manager_status_watcher import ManagerStatusWatcherDependency, ManagerStatusWatcherInput
 from .processors import ProcessorsDependency, ProcessorsProviderInput
+from .stats_reporter import StatsReporterDependency, StatsReporterInput
 
 
 @dataclass
@@ -115,6 +125,10 @@ class ProcessingInput:
     # Log cleanup timer
     distributed_lock_factory: DistributedLockFactory
 
+    # Lifecycle background tasks
+    stats_monitor: StatsPluginContext
+    pidx: int
+
     # Registry quota service (optional, defaults to None)
     registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None = None
 
@@ -125,6 +139,7 @@ class ProcessingResources:
 
     event_dispatcher: EventDispatcher
     processors: Processors
+    stream_cleanup_handler: StreamCleanupEventHandler
 
 
 def _make_registered_reporters(
@@ -231,11 +246,20 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             registry_quota_service=setup_input.registry_quota_service,
         )
 
+        permission_controller_repository = setup_input.repositories.permission_controller.repository
+        rbac_validators = RBACValidators(
+            scope=ScopeActionRBACValidator(permission_controller_repository),
+            single_entity=SingleEntityActionRBACValidator(permission_controller_repository),
+        )
+
         processors = await stack.enter_dependency(
             ProcessorsDependency(),
             ProcessorsProviderInput(
                 service_args=service_args,
                 action_monitors=[reporter_monitor, prometheus_monitor, audit_log_monitor],
+                event_hub=setup_input.event_hub,
+                event_fetcher=setup_input.event_fetcher,
+                validators=ActionValidators(rbac=rbac_validators),
             ),
         )
 
@@ -289,7 +313,35 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             ),
         )
 
+        # Step 5: Start lifecycle background tasks
+        await stack.enter_dependency(
+            AgentLostCheckerDependency(),
+            AgentLostCheckerInput(
+                config_provider=setup_input.config_provider,
+                valkey_live=setup_input.valkey_live,
+                event_producer=setup_input.event_producer,
+            ),
+        )
+        await stack.enter_dependency(
+            StatsReporterDependency(),
+            StatsReporterInput(
+                stats_monitor=setup_input.stats_monitor,
+                registry=setup_input.agent_registry,
+                db=setup_input.db,
+            ),
+        )
+        await stack.enter_dependency(
+            ManagerStatusWatcherDependency(),
+            ManagerStatusWatcherInput(
+                config_provider=setup_input.config_provider,
+                pidx=setup_input.pidx,
+                valkey_stat=setup_input.valkey_stat,
+                db=setup_input.db,
+            ),
+        )
+
         yield ProcessingResources(
             event_dispatcher=event_dispatcher,
             processors=processors,
+            stream_cleanup_handler=dispatchers.stream_cleanup_handler,
         )

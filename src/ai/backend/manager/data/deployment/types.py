@@ -244,7 +244,7 @@ class MountSpec:
 @dataclass
 class MountInfo:
     vfolder_id: UUID
-    kernel_path: PurePosixPath
+    kernel_path: PurePosixPath | None = None
 
 
 @dataclass
@@ -353,6 +353,7 @@ class DeploymentInfo:
     network: DeploymentNetworkSpec
     model_revisions: list[ModelRevisionSpec]
     current_revision_id: UUID | None = None
+    policy: DeploymentPolicyData | None = None
 
     def target_revision(self) -> ModelRevisionSpec | None:
         if self.model_revisions:
@@ -388,7 +389,7 @@ class RouteInfo:
     session_id: SessionId | None
     status: RouteStatus
     traffic_ratio: float
-    created_at: datetime | None
+    created_at: datetime
     revision_id: UUID | None
     traffic_status: RouteTrafficStatus
     error_data: dict[str, Any] = field(default_factory=dict)
@@ -521,7 +522,8 @@ class ModelDeploymentData:
     replica_state: ReplicaStateData
     default_deployment_strategy: DeploymentStrategy
     created_user_id: UUID
-    access_token_ids: UUID | None = None
+    policy: DeploymentPolicyData | None = None
+    access_token_ids: list[UUID] | None = None
 
 
 class DeploymentOrderField(enum.StrEnum):
@@ -677,6 +679,14 @@ class DeploymentPolicyData:
     rollback_on_failure: bool
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass
+class DeploymentPolicyUpsertResult:
+    """Result of upserting a deployment policy."""
+
+    data: DeploymentPolicyData
+    created: bool
 
 
 @dataclass

@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.container_registry.actions.clear_images import (
     ClearImagesAction,
     ClearImagesActionResult,
@@ -101,7 +102,10 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
     ]
 
     def __init__(
-        self, service: ContainerRegistryService, action_monitors: list[ActionMonitor]
+        self,
+        service: ContainerRegistryService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
     ) -> None:
         self.rescan_images = ActionProcessor(service.rescan_images, action_monitors)
         self.clear_images = ActionProcessor(service.clear_images, action_monitors)

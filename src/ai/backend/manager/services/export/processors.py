@@ -7,6 +7,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
     ExportAuditLogsCSVAction,
@@ -46,7 +47,12 @@ class ExportProcessors(AbstractProcessorPackage):
     export_keypairs_csv: ActionProcessor[ExportKeypairsCSVAction, ExportKeypairsCSVActionResult]
     export_audit_logs_csv: ActionProcessor[ExportAuditLogsCSVAction, ExportAuditLogsCSVActionResult]
 
-    def __init__(self, service: ExportService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: ExportService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.list_reports = ActionProcessor(service.list_reports, action_monitors)
         self.get_report = ActionProcessor(service.get_report, action_monitors)
         self.export_users_csv = ActionProcessor(service.export_users_csv, action_monitors)

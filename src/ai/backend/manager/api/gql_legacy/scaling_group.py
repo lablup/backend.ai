@@ -460,7 +460,7 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
             driver=row.driver,
             driver_opts=row.driver_opts,
             scheduler=row.scheduler,
-            scheduler_opts=row.scheduler_opts.to_json(),
+            scheduler_opts=row.scheduler_opts.model_dump(mode="json"),
             use_host_network=row.use_host_network,
         )
 
@@ -480,7 +480,7 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
             driver=row.driver,
             driver_opts=row.driver_opts,
             scheduler=row.scheduler,
-            scheduler_opts=row.scheduler_opts.to_json(),
+            scheduler_opts=row.scheduler_opts.model_dump(mode="json"),
             use_host_network=row.use_host_network,
         )
 
@@ -680,7 +680,7 @@ class ModifyScalingGroupInput(graphene.InputObjectType):  # type: ignore[misc]
         scheduler_spec = ScalingGroupSchedulerConfigUpdaterSpec(
             scheduler=OptionalState.from_graphql(self.scheduler),
             scheduler_opts=OptionalState.from_graphql(
-                ScalingGroupOpts.from_json(self.scheduler_opts)
+                ScalingGroupOpts.model_validate(self.scheduler_opts)
                 if self.scheduler_opts is not None and self.scheduler_opts is not Undefined
                 else Undefined
             ),
@@ -725,7 +725,7 @@ class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
             driver=props.driver,
             driver_opts=props.driver_opts,
             scheduler=props.scheduler,
-            scheduler_opts=ScalingGroupOpts.from_json(props.scheduler_opts),
+            scheduler_opts=ScalingGroupOpts.model_validate(props.scheduler_opts),
             use_host_network=bool(props.use_host_network),
         )
         creator = Creator(spec=spec)

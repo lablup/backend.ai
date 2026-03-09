@@ -52,7 +52,8 @@ from ai.backend.manager.services.artifact_revision.actions.delegate_import_revis
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.services.processors import Processors
+    from ai.backend.manager.services.artifact.processors import ArtifactProcessors
+    from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -60,20 +61,14 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ArtifactRegistryHandler:
     """Artifact registry API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors | None = None) -> None:
-        self._processors_ref = processors
-
-    def bind_processors(self, processors: Processors) -> None:
-        """Late-bind processors for backward-compatible create_app() usage."""
-        self._processors_ref = processors
-
-    @property
-    def _processors(self) -> Processors:
-        if self._processors_ref is None:
-            raise RuntimeError(
-                "Processors not bound. Pass processors= to __init__ or call bind_processors()."
-            )
-        return self._processors_ref
+    def __init__(
+        self,
+        *,
+        artifact: ArtifactProcessors,
+        artifact_revision: ArtifactRevisionProcessors,
+    ) -> None:
+        self._artifact = artifact
+        self._artifact_revision = artifact_revision
 
     async def scan_artifacts(
         self,
@@ -88,8 +83,8 @@ class ArtifactRegistryHandler:
 
         This is the first step in the artifact workflow: Scan -> Import -> Use.
         """
-        processors = self._processors
-        action_result = await processors.artifact.scan.wait_for_complete(
+
+        action_result = await self._artifact.scan.wait_for_complete(
             ScanArtifactsAction(
                 registry_id=body.parsed.registry_id,
                 artifact_type=body.parsed.artifact_type,
@@ -111,8 +106,7 @@ class ArtifactRegistryHandler:
         self,
         body: BodyParam[DelegateScanArtifactsReq],
     ) -> APIResponse:
-        processors = self._processors
-        action_result = await processors.artifact.delegate_scan.wait_for_complete(
+        action_result = await self._artifact.delegate_scan.wait_for_complete(
             DelegateScanArtifactsAction(
                 delegator_reservoir_id=body.parsed.delegator_reservoir_id,
                 artifact_type=body.parsed.artifact_type,
@@ -140,10 +134,9 @@ class ArtifactRegistryHandler:
         self,
         body: BodyParam[DelegateImportArtifactsReq],
     ) -> APIResponse:
-        processors = self._processors
         force = body.parsed.options.force
         action_result = (
-            await processors.artifact_revision.delegate_import_revision_batch.wait_for_complete(
+            await self._artifact_revision.delegate_import_revision_batch.wait_for_complete(
                 DelegateImportArtifactRevisionBatchAction(
                     delegator_reservoir_id=body.parsed.delegator_reservoir_id,
                     artifact_type=body.parsed.artifact_type,
@@ -186,12 +179,12 @@ class ArtifactRegistryHandler:
         Supports efficient pagination for browsing through large datasets of artifacts
         with their revision information.
         """
-        processors = self._processors
+
         pagination = body.parsed.pagination
         filters = body.parsed.filters
         ordering = body.parsed.ordering
 
-        action_result = await processors.artifact.list_artifacts_with_revisions.wait_for_complete(
+        action_result = await self._artifact.list_artifacts_with_revisions.wait_for_complete(
             ListArtifactsWithRevisionsAction(
                 pagination=pagination,
                 ordering=ordering,
@@ -219,8 +212,8 @@ class ArtifactRegistryHandler:
         The README content and file sizes are processed in the background,
         unlike single model scanning which retrieves this information immediately.
         """
-        processors = self._processors
-        action_result = await processors.artifact.retrieve_models.wait_for_complete(
+
+        action_result = await self._artifact.retrieve_models.wait_for_complete(
             RetrieveModelsAction(
                 models=body.parsed.models,
                 registry_id=body.parsed.registry_id,
@@ -247,12 +240,12 @@ class ArtifactRegistryHandler:
         README content and file sizes. This provides complete metadata
         for the model, ready for import or direct use.
         """
-        processors = self._processors
+
         model = ModelTarget(
             model_id=path.parsed.model_id,
             revision=query.parsed.revision,
         )
-        action_result = await processors.artifact.retrieve_single_model.wait_for_complete(
+        action_result = await self._artifact.retrieve_single_model.wait_for_complete(
             RetrieveModelAction(
                 model=model,
                 registry_id=query.parsed.registry_id,

@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
     AuthorizeActionResult,
@@ -15,6 +16,14 @@ from ai.backend.manager.services.auth.actions.get_role import GetRoleAction, Get
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
     GetSSHKeypairActionResult,
+)
+from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
+    ResolveAccessKeyScopeAction,
+    ResolveAccessKeyScopeResult,
+)
+from ai.backend.manager.services.auth.actions.resolve_user_scope import (
+    ResolveUserScopeAction,
+    ResolveUserScopeResult,
 )
 from ai.backend.manager.services.auth.actions.signout import SignoutAction, SignoutActionResult
 from ai.backend.manager.services.auth.actions.signup import SignupAction, SignupActionResult
@@ -50,8 +59,17 @@ class AuthProcessors(AbstractProcessorPackage):
     update_password_no_auth: ActionProcessor[
         UpdatePasswordNoAuthAction, UpdatePasswordNoAuthActionResult
     ]
+    resolve_access_key_scope: ActionProcessor[
+        ResolveAccessKeyScopeAction, ResolveAccessKeyScopeResult
+    ]
+    resolve_user_scope: ActionProcessor[ResolveUserScopeAction, ResolveUserScopeResult]
 
-    def __init__(self, service: AuthService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: AuthService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.signout = ActionProcessor(service.signout, action_monitors)
         self.update_full_name = ActionProcessor(service.update_full_name, action_monitors)
         self.get_ssh_keypair = ActionProcessor(service.get_ssh_keypair, action_monitors)
@@ -64,6 +82,10 @@ class AuthProcessors(AbstractProcessorPackage):
         self.update_password_no_auth = ActionProcessor(
             service.update_password_no_auth, action_monitors
         )
+        self.resolve_access_key_scope = ActionProcessor(
+            service.resolve_access_key_scope, action_monitors
+        )
+        self.resolve_user_scope = ActionProcessor(service.resolve_user_scope, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -78,4 +100,6 @@ class AuthProcessors(AbstractProcessorPackage):
             SignupAction.spec(),
             UpdatePasswordAction.spec(),
             UpdatePasswordNoAuthAction.spec(),
+            ResolveAccessKeyScopeAction.spec(),
+            ResolveUserScopeAction.spec(),
         ]

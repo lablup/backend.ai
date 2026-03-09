@@ -10,13 +10,12 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from .handler import AuthHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_auth_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_auth_routes(handler: AuthHandler, route_deps: RouteDeps) -> RouteRegistry:
     """Build the auth sub-application."""
-    reg = RouteRegistry.create("auth", deps.cors_options)
-    handler = AuthHandler(processors=deps.processors)
+    reg = RouteRegistry.create("auth", route_deps.cors_options)
 
     # /auth root — test endpoint (GET and POST split into separate handlers)
     reg.add("GET", "", handler.test_get, middlewares=[auth_required])

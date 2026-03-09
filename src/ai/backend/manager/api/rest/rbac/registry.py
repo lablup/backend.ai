@@ -10,13 +10,12 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from .handler import RBACHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_rbac_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_rbac_routes(handler: RBACHandler, route_deps: RouteDeps) -> RouteRegistry:
     """Build the RBAC sub-registry (child of admin)."""
-    reg = RouteRegistry.create("rbac", deps.cors_options)
-    handler = RBACHandler(processors=deps.processors)
+    reg = RouteRegistry.create("rbac", route_deps.cors_options)
 
     # Role management routes
     reg.add("POST", "/roles", handler.create_role, middlewares=[auth_required])

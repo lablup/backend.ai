@@ -8,15 +8,14 @@ wrapper, and return ``APIResponse`` objects.
 from __future__ import annotations
 
 from http import HTTPStatus
-from typing import TYPE_CHECKING
 
 from aiohttp import web
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
-    CreateDeploymentPolicyRequest,
-    CreateDeploymentPolicyResponse,
+    AddRevisionRequest,
+    AddRevisionResponse,
     CreateDeploymentRequest,
     CreateDeploymentResponse,
     CursorPaginationInfo,
@@ -38,12 +37,12 @@ from ai.backend.common.dto.manager.deployment import (
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
-    UpdateDeploymentPolicyRequest,
-    UpdateDeploymentPolicyResponse,
     UpdateDeploymentRequest,
     UpdateDeploymentResponse,
     UpdateRouteTrafficStatusRequest,
     UpdateRouteTrafficStatusResponse,
+    UpsertDeploymentPolicyRequest,
+    UpsertDeploymentPolicyResponse,
 )
 from ai.backend.manager.data.deployment.types import RouteTrafficStatus as ManagerRouteTrafficStatus
 from ai.backend.manager.dto.context import UserContext
@@ -57,20 +56,20 @@ from ai.backend.manager.repositories.deployment.updaters import (
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
 )
-from ai.backend.manager.services.deployment.actions.deployment_policy.create_deployment_policy import (
-    CreateDeploymentPolicyAction,
-)
 from ai.backend.manager.services.deployment.actions.deployment_policy.get_deployment_policy import (
     GetDeploymentPolicyAction,
 )
-from ai.backend.manager.services.deployment.actions.deployment_policy.update_deployment_policy import (
-    UpdateDeploymentPolicyAction,
+from ai.backend.manager.services.deployment.actions.deployment_policy.upsert_deployment_policy import (
+    UpsertDeploymentPolicyAction,
 )
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
 )
 from ai.backend.manager.services.deployment.actions.get_deployment_by_id import (
     GetDeploymentByIdAction,
+)
+from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
+    AddModelRevisionAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
@@ -95,6 +94,7 @@ from ai.backend.manager.services.deployment.processors import DeploymentProcesso
 from ai.backend.manager.types import OptionalState
 
 from .adapter import (
+    AddRevisionAdapter,
     CreateDeploymentAdapter,
     DeploymentAdapter,
     DeploymentPolicyAdapter,
@@ -102,40 +102,30 @@ from .adapter import (
     RouteAdapter,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.services.processors import Processors
-
 
 class DeploymentAPIHandler:
     """REST API handler class for deployment operations with constructor DI."""
 
-    def __init__(self, *, processors: Processors | None = None) -> None:
-        self._processors_ref = processors
+    def __init__(
+        self,
+        *,
+        deployment: DeploymentProcessors | None,
+    ) -> None:
+        self._deployment = deployment
         self._deployment_adapter = DeploymentAdapter()
         self._revision_adapter = RevisionAdapter()
         self._route_adapter = RouteAdapter()
         self._create_deployment_adapter = CreateDeploymentAdapter()
         self._policy_adapter = DeploymentPolicyAdapter()
-
-    def bind_processors(self, processors: Processors) -> None:
-        """Late-bind processors for backward-compatible create_app() usage."""
-        self._processors_ref = processors
-
-    @property
-    def _processors(self) -> Processors:
-        if self._processors_ref is None:
-            raise RuntimeError(
-                "Processors not bound. Pass processors= to __init__ or call bind_processors()."
-            )
-        return self._processors_ref
+        self._add_revision_adapter = AddRevisionAdapter()
 
     def _get_deployment_processors(self) -> DeploymentProcessors:
         """Get deployment processors, raising ServiceUnavailable if not available."""
-        if self._processors.deployment is None:
+        if self._deployment is None:
             raise web.HTTPServiceUnavailable(
                 reason="Deployment service is not available on this manager"
             )
-        return self._processors.deployment
+        return self._deployment
 
     # Deployment Endpoints
 
@@ -268,6 +258,31 @@ class DeploymentAPIHandler:
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     # Revision Endpoints
+
+    async def add_revision(
+        self,
+        path: PathParam[DeploymentPathParam],
+        body: BodyParam[AddRevisionRequest],
+    ) -> APIResponse:
+        """Add a new revision to an existing deployment."""
+        deployment_processors = self._get_deployment_processors()
+
+        # Build revision creator from request using adapter
+        revision_creator = self._add_revision_adapter.build_revision_creator(body.parsed.revision)
+
+        # Call service action
+        action_result = await deployment_processors.add_model_revision.wait_for_complete(
+            AddModelRevisionAction(
+                model_deployment_id=path.parsed.deployment_id,
+                adder=revision_creator,
+            )
+        )
+
+        # Build response
+        resp = AddRevisionResponse(
+            revision=self._revision_adapter.convert_to_dto(action_result.revision)
+        )
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
     async def search_revisions(
         self,
@@ -409,53 +424,28 @@ class DeploymentAPIHandler:
 
     # Deployment Policy Endpoints
 
-    async def create_deployment_policy(
+    async def upsert_deployment_policy(
         self,
         path: PathParam[DeploymentPolicyPathParam],
-        body: BodyParam[CreateDeploymentPolicyRequest],
+        body: BodyParam[UpsertDeploymentPolicyRequest],
     ) -> APIResponse:
-        """Create a deployment policy for a deployment."""
-        deployment_processors = self._get_deployment_processors()
+        """Create or update a deployment policy for a deployment.
 
-        creator = self._policy_adapter.build_creator(
+        Uses PostgreSQL ON CONFLICT to atomically insert or update.
+        """
+        deployment_processors = self._get_deployment_processors()
+        upserter = self._policy_adapter.build_upserter(
             body.parsed, deployment_id=path.parsed.deployment_id
         )
-
-        action_result = await deployment_processors.create_deployment_policy.wait_for_complete(
-            CreateDeploymentPolicyAction(creator=creator)
+        result = await deployment_processors.upsert_deployment_policy.wait_for_complete(
+            UpsertDeploymentPolicyAction(upserter=upserter)
         )
-
-        resp = CreateDeploymentPolicyResponse(
-            deployment_policy=self._policy_adapter.convert_to_dto(action_result.data)
+        resp = UpsertDeploymentPolicyResponse(
+            deployment_policy=self._policy_adapter.convert_to_dto(result.data),
+            created=result.created,
         )
-        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
-
-    async def update_deployment_policy(
-        self,
-        path: PathParam[DeploymentPolicyPathParam],
-        body: BodyParam[UpdateDeploymentPolicyRequest],
-    ) -> APIResponse:
-        """Update a deployment policy."""
-        deployment_processors = self._get_deployment_processors()
-
-        modifier = self._policy_adapter.build_modifier(body.parsed)
-
-        # Get the policy first to find its ID
-        policy_result = await deployment_processors.get_deployment_policy.wait_for_complete(
-            GetDeploymentPolicyAction(endpoint_id=path.parsed.deployment_id)
-        )
-
-        action_result = await deployment_processors.update_deployment_policy.wait_for_complete(
-            UpdateDeploymentPolicyAction(
-                policy_id=policy_result.data.id,
-                modifier=modifier,
-            )
-        )
-
-        resp = UpdateDeploymentPolicyResponse(
-            deployment_policy=self._policy_adapter.convert_to_dto(action_result.data)
-        )
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+        status_code = HTTPStatus.CREATED if result.created else HTTPStatus.OK
+        return APIResponse.build(status_code=status_code, response_model=resp)
 
     async def get_deployment_policy(
         self,

@@ -10,6 +10,7 @@ from sqlalchemy import RowMapping
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
+from ai.backend.common.types import AccessKey
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
@@ -54,6 +55,14 @@ from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
     GetSSHKeypairActionResult,
 )
+from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
+    ResolveAccessKeyScopeAction,
+    ResolveAccessKeyScopeResult,
+)
+from ai.backend.manager.services.auth.actions.resolve_user_scope import (
+    ResolveUserScopeAction,
+    ResolveUserScopeResult,
+)
 from ai.backend.manager.services.auth.actions.signout import SignoutAction, SignoutActionResult
 from ai.backend.manager.services.auth.actions.signup import SignupAction, SignupActionResult
 from ai.backend.manager.services.auth.actions.update_full_name import (
@@ -72,6 +81,7 @@ from ai.backend.manager.services.auth.actions.upload_ssh_keypair import (
     UploadSSHKeypairAction,
     UploadSSHKeypairActionResult,
 )
+from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -428,6 +438,74 @@ class AuthService:
                 ssh_public_key=pubkey,
                 ssh_private_key=privkey,
             ),
+        )
+
+    async def resolve_access_key_scope(
+        self, action: ResolveAccessKeyScopeAction
+    ) -> ResolveAccessKeyScopeResult:
+        requester_ak = AccessKey(action.requester_access_key)
+        if (
+            action.owner_access_key is None
+            or action.owner_access_key == action.requester_access_key
+        ):
+            return ResolveAccessKeyScopeResult(
+                requester_access_key=requester_ak,
+                owner_access_key=requester_ak,
+            )
+        owner_ak = AccessKey(action.owner_access_key)
+        try:
+            (
+                owner_domain,
+                owner_role,
+            ) = await self._auth_repository.get_delegation_target_by_access_key(
+                action.owner_access_key,
+            )
+        except ValueError as e:
+            raise InvalidAPIParameters(str(e)) from e
+        try:
+            check_if_requester_is_eligible_to_act_as_target_user(
+                action.requester_role,
+                action.requester_domain,
+                owner_role,
+                owner_domain,
+            )
+        except RuntimeError as e:
+            raise GenericForbidden(str(e)) from e
+        return ResolveAccessKeyScopeResult(
+            requester_access_key=requester_ak,
+            owner_access_key=owner_ak,
+        )
+
+    async def resolve_user_scope(self, action: ResolveUserScopeAction) -> ResolveUserScopeResult:
+        if action.owner_user_email is None:
+            return ResolveUserScopeResult(
+                owner_uuid=action.requester_uuid,
+                owner_role=action.requester_role,
+            )
+        if not action.is_superadmin:
+            raise InvalidAPIParameters("Only superadmins may have user scopes.")
+        try:
+            (
+                owner_uuid,
+                owner_role,
+                owner_domain,
+            ) = await self._auth_repository.get_delegation_target_by_email(
+                action.owner_user_email,
+            )
+        except ValueError as e:
+            raise InvalidAPIParameters(str(e)) from e
+        try:
+            check_if_requester_is_eligible_to_act_as_target_user(
+                action.requester_role,
+                action.requester_domain,
+                owner_role,
+                owner_domain,
+            )
+        except RuntimeError as e:
+            raise GenericForbidden(str(e)) from e
+        return ResolveUserScopeResult(
+            owner_uuid=owner_uuid,
+            owner_role=owner_role,
         )
 
     async def _check_password_age(self, user: RowMapping, auth_config: AuthConfig | None) -> None:

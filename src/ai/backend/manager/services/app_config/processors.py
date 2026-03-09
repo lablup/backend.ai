@@ -7,6 +7,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
     DeleteDomainConfigAction,
@@ -43,7 +44,12 @@ class AppConfigProcessors(AbstractProcessorPackage):
     # Merged config processor
     get_merged_config: ActionProcessor[GetMergedAppConfigAction, GetMergedAppConfigActionResult]
 
-    def __init__(self, service: AppConfigService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: AppConfigService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         # Domain config processors
         self.get_domain_config = ActionProcessor(service.get_domain_config, action_monitors)
         self.upsert_domain_config = ActionProcessor(service.upsert_domain_config, action_monitors)

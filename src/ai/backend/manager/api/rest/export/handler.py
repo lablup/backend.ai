@@ -1,7 +1,7 @@
 """Export handler class using constructor dependency injection.
 
 All handlers use the new ApiHandler pattern: typed parameters
-(``BodyParam``, ``PathParam``, ``HeaderParam``, ``ExportCtx``, etc.)
+(``BodyParam``, ``PathParam``, ``HeaderParam``, etc.)
 are automatically extracted by ``_wrap_api_handler`` and responses are
 returned as ``APIResponse`` or ``web.StreamResponse`` objects.
 """
@@ -33,7 +33,8 @@ from ai.backend.common.dto.manager.export import (
     UserExportCSVRequest,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.dto.context import ExportCtx, RequestCtx
+from ai.backend.manager.config.unified import ExportConfig
+from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.dto.export import ExportFilenameHeader, ExportPathParam
 from ai.backend.manager.exporter.csv import CSVExporter
 from ai.backend.manager.exporter.stream import CSVExportStreamReader
@@ -47,7 +48,7 @@ from ai.backend.manager.services.export.actions import (
     GetReportAction,
     ListReportsAction,
 )
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.export.processors import ExportProcessors
 
 from .adapter import ExportAdapter
 
@@ -73,9 +74,10 @@ AUDIT_LOGS_REPORT_KEY = "audit-logs"
 class ExportHandler:
     """Export API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, export: ExportProcessors, export_config: ExportConfig) -> None:
+        self._export = export
         self._adapter = ExportAdapter()
+        self._export_config = export_config
 
     # ------------------------------------------------------------------
     # list_reports (GET /export/reports)
@@ -83,9 +85,7 @@ class ExportHandler:
 
     async def list_reports(self) -> APIResponse:
         """List available export reports."""
-        action_result = await self._processors.export.list_reports.wait_for_complete(
-            ListReportsAction()
-        )
+        action_result = await self._export.list_reports.wait_for_complete(ListReportsAction())
 
         reports = [
             ExportReportInfo(
@@ -117,7 +117,7 @@ class ExportHandler:
         path: PathParam[ExportPathParam],
     ) -> APIResponse:
         """Get a specific export report by key."""
-        action_result = await self._processors.export.get_report.wait_for_complete(
+        action_result = await self._export.get_report.wait_for_complete(
             GetReportAction(report_key=path.parsed.report_key)
         )
 
@@ -148,25 +148,26 @@ class ExportHandler:
         self,
         body: BodyParam[UserExportCSVRequest],
         header: HeaderParam[ExportFilenameHeader],
-        export_ctx: ExportCtx,
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
         """Export user data as CSV."""
-        report = export_ctx.repository.get_report(USERS_REPORT_KEY)
+        report_result = await self._export.get_report.wait_for_complete(
+            GetReportAction(report_key=USERS_REPORT_KEY)
+        )
         query = self._adapter.build_user_query(
-            report=report,
+            report=report_result.report,
             fields=body.parsed.fields,
             filter=body.parsed.filter,
             order=body.parsed.order,
-            max_rows=export_ctx.config.max_rows,
-            statement_timeout_sec=export_ctx.config.statement_timeout_sec,
+            max_rows=self._export_config.max_rows,
+            statement_timeout_sec=self._export_config.statement_timeout_sec,
         )
         action = ExportUsersCSVAction(
             query=query,
             encoding=body.parsed.encoding,
             filename=header.parsed.filename,
         )
-        action_result = await self._processors.export.export_users_csv.wait_for_complete(action)
+        action_result = await self._export.export_users_csv.wait_for_complete(action)
         return await self._build_csv_stream_response(request_ctx.request, action_result)
 
     # ------------------------------------------------------------------
@@ -177,25 +178,26 @@ class ExportHandler:
         self,
         body: BodyParam[SessionExportCSVRequest],
         header: HeaderParam[ExportFilenameHeader],
-        export_ctx: ExportCtx,
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
         """Export session data as CSV."""
-        report = export_ctx.repository.get_report(SESSIONS_REPORT_KEY)
+        report_result = await self._export.get_report.wait_for_complete(
+            GetReportAction(report_key=SESSIONS_REPORT_KEY)
+        )
         query = self._adapter.build_session_query(
-            report=report,
+            report=report_result.report,
             fields=body.parsed.fields,
             filter=body.parsed.filter,
             order=body.parsed.order,
-            max_rows=export_ctx.config.max_rows,
-            statement_timeout_sec=export_ctx.config.statement_timeout_sec,
+            max_rows=self._export_config.max_rows,
+            statement_timeout_sec=self._export_config.statement_timeout_sec,
         )
         action = ExportSessionsCSVAction(
             query=query,
             encoding=body.parsed.encoding,
             filename=header.parsed.filename,
         )
-        action_result = await self._processors.export.export_sessions_csv.wait_for_complete(action)
+        action_result = await self._export.export_sessions_csv.wait_for_complete(action)
         return await self._build_csv_stream_response(request_ctx.request, action_result)
 
     # ------------------------------------------------------------------
@@ -206,25 +208,26 @@ class ExportHandler:
         self,
         body: BodyParam[ProjectExportCSVRequest],
         header: HeaderParam[ExportFilenameHeader],
-        export_ctx: ExportCtx,
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
         """Export project data as CSV."""
-        report = export_ctx.repository.get_report(PROJECTS_REPORT_KEY)
+        report_result = await self._export.get_report.wait_for_complete(
+            GetReportAction(report_key=PROJECTS_REPORT_KEY)
+        )
         query = self._adapter.build_project_query(
-            report=report,
+            report=report_result.report,
             fields=body.parsed.fields,
             filter=body.parsed.filter,
             order=body.parsed.order,
-            max_rows=export_ctx.config.max_rows,
-            statement_timeout_sec=export_ctx.config.statement_timeout_sec,
+            max_rows=self._export_config.max_rows,
+            statement_timeout_sec=self._export_config.statement_timeout_sec,
         )
         action = ExportProjectsCSVAction(
             query=query,
             encoding=body.parsed.encoding,
             filename=header.parsed.filename,
         )
-        action_result = await self._processors.export.export_projects_csv.wait_for_complete(action)
+        action_result = await self._export.export_projects_csv.wait_for_complete(action)
         return await self._build_csv_stream_response(request_ctx.request, action_result)
 
     # ------------------------------------------------------------------
@@ -235,25 +238,26 @@ class ExportHandler:
         self,
         body: BodyParam[KeypairExportCSVRequest],
         header: HeaderParam[ExportFilenameHeader],
-        export_ctx: ExportCtx,
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
         """Export keypair data as CSV."""
-        report = export_ctx.repository.get_report(KEYPAIRS_REPORT_KEY)
+        report_result = await self._export.get_report.wait_for_complete(
+            GetReportAction(report_key=KEYPAIRS_REPORT_KEY)
+        )
         query = self._adapter.build_keypair_query(
-            report=report,
+            report=report_result.report,
             fields=body.parsed.fields,
             filter=None,
             order=None,
-            max_rows=export_ctx.config.max_rows,
-            statement_timeout_sec=export_ctx.config.statement_timeout_sec,
+            max_rows=self._export_config.max_rows,
+            statement_timeout_sec=self._export_config.statement_timeout_sec,
         )
         action = ExportKeypairsCSVAction(
             query=query,
             encoding=body.parsed.encoding,
             filename=header.parsed.filename,
         )
-        action_result = await self._processors.export.export_keypairs_csv.wait_for_complete(action)
+        action_result = await self._export.export_keypairs_csv.wait_for_complete(action)
         return await self._build_csv_stream_response(request_ctx.request, action_result)
 
     # ------------------------------------------------------------------
@@ -264,27 +268,26 @@ class ExportHandler:
         self,
         body: BodyParam[AuditLogExportCSVRequest],
         header: HeaderParam[ExportFilenameHeader],
-        export_ctx: ExportCtx,
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
         """Export audit log data as CSV."""
-        report = export_ctx.repository.get_report(AUDIT_LOGS_REPORT_KEY)
+        report_result = await self._export.get_report.wait_for_complete(
+            GetReportAction(report_key=AUDIT_LOGS_REPORT_KEY)
+        )
         query = self._adapter.build_audit_log_query(
-            report=report,
+            report=report_result.report,
             fields=body.parsed.fields,
             filter=body.parsed.filter,
             order=body.parsed.order,
-            max_rows=export_ctx.config.max_rows,
-            statement_timeout_sec=export_ctx.config.statement_timeout_sec,
+            max_rows=self._export_config.max_rows,
+            statement_timeout_sec=self._export_config.statement_timeout_sec,
         )
         action = ExportAuditLogsCSVAction(
             query=query,
             encoding=body.parsed.encoding,
             filename=header.parsed.filename,
         )
-        action_result = await self._processors.export.export_audit_logs_csv.wait_for_complete(
-            action
-        )
+        action_result = await self._export.export_audit_logs_csv.wait_for_complete(action)
         return await self._build_csv_stream_response(request_ctx.request, action_result)
 
     # ------------------------------------------------------------------

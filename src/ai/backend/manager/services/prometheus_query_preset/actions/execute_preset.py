@@ -17,7 +17,7 @@ class ExecutePresetAction(PrometheusQueryPresetAction):
     preset_id: UUID
     options: ExecutePresetOptions
     window: str | None
-    time_range: QueryTimeRange
+    time_range: QueryTimeRange | None
 
     @override
     def entity_id(self) -> str | None:

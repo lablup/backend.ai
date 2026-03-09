@@ -520,6 +520,11 @@ type AgentV2 implements Node
   Added in 26.2.0. List of kernels running on this agent with pagination support.
   """
   kernels(filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection!
+
+  """
+  Added in 26.3.0. List of sessions running on this agent with pagination support.
+  """
+  sessions(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
 }
 
 """
@@ -10351,6 +10356,12 @@ type Role implements Node
   createdAt: DateTime!
   updatedAt: DateTime!
   deletedAt: DateTime
+
+  """Added in 26.3.0. Permissions associated with this role."""
+  permissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection!
+
+  """Added in 26.3.0. Users assigned to this role."""
+  users(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
 }
 
 """Added in 26.3.0. RBAC role assignment (user-role association)"""
@@ -10407,6 +10418,8 @@ input RoleAssignmentFilter
 {
   roleId: UUID = null
   role: RoleAssignmentRoleNestedFilter = null
+  username: StringFilter = null
+  email: StringFilter = null
 }
 
 """Added in 26.3.0. Order by specification for role assignments"""
@@ -10421,6 +10434,8 @@ input RoleAssignmentOrderBy
 enum RoleAssignmentOrderField
   @join__type(graph: STRAWBERRY)
 {
+  USERNAME @join__enumValue(graph: STRAWBERRY)
+  EMAIL @join__enumValue(graph: STRAWBERRY)
   GRANTED_AT @join__enumValue(graph: STRAWBERRY)
 }
 

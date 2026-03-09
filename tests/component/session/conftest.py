@@ -3,7 +3,6 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -14,38 +13,30 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
+from ai.backend.manager.actions.validators import ActionValidators
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
 # which Pants cannot trace statically.
-from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api import auth as _auth_api
-from ai.backend.manager.api import session as _session_api
-from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.rest.auth.registry import register_auth_routes
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.session.handler import SessionHandler
 from ai.backend.manager.api.rest.session.registry import register_session_routes
-from ai.backend.manager.api.rest.types import ModuleRegistrar
-from ai.backend.manager.api.types import CleanupContext
+from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.repositories.repositories import Repositories
-from ai.backend.manager.repositories.types import RepositoryArgs
-from ai.backend.manager.server import (
-    background_task_ctx,
-    database_ctx,
-    event_hub_ctx,
-    event_producer_ctx,
-    message_queue_ctx,
-    monitoring_ctx,
-    redis_ctx,
-    storage_manager_ctx,
-)
-from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
-
-_SESSION_SERVER_SUBAPP_MODULES = (_auth_api, _session_api)
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.session.repository import SessionRepository
+from ai.backend.manager.services.agent.processors import AgentProcessors
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.session.processors import SessionProcessors
+from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 
 
 @dataclass
@@ -69,104 +60,70 @@ class SessionSeedData:
     domain_name: str
 
 
-@asynccontextmanager
-async def _session_domain_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    """Set up repositories and processors for session component tests.
-
-    Relies on the preceding cleanup contexts having already initialized:
-    - redis_ctx      -> root_ctx.valkey_* (all 8 clients)
-    - database_ctx   -> root_ctx.db
-    - monitoring_ctx -> root_ctx.error_monitor / stats_monitor
-    - storage_manager_ctx  -> root_ctx.storage_manager
-    - message_queue_ctx    -> root_ctx.message_queue
-    - event_producer_ctx   -> root_ctx.event_producer / event_fetcher
-    - event_hub_ctx        -> root_ctx.event_hub
-    - background_task_ctx  -> root_ctx.background_task_manager
-
-    agent_registry, scheduling_controller, and other agent-dependent services
-    are left as AsyncMock because they require live gRPC connections to real
-    agents, which are not available in component tests.
-    """
-    # _TestConfigProvider skips super().__init__() so _legacy_etcd_config_loader
-    # is never set.  The @server_status_required decorator (used by session
-    # handlers) calls config_provider._legacy_etcd_config_loader.get_manager_status()
-    # which is async.  Inject a MagicMock with an AsyncMock method so the check passes.
-    mock_legacy_loader = MagicMock()
-    mock_legacy_loader.get_manager_status = AsyncMock(return_value=ManagerStatus.RUNNING)
-    root_ctx.config_provider._legacy_etcd_config_loader = mock_legacy_loader
-
-    root_ctx.registry = AsyncMock()
-
-    # idle_checker_host.get_idle_check_report() must return a JSON-serializable
-    # value; the default AsyncMock return (another AsyncMock object) causes
-    # TypeError in web.json_response().
-    mock_idle_checker = AsyncMock()
-    mock_idle_checker.get_idle_check_report = AsyncMock(return_value={})
-
-    root_ctx.repositories = Repositories.create(
-        RepositoryArgs(
-            db=root_ctx.db,
-            storage_manager=root_ctx.storage_manager,
-            config_provider=root_ctx.config_provider,
-            valkey_stat_client=root_ctx.valkey_stat,
-            valkey_schedule_client=root_ctx.valkey_schedule,
-            valkey_image_client=root_ctx.valkey_image,
-            valkey_live_client=root_ctx.valkey_live,
-        )
+@pytest.fixture()
+async def session_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    agent_registry: AsyncMock,
+    background_task_manager: BackgroundTaskManager,
+    error_monitor: ErrorPluginContext,
+    appproxy_client_pool: AsyncMock,
+) -> SessionProcessors:
+    """Real SessionProcessors with real SessionService and SessionRepository."""
+    session_repo = SessionRepository(database_engine)
+    args = SessionServiceArgs(
+        agent_registry=agent_registry,
+        event_fetcher=AsyncMock(),
+        background_task_manager=background_task_manager,
+        event_hub=AsyncMock(),
+        error_monitor=error_monitor,
+        idle_checker_host=AsyncMock(),
+        session_repository=session_repo,
+        scheduling_controller=AsyncMock(),
+        appproxy_client_pool=appproxy_client_pool,
     )
-    root_ctx.processors = Processors.create(
-        ProcessorArgs(
-            service_args=ServiceArgs(
-                db=root_ctx.db,
-                repositories=root_ctx.repositories,
-                etcd=root_ctx.etcd,
-                config_provider=root_ctx.config_provider,
-                storage_manager=root_ctx.storage_manager,
-                valkey_stat_client=root_ctx.valkey_stat,
-                valkey_live=root_ctx.valkey_live,
-                valkey_artifact_client=root_ctx.valkey_artifact,
-                error_monitor=root_ctx.error_monitor,
-                event_fetcher=root_ctx.event_fetcher,
-                background_task_manager=root_ctx.background_task_manager,
-                event_hub=root_ctx.event_hub,
-                event_producer=root_ctx.event_producer,
-                agent_registry=AsyncMock(),
-                idle_checker_host=mock_idle_checker,
-                event_dispatcher=AsyncMock(),
-                hook_plugin_ctx=AsyncMock(),
-                scheduling_controller=AsyncMock(),
-                deployment_controller=AsyncMock(),
-                revision_generator_registry=AsyncMock(),
-                agent_cache=AsyncMock(),
-                notification_center=AsyncMock(),
-                appproxy_client_pool=AsyncMock(),
-                prometheus_client=AsyncMock(),
-            ),
-        ),
-        [],
+    service = SessionService(args)
+    return SessionProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
     )
-    yield
 
 
 @pytest.fixture()
-def server_module_registrars() -> list[ModuleRegistrar]:
+def agent_processors_mock() -> AgentProcessors:
+    """AgentProcessors with a mocked AgentService."""
+    return AgentProcessors(
+        service=AsyncMock(), action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
+
+
+@pytest.fixture()
+def vfolder_processors_mock() -> VFolderProcessors:
+    """VFolderProcessors with a mocked VFolderService."""
+    return VFolderProcessors(
+        service=AsyncMock(), action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    config_provider: ManagerConfigProvider,
+    auth_processors: AuthProcessors,
+    session_processors: SessionProcessors,
+    agent_processors_mock: AgentProcessors,
+    vfolder_processors_mock: VFolderProcessors,
+) -> list[RouteRegistry]:
     """Load only the modules required for session component tests."""
-    return [register_auth_routes, register_session_routes]
-
-
-@pytest.fixture()
-def server_cleanup_contexts() -> list[CleanupContext]:
-    """Provide cleanup contexts for session component tests."""
     return [
-        redis_ctx,
-        database_ctx,
-        monitoring_ctx,
-        storage_manager_ctx,
-        message_queue_ctx,
-        event_producer_ctx,
-        event_hub_ctx,
-        background_task_ctx,
-        _session_domain_ctx,
+        register_session_routes(
+            SessionHandler(
+                auth=auth_processors,
+                session=session_processors,
+                agent=agent_processors_mock,
+                vfolder=vfolder_processors_mock,
+                config_provider=config_provider,
+            ),
+            route_deps,
+        ),
     ]
 
 

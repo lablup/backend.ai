@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from functools import cached_property, partial
+from typing import TYPE_CHECKING
 
 from strawberry.dataloader import DataLoader
 
@@ -12,6 +13,7 @@ from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryDa
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryData,
+    DeploymentPolicyData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
@@ -40,7 +42,9 @@ from ai.backend.manager.data.session.types import SessionData, SessionScheduling
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
-from ai.backend.manager.services.processors import Processors
+
+if TYPE_CHECKING:
+    from ai.backend.manager.services.processors import Processors  # pants: no-infer-dep
 
 from .agent import load_agents_by_ids, load_container_counts
 from .artifact import load_artifacts_by_ids
@@ -50,6 +54,7 @@ from .container_registry import load_container_registries_by_ids
 from .deployment import (
     load_access_tokens_by_ids,
     load_auto_scaling_rules_by_ids,
+    load_deployment_policies_by_endpoint_ids,
     load_deployments_by_ids,
     load_replicas_by_ids,
     load_revisions_by_ids,
@@ -279,6 +284,14 @@ class DataLoaders:
         self,
     ) -> DataLoader[uuid.UUID, ModelDeploymentAccessTokenData | None]:
         return DataLoader(load_fn=partial(load_access_tokens_by_ids, self._processors.deployment))
+
+    @cached_property
+    def deployment_policy_by_endpoint_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, DeploymentPolicyData | None]:
+        return DataLoader(
+            load_fn=partial(load_deployment_policies_by_endpoint_ids, self._processors.deployment)
+        )
 
     @cached_property
     def session_history_loader(

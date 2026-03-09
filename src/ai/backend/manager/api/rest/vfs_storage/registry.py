@@ -7,17 +7,16 @@ from typing import TYPE_CHECKING
 from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
+from .handler import VFSStorageHandler
+
 if TYPE_CHECKING:
-    from ai.backend.manager.api.rest.types import ModuleDeps
+    from ai.backend.manager.api.rest.types import RouteDeps
 
 
-def register_vfs_storage_routes(deps: ModuleDeps) -> RouteRegistry:
+def register_vfs_storage_routes(handler: VFSStorageHandler, route_deps: RouteDeps) -> RouteRegistry:
     """Build the VFS storage sub-application."""
-    # Import handler inside function to avoid circular imports
-    from .handler import VFSStorageHandler
 
-    reg = RouteRegistry.create("vfs-storages", deps.cors_options)
-    handler = VFSStorageHandler()
+    reg = RouteRegistry.create("vfs-storages", route_deps.cors_options)
 
     reg.add(
         "POST",

@@ -6,9 +6,7 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from pathlib import PurePosixPath
-from typing import Any
 from uuid import UUID, uuid4
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -20,12 +18,12 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.dto.manager.deployment import (
     ClusterConfigDTO,
-    CreateDeploymentPolicyRequest,
     CreateDeploymentRequest,
     DeploymentDTO,
     DeploymentFilter,
     DeploymentOrder,
     DeploymentPolicyDTO,
+    DeploymentStrategyInput,
     ModelMountConfigDTO,
     ModelRuntimeConfigDTO,
     NetworkConfigDTO,
@@ -41,7 +39,7 @@ from ai.backend.common.dto.manager.deployment import (
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
-    UpdateDeploymentPolicyRequest,
+    UpsertDeploymentPolicyRequest,
 )
 from ai.backend.common.dto.manager.deployment.types import (
     DeploymentOrderField,
@@ -50,15 +48,13 @@ from ai.backend.common.dto.manager.deployment.types import (
     RouteOrderField,
 )
 from ai.backend.common.types import ClusterMode, RuntimeVariant
-from ai.backend.manager.api.adapter import BaseFilterAdapter
+from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.deployment.creator import (
     DeploymentPolicyConfig,
-    DeploymentPolicyCreator,
     ModelRevisionCreator,
     NewDeploymentCreator,
     VFolderMountsCreator,
 )
-from ai.backend.manager.data.deployment.modifier import DeploymentPolicyModifier
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
@@ -77,7 +73,9 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
+from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.deployment import IncompleteRevisionData
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -93,15 +91,16 @@ from ai.backend.manager.repositories.deployment.options import (
     RouteConditions,
     RouteOrders,
 )
-from ai.backend.manager.types import OptionalState
 
 __all__ = (
+    "AddRevisionAdapter",
     "CreateDeploymentAdapter",
     "CreateRevisionAdapter",
     "DeploymentAdapter",
     "DeploymentPolicyAdapter",
     "RevisionAdapter",
     "RouteAdapter",
+    "build_revision_creator",
 )
 
 
@@ -114,6 +113,11 @@ class DeploymentAdapter(BaseFilterAdapter):
         if data.revision:
             revision_adapter = RevisionAdapter()
             current_revision = revision_adapter.convert_to_dto(data.revision)
+
+        deployment_policy = None
+        if data.policy:
+            policy_adapter = DeploymentPolicyAdapter()
+            deployment_policy = policy_adapter.convert_to_dto(data.policy)
 
         return DeploymentDTO(
             id=data.id,
@@ -136,6 +140,7 @@ class DeploymentAdapter(BaseFilterAdapter):
             ),
             default_deployment_strategy=data.default_deployment_strategy,
             current_revision=current_revision,
+            deployment_policy=deployment_policy,
         )
 
     def build_querier(self, request: SearchDeploymentsRequest) -> BatchQuerier:
@@ -208,6 +213,9 @@ class RevisionAdapter(BaseFilterAdapter):
 
     def convert_to_dto(self, data: ModelRevisionData) -> RevisionDTO:
         """Convert ModelRevisionData to DTO."""
+        mount_config = data.model_mount_config
+        if mount_config.vfolder_id is None:
+            raise IncompleteRevisionData(f"Revision {data.id} has incomplete model mount config")
         return RevisionDTO(
             id=data.id,
             name=data.name,
@@ -223,9 +231,9 @@ class RevisionAdapter(BaseFilterAdapter):
                 runtime_variant=data.model_runtime_config.runtime_variant,
             ),
             model_mount_config=ModelMountConfigDTO(
-                vfolder_id=data.model_mount_config.vfolder_id or uuid4(),
-                mount_destination=data.model_mount_config.mount_destination or "",
-                definition_path=data.model_mount_config.definition_path,
+                vfolder_id=mount_config.vfolder_id,
+                mount_destination=mount_config.mount_destination,
+                definition_path=mount_config.definition_path,
             ),
             created_at=data.created_at,
             image_id=data.image_id,
@@ -295,7 +303,7 @@ class RouteAdapter(BaseFilterAdapter):
             session_id=str(data.session_id) if data.session_id else None,
             status=CommonRouteStatus(data.status.value),
             traffic_ratio=data.traffic_ratio,
-            created_at=data.created_at or datetime.now(tz=UTC),
+            created_at=data.created_at,
             revision_id=data.revision_id,
             traffic_status=CommonRouteTrafficStatus(data.traffic_status.value),
             error_data=data.error_data,
@@ -364,6 +372,73 @@ class RouteAdapter(BaseFilterAdapter):
         return OffsetPagination(limit=limit, offset=offset)
 
 
+def build_revision_creator(revision_input: RevisionInput) -> ModelRevisionCreator:
+    """Build ModelRevisionCreator from RevisionInput.
+
+    Shared by AddRevisionAdapter and CreateDeploymentAdapter to avoid
+    duplicated conversion logic.
+    """
+    resource_spec = ResourceSpec(
+        cluster_mode=ClusterMode(revision_input.cluster_config.mode),
+        cluster_size=revision_input.cluster_config.size,
+        resource_slots=dict(revision_input.resource_config.resource_slots),
+        resource_opts=(
+            dict(revision_input.resource_config.resource_opts)
+            if revision_input.resource_config.resource_opts
+            else None
+        ),
+    )
+
+    extra_mounts: list[MountInfo] = []
+    if revision_input.extra_mounts:
+        extra_mounts = [
+            MountInfo(
+                vfolder_id=mount.vfolder_id,
+                kernel_path=PurePosixPath(mount.mount_destination)
+                if mount.mount_destination
+                else None,
+            )
+            for mount in revision_input.extra_mounts
+        ]
+
+    mounts = VFolderMountsCreator(
+        model_vfolder_id=revision_input.model_mount_config.vfolder_id,
+        model_definition_path=revision_input.model_mount_config.definition_path,
+        model_mount_destination=revision_input.model_mount_config.mount_destination,
+        extra_mounts=extra_mounts,
+    )
+
+    execution = ExecutionSpec(
+        runtime_variant=RuntimeVariant(revision_input.model_runtime_config.runtime_variant),
+        inference_runtime_config=(
+            dict(revision_input.model_runtime_config.inference_runtime_config)
+            if revision_input.model_runtime_config.inference_runtime_config
+            else None
+        ),
+        environ=(
+            dict(revision_input.model_runtime_config.environ)
+            if revision_input.model_runtime_config.environ
+            else None
+        ),
+    )
+
+    return ModelRevisionCreator(
+        image_id=revision_input.image.id,
+        resource_spec=resource_spec,
+        mounts=mounts,
+        execution=execution,
+    )
+
+
+class AddRevisionAdapter:
+    """Adapter for converting add revision request to ModelRevisionCreator."""
+
+    @staticmethod
+    def build_revision_creator(revision_input: RevisionInput) -> ModelRevisionCreator:
+        """Build ModelRevisionCreator from revision input."""
+        return build_revision_creator(revision_input)
+
+
 class CreateDeploymentAdapter:
     """Adapter for converting create deployment request to creators."""
 
@@ -409,7 +484,7 @@ class CreateDeploymentAdapter:
         )
 
         # Build model revision creator
-        model_revision = self._build_revision_creator(request.initial_revision)
+        model_revision = build_revision_creator(request.initial_revision)
 
         # Build policy config
         policy = self._build_policy_config(request.default_deployment_strategy)
@@ -422,67 +497,9 @@ class CreateDeploymentAdapter:
             policy=policy,
         )
 
-    def _build_revision_creator(
-        self,
-        revision_input: RevisionInput,
-    ) -> ModelRevisionCreator:
-        """Build ModelRevisionCreator from revision input."""
-        # Build resource spec
-        resource_spec = ResourceSpec(
-            cluster_mode=ClusterMode(revision_input.cluster_config.mode),
-            cluster_size=revision_input.cluster_config.size,
-            resource_slots=dict(revision_input.resource_config.resource_slots),
-            resource_opts=(
-                dict(revision_input.resource_config.resource_opts)
-                if revision_input.resource_config.resource_opts
-                else None
-            ),
-        )
-
-        # Build extra mounts
-        extra_mounts: list[MountInfo] = []
-        if revision_input.extra_mounts:
-            extra_mounts = [
-                MountInfo(
-                    vfolder_id=mount.vfolder_id,
-                    kernel_path=PurePosixPath(mount.mount_destination or ""),
-                )
-                for mount in revision_input.extra_mounts
-            ]
-
-        # Build vfolder mounts creator
-        mounts = VFolderMountsCreator(
-            model_vfolder_id=revision_input.model_mount_config.vfolder_id,
-            model_definition_path=revision_input.model_mount_config.definition_path,
-            model_mount_destination=revision_input.model_mount_config.mount_destination,
-            extra_mounts=extra_mounts,
-        )
-
-        # Build execution spec
-        execution = ExecutionSpec(
-            runtime_variant=RuntimeVariant(revision_input.model_runtime_config.runtime_variant),
-            inference_runtime_config=(
-                dict(revision_input.model_runtime_config.inference_runtime_config)
-                if revision_input.model_runtime_config.inference_runtime_config
-                else None
-            ),
-            environ=(
-                dict(revision_input.model_runtime_config.environ)
-                if revision_input.model_runtime_config.environ
-                else None
-            ),
-        )
-
-        return ModelRevisionCreator(
-            image_id=revision_input.image.id,
-            resource_spec=resource_spec,
-            mounts=mounts,
-            execution=execution,
-        )
-
     def _build_policy_config(
         self,
-        strategy_input: Any,  # DeploymentStrategyInput
+        strategy_input: DeploymentStrategyInput,
     ) -> DeploymentPolicyConfig:
         """Build DeploymentPolicyConfig from strategy input."""
         strategy = DeploymentStrategy(strategy_input.type)
@@ -526,8 +543,7 @@ class CreateRevisionAdapter:
         Returns:
             ModelRevisionCreator for service layer
         """
-        deployment_adapter = CreateDeploymentAdapter()
-        return deployment_adapter._build_revision_creator(request)
+        return build_revision_creator(request)
 
 
 class DeploymentPolicyAdapter:
@@ -537,6 +553,7 @@ class DeploymentPolicyAdapter:
         """Convert DeploymentPolicyData to DTO."""
         return DeploymentPolicyDTO(
             id=data.id,
+            deployment_id=data.endpoint,
             strategy=data.strategy,
             strategy_spec=data.strategy_spec.model_dump(),
             rollback_on_failure=data.rollback_on_failure,
@@ -544,10 +561,10 @@ class DeploymentPolicyAdapter:
             updated_at=data.updated_at,
         )
 
-    def build_creator(
-        self, request: CreateDeploymentPolicyRequest, deployment_id: UUID
-    ) -> DeploymentPolicyCreator:
-        """Build DeploymentPolicyCreator from create request."""
+    def build_upserter(
+        self, request: UpsertDeploymentPolicyRequest, deployment_id: UUID
+    ) -> DeploymentPolicyUpserter:
+        """Build DeploymentPolicyUpserter from upsert request."""
         strategy = request.strategy
 
         strategy_spec: RollingUpdateSpec | BlueGreenSpec
@@ -571,40 +588,9 @@ class DeploymentPolicyAdapter:
             case _:
                 raise InvalidAPIParameters(f"Unsupported deployment strategy: {strategy}")
 
-        return DeploymentPolicyCreator(
+        return DeploymentPolicyUpserter(
             deployment_id=deployment_id,
             strategy=strategy,
             strategy_spec=strategy_spec,
             rollback_on_failure=request.rollback_on_failure,
-        )
-
-    def build_modifier(self, request: UpdateDeploymentPolicyRequest) -> DeploymentPolicyModifier:
-        """Build DeploymentPolicyModifier from update request."""
-        strategy: OptionalState[DeploymentStrategy] = OptionalState.nop()
-        strategy_spec: OptionalState[RollingUpdateSpec | BlueGreenSpec] = OptionalState.nop()
-        rollback_on_failure: OptionalState[bool] = OptionalState.nop()
-
-        if request.strategy is not None:
-            strategy = OptionalState.update(request.strategy)
-        if request.rollback_on_failure is not None:
-            rollback_on_failure = OptionalState.update(request.rollback_on_failure)
-        if request.rolling_update is not None:
-            strategy_spec = OptionalState.update(
-                RollingUpdateSpec(
-                    max_surge=request.rolling_update.max_surge,
-                    max_unavailable=request.rolling_update.max_unavailable,
-                )
-            )
-        elif request.blue_green is not None:
-            strategy_spec = OptionalState.update(
-                BlueGreenSpec(
-                    auto_promote=request.blue_green.auto_promote,
-                    promote_delay_seconds=request.blue_green.promote_delay_seconds,
-                )
-            )
-
-        return DeploymentPolicyModifier(
-            strategy=strategy,
-            strategy_spec=strategy_spec,
-            rollback_on_failure=rollback_on_failure,
         )

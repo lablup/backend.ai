@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.domain import (
     UpdateDomainRequest,
 )
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.api.adapter import BaseFilterAdapter
+from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.repositories.base import (

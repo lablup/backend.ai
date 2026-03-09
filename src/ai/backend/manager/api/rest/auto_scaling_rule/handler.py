@@ -50,7 +50,6 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_aut
     UpdateAutoScalingRuleAction,
 )
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
-from ai.backend.manager.services.processors import Processors
 
 from .adapter import AutoScalingRuleAdapter
 
@@ -60,17 +59,17 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class AutoScalingRuleHandler:
     """Auto-scaling rule API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, *, deployment: DeploymentProcessors | None) -> None:
+        self._deployment = deployment
         self._adapter = AutoScalingRuleAdapter()
 
     def _get_deployment_processors(self) -> DeploymentProcessors:
         """Get deployment processors, raising ServiceUnavailable if not available."""
-        if self._processors.deployment is None:
+        if self._deployment is None:
             raise web.HTTPServiceUnavailable(
                 reason="Deployment service is not available on this manager"
             )
-        return self._processors.deployment
+        return self._deployment
 
     async def create(
         self,

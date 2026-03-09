@@ -20,6 +20,7 @@ from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageCanonical, ImageID, SlotName
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
@@ -27,6 +28,7 @@ from ai.backend.manager.data.image.types import (
     ImageLabelsData,
     ImageListResult,
     ImageResourcesData,
+    RescanImagesResult,
     ResourceLimitInput,
 )
 from ai.backend.manager.errors.image import (
@@ -53,15 +55,20 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
     ForgetImageByIdAction,
 )
+from ai.backend.manager.services.image.actions.get_image_installed_agents import (
+    GetImageInstalledAgentsAction,
+)
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionUnknownImageReferenceError,
 )
+from ai.backend.manager.services.image.actions.preload_image import PreloadImageAction
 from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImageByIdAction,
     PurgeImagesAction,
     PurgeImagesKeyData,
 )
+from ai.backend.manager.services.image.actions.scan_image import ScanImageAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 from ai.backend.manager.services.image.actions.set_image_resource_limit import (
     SetImageResourceLimitByIdAction,
@@ -112,7 +119,7 @@ class ImageServiceBaseFixtures:
     @pytest.fixture
     def processors(self, image_service: ImageService) -> ImageProcessors:
         """Create ImageProcessors with mock ImageService."""
-        return ImageProcessors(image_service, [])
+        return ImageProcessors(image_service, [], MagicMock(spec=ActionValidators))
 
     @pytest.fixture
     def container_registry_id(self) -> uuid.UUID:
@@ -1088,3 +1095,165 @@ class TestSetImageResourceLimitById(ImageServiceBaseFixtures):
 
         with pytest.raises(ImageNotFound):
             await processors.set_image_resource_limit_by_id.wait_for_complete(action)
+
+
+class TestPreloadImage(ImageServiceBaseFixtures):
+    """Tests for ImageService.preload_image"""
+
+    async def test_preload_image_raises_not_implemented(
+        self,
+        processors: ImageProcessors,
+        image_data: ImageData,
+    ) -> None:
+        """PreloadImageAction currently raises NotImplementedError."""
+        action = PreloadImageAction(
+            image_ids=[image_data.id],
+            agents=["agent-001"],
+        )
+
+        with pytest.raises(NotImplementedError):
+            await processors.preload_image.wait_for_complete(action)
+
+    async def test_preload_image_empty_lists_raises_not_implemented(
+        self,
+        processors: ImageProcessors,
+    ) -> None:
+        """Empty image/agent lists still raises NotImplementedError."""
+        action = PreloadImageAction(image_ids=[], agents=[])
+
+        with pytest.raises(NotImplementedError):
+            await processors.preload_image.wait_for_complete(action)
+
+    async def test_preload_image_multiple_images_agents_raises_not_implemented(
+        self,
+        processors: ImageProcessors,
+    ) -> None:
+        """Multiple image/agent combinations raises NotImplementedError."""
+        action = PreloadImageAction(
+            image_ids=[ImageID(uuid.uuid4()), ImageID(uuid.uuid4())],
+            agents=["agent-001", "agent-002"],
+        )
+
+        with pytest.raises(NotImplementedError):
+            await processors.preload_image.wait_for_complete(action)
+
+
+class TestScanImage(ImageServiceBaseFixtures):
+    """Tests for ImageService.scan_image"""
+
+    async def test_scan_image_success(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+        image_data: ImageData,
+    ) -> None:
+        """Valid canonical/architecture returns ImageData with no errors."""
+        mock_image_repository.scan_image_by_identifier = AsyncMock(
+            return_value=RescanImagesResult(images=[image_data], errors=[])
+        )
+
+        action = ScanImageAction(
+            canonical=str(image_data.name),
+            architecture=image_data.architecture,
+        )
+
+        result = await processors.scan_image.wait_for_complete(action)
+
+        assert result.image == image_data
+        assert result.errors == []
+        mock_image_repository.scan_image_by_identifier.assert_called_once_with(
+            str(image_data.name), image_data.architecture
+        )
+
+    async def test_scan_image_with_errors(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+        image_data: ImageData,
+    ) -> None:
+        """Scan errors are included in the result errors list."""
+        scan_errors = ["Resource limit warning", "Label parse error"]
+        mock_image_repository.scan_image_by_identifier = AsyncMock(
+            return_value=RescanImagesResult(images=[image_data], errors=scan_errors)
+        )
+
+        action = ScanImageAction(
+            canonical=str(image_data.name),
+            architecture=image_data.architecture,
+        )
+
+        result = await processors.scan_image.wait_for_complete(action)
+
+        assert result.image == image_data
+        assert result.errors == scan_errors
+
+    async def test_scan_image_not_found(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+    ) -> None:
+        """Scanning non-existent image raises ImageNotFound."""
+        mock_image_repository.scan_image_by_identifier = AsyncMock(side_effect=ImageNotFound())
+
+        action = ScanImageAction(
+            canonical="non-existent-registry/project/image:tag",
+            architecture="x86_64",
+        )
+
+        with pytest.raises(ImageNotFound):
+            await processors.scan_image.wait_for_complete(action)
+
+
+class TestGetImageInstalledAgents(ImageServiceBaseFixtures):
+    """Tests for ImageService.get_image_installed_agents"""
+
+    async def test_single_image_returns_installed_agents(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+        image_data: ImageData,
+    ) -> None:
+        """Single image returns its installed agent list."""
+        agent_id_1 = AgentId("agent-001")
+        agent_id_2 = AgentId("agent-002")
+        mock_image_repository.get_image_installed_agents = AsyncMock(
+            return_value={image_data.id: {agent_id_1, agent_id_2}}
+        )
+
+        action = GetImageInstalledAgentsAction(image_ids=[image_data.id])
+
+        result = await processors.get_image_installed_agents.wait_for_complete(action)
+
+        assert result.data[image_data.id] == {agent_id_1, agent_id_2}
+        mock_image_repository.get_image_installed_agents.assert_called_once_with([image_data.id])
+
+    async def test_image_with_no_agents_returns_empty_set(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+        image_data: ImageData,
+    ) -> None:
+        """Image with no installed agents returns empty set."""
+        mock_image_repository.get_image_installed_agents = AsyncMock(
+            return_value={image_data.id: set()}
+        )
+
+        action = GetImageInstalledAgentsAction(image_ids=[image_data.id])
+
+        result = await processors.get_image_installed_agents.wait_for_complete(action)
+
+        assert result.data[image_data.id] == set()
+
+    async def test_nonexistent_image_returns_empty_result(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+    ) -> None:
+        """Non-existent image returns empty mapping."""
+        mock_image_repository.get_image_installed_agents = AsyncMock(return_value={})
+
+        action = GetImageInstalledAgentsAction(image_ids=[ImageID(uuid.uuid4())])
+
+        result = await processors.get_image_installed_agents.wait_for_complete(action)
+
+        assert result.data == {}
