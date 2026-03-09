@@ -149,7 +149,7 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
 
     @pytest.fixture
     def memory_cgroup_context(
-        self, cgroup_stat_context: MagicMock
+        self, cgroup_stat_context: MagicMock, tmp_path: Path
     ) -> Generator[MagicMock, None, None]:
         """CGROUP stat context with memory/io cgroup v2 path mocks and related patches."""
         ctx = cgroup_stat_context
@@ -171,8 +171,10 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
 
         ctx.agent.get_cgroup_path = mock_get_cgroup_path
 
+        sandbox_file = tmp_path / "fake_netns"
+        sandbox_file.touch()
         mock_container_data = {
-            "NetworkSettings": {"SandboxKey": "/var/run/docker/netns/fake"},
+            "NetworkSettings": {"SandboxKey": str(sandbox_file)},
         }
 
         with (
@@ -190,7 +192,6 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
             patch(
                 "ai.backend.agent.docker.intrinsic.current_loop",
             ) as mock_loop,
-            patch("pathlib.Path.exists", return_value=True),
         ):
             mock_container_instance = AsyncMock()
             mock_container_instance.show.return_value = mock_container_data
@@ -250,11 +251,13 @@ class TestMemoryPluginNamespaceValidation(BaseDockerIntrinsicTest):
     def _make_cgroup_context(
         self,
         cgroup_stat_context: MagicMock,
-        sandbox_key: str | None,
-        *,
-        ns_path_exists: bool = False,
+        sandbox_key: str,
     ) -> Generator[tuple[MagicMock, MagicMock], None, None]:
-        """Build a CGROUP stat context with configurable sandbox_key and path existence."""
+        """Build a CGROUP stat context with configurable sandbox_key.
+
+        Pass a real filesystem path for sandbox_key — an existing path
+        triggers netstat_ns, a non-existent one skips it.
+        """
         ctx = cgroup_stat_context
         ctx.agent.get_cgroup_version = MagicMock(return_value="2")
 
@@ -293,7 +296,6 @@ class TestMemoryPluginNamespaceValidation(BaseDockerIntrinsicTest):
             patch(
                 "ai.backend.agent.docker.intrinsic.current_loop",
             ) as mock_loop,
-            patch("pathlib.Path.exists", return_value=ns_path_exists),
         ):
             mock_netstat.return_value = {
                 "eth0": MagicMock(bytes_recv=4096, bytes_sent=8192),
@@ -308,12 +310,13 @@ class TestMemoryPluginNamespaceValidation(BaseDockerIntrinsicTest):
         self,
         memory_plugin: MemoryPlugin,
         cgroup_stat_context: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """When namespace path does not exist, net stats should be 0 but other stats collected."""
+        gone_path = tmp_path / "nonexistent_netns"
         with self._make_cgroup_context(
             cgroup_stat_context,
-            sandbox_key="/var/run/docker/netns/gone",
-            ns_path_exists=False,
+            sandbox_key=str(gone_path),
         ) as (ctx, mock_netstat):
             results = await memory_plugin.gather_container_measures(ctx, ["cid_001"])
             mock_netstat.assert_not_called()
@@ -332,7 +335,6 @@ class TestMemoryPluginNamespaceValidation(BaseDockerIntrinsicTest):
         with self._make_cgroup_context(
             cgroup_stat_context,
             sandbox_key="",
-            ns_path_exists=False,
         ) as (ctx, mock_netstat):
             results = await memory_plugin.gather_container_measures(ctx, ["cid_001"])
             mock_netstat.assert_not_called()
@@ -346,12 +348,14 @@ class TestMemoryPluginNamespaceValidation(BaseDockerIntrinsicTest):
         self,
         memory_plugin: MemoryPlugin,
         cgroup_stat_context: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """When namespace path exists, netstat_ns should be called and net stats collected."""
+        valid_path = tmp_path / "valid_netns"
+        valid_path.touch()
         with self._make_cgroup_context(
             cgroup_stat_context,
-            sandbox_key="/var/run/docker/netns/valid",
-            ns_path_exists=True,
+            sandbox_key=str(valid_path),
         ) as (ctx, mock_netstat):
             results = await memory_plugin.gather_container_measures(ctx, ["cid_001"])
             mock_netstat.assert_called()
