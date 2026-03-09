@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentStatusTransitions,
-    DeploymentSubStep,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
@@ -46,15 +45,6 @@ class DeploymentHandler:
             List of deployment statuses that this handler targets
         """
         raise NotImplementedError("Subclasses must implement target_statuses()")
-
-    @classmethod
-    def target_sub_step(cls) -> DeploymentSubStep | None:
-        """Get the target sub-step filter for this handler.
-
-        Returns None by default, meaning no sub-step filtering.
-        DEPLOYING sub-step handlers override this to filter by their sub-step.
-        """
-        return None
 
     @classmethod
     @abstractmethod

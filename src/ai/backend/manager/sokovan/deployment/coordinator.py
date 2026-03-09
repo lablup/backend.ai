@@ -68,8 +68,9 @@ from .handlers import (
     build_lifecycle_notification_event,
 )
 from .strategy.blue_green import BlueGreenStrategy
-from .strategy.evaluator import DeploymentStrategyEvaluator, DeploymentStrategyRegistry
+from .strategy.evaluator import DeploymentStrategyEvaluator
 from .strategy.rolling_update import RollingUpdateStrategy
+from .strategy.types import DeploymentStrategyRegistry
 from .types import DeploymentExecutionResult, DeploymentLifecycleType
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -273,13 +274,13 @@ class DeploymentCoordinator:
                         self._config_provider.config.manager.session_schedule_lock_lifetime
                     )
                     await stack.enter_async_context(self._lock_factory(lock_id, lock_lifetime))
-                await self._run_handler(handler, lifecycle_type)
+                await self._run_handler(handler, lifecycle_type, sub_step=None)
         else:
             # Lifecycle with sub-steps — run pre-step then each sub-step handler
             await self._run_pre_step(lifecycle_type)
             for sub_step in sub_steps:
                 handler = self._registry.handlers[(lifecycle_type, sub_step)]
-                await self._run_handler(handler, lifecycle_type)
+                await self._run_handler(handler, lifecycle_type, sub_step=sub_step)
 
     async def _run_pre_step(self, lifecycle_type: DeploymentLifecycleType) -> None:
         """Run the optional pre-step for a lifecycle type."""
@@ -291,11 +292,12 @@ class DeploymentCoordinator:
         self,
         handler: DeploymentHandler,
         lifecycle_type: DeploymentLifecycleType,
+        sub_step: DeploymentSubStep | None,
     ) -> None:
         """Run a single handler: fetch filtered deployments → execute → transitions → post_process."""
         deployments = await self._deployment_repository.get_endpoints_by_statuses(
             handler.target_statuses(),
-            sub_step=handler.target_sub_step(),
+            sub_step=sub_step,
         )
         if not deployments:
             log.trace("No deployments to process for handler: {}", handler.name())
@@ -359,7 +361,10 @@ class DeploymentCoordinator:
             ]
             batch_updaters.append(
                 BatchUpdater(
-                    spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=next_lifecycle),
+                    spec=EndpointLifecycleBatchUpdaterSpec(
+                        lifecycle_stage=next_lifecycle,
+                        sub_step=sub_status,
+                    ),
                     conditions=[
                         DeploymentConditions.by_ids(endpoint_ids),
                         DeploymentConditions.by_lifecycle_stages(target_statuses),
@@ -401,7 +406,10 @@ class DeploymentCoordinator:
             ]
             batch_updaters.append(
                 BatchUpdater(
-                    spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=failure_lifecycle),
+                    spec=EndpointLifecycleBatchUpdaterSpec(
+                        lifecycle_stage=failure_lifecycle,
+                        sub_step=failure_sub_status,
+                    ),
                     conditions=[
                         DeploymentConditions.by_ids(endpoint_ids),
                         DeploymentConditions.by_lifecycle_stages(target_statuses),

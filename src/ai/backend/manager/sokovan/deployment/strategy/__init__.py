@@ -2,10 +2,10 @@
 
 from .blue_green import BlueGreenStrategy
 from .rolling_update import RollingUpdateStrategy
-from .types import BaseDeploymentStrategy
+from .types import AbstractDeploymentStrategy
 
 __all__ = [
-    "BaseDeploymentStrategy",
+    "AbstractDeploymentStrategy",
     "BlueGreenStrategy",
     "RollingUpdateStrategy",
 ]

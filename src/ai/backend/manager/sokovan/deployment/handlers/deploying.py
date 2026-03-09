@@ -1,8 +1,8 @@
 """Handlers for DEPLOYING sub-steps (BEP-1049).
 
 All sub-step handlers are registered flat in the coordinator alongside other
-lifecycle handlers.  Each handler declares its ``target_sub_step()`` so the
-coordinator can dispatch by sub-step.
+lifecycle handlers.  The coordinator dispatches by sub-step using the
+``(lifecycle_type, sub_step)`` registry key.
 
 Before the sub-step handlers run, the coordinator executes
 ``DeployingEvaluatePreStep`` to evaluate the strategy FSM, update the
@@ -214,11 +214,6 @@ class DeployingProvisioningHandler(DeployingInProgressHandler):
 
     @classmethod
     @override
-    def target_sub_step(cls) -> DeploymentSubStep | None:
-        return DeploymentSubStep.PROVISIONING
-
-    @classmethod
-    @override
     def status_transitions(cls) -> DeploymentStatusTransitions:
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(
@@ -239,11 +234,6 @@ class DeployingProgressingHandler(DeployingInProgressHandler):
     @override
     def name(cls) -> str:
         return "deploying-progressing"
-
-    @classmethod
-    @override
-    def target_sub_step(cls) -> DeploymentSubStep | None:
-        return DeploymentSubStep.PROGRESSING
 
     @classmethod
     @override
@@ -286,11 +276,6 @@ class DeployingCompletedHandler(DeploymentHandler):
     @override
     def target_statuses(cls) -> list[EndpointLifecycle]:
         return [EndpointLifecycle.DEPLOYING]
-
-    @classmethod
-    @override
-    def target_sub_step(cls) -> DeploymentSubStep | None:
-        return DeploymentSubStep.COMPLETED
 
     @classmethod
     @override
@@ -339,11 +324,6 @@ class DeployingRolledBackHandler(DeploymentHandler):
     @override
     def target_statuses(cls) -> list[EndpointLifecycle]:
         return [EndpointLifecycle.DEPLOYING]
-
-    @classmethod
-    @override
-    def target_sub_step(cls) -> DeploymentSubStep | None:
-        return DeploymentSubStep.ROLLED_BACK
 
     @classmethod
     @override

@@ -10,6 +10,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentSubStep,
@@ -58,7 +59,7 @@ class EvaluationResult:
     route_changes: RouteChanges = field(default_factory=RouteChanges)
 
 
-class BaseDeploymentStrategy(ABC):
+class AbstractDeploymentStrategy(ABC):
     """Base interface for deployment strategy cycle evaluation.
 
     Each concrete strategy (Blue-Green, Rolling Update) implements this interface.
@@ -74,3 +75,29 @@ class BaseDeploymentStrategy(ABC):
         deployment: DeploymentInfo,
         routes: Sequence[RouteInfo],
     ) -> CycleEvaluationResult: ...
+
+
+@dataclass(frozen=True)
+class DeploymentStrategyRegistryEntry:
+    """Maps a deployment strategy to its implementation class and expected spec type."""
+
+    strategy_cls: type[AbstractDeploymentStrategy]
+    spec_type: type[BaseModel]
+
+
+class DeploymentStrategyRegistry:
+    """Registry of deployment strategy implementations."""
+
+    def __init__(self) -> None:
+        self._entries: dict[DeploymentStrategy, DeploymentStrategyRegistryEntry] = {}
+
+    def register(
+        self,
+        strategy: DeploymentStrategy,
+        strategy_cls: type[AbstractDeploymentStrategy],
+        spec_type: type[BaseModel],
+    ) -> None:
+        self._entries[strategy] = DeploymentStrategyRegistryEntry(strategy_cls, spec_type)
+
+    def get(self, strategy: DeploymentStrategy) -> DeploymentStrategyRegistryEntry | None:
+        return self._entries.get(strategy)

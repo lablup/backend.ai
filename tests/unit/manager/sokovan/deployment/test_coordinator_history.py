@@ -165,7 +165,6 @@ def mock_handler_with_success(
     mock.name = MagicMock(return_value="check_pending")
     mock.lock_id = None
     mock.target_statuses = MagicMock(return_value=[EndpointLifecycle.PENDING])
-    mock.target_sub_step = MagicMock(return_value=None)
     mock.status_transitions = MagicMock(
         return_value=DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.CREATED),
@@ -191,7 +190,6 @@ def mock_handler_with_failure(
     mock.name = MagicMock(return_value="check_pending")
     mock.lock_id = None
     mock.target_statuses = MagicMock(return_value=[EndpointLifecycle.PENDING])
-    mock.target_sub_step = MagicMock(return_value=None)
     mock.status_transitions = MagicMock(
         return_value=DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.CREATED),
@@ -215,7 +213,6 @@ def mock_handler_with_empty_result() -> MagicMock:
     mock.name = MagicMock(return_value="check_pending")
     mock.lock_id = None
     mock.target_statuses = MagicMock(return_value=[EndpointLifecycle.PENDING])
-    mock.target_sub_step = MagicMock(return_value=None)
     mock.status_transitions = MagicMock(
         return_value=DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.CREATED),
@@ -312,8 +309,8 @@ class TestProcessDeploymentLifecycle:
         mock_handler_with_success: MagicMock,
     ) -> None:
         """History is recorded when handler returns success."""
-        coordinator_with_pending_deployments._deployment_handlers = {
-            DeploymentLifecycleType.CHECK_PENDING: [mock_handler_with_success]
+        coordinator_with_pending_deployments._registry.handlers = {
+            (DeploymentLifecycleType.CHECK_PENDING, None): mock_handler_with_success
         }
 
         await coordinator_with_pending_deployments.process_deployment_lifecycle(
@@ -329,8 +326,8 @@ class TestProcessDeploymentLifecycle:
         mock_handler_with_failure: MagicMock,
     ) -> None:
         """History is recorded when handler returns failure."""
-        coordinator_with_pending_deployments._deployment_handlers = {
-            DeploymentLifecycleType.CHECK_PENDING: [mock_handler_with_failure]
+        coordinator_with_pending_deployments._registry.handlers = {
+            (DeploymentLifecycleType.CHECK_PENDING, None): mock_handler_with_failure
         }
 
         await coordinator_with_pending_deployments.process_deployment_lifecycle(
@@ -358,8 +355,8 @@ class TestProcessDeploymentLifecycle:
         mock_handler_with_empty_result: MagicMock,
     ) -> None:
         """History is not recorded when handler returns empty result."""
-        coordinator_with_pending_deployments._deployment_handlers = {
-            DeploymentLifecycleType.CHECK_PENDING: [mock_handler_with_empty_result]
+        coordinator_with_pending_deployments._registry.handlers = {
+            (DeploymentLifecycleType.CHECK_PENDING, None): mock_handler_with_empty_result
         }
 
         await coordinator_with_pending_deployments.process_deployment_lifecycle(
