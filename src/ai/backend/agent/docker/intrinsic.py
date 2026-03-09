@@ -72,6 +72,9 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # Note that psutil's linux implementation automatically filters out "non-device" filesystems by
 # checking /proc/filesystems so we don't have to put all the details virtual filesystems like
 # "sockfs", "debugfs", etc.
+_CONTAINER_STAT_TIMEOUT: float = 2.0
+
+# The list of pruned fstype when checking the filesystem usage statistics.
 pruned_disk_types = frozenset([
     "vfat",
     "lxcfs",
@@ -280,7 +283,7 @@ class CPUPlugin(AbstractComputePlugin):
         async def api_impl(container_id: str) -> float | None:
             container = DockerContainer(self._docker, id=container_id)
             try:
-                async with async_timeout.timeout(2.0):
+                async with async_timeout.timeout(_CONTAINER_STAT_TIMEOUT):
                     ret = await fetch_api_stats(container)
             except TimeoutError:
                 return None
@@ -712,7 +715,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 return None
             container = DockerContainer(self._docker, id=container_id)
             try:
-                async with async_timeout.timeout(2.0):
+                async with async_timeout.timeout(_CONTAINER_STAT_TIMEOUT):
                     data = await container.show()
                     sandbox_key = data["NetworkSettings"]["SandboxKey"]
             except TimeoutError:
@@ -724,7 +727,7 @@ class MemoryPlugin(AbstractComputePlugin):
             net_rx_bytes = 0
             net_tx_bytes = 0
             try:
-                async with async_timeout.timeout(2.0):
+                async with async_timeout.timeout(_CONTAINER_STAT_TIMEOUT):
                     nstat = await netstat_ns(sandbox_key)
             except TimeoutError:
                 log.warning(
@@ -761,7 +764,7 @@ class MemoryPlugin(AbstractComputePlugin):
         ) -> tuple[int, int, int, int, int, int, int] | None:
             container = DockerContainer(self._docker, id=container_id)
             try:
-                async with async_timeout.timeout(2.0):
+                async with async_timeout.timeout(_CONTAINER_STAT_TIMEOUT):
                     ret = await fetch_api_stats(container)
             except TimeoutError:
                 return None
