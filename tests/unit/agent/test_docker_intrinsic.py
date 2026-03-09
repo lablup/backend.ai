@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import subprocess
 import sys
 import time
@@ -409,3 +410,171 @@ class TestNetstatNsWork:
             future = pool.submit(netstat_ns_work, Path("/dev/null"))
             with pytest.raises(OSError):
                 future.result()
+
+
+class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
+    """Tests for timeout protection and error isolation in MemoryPlugin sysfs_impl."""
+
+    @pytest.fixture
+    def memory_plugin(self) -> MemoryPlugin:
+        plugin = MemoryPlugin.__new__(MemoryPlugin)
+        plugin.local_config = {"agent": {"docker-mode": "default"}}
+        plugin._docker = AsyncMock()
+        return plugin
+
+    def _make_cgroup_mocks(self) -> tuple[MagicMock, MagicMock]:
+        """Create memory and io cgroup v2 path mocks."""
+        mem_path = MagicMock()
+        mem_stat = MagicMock()
+        mem_stat.read_text.return_value = "inactive_file 0\n"
+        mem_path.__truediv__ = MagicMock(return_value=mem_stat)
+        io_path = MagicMock()
+        io_stat = MagicMock()
+        io_stat.read_text.return_value = ""
+        io_path.__truediv__ = MagicMock(return_value=io_stat)
+        return mem_path, io_path
+
+    async def test_slow_container_show_times_out(
+        self,
+        memory_plugin: MemoryPlugin,
+        cgroup_stat_context: MagicMock,
+    ) -> None:
+        """When container.show() hangs, the call times out and returns None
+        for that container while other containers succeed."""
+        ctx = cgroup_stat_context
+        ctx.agent.get_cgroup_version = MagicMock(return_value="2")
+        mem_path, io_path = self._make_cgroup_mocks()
+        ctx.agent.get_cgroup_path = lambda subsys, cid: mem_path if subsys == "memory" else io_path
+
+        mock_container_data = {
+            "NetworkSettings": {"SandboxKey": "/var/run/docker/netns/fake"},
+        }
+
+        call_count = 0
+
+        async def slow_show_for_first(*args: Any, **kwargs: Any) -> dict:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # First container hangs longer than the 2s timeout
+                await asyncio.sleep(10)
+            return mock_container_data
+
+        with (
+            patch(
+                "ai.backend.agent.docker.intrinsic.DockerContainer",
+            ) as mock_container_cls,
+            patch("ai.backend.agent.docker.intrinsic.read_sysfs", return_value=1048576),
+            patch("ai.backend.agent.docker.intrinsic.netstat_ns", return_value={}),
+            patch("ai.backend.agent.docker.intrinsic.current_loop") as mock_loop,
+        ):
+            mock_container_instance = AsyncMock()
+            mock_container_instance.show.side_effect = slow_show_for_first
+            mock_container_cls.return_value = mock_container_instance
+            mock_loop.return_value.run_in_executor = AsyncMock(return_value=0)
+
+            container_ids = ["slow_container", "normal_container"]
+            results = await memory_plugin.gather_container_measures(ctx, container_ids)
+
+        # Should still return measurements — the normal container's data is collected
+        mem_measurement = results[0]
+        assert "slow_container" not in mem_measurement.per_container
+        assert "normal_container" in mem_measurement.per_container
+
+    async def test_slow_netstat_ns_times_out(
+        self,
+        memory_plugin: MemoryPlugin,
+        cgroup_stat_context: MagicMock,
+    ) -> None:
+        """When netstat_ns() hangs, the call times out and returns None
+        for that container while other containers succeed."""
+        ctx = cgroup_stat_context
+        ctx.agent.get_cgroup_version = MagicMock(return_value="2")
+        mem_path, io_path = self._make_cgroup_mocks()
+        ctx.agent.get_cgroup_path = lambda subsys, cid: mem_path if subsys == "memory" else io_path
+
+        mock_container_data = {
+            "NetworkSettings": {"SandboxKey": "/var/run/docker/netns/fake"},
+        }
+
+        call_count = 0
+
+        async def slow_netstat_for_first(*args: Any, **kwargs: Any) -> dict:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                await asyncio.sleep(10)
+            return {}
+
+        with (
+            patch(
+                "ai.backend.agent.docker.intrinsic.DockerContainer",
+            ) as mock_container_cls,
+            patch("ai.backend.agent.docker.intrinsic.read_sysfs", return_value=1048576),
+            patch(
+                "ai.backend.agent.docker.intrinsic.netstat_ns",
+                side_effect=slow_netstat_for_first,
+            ),
+            patch("ai.backend.agent.docker.intrinsic.current_loop") as mock_loop,
+        ):
+            mock_container_instance = AsyncMock()
+            mock_container_instance.show.return_value = mock_container_data
+            mock_container_cls.return_value = mock_container_instance
+            mock_loop.return_value.run_in_executor = AsyncMock(return_value=0)
+
+            container_ids = ["slow_container", "normal_container"]
+            results = await memory_plugin.gather_container_measures(ctx, container_ids)
+
+        mem_measurement = results[0]
+        assert "slow_container" not in mem_measurement.per_container
+        assert "normal_container" in mem_measurement.per_container
+
+    async def test_gather_isolates_container_failures(
+        self,
+        memory_plugin: MemoryPlugin,
+        cgroup_stat_context: MagicMock,
+    ) -> None:
+        """When one container raises an exception, other containers
+        are still collected thanks to return_exceptions=True."""
+        ctx = cgroup_stat_context
+        ctx.agent.get_cgroup_version = MagicMock(return_value="2")
+
+        call_count = 0
+
+        def make_cgroup_path(subsys: str, cid: str) -> MagicMock:
+            nonlocal call_count
+            if cid == "broken_container":
+                # Simulate a broken cgroup path that raises on read
+                path = MagicMock()
+                broken_file = MagicMock()
+                broken_file.read_text.side_effect = OSError("cgroup path gone")
+                path.__truediv__ = MagicMock(return_value=broken_file)
+                return path
+            mem_path, io_path = self._make_cgroup_mocks()
+            return mem_path if subsys == "memory" else io_path
+
+        ctx.agent.get_cgroup_path = make_cgroup_path
+
+        mock_container_data = {
+            "NetworkSettings": {"SandboxKey": "/var/run/docker/netns/fake"},
+        }
+
+        with (
+            patch(
+                "ai.backend.agent.docker.intrinsic.DockerContainer",
+            ) as mock_container_cls,
+            patch("ai.backend.agent.docker.intrinsic.read_sysfs", return_value=1048576),
+            patch("ai.backend.agent.docker.intrinsic.netstat_ns", return_value={}),
+            patch("ai.backend.agent.docker.intrinsic.current_loop") as mock_loop,
+        ):
+            mock_container_instance = AsyncMock()
+            mock_container_instance.show.return_value = mock_container_data
+            mock_container_cls.return_value = mock_container_instance
+            mock_loop.return_value.run_in_executor = AsyncMock(return_value=0)
+
+            container_ids = ["broken_container", "healthy_container"]
+            results = await memory_plugin.gather_container_measures(ctx, container_ids)
+
+        mem_measurement = results[0]
+        assert "broken_container" not in mem_measurement.per_container
+        assert "healthy_container" in mem_measurement.per_container
