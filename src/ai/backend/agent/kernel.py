@@ -50,6 +50,7 @@ from ai.backend.common.json import load_json
 from ai.backend.common.types import (
     AgentId,
     CommitStatus,
+    ContainerId,
     KernelId,
     ServicePort,
     SessionId,
@@ -182,7 +183,7 @@ class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
     kernel_id: KernelId
     agent_id: AgentId
     network_id: str
-    container_id: str | None
+    container_id: ContainerId | None
     image: ImageRef
     resource_spec: KernelResourceSpec
     service_ports: list[ServicePort]
@@ -232,6 +233,10 @@ class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
         self.container_id = None
         self.state = KernelLifecycleStatus.PREPARING
         self.session_type = session_type
+
+    def set_container_id(self, cid: ContainerId) -> None:
+        self.container_id = cid
+        self["container_id"] = cid
 
     async def init(self, event_producer: EventProducer) -> None:
         log.debug(

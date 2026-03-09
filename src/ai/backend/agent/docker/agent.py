@@ -1310,7 +1310,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 network = await docker.networks.get(name)
                 await network.connect({"Container": container._id})
 
-            kernel_obj.container_id = container._id
+            kernel_obj.set_container_id(ContainerId(cast(str, container._id)))
             container_network_info: ContainerNetworkInfo | None = None
             if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
                 try:

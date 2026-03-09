@@ -1425,11 +1425,8 @@ class AbstractAgent[
             kernel_obj = self.kernel_registry.get(ev.kernel_id)
             if kernel_obj is not None:
                 kernel_obj.state = KernelLifecycleStatus.RUNNING
-                # Sync container_id instance attribute with data dict
-                # to ensure collect_container_stat() can access it correctly
                 if ev.container_id is not None:
-                    kernel_obj.container_id = ev.container_id
-                    kernel_obj["container_id"] = ev.container_id
+                    kernel_obj.set_container_id(ev.container_id)
         log.info("Kernel {0} started", ev.kernel_id)
 
     async def _handle_destroy_event(self, ev: ContainerLifecycleEvent) -> None:
@@ -1777,9 +1774,7 @@ class AbstractAgent[
                     # This will be overwritten by create_kernel() soon, but
                     # updating here improves consistency of kernel_id to container_id
                     # mapping earlier.
-                    kernel_obj["container_id"] = container_id
-                    # Sync instance attribute to match UserDict data dict
-                    kernel_obj.container_id = container_id
+                    kernel_obj.set_container_id(container_id)
                 elif container_id != kernel_obj["container_id"]:
                     # This should not happen!
                     log.warning(
@@ -3034,7 +3029,7 @@ class AbstractAgent[
                         )
                         cid = e.container_id
                         async with self.registry_lock:
-                            self.kernel_registry[ctx.kernel_id]["container_id"] = cid
+                            self.kernel_registry[ctx.kernel_id].set_container_id(ContainerId(cid))
                         await self.inject_container_lifecycle_event(
                             kernel_id,
                             session_id,
@@ -3071,11 +3066,10 @@ class AbstractAgent[
                     )
                     async with self.registry_lock:
                         self.kernel_registry[kernel_id].data.update(container_data)
-                        # Sync container_id instance attribute with data dict to avoid shadowing
                         if "container_id" in container_data:
-                            self.kernel_registry[kernel_id].container_id = container_data[
-                                "container_id"
-                            ]
+                            self.kernel_registry[kernel_id].set_container_id(
+                                container_data["container_id"]
+                            )
                     await kernel_obj.init(self.event_producer)
                     log.info(
                         "create_kernel(kernel:{}, session:{}, container:{}) kernel object initialized",
