@@ -232,9 +232,9 @@ class CUDAPlugin(AbstractComputePlugin):
                     util_total += dev_stat.gpu_util
                     util_stats[dev_id] = Measurement(Decimal(dev_stat.gpu_util), Decimal(100))
             except ImportError:
-                log.warning("gather_node_measure(): NVML library is not found")
+                log.warning("gather_node_measures(): NVML library is not found")
             except LibraryError as e:
-                log.warning("gather_node_measure(): {!r}", e)
+                log.warning("gather_node_measures(): {!r}", e)
         return [
             NodeMeasurement(
                 MetricKey("cuda_mem"),
@@ -259,7 +259,84 @@ class CUDAPlugin(AbstractComputePlugin):
         ctx: StatContext,
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
-        return []
+        mem_stats: dict[str, int] = {}
+        mem_sizes: dict[str, int] = {}
+        util_stats: dict[str, Decimal] = {}
+        number_of_devices_per_container: dict[str, int] = {}
+
+        if self.enabled:
+            dev_count = libnvml.get_device_count()
+            mem_stats_by_device_id: dict[DeviceId, Measurement] = {}
+            util_stats_by_device_id: dict[DeviceId, Measurement] = {}
+            try:
+                dev_count = libnvml.get_device_count()
+                for dev_id in map(lambda idx: DeviceId(str(idx)), range(dev_count)):
+                    if dev_id in self.device_mask:
+                        continue
+                    dev_stat = libnvml.get_device_stats(int(dev_id))
+                    mem_stats_by_device_id[dev_id] = Measurement(
+                        Decimal(dev_stat.mem_used), Decimal(dev_stat.mem_total)
+                    )
+                    util_stats_by_device_id[dev_id] = Measurement(
+                        Decimal(dev_stat.gpu_util), Decimal(100)
+                    )
+
+                for cid in container_ids:
+                    async with aiodocker.Docker() as docker:
+                        container_info = await docker.containers.get(cid)
+                    nvidia_device_reqs = [
+                        x
+                        for x in container_info["HostConfig"]["DeviceRequests"]
+                        if x["Driver"] == "nvidia"
+                    ]
+                    if not nvidia_device_reqs:
+                        continue
+
+                    mem_stats[cid] = 0
+                    mem_sizes[cid] = 0
+                    util_stats[cid] = Decimal("0")
+                    number_of_devices_per_container[cid] = 0
+
+                    for device_id in nvidia_device_reqs[0]["DeviceIDs"]:
+                        mem_stat = mem_stats_by_device_id[DeviceId(device_id)]
+                        util_stat = util_stats_by_device_id[DeviceId(device_id)]
+                        mem_stats[cid] += int(mem_stat.value)
+                        mem_sizes[cid] += int(mem_stat.capacity or 0)
+                        util_stats[cid] += Decimal(util_stat.value)
+                        number_of_devices_per_container[cid] += 1
+            except ImportError:
+                log.warning("gather_container_measures(): NVML library is not found")
+            except LibraryError as e:
+                log.warning("gather_container_measures(): {!r}", e)
+
+        return [
+            ContainerMeasurement(
+                MetricKey("cuda_mem"),
+                MetricTypes.USAGE,
+                unit_hint="bytes",
+                stats_filter=frozenset({"max"}),
+                per_container={
+                    cid: Measurement(
+                        Decimal(usage),
+                        Decimal(mem_sizes[cid]),
+                    )
+                    for cid, usage in mem_stats.items()
+                },
+            ),
+            ContainerMeasurement(
+                MetricKey("cuda_util"),
+                MetricTypes.USAGE,
+                unit_hint="percent",
+                stats_filter=frozenset({"avg", "max"}),
+                per_container={
+                    cid: Measurement(
+                        util,
+                        Decimal(number_of_devices_per_container[cid] * 100),
+                    )
+                    for cid, util in util_stats.items()
+                },
+            ),
+        ]
 
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
