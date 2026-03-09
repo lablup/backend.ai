@@ -296,20 +296,22 @@ class DeployingProgressingHandler(DeploymentHandler):
         completed: list[DeploymentInfo] = []
         rolled_back: list[DeploymentInfo] = []
 
-        for d in deployments:
-            if d.sub_step == DeploymentSubStep.COMPLETED:
-                completed.append(d)
-            elif d.sub_step == DeploymentSubStep.ROLLED_BACK:
-                rolled_back.append(d)
-            # PROGRESSING: still in progress — not included in result
+        for deployment in deployments:
+            match deployment.sub_step:
+                case DeploymentSubStep.COMPLETED:
+                    completed.append(deployment)
+                case DeploymentSubStep.ROLLED_BACK:
+                    rolled_back.append(deployment)
+                case _:
+                    pass  # PROGRESSING: still in progress — not included in result
 
         if completed:
-            endpoint_ids = {d.id for d in completed}
+            endpoint_ids = {deployment.id for deployment in completed}
             await self._deployment_repo.complete_deployment_revision_swap(endpoint_ids)
             log.info("Swapped revision for {} completed deployments", len(endpoint_ids))
 
         if rolled_back:
-            endpoint_ids = {d.id for d in rolled_back}
+            endpoint_ids = {deployment.id for deployment in rolled_back}
             await self._deployment_repo.clear_deploying_revision(endpoint_ids)
             log.info("Cleared deploying_revision for {} rolled-back deployments", len(endpoint_ids))
 
@@ -317,11 +319,11 @@ class DeployingProgressingHandler(DeploymentHandler):
             successes=completed,
             errors=[
                 DeploymentExecutionError(
-                    deployment_info=d,
+                    deployment_info=deployment,
                     reason="Deployment rolled back — all new routes failed",
                     error_detail="Strategy FSM determined rollback",
                 )
-                for d in rolled_back
+                for deployment in rolled_back
             ],
         )
 
