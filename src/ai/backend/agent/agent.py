@@ -3070,6 +3070,11 @@ class AbstractAgent[
                     )
                     async with self.registry_lock:
                         self.kernel_registry[kernel_id].data.update(container_data)
+                        # Sync container_id instance attribute with data dict to avoid shadowing
+                        if "container_id" in container_data:
+                            self.kernel_registry[kernel_id].container_id = container_data[
+                                "container_id"
+                            ]
                     await kernel_obj.init(self.event_producer)
                     log.info(
                         "create_kernel(kernel:{}, session:{}, container:{}) kernel object initialized",
