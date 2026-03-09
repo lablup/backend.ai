@@ -268,18 +268,16 @@ def add_revision_cmd(
     from ai.backend.client.v2.registry import BackendAIClientRegistry
     from ai.backend.common.dto.manager.deployment import AddRevisionRequest
 
-    config_file_path = Path(config_file)
-    with config_file_path.open(encoding="utf-8") as f:
-        config_data = json.load(f)
-
-    request = AddRevisionRequest.model_validate(config_data)
-
     async def _run() -> None:
         api_config = get_config()
         v2_config = ClientConfig.from_v1_config(api_config)
         auth = HMACAuth(api_config.access_key, api_config.secret_key)
         registry = await BackendAIClientRegistry.create(v2_config, auth)
         try:
+            config_file_path = Path(config_file)
+            with config_file_path.open(encoding="utf-8") as f:
+                config_data = json.load(f)
+            request = AddRevisionRequest.model_validate(config_data)
             result = await registry.deployment.add_revision(deployment_id, request)
             print_done(f"Revision added: {result.revision.id}")
             print(json.dumps(result.revision.model_dump(mode="json"), indent=2, default=str))
