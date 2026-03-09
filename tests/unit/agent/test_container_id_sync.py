@@ -8,6 +8,7 @@ and the UserDict data dict in a single call.
 from __future__ import annotations
 
 from unittest.mock import Mock
+from uuid import uuid4
 
 import pytest
 
@@ -20,8 +21,8 @@ from ai.backend.common.types import AgentId, ContainerId, KernelId, SessionId
 @pytest.fixture
 def mock_kernel_obj() -> DockerKernel:
     """Create a mock kernel object for testing."""
-    kernel_id = KernelId("test-kernel-id")
-    session_id = SessionId("test-session-id")
+    kernel_id = KernelId(uuid4())
+    session_id = SessionId(uuid4())
     agent_id = AgentId("test-agent-id")
 
     ownership_data = KernelOwnershipData(
@@ -54,9 +55,7 @@ def mock_kernel_obj() -> DockerKernel:
 class TestSetContainerId:
     """Tests for AbstractKernel.set_container_id()."""
 
-    def test_sets_both_instance_attr_and_data_dict(
-        self, mock_kernel_obj: DockerKernel
-    ) -> None:
+    def test_sets_both_instance_attr_and_data_dict(self, mock_kernel_obj: DockerKernel) -> None:
         """set_container_id() should update both the instance attribute and data dict."""
         assert mock_kernel_obj.container_id is None
         assert "container_id" not in mock_kernel_obj.data
@@ -68,9 +67,7 @@ class TestSetContainerId:
         assert mock_kernel_obj["container_id"] == cid
         assert mock_kernel_obj.data["container_id"] == cid
 
-    def test_second_call_updates_both_sources(
-        self, mock_kernel_obj: DockerKernel
-    ) -> None:
+    def test_second_call_updates_both_sources(self, mock_kernel_obj: DockerKernel) -> None:
         """A second set_container_id() call should update both sources to the new value."""
         first = ContainerId("first-container-111")
         second = ContainerId("second-container-222")
