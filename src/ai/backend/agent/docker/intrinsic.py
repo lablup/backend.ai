@@ -809,9 +809,14 @@ class MemoryPlugin(AbstractComputePlugin):
         tasks = []
         for cid in container_ids:
             tasks.append(asyncio.create_task(impl(cid)))
-        results = await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
         for cid, result in zip(container_ids, results, strict=True):
             if result is None:
+                continue
+            if isinstance(result, Exception):
+                log.warning(
+                    "gather_container_measures: error collecting stats for {}: {}", cid, result
+                )
                 continue
             per_container_mem_used_bytes[cid] = Measurement(
                 Decimal(result[0]), capacity=Decimal(result[1])
