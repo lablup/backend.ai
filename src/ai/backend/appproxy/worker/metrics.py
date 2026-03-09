@@ -394,16 +394,6 @@ async def collect_inference_metric(root_ctx: RootContext, _interval: float) -> N
                                     sum=replica_inference_metrics.sum,
                                 )
 
-        # Clean up stale replica metrics for routes no longer in circuit.route_info
-        for circuit in inference_circuits:
-            active_route_ids = {r.route_id for r in circuit.route_info if r.route_id}
-            for metric_key in list(circuit._replica_inference_metrics.keys()):
-                stale_ids = (
-                    set(circuit._replica_inference_metrics[metric_key].keys()) - active_route_ids
-                )
-                for stale_id in stale_ids:
-                    del circuit._replica_inference_metrics[metric_key][stale_id]
-
         # push to the Redis server
         app_metrics_updates = {
             circuit.endpoint_id: {
