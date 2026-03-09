@@ -2151,7 +2151,7 @@ class DeploymentDBSource:
 
             return row.to_deployment_info()
 
-    async def start_deploying_revision(
+    async def set_deploying_revision(
         self,
         endpoint_id: uuid.UUID,
         revision_id: uuid.UUID,
