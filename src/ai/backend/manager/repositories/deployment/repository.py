@@ -1244,6 +1244,24 @@ class DeploymentRepository:
         """Bulk-update the sub_step column for multiple endpoints."""
         await self._db_source.update_sub_steps(sub_step_map)
 
+    @deployment_repository_resilience.apply()
+    async def get_last_deployment_histories(
+        self,
+        deployment_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, DeploymentHistoryRow]:
+        """Get last history records for multiple deployments.
+
+        Returns the most recent history record for each deployment. The caller
+        should compare history.phase with the current phase to determine
+        if attempts should be used or reset to 0.
+        """
+        return await self._db_source.get_last_deployment_histories(deployment_ids)
+
+    @deployment_repository_resilience.apply()
+    async def get_db_now(self) -> datetime:
+        """Get current database server time."""
+        return await self._db_source.get_db_now()
+
     # ===================
     # Route operations
     # ===================

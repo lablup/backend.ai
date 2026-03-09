@@ -716,6 +716,28 @@ class DeploymentDBSource:
         rows = result.scalars().all()
         return {row.deployment_id: row for row in rows}
 
+    async def get_last_deployment_histories(
+        self,
+        deployment_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, DeploymentHistoryRow]:
+        """Get last history records for multiple deployments (regardless of phase).
+
+        Returns the most recent history record for each deployment. The caller
+        should compare history.phase with the current phase to determine
+        if attempts should be used or reset to 0.
+        """
+        if not deployment_ids:
+            return {}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            return await self._get_last_deployment_histories_bulk(db_sess, deployment_ids)
+
+    async def get_db_now(self) -> datetime:
+        """Get current database server time."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            result = await db_sess.execute(sa.select(sa.func.now()))
+            return result.scalar_one()
+
     async def delete_endpoint_with_routes(
         self,
         endpoint_id: uuid.UUID,

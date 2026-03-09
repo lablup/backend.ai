@@ -188,7 +188,7 @@ class DeployingInProgressHandler(DeploymentHandler):
     @override
     def status_transitions(cls) -> DeploymentStatusTransitions:
         # Stay in DEPLOYING — no transition.
-        return DeploymentStatusTransitions(success=None, failure=None)
+        return DeploymentStatusTransitions()
 
     @override
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
@@ -231,7 +231,6 @@ class DeployingProvisioningHandler(DeployingInProgressHandler):
                 lifecycle=EndpointLifecycle.DEPLOYING,
                 sub_status=DeploymentSubStep.PROVISIONING,
             ),
-            failure=None,
         )
 
 
@@ -286,9 +285,12 @@ class DeployingProgressingHandler(DeploymentHandler):
     @classmethod
     @override
     def status_transitions(cls) -> DeploymentStatusTransitions:
+        ready = DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY)
         return DeploymentStatusTransitions(
-            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
-            failure=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
+            success=ready,
+            need_retry=ready,
+            expired=ready,
+            give_up=ready,
         )
 
     @override

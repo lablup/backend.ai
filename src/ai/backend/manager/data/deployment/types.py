@@ -194,15 +194,20 @@ class DeploymentLifecycleStatus:
 class DeploymentStatusTransitions:
     """Status transitions for deployment handlers.
 
-    Deployment handlers only have success/failure outcomes (no expired/give_up).
+    Mirrors the session-side ``StatusTransitions`` pattern with failure
+    classification into need_retry / expired / give_up.
 
     Attributes:
         success: Target lifecycle when handler succeeds, None means no change
-        failure: Target lifecycle when handler fails, None means no change
+        need_retry: Target lifecycle when handler fails but can retry
+        expired: Target lifecycle when time elapsed in current state
+        give_up: Target lifecycle when retry count exceeded
     """
 
     success: DeploymentLifecycleStatus | None = None
-    failure: DeploymentLifecycleStatus | None = None
+    need_retry: DeploymentLifecycleStatus | None = None
+    expired: DeploymentLifecycleStatus | None = None
+    give_up: DeploymentLifecycleStatus | None = None
 
 
 @dataclass(frozen=True)
@@ -371,6 +376,8 @@ class DeploymentInfo:
     policy: DeploymentPolicyData | None = None
     deploying_revision_id: UUID | None = None
     sub_step: DeploymentSubStep | None = None
+    phase_attempts: int = 0
+    phase_started_at: datetime | None = None
 
     def target_revision(self) -> ModelRevisionSpec | None:
         if self.model_revisions:
