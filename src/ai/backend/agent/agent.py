@@ -1425,6 +1425,10 @@ class AbstractAgent[
             kernel_obj = self.kernel_registry.get(ev.kernel_id)
             if kernel_obj is not None:
                 kernel_obj.state = KernelLifecycleStatus.RUNNING
+                # Sync container_id instance attribute with data dict
+                # to ensure collect_container_stat() can access it correctly
+                if ev.container_id is not None:
+                    kernel_obj.container_id = ev.container_id
         log.info("Kernel {0} started", ev.kernel_id)
 
     async def _handle_destroy_event(self, ev: ContainerLifecycleEvent) -> None:
