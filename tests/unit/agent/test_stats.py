@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -93,7 +94,7 @@ class TestMovingStatistics:
         assert stats.rate == case.expected_rate
 
 
-def _make_stat_context(computers: dict) -> StatContext:
+def _make_stat_context(computers: dict[str, MagicMock]) -> StatContext:
     """Create a minimal StatContext with mocked agent for testing collect_container_stat."""
     mock_agent = MagicMock()
     mock_agent.kernel_registry = {}
@@ -124,7 +125,9 @@ class TestPluginTimeout:
         """When one plugin hangs beyond the timeout, it raises TimeoutError
         while other plugins return their results normally."""
 
-        async def _fast_plugin(ctx, container_ids):
+        async def _fast_plugin(
+            ctx: StatContext, container_ids: Sequence[str]
+        ) -> Sequence[ContainerMeasurement]:
             return [
                 ContainerMeasurement(
                     key=MetricKey("cpu_util"),
@@ -133,7 +136,9 @@ class TestPluginTimeout:
                 )
             ]
 
-        async def _hanging_plugin(ctx, container_ids):
+        async def _hanging_plugin(
+            ctx: StatContext, container_ids: Sequence[str]
+        ) -> Sequence[ContainerMeasurement]:
             await asyncio.sleep(3600)  # hang "forever"
             return []
 
@@ -158,7 +163,9 @@ class TestPluginTimeout:
             per_container={},
         )
 
-        async def _normal_plugin(ctx, container_ids):
+        async def _normal_plugin(
+            ctx: StatContext, container_ids: Sequence[str]
+        ) -> Sequence[ContainerMeasurement]:
             return [measurement]
 
         computer_a = _make_computer(AsyncMock(side_effect=_normal_plugin))
