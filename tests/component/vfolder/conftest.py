@@ -4,7 +4,7 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 import sqlalchemy as sa
@@ -21,6 +21,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -108,7 +109,11 @@ def vfolder_processors(
         valkey_stat_client=valkey_clients.stat,
     )
     return VFolderProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service,
+        action_monitors=[],
+        validators=ActionValidators(
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+        ),
     )
 
 
@@ -127,7 +132,11 @@ def vfolder_file_processors(
         user_repository=user_repository,
     )
     return VFolderFileProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service,
+        action_monitors=[],
+        validators=ActionValidators(
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+        ),
     )
 
 
@@ -144,7 +153,11 @@ def vfolder_invite_processors(
         user_repository=user_repository,
     )
     return VFolderInviteProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service,
+        action_monitors=[],
+        validators=ActionValidators(
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+        ),
     )
 
 
@@ -161,7 +174,11 @@ def vfolder_sharing_processors(
         user_repository=user_repository,
     )
     return VFolderSharingProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service,
+        action_monitors=[],
+        validators=ActionValidators(
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+        ),
     )
 
 
