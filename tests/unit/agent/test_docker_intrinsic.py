@@ -190,11 +190,7 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
             patch(
                 "ai.backend.agent.docker.intrinsic.current_loop",
             ) as mock_loop,
-            patch(
-                "asyncio.to_thread",
-                new_callable=AsyncMock,
-                return_value=True,
-            ),
+            patch("pathlib.Path.exists", return_value=True),
         ):
             mock_container_instance = AsyncMock()
             mock_container_instance.show.return_value = mock_container_data
@@ -297,11 +293,7 @@ class TestMemoryPluginNamespaceValidation(BaseDockerIntrinsicTest):
             patch(
                 "ai.backend.agent.docker.intrinsic.current_loop",
             ) as mock_loop,
-            patch(
-                "asyncio.to_thread",
-                new_callable=AsyncMock,
-                return_value=ns_path_exists,
-            ),
+            patch("pathlib.Path.exists", return_value=ns_path_exists),
         ):
             mock_netstat.return_value = {
                 "eth0": MagicMock(bytes_recv=4096, bytes_sent=8192),

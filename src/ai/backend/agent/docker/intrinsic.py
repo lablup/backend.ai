@@ -723,7 +723,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 )
             else:
                 ns_path = Path(sandbox_key)
-                if not await asyncio.to_thread(ns_path.exists):
+                if not ns_path.exists():
                     log.warning(
                         "MemoryPlugin: network namespace path does not exist for container"
                         " {0} (sandbox_key={1!r}), skipping net stat collection",
