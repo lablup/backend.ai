@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
     CheckAndTransitStatusActionResult,
@@ -165,7 +166,12 @@ class SessionProcessors(AbstractProcessorPackage):
         CheckAndTransitStatusAction, CheckAndTransitStatusActionResult
     ]
 
-    def __init__(self, service: SessionService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: SessionService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.commit_session = ActionProcessor(service.commit_session, action_monitors)
         self.complete = ActionProcessor(service.complete, action_monitors)
         self.convert_session_to_image = ActionProcessor(

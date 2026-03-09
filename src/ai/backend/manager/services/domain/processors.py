@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.domain.actions.create_domain import (
     CreateDomainAction,
     CreateDomainActionResult,
@@ -54,7 +55,12 @@ class DomainProcessors(AbstractProcessorPackage):
     search_domains: ActionProcessor[SearchDomainsAction, SearchDomainsActionResult]
     search_rg_domains: ActionProcessor[SearchRGDomainsAction, SearchRGDomainsActionResult]
 
-    def __init__(self, service: DomainService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: DomainService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.create_domain_node = ActionProcessor(service.create_domain_node, action_monitors)
         self.modify_domain_node = ActionProcessor(service.modify_domain_node, action_monitors)
         self.create_domain = ActionProcessor(service.create_domain, action_monitors)

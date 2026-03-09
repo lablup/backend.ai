@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.export.handler import ExportHandler
 from ai.backend.manager.api.rest.export.registry import register_export_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -22,7 +23,9 @@ def export_processors(database_engine: ExtendedAsyncSAEngine) -> ExportProcessor
     registry = ExportReportRegistry.create_default()
     repo = ExportRepository(db_source, registry)
     service = ExportService(repo)
-    return ExportProcessors(service=service, action_monitors=[])
+    return ExportProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()

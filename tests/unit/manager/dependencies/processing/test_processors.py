@@ -3,6 +3,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.dependencies.processing.processors import (
     ProcessorsDependency,
     ProcessorsProviderInput,
@@ -30,6 +31,7 @@ class TestProcessorsDependency:
             action_monitors=mock_monitors,
             event_hub=MagicMock(),
             event_fetcher=MagicMock(),
+            validators=MagicMock(spec=ActionValidators),
         )
 
         async with dependency.provide(processors_input) as processors:

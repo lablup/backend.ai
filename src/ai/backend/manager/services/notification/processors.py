@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
     CreateChannelAction,
@@ -56,7 +57,12 @@ class NotificationProcessors(AbstractProcessorPackage):
         ProcessNotificationAction, ProcessNotificationActionResult
     ]
 
-    def __init__(self, service: NotificationService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: NotificationService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.create_channel = ActionProcessor(service.create_channel, action_monitors)
         self.search_channels = ActionProcessor(service.search_channels, action_monitors)
         self.get_channel = ActionProcessor(service.get_channel, action_monitors)

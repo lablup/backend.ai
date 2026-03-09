@@ -19,6 +19,7 @@ from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.hub import EventHub
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.model_serving.types import MutationResult
@@ -183,6 +184,7 @@ class ModelServingCRUDBaseFixtures:
         return ModelServingProcessors(
             service=model_serving_service,
             action_monitors=[mock_action_monitor],
+            validators=MagicMock(spec=ActionValidators),
         )
 
     @pytest.fixture

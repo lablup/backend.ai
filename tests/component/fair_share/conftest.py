@@ -3,11 +3,13 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.fair_share.handler import FairShareAPIHandler
 from ai.backend.manager.api.rest.fair_share.registry import register_fair_share_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -32,21 +34,27 @@ from ai.backend.manager.services.scaling_group.service import ScalingGroupServic
 def fair_share_processors(database_engine: ExtendedAsyncSAEngine) -> FairShareProcessors:
     repo = FairShareRepository(database_engine)
     service = FairShareService(repo)
-    return FairShareProcessors(service=service, action_monitors=[])
+    return FairShareProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
 def resource_usage_processors(database_engine: ExtendedAsyncSAEngine) -> ResourceUsageProcessors:
     repo = ResourceUsageHistoryRepository(database_engine)
     service = ResourceUsageService(repo)
-    return ResourceUsageProcessors(service=service, action_monitors=[])
+    return ResourceUsageProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
 def scaling_group_processors(database_engine: ExtendedAsyncSAEngine) -> ScalingGroupProcessors:
     repo = ScalingGroupRepository(database_engine)
     service = ScalingGroupService(repo, appproxy_client_pool=None)
-    return ScalingGroupProcessors(service=service, action_monitors=[])
+    return ScalingGroupProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()

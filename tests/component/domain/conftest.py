@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.domain import (
     CreateDomainResponse,
     PurgeDomainRequest,
 )
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.domain.handler import DomainHandler
@@ -35,7 +36,9 @@ DomainFactory = Callable[..., Coroutine[Any, Any, CreateDomainResponse]]
 def domain_processors(database_engine: ExtendedAsyncSAEngine) -> DomainProcessors:
     repo = DomainRepository(database_engine)
     service = DomainService(repo)
-    return DomainProcessors(service=service, action_monitors=[])
+    return DomainProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()

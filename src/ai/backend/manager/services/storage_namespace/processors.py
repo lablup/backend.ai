@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.storage_namespace.actions.get_all import (
     GetAllNamespacesAction,
     GetAllNamespacesActionResult,
@@ -36,7 +37,10 @@ class StorageNamespaceProcessors(AbstractProcessorPackage):
     ]
 
     def __init__(
-        self, service: StorageNamespaceService, action_monitors: list[ActionMonitor]
+        self,
+        service: StorageNamespaceService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
     ) -> None:
         self.register = ActionProcessor(service.register, action_monitors)
         self.unregister = ActionProcessor(service.unregister, action_monitors)

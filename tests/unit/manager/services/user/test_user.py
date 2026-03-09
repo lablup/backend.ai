@@ -13,6 +13,7 @@ import pytest
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserInfoContext
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -74,6 +75,7 @@ class TestUserServiceCompatibility:
         return UserProcessors(
             user_service=user_service,
             action_monitors=[mock_dependencies["action_monitor"]],
+            validators=MagicMock(spec=ActionValidators),
         )
 
     async def test_create_user_action_structure(

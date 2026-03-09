@@ -16,6 +16,7 @@ from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -557,89 +558,116 @@ class Processors(AbstractProcessorPackage):
     events: EventsProcessors
 
     @classmethod
-    def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
+    def create(
+        cls,
+        args: ProcessorArgs,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> Self:
         services = Services.create(args.service_args)
-        agent_processors = AgentProcessors(services.agent, action_monitors)
-        app_config_processors = AppConfigProcessors(services.app_config, action_monitors)
-        domain_processors = DomainProcessors(services.domain, action_monitors)
-        dotfile_processors = DotfileProcessors(services.dotfile, action_monitors)
-        error_log_processors = ErrorLogProcessors(services.error_log, action_monitors)
-        etcd_config_processors = EtcdConfigProcessors(services.etcd_config, action_monitors)
-        export_processors = ExportProcessors(services.export, action_monitors)
-        fair_share_processors = FairShareProcessors(services.fair_share, action_monitors)
-        group_processors = GroupProcessors(services.group, action_monitors)
-        user_processors = UserProcessors(services.user, action_monitors)
-        image_processors = ImageProcessors(services.image, action_monitors)
-        container_registry_processors = ContainerRegistryProcessors(
-            services.container_registry, action_monitors
+        agent_processors = AgentProcessors(services.agent, action_monitors, validators)
+        app_config_processors = AppConfigProcessors(
+            services.app_config, action_monitors, validators
         )
-        vfolder_processors = VFolderProcessors(services.vfolder, action_monitors)
-        vfolder_file_processors = VFolderFileProcessors(services.vfolder_file, action_monitors)
+        domain_processors = DomainProcessors(services.domain, action_monitors, validators)
+        dotfile_processors = DotfileProcessors(services.dotfile, action_monitors, validators)
+        error_log_processors = ErrorLogProcessors(services.error_log, action_monitors, validators)
+        etcd_config_processors = EtcdConfigProcessors(
+            services.etcd_config, action_monitors, validators
+        )
+        export_processors = ExportProcessors(services.export, action_monitors, validators)
+        fair_share_processors = FairShareProcessors(
+            services.fair_share, action_monitors, validators
+        )
+        group_processors = GroupProcessors(services.group, action_monitors, validators)
+        user_processors = UserProcessors(services.user, action_monitors, validators)
+        image_processors = ImageProcessors(services.image, action_monitors, validators)
+        container_registry_processors = ContainerRegistryProcessors(
+            services.container_registry, action_monitors, validators
+        )
+        vfolder_processors = VFolderProcessors(services.vfolder, action_monitors, validators)
+        vfolder_file_processors = VFolderFileProcessors(
+            services.vfolder_file, action_monitors, validators
+        )
         vfolder_invite_processors = VFolderInviteProcessors(
-            services.vfolder_invite, action_monitors
+            services.vfolder_invite, action_monitors, validators
         )
         vfolder_sharing_processors = VFolderSharingProcessors(
-            services.vfolder_sharing, action_monitors
+            services.vfolder_sharing, action_monitors, validators
         )
-        session_processors = SessionProcessors(services.session, action_monitors)
+        session_processors = SessionProcessors(services.session, action_monitors, validators)
         keypair_resource_policy_processors = KeypairResourcePolicyProcessors(
-            services.keypair_resource_policy, action_monitors
+            services.keypair_resource_policy, action_monitors, validators
         )
-        manager_admin_processors = ManagerAdminProcessors(services.manager_admin, action_monitors)
+        manager_admin_processors = ManagerAdminProcessors(
+            services.manager_admin, action_monitors, validators
+        )
         user_resource_policy_processors = UserResourcePolicyProcessors(
-            services.user_resource_policy, action_monitors
+            services.user_resource_policy, action_monitors, validators
         )
         project_resource_policy_processors = ProjectResourcePolicyProcessors(
-            services.project_resource_policy, action_monitors
+            services.project_resource_policy, action_monitors, validators
         )
         prometheus_query_preset_processors = PrometheusQueryPresetProcessors(
-            services.prometheus_query_preset, action_monitors
+            services.prometheus_query_preset, action_monitors, validators
         )
         resource_preset_processors = ResourcePresetProcessors(
-            services.resource_preset, action_monitors
+            services.resource_preset, action_monitors, validators
         )
-        resource_slot_processors = ResourceSlotProcessors(services.resource_slot, action_monitors)
+        resource_slot_processors = ResourceSlotProcessors(
+            services.resource_slot, action_monitors, validators
+        )
         resource_usage_processors = ResourceUsageProcessors(
-            services.resource_usage, action_monitors
+            services.resource_usage, action_monitors, validators
         )
-        scaling_group_processors = ScalingGroupProcessors(services.scaling_group, action_monitors)
-        model_serving_processors = ModelServingProcessors(services.model_serving, action_monitors)
+        scaling_group_processors = ScalingGroupProcessors(
+            services.scaling_group, action_monitors, validators
+        )
+        model_serving_processors = ModelServingProcessors(
+            services.model_serving, action_monitors, validators
+        )
         model_serving_auto_scaling_processors = ModelServingAutoScalingProcessors(
-            services.model_serving_auto_scaling, action_monitors
+            services.model_serving_auto_scaling, action_monitors, validators
         )
         utilization_metric_processors = UtilizationMetricProcessors(
-            services.utilization_metric, action_monitors
+            services.utilization_metric, action_monitors, validators
         )
-        auth = AuthProcessors(services.auth, action_monitors)
-        notification_processors = NotificationProcessors(services.notification, action_monitors)
+        auth = AuthProcessors(services.auth, action_monitors, validators)
+        notification_processors = NotificationProcessors(
+            services.notification, action_monitors, validators
+        )
         permission_controller_processors = PermissionControllerProcessors(
-            services.permission_controller, action_monitors
+            services.permission_controller, action_monitors, validators
         )
         object_storage_processors = ObjectStorageProcessors(
-            services.object_storage, action_monitors
+            services.object_storage, action_monitors, validators
         )
-        vfs_storage_processors = VFSStorageProcessors(services.vfs_storage, action_monitors)
-        artifact_processors = ArtifactProcessors(services.artifact, action_monitors)
+        vfs_storage_processors = VFSStorageProcessors(
+            services.vfs_storage, action_monitors, validators
+        )
+        artifact_processors = ArtifactProcessors(services.artifact, action_monitors, validators)
         artifact_registry_processors = ArtifactRegistryProcessors(
-            services.artifact_registry, action_monitors
+            services.artifact_registry, action_monitors, validators
         )
         artifact_revision_processors = ArtifactRevisionProcessors(
-            services.artifact_revision, action_monitors
+            services.artifact_revision, action_monitors, validators
         )
 
-        deployment_processors = DeploymentProcessors(services.deployment, action_monitors)
+        deployment_processors = DeploymentProcessors(
+            services.deployment, action_monitors, validators
+        )
 
         storage_namespace_processors = StorageNamespaceProcessors(
-            services.storage_namespace, action_monitors
+            services.storage_namespace, action_monitors, validators
         )
-        audit_log_processors = AuditLogProcessors(services.audit_log, [])
+        audit_log_processors = AuditLogProcessors(services.audit_log, [], validators)
         scheduling_history_processors = SchedulingHistoryProcessors(
-            services.scheduling_history, action_monitors
+            services.scheduling_history, action_monitors, validators
         )
         service_catalog_processors = ServiceCatalogProcessors(
-            services.service_catalog, action_monitors
+            services.service_catalog, action_monitors, validators
         )
-        template_processors = TemplateProcessors(services.template, action_monitors)
+        template_processors = TemplateProcessors(services.template, action_monitors, validators)
         stream_processors = StreamProcessors(services.stream, action_monitors)
         events_processors = EventsProcessors(
             services.events,

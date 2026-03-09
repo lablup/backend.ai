@@ -5,6 +5,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions.delete_config import DeleteConfigAction, DeleteConfigActionResult
 from .actions.get_config import GetConfigAction, GetConfigActionResult
@@ -32,7 +33,12 @@ class EtcdConfigProcessors(AbstractProcessorPackage):
     set_config: ActionProcessor[SetConfigAction, SetConfigActionResult]
     delete_config: ActionProcessor[DeleteConfigAction, DeleteConfigActionResult]
 
-    def __init__(self, service: EtcdConfigService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: EtcdConfigService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.get_resource_slots = ActionProcessor(service.get_resource_slots, action_monitors)
         self.get_resource_metadata = ActionProcessor(service.get_resource_metadata, action_monitors)
         self.get_vfolder_types = ActionProcessor(service.get_vfolder_types, action_monitors)

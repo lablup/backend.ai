@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.image.handler import ImageHandler
@@ -36,7 +37,9 @@ def image_processors(
 ) -> ImageProcessors:
     repo = ImageRepository(database_engine, valkey_clients.image, config_provider)
     service = ImageService(agent_registry, repo, config_provider)
-    return ImageProcessors(service=service, action_monitors=[])
+    return ImageProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()

@@ -5,6 +5,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
     GetAgentResourcesAction,
@@ -45,7 +46,12 @@ class ResourceSlotProcessors(AbstractProcessorPackage):
         GetProjectResourceOverviewAction, GetProjectResourceOverviewResult
     ]
 
-    def __init__(self, service: ResourceSlotService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: ResourceSlotService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.get_agent_resources = ActionProcessor(service.get_agent_resources, action_monitors)
         self.search_agent_resources = ActionProcessor(
             service.search_agent_resources, action_monitors

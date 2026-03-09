@@ -16,6 +16,7 @@ import pytest
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.deployment.creator import (
     ModelRevisionCreator,
     VFolderMountsCreator,
@@ -95,7 +96,7 @@ class DeploymentServiceBaseFixtures:
     @pytest.fixture
     def processors(self, deployment_service: DeploymentService) -> DeploymentProcessors:
         """Create DeploymentProcessors with mock DeploymentService."""
-        return DeploymentProcessors(deployment_service, [])
+        return DeploymentProcessors(deployment_service, [], MagicMock(spec=ActionValidators))
 
     @pytest.fixture
     def deployment_policy_data(self) -> DeploymentPolicyData:

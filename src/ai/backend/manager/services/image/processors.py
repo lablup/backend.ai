@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
     AliasImageActionResult,
@@ -126,7 +127,12 @@ class ImageProcessors(AbstractProcessorPackage):
     search_images: ActionProcessor[SearchImagesAction, SearchImagesActionResult]
     search_aliases: ActionProcessor[SearchAliasesAction, SearchAliasesActionResult]
 
-    def __init__(self, service: ImageService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: ImageService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.get_image_installed_agents = ActionProcessor(
             service.get_image_installed_agents, action_monitors
         )
