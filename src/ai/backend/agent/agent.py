@@ -1429,6 +1429,7 @@ class AbstractAgent[
                 # to ensure collect_container_stat() can access it correctly
                 if ev.container_id is not None:
                     kernel_obj.container_id = ev.container_id
+                    kernel_obj["container_id"] = ev.container_id
         log.info("Kernel {0} started", ev.kernel_id)
 
     async def _handle_destroy_event(self, ev: ContainerLifecycleEvent) -> None:

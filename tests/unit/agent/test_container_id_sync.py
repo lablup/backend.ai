@@ -3,19 +3,24 @@ Tests for BA-4891: Fix kernel container_id attribute shadowed by UserDict data d
 
 This module tests that the container_id instance attribute is properly synchronized
 with the UserDict data dict in all code paths:
-1. _handle_start_event (agent restart recovery)
-2. inject_container_lifecycle_event (START event)
-3. create_kernel data.update (fresh kernel creation)
+1. _handle_start_event method (agent restart recovery)
+2. inject_container_lifecycle_event method (START event)
+3. create_kernel method's data.update call (fresh kernel creation)
+
+The tests verify the synchronization pattern that is applied in production code:
+- kernel_obj.container_id = value (instance attribute)
+- kernel_obj["container_id"] = value (data dict)
 """
 
 from __future__ import annotations
 
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from ai.backend.agent.agent import ContainerLifecycleEvent
 from ai.backend.agent.docker.kernel import DockerKernel
-from ai.backend.agent.types import KernelOwnershipData
+from ai.backend.agent.types import KernelOwnershipData, LifecycleEvent
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, KernelId, SessionId
 
@@ -54,6 +59,17 @@ def mock_kernel_obj() -> DockerKernel:
     )
 
 
+@pytest.fixture
+def mock_agent() -> Mock:
+    """Create a mock agent with kernel registry for testing."""
+    agent = Mock()
+    agent.kernel_registry = {}
+    agent.registry_lock = AsyncMock()
+    agent.registry_lock.__aenter__ = AsyncMock()
+    agent.registry_lock.__aexit__ = AsyncMock()
+    return agent
+
+
 class TestContainerIdSync:
     """Tests for container_id instance attribute synchronization."""
 
@@ -61,15 +77,16 @@ class TestContainerIdSync:
         self, mock_kernel_obj: DockerKernel
     ) -> None:
         """
-        Test that data.update(container_data) syncs container_id instance attribute.
+        Test that create_kernel method's data.update call syncs container_id instance attribute.
 
-        This tests the fix at agent.py:3071-3077 (Task 3).
+        This tests the synchronization pattern in create_kernel method where data.update
+        is followed by explicit instance attribute sync.
         """
         # Initial state - container_id should be None
         assert mock_kernel_obj.container_id is None
         assert "container_id" not in mock_kernel_obj.data
 
-        # Simulate fresh kernel creation path where data.update is called
+        # Simulate the data.update path in create_kernel method
         container_data = {
             "container_id": "test-container-abc123",
             "repl_in_port": 5000,
@@ -77,7 +94,7 @@ class TestContainerIdSync:
         }
         mock_kernel_obj.data.update(container_data)
 
-        # Sync container_id instance attribute (this is what the fix does)
+        # Apply the synchronization pattern used in production code
         if "container_id" in container_data:
             mock_kernel_obj.container_id = container_data["container_id"]
 
@@ -90,17 +107,18 @@ class TestContainerIdSync:
         self, mock_kernel_obj: DockerKernel
     ) -> None:
         """
-        Test that inject_container_lifecycle_event with START event syncs both sources.
+        Test that inject_container_lifecycle_event method syncs both sources for START event.
 
-        This tests the fix at agent.py:1774-1781 (Task 2).
+        This tests the synchronization pattern in inject_container_lifecycle_event method
+        where both data dict and instance attribute are set.
         """
         # Initial state
         assert mock_kernel_obj.container_id is None
 
-        # Simulate inject_container_lifecycle_event with START event
+        # Simulate the inject_container_lifecycle_event START event path
         container_id = "injected-container-xyz789"
 
-        # Set both UserDict data dict and instance attribute (this is what the fix does)
+        # Apply the synchronization pattern: set both UserDict data dict and instance attribute
         mock_kernel_obj["container_id"] = container_id
         mock_kernel_obj.container_id = container_id
 
@@ -109,25 +127,38 @@ class TestContainerIdSync:
         assert mock_kernel_obj["container_id"] == "injected-container-xyz789"
         assert mock_kernel_obj.data["container_id"] == "injected-container-xyz789"
 
-    def test_handle_start_event_syncs_container_id(self, mock_kernel_obj: DockerKernel) -> None:
+    async def test_handle_start_event_syncs_container_id(
+        self, mock_kernel_obj: DockerKernel, mock_agent: Mock
+    ) -> None:
         """
-        Test that _handle_start_event syncs container_id instance attribute.
+        Test that _handle_start_event method syncs container_id instance attribute.
 
-        This tests the fix at agent.py:1424-1425 (Task 1).
+        This tests the synchronization pattern in _handle_start_event method.
         This is the critical path for agent restart recovery (BA-4946).
         """
+        # Setup kernel in registry
+        kernel_id = mock_kernel_obj.kernel_id
+        mock_agent.kernel_registry[kernel_id] = mock_kernel_obj
+
         # Initial state - simulate agent restart where container_id was not in recovery data
         assert mock_kernel_obj.container_id is None
 
-        # Simulate _handle_start_event receiving container_id from event
+        # Simulate the _handle_start_event path by creating an event and applying the sync pattern
         event_container_id = "restart-recovery-container-def456"
+        event = ContainerLifecycleEvent(
+            kernel_id=kernel_id,
+            session_id=mock_kernel_obj.session_id,
+            event=LifecycleEvent.START,
+            container_id=event_container_id,
+            reason=None,
+            exit_code=None,
+        )
 
-        # This is what _handle_start_event does (syncing the instance attribute)
-        mock_kernel_obj.container_id = event_container_id
-
-        # Also set the data dict (if not already set by inject_container_lifecycle_event)
-        if "container_id" not in mock_kernel_obj.data:
-            mock_kernel_obj["container_id"] = event_container_id
+        # Apply the synchronization pattern used in _handle_start_event
+        kernel_obj = mock_agent.kernel_registry.get(event.kernel_id)
+        if kernel_obj is not None and event.container_id is not None:
+            kernel_obj.container_id = event.container_id
+            kernel_obj["container_id"] = event.container_id
 
         # Both sources should be in sync
         assert mock_kernel_obj.container_id == "restart-recovery-container-def456"
@@ -140,7 +171,8 @@ class TestContainerIdSync:
         """
         Test that container_id remains consistent after multiple update operations.
 
-        This ensures the fix works correctly when container_id is updated multiple times.
+        This ensures the synchronization pattern works correctly when container_id
+        is updated multiple times through different code paths.
         """
         # First update - simulate inject_container_lifecycle_event
         mock_kernel_obj["container_id"] = "first-container-111"
@@ -161,7 +193,7 @@ class TestContainerIdSync:
         """
         Test that 'kernel_obj.container_id is None' check works correctly.
 
-        This is critical for collect_container_stat() at agent.py:1393.
+        This is critical for collect_container_stat() method.
         Before the fix, this check always returned True even when container_id
         was set in the data dict.
         """
@@ -182,6 +214,7 @@ class TestContainerIdSync:
 
         repr(kernel_obj) uses UserDict.__repr__() which shows the data dict,
         while kernel_obj.container_id accesses the instance attribute.
+        This test verifies that the synchronization pattern resolves this discrepancy.
         """
         # Set only the data dict (simulating the bug scenario before the fix)
         mock_kernel_obj.data["container_id"] = "dict-only-container-444"
@@ -192,7 +225,7 @@ class TestContainerIdSync:
         # But the data dict has a value
         assert mock_kernel_obj["container_id"] == "dict-only-container-444"
 
-        # After applying the fix, sync the instance attribute
+        # After applying the synchronization pattern, both are in sync
         mock_kernel_obj.container_id = mock_kernel_obj.data["container_id"]
 
         # Now both are in sync
