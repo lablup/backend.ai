@@ -715,7 +715,15 @@ class MemoryPlugin(AbstractComputePlugin):
             sandbox_key = data["NetworkSettings"]["SandboxKey"]
             net_rx_bytes = 0
             net_tx_bytes = 0
-            nstat = await netstat_ns(sandbox_key)
+            try:
+                nstat = await netstat_ns(sandbox_key)
+            except OSError as e:
+                log.warning(
+                    "MemoryPlugin: cannot read net stats for container {0}: {1!r}",
+                    container_id[:7],
+                    e,
+                )
+                return None
             for name, net_stat in nstat.items():
                 if name == "lo":
                     continue
