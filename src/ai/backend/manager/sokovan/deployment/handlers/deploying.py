@@ -1,15 +1,12 @@
 """Handlers for DEPLOYING sub-steps (BEP-1049).
 
-Each handler is registered statically and targets deployments filtered by
-their ``sub_step`` column in the DB.  The coordinator runs them in order:
+All sub-step handlers are registered flat in the coordinator alongside other
+lifecycle handlers.  Each handler declares its ``target_sub_step()`` so the
+coordinator can dispatch by sub-step.
 
-1. **EvaluateHandler** — runs the strategy evaluator on all DEPLOYING
-   deployments (regardless of sub_step), updates the ``sub_step`` column,
-   and applies route mutations.
-2. **ProvisioningHandler** — targets sub_step=PROVISIONING.
-3. **ProgressingHandler** — targets sub_step=PROGRESSING.
-4. **CompletedHandler** — targets sub_step=COMPLETED; revision swap → READY.
-5. **RolledBackHandler** — targets sub_step=ROLLED_BACK; cleanup → READY.
+Before the sub-step handlers run, the coordinator executes
+``DeployingEvaluatePreStep`` to evaluate the strategy FSM, update the
+``sub_step`` column, and apply route mutations.
 """
 
 from __future__ import annotations
@@ -56,7 +53,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 # ---------------------------------------------------------------------------
-# Evaluate handler (runs first, no sub_step filter)
+# Notification helper
 # ---------------------------------------------------------------------------
 
 
@@ -86,11 +83,19 @@ def build_lifecycle_notification_event(
     )
 
 
-class DeployingEvaluateHandler(DeploymentHandler):
+# ---------------------------------------------------------------------------
+# Evaluate pre-step (runs before sub-step handlers)
+# ---------------------------------------------------------------------------
+
+
+class DeployingEvaluatePreStep:
     """Evaluates strategy for all DEPLOYING deployments.
 
+    This is NOT a handler.  The coordinator runs it once before dispatching
+    to individual sub-step handlers.
+
     - Updates the ``sub_step`` column in DB (including COMPLETED/ROLLED_BACK).
-    - Applies route mutations.
+    - Applies route mutations (rollout / drain).
     """
 
     def __init__(
@@ -101,40 +106,17 @@ class DeployingEvaluateHandler(DeploymentHandler):
         self._evaluator = evaluator
         self._deployment_repo = deployment_repo
 
-    @classmethod
-    @override
-    def name(cls) -> str:
-        return "deploying-evaluate"
-
-    @property
-    @override
-    def lock_id(self) -> LockID | None:
-        return LockID.LOCKID_DEPLOYMENT_DEPLOYING
-
-    @classmethod
-    @override
-    def target_statuses(cls) -> list[EndpointLifecycle]:
-        return [EndpointLifecycle.DEPLOYING]
-
-    @classmethod
-    @override
-    def status_transitions(cls) -> DeploymentStatusTransitions:
-        # No lifecycle transition via the standard coordinator path.
-        # Completed/rolled-back transitions are handled directly.
-        return DeploymentStatusTransitions(success=None, failure=None)
-
-    @override
-    async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
+    async def run(self) -> None:
+        """Run evaluation and apply side-effects (sub_step update + route changes)."""
+        deployments = await self._deployment_repo.get_endpoints_by_statuses([
+            EndpointLifecycle.DEPLOYING
+        ])
+        if not deployments:
+            return
+        log.info("pre-step evaluate: processing {} deployments", len(deployments))
         eval_result = await self._evaluator.evaluate(deployments)
         await self._update_sub_steps(eval_result)
         await self._apply_route_changes(eval_result)
-        return DeploymentExecutionResult(successes=list(deployments))
-
-    @override
-    async def post_process(self, result: DeploymentExecutionResult) -> None:
-        pass
-
-    # -- Private helpers --
 
     async def _update_sub_steps(self, eval_result: EvaluationResult) -> None:
         """Bulk-update the sub_step column based on evaluation results."""

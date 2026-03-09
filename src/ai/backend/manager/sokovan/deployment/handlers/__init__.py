@@ -5,7 +5,7 @@ Deployment lifecycle operation handlers.
 from .base import DeploymentHandler
 from .deploying import (
     DeployingCompletedHandler,
-    DeployingEvaluateHandler,
+    DeployingEvaluatePreStep,
     DeployingInProgressHandler,
     DeployingProgressingHandler,
     DeployingProvisioningHandler,
@@ -22,7 +22,7 @@ __all__ = [
     "CheckPendingDeploymentHandler",
     "CheckReplicaDeploymentHandler",
     "DeployingCompletedHandler",
-    "DeployingEvaluateHandler",
+    "DeployingEvaluatePreStep",
     "DeployingInProgressHandler",
     "DeployingProgressingHandler",
     "DeployingProvisioningHandler",

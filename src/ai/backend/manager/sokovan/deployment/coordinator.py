@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Protocol
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
@@ -26,6 +27,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
     DeploymentSubStatus,
+    DeploymentSubStep,
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
@@ -55,7 +57,7 @@ from .handlers import (
     CheckPendingDeploymentHandler,
     CheckReplicaDeploymentHandler,
     DeployingCompletedHandler,
-    DeployingEvaluateHandler,
+    DeployingEvaluatePreStep,
     DeployingProgressingHandler,
     DeployingProvisioningHandler,
     DeployingRolledBackHandler,
@@ -71,6 +73,32 @@ from .strategy.rolling_update import RollingUpdateStrategy
 from .types import DeploymentExecutionResult, DeploymentLifecycleType
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
+
+# Handler registry key: (lifecycle_type, sub_step).
+# sub_step is None for handlers that don't filter by sub-step.
+type HandlerKey = tuple[DeploymentLifecycleType, DeploymentSubStep | None]
+
+
+class LifecyclePreStep(Protocol):
+    """Protocol for optional pre-steps that run before handler dispatch."""
+
+    async def run(self) -> None: ...
+
+
+@dataclass
+class HandlerRegistry:
+    """Registry holding flat handler map and pre-steps."""
+
+    handlers: dict[HandlerKey, DeploymentHandler]
+    pre_steps: dict[DeploymentLifecycleType, LifecyclePreStep]
+
+    def sub_steps_for(self, lifecycle_type: DeploymentLifecycleType) -> list[DeploymentSubStep]:
+        """Derive sub-steps from registered handler keys."""
+        return [
+            sub_step
+            for lt, sub_step in self.handlers
+            if lt == lifecycle_type and sub_step is not None
+        ]
 
 
 @dataclass
@@ -102,12 +130,19 @@ class DeploymentTaskSpec:
 
 
 class DeploymentCoordinator:
-    """Coordinates deployment-related operations."""
+    """Coordinates deployment-related operations.
+
+    Handlers are registered flat with a ``(lifecycle_type, sub_step)`` key.
+    ``sub_step=None`` means the handler matches all deployments of that lifecycle.
+
+    A lifecycle type may optionally have a **pre-step** that runs once on all
+    deployments of that lifecycle before handlers are dispatched.
+    """
 
     _valkey_schedule: ValkeyScheduleClient
     _deployment_controller: DeploymentController
     _deployment_repository: DeploymentRepository
-    _deployment_handlers: Mapping[DeploymentLifecycleType, list[DeploymentHandler]]
+    _registry: HandlerRegistry
     _lock_factory: DistributedLockFactory
     _config_provider: ManagerConfigProvider
     _event_producer: EventProducer
@@ -142,7 +177,7 @@ class DeploymentCoordinator:
             client_pool=client_pool,
             valkey_stat=valkey_stat,
         )
-        self._deployment_handlers = self._init_handlers(executor)
+        self._registry = self._init_handlers(executor)
 
     @staticmethod
     def _init_deployment_strategy_registry() -> DeploymentStrategyRegistry:
@@ -152,99 +187,105 @@ class DeploymentCoordinator:
         registry.register(DeploymentStrategy.BLUE_GREEN, BlueGreenStrategy, BlueGreenSpec)
         return registry
 
-    def _init_handlers(
-        self, executor: DeploymentExecutor
-    ) -> Mapping[DeploymentLifecycleType, list[DeploymentHandler]]:
-        """Initialize and return the mapping of lifecycle types to their handlers.
-
-        Most lifecycle types have a single handler.  DEPLOYING has multiple handlers
-        that are executed in order: evaluate first, then sub-step handlers.
-        """
-        # Strategy registry + evaluator for DEPLOYING
+    def _init_handlers(self, executor: DeploymentExecutor) -> HandlerRegistry:
+        """Initialize the flat handler registry and pre-steps."""
         strategy_registry = self._init_deployment_strategy_registry()
         evaluator = DeploymentStrategyEvaluator(
             deployment_repo=self._deployment_repository,
             strategy_registry=strategy_registry,
         )
 
-        handlers: dict[DeploymentLifecycleType, list[DeploymentHandler]] = {
-            DeploymentLifecycleType.CHECK_PENDING: [
-                CheckPendingDeploymentHandler(
-                    deployment_executor=executor,
-                    deployment_controller=self._deployment_controller,
-                ),
-            ],
-            DeploymentLifecycleType.CHECK_REPLICA: [
-                CheckReplicaDeploymentHandler(
-                    deployment_executor=executor,
-                    deployment_controller=self._deployment_controller,
-                ),
-            ],
-            DeploymentLifecycleType.SCALING: [
-                ScalingDeploymentHandler(
-                    deployment_executor=executor,
-                    deployment_controller=self._deployment_controller,
-                    route_controller=self._route_controller,
-                ),
-            ],
-            DeploymentLifecycleType.RECONCILE: [
-                ReconcileDeploymentHandler(
-                    deployment_executor=executor,
-                    deployment_controller=self._deployment_controller,
-                ),
-            ],
-            DeploymentLifecycleType.DEPLOYING: [
-                # 1. Evaluate: runs strategy FSM, updates sub_step column, applies route changes
-                DeployingEvaluateHandler(
-                    evaluator=evaluator,
-                    deployment_repo=self._deployment_repository,
-                ),
-                # 2-3. In-progress sub-step handlers
+        handlers: dict[HandlerKey, DeploymentHandler] = {
+            # -- simple lifecycle handlers (sub_step=None) --
+            (DeploymentLifecycleType.CHECK_PENDING, None): CheckPendingDeploymentHandler(
+                deployment_executor=executor,
+                deployment_controller=self._deployment_controller,
+            ),
+            (DeploymentLifecycleType.CHECK_REPLICA, None): CheckReplicaDeploymentHandler(
+                deployment_executor=executor,
+                deployment_controller=self._deployment_controller,
+            ),
+            (DeploymentLifecycleType.SCALING, None): ScalingDeploymentHandler(
+                deployment_executor=executor,
+                deployment_controller=self._deployment_controller,
+                route_controller=self._route_controller,
+            ),
+            (DeploymentLifecycleType.RECONCILE, None): ReconcileDeploymentHandler(
+                deployment_executor=executor,
+                deployment_controller=self._deployment_controller,
+            ),
+            (DeploymentLifecycleType.DESTROYING, None): DestroyingDeploymentHandler(
+                deployment_executor=executor,
+                deployment_controller=self._deployment_controller,
+                route_controller=self._route_controller,
+            ),
+            # -- DEPLOYING sub-step handlers --
+            (DeploymentLifecycleType.DEPLOYING, DeploymentSubStep.PROVISIONING): (
                 DeployingProvisioningHandler(
                     deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
-                ),
+                )
+            ),
+            (DeploymentLifecycleType.DEPLOYING, DeploymentSubStep.PROGRESSING): (
                 DeployingProgressingHandler(
                     deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
-                ),
-                # 4-5. Terminal sub-step handlers
+                )
+            ),
+            (DeploymentLifecycleType.DEPLOYING, DeploymentSubStep.COMPLETED): (
                 DeployingCompletedHandler(
                     deployment_repo=self._deployment_repository,
-                ),
+                )
+            ),
+            (DeploymentLifecycleType.DEPLOYING, DeploymentSubStep.ROLLED_BACK): (
                 DeployingRolledBackHandler(
                     deployment_repo=self._deployment_repository,
-                ),
-            ],
-            DeploymentLifecycleType.DESTROYING: [
-                DestroyingDeploymentHandler(
-                    deployment_executor=executor,
-                    deployment_controller=self._deployment_controller,
-                    route_controller=self._route_controller,
-                ),
-            ],
+                )
+            ),
         }
-        return handlers
+
+        pre_steps: dict[DeploymentLifecycleType, LifecyclePreStep] = {
+            DeploymentLifecycleType.DEPLOYING: DeployingEvaluatePreStep(
+                evaluator=evaluator,
+                deployment_repo=self._deployment_repository,
+            ),
+        }
+
+        return HandlerRegistry(handlers=handlers, pre_steps=pre_steps)
 
     async def process_deployment_lifecycle(
         self,
         lifecycle_type: DeploymentLifecycleType,
     ) -> None:
-        handler_list = self._deployment_handlers.get(lifecycle_type)
-        if not handler_list:
-            log.warning("No handlers for deployment lifecycle type: {}", lifecycle_type.value)
-            return
+        sub_steps = self._registry.sub_steps_for(lifecycle_type)
+        if not sub_steps:
+            # Simple lifecycle — single handler with sub_step=None
+            handler = self._registry.handlers.get((lifecycle_type, None))
+            if handler is None:
+                log.warning("No handler for deployment lifecycle type: {}", lifecycle_type.value)
+                return
 
-        # Acquire the lock from the first handler that declares one
-        lock_id = next((h.lock_id for h in handler_list if h.lock_id is not None), None)
-
-        async with AsyncExitStack() as stack:
-            if lock_id is not None:
-                lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
-                await stack.enter_async_context(self._lock_factory(lock_id, lock_lifetime))
-
-            for handler in handler_list:
+            # Acquire the lock from the handler that declares one
+            lock_id = handler.lock_id
+            async with AsyncExitStack() as stack:
+                if lock_id is not None:
+                    lock_lifetime = (
+                        self._config_provider.config.manager.session_schedule_lock_lifetime
+                    )
+                    await stack.enter_async_context(self._lock_factory(lock_id, lock_lifetime))
                 await self._run_handler(handler, lifecycle_type)
+        else:
+            # Lifecycle with sub-steps — run pre-step then each sub-step handler
+            await self._run_pre_step(lifecycle_type)
+            for sub_step in sub_steps:
+                handler = self._registry.handlers[(lifecycle_type, sub_step)]
+                await self._run_handler(handler, lifecycle_type)
+
+    async def _run_pre_step(self, lifecycle_type: DeploymentLifecycleType) -> None:
+        """Run the optional pre-step for a lifecycle type."""
+        pre_step = self._registry.pre_steps.get(lifecycle_type)
+        if pre_step is not None:
+            await pre_step.run()
 
     async def _run_handler(
         self,
@@ -284,11 +325,6 @@ class DeploymentCoordinator:
 
         All transitions (success and failure) are processed in a single transaction
         to ensure atomicity.
-
-        Args:
-            handler: The deployment handler that was executed
-            result: The result of the handler execution
-            records: Execution records from the recorder context
         """
         handler_name = handler.name()
         target_statuses = handler.target_statuses()
