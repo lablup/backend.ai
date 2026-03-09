@@ -67,10 +67,6 @@ from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
     GetArtifactRevisionsActionResult,
 )
-from ai.backend.manager.services.artifact.actions.list_with_revisions import (
-    ListArtifactsWithRevisionsAction,
-    ListArtifactsWithRevisionsActionResult,
-)
 from ai.backend.manager.services.artifact.actions.restore_multi import (
     RestoreArtifactsAction,
     RestoreArtifactsActionResult,
@@ -355,22 +351,6 @@ class ArtifactService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
-        )
-
-    async def list_with_revisions(
-        self, action: ListArtifactsWithRevisionsAction
-    ) -> ListArtifactsWithRevisionsActionResult:
-        # Old-style pagination for REST API compatibility
-        (
-            artifacts_data,
-            total_count,
-        ) = await self._artifact_repository.list_artifacts_with_revisions_paginated(
-            pagination=action.pagination,
-            ordering=action.ordering,
-            filters=action.filters,
-        )
-        return ListArtifactsWithRevisionsActionResult(
-            data=artifacts_data, total_count=total_count or 0
         )
 
     async def search_with_revisions(
