@@ -452,7 +452,7 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
 
         call_count = 0
 
-        async def slow_show_for_first(*args: Any, **kwargs: Any) -> dict:
+        async def slow_show_for_first(*args: Any, **kwargs: Any) -> dict[str, Any]:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
@@ -499,7 +499,7 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
 
         call_count = 0
 
-        async def slow_netstat_for_first(*args: Any, **kwargs: Any) -> dict:
+        async def slow_netstat_for_first(*args: Any, **kwargs: Any) -> dict[str, Any]:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
@@ -534,26 +534,17 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
         memory_plugin: MemoryPlugin,
         cgroup_stat_context: MagicMock,
     ) -> None:
-        """When one container raises an exception, other containers
-        are still collected thanks to return_exceptions=True."""
+        """When one container raises an uncaught exception, other containers
+        are still collected thanks to return_exceptions=True.
+
+        Uses RuntimeError (not OSError) because OSError is caught inside
+        sysfs_impl and returns None — it never reaches the BaseException
+        branch in the results loop.
+        """
         ctx = cgroup_stat_context
         ctx.agent.get_cgroup_version = MagicMock(return_value="2")
-
-        call_count = 0
-
-        def make_cgroup_path(subsys: str, cid: str) -> MagicMock:
-            nonlocal call_count
-            if cid == "broken_container":
-                # Simulate a broken cgroup path that raises on read
-                path = MagicMock()
-                broken_file = MagicMock()
-                broken_file.read_text.side_effect = OSError("cgroup path gone")
-                path.__truediv__ = MagicMock(return_value=broken_file)
-                return path
-            mem_path, io_path = self._make_cgroup_mocks()
-            return mem_path if subsys == "memory" else io_path
-
-        ctx.agent.get_cgroup_path = make_cgroup_path
+        mem_path, io_path = self._make_cgroup_mocks()
+        ctx.agent.get_cgroup_path = lambda subsys, cid: mem_path if subsys == "memory" else io_path
 
         mock_container_data = {
             "NetworkSettings": {"SandboxKey": "/var/run/docker/netns/fake"},
@@ -570,7 +561,17 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
             mock_container_instance = AsyncMock()
             mock_container_instance.show.return_value = mock_container_data
             mock_container_cls.return_value = mock_container_instance
-            mock_loop.return_value.run_in_executor = AsyncMock(return_value=0)
+
+            # For the broken container, run_in_executor raises RuntimeError
+            # which is NOT caught inside sysfs_impl, so it propagates through
+            # asyncio.gather(return_exceptions=True) into the BaseException branch.
+            async def selective_run_in_executor(executor: Any, fn: Any, *args: Any) -> int:
+                # get_scratch_size is called with container_id as first arg
+                if args and args[0] == "broken_container":
+                    raise RuntimeError("unexpected executor failure")
+                return 0
+
+            mock_loop.return_value.run_in_executor = selective_run_in_executor
 
             container_ids = ["broken_container", "healthy_container"]
             results = await memory_plugin.gather_container_measures(ctx, container_ids)

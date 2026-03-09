@@ -813,6 +813,8 @@ class MemoryPlugin(AbstractComputePlugin):
         for cid, result in zip(container_ids, results, strict=True):
             if result is None:
                 continue
+            if isinstance(result, asyncio.CancelledError):
+                raise result
             if isinstance(result, BaseException):
                 log.warning(
                     "gather_container_measures: error collecting stats for {}: {}", cid, result
