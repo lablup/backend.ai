@@ -361,8 +361,12 @@ def create_processors(
         ),
         vfolder=VFolderProcessors(services.vfolder, action_monitors, validators),
         vfolder_file=VFolderFileProcessors(services.vfolder_file, action_monitors, validators),
-        vfolder_invite=VFolderInviteProcessors(services.vfolder_invite, action_monitors, validators),
-        vfolder_sharing=VFolderSharingProcessors(services.vfolder_sharing, action_monitors, validators),
+        vfolder_invite=VFolderInviteProcessors(
+            services.vfolder_invite, action_monitors, validators
+        ),
+        vfolder_sharing=VFolderSharingProcessors(
+            services.vfolder_sharing, action_monitors, validators
+        ),
         session=SessionProcessors(services.session, action_monitors, validators),
         keypair_resource_policy=KeypairResourcePolicyProcessors(
             services.keypair_resource_policy, action_monitors, validators
@@ -377,9 +381,13 @@ def create_processors(
         prometheus_query_preset=PrometheusQueryPresetProcessors(
             services.prometheus_query_preset, action_monitors, validators
         ),
-        resource_preset=ResourcePresetProcessors(services.resource_preset, action_monitors, validators),
+        resource_preset=ResourcePresetProcessors(
+            services.resource_preset, action_monitors, validators
+        ),
         resource_slot=ResourceSlotProcessors(services.resource_slot, action_monitors, validators),
-        resource_usage=ResourceUsageProcessors(services.resource_usage, action_monitors, validators),
+        resource_usage=ResourceUsageProcessors(
+            services.resource_usage, action_monitors, validators
+        ),
         scaling_group=ScalingGroupProcessors(services.scaling_group, action_monitors, validators),
         utilization_metric=UtilizationMetricProcessors(
             services.utilization_metric, action_monitors, validators
@@ -390,21 +398,31 @@ def create_processors(
         ),
         auth=AuthProcessors(services.auth, action_monitors, validators),
         notification=NotificationProcessors(services.notification, action_monitors, validators),
-        object_storage=ObjectStorageProcessors(services.object_storage, action_monitors, validators),
+        object_storage=ObjectStorageProcessors(
+            services.object_storage, action_monitors, validators
+        ),
         permission_controller=PermissionControllerProcessors(
             services.permission_controller, action_monitors, validators
         ),
         vfs_storage=VFSStorageProcessors(services.vfs_storage, action_monitors, validators),
         artifact=ArtifactProcessors(services.artifact, action_monitors, validators),
-        artifact_registry=ArtifactRegistryProcessors(services.artifact_registry, action_monitors, validators),
-        artifact_revision=ArtifactRevisionProcessors(services.artifact_revision, action_monitors, validators),
+        artifact_registry=ArtifactRegistryProcessors(
+            services.artifact_registry, action_monitors, validators
+        ),
+        artifact_revision=ArtifactRevisionProcessors(
+            services.artifact_revision, action_monitors, validators
+        ),
         deployment=DeploymentProcessors(services.deployment, action_monitors, validators),
-        storage_namespace=StorageNamespaceProcessors(services.storage_namespace, action_monitors, validators),
+        storage_namespace=StorageNamespaceProcessors(
+            services.storage_namespace, action_monitors, validators
+        ),
         audit_log=AuditLogProcessors(services.audit_log, [], validators),
         scheduling_history=SchedulingHistoryProcessors(
             services.scheduling_history, action_monitors, validators
         ),
-        service_catalog=ServiceCatalogProcessors(services.service_catalog, action_monitors, validators),
+        service_catalog=ServiceCatalogProcessors(
+            services.service_catalog, action_monitors, validators
+        ),
         template=TemplateProcessors(services.template, action_monitors, validators),
         stream=StreamProcessors(services.stream, action_monitors),
         events=EventsProcessors(
