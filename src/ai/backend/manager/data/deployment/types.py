@@ -162,11 +162,13 @@ class DeploymentSubStep(DeploymentSubStatus):
 
     - PROVISIONING: New revision routes are being provisioned; waiting for readiness.
     - PROGRESSING: Actively replacing old routes with new routes.
-    - ROLLED_BACK: All new routes failed; deployment rolled back to previous revision.
+    - COMPLETED: All strategy conditions satisfied; ready for revision swap.
+    - ROLLED_BACK: All new routes failed; ready for rollback cleanup.
     """
 
     PROVISIONING = "provisioning"
     PROGRESSING = "progressing"
+    COMPLETED = "completed"
     ROLLED_BACK = "rolled_back"
 
 
@@ -368,6 +370,7 @@ class DeploymentInfo:
     current_revision_id: UUID | None = None
     policy: DeploymentPolicyData | None = None
     deploying_revision_id: UUID | None = None
+    sub_step: DeploymentSubStep | None = None
 
     def target_revision(self) -> ModelRevisionSpec | None:
         if self.model_revisions:

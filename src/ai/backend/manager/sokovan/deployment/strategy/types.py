@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
 
 from pydantic import BaseModel
 
-from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentSubStep,
@@ -29,48 +29,32 @@ class RouteChanges:
 
 @dataclass
 class CycleEvaluationResult:
-    """Result of evaluating a single deployment's strategy cycle."""
+    """Result of evaluating a single deployment's strategy cycle.
+
+    ``sub_step`` indicates the next state: PROVISIONING, PROGRESSING,
+    COMPLETED, or ROLLED_BACK.
+    """
 
     sub_step: DeploymentSubStep
-    completed: bool = False
     route_changes: RouteChanges = field(default_factory=RouteChanges)
 
 
 @dataclass
-class EvaluationGroup:
-    """Deployments grouped by their sub-step result."""
-
-    sub_step: DeploymentSubStep
-    deployments: list[DeploymentInfo] = field(default_factory=list)
-
-
-@dataclass
 class EvaluationResult:
-    """Aggregate result of evaluating all DEPLOYING deployments."""
+    """Aggregate result of evaluating all DEPLOYING deployments.
 
-    # In-progress deployments grouped by sub-step (PROVISIONING, PROGRESSING, etc.).
-    # DeployingHandler.prepare() resolves the sub-step handler for each group.
-    groups: dict[DeploymentSubStep, EvaluationGroup] = field(default_factory=dict)
+    The evaluator classifies each deployment into a sub_step and records
+    the mapping so the evaluate handler can bulk-update the DB column.
+    All outcomes — including COMPLETED and ROLLED_BACK — are expressed
+    as sub_step values and persisted to the DB for their respective handlers.
+    """
 
-    # Deployments that satisfied all strategy FSM conditions and are ready to finish.
-    # DeployingHandler.finalize() performs an atomic revision swap + READY transition.
-    completed: list[DeploymentInfo] = field(default_factory=list)
-
-    # Maps each completed deployment to the strategy (ROLLING, BLUE_GREEN) it used.
-    # Included in the history message for observability.
-    completed_strategies: dict[UUID, DeploymentStrategy] = field(default_factory=dict)
-
-    # Deployments skipped because no deployment policy was found.
-    # DeployingHandler.finalize() records SKIPPED history and emits a warning log.
-    skipped: list[DeploymentInfo] = field(default_factory=list)
-
-    # Deployments that raised an exception during strategy FSM evaluation, paired
-    # with the error message. DeployingHandler.finalize() records NEED_RETRY history
-    # and keeps the lifecycle at DEPLOYING so the next cycle can retry.
-    errors: list[tuple[DeploymentInfo, str]] = field(default_factory=list)
+    # Mapping from sub_step to endpoint IDs — used to bulk-update the DB.
+    assignments: defaultdict[DeploymentSubStep, set[UUID]] = field(
+        default_factory=lambda: defaultdict(set)
+    )
 
     # Aggregated route mutations from all per-deployment evaluations.
-    # DeployingHandler.prepare() applies these after evaluation completes.
     route_changes: RouteChanges = field(default_factory=RouteChanges)
 
 

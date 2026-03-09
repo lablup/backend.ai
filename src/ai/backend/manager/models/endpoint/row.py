@@ -66,6 +66,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
     DeploymentState,
+    DeploymentSubStep,
     ExecutionSpec,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionSpec,
@@ -307,6 +308,12 @@ class EndpointRow(Base):  # type: ignore[misc]
     current_revision: Mapped[UUID | None] = mapped_column("current_revision", GUID, nullable=True)
     deploying_revision: Mapped[UUID | None] = mapped_column(
         "deploying_revision", GUID, nullable=True
+    )
+    sub_step: Mapped[DeploymentSubStep | None] = mapped_column(
+        "sub_step",
+        EnumValueType(DeploymentSubStep),
+        nullable=True,
+        default=None,
     )
     revision_history_limit: Mapped[int] = mapped_column(
         "revision_history_limit",
@@ -846,6 +853,7 @@ class EndpointRow(Base):  # type: ignore[misc]
             ],
             current_revision_id=self.current_revision,
             deploying_revision_id=self.deploying_revision,
+            sub_step=self.sub_step,
         )
 
     def _to_deployment_info_legacy(self) -> DeploymentInfo:
@@ -908,6 +916,7 @@ class EndpointRow(Base):  # type: ignore[misc]
             ],
             current_revision_id=self.current_revision,
             deploying_revision_id=self.deploying_revision,
+            sub_step=self.sub_step,
         )
 
 

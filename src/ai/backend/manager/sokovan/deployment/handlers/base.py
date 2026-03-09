@@ -1,21 +1,25 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from collections.abc import Mapping, Sequence
-from uuid import UUID
+from collections.abc import Sequence
 
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentStatusTransitions,
+    DeploymentSubStep,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.types import DeploymentExecutionResult
-from ai.backend.manager.sokovan.recorder.types import ExecutionRecord
 
 
 class DeploymentHandler:
-    """Base class for deployment operation handlers using the generic interface."""
+    """Base class for deployment operation handlers.
+
+    Each handler targets deployments matching specific lifecycle statuses
+    and optionally a sub-step.  The coordinator queries the DB using these
+    filters and passes only the matching deployments to ``execute()``.
+    """
 
     @classmethod
     @abstractmethod
@@ -44,6 +48,15 @@ class DeploymentHandler:
         raise NotImplementedError("Subclasses must implement target_statuses()")
 
     @classmethod
+    def target_sub_step(cls) -> DeploymentSubStep | None:
+        """Get the target sub-step filter for this handler.
+
+        Returns None by default, meaning no sub-step filtering.
+        DEPLOYING sub-step handlers override this to filter by their sub-step.
+        """
+        return None
+
+    @classmethod
     @abstractmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
         """Define state transitions for different handler outcomes (BEP-1030).
@@ -56,16 +69,6 @@ class DeploymentHandler:
             - None value: Don't change the deployment lifecycle
         """
         raise NotImplementedError("Subclasses must implement status_transitions()")
-
-    async def prepare(
-        self, deployments: Sequence[DeploymentInfo]
-    ) -> list[tuple[DeploymentHandler, Sequence[DeploymentInfo]]]:
-        """Prepare handler tasks for execution.
-
-        Default: treat self as a single sub-step.
-        Override for composite handlers (e.g., DeployingHandler) that dispatch to sub-handlers.
-        """
-        return [(self, deployments)]
 
     @abstractmethod
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
@@ -80,22 +83,9 @@ class DeploymentHandler:
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         """Per-handler post-processing after execute().
 
-        Called for each (handler, result) pair returned by prepare().
-        For composite handlers, this means each sub-step handler's post_process
-        is called individually — not the composite handler itself.
-
         Typical use: reschedule the next lifecycle cycle, trigger dependent lifecycles.
 
         Args:
             result: The result from this handler's execute()
         """
         raise NotImplementedError("Subclasses must implement post_process()")
-
-    async def finalize(self, records: Mapping[UUID, ExecutionRecord]) -> None:
-        """Post-execution finalization with access to execution records.
-
-        Called after all handler tasks have been executed and status transitions recorded,
-        but before post_process. Default: no-op.
-        Override for composite handlers that need atomic completion transitions.
-        """
-        pass

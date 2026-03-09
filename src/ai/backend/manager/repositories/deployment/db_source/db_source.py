@@ -45,6 +45,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
+    DeploymentSubStep,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
@@ -476,11 +477,13 @@ class DeploymentDBSource:
             return cleanup_configs
 
     async def get_endpoints_by_statuses(
-        self, statuses: list[EndpointLifecycle]
+        self,
+        statuses: list[EndpointLifecycle],
+        sub_step: DeploymentSubStep | None = None,
     ) -> list[DeploymentInfo]:
-        """Get all active endpoints."""
+        """Get endpoints by lifecycle statuses, optionally filtered by sub_step."""
         async with self._begin_readonly_session_read_committed() as db_sess:
-            rows = await self._get_endpoints_by_statuses(db_sess, statuses)
+            rows = await self._get_endpoints_by_statuses(db_sess, statuses, sub_step=sub_step)
 
         return [row.to_deployment_info() for row in rows]
 
@@ -488,11 +491,16 @@ class DeploymentDBSource:
         self,
         db_sess: SASession,
         statuses: list[EndpointLifecycle],
+        *,
+        sub_step: DeploymentSubStep | None = None,
     ) -> list[EndpointRow]:
-        """Fetch endpoints by lifecycle statuses."""
+        """Fetch endpoints by lifecycle statuses, optionally filtered by sub_step."""
+        where_clause: sa.ColumnElement[bool] = EndpointRow.lifecycle_stage.in_(statuses)
+        if sub_step is not None:
+            where_clause = sa.and_(where_clause, EndpointRow.sub_step == sub_step.value)
         query = (
             sa.select(EndpointRow)
-            .where(EndpointRow.lifecycle_stage.in_(statuses))
+            .where(where_clause)
             .options(
                 selectinload(EndpointRow.image_row),
                 selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
@@ -2414,6 +2422,27 @@ class DeploymentDBSource:
                 .values(deploying_revision=None)
             )
             await db_sess.execute(stmt)
+
+    async def update_sub_steps(
+        self,
+        sub_step_map: dict[DeploymentSubStep, set[uuid.UUID]],
+    ) -> None:
+        """Bulk-update the sub_step column for multiple endpoints.
+
+        Args:
+            sub_step_map: Mapping from sub_step value to the set of endpoint IDs
+                that should be set to that sub_step.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            for sub_step, endpoint_ids in sub_step_map.items():
+                if not endpoint_ids:
+                    continue
+                stmt = (
+                    sa.update(EndpointRow)
+                    .where(EndpointRow.id.in_(endpoint_ids))
+                    .values(sub_step=sub_step.value)
+                )
+                await db_sess.execute(stmt)
 
     # ========== Access Token Operations ==========
 

@@ -179,9 +179,11 @@ class EndpointLifecycleBatchUpdaterSpec(BatchUpdaterSpec[EndpointRow]):
     """BatchUpdaterSpec for batch updating endpoint lifecycle status.
 
     Used for transitioning multiple endpoints between lifecycle states.
+    Automatically clears the ``sub_step`` column unless explicitly set.
     """
 
     lifecycle_stage: EndpointLifecycle
+    sub_step: str | None = None
 
     @property
     @override
@@ -190,4 +192,4 @@ class EndpointLifecycleBatchUpdaterSpec(BatchUpdaterSpec[EndpointRow]):
 
     @override
     def build_values(self) -> dict[str, Any]:
-        return {"lifecycle_stage": self.lifecycle_stage}
+        return {"lifecycle_stage": self.lifecycle_stage, "sub_step": self.sub_step}

@@ -50,6 +50,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
+    DeploymentSubStep,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
@@ -285,9 +286,10 @@ class DeploymentRepository:
     async def get_endpoints_by_statuses(
         self,
         statuses: list[EndpointLifecycle],
+        sub_step: DeploymentSubStep | None = None,
     ) -> list[DeploymentInfo]:
-        """Get endpoints by lifecycle statuses."""
-        return await self._db_source.get_endpoints_by_statuses(statuses)
+        """Get endpoints by lifecycle statuses, optionally filtered by sub_step."""
+        return await self._db_source.get_endpoints_by_statuses(statuses, sub_step=sub_step)
 
     @deployment_repository_resilience.apply()
     async def get_endpoint_info(
@@ -1245,6 +1247,14 @@ class DeploymentRepository:
     ) -> None:
         """Clear deploying_revision for rolled-back deployments."""
         await self._db_source.clear_deploying_revision(endpoint_ids)
+
+    @deployment_repository_resilience.apply()
+    async def update_sub_steps(
+        self,
+        sub_step_map: dict[DeploymentSubStep, set[uuid.UUID]],
+    ) -> None:
+        """Bulk-update the sub_step column for multiple endpoints."""
+        await self._db_source.update_sub_steps(sub_step_map)
 
     # ===================
     # Route operations
