@@ -46,7 +46,6 @@ from ai.backend.common.types import (
     DeviceModelInfo,
     DeviceName,
     MetricKey,
-    MountTypes,
     SlotName,
     SlotTypes,
 )
@@ -56,6 +55,7 @@ _atom_config_iv = t.Dict({
     "general": t.Dict({
         t.Key("rbln_stat_path"): t.Null | t.String,
         t.Key("enforce_singular_numa_affinity", default=False): t.Null | t.Bool,
+        t.Key("enable_rsd", default=True): t.Null | t.Bool,
     }).allow_extra("*"),
 }).allow_extra("*")
 
@@ -75,6 +75,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
 
     _rbln_stat_path: str
     _all_devices: list[TATOMDevice] | None
+    _enable_rsd: bool
 
     async def init(self, context: Any = None) -> None:
         self._all_devices = None
@@ -95,6 +96,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
             self.enabled = False
             return
         self._rbln_stat_path = _rbln_stat_path
+        self._enable_rsd = self.atom_config["general"]["enable_rsd"]
         try:
             detected_devices = await self.list_devices()
             log.info("detected devices:\n" + pformat(detected_devices))
@@ -253,11 +255,6 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
         source_path: Path,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> list[MountInfo]:
-        binpath = Path("/usr/local/bin")
-        if self.slot_types[0][0] in device_alloc:
-            return [
-                MountInfo(MountTypes.BIND, binpath / "rbln-stat", binpath / "rbln-stat"),
-            ]
         return []
 
     @abstractmethod
@@ -273,16 +270,19 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Mapping[str, Any]:
         assigned_devices: list[TATOMDevice] = []
-        device_files: list[Path] = []
-        additional_device_files = [Path("/dev/rmda")]
+        device_files: list[tuple[Path, Path]] = []
+        additional_device_files = []
 
         numa_node_indexes: set[int] = set()
+        idx = 0
         for dev in await self._list_devices():
             if dev.device_id in device_alloc.get(self.slot_types[0][0], {}).keys():
                 if dev.numa_node is None:
                     raise RuntimeError("NUMA node index of accelerator cannot be null!")
                 assigned_devices.append(dev)
-                device_files.extend([Path(x) for x in await self.list_device_files(dev)])
+                for dev_file in await self.list_device_files(dev):
+                    device_files.append((Path(dev_file), Path(f"/dev/rbln{idx}")))
+                    idx += 1
                 numa_node_indexes.add(dev.numa_node)
         if (
             len(numa_node_indexes) > 1
@@ -290,18 +290,23 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
         ):
             raise RuntimeError(f"NUMA affinity dispersed ({numa_node_indexes})!")
 
-        try:
-            group_idx = await self.group_npus(assigned_devices)
-            log.debug("Created NPU Group {} with members {}", group_idx, assigned_devices)
-            additional_device_files.append(Path(f"/dev/rsd{group_idx}"))
-        except LibraryError as e:
-            log.warning(f"Failed to create NPU Group: {e!s}, starting kernel without NPU group")
-            additional_device_files.append(Path("/dev/rsd0"))
+        if self._enable_rsd:
+            try:
+                group_idx = await self.group_npus(assigned_devices)
+                log.debug("Created NPU Group {} with members {}", group_idx, assigned_devices)
+                additional_device_files.append(Path(f"/dev/rsd{group_idx}"))
+            except LibraryError as e:
+                log.warning(f"Failed to create NPU Group: {e!s}, starting kernel without NPU group")
+                additional_device_files.append(Path("/dev/rsd0"))
+        else:
+            default_rsd_path = Path("/dev/rsd0")
+            if default_rsd_path.exists():
+                additional_device_files.append(Path("/dev/rsd0"))
 
         for filename in additional_device_files:
             try:
                 filename.stat()  # check if target file exists
-                device_files.append(filename)
+                device_files.append((filename, filename))
             except FileNotFoundError:
                 pass  # just skip mounting without raising error
 
@@ -321,11 +326,19 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
                 },
                 "Devices": [
                     {
-                        "PathOnHost": dev.as_posix(),
-                        "PathInContainer": dev.as_posix(),
+                        "PathOnHost": host.as_posix(),
+                        "PathInContainer": container.as_posix(),
                         "CgroupPermissions": "rwm",
                     }
-                    for dev in device_files
+                    for idx, (host, container) in enumerate(device_files)
+                ],
+                "DeviceRequests": [
+                    {
+                        "Driver": "cdi",
+                        "Count": 0,
+                        "DeviceIDs": ["rebellions.ai/npu=runtime"],
+                        "Capabilities": None,
+                    }
                 ],
             },
         }
