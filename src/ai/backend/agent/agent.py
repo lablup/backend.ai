@@ -1777,6 +1777,8 @@ class AbstractAgent[
                     # updating here improves consistency of kernel_id to container_id
                     # mapping earlier.
                     kernel_obj["container_id"] = container_id
+                    # Sync instance attribute to match UserDict data dict
+                    kernel_obj.container_id = container_id
                 elif container_id != kernel_obj["container_id"]:
                     # This should not happen!
                     log.warning(
