@@ -26,6 +26,7 @@ import attrs
 from ai.backend.common import msgpack
 from ai.backend.common.identity import is_containerized
 from ai.backend.common.metrics.metric import StageObserver
+from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
 from ai.backend.common.types import (
     PID,
     ContainerId,
@@ -68,7 +69,7 @@ __all__ = (
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_PLUGIN_TIMEOUT: float = 120.0
+_PLUGIN_TIMEOUT: float = max(UTILIZATION_METRIC_INTERVAL - 1.0, 1.0)
 
 
 def check_cgroup_available() -> bool:
