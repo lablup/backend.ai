@@ -816,13 +816,13 @@ class MemoryPlugin(AbstractComputePlugin):
         for cid, result in zip(container_ids, results, strict=True):
             if result is None:
                 continue
-            if isinstance(result, asyncio.CancelledError):
-                raise result
-            if isinstance(result, BaseException):
+            if isinstance(result, Exception):
                 log.warning(
                     "gather_container_measures: error collecting stats for {}: {}", cid, result
                 )
                 continue
+            if isinstance(result, BaseException):
+                raise result
             per_container_mem_used_bytes[cid] = Measurement(
                 Decimal(result[0]), capacity=Decimal(result[1])
             )
