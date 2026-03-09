@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.model_serving.actions.clear_error import (
     ClearErrorAction,
     ClearErrorActionResult,
@@ -88,6 +89,7 @@ class ModelServingProcessors(AbstractProcessorPackage):
         self,
         service: ModelServingService,
         action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
     ) -> None:
         self.create_model_service = ActionProcessor(service.create, action_monitors)
         self.list_model_service = ActionProcessor(service.list_serve, action_monitors)

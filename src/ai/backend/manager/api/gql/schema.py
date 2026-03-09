@@ -2,6 +2,8 @@ import strawberry
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
+from ai.backend.manager.api.gql.extensions import GQLLoggingExtension
+
 from .agent import (
     agent_stats,
     agents_v2,
@@ -512,4 +514,7 @@ schema = CustomizedSchema(
     subscription=Subscription,
     config=StrawberryConfig(auto_camel_case=True),
     enable_federation_2=True,
+    extensions=[
+        GQLLoggingExtension,
+    ],
 )

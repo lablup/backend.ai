@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.group.actions.create_group import (
     CreateGroupAction,
     CreateGroupActionResult,
@@ -52,7 +53,12 @@ class GroupProcessors(AbstractProcessorPackage):
     search_projects_by_user: ActionProcessor[SearchProjectsByUserAction, SearchProjectsActionResult]
     get_project: ActionProcessor[GetProjectAction, GetProjectActionResult]
 
-    def __init__(self, group_service: GroupService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        group_service: GroupService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.create_group = ActionProcessor(group_service.create_group, action_monitors)
         self.modify_group = ActionProcessor(group_service.modify_group, action_monitors)
         self.delete_group = ActionProcessor(group_service.delete_group, action_monitors)

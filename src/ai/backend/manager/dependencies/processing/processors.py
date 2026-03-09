@@ -8,6 +8,7 @@ from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
 
 
@@ -19,6 +20,7 @@ class ProcessorsProviderInput:
     action_monitors: list[ActionMonitor]
     event_hub: EventHub
     event_fetcher: EventFetcher
+    validators: ActionValidators
 
 
 class ProcessorsDependency(NonMonitorableDependencyProvider[ProcessorsProviderInput, Processors]):
@@ -41,5 +43,6 @@ class ProcessorsDependency(NonMonitorableDependencyProvider[ProcessorsProviderIn
                 event_fetcher=setup_input.event_fetcher,
             ),
             setup_input.action_monitors,
+            setup_input.validators,
         )
         yield processors

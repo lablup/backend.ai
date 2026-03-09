@@ -44,6 +44,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfoWithAutoScalingRules,
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
+    DeploymentPolicyUpsertResult,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
@@ -122,6 +123,10 @@ from ai.backend.manager.repositories.base.updater import (
     Updater,
     execute_batch_updater,
     execute_updater,
+)
+from ai.backend.manager.repositories.base.upserter import (
+    Upserter,
+    execute_upserter,
 )
 from ai.backend.manager.repositories.deployment.creators import (
     DeploymentCreatorSpec,
@@ -258,7 +263,10 @@ class DeploymentDBSource:
             stmt = (
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint.id)
-                .options(selectinload(EndpointRow.image_row))
+                .options(
+                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.deployment_policy),
+                )
             )
             result = await db_sess.execute(stmt)
             endpoint_result: EndpointRow = result.scalar_one()
@@ -297,7 +305,10 @@ class DeploymentDBSource:
             stmt = (
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint.id)
-                .options(selectinload(EndpointRow.image_row))
+                .options(
+                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.deployment_policy),
+                )
             )
             result = await db_sess.execute(stmt)
             endpoint_result: EndpointRow = result.scalar_one()
@@ -385,6 +396,7 @@ class DeploymentDBSource:
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
+                    selectinload(EndpointRow.deployment_policy),
                 )
             )
             result = await db_sess.execute(query)
@@ -1020,7 +1032,11 @@ class DeploymentDBSource:
             DeploymentInfoSearchResult with items, total_count, and pagination info
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(EndpointRow).options(selectinload(EndpointRow.revisions))
+            query = sa.select(EndpointRow).options(
+                selectinload(EndpointRow.image_row),
+                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
+                selectinload(EndpointRow.deployment_policy),
+            )
 
             result = await execute_batch_querier(
                 db_sess,
@@ -2119,6 +2135,7 @@ class DeploymentDBSource:
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
+                    selectinload(EndpointRow.deployment_policy),
                 )
             )
             query_result = await db_sess.execute(query)
@@ -2220,19 +2237,22 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             return await execute_purger(db_sess, purger)
 
-    async def create_deployment_policy(
+    async def upsert_deployment_policy(
         self,
-        creator: Creator[DeploymentPolicyRow],
-    ) -> DeploymentPolicyData:
-        """Create a new deployment policy for an endpoint.
-
-        Each endpoint can have at most one deployment policy (1:1 relationship).
-        If a policy already exists for the endpoint, the database will raise a
-        unique constraint violation.
-        """
+        upserter: Upserter[DeploymentPolicyRow],
+    ) -> DeploymentPolicyUpsertResult:
+        """Create or update a deployment policy using ON CONFLICT."""
         async with self._begin_session_read_committed() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            return result.row.to_data()
+            result = await execute_upserter(
+                db_sess,
+                upserter,
+                index_elements=["endpoint"],
+            )
+            row = result.row
+            return DeploymentPolicyUpsertResult(
+                data=row.to_data(),
+                created=row.created_at == row.updated_at,
+            )
 
     async def get_deployment_policy(
         self,
@@ -2254,23 +2274,6 @@ class DeploymentDBSource:
                     f"Deployment policy for endpoint {endpoint_id} not found"
                 )
             return row.to_data()
-
-    async def update_deployment_policy(
-        self,
-        updater: Updater[DeploymentPolicyRow],
-    ) -> DeploymentPolicyData:
-        """Update a deployment policy using the provided updater spec.
-
-        The updater's pk_value should be the policy ID (primary key).
-
-        Raises:
-            DeploymentPolicyNotFound: If the policy does not exist.
-        """
-        async with self._begin_session_read_committed() as db_sess:
-            result = await execute_updater(db_sess, updater)
-            if result is None:
-                raise DeploymentPolicyNotFound(f"Deployment policy {updater.pk_value} not found")
-            return result.row.to_data()
 
     async def delete_deployment_policy(
         self,

@@ -15,6 +15,7 @@ from ai.backend.common.types import (
     EndpointId,
 )
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.model_serving.creator import EndpointAutoScalingRuleCreator
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
@@ -77,6 +78,7 @@ class TestCreateEndpointAutoScalingRule:
         return ModelServingAutoScalingProcessors(
             service=auto_scaling_service,
             action_monitors=[mock_action_monitor],
+            validators=MagicMock(spec=ActionValidators),
         )
 
     @pytest.fixture

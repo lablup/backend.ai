@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
+from ai.backend.manager.actions.validators import ActionValidators
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -81,19 +82,25 @@ async def session_processors(
         appproxy_client_pool=appproxy_client_pool,
     )
     service = SessionService(args)
-    return SessionProcessors(service=service, action_monitors=[])
+    return SessionProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
 def agent_processors_mock() -> AgentProcessors:
     """AgentProcessors with a mocked AgentService."""
-    return AgentProcessors(service=AsyncMock(), action_monitors=[])
+    return AgentProcessors(
+        service=AsyncMock(), action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
 def vfolder_processors_mock() -> VFolderProcessors:
     """VFolderProcessors with a mocked VFolderService."""
-    return VFolderProcessors(service=AsyncMock(), action_monitors=[])
+    return VFolderProcessors(
+        service=AsyncMock(), action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()

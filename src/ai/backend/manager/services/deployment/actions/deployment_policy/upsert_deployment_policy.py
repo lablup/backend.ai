@@ -1,28 +1,26 @@
-"""Action for updating a deployment policy."""
+"""Action for upserting a deployment policy."""
 
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.deployment.modifier import DeploymentPolicyModifier
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
+from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.services.deployment.actions.deployment_policy.base import (
     DeploymentPolicyBaseAction,
 )
 
 
 @dataclass
-class UpdateDeploymentPolicyAction(DeploymentPolicyBaseAction):
-    """Action to update a deployment policy."""
+class UpsertDeploymentPolicyAction(DeploymentPolicyBaseAction):
+    """Action to create or update a deployment policy using ON CONFLICT."""
 
-    policy_id: UUID
-    modifier: DeploymentPolicyModifier
+    upserter: DeploymentPolicyUpserter
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.policy_id)
+        return str(self.upserter.deployment_id)
 
     @override
     @classmethod
@@ -31,10 +29,11 @@ class UpdateDeploymentPolicyAction(DeploymentPolicyBaseAction):
 
 
 @dataclass
-class UpdateDeploymentPolicyActionResult(BaseActionResult):
-    """Result of updating a deployment policy."""
+class UpsertDeploymentPolicyActionResult(BaseActionResult):
+    """Result of upserting a deployment policy."""
 
     data: DeploymentPolicyData
+    created: bool
 
     @override
     def entity_id(self) -> str | None:

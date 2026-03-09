@@ -1388,25 +1388,25 @@ class AbstractAgent[
     async def collect_container_stat(self, interval: float) -> None:
         if self.local_config.debug.log_stats:
             log.debug("collecting container statistics")
-        container_ids: list[ContainerId] = []
+        container_ids: set[ContainerId] = set()
         for kernel_obj in [*self.kernel_registry.values()]:
             if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
                 continue
-            container_ids.append(ContainerId(kernel_obj.container_id))
+            container_ids.add(ContainerId(kernel_obj.container_id))
         async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
-            await self.stat_ctx.collect_container_stat(container_ids)
+            await self.stat_ctx.collect_container_stat(list(container_ids))
 
     @_observe_stat_task(stat_scope=StatScope.PROCESS)
     async def collect_process_stat(self, interval: float) -> None:
         if self.local_config.debug.log_stats:
             log.debug("collecting process statistics in container")
-        container_ids = []
+        container_ids: set[ContainerId] = set()
         for kernel_obj in [*self.kernel_registry.values()]:
             if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
                 continue
-            container_ids.append(ContainerId(kernel_obj.container_id))
+            container_ids.add(ContainerId(kernel_obj.container_id))
         async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
-            await self.stat_ctx.collect_per_container_process_stat(container_ids)
+            await self.stat_ctx.collect_per_container_process_stat(list(container_ids))
 
     def _get_public_host(self) -> str:
         agent_config = self.local_config.agent

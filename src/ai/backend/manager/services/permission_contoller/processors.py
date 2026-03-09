@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
     AssignRoleAction,
@@ -97,7 +98,10 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     delete_permission: ActionProcessor[DeletePermissionAction, DeletePermissionActionResult]
 
     def __init__(
-        self, service: PermissionControllerService, action_monitors: list[ActionMonitor]
+        self,
+        service: PermissionControllerService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
     ) -> None:
         self.create_role = ActionProcessor(service.create_role, action_monitors)
         self.update_role = ActionProcessor(service.update_role, action_monitors)

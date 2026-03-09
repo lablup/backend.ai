@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
@@ -76,7 +77,12 @@ class UserProcessors(AbstractProcessorPackage):
     ]
     search_users_by_role: ActionProcessor[SearchUsersByRoleAction, SearchUsersByRoleActionResult]
 
-    def __init__(self, user_service: UserService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        user_service: UserService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.create_user = ActionProcessor(user_service.create_user, action_monitors)
         self.bulk_create_users = ActionProcessor(user_service.bulk_create_users, action_monitors)
         self.modify_user = ActionProcessor(user_service.modify_user, action_monitors)

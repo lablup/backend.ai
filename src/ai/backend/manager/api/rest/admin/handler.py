@@ -1,8 +1,7 @@
 """Admin handler class using constructor dependency injection.
 
 Handles GraphQL endpoints (graphene legacy, graphene v1, strawberry v2).
-The Strawberry GraphQL view is registered separately since it uses its own
-class-based handler (``CustomGraphQLView``).
+Strawberry v2 is served at ``POST /admin/gql/strawberry`` via ``handle_gql_strawberry()``.
 """
 
 from __future__ import annotations
@@ -23,6 +22,7 @@ from ai.backend.common.dto.manager.admin.request import GraphQLRequest
 from ai.backend.common.dto.manager.admin.response import GraphQLResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api import ManagerStatus
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.base import DataLoaderManager
 from ai.backend.manager.api.gql_legacy.schema import (
     GQLExceptionMiddleware,
@@ -37,6 +37,7 @@ from ai.backend.manager.errors.common import ServerFrozen
 
 if TYPE_CHECKING:
     from graphql import FieldNode
+    from strawberry.federation import Schema as StrawberrySchema
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -86,9 +87,11 @@ class AdminHandler:
         *,
         gql_schema: graphene.Schema,
         gql_deps: GQLContextDeps,
+        strawberry_schema: StrawberrySchema,
     ) -> None:
         self._gql_schema = gql_schema
         self._gql_deps = gql_deps
+        self._strawberry_schema = strawberry_schema
 
     async def _handle_gql_common(
         self, request_ctx: RequestCtx, params: GraphQLRequest
@@ -201,4 +204,40 @@ class AdminHandler:
                 log.error("ADMIN.GQL Exception: {}", e.formatted)
             raise BackendGQLError(extra_data=errors)
         resp = GraphQLResponse(data=result.data)
+        return APIResponse.build(HTTPStatus.OK, resp)
+
+    # ------------------------------------------------------------------
+    # handle_gql_strawberry (POST /admin/gql/strawberry)
+    # ------------------------------------------------------------------
+
+    async def handle_gql_strawberry(
+        self,
+        body: BodyParam[GraphQLRequest],
+        ctx: UserContext,
+        request_ctx: RequestCtx,
+    ) -> APIResponse:
+        params = body.parsed
+        gql_deps = self._gql_deps
+        gql_ctx = StrawberryGQLContext(
+            processors=gql_deps.processors,
+            config_provider=gql_deps.config_provider,
+            event_hub=gql_deps.processors.events.event_hub,
+            event_fetcher=gql_deps.processors.events.event_fetcher,
+            gql_adapter=gql_deps.strawberry_gql_adapter,
+            data_loaders=gql_deps.strawberry_data_loaders,
+        )
+        result = await self._strawberry_schema.execute(
+            params.query,
+            variable_values=params.variables,
+            operation_name=params.operation_name,
+            context_value=gql_ctx,
+        )
+        if result.errors:
+            for e in result.errors:
+                log.error("ADMIN.GQL.V2 Exception: {}", e.formatted)
+                log.debug("{}", repr(e))
+        resp = GraphQLResponse(
+            data=result.data,
+            errors=[dict(e.formatted) for e in result.errors] if result.errors else None,
+        )
         return APIResponse.build(HTTPStatus.OK, resp)

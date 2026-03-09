@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.scaling_group.actions.associate_with_domain import (
     AssociateScalingGroupWithDomainsAction,
     AssociateScalingGroupWithDomainsActionResult,
@@ -97,7 +98,12 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         DisassociateScalingGroupWithUserGroupsActionResult,
     ]
 
-    def __init__(self, service: ScalingGroupService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: ScalingGroupService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.create_scaling_group = ActionProcessor(service.create_scaling_group, action_monitors)
         self.purge_scaling_group = ActionProcessor(service.purge_scaling_group, action_monitors)
         self.modify_scaling_group = ActionProcessor(service.modify_scaling_group, action_monitors)

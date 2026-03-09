@@ -4,12 +4,21 @@ from ai.backend.manager.data.resource_slot.types import (
     AgentResourceData,
     NumberFormatData,
     ResourceAllocationData,
+    ResourceOccupancy,
     ResourceSlotTypeData,
 )
 from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
 
 from .actions.get_agent_resources import GetAgentResourcesAction, GetAgentResourcesResult
+from .actions.get_domain_resource_overview import (
+    GetDomainResourceOverviewAction,
+    GetDomainResourceOverviewResult,
+)
 from .actions.get_kernel_allocations import GetKernelAllocationsAction, GetKernelAllocationsResult
+from .actions.get_project_resource_overview import (
+    GetProjectResourceOverviewAction,
+    GetProjectResourceOverviewResult,
+)
 from .actions.get_resource_slot_type import GetResourceSlotTypeAction, GetResourceSlotTypeResult
 from .actions.search_agent_resources import SearchAgentResourcesAction, SearchAgentResourcesResult
 from .actions.search_resource_allocations import (
@@ -107,3 +116,19 @@ class ResourceSlotService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def get_domain_resource_overview(
+        self, action: GetDomainResourceOverviewAction
+    ) -> GetDomainResourceOverviewResult:
+        occupancy: ResourceOccupancy = await self._repository.get_domain_resource_overview(
+            action.domain_name
+        )
+        return GetDomainResourceOverviewResult(item=occupancy)
+
+    async def get_project_resource_overview(
+        self, action: GetProjectResourceOverviewAction
+    ) -> GetProjectResourceOverviewResult:
+        occupancy: ResourceOccupancy = await self._repository.get_project_resource_overview(
+            action.project_id
+        )
+        return GetProjectResourceOverviewResult(item=occupancy)

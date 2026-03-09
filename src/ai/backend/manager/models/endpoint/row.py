@@ -763,6 +763,10 @@ class EndpointRow(Base):  # type: ignore[misc]
         If current_revision is set and revisions are loaded, uses revision data.
         Otherwise, falls back to endpoint-level fields for legacy compatibility.
         """
+        policy_data = None
+        if self.deployment_policy is not None:
+            policy_data = self.deployment_policy.to_data()
+
         # Try to use current revision if available
         if self.current_revision and hasattr(self, "revisions") and self.revisions:
             current_rev = next(
@@ -770,10 +774,14 @@ class EndpointRow(Base):  # type: ignore[misc]
                 None,
             )
             if current_rev:
-                return self._to_deployment_info_from_revision(current_rev)
+                info = self._to_deployment_info_from_revision(current_rev)
+                info.policy = policy_data
+                return info
 
         # Fallback: use endpoint-level fields (legacy)
-        return self._to_deployment_info_legacy()
+        info = self._to_deployment_info_legacy()
+        info.policy = policy_data
+        return info
 
     def _to_deployment_info_from_revision(
         self,

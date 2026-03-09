@@ -29,7 +29,6 @@ from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators.endpoint import LegacyEndpointCreatorSpec
 from ai.backend.manager.repositories.deployment.options import RouteConditions
 from ai.backend.manager.repositories.deployment.updaters import (
-    DeploymentPolicyUpdaterSpec,
     DeploymentUpdaterSpec,
     RouteUpdaterSpec,
 )
@@ -227,26 +226,6 @@ class DeploymentController:
             DeploymentPolicyData: Policy data
         """
         return await self._deployment_repository.get_deployment_policy(endpoint_id)
-
-    async def update_deployment_policy(
-        self,
-        endpoint_id: uuid.UUID,
-        updater_spec: DeploymentPolicyUpdaterSpec,
-    ) -> DeploymentPolicyData:
-        """Update the deployment policy for an endpoint.
-
-        Args:
-            endpoint_id: ID of the endpoint
-            updater_spec: Policy update specification
-
-        Returns:
-            DeploymentPolicyData: Updated policy data
-        """
-        # First get the policy to find its ID (primary key)
-        policy = await self._deployment_repository.get_deployment_policy(endpoint_id)
-        return await self._deployment_repository.update_deployment_policy(
-            Updater(spec=updater_spec, pk_value=policy.id)
-        )
 
     # Route operations
 

@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.artifact.actions.delegate_scan import (
     DelegateScanArtifactsAction,
     DelegateScanArtifactsActionResult,
@@ -81,7 +82,12 @@ class ArtifactProcessors(AbstractProcessorPackage):
 
     delegate_scan: ActionProcessor[DelegateScanArtifactsAction, DelegateScanArtifactsActionResult]
 
-    def __init__(self, service: ArtifactService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: ArtifactService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         # TODO: Move scan action to ArtifactRegistryService
         self.scan = ActionProcessor(service.scan, action_monitors)
         self.get = ActionProcessor(service.get, action_monitors)

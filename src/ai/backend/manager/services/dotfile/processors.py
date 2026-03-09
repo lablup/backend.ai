@@ -5,6 +5,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions.check_group_membership import (
     CheckGroupMembershipAction,
@@ -38,7 +39,12 @@ class DotfileProcessors(AbstractProcessorPackage):
         UpdateBootstrapScriptAction, UpdateBootstrapScriptActionResult
     ]
 
-    def __init__(self, service: DotfileService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: DotfileService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.create = ActionProcessor(service.create_dotfile, action_monitors)
         self.list_or_get = ActionProcessor(service.list_or_get_dotfiles, action_monitors)
         self.update = ActionProcessor(service.update_dotfile, action_monitors)

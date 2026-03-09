@@ -4,6 +4,7 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -19,6 +20,7 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
     VFolderUsageMode,
 )
+from ai.backend.manager.actions.validators import ActionValidators
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -105,7 +107,9 @@ def vfolder_processors(
         user_repository=user_repository,
         valkey_stat_client=valkey_clients.stat,
     )
-    return VFolderProcessors(service=service, action_monitors=[])
+    return VFolderProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
@@ -122,7 +126,9 @@ def vfolder_file_processors(
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
     )
-    return VFolderFileProcessors(service=service, action_monitors=[])
+    return VFolderFileProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
@@ -137,7 +143,9 @@ def vfolder_invite_processors(
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
     )
-    return VFolderInviteProcessors(service=service, action_monitors=[])
+    return VFolderInviteProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
@@ -152,7 +160,9 @@ def vfolder_sharing_processors(
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
     )
-    return VFolderSharingProcessors(service=service, action_monitors=[])
+    return VFolderSharingProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()

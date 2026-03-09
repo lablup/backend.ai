@@ -5,15 +5,20 @@ import uuid
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
+    AddRevisionRequest,
+    AddRevisionResponse,
     CreateDeploymentRequest,
     CreateDeploymentResponse,
     DeactivateRevisionResponse,
     DestroyDeploymentResponse,
+    GetDeploymentPolicyResponse,
     GetDeploymentResponse,
     GetRevisionResponse,
+    ListDeploymentPoliciesResponse,
     ListDeploymentsResponse,
     ListRevisionsResponse,
     ListRoutesResponse,
+    SearchDeploymentPoliciesRequest,
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
@@ -21,6 +26,8 @@ from ai.backend.common.dto.manager.deployment import (
     UpdateDeploymentResponse,
     UpdateRouteTrafficStatusRequest,
     UpdateRouteTrafficStatusResponse,
+    UpsertDeploymentPolicyRequest,
+    UpsertDeploymentPolicyResponse,
 )
 
 
@@ -88,6 +95,18 @@ class DeploymentClient(BaseDomainClient):
     # ---------------------------------------------------------------------------
     # Revision operations
     # ---------------------------------------------------------------------------
+
+    async def add_revision(
+        self,
+        deployment_id: uuid.UUID,
+        request: AddRevisionRequest,
+    ) -> AddRevisionResponse:
+        return await self._client.typed_request(
+            "POST",
+            f"{self.API_PREFIX}/{deployment_id}/revisions",
+            request=request,
+            response_model=AddRevisionResponse,
+        )
 
     async def search_revisions(
         self,
@@ -161,4 +180,41 @@ class DeploymentClient(BaseDomainClient):
             f"{self.API_PREFIX}/{deployment_id}/routes/{route_id}/traffic-status",
             request=request,
             response_model=UpdateRouteTrafficStatusResponse,
+        )
+
+    # ---------------------------------------------------------------------------
+    # Policy operations
+    # ---------------------------------------------------------------------------
+
+    async def search_policies(
+        self,
+        request: SearchDeploymentPoliciesRequest,
+    ) -> ListDeploymentPoliciesResponse:
+        return await self._client.typed_request(
+            "POST",
+            f"{self.API_PREFIX}/policies/search",
+            request=request,
+            response_model=ListDeploymentPoliciesResponse,
+        )
+
+    async def get_policy(
+        self,
+        deployment_id: uuid.UUID,
+    ) -> GetDeploymentPolicyResponse:
+        return await self._client.typed_request(
+            "GET",
+            f"{self.API_PREFIX}/{deployment_id}/policy",
+            response_model=GetDeploymentPolicyResponse,
+        )
+
+    async def upsert_policy(
+        self,
+        deployment_id: uuid.UUID,
+        request: UpsertDeploymentPolicyRequest,
+    ) -> UpsertDeploymentPolicyResponse:
+        return await self._client.typed_request(
+            "PUT",
+            f"{self.API_PREFIX}/{deployment_id}/policy",
+            request=request,
+            response_model=UpsertDeploymentPolicyResponse,
         )

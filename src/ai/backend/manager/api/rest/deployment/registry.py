@@ -70,15 +70,9 @@ def register_deployment_routes(
 
     # Policy routes (nested under deployment)
     reg.add(
-        "POST",
+        "PUT",
         "/{deployment_id}/policy",
-        handler.create_deployment_policy,
-        middlewares=[auth_required],
-    )
-    reg.add(
-        "PATCH",
-        "/{deployment_id}/policy",
-        handler.update_deployment_policy,
+        handler.upsert_deployment_policy,
         middlewares=[auth_required],
     )
     reg.add(

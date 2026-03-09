@@ -86,10 +86,10 @@ from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
     DeploymentAutoScalingPolicyCreatorSpec,
-    DeploymentPolicyCreatorSpec,
     DeploymentRevisionCreatorSpec,
     RouteCreatorSpec,
 )
@@ -99,13 +99,13 @@ from ai.backend.manager.repositories.deployment.creators.endpoint import (
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentAutoScalingPolicyUpdaterSpec,
     DeploymentMetadataUpdaterSpec,
-    DeploymentPolicyUpdaterSpec,
     DeploymentUpdaterSpec,
     ReplicaSpecUpdaterSpec,
     RevisionStateUpdaterSpec,
     RouteStatusUpdaterSpec,
     RouteUpdaterSpec,
 )
+from ai.backend.manager.repositories.deployment.upserters import DeploymentPolicyUpserterSpec
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 
@@ -1195,6 +1195,7 @@ class TestDeploymentRevisionOperations:
                 EndpointRow,
                 EntityFieldRow,  # DeploymentRevisionRow relationship dependency
                 DeploymentRevisionRow,
+                DeploymentPolicyRow,
             ],
         ):
             yield database_connection
@@ -2404,36 +2405,60 @@ class TestDeploymentPolicyOperations:
         deployment_repository: DeploymentRepository,
         test_endpoint_id: uuid.UUID,
     ) -> DeploymentPolicyData:
-        """Create a single test deployment policy."""
-        spec = DeploymentPolicyCreatorSpec(
+        """Create a single test deployment policy via upsert."""
+        spec = DeploymentPolicyUpserterSpec(
             endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
             rollback_on_failure=False,
         )
-        return await deployment_repository.create_deployment_policy(Creator(spec=spec))
+        result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
+        return result.data
 
-    async def test_create_deployment_policy(
+    async def test_upsert_deployment_policy_insert(
         self,
         deployment_repository: DeploymentRepository,
         test_endpoint_id: uuid.UUID,
     ) -> None:
-        """Test creating a deployment policy using Creator."""
-        spec = DeploymentPolicyCreatorSpec(
+        """Test upserting a deployment policy (insert path)."""
+        spec = DeploymentPolicyUpserterSpec(
             endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=60),
             rollback_on_failure=False,
         )
-        creator = Creator(spec=spec)
 
-        result = await deployment_repository.create_deployment_policy(creator)
+        result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
 
-        assert result.id is not None
-        assert result.endpoint == test_endpoint_id
-        assert result.strategy == DeploymentStrategy.BLUE_GREEN
-        assert result.strategy_spec == BlueGreenSpec(auto_promote=True, promote_delay_seconds=60)
-        assert result.rollback_on_failure is False
+        assert result.data.id is not None
+        assert result.data.endpoint == test_endpoint_id
+        assert result.data.strategy == DeploymentStrategy.BLUE_GREEN
+        assert result.data.strategy_spec == BlueGreenSpec(
+            auto_promote=True, promote_delay_seconds=60
+        )
+        assert result.data.rollback_on_failure is False
+        assert result.created is True
+
+    async def test_upsert_deployment_policy_update(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: uuid.UUID,
+        test_deployment_policy_data: DeploymentPolicyData,
+    ) -> None:
+        """Test upserting a deployment policy (update path)."""
+        spec = DeploymentPolicyUpserterSpec(
+            endpoint_id=test_endpoint_id,
+            strategy=DeploymentStrategy.BLUE_GREEN,
+            strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
+            rollback_on_failure=True,
+        )
+
+        result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
+
+        assert result.data.endpoint == test_endpoint_id
+        assert result.data.strategy == DeploymentStrategy.BLUE_GREEN
+        assert result.data.rollback_on_failure is True
+        assert result.created is False
 
     async def test_get_deployment_policy(
         self,
@@ -2457,45 +2482,6 @@ class TestDeploymentPolicyOperations:
         """Test that get_deployment_policy raises DeploymentPolicyNotFound."""
         with pytest.raises(DeploymentPolicyNotFound):
             await deployment_repository.get_deployment_policy(test_endpoint_id)
-
-    async def test_update_deployment_policy(
-        self,
-        deployment_repository: DeploymentRepository,
-        test_deployment_policy_data: DeploymentPolicyData,
-    ) -> None:
-        """Test updating a deployment policy using Updater."""
-        new_strategy_spec = BlueGreenSpec(auto_promote=True, promote_delay_seconds=30)
-        updater = Updater(
-            spec=DeploymentPolicyUpdaterSpec(
-                strategy=OptionalState.update(DeploymentStrategy.BLUE_GREEN),
-                strategy_spec=OptionalState.update(new_strategy_spec),
-                rollback_on_failure=OptionalState.update(True),
-            ),
-            pk_value=test_deployment_policy_data.id,
-        )
-
-        result = await deployment_repository.update_deployment_policy(updater)
-
-        assert result.id == test_deployment_policy_data.id
-        assert result.strategy == DeploymentStrategy.BLUE_GREEN
-        assert result.strategy_spec == new_strategy_spec
-        assert result.rollback_on_failure is True
-
-    async def test_update_deployment_policy_not_found(
-        self,
-        deployment_repository: DeploymentRepository,
-    ) -> None:
-        """Test that update_deployment_policy raises DeploymentPolicyNotFound."""
-        nonexistent_id = uuid.uuid4()
-        updater = Updater(
-            spec=DeploymentPolicyUpdaterSpec(
-                strategy=OptionalState.update(DeploymentStrategy.BLUE_GREEN),
-            ),
-            pk_value=nonexistent_id,
-        )
-
-        with pytest.raises(DeploymentPolicyNotFound):
-            await deployment_repository.update_deployment_policy(updater)
 
     async def test_delete_deployment_policy(
         self,
@@ -2730,9 +2716,9 @@ class TestSearchDeploymentPolicies:
             (DeploymentStrategy.ROLLING, RollingUpdateSpec(max_surge=0, max_unavailable=1)),
         ]
         for eid, (strategy, spec) in zip(sample_endpoint_ids, strategies, strict=False):
-            data = await deployment_repository.create_deployment_policy(
-                Creator(
-                    spec=DeploymentPolicyCreatorSpec(
+            result = await deployment_repository.upsert_deployment_policy(
+                Upserter(
+                    spec=DeploymentPolicyUpserterSpec(
                         endpoint_id=eid,
                         strategy=strategy,
                         strategy_spec=spec,
@@ -2740,7 +2726,7 @@ class TestSearchDeploymentPolicies:
                     )
                 )
             )
-            policies.append(data)
+            policies.append(result.data)
         return policies
 
     @pytest.fixture
@@ -3269,6 +3255,7 @@ class TestDeploymentRepositoryDuplicateName:
                 ImageRow,
                 EndpointRow,
                 AssociationScopesEntitiesRow,
+                DeploymentPolicyRow,
             ],
         ):
             yield database_connection

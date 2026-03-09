@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
@@ -44,14 +45,12 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
     CreateLegacyDeploymentActionResult,
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
-    CreateDeploymentPolicyAction,
-    CreateDeploymentPolicyActionResult,
     GetDeploymentPolicyAction,
     GetDeploymentPolicyActionResult,
     SearchDeploymentPoliciesAction,
     SearchDeploymentPoliciesActionResult,
-    UpdateDeploymentPolicyAction,
-    UpdateDeploymentPolicyActionResult,
+    UpsertDeploymentPolicyAction,
+    UpsertDeploymentPolicyActionResult,
 )
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
@@ -126,11 +125,8 @@ class DeploymentProcessors(AbstractProcessorPackage):
     search_deployment_policies: ActionProcessor[
         SearchDeploymentPoliciesAction, SearchDeploymentPoliciesActionResult
     ]
-    create_deployment_policy: ActionProcessor[
-        CreateDeploymentPolicyAction, CreateDeploymentPolicyActionResult
-    ]
-    update_deployment_policy: ActionProcessor[
-        UpdateDeploymentPolicyAction, UpdateDeploymentPolicyActionResult
+    upsert_deployment_policy: ActionProcessor[
+        UpsertDeploymentPolicyAction, UpsertDeploymentPolicyActionResult
     ]
 
     # Revision operations
@@ -169,7 +165,12 @@ class DeploymentProcessors(AbstractProcessorPackage):
     create_access_token: ActionProcessor[CreateAccessTokenAction, CreateAccessTokenActionResult]
     search_access_tokens: ActionProcessor[SearchAccessTokensAction, SearchAccessTokensActionResult]
 
-    def __init__(self, service: DeploymentService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: DeploymentService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         # Deployment CRUD
         self.create_deployment = ActionProcessor(service.create_deployment, action_monitors)
         self.create_legacy_deployment = ActionProcessor(
@@ -183,11 +184,8 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.search_deployment_policies = ActionProcessor(
             service.search_deployment_policies, action_monitors
         )
-        self.create_deployment_policy = ActionProcessor(
-            service.create_deployment_policy, action_monitors
-        )
-        self.update_deployment_policy = ActionProcessor(
-            service.update_deployment_policy, action_monitors
+        self.upsert_deployment_policy = ActionProcessor(
+            service.upsert_deployment_policy, action_monitors
         )
 
         # Revision operations
@@ -238,8 +236,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
             GetDeploymentByIdAction.spec(),
             GetDeploymentPolicyAction.spec(),
             SearchDeploymentPoliciesAction.spec(),
-            CreateDeploymentPolicyAction.spec(),
-            UpdateDeploymentPolicyAction.spec(),
+            UpsertDeploymentPolicyAction.spec(),
             # Revision operations
             AddModelRevisionAction.spec(),
             GetRevisionByIdAction.spec(),
