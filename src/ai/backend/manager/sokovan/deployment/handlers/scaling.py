@@ -46,9 +46,9 @@ class ScalingDeploymentHandler(DeploymentHandler):
         return LockID.LOCKID_DEPLOYMENT_AUTO_SCALER
 
     @classmethod
-    def target_statuses(cls) -> list[EndpointLifecycle]:
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
         """Get the target deployment statuses for this handler."""
-        return [EndpointLifecycle.SCALING]
+        return [DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING)]
 
     @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:

@@ -180,8 +180,8 @@ class DeployingInProgressHandler(DeploymentHandler):
 
     @classmethod
     @override
-    def target_statuses(cls) -> list[EndpointLifecycle]:
-        return [EndpointLifecycle.DEPLOYING]
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
+        return [DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DEPLOYING)]
 
     @classmethod
     @override
@@ -214,6 +214,16 @@ class DeployingProvisioningHandler(DeployingInProgressHandler):
 
     @classmethod
     @override
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
+        return [
+            DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_status=DeploymentSubStep.PROVISIONING,
+            )
+        ]
+
+    @classmethod
+    @override
     def status_transitions(cls) -> DeploymentStatusTransitions:
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(
@@ -234,6 +244,16 @@ class DeployingProgressingHandler(DeployingInProgressHandler):
     @override
     def name(cls) -> str:
         return "deploying-progressing"
+
+    @classmethod
+    @override
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
+        return [
+            DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_status=DeploymentSubStep.PROGRESSING,
+            )
+        ]
 
     @classmethod
     @override
@@ -274,8 +294,13 @@ class DeployingCompletedHandler(DeploymentHandler):
 
     @classmethod
     @override
-    def target_statuses(cls) -> list[EndpointLifecycle]:
-        return [EndpointLifecycle.DEPLOYING]
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
+        return [
+            DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_status=DeploymentSubStep.COMPLETED,
+            )
+        ]
 
     @classmethod
     @override
@@ -322,8 +347,13 @@ class DeployingRolledBackHandler(DeploymentHandler):
 
     @classmethod
     @override
-    def target_statuses(cls) -> list[EndpointLifecycle]:
-        return [EndpointLifecycle.DEPLOYING]
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
+        return [
+            DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_status=DeploymentSubStep.ROLLED_BACK,
+            )
+        ]
 
     @classmethod
     @override

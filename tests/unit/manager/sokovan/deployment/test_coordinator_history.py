@@ -164,7 +164,9 @@ def mock_handler_with_success(
     mock = MagicMock(spec=DeploymentHandler)
     mock.name = MagicMock(return_value="check_pending")
     mock.lock_id = None
-    mock.target_statuses = MagicMock(return_value=[EndpointLifecycle.PENDING])
+    mock.target_statuses = MagicMock(
+        return_value=[DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.PENDING)]
+    )
     mock.status_transitions = MagicMock(
         return_value=DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.CREATED),
@@ -189,7 +191,9 @@ def mock_handler_with_failure(
     mock = MagicMock(spec=DeploymentHandler)
     mock.name = MagicMock(return_value="check_pending")
     mock.lock_id = None
-    mock.target_statuses = MagicMock(return_value=[EndpointLifecycle.PENDING])
+    mock.target_statuses = MagicMock(
+        return_value=[DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.PENDING)]
+    )
     mock.status_transitions = MagicMock(
         return_value=DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.CREATED),
@@ -212,7 +216,9 @@ def mock_handler_with_empty_result() -> MagicMock:
     mock = MagicMock(spec=DeploymentHandler)
     mock.name = MagicMock(return_value="check_pending")
     mock.lock_id = None
-    mock.target_statuses = MagicMock(return_value=[EndpointLifecycle.PENDING])
+    mock.target_statuses = MagicMock(
+        return_value=[DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.PENDING)]
+    )
     mock.status_transitions = MagicMock(
         return_value=DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.CREATED),
