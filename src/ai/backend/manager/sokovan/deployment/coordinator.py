@@ -364,7 +364,7 @@ class DeploymentCoordinator:
         handler: DeploymentHandler,
         lifecycle_type: DeploymentLifecycleType,
     ) -> None:
-        """Run a single handler: fetch filtered deployments → execute → transitions → post_process."""
+        """Run a single handler: fetch filtered deployments -> execute -> transitions -> post_process."""
         target_statuses = handler.target_statuses()
         lifecycles = list({s.lifecycle for s in target_statuses})
         sub_steps = [

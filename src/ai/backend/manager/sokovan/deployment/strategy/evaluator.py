@@ -67,7 +67,7 @@ class DeploymentStrategyEvaluator:
 
         endpoint_ids = {d.id for d in deployments}
 
-        # ── 1. Bulk-load policies and routes ──
+        # -- 1. Bulk-load policies and routes --
         policy_search = await self._deployment_repo.search_deployment_policies(
             BatchQuerier(
                 pagination=NoPagination(),
@@ -77,7 +77,7 @@ class DeploymentStrategyEvaluator:
         policy_map = {p.endpoint: p for p in policy_search.items}
         route_map = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(endpoint_ids)
 
-        # ── 2. Per-deployment evaluation ──
+        # -- 2. Per-deployment evaluation --
         for deployment in deployments:
             policy = policy_map.get(deployment.id)
             if policy is None:
@@ -93,7 +93,7 @@ class DeploymentStrategyEvaluator:
                 log.warning("deployment {}: evaluation error — {}", deployment.id, e)
                 continue
 
-            # ── 3. Aggregate route changes and record sub-steps ──
+            # -- 3. Aggregate route changes and record sub-steps --
             changes = cycle_result.route_changes
             result.route_changes.rollout_specs.extend(changes.rollout_specs)
             result.route_changes.drain_route_ids.extend(changes.drain_route_ids)
