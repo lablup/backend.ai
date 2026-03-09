@@ -15,7 +15,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec
 
-from .types import AbstractDeploymentStrategy, CycleEvaluationResult
+from .types import AbstractDeploymentStrategy, StrategyCycleResult
 
 
 class BlueGreenStrategy(AbstractDeploymentStrategy):
@@ -30,6 +30,6 @@ class BlueGreenStrategy(AbstractDeploymentStrategy):
         self,
         deployment: DeploymentInfo,
         routes: Sequence[RouteInfo],
-    ) -> CycleEvaluationResult:
+    ) -> StrategyCycleResult:
         """Evaluate one cycle of blue-green deployment for a single deployment."""
         raise NotImplementedError("Blue-green deployment strategy is not yet implemented")

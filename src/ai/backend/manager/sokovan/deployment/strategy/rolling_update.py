@@ -15,7 +15,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.deployment_policy import RollingUpdateSpec
 
-from .types import AbstractDeploymentStrategy, CycleEvaluationResult
+from .types import AbstractDeploymentStrategy, StrategyCycleResult
 
 
 class RollingUpdateStrategy(AbstractDeploymentStrategy):
@@ -30,6 +30,6 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
         self,
         deployment: DeploymentInfo,
         routes: Sequence[RouteInfo],
-    ) -> CycleEvaluationResult:
+    ) -> StrategyCycleResult:
         """Evaluate one cycle of rolling update for a single deployment."""
         raise NotImplementedError("Rolling update strategy is not yet implemented")

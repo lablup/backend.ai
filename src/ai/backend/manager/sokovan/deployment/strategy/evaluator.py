@@ -31,8 +31,8 @@ from ai.backend.manager.sokovan.deployment.recorder import DeploymentRecorderCon
 from .types import (
     AbstractDeploymentStrategy,
     DeploymentStrategyRegistry,
-    EvaluationResult,
     RouteChanges,
+    StrategyEvaluationSummary,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -52,7 +52,7 @@ class DeploymentStrategyEvaluator:
     async def evaluate(
         self,
         deployments: Sequence[DeploymentInfo],
-    ) -> EvaluationResult:
+    ) -> StrategyEvaluationSummary:
         """Evaluate all DEPLOYING deployments in a single cycle.
 
         Steps:
@@ -60,7 +60,7 @@ class DeploymentStrategyEvaluator:
             2. Per-deployment: dispatch to strategy FSM.
             3. Aggregate route changes and sub_step assignments.
         """
-        result = EvaluationResult()
+        result = StrategyEvaluationSummary()
 
         if not deployments:
             return result

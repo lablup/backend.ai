@@ -41,7 +41,7 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import Deployme
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.manager.sokovan.deployment.strategy.evaluator import DeploymentStrategyEvaluator
-from ai.backend.manager.sokovan.deployment.strategy.types import EvaluationResult
+from ai.backend.manager.sokovan.deployment.strategy.types import StrategyEvaluationSummary
 from ai.backend.manager.sokovan.deployment.types import (
     DeploymentExecutionResult,
     DeploymentLifecycleType,
@@ -118,12 +118,12 @@ class DeployingEvaluatePreStep:
         await self._update_sub_steps(eval_result)
         await self._apply_route_changes(eval_result)
 
-    async def _update_sub_steps(self, eval_result: EvaluationResult) -> None:
+    async def _update_sub_steps(self, eval_result: StrategyEvaluationSummary) -> None:
         """Bulk-update the sub_step column based on evaluation results."""
         if eval_result.assignments:
             await self._deployment_repo.update_sub_steps(eval_result.assignments)
 
-    async def _apply_route_changes(self, eval_result: EvaluationResult) -> None:
+    async def _apply_route_changes(self, eval_result: StrategyEvaluationSummary) -> None:
         """Apply aggregated route mutations from the evaluation result."""
         changes = eval_result.route_changes
         if not changes.rollout_specs and not changes.drain_route_ids:

@@ -29,7 +29,7 @@ class RouteChanges:
 
 
 @dataclass
-class CycleEvaluationResult:
+class StrategyCycleResult:
     """Result of evaluating a single deployment's strategy cycle.
 
     ``sub_step`` indicates the next state: PROVISIONING, PROGRESSING,
@@ -41,7 +41,7 @@ class CycleEvaluationResult:
 
 
 @dataclass
-class EvaluationResult:
+class StrategyEvaluationSummary:
     """Aggregate result of evaluating all DEPLOYING deployments.
 
     The evaluator classifies each deployment into a sub_step and records
@@ -74,7 +74,7 @@ class AbstractDeploymentStrategy(ABC):
         self,
         deployment: DeploymentInfo,
         routes: Sequence[RouteInfo],
-    ) -> CycleEvaluationResult: ...
+    ) -> StrategyCycleResult: ...
 
 
 @dataclass(frozen=True)
