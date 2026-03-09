@@ -295,32 +295,25 @@ def add_revision_cmd(
 
 @revision.command("list")
 @pass_ctx_obj
-@click.argument("deployment_id", type=click.UUID)
+@click.argument("deployment_id", type=str)
 @click.option("--limit", type=int, default=50, help="Maximum items to return")
 @click.option("--offset", type=int, default=0, help="Number of items to skip")
 def list_revisions_cmd(
     ctx: CLIContext,
-    deployment_id: UUID,
+    deployment_id: str,
     limit: int,
     offset: int,
 ) -> None:
     """List revisions for a deployment."""
-    import asyncio
+    from uuid import UUID
 
-    from ai.backend.client.config import get_config
-    from ai.backend.client.v2.auth import HMACAuth
-    from ai.backend.client.v2.config import ClientConfig
-    from ai.backend.client.v2.registry import BackendAIClientRegistry
+    from ai.backend.client.session import Session
     from ai.backend.common.dto.manager.deployment import SearchRevisionsRequest
 
-    async def _run() -> None:
-        api_config = get_config()
-        v2_config = ClientConfig.from_v1_config(api_config)
-        auth = HMACAuth(api_config.access_key, api_config.secret_key)
-        registry = await BackendAIClientRegistry.create(v2_config, auth)
+    with Session() as session:
         try:
             request = SearchRevisionsRequest(limit=limit, offset=offset)
-            result = await registry.deployment.search_revisions(deployment_id, request)
+            result = session.Deployment.search_revisions(UUID(deployment_id), request)
 
             revisions = result.revisions
             if not revisions:
@@ -333,116 +326,75 @@ def list_revisions_cmd(
                 print(f"Image: {rev.image_id}")
                 print(f"Created: {rev.created_at}")
                 print("---")
-        finally:
-            await registry.close()
-
-    try:
-        asyncio.run(_run())
-    except Exception as e:
-        ctx.output.print_error(e)
-        sys.exit(ExitCode.FAILURE)
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
 
 
 @revision.command("info")
 @pass_ctx_obj
-@click.argument("deployment_id", type=click.UUID)
-@click.argument("revision_id", type=click.UUID)
-def info_revision_cmd(ctx: CLIContext, deployment_id: UUID, revision_id: UUID) -> None:
+@click.argument("deployment_id", type=str)
+@click.argument("revision_id", type=str)
+def info_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str) -> None:
     """Display detailed information of a revision."""
-    import asyncio
     import json
+    from uuid import UUID
 
-    from ai.backend.client.config import get_config
-    from ai.backend.client.v2.auth import HMACAuth
-    from ai.backend.client.v2.config import ClientConfig
-    from ai.backend.client.v2.registry import BackendAIClientRegistry
+    from ai.backend.client.session import Session
 
-    async def _run() -> None:
-        api_config = get_config()
-        v2_config = ClientConfig.from_v1_config(api_config)
-        auth = HMACAuth(api_config.access_key, api_config.secret_key)
-        registry = await BackendAIClientRegistry.create(v2_config, auth)
+    with Session() as session:
         try:
-            result = await registry.deployment.get_revision(deployment_id, revision_id)
+            result = session.Deployment.get_revision(UUID(deployment_id), UUID(revision_id))
             print(json.dumps(result.revision.model_dump(mode="json"), indent=2, default=str))
-        finally:
-            await registry.close()
-
-    try:
-        asyncio.run(_run())
-    except Exception as e:
-        ctx.output.print_error(e)
-        sys.exit(ExitCode.FAILURE)
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
 
 
 @revision.command("activate")
 @pass_ctx_obj
-@click.argument("deployment_id", type=click.UUID)
-@click.argument("revision_id", type=click.UUID)
-def activate_revision_cmd(ctx: CLIContext, deployment_id: UUID, revision_id: UUID) -> None:
+@click.argument("deployment_id", type=str)
+@click.argument("revision_id", type=str)
+def activate_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str) -> None:
     """Activate a revision."""
-    import asyncio
+    from uuid import UUID
 
-    from ai.backend.client.config import get_config
-    from ai.backend.client.v2.auth import HMACAuth
-    from ai.backend.client.v2.config import ClientConfig
-    from ai.backend.client.v2.registry import BackendAIClientRegistry
+    from ai.backend.client.session import Session
 
-    async def _run() -> None:
-        api_config = get_config()
-        v2_config = ClientConfig.from_v1_config(api_config)
-        auth = HMACAuth(api_config.access_key, api_config.secret_key)
-        registry = await BackendAIClientRegistry.create(v2_config, auth)
+    with Session() as session:
         try:
-            result = await registry.deployment.activate_revision(deployment_id, revision_id)
+            result = session.Deployment.activate_revision(UUID(deployment_id), UUID(revision_id))
             if result.success:
                 print_done(f"Revision activated: {revision_id}")
             else:
                 print_fail(f"Failed to activate revision: {revision_id}")
                 sys.exit(ExitCode.FAILURE)
-        finally:
-            await registry.close()
-
-    try:
-        asyncio.run(_run())
-    except Exception as e:
-        ctx.output.print_error(e)
-        sys.exit(ExitCode.FAILURE)
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
 
 
 @revision.command("deactivate")
 @pass_ctx_obj
-@click.argument("deployment_id", type=click.UUID)
-@click.argument("revision_id", type=click.UUID)
-def deactivate_revision_cmd(ctx: CLIContext, deployment_id: UUID, revision_id: UUID) -> None:
+@click.argument("deployment_id", type=str)
+@click.argument("revision_id", type=str)
+def deactivate_revision_cmd(ctx: CLIContext, deployment_id: str, revision_id: str) -> None:
     """Deactivate a revision."""
-    import asyncio
+    from uuid import UUID
 
-    from ai.backend.client.config import get_config
-    from ai.backend.client.v2.auth import HMACAuth
-    from ai.backend.client.v2.config import ClientConfig
-    from ai.backend.client.v2.registry import BackendAIClientRegistry
+    from ai.backend.client.session import Session
 
-    async def _run() -> None:
-        api_config = get_config()
-        v2_config = ClientConfig.from_v1_config(api_config)
-        auth = HMACAuth(api_config.access_key, api_config.secret_key)
-        registry = await BackendAIClientRegistry.create(v2_config, auth)
+    with Session() as session:
         try:
-            result = await registry.deployment.deactivate_revision(deployment_id, revision_id)
+            result = session.Deployment.deactivate_revision(UUID(deployment_id), UUID(revision_id))
             if result.success:
                 print_done(f"Revision deactivated: {revision_id}")
             else:
                 print_fail(f"Failed to deactivate revision: {revision_id}")
                 sys.exit(ExitCode.FAILURE)
-        finally:
-            await registry.close()
-
-    try:
-        asyncio.run(_run())
-    except Exception as e:
-        ctx.output.print_error(e)
-        sys.exit(ExitCode.FAILURE)
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
 
 
 # Route commands
