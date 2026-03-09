@@ -715,9 +715,10 @@ class MemoryPlugin(AbstractComputePlugin):
             sandbox_key = data["NetworkSettings"]["SandboxKey"]
             net_rx_bytes = 0
             net_tx_bytes = 0
-            if sandbox_key and await asyncio.to_thread(Path(sandbox_key).exists):
+            ns_path = Path(sandbox_key) if sandbox_key else None
+            if ns_path is not None and await asyncio.to_thread(ns_path.exists):
                 try:
-                    nstat = await netstat_ns(sandbox_key)
+                    nstat = await netstat_ns(ns_path)
                 except OSError as e:
                     log.warning(
                         "MemoryPlugin: cannot read net stats for container {0}: {1!r}",

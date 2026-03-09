@@ -190,6 +190,11 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
             patch(
                 "ai.backend.agent.docker.intrinsic.current_loop",
             ) as mock_loop,
+            patch(
+                "asyncio.to_thread",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
         ):
             mock_container_instance = AsyncMock()
             mock_container_instance.show.return_value = mock_container_data
