@@ -286,10 +286,10 @@ class DeploymentRepository:
     async def get_endpoints_by_statuses(
         self,
         statuses: list[EndpointLifecycle],
-        sub_step: DeploymentSubStep | None = None,
+        sub_steps: list[DeploymentSubStep] | None = None,
     ) -> list[DeploymentInfo]:
-        """Get endpoints by lifecycle statuses, optionally filtered by sub_step."""
-        return await self._db_source.get_endpoints_by_statuses(statuses, sub_step=sub_step)
+        """Get endpoints by lifecycle statuses, optionally filtered by sub_steps."""
+        return await self._db_source.get_endpoints_by_statuses(statuses, sub_steps=sub_steps)
 
     @deployment_repository_resilience.apply()
     async def get_endpoint_info(

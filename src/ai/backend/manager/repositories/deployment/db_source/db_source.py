@@ -480,23 +480,23 @@ class DeploymentDBSource:
     async def get_endpoints_by_statuses(
         self,
         statuses: list[EndpointLifecycle],
-        sub_step: DeploymentSubStep | None = None,
+        sub_steps: list[DeploymentSubStep] | None = None,
     ) -> list[DeploymentInfo]:
-        """Get endpoints by lifecycle statuses, optionally filtered by sub_step."""
+        """Get endpoints by lifecycle statuses, optionally filtered by sub_steps."""
         async with self._begin_readonly_session_read_committed() as db_sess:
-            rows = await self._get_endpoints_by_statuses(db_sess, statuses, sub_step)
+            rows = await self._get_endpoints_by_statuses(db_sess, statuses, sub_steps)
             return [row.to_deployment_info() for row in rows]
 
     async def _get_endpoints_by_statuses(
         self,
         db_sess: SASession,
         statuses: list[EndpointLifecycle],
-        sub_step: DeploymentSubStep | None = None,
+        sub_steps: list[DeploymentSubStep] | None = None,
     ) -> list[EndpointRow]:
-        """Fetch endpoints by lifecycle statuses, optionally filtered by sub_step."""
+        """Fetch endpoints by lifecycle statuses, optionally filtered by sub_steps."""
         where_clause: sa.ColumnElement[bool] = EndpointRow.lifecycle_stage.in_(statuses)
-        if sub_step is not None:
-            where_clause = sa.and_(where_clause, EndpointRow.sub_step == sub_step)
+        if sub_steps is not None:
+            where_clause = sa.and_(where_clause, EndpointRow.sub_step.in_(sub_steps))
         query = (
             sa.select(EndpointRow)
             .where(where_clause)

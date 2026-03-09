@@ -56,11 +56,9 @@ from .executor import DeploymentExecutor
 from .handlers import (
     CheckPendingDeploymentHandler,
     CheckReplicaDeploymentHandler,
-    DeployingCompletedHandler,
     DeployingEvaluatePreStep,
     DeployingProgressingHandler,
     DeployingProvisioningHandler,
-    DeployingRolledBackHandler,
     DeploymentHandler,
     DestroyingDeploymentHandler,
     ReconcileDeploymentHandler,
@@ -251,17 +249,6 @@ class DeploymentCoordinator:
                 DeployingProgressingHandler(
                     deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
-                ),
-            ),
-            (
-                DeploymentLifecycleType.DEPLOYING,
-                DeployingCompletedHandler(
-                    deployment_repo=self._deployment_repository,
-                ),
-            ),
-            (
-                DeploymentLifecycleType.DEPLOYING,
-                DeployingRolledBackHandler(
                     deployment_repo=self._deployment_repository,
                 ),
             ),
@@ -288,16 +275,16 @@ class DeploymentCoordinator:
     ) -> HandlerKey:
         """Derive a registry key from the handler's target_statuses().
 
-        If all targets share the same sub_status, that becomes the key's sub_step.
-        If targets have no sub_status (all None), sub_step is None.
+        Uses the first entry's sub_status as the key.  Handlers that target
+        multiple sub-steps (e.g. PROGRESSING handler handling COMPLETED and
+        ROLLED_BACK too) are keyed by their primary sub-step.
         """
         statuses = handler.target_statuses()
-        sub_statuses = {s.sub_status for s in statuses}
-        if len(sub_statuses) != 1:
+        if not statuses:
             return (lifecycle_type, None)
-        sub_status = sub_statuses.pop()
-        if isinstance(sub_status, DeploymentSubStep):
-            return (lifecycle_type, sub_status)
+        first_sub = statuses[0].sub_status
+        if isinstance(first_sub, DeploymentSubStep):
+            return (lifecycle_type, first_sub)
         return (lifecycle_type, None)
 
     async def process_deployment_lifecycle(
@@ -341,13 +328,13 @@ class DeploymentCoordinator:
     ) -> None:
         """Run a single handler: fetch filtered deployments → execute → transitions → post_process."""
         target_statuses = handler.target_statuses()
-        lifecycles = [s.lifecycle for s in target_statuses]
-        # All targets share the same sub_status (enforced by _derive_handler_key)
-        raw_sub = target_statuses[0].sub_status if target_statuses else None
-        sub_step = raw_sub if isinstance(raw_sub, DeploymentSubStep) else None
+        lifecycles = list({s.lifecycle for s in target_statuses})
+        sub_steps = [
+            s.sub_status for s in target_statuses if isinstance(s.sub_status, DeploymentSubStep)
+        ]
         deployments = await self._deployment_repository.get_endpoints_by_statuses(
             lifecycles,
-            sub_step=sub_step,
+            sub_steps=sub_steps or None,
         )
         if not deployments:
             log.trace("No deployments to process for handler: {}", handler.name())
@@ -382,6 +369,8 @@ class DeploymentCoordinator:
         target_statuses = handler.target_statuses()
         target_lifecycles = [s.lifecycle for s in target_statuses]
         from_status = target_lifecycles[0] if target_lifecycles else None
+        # sub_status from target_statuses — used for history recording
+        target_sub_status = target_statuses[0].sub_status if target_statuses else None
 
         # Collect all batch updaters and history specs
         batch_updaters: list[BatchUpdater[EndpointRow]] = []
@@ -405,7 +394,7 @@ class DeploymentCoordinator:
                     from_status=from_status,
                     to_status=next_lifecycle,
                     sub_steps=self._build_history_sub_steps(
-                        d.id, records, sub_status, SchedulingResult.SUCCESS
+                        d.id, records, target_sub_status, SchedulingResult.SUCCESS
                     ),
                 )
                 for d in result.successes
@@ -450,7 +439,7 @@ class DeploymentCoordinator:
                     to_status=failure_lifecycle,
                     error_code=e.error_code,
                     sub_steps=self._build_history_sub_steps(
-                        e.deployment_info.id, records, failure_sub_status, SchedulingResult.FAILURE
+                        e.deployment_info.id, records, target_sub_status, SchedulingResult.FAILURE
                     ),
                 )
                 for e in result.errors

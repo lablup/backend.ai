@@ -43,6 +43,7 @@ from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.manager.sokovan.deployment.strategy.evaluator import DeploymentStrategyEvaluator
 from ai.backend.manager.sokovan.deployment.strategy.types import StrategyEvaluationSummary
 from ai.backend.manager.sokovan.deployment.types import (
+    DeploymentExecutionError,
     DeploymentExecutionResult,
     DeploymentLifecycleType,
 )
@@ -234,59 +235,31 @@ class DeployingProvisioningHandler(DeployingInProgressHandler):
         )
 
 
-class DeployingProgressingHandler(DeployingInProgressHandler):
-    """Handler for DEPLOYING / PROGRESSING sub-step.
+class DeployingProgressingHandler(DeploymentHandler):
+    """Handler for DEPLOYING / PROGRESSING sub-step (including terminal states).
 
-    Actively replacing old routes with new routes.
+    Handles three sub-steps set by the pre-step evaluator:
+
+    - **PROGRESSING**: Actively replacing routes — no-op, re-schedule next cycle.
+    - **COMPLETED**: All strategy conditions met — revision swap → success (→ READY).
+    - **ROLLED_BACK**: All new routes failed — clear deploying_revision → failure (→ READY).
     """
+
+    def __init__(
+        self,
+        deployment_controller: DeploymentController,
+        route_controller: RouteController,
+        deployment_repo: DeploymentRepository,
+    ) -> None:
+        self._deployment_controller = deployment_controller
+        self._route_controller = route_controller
+        self._deployment_repo = deployment_repo
 
     @classmethod
     @override
     def name(cls) -> str:
         return "deploying-progressing"
 
-    @classmethod
-    @override
-    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
-        return [
-            DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.PROGRESSING,
-            )
-        ]
-
-    @classmethod
-    @override
-    def status_transitions(cls) -> DeploymentStatusTransitions:
-        return DeploymentStatusTransitions(
-            success=DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.PROGRESSING,
-            ),
-            failure=None,
-        )
-
-
-# ---------------------------------------------------------------------------
-# Terminal handlers (COMPLETED / ROLLED_BACK)
-# ---------------------------------------------------------------------------
-
-
-class DeployingCompletedHandler(DeploymentHandler):
-    """Handler for DEPLOYING / COMPLETED sub-step.
-
-    Performs revision swap only.  Lifecycle transition to READY is handled
-    by the coordinator via ``status_transitions()``.
-    """
-
-    def __init__(self, deployment_repo: DeploymentRepository) -> None:
-        self._deployment_repo = deployment_repo
-
-    @classmethod
-    @override
-    def name(cls) -> str:
-        return "deploying-completed"
-
     @property
     @override
     def lock_id(self) -> LockID | None:
@@ -298,81 +271,62 @@ class DeployingCompletedHandler(DeploymentHandler):
         return [
             DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.COMPLETED,
-            )
-        ]
-
-    @classmethod
-    @override
-    def status_transitions(cls) -> DeploymentStatusTransitions:
-        return DeploymentStatusTransitions(
-            success=DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.READY,
+                sub_status=DeploymentSubStep.PROGRESSING,
+            ),
+            DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
                 sub_status=DeploymentSubStep.COMPLETED,
             ),
-            failure=None,
-        )
-
-    @override
-    async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
-        endpoint_ids = {d.id for d in deployments}
-        await self._deployment_repo.complete_deployment_revision_swap(endpoint_ids)
-        log.info("Swapped revision for {} completed deployments", len(endpoint_ids))
-        return DeploymentExecutionResult(successes=list(deployments))
-
-    @override
-    async def post_process(self, result: DeploymentExecutionResult) -> None:
-        pass
-
-
-class DeployingRolledBackHandler(DeploymentHandler):
-    """Handler for DEPLOYING / ROLLED_BACK sub-step.
-
-    Clears deploying_revision only.  Lifecycle transition to READY is handled
-    by the coordinator via ``status_transitions()``.
-    """
-
-    def __init__(self, deployment_repo: DeploymentRepository) -> None:
-        self._deployment_repo = deployment_repo
-
-    @classmethod
-    @override
-    def name(cls) -> str:
-        return "deploying-rolled-back"
-
-    @property
-    @override
-    def lock_id(self) -> LockID | None:
-        return None
-
-    @classmethod
-    @override
-    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
-        return [
             DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
                 sub_status=DeploymentSubStep.ROLLED_BACK,
-            )
+            ),
         ]
 
     @classmethod
     @override
     def status_transitions(cls) -> DeploymentStatusTransitions:
         return DeploymentStatusTransitions(
-            success=DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.READY,
-                sub_status=DeploymentSubStep.ROLLED_BACK,
-            ),
-            failure=None,
+            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
+            failure=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
         )
 
     @override
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
-        endpoint_ids = {d.id for d in deployments}
-        await self._deployment_repo.clear_deploying_revision(endpoint_ids)
-        log.info("Cleared deploying_revision for {} rolled-back deployments", len(endpoint_ids))
-        return DeploymentExecutionResult(successes=list(deployments))
+        completed: list[DeploymentInfo] = []
+        rolled_back: list[DeploymentInfo] = []
+
+        for d in deployments:
+            if d.sub_step == DeploymentSubStep.COMPLETED:
+                completed.append(d)
+            elif d.sub_step == DeploymentSubStep.ROLLED_BACK:
+                rolled_back.append(d)
+            # PROGRESSING: still in progress — not included in result
+
+        if completed:
+            endpoint_ids = {d.id for d in completed}
+            await self._deployment_repo.complete_deployment_revision_swap(endpoint_ids)
+            log.info("Swapped revision for {} completed deployments", len(endpoint_ids))
+
+        if rolled_back:
+            endpoint_ids = {d.id for d in rolled_back}
+            await self._deployment_repo.clear_deploying_revision(endpoint_ids)
+            log.info("Cleared deploying_revision for {} rolled-back deployments", len(endpoint_ids))
+
+        return DeploymentExecutionResult(
+            successes=completed,
+            errors=[
+                DeploymentExecutionError(
+                    deployment_info=d,
+                    reason="Deployment rolled back — all new routes failed",
+                    error_detail="Strategy FSM determined rollback",
+                )
+                for d in rolled_back
+            ],
+        )
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
-        pass
+        # Re-schedule DEPLOYING for still-progressing deployments
+        await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.DEPLOYING)
+        await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)
