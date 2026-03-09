@@ -170,39 +170,52 @@ class CircuitManager:
         worker_authority = circuit.worker_row.authority
         etcd_prefix = f"worker_{worker_authority}/{circuit.protocol.value.lower()}"
 
-        # Use health-aware services configuration
-        new_route_keys = {
-            f"bai_session_{r.session_id}_{circuit.id}" for r in circuit.healthy_routes
-        }
-        new_services = circuit.traefik_services
-        new_services = {
-            f"bai_service_{circuit.id}": new_services[f"bai_service_{circuit.id}"],
-            **{k: v for k, v in new_services.items() if k in new_route_keys},
-        }
+        old_session_ids = {r.session_id for r in old_routes}
+        new_healthy_session_ids = {r.session_id for r in circuit.healthy_routes}
 
-        # clear old routes
-        for route in old_routes:
+        removed_session_ids = old_session_ids - new_healthy_session_ids
+        added_session_ids = new_healthy_session_ids - old_session_ids
+
+        # Delete only removed routes
+        for session_id in removed_session_ids:
             log.debug(
                 "traefik_etcd.delete_prefix {}",
-                f"{etcd_prefix}/services/bai_session_{route.session_id}_{circuit.id}",
+                f"{etcd_prefix}/services/bai_session_{session_id}_{circuit.id}",
             )
             await self.traefik_etcd.delete_prefix(
-                f"{etcd_prefix}/services/bai_session_{route.session_id}_{circuit.id}"
+                f"{etcd_prefix}/services/bai_session_{session_id}_{circuit.id}"
             )
-        log.debug(
-            "traefik_etcd.delete_prefix {}", f"{etcd_prefix}/services/bai_service_{circuit.id}"
-        )
-        await self.traefik_etcd.delete_prefix(f"{etcd_prefix}/services/bai_service_{circuit.id}")
 
-        log.debug(
-            "traefik_etcd.put_prefix {} {}",
-            f"{etcd_prefix}/services",
-            convert_to_etcd_dict(new_services),
-        )
-        await self.traefik_etcd.put_prefix(
-            f"{etcd_prefix}/services",
-            convert_to_etcd_dict(new_services),
-        )
+        # Always update the weighted service config and add new route backends
+        new_services = circuit.traefik_services
+        if new_services:
+            services_to_put = {
+                f"bai_service_{circuit.id}": new_services[f"bai_service_{circuit.id}"],
+            }
+            for session_id in added_session_ids:
+                key = f"bai_session_{session_id}_{circuit.id}"
+                if key in new_services:
+                    services_to_put[key] = new_services[key]
+
+            log.debug(
+                "traefik_etcd.put_prefix {} {}",
+                f"{etcd_prefix}/services",
+                convert_to_etcd_dict(services_to_put),
+            )
+            await self.traefik_etcd.put_prefix(
+                f"{etcd_prefix}/services",
+                convert_to_etcd_dict(services_to_put),
+            )
+        else:
+            # No healthy routes — remove the service entirely
+            log.debug(
+                "traefik_etcd.delete_prefix {}",
+                f"{etcd_prefix}/services/bai_service_{circuit.id}",
+            )
+            await self.traefik_etcd.delete_prefix(
+                f"{etcd_prefix}/services/bai_service_{circuit.id}"
+            )
+
         log.debug("update_traefik_circuit_routes(): end")
 
     async def update_legacy_circuit_routes(
