@@ -430,6 +430,7 @@ class DeploymentDBSource:
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
+                    selectinload(EndpointRow.deployment_policy),
                 )
             )
             result = await db_sess.execute(query)
@@ -484,8 +485,7 @@ class DeploymentDBSource:
         """Get endpoints by lifecycle statuses, optionally filtered by sub_step."""
         async with self._begin_readonly_session_read_committed() as db_sess:
             rows = await self._get_endpoints_by_statuses(db_sess, statuses, sub_step=sub_step)
-
-        return [row.to_deployment_info() for row in rows]
+            return [row.to_deployment_info() for row in rows]
 
     async def _get_endpoints_by_statuses(
         self,
@@ -497,13 +497,14 @@ class DeploymentDBSource:
         """Fetch endpoints by lifecycle statuses, optionally filtered by sub_step."""
         where_clause: sa.ColumnElement[bool] = EndpointRow.lifecycle_stage.in_(statuses)
         if sub_step is not None:
-            where_clause = sa.and_(where_clause, EndpointRow.sub_step == sub_step.value)
+            where_clause = sa.and_(where_clause, EndpointRow.sub_step == sub_step)
         query = (
             sa.select(EndpointRow)
             .where(where_clause)
             .options(
                 selectinload(EndpointRow.image_row),
                 selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
+                selectinload(EndpointRow.deployment_policy),
             )
         )
         result = await db_sess.execute(query)
@@ -2440,7 +2441,7 @@ class DeploymentDBSource:
                 stmt = (
                     sa.update(EndpointRow)
                     .where(EndpointRow.id.in_(endpoint_ids))
-                    .values(sub_step=sub_step.value)
+                    .values(sub_step=sub_step)
                 )
                 await db_sess.execute(stmt)
 

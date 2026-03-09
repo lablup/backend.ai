@@ -311,7 +311,7 @@ class EndpointRow(Base):  # type: ignore[misc]
     )
     sub_step: Mapped[DeploymentSubStep | None] = mapped_column(
         "sub_step",
-        EnumValueType(DeploymentSubStep),
+        StrEnumType(DeploymentSubStep),
         nullable=True,
         default=None,
     )
