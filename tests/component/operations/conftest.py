@@ -3,6 +3,7 @@ from __future__ import annotations
 import secrets
 from collections.abc import AsyncIterator
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair, ResourceSlot
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.error_log.handler import ErrorLogHandler
 from ai.backend.manager.api.rest.error_log.registry import register_error_log_routes
 from ai.backend.manager.api.rest.manager.handler import ManagerHandler
@@ -34,7 +36,9 @@ from ai.backend.manager.services.manager_admin.service import ManagerAdminServic
 def error_log_processors(database_engine: ExtendedAsyncSAEngine) -> ErrorLogProcessors:
     repo = ErrorLogRepository(database_engine)
     service = ErrorLogService(repo)
-    return ErrorLogProcessors(service=service, action_monitors=[])
+    return ErrorLogProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
@@ -69,7 +73,9 @@ def manager_admin_processors(
         db=database_engine,
         valkey_stat=valkey_clients.stat,
     )
-    return ManagerAdminProcessors(service=service, action_monitors=[])
+    return ManagerAdminProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()

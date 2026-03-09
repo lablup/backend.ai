@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.vfolder.actions.file import (
     CreateArchiveDownloadSessionAction,
     CreateArchiveDownloadSessionActionResult,
@@ -39,7 +40,12 @@ class VFolderFileProcessors(AbstractProcessorPackage):
     mkdir: ActionProcessor[MkdirAction, MkdirActionResult]
     move_file: ActionProcessor[MoveFileAction, MoveFileActionResult]
 
-    def __init__(self, service: VFolderFileService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: VFolderFileService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.upload_file = ActionProcessor(service.upload_file, action_monitors)
         self.download_file = ActionProcessor(service.download_file, action_monitors)
         self.create_archive_download_session = ActionProcessor(

@@ -38,6 +38,12 @@ def register_admin_routes(
         handler.handle_gql_graphene,
         middlewares=[auth_required],
     )
+    reg.add(
+        "POST",
+        "/gql/strawberry",
+        handler.handle_gql_strawberry,
+        middlewares=[auth_required],
+    )
 
     # Sub-registries (built by the composition root)
     for sub in sub_registries:

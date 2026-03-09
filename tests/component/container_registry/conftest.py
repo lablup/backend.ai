@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.container_registry.handler import ContainerRegistryHandler
 from ai.backend.manager.api.rest.container_registry.registry import (
     register_container_registry_routes,
@@ -29,7 +31,9 @@ def container_registry_processors(
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine)
     service = ContainerRegistryService(database_engine, repo)
-    return ContainerRegistryProcessors(service=service, action_monitors=[])
+    return ContainerRegistryProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.events.hub.hub import EventHub
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.service.handler import ServiceHandler
 from ai.backend.manager.api.rest.service.registry import register_service_routes
@@ -66,7 +67,9 @@ def model_serving_processors(
         scheduling_controller=AsyncMock(),
         revision_generator_registry=revision_gen,
     )
-    return ModelServingProcessors(service=service, action_monitors=[])
+    return ModelServingProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
@@ -76,7 +79,9 @@ def auto_scaling_processors(
     """Real ModelServingAutoScalingProcessors with real AutoScalingService."""
     repo = ModelServingRepository(database_engine)
     service = AutoScalingService(repository=repo)
-    return ModelServingAutoScalingProcessors(service=service, action_monitors=[])
+    return ModelServingAutoScalingProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
@@ -98,7 +103,9 @@ def deployment_processors(
         RevisionGeneratorRegistryArgs(deployment_repository=repo)
     )
     service = DeploymentService(deployment_controller, repo, revision_generator_registry)
-    return DeploymentProcessors(service=service, action_monitors=[])
+    return DeploymentProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()

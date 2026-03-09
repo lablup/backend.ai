@@ -227,6 +227,71 @@ def revision() -> None:
     """Manage deployment revisions"""
 
 
+@revision.command("add")
+@pass_ctx_obj
+@click.argument("deployment_id", type=click.UUID)
+@click.option(
+    "-f",
+    "--file",
+    "config_file",
+    type=click.Path(exists=True),
+    required=True,
+    help="Path to JSON configuration file for the revision",
+)
+def add_revision_cmd(
+    ctx: CLIContext,
+    deployment_id: UUID,
+    config_file: str,
+) -> None:
+    """Add a new revision to an existing deployment.
+
+    The configuration file should contain the following structure:
+    {
+        "revision": {
+            "name": "optional string",
+            "cluster_config": {"mode": "single-node", "size": 1},
+            "resource_config": {"resource_group": "string", "resource_slots": {}},
+            "image": {"id": "uuid"},
+            "model_runtime_config": {"runtime_variant": "CUSTOM"},
+            "model_mount_config": {"vfolder_id": "uuid", "definition_path": "string"},
+            "extra_mounts": [{"vfolder_id": "uuid", "mount_destination": "/path"}]
+        }
+    }
+    """
+    import asyncio
+    import json
+    from pathlib import Path
+
+    from ai.backend.client.config import get_config
+    from ai.backend.client.v2.auth import HMACAuth
+    from ai.backend.client.v2.config import ClientConfig
+    from ai.backend.client.v2.registry import BackendAIClientRegistry
+    from ai.backend.common.dto.manager.deployment import AddRevisionRequest
+
+    config_file_path = Path(config_file)
+    with config_file_path.open(encoding="utf-8") as f:
+        config_data = json.load(f)
+    request = AddRevisionRequest.model_validate(config_data)
+
+    async def _run() -> None:
+        api_config = get_config()
+        v2_config = ClientConfig.from_v1_config(api_config)
+        auth = HMACAuth(api_config.access_key, api_config.secret_key)
+        registry = await BackendAIClientRegistry.create(v2_config, auth)
+        try:
+            result = await registry.deployment.add_revision(deployment_id, request)
+            print_done(f"Revision added: {result.revision.id}")
+            print(json.dumps(result.revision.model_dump(mode="json"), indent=2, default=str))
+        finally:
+            await registry.close()
+
+    try:
+        asyncio.run(_run())
+    except Exception as e:
+        ctx.output.print_error(e)
+        sys.exit(ExitCode.FAILURE)
+
+
 @revision.command("list")
 @pass_ctx_obj
 @click.argument("deployment_id", type=str)

@@ -4,6 +4,7 @@ import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from dataclasses import dataclass
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -11,6 +12,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.artifact.handler import ArtifactHandler
 from ai.backend.manager.api.rest.artifact.registry import register_artifact_routes
 from ai.backend.manager.api.rest.artifact_registry.handler import ArtifactRegistryHandler
@@ -80,7 +82,9 @@ def artifact_processors(
         storage_manager=storage_manager,
         config_provider=config_provider,
     )
-    return ArtifactProcessors(service=service, action_monitors=[])
+    return ArtifactProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
@@ -113,7 +117,9 @@ def artifact_revision_processors(
         valkey_artifact_client=valkey_clients.artifact,
         background_task_manager=background_task_manager,
     )
-    return ArtifactRevisionProcessors(service=service, action_monitors=[])
+    return ArtifactRevisionProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()

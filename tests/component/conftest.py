@@ -73,6 +73,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.rest.app import build_root_app, mount_registries
@@ -1184,7 +1185,9 @@ def auth_processors(
         auth_repository=repo,
         config_provider=config_provider,
     )
-    return AuthProcessors(service=service, action_monitors=[])
+    return AuthProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 # ---------------------------------------------------------------------------

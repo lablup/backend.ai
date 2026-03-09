@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
     StorageProxyManagerFacingClient,
 )
@@ -61,7 +62,12 @@ class VFSStorageProcessors(AbstractProcessorPackage):
     set_quota_scope: ActionProcessor[SetQuotaScopeAction, SetQuotaScopeActionResult]
     unset_quota_scope: ActionProcessor[UnsetQuotaScopeAction, UnsetQuotaScopeActionResult]
 
-    def __init__(self, service: VFSStorageService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: VFSStorageService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self._service = service
         self.create = ActionProcessor(service.create, action_monitors)
         self.update = ActionProcessor(service.update, action_monitors)

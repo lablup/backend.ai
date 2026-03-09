@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.user import (
     PurgeUserRequest,
     UserStatus,
 )
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -50,7 +51,9 @@ def user_processors(
         agent_registry=agent_registry,
         user_repository=user_repository,
     )
-    return UserProcessors(user_service=service, action_monitors=[])
+    return UserProcessors(
+        user_service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
@@ -66,7 +69,9 @@ def server_module_registries(
     )
     return [
         register_admin_routes(
-            AdminHandler(gql_schema=MagicMock(), gql_deps=MagicMock()),
+            AdminHandler(
+                gql_schema=MagicMock(), gql_deps=MagicMock(), strawberry_schema=MagicMock()
+            ),
             route_deps,
             sub_registries=[user_registry],
         ),

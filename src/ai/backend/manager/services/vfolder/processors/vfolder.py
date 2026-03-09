@@ -5,6 +5,7 @@ from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CloneVFolderActionResult,
@@ -105,7 +106,12 @@ class VFolderProcessors(AbstractProcessorPackage):
         GetAccessibleVFolderAction, GetAccessibleVFolderActionResult
     ]
 
-    def __init__(self, service: VFolderService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: VFolderService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.create_vfolder = ScopeActionProcessor(service.create, action_monitors)
         self.get_vfolder = SingleEntityActionProcessor(service.get, action_monitors)
         self.list_vfolder = ScopeActionProcessor(service.list, action_monitors)

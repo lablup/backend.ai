@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.auto_scaling_rule.handler import AutoScalingRuleHandler
@@ -59,7 +60,9 @@ def deployment_processors(
     deployment_controller = AsyncMock()
     revision_generator_registry = MagicMock()
     service = DeploymentService(deployment_controller, repo, revision_generator_registry)
-    return DeploymentProcessors(service=service, action_monitors=[])
+    return DeploymentProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
@@ -73,7 +76,9 @@ def server_module_registries(
     )
     return [
         register_admin_routes(
-            AdminHandler(gql_schema=MagicMock(), gql_deps=MagicMock()),
+            AdminHandler(
+                gql_schema=MagicMock(), gql_deps=MagicMock(), strawberry_schema=MagicMock()
+            ),
             route_deps,
             sub_registries=[auto_scaling_rule_registry],
         ),

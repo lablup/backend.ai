@@ -20,6 +20,7 @@ from ai.backend.common.data.model_deployment.types import (
     ReadinessStatus,
 )
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant, SessionId
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchResult,
     ClusterConfigData,
@@ -100,7 +101,7 @@ class DeploymentCRUDBaseFixtures:
 
     @pytest.fixture
     def processors(self, deployment_service: DeploymentService) -> DeploymentProcessors:
-        return DeploymentProcessors(deployment_service, [])
+        return DeploymentProcessors(deployment_service, [], MagicMock(spec=ActionValidators))
 
     @pytest.fixture
     def endpoint_id(self) -> uuid.UUID:

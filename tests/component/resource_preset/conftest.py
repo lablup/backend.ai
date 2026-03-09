@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -13,6 +13,7 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
 from ai.backend.manager.api.rest.resource.registry import register_resource_routes
@@ -56,7 +57,9 @@ def container_registry_processors(
 ) -> ContainerRegistryProcessors:
     repo = ContainerRegistryRepository(database_engine)
     service = ContainerRegistryService(database_engine, repo)
-    return ContainerRegistryProcessors(service=service, action_monitors=[])
+    return ContainerRegistryProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
@@ -67,7 +70,9 @@ def resource_preset_processors(
 ) -> ResourcePresetProcessors:
     repo = ResourcePresetRepository(database_engine, valkey_clients.stat, config_provider)
     service = ResourcePresetService(repo)
-    return ResourcePresetProcessors(service=service, action_monitors=[])
+    return ResourcePresetProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
@@ -97,7 +102,9 @@ def agent_processors(
         event_producer=event_producer,
         agent_cache=AsyncMock(),
     )
-    return AgentProcessors(service=service, action_monitors=[])
+    return AgentProcessors(
+        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
@@ -112,7 +119,9 @@ def group_processors(
     )
     group_repos = GroupRepositories(repository=group_repo)
     service = GroupService(storage_manager, config_provider, valkey_clients.stat, group_repos)
-    return GroupProcessors(group_service=service, action_monitors=[])
+    return GroupProcessors(
+        group_service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
@@ -123,7 +132,9 @@ def user_processors(
 ) -> UserProcessors:
     user_repo = UserRepository(database_engine)
     service = UserService(storage_manager, valkey_clients.stat, AsyncMock(), user_repo)
-    return UserProcessors(user_service=service, action_monitors=[])
+    return UserProcessors(
+        user_service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+    )
 
 
 @pytest.fixture()
