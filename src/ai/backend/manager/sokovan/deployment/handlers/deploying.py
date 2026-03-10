@@ -90,9 +90,9 @@ class DeployingEvaluatePreStep:
             eval_result = await self._evaluator.evaluate(deployments)
 
         changes = eval_result.route_changes
-        scale_in_updater: BatchUpdater[RoutingRow] | None = None
+        drain: BatchUpdater[RoutingRow] | None = None
         if changes.drain_route_ids:
-            scale_in_updater = BatchUpdater(
+            drain = BatchUpdater(
                 spec=RouteBatchUpdaterSpec(
                     status=RouteStatus.TERMINATING,
                     traffic_ratio=0.0,
@@ -102,11 +102,11 @@ class DeployingEvaluatePreStep:
             )
 
         # Apply sub_step updates and route mutations atomically
-        if eval_result.assignments or changes.rollout_specs or scale_in_updater:
+        if eval_result.assignments or changes.rollout_specs or drain:
             await self._deployment_repo.apply_deploying_pre_step(
                 eval_result.assignments,
                 changes.rollout_specs,
-                scale_in_updater,
+                drain,
             )
             log.debug(
                 "Applied pre-step: {} sub_step groups, {} routes created, {} routes drained",

@@ -2414,8 +2414,8 @@ class DeploymentDBSource:
     async def apply_deploying_pre_step(
         self,
         sub_step_map: dict[DeploymentSubStep, set[uuid.UUID]],
-        rollout_creators: Sequence[Creator[RoutingRow]],
-        drain_updater: BatchUpdater[RoutingRow] | None,
+        rollout: Sequence[Creator[RoutingRow]],
+        drain: BatchUpdater[RoutingRow] | None,
     ) -> None:
         """Atomically update sub_steps and apply route changes in a single transaction.
 
@@ -2425,8 +2425,8 @@ class DeploymentDBSource:
 
         Args:
             sub_step_map: Mapping from sub_step value to endpoint IDs.
-            rollout_creators: Route creators for new routes.
-            drain_updater: Batch updater for draining old routes.
+            rollout: Route creators for new-revision routes.
+            drain: Batch updater for draining old-revision routes.
         """
         async with self._begin_session_read_committed() as db_sess:
             # 1. Update sub_steps
@@ -2441,12 +2441,12 @@ class DeploymentDBSource:
                 await db_sess.execute(stmt)
 
             # 2. Rollout new routes
-            for creator in rollout_creators:
+            for creator in rollout:
                 await execute_creator(db_sess, creator)
 
             # 3. Drain old routes
-            if drain_updater:
-                await execute_batch_updater(db_sess, drain_updater)
+            if drain:
+                await execute_batch_updater(db_sess, drain)
 
     # ========== Access Token Operations ==========
 

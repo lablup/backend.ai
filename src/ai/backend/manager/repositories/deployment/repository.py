@@ -1247,14 +1247,14 @@ class DeploymentRepository:
     async def apply_deploying_pre_step(
         self,
         sub_step_map: dict[DeploymentSubStep, set[uuid.UUID]],
-        scale_out_creators: Sequence[Creator[RoutingRow]],
-        scale_in_updater: BatchUpdater[RoutingRow] | None,
+        rollout: Sequence[Creator[RoutingRow]],
+        drain: BatchUpdater[RoutingRow] | None,
     ) -> None:
         """Atomically update sub_steps and apply route changes in a single transaction."""
         await self._db_source.apply_deploying_pre_step(
             sub_step_map,
-            scale_out_creators,
-            scale_in_updater,
+            rollout,
+            drain,
         )
 
     @deployment_repository_resilience.apply()
