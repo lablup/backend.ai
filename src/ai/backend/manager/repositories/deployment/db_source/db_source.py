@@ -1452,37 +1452,6 @@ class DeploymentDBSource:
                 routes_by_endpoint[row.endpoint].append(row.to_route_info())
             return routes_by_endpoint
 
-    async def fetch_deploying_routes_by_endpoint_ids(
-        self,
-        endpoint_ids: set[uuid.UUID],
-    ) -> Mapping[uuid.UUID, list[RouteInfo]]:
-        """Fetch all non-terminated routes for DEPLOYING endpoints.
-
-        Unlike ``fetch_active_routes_by_endpoint_ids``, this also includes
-        ``FAILED_TO_START`` routes so the rolling update strategy can detect
-        failures and trigger rollback correctly.  ``TERMINATED`` routes are
-        excluded because they are already cleaned up.
-        """
-        if not endpoint_ids:
-            return {}
-
-        # All statuses except TERMINATED
-        included_statuses = {s for s in RouteStatus if s != RouteStatus.TERMINATED}
-
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(RoutingRow).where(
-                sa.and_(
-                    RoutingRow.endpoint.in_(endpoint_ids),
-                    RoutingRow.status.in_(included_statuses),
-                )
-            )
-            result = await db_sess.execute(query)
-            rows: Sequence[RoutingRow] = result.scalars().all()
-            routes_by_endpoint: defaultdict[uuid.UUID, list[RouteInfo]] = defaultdict(list)
-            for row in rows:
-                routes_by_endpoint[row.endpoint].append(row.to_route_info())
-            return routes_by_endpoint
-
     async def scale_routes(
         self,
         scale_out_creators: Sequence[Creator[RoutingRow]],
@@ -2445,8 +2414,8 @@ class DeploymentDBSource:
     async def apply_deploying_pre_step(
         self,
         sub_step_map: dict[DeploymentSubStep, set[uuid.UUID]],
-        scale_out_creators: Sequence[Creator[RoutingRow]],
-        scale_in_updater: BatchUpdater[RoutingRow] | None,
+        rollout_creators: Sequence[Creator[RoutingRow]],
+        drain_updater: BatchUpdater[RoutingRow] | None,
     ) -> None:
         """Atomically update sub_steps and apply route changes in a single transaction.
 
@@ -2456,8 +2425,8 @@ class DeploymentDBSource:
 
         Args:
             sub_step_map: Mapping from sub_step value to endpoint IDs.
-            scale_out_creators: Route creators for new routes.
-            scale_in_updater: Batch updater for draining old routes.
+            rollout_creators: Route creators for new routes.
+            drain_updater: Batch updater for draining old routes.
         """
         async with self._begin_session_read_committed() as db_sess:
             # 1. Update sub_steps
@@ -2471,13 +2440,13 @@ class DeploymentDBSource:
                 )
                 await db_sess.execute(stmt)
 
-            # 2. Scale out routes
-            for creator in scale_out_creators:
+            # 2. Rollout new routes
+            for creator in rollout_creators:
                 await execute_creator(db_sess, creator)
 
-            # 3. Scale in routes
-            if scale_in_updater:
-                await execute_batch_updater(db_sess, scale_in_updater)
+            # 3. Drain old routes
+            if drain_updater:
+                await execute_batch_updater(db_sess, drain_updater)
 
     # ========== Access Token Operations ==========
 

@@ -552,13 +552,6 @@ class DeploymentRepository:
         """Fetch routes for multiple endpoints."""
         return await self._db_source.fetch_active_routes_by_endpoint_ids(endpoint_ids)
 
-    async def fetch_deploying_routes_by_endpoint_ids(
-        self,
-        endpoint_ids: set[uuid.UUID],
-    ) -> Mapping[uuid.UUID, list[RouteInfo]]:
-        """Fetch all non-terminated routes for DEPLOYING endpoints (includes FAILED_TO_START)."""
-        return await self._db_source.fetch_deploying_routes_by_endpoint_ids(endpoint_ids)
-
     @deployment_repository_resilience.apply()
     async def scale_routes(
         self,
