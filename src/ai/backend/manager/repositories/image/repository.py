@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from datetime import datetime
 from uuid import UUID
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
@@ -349,3 +350,11 @@ class ImageRepository:
             project,
             reporter=reporter,
         )
+
+    @image_repository_resilience.apply()
+    async def load_image_last_used(
+        self,
+        image_ids: Sequence[ImageID],
+    ) -> Mapping[ImageID, datetime]:
+        """Load last used timestamps for images by querying the kernels table."""
+        return await self._db_source.load_image_last_used(image_ids)

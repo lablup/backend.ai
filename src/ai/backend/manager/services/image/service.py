@@ -58,6 +58,10 @@ from ai.backend.manager.services.image.actions.get_images import (
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
 )
+from ai.backend.manager.services.image.actions.load_image_last_used import (
+    LoadImageLastUsedAction,
+    LoadImageLastUsedActionResult,
+)
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionResult,
@@ -458,3 +462,10 @@ class ImageService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def load_image_last_used(
+        self, action: LoadImageLastUsedAction
+    ) -> LoadImageLastUsedActionResult:
+        """Load last used timestamps for images."""
+        last_used_map = await self._image_repository.load_image_last_used(action.image_ids)
+        return LoadImageLastUsedActionResult(last_used_map=last_used_map)

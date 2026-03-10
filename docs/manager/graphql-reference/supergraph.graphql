@@ -5003,6 +5003,11 @@ type ImageV2 implements Node
   """UUID of the container registry where this image is stored."""
   registryId: UUID!
 
+  """
+  Added in 26.3.0. Timestamp of the most recent session created with this image. Returns null if the image has never been used.
+  """
+  lastUsed: DateTime
+
   """Added in 26.2.0. Aliases for this image."""
   aliases(filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageV2AliasConnection!
 }
@@ -5136,6 +5141,9 @@ input ImageV2FilterGQL
 
   """Added in 26.3.0. Filter by nested alias conditions."""
   alias: ImageAliasNestedFilter = null
+
+  """Added in 26.3.0. Filter by last used datetime (before/after)."""
+  lastUsed: DateTimeFilter = null
   AND: [ImageV2FilterGQL!] = null
   OR: [ImageV2FilterGQL!] = null
   NOT: [ImageV2FilterGQL!] = null
@@ -5228,6 +5236,7 @@ enum ImageV2OrderField
 {
   NAME @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  LAST_USED @join__enumValue(graph: STRAWBERRY)
 }
 
 """
