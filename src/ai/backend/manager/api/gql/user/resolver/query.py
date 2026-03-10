@@ -22,6 +22,7 @@ from ai.backend.manager.api.gql.user.types import (
     UserV2Connection,
     UserV2GQL,
 )
+from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
 
 
@@ -47,6 +48,7 @@ async def admin_user_v2(
     Raises:
         UserNotFound: If the user with the given UUID does not exist.
     """
+    check_admin_only(info.context)
     processors = info.context.processors
 
     # Execute GetUserAction via processor
@@ -90,6 +92,7 @@ async def admin_users_v2(
     Returns:
         UserV2Connection with paginated user records.
     """
+    check_admin_only(info.context)
     return await fetch_admin_users(
         info,
         filter=filter,
