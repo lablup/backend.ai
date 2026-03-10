@@ -166,7 +166,7 @@ class TestStrategyResultApplier:
         result = await applier.apply(provisioning_summary)
 
         mock_txn.update_sub_steps.assert_called_once()
-        mock_txn.create_routes.assert_called_once()
+        mock_txn.create_routes.assert_not_called()
         mock_txn.drain_routes.assert_not_called()
         mock_txn.complete_deployment_revision_swap.assert_not_called()
         mock_txn.clear_deploying_revision.assert_not_called()

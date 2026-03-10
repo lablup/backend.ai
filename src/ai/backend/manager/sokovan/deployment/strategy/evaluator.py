@@ -11,6 +11,7 @@ import logging
 from collections.abc import Sequence
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.exception import BackendAIError
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -93,9 +94,15 @@ class DeploymentStrategyEvaluator:
             try:
                 strategy = self._create_strategy(policy.strategy, policy)
                 cycle_result = strategy.evaluate_cycle(deployment, routes)
-            except Exception as e:
+            except BackendAIError as e:
                 log.warning("deployment {}: evaluation error — {}", deployment.id, e)
                 result.errors.append(EvaluationErrorData(deployment=deployment, reason=str(e)))
+                continue
+            except Exception:
+                log.exception("deployment {}: unexpected evaluation error", deployment.id)
+                result.errors.append(
+                    EvaluationErrorData(deployment=deployment, reason="Unexpected evaluation error")
+                )
                 continue
 
             # ── 3. Aggregate route changes and record sub-steps ──
