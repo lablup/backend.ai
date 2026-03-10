@@ -107,6 +107,8 @@ __all__ = (
     "MountPoint",
     "MountTypes",
     "MovingStatValue",
+    "PreemptionMode",
+    "PreemptionOrder",
     "PromMetric",
     "PromMetricGroup",
     "PromMetricPrimitive",
@@ -1892,6 +1894,16 @@ class AgentSelectionStrategy(enum.StrEnum):
     ROUNDROBIN = "roundrobin"
     # LEGACY chooses the largest agent (the sort key is a tuple of resource slots).
     LEGACY = "legacy"
+
+
+class PreemptionMode(enum.StrEnum):
+    TERMINATE = "terminate"
+    SUSPEND = "suspend"
+
+
+class PreemptionOrder(enum.StrEnum):
+    OLDEST = "oldest"
+    NEWEST = "newest"
 
 
 class SchedulerStatus(TypedDict):
