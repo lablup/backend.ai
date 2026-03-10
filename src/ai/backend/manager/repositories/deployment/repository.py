@@ -4,6 +4,7 @@ import logging
 import uuid
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
+from contextlib import AbstractAsyncContextManager as AsyncContextManager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, DecimalException
@@ -87,7 +88,7 @@ from ai.backend.manager.repositories.base.updater import BatchUpdater, Updater
 from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
-from .db_source import DeploymentDBSource
+from .db_source import DeploymentDBSource, StrategyTransaction
 from .storage_source import DeploymentStorageSource
 from .types import RouteData, RouteServiceDiscoveryInfo
 
@@ -1134,11 +1135,12 @@ class DeploymentRepository:
         self,
         endpoint_id: uuid.UUID,
         revision_id: uuid.UUID,
-    ) -> uuid.UUID | None:
+    ) -> tuple[uuid.UUID | None, int]:
         """Set deploying_revision and transition lifecycle to DEPLOYING.
 
         Returns:
-            The current (previous) revision ID, or None if there was no previous revision.
+            Tuple of (previous_revision_id, rowcount).
+            Callers must check ``rowcount > 0`` to confirm the update was applied.
         """
         return await self._db_source.set_deploying_revision(endpoint_id, revision_id)
 
@@ -1251,12 +1253,21 @@ class DeploymentRepository:
         rollout: BulkCreator[RoutingRow],
         drain: BatchUpdater[RoutingRow] | None,
     ) -> None:
-        """Atomically update sub_steps and apply route changes in a single transaction."""
+        """Atomically apply sub_step assignments and route mutations in a single transaction."""
         await self._db_source.apply_strategy_evaluation(
             assignments,
             rollout,
             drain,
         )
+
+    def begin_strategy_transaction(self) -> AsyncContextManager[StrategyTransaction]:
+        """Begin a transaction that spans multiple strategy-related DB operations.
+
+        All operations on the yielded ``StrategyTransaction`` share a single
+        DB session/transaction, ensuring atomicity across sub_step assignment,
+        route mutations, revision swap, and deploying_revision clear.
+        """
+        return self._db_source.begin_strategy_transaction()
 
     @deployment_repository_resilience.apply()
     async def get_last_deployment_histories(

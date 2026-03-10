@@ -678,10 +678,17 @@ class DeploymentService:
                 f"of deployment {action.deployment_id}."
             )
 
-        # 3. Set deploying_revision and transition to DEPLOYING lifecycle
-        previous_revision_id = await self._deployment_repository.set_deploying_revision(
+        # 3. Set deploying_revision and transition to DEPLOYING lifecycle.
+        # The DB WHERE clause includes ``deploying_revision IS NULL`` to guard
+        # against concurrent activations; rowcount == 0 means the guard fired.
+        previous_revision_id, rowcount = await self._deployment_repository.set_deploying_revision(
             action.deployment_id, action.revision_id
         )
+        if rowcount == 0:
+            raise DeploymentAlreadyInProgress(
+                f"Deployment {action.deployment_id} already has a deploying revision in progress "
+                f"(concurrent activation detected)."
+            )
 
         # 4. Trigger DEPLOYING lifecycle to start strategy execution
         await self._deployment_controller.mark_lifecycle_needed(

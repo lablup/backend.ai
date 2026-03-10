@@ -97,9 +97,22 @@ class DeployingProvisioningHandler(DeploymentHandler):
 
     @override
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
-        result = await self._evaluator.evaluate(deployments)
-        await self._applier.apply(result)
-        return DeploymentExecutionResult(successes=list(deployments))
+        summary = await self._evaluator.evaluate(deployments)
+        await self._applier.apply(summary)
+
+        # Deployments that were successfully evaluated stay in DEPLOYING;
+        # those that failed evaluation are reported as errors.
+        evaluated_ids = set(summary.assignments.keys())
+        successes = [d for d in deployments if d.id in evaluated_ids]
+        errors = [
+            DeploymentExecutionError(
+                deployment_info=e.deployment,
+                reason=f"Strategy evaluation failed: {e.reason}",
+                error_detail=e.reason,
+            )
+            for e in summary.errors
+        ]
+        return DeploymentExecutionResult(successes=successes, errors=errors)
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
@@ -176,6 +189,7 @@ class DeployingProgressingHandler(DeploymentHandler):
         apply_result = await self._applier.apply(summary)
 
         deployment_map = {d.id: d for d in deployments}
+
         completed = [
             deployment_map[eid] for eid in apply_result.completed_ids if eid in deployment_map
         ]
@@ -183,16 +197,28 @@ class DeployingProgressingHandler(DeploymentHandler):
             deployment_map[eid] for eid in apply_result.rolled_back_ids if eid in deployment_map
         ]
 
+        errors: list[DeploymentExecutionError] = [
+            DeploymentExecutionError(
+                deployment_info=deployment,
+                reason="Deployment rolled back — all new routes failed",
+                error_detail="Strategy FSM determined rollback",
+            )
+            for deployment in rolled_back
+        ]
+        # Include evaluation errors so they flow through coordinator's
+        # failure classification (give_up/expired/need_retry).
+        errors.extend(
+            DeploymentExecutionError(
+                deployment_info=e.deployment,
+                reason=f"Strategy evaluation failed: {e.reason}",
+                error_detail=e.reason,
+            )
+            for e in summary.errors
+        )
+
         return DeploymentExecutionResult(
             successes=completed,
-            errors=[
-                DeploymentExecutionError(
-                    deployment_info=deployment,
-                    reason="Deployment rolled back — all new routes failed",
-                    error_detail="Strategy FSM determined rollback",
-                )
-                for deployment in rolled_back
-            ],
+            errors=errors,
         )
 
     @override

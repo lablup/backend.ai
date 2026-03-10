@@ -31,6 +31,7 @@ from ai.backend.manager.sokovan.deployment.recorder import DeploymentRecorderCon
 from .types import (
     AbstractDeploymentStrategy,
     DeploymentStrategyRegistry,
+    EvaluationErrorData,
     RouteChanges,
     StrategyEvaluationSummary,
 )
@@ -82,6 +83,9 @@ class DeploymentStrategyEvaluator:
             policy = policy_map.get(deployment.id)
             if policy is None:
                 log.warning("deployment {}: no policy found — skipping", deployment.id)
+                result.errors.append(
+                    EvaluationErrorData(deployment=deployment, reason="No deployment policy found")
+                )
                 continue
 
             routes: list[RouteInfo] = list(route_map.get(deployment.id, []))
@@ -91,6 +95,7 @@ class DeploymentStrategyEvaluator:
                 cycle_result = strategy.evaluate_cycle(deployment, routes)
             except Exception as e:
                 log.warning("deployment {}: evaluation error — {}", deployment.id, e)
+                result.errors.append(EvaluationErrorData(deployment=deployment, reason=str(e)))
                 continue
 
             # ── 3. Aggregate route changes and record sub-steps ──

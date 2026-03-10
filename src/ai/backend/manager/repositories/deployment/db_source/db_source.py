@@ -157,6 +157,88 @@ class EndpointWithRoutesRawData:
     route_rows: list[RoutingRow]
 
 
+class StrategyTransaction:
+    """A shared-session handle for strategy-related DB operations.
+
+    All methods execute on the same underlying DB session so that sub_step
+    assignment, route mutations, revision swap, and deploying_revision clear
+    are committed atomically.
+    """
+
+    def __init__(
+        self,
+        db_sess: SASession,
+        apply_sub_step_assignments: Any,
+    ) -> None:
+        self._db_sess = db_sess
+        self._apply_sub_step_assignments = apply_sub_step_assignments
+
+    async def apply_strategy_evaluation(
+        self,
+        assignments: dict[uuid.UUID, DeploymentSubStep],
+        rollout: BulkCreator[RoutingRow],
+        drain: BatchUpdater[RoutingRow] | None,
+    ) -> None:
+        """Update sub_steps and apply route changes."""
+        await self._apply_sub_step_assignments(self._db_sess, assignments)
+        if rollout.specs:
+            await execute_bulk_creator(self._db_sess, rollout)
+        if drain:
+            await execute_batch_updater(self._db_sess, drain)
+
+    async def complete_deployment_revision_swap(
+        self,
+        endpoint_ids: set[uuid.UUID],
+    ) -> int:
+        """Swap deploying_revision → current_revision. Returns rowcount."""
+        if not endpoint_ids:
+            return 0
+        stmt = (
+            sa.update(EndpointRow)
+            .where(
+                EndpointRow.id.in_(endpoint_ids),
+                EndpointRow.deploying_revision.isnot(None),
+                # Skip DESTROYING/DESTROYED deployments — routes being torn down
+                # belong to the old revision and should remain under current_revision.
+                # Swapping would reassign current_revision to the new revision,
+                # orphaning the old routes from their original revision.
+                EndpointRow.lifecycle_stage.notin_([
+                    EndpointLifecycle.DESTROYING,
+                    EndpointLifecycle.DESTROYED,
+                ]),
+            )
+            .values(
+                current_revision=EndpointRow.deploying_revision,
+                deploying_revision=None,
+            )
+        )
+        cursor_result = cast(CursorResult[Any], await self._db_sess.execute(stmt))
+        return cursor_result.rowcount
+
+    async def clear_deploying_revision(
+        self,
+        endpoint_ids: set[uuid.UUID],
+    ) -> None:
+        """Clear deploying_revision for rolled-back deployments."""
+        if not endpoint_ids:
+            return
+        stmt = (
+            sa.update(EndpointRow)
+            .where(
+                EndpointRow.id.in_(endpoint_ids),
+                # Skip DESTROYING/DESTROYED deployments — the deployment was
+                # terminated mid-deploy, so leave deploying_revision as-is
+                # rather than clearing it for a rollback that will never complete.
+                EndpointRow.lifecycle_stage.notin_([
+                    EndpointLifecycle.DESTROYING,
+                    EndpointLifecycle.DESTROYED,
+                ]),
+            )
+            .values(deploying_revision=None)
+        )
+        await self._db_sess.execute(stmt)
+
+
 class DeploymentDBSource:
     """Database source for deployment-related operations."""
 
@@ -2178,16 +2260,13 @@ class DeploymentDBSource:
         self,
         endpoint_id: uuid.UUID,
         revision_id: uuid.UUID,
-    ) -> uuid.UUID | None:
+    ) -> tuple[uuid.UUID | None, int]:
         """Set deploying_revision and transition lifecycle to DEPLOYING.
 
-        Returns the current (previous) revision ID for reference.
-        The coordinator will swap deploying_revision → current_revision on completion.
-
-        The caller (service layer) should check ``deploying_revision`` is ``None``
-        before calling this method.  As an additional safety net, the UPDATE WHERE
-        clause includes ``deploying_revision IS NULL`` so that a concurrent write
-        becomes a no-op rather than silently overwriting.
+        Returns a tuple of (previous_revision_id, rowcount).
+        The caller **must** check ``rowcount > 0`` to confirm the update was applied;
+        a zero rowcount means another deployment was already in progress
+        (the ``deploying_revision IS NULL`` WHERE guard prevented the write).
         """
         async with self._begin_session_read_committed() as db_sess:
             # Get current revision first
@@ -2208,9 +2287,9 @@ class DeploymentDBSource:
                     lifecycle_stage=EndpointLifecycle.DEPLOYING,
                 )
             )
-            await db_sess.execute(update_query)
+            cursor_result = cast(CursorResult[Any], await db_sess.execute(update_query))
 
-            return previous_revision_id
+            return previous_revision_id, cursor_result.rowcount
 
     # -------------------------------------------------------------------------
     # Auto-Scaling Policy Methods (DeploymentAutoScalingPolicyRow)
@@ -2361,6 +2440,14 @@ class DeploymentDBSource:
                 .where(
                     EndpointRow.id.in_(endpoint_ids),
                     EndpointRow.deploying_revision.isnot(None),
+                    # Skip DESTROYING/DESTROYED deployments — routes being torn down
+                    # belong to the old revision and should remain under current_revision.
+                    # Swapping would reassign current_revision to the new revision,
+                    # orphaning the old routes from their original revision.
+                    EndpointRow.lifecycle_stage.notin_([
+                        EndpointLifecycle.DESTROYING,
+                        EndpointLifecycle.DESTROYED,
+                    ]),
                 )
                 .values(
                     current_revision=EndpointRow.deploying_revision,
@@ -2386,7 +2473,16 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             stmt = (
                 sa.update(EndpointRow)
-                .where(EndpointRow.id.in_(endpoint_ids))
+                .where(
+                    EndpointRow.id.in_(endpoint_ids),
+                    # Skip DESTROYING/DESTROYED deployments — the deployment was
+                    # terminated mid-deploy, so leave deploying_revision as-is
+                    # rather than clearing it for a rollback that will never complete.
+                    EndpointRow.lifecycle_stage.notin_([
+                        EndpointLifecycle.DESTROYING,
+                        EndpointLifecycle.DESTROYED,
+                    ]),
+                )
                 .values(deploying_revision=None)
             )
             await db_sess.execute(stmt)
@@ -2431,6 +2527,17 @@ class DeploymentDBSource:
             # 3. Drain old routes
             if drain:
                 await execute_batch_updater(db_sess, drain)
+
+    @actxmgr
+    async def begin_strategy_transaction(self) -> AsyncIterator[StrategyTransaction]:
+        """Begin a transaction that spans multiple strategy-related DB operations.
+
+        All operations on the yielded ``StrategyTransaction`` share a single
+        DB session/transaction, ensuring atomicity across sub_step assignment,
+        route mutations, revision swap, and deploying_revision clear.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            yield StrategyTransaction(db_sess, self._apply_sub_step_assignments)
 
     @staticmethod
     async def _apply_sub_step_assignments(

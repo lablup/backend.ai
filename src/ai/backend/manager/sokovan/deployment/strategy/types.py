@@ -40,6 +40,14 @@ class StrategyCycleResult:
 
 
 @dataclass
+class EvaluationErrorData:
+    """Data about a deployment that failed strategy evaluation."""
+
+    deployment: DeploymentInfo
+    reason: str
+
+
+@dataclass
 class StrategyEvaluationSummary:
     """Aggregate result of evaluating all DEPLOYING deployments.
 
@@ -54,6 +62,9 @@ class StrategyEvaluationSummary:
 
     # Aggregated route mutations from all per-deployment evaluations.
     route_changes: RouteChanges = field(default_factory=RouteChanges)
+
+    # Deployments that failed evaluation (no policy, strategy error, etc.)
+    errors: list[EvaluationErrorData] = field(default_factory=list)
 
 
 class AbstractDeploymentStrategy(ABC):
