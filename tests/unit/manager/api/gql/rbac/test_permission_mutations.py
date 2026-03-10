@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -60,6 +60,11 @@ def _create_mock_info(context: MagicMock) -> MagicMock:
 
 
 class TestAdminUpdatePermission:
+    @pytest.fixture(autouse=True)
+    def _bypass_admin_check(self) -> None:
+        with patch("ai.backend.manager.api.gql.rbac.resolver.permission.check_admin_only"):
+            yield
+
     @pytest.fixture
     def mock_processor(self) -> AsyncMock:
         processor = AsyncMock()
