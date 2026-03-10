@@ -2281,13 +2281,8 @@ class DeploymentDBSource:
         (the ``deploying_revision IS NULL`` WHERE guard prevented the write).
         """
         async with self._begin_session_read_committed() as db_sess:
-            # Get current revision first
-            query = sa.select(EndpointRow.current_revision).where(EndpointRow.id == endpoint_id)
-            result = await db_sess.execute(query)
-            previous_revision_id = result.scalar_one_or_none()
-
-            # Set deploying_revision and transition to DEPLOYING.
-            # The deploying_revision IS NULL guard prevents concurrent activations.
+            # Single UPDATE ... RETURNING to atomically set deploying_revision
+            # and retrieve current_revision without TOCTOU race.
             update_query = (
                 sa.update(EndpointRow)
                 .where(
@@ -2298,10 +2293,13 @@ class DeploymentDBSource:
                     deploying_revision=revision_id,
                     lifecycle_stage=EndpointLifecycle.DEPLOYING,
                 )
+                .returning(EndpointRow.current_revision)
             )
-            cursor_result = cast(CursorResult[Any], await db_sess.execute(update_query))
-
-            return previous_revision_id, cursor_result.rowcount
+            result = await db_sess.execute(update_query)
+            row = result.one_or_none()
+            if row is None:
+                return None, 0
+            return row[0], 1
 
     # -------------------------------------------------------------------------
     # Auto-Scaling Policy Methods (DeploymentAutoScalingPolicyRow)
