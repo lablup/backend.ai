@@ -35,7 +35,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentSubStep,
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
-from ai.backend.manager.defs import SERVICE_MAX_RETRIES
+from ai.backend.manager.defs import SERVICE_MAX_RETRIES, LockID
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
@@ -334,11 +334,16 @@ class DeploymentCoordinator:
                     await stack.enter_async_context(self._lock_factory(lock_id, lock_lifetime))
                 await self._run_handler(handler, lifecycle_type)
         else:
-            # Lifecycle with sub-steps — run pre-step then each sub-step handler
-            await self._run_pre_step(lifecycle_type)
-            for sub_step in sub_steps:
-                handler = self._registry.handlers[(lifecycle_type, sub_step)]
-                await self._run_handler(handler, lifecycle_type)
+            # Lifecycle with sub-steps — acquire distributed lock, then
+            # run pre-step + all sub-step handlers atomically to prevent
+            # concurrent coordinator instances from re-assigning sub_steps
+            # or processing the same deployments in parallel.
+            lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
+            async with self._lock_factory(LockID.LOCKID_DEPLOYMENT_DEPLOYING, lock_lifetime):
+                await self._run_pre_step(lifecycle_type)
+                for sub_step in sub_steps:
+                    handler = self._registry.handlers[(lifecycle_type, sub_step)]
+                    await self._run_handler(handler, lifecycle_type)
 
     async def _run_pre_step(self, lifecycle_type: DeploymentLifecycleType) -> None:
         """Run the optional pre-step for a lifecycle type."""
@@ -648,7 +653,19 @@ class DeploymentCoordinator:
                 lifecycle = deployment.state.lifecycle
                 timeout = DEPLOYMENT_STATUS_TIMEOUT_MAP.get(lifecycle)
                 if timeout:
-                    elapsed = (current_time - deployment.phase_started_at).total_seconds()
+                    # Normalise both to UTC to avoid timezone-naive vs -aware
+                    # comparison errors (DB may return either depending on driver).
+                    ct = (
+                        current_time.astimezone(UTC)
+                        if current_time.tzinfo
+                        else current_time.replace(tzinfo=UTC)
+                    )
+                    ps = (
+                        deployment.phase_started_at.astimezone(UTC)
+                        if deployment.phase_started_at.tzinfo
+                        else deployment.phase_started_at.replace(tzinfo=UTC)
+                    )
+                    elapsed = (ct - ps).total_seconds()
                     if elapsed > timeout:
                         expired_errors.append(error)
                         continue

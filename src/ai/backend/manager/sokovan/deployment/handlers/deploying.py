@@ -34,6 +34,7 @@ from ai.backend.manager.repositories.deployment.creators import (
 from ai.backend.manager.repositories.deployment.options import RouteConditions
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
+from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.manager.sokovan.deployment.strategy.evaluator import DeploymentStrategyEvaluator
@@ -84,7 +85,9 @@ class DeployingEvaluatePreStep:
         if not deployments:
             return
         log.info("pre-step evaluate: processing {} deployments", len(deployments))
-        eval_result = await self._evaluator.evaluate(deployments)
+        deployment_ids = [d.id for d in deployments]
+        with DeploymentRecorderContext.scope("deploying-pre-step", entity_ids=deployment_ids):
+            eval_result = await self._evaluator.evaluate(deployments)
 
         changes = eval_result.route_changes
         scale_in_updater: BatchUpdater[RoutingRow] | None = None
@@ -283,7 +286,10 @@ class DeployingProgressingHandler(DeploymentHandler):
                 case DeploymentSubStep.ROLLED_BACK:
                     rolled_back.append(deployment)
                 case _:
-                    pass  # PROGRESSING: still in progress — not included in result
+                    # PROVISIONING / PROGRESSING: still in progress — intentionally
+                    # excluded from successes/errors so no lifecycle transition occurs.
+                    # The next coordinator cycle will re-evaluate via the pre-step.
+                    pass
 
         if completed:
             endpoint_ids = {deployment.id for deployment in completed}
