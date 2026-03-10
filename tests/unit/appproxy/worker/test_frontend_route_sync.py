@@ -7,14 +7,14 @@ This caused the metric collector to try scraping terminated routes,
 ultimately breaking the auto-scaling feedback loop.
 
 The fix: `self.circuits[key].route_info = new_routes` is now called
-before updating the backend, keeping the circuit's route_info in sync.
+after updating the backend, keeping the circuit's route_info in sync.
 """
 
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, NamedTuple
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -93,6 +93,21 @@ def _make_circuit(routes: list[RouteInfo], port: int = 10200) -> Circuit:
     )
 
 
+class TwoReplicaScenario(NamedTuple):
+    """A circuit with two healthy replicas registered in the frontend."""
+
+    circuit: Circuit
+    healthy_route: RouteInfo
+    target_route: RouteInfo
+
+
+class SingleReplicaScenario(NamedTuple):
+    """A circuit with a single healthy replica."""
+
+    circuit: Circuit
+    route: RouteInfo
+
+
 class TestUpdateCircuitRouteInfo:
     """Regression tests for circuit.route_info synchronization."""
 
@@ -106,19 +121,36 @@ class TestUpdateCircuitRouteInfo:
         return frontend
 
     @pytest.fixture
-    def route_a(self) -> RouteInfo:
-        return _make_route(kernel_host="10.0.0.1", kernel_port=8080)
+    def two_replica_scenario(self) -> TwoReplicaScenario:
+        """Two-replica circuit: healthy_route stays, target_route gets removed on scale-in."""
+        healthy_route = _make_route(kernel_host="10.0.0.1", kernel_port=8080)
+        target_route = _make_route(kernel_host="10.0.0.2", kernel_port=8081)
+        circuit = _make_circuit([healthy_route, target_route], port=self.FRONTEND_PORT)
+        return TwoReplicaScenario(circuit, healthy_route, target_route)
 
     @pytest.fixture
-    def route_b(self) -> RouteInfo:
-        return _make_route(kernel_host="10.0.0.2", kernel_port=8081)
+    def single_replica_scenario(self) -> SingleReplicaScenario:
+        """Single-replica circuit for full scale-in and inactive circuit tests."""
+        route = _make_route(kernel_host="10.0.0.1", kernel_port=8080)
+        circuit = _make_circuit([route], port=self.FRONTEND_PORT)
+        return SingleReplicaScenario(circuit, route)
 
-    async def test_route_info_synced_on_update(
+    @pytest.fixture
+    def registered_two_replica_frontend(
         self,
         mocker: pytest_mock.MockerFixture,
         port_frontend: PortFrontend,
-        route_a: RouteInfo,
-        route_b: RouteInfo,
+        two_replica_scenario: TwoReplicaScenario,
+    ) -> tuple[PortFrontend, TwoReplicaScenario]:
+        """Frontend with the two-replica circuit already registered."""
+        port_frontend.circuits[self.FRONTEND_PORT] = two_replica_scenario.circuit
+        port_frontend.backends[self.FRONTEND_PORT] = mocker.MagicMock()
+        mocker.patch.object(port_frontend, "update_backend", new_callable=AsyncMock)
+        return port_frontend, two_replica_scenario
+
+    async def test_route_info_synced_on_update(
+        self,
+        registered_two_replica_frontend: tuple[PortFrontend, TwoReplicaScenario],
     ) -> None:
         """Regression: circuit.route_info must reflect new routes after update.
 
@@ -126,65 +158,101 @@ class TestUpdateCircuitRouteInfo:
         kept stale routes, causing the metric collector to target terminated
         endpoints.
         """
-        circuit = _make_circuit([route_a, route_b], port=self.FRONTEND_PORT)
+        frontend, scenario = registered_two_replica_frontend
 
-        port_frontend.circuits[self.FRONTEND_PORT] = circuit
-        port_frontend.backends[self.FRONTEND_PORT] = mocker.MagicMock()
-        mocker.patch.object(port_frontend, "update_backend", new_callable=AsyncMock)
+        # Scale-in: remove target_route
+        new_routes = [scenario.healthy_route]
+        await frontend.update_circuit_route_info(scenario.circuit, new_routes)
 
-        # Scale-in: remove route_b
-        new_routes = [route_a]
-        await port_frontend.update_circuit_route_info(circuit, new_routes)
-
-        assert port_frontend.circuits[self.FRONTEND_PORT].route_info == new_routes
-        assert len(port_frontend.circuits[self.FRONTEND_PORT].route_info) == 1
+        assert frontend.circuits[self.FRONTEND_PORT].route_info == new_routes
+        assert len(frontend.circuits[self.FRONTEND_PORT].route_info) == 1
         assert (
-            port_frontend.circuits[self.FRONTEND_PORT].route_info[0].session_id
-            == route_a.session_id
+            frontend.circuits[self.FRONTEND_PORT].route_info[0].session_id
+            == scenario.healthy_route.session_id
         )
 
-    async def test_route_info_synced_before_backend_update(
+    async def test_route_info_synced_after_backend_update(
         self,
         mocker: pytest_mock.MockerFixture,
         port_frontend: PortFrontend,
-        route_a: RouteInfo,
-        route_b: RouteInfo,
+        two_replica_scenario: TwoReplicaScenario,
     ) -> None:
-        """Verify route_info is updated before backend update is called."""
-        circuit = _make_circuit([route_a], port=self.FRONTEND_PORT)
+        """Verify route_info is updated only after backend update succeeds.
 
-        port_frontend.circuits[self.FRONTEND_PORT] = circuit
+        Circuit starts with [healthy_route, target_route].
+        Scale-in removes target_route -> new_routes = [healthy_route].
+        During update_backend, route_info should still be the old 2-route list.
+        """
+        scenario = two_replica_scenario
+        initial_routes = list(scenario.circuit.route_info)
+        port_frontend.circuits[self.FRONTEND_PORT] = scenario.circuit
         port_frontend.backends[self.FRONTEND_PORT] = mocker.MagicMock()
 
         captured_route_info: list[list[RouteInfo]] = []
 
         async def capture_update_backend(backend: object, routes: list[RouteInfo]) -> object:
+            # Capture route_info at the moment update_backend is called
             captured_route_info.append(list(port_frontend.circuits[self.FRONTEND_PORT].route_info))
             return backend
 
         mocker.patch.object(port_frontend, "update_backend", side_effect=capture_update_backend)
 
-        new_routes = [route_a, route_b]
-        await port_frontend.update_circuit_route_info(circuit, new_routes)
+        # Scale-in: remove target_route
+        new_routes = [scenario.healthy_route]
+        await port_frontend.update_circuit_route_info(scenario.circuit, new_routes)
 
-        # At the time update_backend was called, route_info should already be synced
+        # At the time update_backend was called, route_info should still be the old 2-route list
         assert len(captured_route_info) == 1
-        assert captured_route_info[0] == new_routes
+        assert captured_route_info[0] == initial_routes
+        assert len(captured_route_info[0]) == 2
+        # After the call completes, route_info should be updated to new_routes
+        assert port_frontend.circuits[self.FRONTEND_PORT].route_info == new_routes
+        assert len(port_frontend.circuits[self.FRONTEND_PORT].route_info) == 1
+
+    async def test_route_info_unchanged_on_backend_update_failure(
+        self,
+        mocker: pytest_mock.MockerFixture,
+        port_frontend: PortFrontend,
+        two_replica_scenario: TwoReplicaScenario,
+    ) -> None:
+        """If update_backend raises, route_info must remain unchanged.
+
+        This ensures consistency: the backend keeps the old routes, and
+        circuit.route_info matches that state.
+        """
+        scenario = two_replica_scenario
+        initial_routes = list(scenario.circuit.route_info)
+        port_frontend.circuits[self.FRONTEND_PORT] = scenario.circuit
+        port_frontend.backends[self.FRONTEND_PORT] = mocker.MagicMock()
+
+        mocker.patch.object(
+            port_frontend,
+            "update_backend",
+            side_effect=RuntimeError("backend update failed"),
+        )
+
+        with pytest.raises(RuntimeError, match="backend update failed"):
+            await port_frontend.update_circuit_route_info(
+                scenario.circuit, [scenario.healthy_route]
+            )
+
+        # route_info must still be the original 2-route list
+        assert port_frontend.circuits[self.FRONTEND_PORT].route_info == initial_routes
+        assert len(port_frontend.circuits[self.FRONTEND_PORT].route_info) == 2
 
     async def test_route_info_empty_after_full_scale_in(
         self,
         mocker: pytest_mock.MockerFixture,
         port_frontend: PortFrontend,
-        route_a: RouteInfo,
+        single_replica_scenario: SingleReplicaScenario,
     ) -> None:
         """When all routes are removed, circuit.route_info should be empty."""
-        circuit = _make_circuit([route_a], port=self.FRONTEND_PORT)
-
-        port_frontend.circuits[self.FRONTEND_PORT] = circuit
+        scenario = single_replica_scenario
+        port_frontend.circuits[self.FRONTEND_PORT] = scenario.circuit
         port_frontend.backends[self.FRONTEND_PORT] = mocker.MagicMock()
         mocker.patch.object(port_frontend, "update_backend", new_callable=AsyncMock)
 
-        await port_frontend.update_circuit_route_info(circuit, [])
+        await port_frontend.update_circuit_route_info(scenario.circuit, [])
 
         assert port_frontend.circuits[self.FRONTEND_PORT].route_info == []
 
@@ -192,45 +260,36 @@ class TestUpdateCircuitRouteInfo:
         self,
         mocker: pytest_mock.MockerFixture,
         port_frontend: PortFrontend,
-        route_a: RouteInfo,
+        single_replica_scenario: SingleReplicaScenario,
     ) -> None:
         """Updating an unregistered circuit should log warning and do nothing."""
-        circuit = _make_circuit([route_a], port=self.FRONTEND_PORT)
-
         mock_update_backend = mocker.patch.object(
             port_frontend, "update_backend", new_callable=AsyncMock
         )
 
-        await port_frontend.update_circuit_route_info(circuit, [])
+        await port_frontend.update_circuit_route_info(single_replica_scenario.circuit, [])
 
         mock_update_backend.assert_not_called()
 
     async def test_metric_collection_uses_updated_route_info(
         self,
-        mocker: pytest_mock.MockerFixture,
-        port_frontend: PortFrontend,
-        route_a: RouteInfo,
-        route_b: RouteInfo,
+        registered_two_replica_frontend: tuple[PortFrontend, TwoReplicaScenario],
     ) -> None:
         """Regression: the full bug chain from stale route_info to metric failure.
 
         This test verifies the end-to-end scenario:
-        1. Scale-in removes route_b via update_circuit_route_info
+        1. Scale-in removes target_route via update_circuit_route_info
         2. Metric collector (gather_inference_measures) reads circuit.route_info
-        3. Only route_a's endpoint is accessed; route_b's is never contacted
+        3. Only healthy_route's endpoint is accessed; target_route's is never contacted
 
-        Before the fix, circuit.route_info stayed [route_a, route_b] after
+        Before the fix, circuit.route_info stayed [healthy, target] after
         scale-in, so the metric collector would try to scrape the terminated
-        route_b's /metrics endpoint, causing collection failure.
+        target_route's /metrics endpoint, causing collection failure.
         """
-        circuit = _make_circuit([route_a, route_b], port=self.FRONTEND_PORT)
+        frontend, scenario = registered_two_replica_frontend
 
-        port_frontend.circuits[self.FRONTEND_PORT] = circuit
-        port_frontend.backends[self.FRONTEND_PORT] = mocker.MagicMock()
-        mocker.patch.object(port_frontend, "update_backend", new_callable=AsyncMock)
-
-        # Step 1: Scale-in removes route_b
-        await port_frontend.update_circuit_route_info(circuit, [route_a])
+        # Step 1: Scale-in removes target_route
+        await frontend.update_circuit_route_info(scenario.circuit, [scenario.healthy_route])
 
         # Step 2: Metric collector runs — track which endpoints are accessed
         accessed_endpoints: list[str] = []
@@ -252,13 +311,19 @@ class TestUpdateCircuitRouteInfo:
         client_pool = MagicMock()
         client_pool.load_client_session = mock_load_client_session
 
-        updated_circuit = port_frontend.circuits[self.FRONTEND_PORT]
+        updated_circuit = frontend.circuits[self.FRONTEND_PORT]
         measures = await gather_inference_measures(client_pool, updated_circuit)
 
-        # Step 3: Verify only route_a was accessed, route_b was NOT
-        route_a_endpoint = f"http://{route_a.current_kernel_host}:{route_a.kernel_port}"
-        route_b_endpoint = f"http://{route_b.current_kernel_host}:{route_b.kernel_port}"
-        assert route_a_endpoint in accessed_endpoints
-        assert route_b_endpoint not in accessed_endpoints
+        # Step 3: Verify only healthy_route was accessed, target_route was NOT
+        healthy_endpoint = (
+            f"http://{scenario.healthy_route.current_kernel_host}"
+            f":{scenario.healthy_route.kernel_port}"
+        )
+        target_endpoint = (
+            f"http://{scenario.target_route.current_kernel_host}"
+            f":{scenario.target_route.kernel_port}"
+        )
+        assert healthy_endpoint in accessed_endpoints
+        assert target_endpoint not in accessed_endpoints
         assert measures is not None
         assert len(measures) > 0
