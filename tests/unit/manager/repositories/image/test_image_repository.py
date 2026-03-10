@@ -5,7 +5,9 @@ Tests the repository layer with real database operations.
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable, Coroutine
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
@@ -13,16 +15,29 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.manager.models.agent import AgentRow as AgentRow
+from ai.backend.common.types import BinarySize, ImageID, KernelId, ResourceSlot, SessionId
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.group.row import GroupRow as GroupRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
-from ai.backend.manager.models.session.row import SessionRow as SessionRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.image.options import ImageConditions
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.testutils.db import with_tables
+
+CreateKernelForImageFunc = Callable[[ImageRow, datetime], Coroutine[Any, Any, None]]
 
 
 class TestImageRepositorySearch:
@@ -413,3 +428,271 @@ class TestImageRepositorySearch:
         result = await image_repository.search_images(querier)
         assert result.total_count == 1
         assert "python:3.9" in str(result.items[0].name)
+
+
+class TestImageRepositoryLoadLastUsed:
+    """Test cases for ImageRepository.load_image_last_used()"""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with all tables needed for kernel queries."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents before children
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                AgentRow,
+                ContainerRegistryRow,
+                ImageRow,
+                SessionRow,
+                KernelRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def image_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> ImageRepository:
+        mock_valkey = MagicMock()
+        mock_config = MagicMock()
+        return ImageRepository(
+            db=db_with_cleanup,
+            valkey_image=mock_valkey,
+            config_provider=mock_config,
+        )
+
+    @pytest.fixture
+    async def domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainRow:
+        domain = DomainRow(name=f"test-{uuid4()}")
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(domain)
+            await db_sess.flush()
+        return domain
+
+    @pytest.fixture
+    async def user_policy(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> UserResourcePolicyRow:
+        policy = UserResourcePolicyRow(
+            name=f"{uuid4()}",
+            max_vfolder_count=10,
+            max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+            max_session_count_per_model_session=5,
+            max_customized_image_count=3,
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(policy)
+            await db_sess.flush()
+        return policy
+
+    @pytest.fixture
+    async def group_policy(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> ProjectResourcePolicyRow:
+        policy = ProjectResourcePolicyRow(
+            name=f"{uuid4()}",
+            max_vfolder_count=10,
+            max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+            max_network_count=5,
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(policy)
+            await db_sess.flush()
+        return policy
+
+    @pytest.fixture
+    async def user(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain: DomainRow,
+        user_policy: UserResourcePolicyRow,
+    ) -> UserRow:
+        user = UserRow(
+            uuid=uuid4(),
+            email=f"test-{uuid4().hex[:8]}@example.com",
+            domain_name=domain.name,
+            resource_policy=user_policy.name,
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(user)
+            await db_sess.flush()
+        return user
+
+    @pytest.fixture
+    async def group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain: DomainRow,
+        group_policy: ProjectResourcePolicyRow,
+    ) -> GroupRow:
+        group = GroupRow(
+            id=uuid4(),
+            name=f"test-group-{uuid4().hex[:8]}",
+            domain_name=domain.name,
+            resource_policy=group_policy.name,
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(group)
+            await db_sess.flush()
+        return group
+
+    @pytest.fixture
+    async def test_registry_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> UUID:
+        registry_id = uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            registry = ContainerRegistryRow(
+                id=registry_id,
+                url="https://registry.example.com",
+                registry_name="registry.example.com",
+                type=ContainerRegistryType.DOCKER,
+                project="test_project",
+                is_global=True,
+            )
+            db_sess.add(registry)
+            await db_sess.flush()
+        return registry_id
+
+    @pytest.fixture
+    async def sample_images(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_registry_id: UUID,
+    ) -> list[ImageRow]:
+        """Create sample images and return their rows."""
+        images_data = [
+            ("python:3.9", "x86_64"),
+            ("python:3.10", "x86_64"),
+            ("nginx:latest", "x86_64"),
+        ]
+        image_rows: list[ImageRow] = []
+        async with db_with_cleanup.begin_session() as db_sess:
+            for name, arch in images_data:
+                image = ImageRow(
+                    name=f"registry.example.com/test_project/{name}",
+                    image=name.split(":")[0],
+                    tag=name.split(":")[1],
+                    registry="registry.example.com",
+                    registry_id=test_registry_id,
+                    project="test_project",
+                    architecture=arch,
+                    config_digest=f"sha256:{uuid4().hex}",
+                    size_bytes=1000000,
+                    type=ImageType.COMPUTE,
+                    status=ImageStatus.ALIVE,
+                    accelerators=None,
+                    labels={},
+                    resources={},
+                )
+                db_sess.add(image)
+                image_rows.append(image)
+            await db_sess.flush()
+            await db_sess.commit()
+        return image_rows
+
+    @pytest.fixture
+    def create_kernel_for_image(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        user: UserRow,
+        group: GroupRow,
+        domain: DomainRow,
+    ) -> CreateKernelForImageFunc:
+        """Return a factory that creates a session + kernel for the given image."""
+
+        async def _create(image: ImageRow, created_at: datetime) -> None:
+            session_id = SessionId(uuid4())
+            async with db_with_cleanup.begin_session() as db_sess:
+                session = SessionRow(
+                    id=session_id,
+                    name=f"sess-{uuid4()}",
+                    user_uuid=user.uuid,
+                    group_id=group.id,
+                    domain_name=domain.name,
+                    occupying_slots=ResourceSlot(),
+                    requested_slots=ResourceSlot(),
+                    vfolder_mounts=[],
+                )
+                db_sess.add(session)
+                await db_sess.flush()
+
+                kernel = KernelRow(
+                    id=KernelId(uuid4()),
+                    session_id=session_id,
+                    image=image.name,
+                    architecture=image.architecture,
+                    domain_name=domain.name,
+                    group_id=group.id,
+                    user_uuid=user.uuid,
+                    occupied_slots=ResourceSlot(),
+                    requested_slots=ResourceSlot(),
+                    repl_in_port=0,
+                    repl_out_port=0,
+                    stdin_port=0,
+                    stdout_port=0,
+                    created_at=created_at,
+                )
+                db_sess.add(kernel)
+                await db_sess.flush()
+                await db_sess.commit()
+
+        return _create
+
+    async def test_load_image_last_used_returns_most_recent(
+        self,
+        image_repository: ImageRepository,
+        sample_images: list[ImageRow],
+        create_kernel_for_image: CreateKernelForImageFunc,
+    ) -> None:
+        """Test that load_image_last_used returns the most recent kernel created_at."""
+        now = datetime.now(UTC)
+        older = now - timedelta(hours=2)
+        newer = now - timedelta(hours=1)
+        img = sample_images[0]
+
+        await create_kernel_for_image(img, older)
+        await create_kernel_for_image(img, newer)
+
+        result = await image_repository.load_image_last_used([ImageID(img.id)])
+
+        assert ImageID(img.id) in result
+        assert abs(result[ImageID(img.id)].timestamp() - newer.timestamp()) < 1.0
+
+    async def test_load_image_last_used_excludes_unused_images(
+        self,
+        image_repository: ImageRepository,
+        sample_images: list[ImageRow],
+        create_kernel_for_image: CreateKernelForImageFunc,
+    ) -> None:
+        """Test that only used images appear in the result; unused ones are excluded."""
+        now = datetime.now(UTC)
+
+        await create_kernel_for_image(sample_images[0], now - timedelta(hours=3))
+        await create_kernel_for_image(sample_images[1], now - timedelta(hours=1))
+
+        image_ids = [ImageID(img.id) for img in sample_images]
+        result = await image_repository.load_image_last_used(image_ids)
+
+        assert len(result) == 2
+        assert ImageID(sample_images[0].id) in result
+        assert ImageID(sample_images[1].id) in result
+        assert ImageID(sample_images[2].id) not in result
