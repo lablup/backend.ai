@@ -482,7 +482,7 @@ class ImageDBSource:
         Returns a mapping of ImageID to the most recent session created_at.
         Images that have never been used will not appear in the mapping.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             stmt = (
                 sa.select(
                     ImageRow.id,
