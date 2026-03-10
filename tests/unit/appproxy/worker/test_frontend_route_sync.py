@@ -96,6 +96,8 @@ def _make_circuit(routes: list[RouteInfo], port: int = 10200) -> Circuit:
 class TestUpdateCircuitRouteInfo:
     """Regression tests for circuit.route_info synchronization."""
 
+    FRONTEND_PORT = 10200
+
     @pytest.fixture
     def port_frontend(self, mocker: pytest_mock.MockerFixture) -> PortFrontend:
         frontend = PortFrontend(root_context=mocker.MagicMock())
@@ -103,10 +105,20 @@ class TestUpdateCircuitRouteInfo:
         frontend.backends = {}
         return frontend
 
+    @pytest.fixture
+    def route_a(self) -> RouteInfo:
+        return _make_route(kernel_host="10.0.0.1", kernel_port=8080)
+
+    @pytest.fixture
+    def route_b(self) -> RouteInfo:
+        return _make_route(kernel_host="10.0.0.2", kernel_port=8081)
+
     async def test_route_info_synced_on_update(
         self,
         mocker: pytest_mock.MockerFixture,
         port_frontend: PortFrontend,
+        route_a: RouteInfo,
+        route_b: RouteInfo,
     ) -> None:
         """Regression: circuit.route_info must reflect new routes after update.
 
@@ -114,45 +126,44 @@ class TestUpdateCircuitRouteInfo:
         kept stale routes, causing the metric collector to target terminated
         endpoints.
         """
-        port = 10200
-        route_a = _make_route(kernel_host="10.0.0.1", kernel_port=8080)
-        route_b = _make_route(kernel_host="10.0.0.2", kernel_port=8081)
-        circuit = _make_circuit([route_a, route_b], port=port)
+        circuit = _make_circuit([route_a, route_b], port=self.FRONTEND_PORT)
 
-        port_frontend.circuits[port] = circuit
-        port_frontend.backends[port] = mocker.MagicMock()
+        port_frontend.circuits[self.FRONTEND_PORT] = circuit
+        port_frontend.backends[self.FRONTEND_PORT] = mocker.MagicMock()
         mocker.patch.object(port_frontend, "update_backend", new_callable=AsyncMock)
 
         # Scale-in: remove route_b
         new_routes = [route_a]
         await port_frontend.update_circuit_route_info(circuit, new_routes)
 
-        assert port_frontend.circuits[port].route_info == new_routes
-        assert len(port_frontend.circuits[port].route_info) == 1
-        assert port_frontend.circuits[port].route_info[0].session_id == route_a.session_id
+        assert port_frontend.circuits[self.FRONTEND_PORT].route_info == new_routes
+        assert len(port_frontend.circuits[self.FRONTEND_PORT].route_info) == 1
+        assert (
+            port_frontend.circuits[self.FRONTEND_PORT].route_info[0].session_id
+            == route_a.session_id
+        )
 
     async def test_route_info_synced_before_backend_update(
         self,
         mocker: pytest_mock.MockerFixture,
         port_frontend: PortFrontend,
+        route_a: RouteInfo,
+        route_b: RouteInfo,
     ) -> None:
         """Verify route_info is updated before backend update is called."""
-        port = 10200
-        route_a = _make_route()
-        circuit = _make_circuit([route_a], port=port)
+        circuit = _make_circuit([route_a], port=self.FRONTEND_PORT)
 
-        port_frontend.circuits[port] = circuit
-        port_frontend.backends[port] = mocker.MagicMock()
+        port_frontend.circuits[self.FRONTEND_PORT] = circuit
+        port_frontend.backends[self.FRONTEND_PORT] = mocker.MagicMock()
 
         captured_route_info: list[list[RouteInfo]] = []
 
         async def capture_update_backend(backend: object, routes: list[RouteInfo]) -> object:
-            captured_route_info.append(list(port_frontend.circuits[port].route_info))
+            captured_route_info.append(list(port_frontend.circuits[self.FRONTEND_PORT].route_info))
             return backend
 
         mocker.patch.object(port_frontend, "update_backend", side_effect=capture_update_backend)
 
-        route_b = _make_route(kernel_host="10.0.0.3", kernel_port=9090)
         new_routes = [route_a, route_b]
         await port_frontend.update_circuit_route_info(circuit, new_routes)
 
@@ -164,28 +175,27 @@ class TestUpdateCircuitRouteInfo:
         self,
         mocker: pytest_mock.MockerFixture,
         port_frontend: PortFrontend,
+        route_a: RouteInfo,
     ) -> None:
         """When all routes are removed, circuit.route_info should be empty."""
-        port = 10200
-        route_a = _make_route()
-        circuit = _make_circuit([route_a], port=port)
+        circuit = _make_circuit([route_a], port=self.FRONTEND_PORT)
 
-        port_frontend.circuits[port] = circuit
-        port_frontend.backends[port] = mocker.MagicMock()
+        port_frontend.circuits[self.FRONTEND_PORT] = circuit
+        port_frontend.backends[self.FRONTEND_PORT] = mocker.MagicMock()
         mocker.patch.object(port_frontend, "update_backend", new_callable=AsyncMock)
 
         await port_frontend.update_circuit_route_info(circuit, [])
 
-        assert port_frontend.circuits[port].route_info == []
+        assert port_frontend.circuits[self.FRONTEND_PORT].route_info == []
 
     async def test_inactive_circuit_update_is_noop(
         self,
         mocker: pytest_mock.MockerFixture,
         port_frontend: PortFrontend,
+        route_a: RouteInfo,
     ) -> None:
         """Updating an unregistered circuit should log warning and do nothing."""
-        route_a = _make_route()
-        circuit = _make_circuit([route_a], port=10200)
+        circuit = _make_circuit([route_a], port=self.FRONTEND_PORT)
 
         mock_update_backend = mocker.patch.object(
             port_frontend, "update_backend", new_callable=AsyncMock
@@ -199,6 +209,8 @@ class TestUpdateCircuitRouteInfo:
         self,
         mocker: pytest_mock.MockerFixture,
         port_frontend: PortFrontend,
+        route_a: RouteInfo,
+        route_b: RouteInfo,
     ) -> None:
         """Regression: the full bug chain from stale route_info to metric failure.
 
@@ -211,13 +223,10 @@ class TestUpdateCircuitRouteInfo:
         scale-in, so the metric collector would try to scrape the terminated
         route_b's /metrics endpoint, causing collection failure.
         """
-        port = 10200
-        route_a = _make_route(kernel_host="10.0.0.1", kernel_port=8080)
-        route_b = _make_route(kernel_host="10.0.0.2", kernel_port=8081)
-        circuit = _make_circuit([route_a, route_b], port=port)
+        circuit = _make_circuit([route_a, route_b], port=self.FRONTEND_PORT)
 
-        port_frontend.circuits[port] = circuit
-        port_frontend.backends[port] = mocker.MagicMock()
+        port_frontend.circuits[self.FRONTEND_PORT] = circuit
+        port_frontend.backends[self.FRONTEND_PORT] = mocker.MagicMock()
         mocker.patch.object(port_frontend, "update_backend", new_callable=AsyncMock)
 
         # Step 1: Scale-in removes route_b
@@ -243,11 +252,13 @@ class TestUpdateCircuitRouteInfo:
         client_pool = MagicMock()
         client_pool.load_client_session = mock_load_client_session
 
-        updated_circuit = port_frontend.circuits[port]
+        updated_circuit = port_frontend.circuits[self.FRONTEND_PORT]
         measures = await gather_inference_measures(client_pool, updated_circuit)
 
         # Step 3: Verify only route_a was accessed, route_b was NOT
-        assert "http://10.0.0.1:8080" in accessed_endpoints
-        assert "http://10.0.0.2:8081" not in accessed_endpoints
+        route_a_endpoint = f"http://{route_a.current_kernel_host}:{route_a.kernel_port}"
+        route_b_endpoint = f"http://{route_b.current_kernel_host}:{route_b.kernel_port}"
+        assert route_a_endpoint in accessed_endpoints
+        assert route_b_endpoint not in accessed_endpoints
         assert measures is not None
         assert len(measures) > 0

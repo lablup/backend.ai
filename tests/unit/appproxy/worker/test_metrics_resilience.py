@@ -18,6 +18,8 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+import pytest
+
 from ai.backend.appproxy.common.types import ProxyProtocol, RouteInfo
 from ai.backend.appproxy.worker.metrics import gather_prometheus_inference_measures
 from ai.backend.appproxy.worker.types import Measurement
@@ -50,6 +52,10 @@ def _make_route(
         last_health_check=None,
         consecutive_failures=0,
     )
+
+
+def _route_endpoint(route: RouteInfo) -> str:
+    return f"http://{route.current_kernel_host}:{route.kernel_port}"
 
 
 def _make_client_pool(
@@ -98,51 +104,59 @@ def _make_client_pool(
 class TestGatherPrometheusInferenceMeasures:
     """Regression tests for per-route error resilience in metric collection."""
 
-    async def test_unreachable_route_does_not_block_others(self) -> None:
+    @pytest.fixture
+    def route_a(self) -> RouteInfo:
+        return _make_route(kernel_host="10.0.0.1", kernel_port=8080)
+
+    @pytest.fixture
+    def route_b(self) -> RouteInfo:
+        return _make_route(kernel_host="10.0.0.2", kernel_port=8081)
+
+    async def test_unreachable_route_does_not_block_others(
+        self,
+        route_a: RouteInfo,
+        route_b: RouteInfo,
+    ) -> None:
         """Regression: one dead route must not prevent collection from healthy ones.
 
         Before the fix, a ConnectionError from a terminated route would
         propagate and abort the entire collection.
         """
-        route_healthy = _make_route(kernel_host="10.0.0.1", kernel_port=8080)
-        route_dead = _make_route(kernel_host="10.0.0.2", kernel_port=8081)
-
         client_pool = _make_client_pool({
-            "http://10.0.0.1:8080": SAMPLE_PROMETHEUS_OUTPUT,
-            "http://10.0.0.2:8081": ConnectionError("Connection refused"),
+            _route_endpoint(route_a): SAMPLE_PROMETHEUS_OUTPUT,
+            _route_endpoint(route_b): ConnectionError("Connection refused"),
         })
 
-        measures = await gather_prometheus_inference_measures(
-            client_pool, [route_healthy, route_dead]
-        )
+        measures = await gather_prometheus_inference_measures(client_pool, [route_a, route_b])
 
         assert len(measures) > 0
-        # Verify we got metrics from the healthy route
         metric_keys = {m.key for m in measures}
         assert "vllm:num_requests_running" in metric_keys
 
-    async def test_all_routes_unreachable_returns_empty(self) -> None:
+    async def test_all_routes_unreachable_returns_empty(
+        self,
+        route_a: RouteInfo,
+        route_b: RouteInfo,
+    ) -> None:
         """When all routes fail, should return empty list without raising."""
-        route_a = _make_route(kernel_host="10.0.0.1", kernel_port=8080)
-        route_b = _make_route(kernel_host="10.0.0.2", kernel_port=8081)
-
         client_pool = _make_client_pool({
-            "http://10.0.0.1:8080": ConnectionError("Connection refused"),
-            "http://10.0.0.2:8081": TimeoutError("Timed out"),
+            _route_endpoint(route_a): ConnectionError("Connection refused"),
+            _route_endpoint(route_b): TimeoutError("Timed out"),
         })
 
         measures = await gather_prometheus_inference_measures(client_pool, [route_a, route_b])
 
         assert measures == []
 
-    async def test_healthy_routes_collected_successfully(self) -> None:
+    async def test_healthy_routes_collected_successfully(
+        self,
+        route_a: RouteInfo,
+        route_b: RouteInfo,
+    ) -> None:
         """Verify normal collection with all routes healthy."""
-        route_a = _make_route(kernel_host="10.0.0.1", kernel_port=8080)
-        route_b = _make_route(kernel_host="10.0.0.2", kernel_port=8081)
-
         client_pool = _make_client_pool({
-            "http://10.0.0.1:8080": SAMPLE_PROMETHEUS_OUTPUT,
-            "http://10.0.0.2:8081": SAMPLE_PROMETHEUS_OUTPUT,
+            _route_endpoint(route_a): SAMPLE_PROMETHEUS_OUTPUT,
+            _route_endpoint(route_b): SAMPLE_PROMETHEUS_OUTPUT,
         })
 
         measures = await gather_prometheus_inference_measures(client_pool, [route_a, route_b])
@@ -155,26 +169,27 @@ class TestGatherPrometheusInferenceMeasures:
                 assert m.per_app.value == Decimal(6)
                 assert len(m.per_replica) == 2
 
-    async def test_unhealthy_route_skipped(self) -> None:
-        """Routes with non-HEALTHY status should be skipped entirely."""
-        route_healthy = _make_route(
-            kernel_host="10.0.0.1",
-            kernel_port=8080,
-            health_status=ModelServiceStatus.HEALTHY,
-        )
-        route_unhealthy = _make_route(
+    @pytest.fixture
+    def route_unhealthy(self) -> RouteInfo:
+        return _make_route(
             kernel_host="10.0.0.2",
             kernel_port=8081,
             health_status=ModelServiceStatus.UNHEALTHY,
         )
 
+    async def test_unhealthy_route_skipped(
+        self,
+        route_a: RouteInfo,
+        route_unhealthy: RouteInfo,
+    ) -> None:
+        """Routes with non-HEALTHY status should be skipped entirely."""
         client_pool = _make_client_pool({
-            "http://10.0.0.1:8080": SAMPLE_PROMETHEUS_OUTPUT,
-            "http://10.0.0.2:8081": SAMPLE_PROMETHEUS_OUTPUT,
+            _route_endpoint(route_a): SAMPLE_PROMETHEUS_OUTPUT,
+            _route_endpoint(route_unhealthy): SAMPLE_PROMETHEUS_OUTPUT,
         })
 
         measures = await gather_prometheus_inference_measures(
-            client_pool, [route_healthy, route_unhealthy]
+            client_pool, [route_a, route_unhealthy]
         )
 
         # Only the healthy route should contribute
