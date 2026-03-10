@@ -13,6 +13,7 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.models.agent import AgentRow as AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group.row import GroupRow as GroupRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
