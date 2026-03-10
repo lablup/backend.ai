@@ -11,6 +11,9 @@ import pytest
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.resource_group.types import (
+    PreemptionConfigGQL,
+    PreemptionModeGQL,
+    PreemptionOrderGQL,
     ResourceGroupGQL,
     ResourceGroupMetadataGQL,
     ResourceGroupNetworkConfigGQL,
@@ -227,7 +230,14 @@ class TestResourceGroupGQLResourceInfoResolver:
                 wsproxy_addr=None,
                 use_host_network=False,
             ),
-            scheduler=ResourceGroupSchedulerConfigGQL(type=SchedulerTypeGQL.FIFO),
+            scheduler=ResourceGroupSchedulerConfigGQL(
+                type=SchedulerTypeGQL.FIFO,
+                preemption=PreemptionConfigGQL(
+                    preemptible_priority=5,
+                    order=PreemptionOrderGQL.OLDEST,
+                    mode=PreemptionModeGQL.TERMINATE,
+                ),
+            ),
             _fair_share_spec_data=FairShareScalingGroupSpec(
                 half_life_days=7,
                 lookback_days=28,

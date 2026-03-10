@@ -4214,6 +4214,54 @@ enum PermissionOrderField {
   ENTITY_TYPE
 }
 
+"""Added in 26.3.0. Preemption configuration for a resource group."""
+type PreemptionConfig {
+  """
+  Sessions with priority <= this value are eligible for preemption. Default is 5.
+  """
+  preemptiblePriority: Int!
+
+  """
+  Tie-breaking order for sessions with the same priority during preemption. 'oldest' preempts the oldest session first, 'newest' preempts the newest. Default is 'oldest'.
+  """
+  order: PreemptionOrder!
+
+  """
+  How to preempt a session when preemption is triggered. 'terminate' destroys the session, 'reschedule' queues it for rescheduling. Default is 'terminate'.
+  """
+  mode: PreemptionMode!
+}
+
+"""Added in 26.3.0. Input for preemption configuration."""
+input PreemptionConfigInput {
+  """Sessions with priority <= this value are preemptible. Default is 5."""
+  preemptiblePriority: Int! = 5
+
+  """
+  Tie-breaking order for same-priority sessions (OLDEST, NEWEST). Default is OLDEST.
+  """
+  order: PreemptionOrder! = OLDEST
+
+  """How to preempt sessions (TERMINATE, RESCHEDULE). Default is TERMINATE."""
+  mode: PreemptionMode! = TERMINATE
+}
+
+"""
+Added in 26.3.0. How to preempt a session when preemption is triggered.
+"""
+enum PreemptionMode {
+  TERMINATE
+  RESCHEDULE
+}
+
+"""
+Added in 26.3.0. Tie-breaking order for same-priority sessions during preemption.
+"""
+enum PreemptionOrder {
+  OLDEST
+  NEWEST
+}
+
 """
 Added in 26.2.0. Basic project information. Contains identity and descriptive fields for the project.
 """
@@ -5714,6 +5762,9 @@ type ResourceGroupSchedulerConfig {
   Type of scheduler used for session scheduling (fifo, lifo, drf, fair-share).
   """
   type: SchedulerType!
+
+  """Added in 26.3.0. Preemption configuration for this resource group."""
+  preemption: PreemptionConfig!
 }
 
 """Added in 26.2.0. Status information for a resource group."""
@@ -7155,6 +7206,11 @@ input UpdateResourceGroupInput {
   Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Leave null to keep existing value.
   """
   schedulerType: SchedulerType = null
+
+  """
+  Added in 26.3.0. Preemption configuration. When provided, replaces the entire preemption config. Leave null to keep existing value.
+  """
+  preemption: PreemptionConfigInput = null
 }
 
 """Added in 26.2.0. Payload for resource group update mutation."""

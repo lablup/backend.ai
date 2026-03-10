@@ -32,6 +32,8 @@ from sqlalchemy.sql.expression import true
 
 from ai.backend.common.types import (
     AgentSelectionStrategy,
+    PreemptionMode,
+    PreemptionOrder,
     SessionTypes,
 )
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
@@ -79,6 +81,27 @@ __all__: Sequence[str] = (
 )
 
 
+class PreemptionConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    preemptible_priority: int = 5
+    """Sessions with priority <= this value are preemptible"""
+
+    order: PreemptionOrder = PreemptionOrder.OLDEST
+    """Tie-breaking order for same-priority sessions"""
+
+    mode: PreemptionMode = PreemptionMode.TERMINATE
+    """How to preempt sessions"""
+
+    @field_serializer("order", mode="plain")
+    def serialize_order(self, value: PreemptionOrder) -> str:
+        return value.value
+
+    @field_serializer("mode", mode="plain")
+    def serialize_mode(self, value: PreemptionMode) -> str:
+        return value.value
+
+
 class ScalingGroupOpts(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -105,6 +128,9 @@ class ScalingGroupOpts(BaseModel):
 
     route_cleanup_target_statuses: list[str] = Field(default_factory=lambda: ["unhealthy"])
     """List of route statuses that should be automatically cleaned up. Valid values: healthy, unhealthy, degraded"""
+
+    preemption: PreemptionConfig = Field(default_factory=PreemptionConfig)
+    """Preemption configuration"""
 
     @field_serializer("allowed_session_types", mode="plain")
     def serialize_allowed_session_types(self, value: list[SessionTypes]) -> list[str]:
@@ -299,6 +325,9 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
     def to_dataclass(self) -> ScalingGroupData:
         """Convert Row to domain model data."""
         from ai.backend.manager.data.scaling_group.types import (
+            PreemptionConfig as DataPreemptionConfig,
+        )
+        from ai.backend.manager.data.scaling_group.types import (
             ScalingGroupDriverConfig,
             ScalingGroupMetadata,
             ScalingGroupNetworkConfig,
@@ -338,6 +367,11 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
                     enforce_spreading_endpoint_replica=self.scheduler_opts.enforce_spreading_endpoint_replica,
                     allow_fractional_resource_fragmentation=self.scheduler_opts.allow_fractional_resource_fragmentation,
                     route_cleanup_target_statuses=self.scheduler_opts.route_cleanup_target_statuses,
+                    preemption=DataPreemptionConfig(
+                        preemptible_priority=self.scheduler_opts.preemption.preemptible_priority,
+                        order=self.scheduler_opts.preemption.order,
+                        mode=self.scheduler_opts.preemption.mode,
+                    ),
                 ),
             ),
             fair_share_spec=self.fair_share_spec or FairShareScalingGroupSpec(),
