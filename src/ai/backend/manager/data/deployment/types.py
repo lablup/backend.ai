@@ -376,8 +376,6 @@ class DeploymentInfo:
     policy: DeploymentPolicyData | None = None
     deploying_revision_id: UUID | None = None
     sub_step: DeploymentSubStep | None = None
-    phase_attempts: int = 0
-    phase_started_at: datetime | None = None
 
     def target_revision(self) -> ModelRevisionSpec | None:
         if self.model_revisions:

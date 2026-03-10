@@ -58,7 +58,6 @@ class ReconcileDeploymentHandler(DeploymentHandler):
 
         - success: None (stays READY)
         - need_retry: Deployment → SCALING (replica-route mismatch needs re-scaling)
-        - expired / give_up: None (reconcile doesn't have terminal failure states)
         """
         return DeploymentStatusTransitions(
             success=None,

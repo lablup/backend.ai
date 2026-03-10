@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
@@ -50,10 +49,8 @@ class StrategyEvaluationSummary:
     as sub_step values and persisted to the DB for their respective handlers.
     """
 
-    # Mapping from sub_step to endpoint IDs — used to bulk-update the DB.
-    assignments: defaultdict[DeploymentSubStep, set[UUID]] = field(
-        default_factory=lambda: defaultdict(set)
-    )
+    # Mapping from endpoint ID to its evaluated sub_step — used to bulk-update the DB.
+    assignments: dict[UUID, DeploymentSubStep] = field(default_factory=dict)
 
     # Aggregated route mutations from all per-deployment evaluations.
     route_changes: RouteChanges = field(default_factory=RouteChanges)

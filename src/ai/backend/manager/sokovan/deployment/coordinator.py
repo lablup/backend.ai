@@ -9,7 +9,6 @@ from collections.abc import Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Protocol
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
@@ -35,7 +34,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentSubStep,
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
-from ai.backend.manager.defs import SERVICE_MAX_RETRIES, LockID
+from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
@@ -62,7 +61,6 @@ from .executor import DeploymentExecutor
 from .handlers import (
     CheckPendingDeploymentHandler,
     CheckReplicaDeploymentHandler,
-    DeployingEvaluatePreStep,
     DeployingProgressingHandler,
     DeployingProvisioningHandler,
     DeploymentHandler,
@@ -70,6 +68,7 @@ from .handlers import (
     ReconcileDeploymentHandler,
     ScalingDeploymentHandler,
 )
+from .strategy.applier import StrategyResultApplier
 from .strategy.blue_green import BlueGreenStrategy
 from .strategy.evaluator import DeploymentStrategyEvaluator
 from .strategy.rolling_update import RollingUpdateStrategy
@@ -88,33 +87,78 @@ DEPLOYMENT_STATUS_TIMEOUT_MAP: dict[EndpointLifecycle, float] = {
 }
 
 
+class _AttemptContext:
+    """Attempt context tracked from scheduling history."""
+
+    def __init__(
+        self,
+        attempts: int = 0,  # Used for give_up classification (max retries exceeded)
+        started_at: datetime | None = None,  # Used for expired classification (timeout exceeded)
+    ) -> None:
+        self.attempts = attempts
+        self.started_at = started_at
+
+    def should_give_up(self, max_retries: int) -> bool:
+        """Check if max retries exceeded."""
+        return self.attempts >= max_retries
+
+    def is_expired(self, lifecycle: EndpointLifecycle, current_dbtime: datetime) -> bool:
+        """Check if timeout exceeded for the given lifecycle status."""
+        if self.started_at is None:
+            return False
+        timeout = DEPLOYMENT_STATUS_TIMEOUT_MAP.get(lifecycle)
+        if not timeout:
+            return False
+        # Normalise both to UTC to avoid timezone-naive vs -aware
+        # comparison errors (DB may return either depending on driver).
+        current_utc = (
+            current_dbtime.astimezone(UTC)
+            if current_dbtime.tzinfo
+            else current_dbtime.replace(tzinfo=UTC)
+        )
+        started_utc = (
+            self.started_at.astimezone(UTC)
+            if self.started_at.tzinfo
+            else self.started_at.replace(tzinfo=UTC)
+        )
+        elapsed = (current_utc - started_utc).total_seconds()
+        return elapsed > timeout
+
+
 @dataclass
 class FailureClassificationResult:
     """Result of classifying failures into give_up, expired, and need_retry.
 
     Classification priority (first match wins):
-    1. give_up: phase_attempts >= SERVICE_MAX_RETRIES
-    2. expired: phase_started_at elapsed > DEPLOYMENT_STATUS_TIMEOUT_MAP threshold
+    1. give_up: attempts >= SERVICE_MAX_RETRIES
+    2. expired: started_at elapsed > DEPLOYMENT_STATUS_TIMEOUT_MAP threshold
     3. need_retry: default (can be retried)
     """
 
     give_up: list[DeploymentExecutionError]
+    """Deployments that exceeded max retries — should transition to give_up status."""
+
     expired: list[DeploymentExecutionError]
+    """Deployments that exceeded timeout threshold — should transition to expired status."""
+
     need_retry: list[DeploymentExecutionError]
+    """Deployments that can be retried — should transition to need_retry status."""
 
 
-class LifecyclePreStep(Protocol):
-    """Protocol for optional pre-steps that run before handler dispatch."""
+@dataclass
+class _TransitionResult:
+    """Result of building a lifecycle transition."""
 
-    async def run(self) -> None: ...
+    updater: BatchUpdater[EndpointRow]
+    history_specs: list[DeploymentHistoryCreatorSpec]
+    notification_events: list[NotificationTriggeredEvent]
 
 
 @dataclass
 class HandlerRegistry:
-    """Registry holding flat handler map and pre-steps."""
+    """Registry holding flat handler map."""
 
     handlers: dict[HandlerKey, DeploymentHandler]
-    pre_steps: dict[DeploymentLifecycleType, LifecyclePreStep]
 
     def sub_steps_for(self, lifecycle_type: DeploymentLifecycleType) -> list[DeploymentSubStep]:
         """Derive sub-steps from registered handler keys."""
@@ -130,27 +174,42 @@ class DeploymentTaskSpec:
     """Specification for a deployment lifecycle periodic task."""
 
     lifecycle_type: DeploymentLifecycleType
+    sub_step: DeploymentSubStep | None = None
     short_interval: float | None = None  # None means no short-cycle task
     long_interval: float = 60.0
     initial_delay: float = 30.0
 
+    def _sub_step_value(self) -> str | None:
+        return self.sub_step.value if self.sub_step is not None else None
+
     def create_if_needed_event(self) -> DoDeploymentLifecycleIfNeededEvent:
         """Create event for checking if processing is needed."""
-        return DoDeploymentLifecycleIfNeededEvent(self.lifecycle_type.value)
+        return DoDeploymentLifecycleIfNeededEvent(
+            self.lifecycle_type.value, sub_step=self._sub_step_value()
+        )
 
     def create_process_event(self) -> DoDeploymentLifecycleEvent:
         """Create event for forced processing."""
-        return DoDeploymentLifecycleEvent(self.lifecycle_type.value)
+        return DoDeploymentLifecycleEvent(
+            self.lifecycle_type.value, sub_step=self._sub_step_value()
+        )
+
+    @property
+    def _suffix(self) -> str:
+        base = self.lifecycle_type.value
+        if self.sub_step is not None:
+            return f"{base}_{self.sub_step.value}"
+        return base
 
     @property
     def short_task_name(self) -> str:
         """Name for the short-cycle task."""
-        return f"deployment_process_if_needed_{self.lifecycle_type.value}"
+        return f"deployment_process_if_needed_{self._suffix}"
 
     @property
     def long_task_name(self) -> str:
         """Name for the long-cycle task."""
-        return f"deployment_process_{self.lifecycle_type.value}"
+        return f"deployment_process_{self._suffix}"
 
 
 class DeploymentCoordinator:
@@ -212,7 +271,7 @@ class DeploymentCoordinator:
         return registry
 
     def _init_handlers(self, executor: DeploymentExecutor) -> HandlerRegistry:
-        """Initialize the flat handler registry and pre-steps.
+        """Initialize the flat handler registry.
 
         Registry keys are derived from each handler's ``target_statuses()``.
         """
@@ -221,6 +280,7 @@ class DeploymentCoordinator:
             deployment_repo=self._deployment_repository,
             strategy_registry=strategy_registry,
         )
+        applier = StrategyResultApplier(deployment_repo=self._deployment_repository)
 
         handler_list: list[tuple[DeploymentLifecycleType, DeploymentHandler]] = [
             # -- simple lifecycle handlers --
@@ -267,6 +327,8 @@ class DeploymentCoordinator:
                 DeployingProvisioningHandler(
                     deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
+                    evaluator=evaluator,
+                    applier=applier,
                 ),
             ),
             (
@@ -274,7 +336,8 @@ class DeploymentCoordinator:
                 DeployingProgressingHandler(
                     deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
-                    deployment_repo=self._deployment_repository,
+                    evaluator=evaluator,
+                    applier=applier,
                 ),
             ),
         ]
@@ -284,14 +347,7 @@ class DeploymentCoordinator:
             key = self._derive_handler_key(lifecycle_type, handler)
             handlers[key] = handler
 
-        pre_steps: dict[DeploymentLifecycleType, LifecyclePreStep] = {
-            DeploymentLifecycleType.DEPLOYING: DeployingEvaluatePreStep(
-                evaluator=evaluator,
-                deployment_repo=self._deployment_repository,
-            ),
-        }
-
-        return HandlerRegistry(handlers=handlers, pre_steps=pre_steps)
+        return HandlerRegistry(handlers=handlers)
 
     @staticmethod
     def _derive_handler_key(
@@ -315,52 +371,35 @@ class DeploymentCoordinator:
     async def process_deployment_lifecycle(
         self,
         lifecycle_type: DeploymentLifecycleType,
+        sub_step: DeploymentSubStep | None = None,
     ) -> None:
-        sub_steps = self._registry.sub_steps_for(lifecycle_type)
-        if not sub_steps:
-            # Simple lifecycle — single handler with sub_step=None
-            handler = self._registry.handlers.get((lifecycle_type, None))
-            if handler is None:
-                log.warning("No handler for deployment lifecycle type: {}", lifecycle_type.value)
-                return
+        handler = self._registry.handlers.get((lifecycle_type, sub_step))
+        if handler is None:
+            log.warning(
+                "No handler for deployment lifecycle ({}, {})",
+                lifecycle_type.value,
+                sub_step,
+            )
+            return
 
-            # Acquire the lock from the handler that declares one
-            lock_id = handler.lock_id
-            async with AsyncExitStack() as stack:
-                if lock_id is not None:
-                    lock_lifetime = (
-                        self._config_provider.config.manager.session_schedule_lock_lifetime
-                    )
-                    await stack.enter_async_context(self._lock_factory(lock_id, lock_lifetime))
-                await self._run_handler(handler, lifecycle_type)
-        else:
-            # Lifecycle with sub-steps — acquire distributed lock, then
-            # run pre-step + all sub-step handlers atomically to prevent
-            # concurrent coordinator instances from re-assigning sub_steps
-            # or processing the same deployments in parallel.
-            lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
-            async with self._lock_factory(LockID.LOCKID_DEPLOYMENT_DEPLOYING, lock_lifetime):
-                await self._run_pre_step(lifecycle_type)
-                for sub_step in sub_steps:
-                    handler = self._registry.handlers[(lifecycle_type, sub_step)]
-                    await self._run_handler(handler, lifecycle_type)
-
-    async def _run_pre_step(self, lifecycle_type: DeploymentLifecycleType) -> None:
-        """Run the optional pre-step for a lifecycle type."""
-        pre_step = self._registry.pre_steps.get(lifecycle_type)
-        if pre_step is not None:
-            await pre_step.run()
+        lock_id = handler.lock_id
+        async with AsyncExitStack() as stack:
+            if lock_id is not None:
+                lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
+                await stack.enter_async_context(self._lock_factory(lock_id, lock_lifetime))
+            await self._run_handler(handler)
 
     async def _run_handler(
         self,
         handler: DeploymentHandler,
-        lifecycle_type: DeploymentLifecycleType,
     ) -> None:
         """Run a single handler: fetch filtered deployments → execute → transitions → post_process."""
         target_statuses = handler.target_statuses()
-        lifecycles = list({s.lifecycle for s in target_statuses})
+        lifecycles = list({status.lifecycle for status in target_statuses})
         sub_steps = [
-            s.sub_status for s in target_statuses if isinstance(s.sub_status, DeploymentSubStep)
+            status.sub_status
+            for status in target_statuses
+            if isinstance(status.sub_status, DeploymentSubStep)
         ]
         deployments = await self._deployment_repository.get_endpoints_by_statuses(
             lifecycles,
@@ -371,40 +410,50 @@ class DeploymentCoordinator:
             return
         log.info("handler: {} - processing {} deployments", handler.name(), len(deployments))
 
-        deployment_ids = [d.id for d in deployments]
+        deployment_ids = [deployment.id for deployment in deployments]
 
-        # Populate phase_attempts and phase_started_at from scheduling history
+        attempt_ctx_map = await self._build_attempt_ctx_map(handler, deployments)
+
         handler_name = handler.name()
-        history_map = await self._deployment_repository.get_last_deployment_histories(
-            deployment_ids
-        )
-        for deployment in deployments:
-            history = history_map.get(deployment.id)
-            if history and history.phase == handler_name:
-                deployment.phase_attempts = history.attempts
-                deployment.phase_started_at = history.created_at
-            else:
-                deployment.phase_attempts = 0
-                deployment.phase_started_at = None
-
-        with DeploymentRecorderContext.scope(
-            lifecycle_type.value, entity_ids=deployment_ids
-        ) as pool:
+        with DeploymentRecorderContext.scope(handler_name, entity_ids=deployment_ids) as pool:
             result = await handler.execute(deployments)
             all_records = pool.build_all_records()
-            await self._handle_status_transitions(handler, result, all_records, deployments)
+            await self._handle_status_transitions(handler, result, all_records, attempt_ctx_map)
 
         try:
             await handler.post_process(result)
         except Exception as e:
             log.error("Error during post-processing for {}: {}", handler.name(), e)
 
+    async def _build_attempt_ctx_map(
+        self,
+        handler: DeploymentHandler,
+        deployments: list[DeploymentInfo],
+    ) -> dict[UUID, _AttemptContext]:
+        """Build attempt context from scheduling history (kept separate from DeploymentInfo)."""
+        handler_name = handler.name()
+        deployment_ids = [deployment.id for deployment in deployments]
+        history_map = await self._deployment_repository.get_last_deployment_histories(
+            deployment_ids
+        )
+        attempt_ctx_map: dict[UUID, _AttemptContext] = {}
+        for deployment in deployments:
+            history = history_map.get(deployment.id)
+            if history and history.phase == handler_name:
+                attempt_ctx_map[deployment.id] = _AttemptContext(
+                    attempts=history.attempts,
+                    started_at=history.created_at,
+                )
+            else:
+                attempt_ctx_map[deployment.id] = _AttemptContext()
+        return attempt_ctx_map
+
     async def _handle_status_transitions(
         self,
         handler: DeploymentHandler,
         result: DeploymentExecutionResult,
         records: Mapping[UUID, ExecutionRecord],
-        deployments: list[DeploymentInfo],
+        attempt_ctx_map: dict[UUID, _AttemptContext],
     ) -> None:
         """Handle status transitions with history recording.
 
@@ -414,96 +463,63 @@ class DeploymentCoordinator:
         """
         handler_name = handler.name()
         target_statuses = handler.target_statuses()
-        target_lifecycles = [s.lifecycle for s in target_statuses]
-        from_status = target_lifecycles[0] if target_lifecycles else None
-        # sub_status from target_statuses — used for history recording
-        target_sub_status = target_statuses[0].sub_status if target_statuses else None
+        target_lifecycles = list({status.lifecycle for status in target_statuses})
 
-        # Collect all batch updaters and history specs
         batch_updaters: list[BatchUpdater[EndpointRow]] = []
         all_history_specs: list[DeploymentHistoryCreatorSpec] = []
         notification_events: list[NotificationTriggeredEvent] = []
         timestamp_now = datetime.now(UTC).isoformat()
 
-        # Handle success transitions
         transitions = handler.status_transitions()
-        next_lifecycle_status = transitions.success
-        if next_lifecycle_status is not None and result.successes:
-            self._collect_transition(
+
+        # Success transitions (None = stay in current state)
+        if transitions.success is not None and result.successes:
+            t = self._build_success_transition(
                 handler_name=handler_name,
-                errors=None,
                 deployments=result.successes,
-                lifecycle_status=next_lifecycle_status,
-                scheduling_result=SchedulingResult.SUCCESS,
-                from_status=from_status,
+                lifecycle_status=transitions.success,
                 target_lifecycles=target_lifecycles,
-                target_sub_status=target_sub_status,
                 records=records,
-                batch_updaters=batch_updaters,
-                history_specs=all_history_specs,
-                notification_events=notification_events,
                 timestamp_now=timestamp_now,
-                transition_label="success",
             )
+            batch_updaters.append(t.updater)
+            all_history_specs.extend(t.history_specs)
+            notification_events.extend(t.notification_events)
 
-        # Classify and handle failure transitions
+        # Failure transitions
         if result.errors:
-            current_time = await self._deployment_repository.get_db_now()
-            classified = self._classify_failures(result.errors, deployments, current_time)
+            current_dbtime = await self._deployment_repository.get_db_now()
+            classified = self._classify_failures(result.errors, attempt_ctx_map, current_dbtime)
 
-            if classified.give_up and transitions.give_up:
-                self._collect_transition(
+            failure_categories = [
+                (classified.give_up, transitions.give_up, SchedulingResult.GIVE_UP, "give_up"),
+                (classified.expired, transitions.expired, SchedulingResult.EXPIRED, "expired"),
+                (
+                    classified.need_retry,
+                    transitions.need_retry,
+                    SchedulingResult.NEED_RETRY,
+                    "need_retry",
+                ),
+            ]
+            for errors, lifecycle_status, scheduling_result, label in failure_categories:
+                if not errors:
+                    continue
+                # No transition defined → stay in current state
+                if not lifecycle_status:
+                    continue
+                t = self._build_failure_transition(
                     handler_name=handler_name,
-                    errors=classified.give_up,
-                    deployments=None,
-                    lifecycle_status=transitions.give_up,
-                    scheduling_result=SchedulingResult.GIVE_UP,
-                    from_status=from_status,
+                    errors=errors,
+                    lifecycle_status=lifecycle_status,
+                    scheduling_result=scheduling_result,
                     target_lifecycles=target_lifecycles,
-                    target_sub_status=target_sub_status,
                     records=records,
-                    batch_updaters=batch_updaters,
-                    history_specs=all_history_specs,
-                    notification_events=notification_events,
                     timestamp_now=timestamp_now,
-                    transition_label="give_up",
+                    transition_label=label,
                 )
-
-            if classified.expired and transitions.expired:
-                self._collect_transition(
-                    handler_name=handler_name,
-                    errors=classified.expired,
-                    deployments=None,
-                    lifecycle_status=transitions.expired,
-                    scheduling_result=SchedulingResult.EXPIRED,
-                    from_status=from_status,
-                    target_lifecycles=target_lifecycles,
-                    target_sub_status=target_sub_status,
-                    records=records,
-                    batch_updaters=batch_updaters,
-                    history_specs=all_history_specs,
-                    notification_events=notification_events,
-                    timestamp_now=timestamp_now,
-                    transition_label="expired",
-                )
-
-            if classified.need_retry and transitions.need_retry:
-                self._collect_transition(
-                    handler_name=handler_name,
-                    errors=classified.need_retry,
-                    deployments=None,
-                    lifecycle_status=transitions.need_retry,
-                    scheduling_result=SchedulingResult.NEED_RETRY,
-                    from_status=from_status,
-                    target_lifecycles=target_lifecycles,
-                    target_sub_status=target_sub_status,
-                    records=records,
-                    batch_updaters=batch_updaters,
-                    history_specs=all_history_specs,
-                    notification_events=notification_events,
-                    timestamp_now=timestamp_now,
-                    transition_label="need_retry",
-                )
+                batch_updaters.append(t.updater)
+                all_history_specs.extend(t.history_specs)
+                notification_events.extend(t.notification_events)
 
         # Execute all updates in a single transaction
         if batch_updaters:
@@ -518,157 +534,154 @@ class DeploymentCoordinator:
             except Exception as e:
                 log.warning("Failed to send lifecycle notification: {}", e)
 
-    def _collect_transition(
+    def _build_lifecycle_updater(
+        self,
+        endpoint_ids: list[UUID],
+        lifecycle_status: DeploymentLifecycleStatus,
+        target_lifecycles: list[EndpointLifecycle],
+    ) -> BatchUpdater[EndpointRow]:
+        return BatchUpdater(
+            spec=EndpointLifecycleBatchUpdaterSpec(
+                lifecycle_stage=lifecycle_status.lifecycle,
+                sub_step=lifecycle_status.sub_status,
+            ),
+            conditions=[
+                DeploymentConditions.by_ids(endpoint_ids),
+                DeploymentConditions.by_lifecycle_stages(target_lifecycles),
+            ],
+        )
+
+    def _build_success_transition(
         self,
         *,
         handler_name: str,
-        errors: list[DeploymentExecutionError] | None,
-        deployments: list[DeploymentInfo] | None,
+        deployments: list[DeploymentInfo],
+        lifecycle_status: DeploymentLifecycleStatus,
+        target_lifecycles: list[EndpointLifecycle],
+        records: Mapping[UUID, ExecutionRecord],
+        timestamp_now: str,
+    ) -> _TransitionResult:
+        next_lifecycle = lifecycle_status.lifecycle
+        endpoint_ids = [deployment.id for deployment in deployments]
+        history_specs = [
+            DeploymentHistoryCreatorSpec(
+                deployment_id=deployment.id,
+                phase=handler_name,
+                result=SchedulingResult.SUCCESS,
+                message=f"{handler_name} completed successfully",
+                from_status=deployment.state.lifecycle,
+                to_status=next_lifecycle,
+                sub_steps=self._build_history_sub_steps(
+                    deployment.id, records, deployment.sub_step, SchedulingResult.SUCCESS
+                ),
+            )
+            for deployment in deployments
+        ]
+        events = [
+            self._build_lifecycle_notification_event(
+                deployment=deployment,
+                from_status=deployment.state.lifecycle,
+                to_status=next_lifecycle,
+                transition_result="success",
+                timestamp=timestamp_now,
+            )
+            for deployment in deployments
+        ]
+        updater = self._build_lifecycle_updater(endpoint_ids, lifecycle_status, target_lifecycles)
+        return _TransitionResult(
+            updater=updater,
+            history_specs=history_specs,
+            notification_events=events,
+        )
+
+    def _build_failure_transition(
+        self,
+        *,
+        handler_name: str,
+        errors: list[DeploymentExecutionError],
         lifecycle_status: DeploymentLifecycleStatus,
         scheduling_result: SchedulingResult,
-        from_status: EndpointLifecycle | None,
         target_lifecycles: list[EndpointLifecycle],
-        target_sub_status: DeploymentSubStatus | None,
         records: Mapping[UUID, ExecutionRecord],
-        batch_updaters: list[BatchUpdater[EndpointRow]],
-        history_specs: list[DeploymentHistoryCreatorSpec],
-        notification_events: list[NotificationTriggeredEvent],
         timestamp_now: str,
         transition_label: str,
-    ) -> None:
-        """Collect batch updaters, history specs, and notifications for a transition category."""
+    ) -> _TransitionResult:
         next_lifecycle = lifecycle_status.lifecycle
-        sub_status = lifecycle_status.sub_status
-
-        if deployments is not None:
-            # Success path — uses DeploymentInfo list
-            endpoint_ids = [d.id for d in deployments]
-            history_specs.extend(
-                DeploymentHistoryCreatorSpec(
-                    deployment_id=d.id,
-                    phase=handler_name,
-                    result=scheduling_result,
-                    message=f"{handler_name} completed successfully",
-                    from_status=from_status,
-                    to_status=next_lifecycle,
-                    sub_steps=self._build_history_sub_steps(
-                        d.id, records, target_sub_status, scheduling_result
-                    ),
-                )
-                for d in deployments
-            )
-            notification_events.extend(
-                self._build_lifecycle_notification_event(
-                    deployment=d,
-                    from_status=from_status,
-                    to_status=next_lifecycle,
-                    transition_result=transition_label,
-                    timestamp=timestamp_now,
-                )
-                for d in deployments
-            )
-        elif errors is not None:
-            # Failure path — uses DeploymentExecutionError list
-            endpoint_ids = [e.deployment_info.id for e in errors]
-            history_specs.extend(
-                DeploymentHistoryCreatorSpec(
-                    deployment_id=e.deployment_info.id,
-                    phase=handler_name,
-                    result=scheduling_result,
-                    message=e.reason,
-                    from_status=from_status,
-                    to_status=next_lifecycle,
-                    error_code=e.error_code,
-                    sub_steps=self._build_history_sub_steps(
-                        e.deployment_info.id, records, target_sub_status, scheduling_result
-                    ),
-                )
-                for e in errors
-            )
-            notification_events.extend(
-                self._build_lifecycle_notification_event(
-                    deployment=e.deployment_info,
-                    from_status=from_status,
-                    to_status=next_lifecycle,
-                    transition_result=transition_label,
-                    timestamp=timestamp_now,
-                )
-                for e in errors
-            )
-        else:
-            return
-
-        batch_updaters.append(
-            BatchUpdater(
-                spec=EndpointLifecycleBatchUpdaterSpec(
-                    lifecycle_stage=next_lifecycle,
-                    sub_step=sub_status,
+        endpoint_ids = [error.deployment_info.id for error in errors]
+        history_specs = [
+            DeploymentHistoryCreatorSpec(
+                deployment_id=error.deployment_info.id,
+                phase=handler_name,
+                result=scheduling_result,
+                message=error.reason,
+                from_status=error.deployment_info.state.lifecycle,
+                to_status=next_lifecycle,
+                error_code=error.error_code,
+                sub_steps=self._build_history_sub_steps(
+                    error.deployment_info.id,
+                    records,
+                    error.deployment_info.sub_step,
+                    scheduling_result,
                 ),
-                conditions=[
-                    DeploymentConditions.by_ids(endpoint_ids),
-                    DeploymentConditions.by_lifecycle_stages(target_lifecycles),
-                ],
             )
+            for error in errors
+        ]
+        events = [
+            self._build_lifecycle_notification_event(
+                deployment=error.deployment_info,
+                from_status=error.deployment_info.state.lifecycle,
+                to_status=next_lifecycle,
+                transition_result=transition_label,
+                timestamp=timestamp_now,
+            )
+            for error in errors
+        ]
+        updater = self._build_lifecycle_updater(endpoint_ids, lifecycle_status, target_lifecycles)
+        return _TransitionResult(
+            updater=updater,
+            history_specs=history_specs,
+            notification_events=events,
         )
 
     @staticmethod
     def _classify_failures(
         errors: list[DeploymentExecutionError],
-        deployments: list[DeploymentInfo],
-        current_time: datetime,
+        attempt_ctx_map: dict[UUID, _AttemptContext],
+        current_dbtime: datetime,
     ) -> FailureClassificationResult:
         """Classify failures into give_up, expired, need_retry.
 
         Classification priority (first match wins):
-        1. give_up: phase_attempts >= SERVICE_MAX_RETRIES
+        1. give_up: attempts >= SERVICE_MAX_RETRIES
         2. expired: timeout exceeded
         3. need_retry: default
 
         Args:
             errors: Failed deployment execution errors
-            deployments: Original deployments with phase_attempts and phase_started_at populated
-            current_time: Current database time for timeout comparison
+            attempt_ctx_map: Attempt context (attempts, started_at) per deployment
+            current_dbtime: Current database time for timeout comparison
 
         Returns:
             FailureClassificationResult with give_up, expired, need_retry lists
         """
-        deployment_map = {d.id: d for d in deployments}
-
         give_up_errors: list[DeploymentExecutionError] = []
         expired_errors: list[DeploymentExecutionError] = []
         retry_errors: list[DeploymentExecutionError] = []
 
         for error in errors:
-            deployment = deployment_map.get(error.deployment_info.id)
-            if not deployment:
-                continue
+            deployment_id = error.deployment_info.id
+            attempt_ctx = attempt_ctx_map.get(deployment_id, _AttemptContext())
 
             # 1. Check max retries exceeded → give_up
-            if deployment.phase_attempts >= SERVICE_MAX_RETRIES:
+            if attempt_ctx.should_give_up(SERVICE_MAX_RETRIES):
                 give_up_errors.append(error)
                 continue
 
             # 2. Check timeout exceeded → expired
-            if deployment.phase_started_at:
-                lifecycle = deployment.state.lifecycle
-                timeout = DEPLOYMENT_STATUS_TIMEOUT_MAP.get(lifecycle)
-                if timeout:
-                    # Normalise both to UTC to avoid timezone-naive vs -aware
-                    # comparison errors (DB may return either depending on driver).
-                    ct = (
-                        current_time.astimezone(UTC)
-                        if current_time.tzinfo
-                        else current_time.replace(tzinfo=UTC)
-                    )
-                    ps = (
-                        deployment.phase_started_at.astimezone(UTC)
-                        if deployment.phase_started_at.tzinfo
-                        else deployment.phase_started_at.replace(tzinfo=UTC)
-                    )
-                    elapsed = (ct - ps).total_seconds()
-                    if elapsed > timeout:
-                        expired_errors.append(error)
-                        continue
+            lifecycle = error.deployment_info.state.lifecycle
+            if attempt_ctx.is_expired(lifecycle, current_dbtime):
+                expired_errors.append(error)
+                continue
 
             # 3. Default → need_retry
             retry_errors.append(error)
@@ -703,7 +716,7 @@ class DeploymentCoordinator:
     @staticmethod
     def _build_lifecycle_notification_event(
         deployment: DeploymentInfo,
-        from_status: EndpointLifecycle | None,
+        from_status: EndpointLifecycle,
         to_status: EndpointLifecycle,
         transition_result: str,
         timestamp: str,
@@ -715,7 +728,7 @@ class DeploymentCoordinator:
             domain=deployment.metadata.domain,
             project_id=str(deployment.metadata.project),
             resource_group=deployment.metadata.resource_group,
-            from_status=from_status.value if from_status else None,
+            from_status=from_status.value,
             to_status=to_status.value,
             transition_result=transition_result,
             event_timestamp=timestamp,
@@ -726,16 +739,26 @@ class DeploymentCoordinator:
             notification_data=message.model_dump(),
         )
 
-    async def process_if_needed(self, lifecycle_type: DeploymentLifecycleType) -> None:
+    async def process_if_needed(
+        self,
+        lifecycle_type: DeploymentLifecycleType,
+        sub_step: DeploymentSubStep | None = None,
+    ) -> None:
         """Process deployment lifecycle operation if needed (based on internal state)."""
-        if not await self._valkey_schedule.load_and_delete_deployment_mark(lifecycle_type.value):
+        sub_step_value = sub_step.value if sub_step is not None else None
+        if not await self._valkey_schedule.load_and_delete_deployment_mark(
+            lifecycle_type.value, sub_step_value
+        ):
             return
-        await self.process_deployment_lifecycle(lifecycle_type)
+        await self.process_deployment_lifecycle(lifecycle_type, sub_step)
 
-    @staticmethod
-    def _create_task_specs() -> list[DeploymentTaskSpec]:
-        """Create task specifications for all deployment lifecycle types."""
-        return [
+    def _create_task_specs(self) -> list[DeploymentTaskSpec]:
+        """Create task specifications for all deployment lifecycle types.
+
+        Simple lifecycles get a single spec with sub_step=None.
+        Lifecycles with sub-step handlers get one spec per sub-step.
+        """
+        specs: list[DeploymentTaskSpec] = [
             # Check pending deployments frequently with both short and long cycles
             DeploymentTaskSpec(
                 DeploymentLifecycleType.CHECK_PENDING,
@@ -763,13 +786,6 @@ class DeploymentCoordinator:
                 long_interval=30.0,
                 initial_delay=10.0,
             ),
-            # Deploying (rolling update) - both short and long cycles
-            DeploymentTaskSpec(
-                DeploymentLifecycleType.DEPLOYING,
-                short_interval=5.0,
-                long_interval=30.0,
-                initial_delay=10.0,
-            ),
             # Check destroying deployments - only long cycle
             DeploymentTaskSpec(
                 DeploymentLifecycleType.DESTROYING,
@@ -778,6 +794,18 @@ class DeploymentCoordinator:
                 initial_delay=25.0,
             ),
         ]
+        # Deploying — one task per sub-step
+        for sub_step in self._registry.sub_steps_for(DeploymentLifecycleType.DEPLOYING):
+            specs.append(
+                DeploymentTaskSpec(
+                    DeploymentLifecycleType.DEPLOYING,
+                    sub_step=sub_step,
+                    short_interval=5.0,
+                    long_interval=30.0,
+                    initial_delay=10.0,
+                )
+            )
+        return specs
 
     def create_task_specs(self) -> list[EventTaskSpec]:
         """Create task specifications for deployment lifecycle events."""
