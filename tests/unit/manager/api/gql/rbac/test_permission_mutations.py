@@ -6,12 +6,14 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from aiohttp.web_exceptions import HTTPForbidden
 
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
     ScopeType,
 )
+from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.api.gql.rbac.resolver import permission as permission_resolver
 from ai.backend.manager.api.gql.rbac.types import PermissionGQL, UpdatePermissionInput
 from ai.backend.manager.api.gql.rbac.types.permission import (
@@ -20,6 +22,7 @@ from ai.backend.manager.api.gql.rbac.types.permission import (
 )
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.permission_contoller.actions.update_permission import (
     UpdatePermissionAction,
     UpdatePermissionActionResult,
@@ -225,3 +228,31 @@ class TestAdminUpdatePermission:
         assert result.scope_id == "default"
         assert result.entity_type == RBACElementTypeGQL.VFOLDER
         assert result.operation == OperationTypeGQL.READ
+
+
+class TestAdminUpdatePermissionAccessControl:
+    async def test_rejects_non_superadmin(self) -> None:
+        non_admin_user = UserData(
+            user_id=uuid.uuid4(),
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="default",
+        )
+        context = MagicMock()
+        info = _create_mock_info(context)
+        input_data = UpdatePermissionInput(
+            id=uuid.uuid4(),
+            operation=OperationTypeGQL.READ,
+        )
+
+        resolver_fn = permission_resolver.admin_update_permission.base_resolver
+        with (
+            patch(
+                "ai.backend.manager.api.gql.utils.current_user",
+                return_value=non_admin_user,
+            ),
+            pytest.raises(HTTPForbidden),
+        ):
+            await resolver_fn(info=info, input=input_data)
