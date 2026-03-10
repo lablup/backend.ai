@@ -59,7 +59,6 @@ class ScalingDeploymentHandler(DeploymentHandler):
         """
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
-            failure=None,
         )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:

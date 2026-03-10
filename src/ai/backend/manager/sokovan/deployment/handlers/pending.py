@@ -61,7 +61,6 @@ class CheckPendingDeploymentHandler(DeploymentHandler):
         """
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
-            failure=None,
         )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
