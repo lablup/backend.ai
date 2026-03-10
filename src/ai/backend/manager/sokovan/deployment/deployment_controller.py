@@ -212,10 +212,15 @@ class DeploymentController:
 
         Args:
             lifecycle_type: Type of deployment lifecycle to mark as needed
-            sub_step: Optional sub-step within the lifecycle to mark as needed
+            sub_step: Optional sub-step for finer-grained dispatch
         """
-        await self._valkey_schedule.mark_deployment_needed(lifecycle_type.value)
-        log.debug("Marked deployment lifecycle needed for type: {}", lifecycle_type.value)
+        sub_step_value = sub_step.value if sub_step is not None else None
+        await self._valkey_schedule.mark_deployment_needed(lifecycle_type.value, sub_step_value)
+        log.debug(
+            "Marked deployment lifecycle needed for type: {}, sub_step: {}",
+            lifecycle_type.value,
+            sub_step_value,
+        )
 
     # ========== Deployment Policy Methods ==========
 
