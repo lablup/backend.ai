@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 import sqlalchemy as sa
@@ -17,6 +17,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -83,7 +84,11 @@ async def session_processors(
     )
     service = SessionService(args)
     return SessionProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service,
+        action_monitors=[],
+        validators=ActionValidators(
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+        ),
     )
 
 
@@ -91,7 +96,11 @@ async def session_processors(
 def agent_processors_mock() -> AgentProcessors:
     """AgentProcessors with a mocked AgentService."""
     return AgentProcessors(
-        service=AsyncMock(), action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=AsyncMock(),
+        action_monitors=[],
+        validators=ActionValidators(
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+        ),
     )
 
 
@@ -99,7 +108,11 @@ def agent_processors_mock() -> AgentProcessors:
 def vfolder_processors_mock() -> VFolderProcessors:
     """VFolderProcessors with a mocked VFolderService."""
     return VFolderProcessors(
-        service=AsyncMock(), action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=AsyncMock(),
+        action_monitors=[],
+        validators=ActionValidators(
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+        ),
     )
 
 
