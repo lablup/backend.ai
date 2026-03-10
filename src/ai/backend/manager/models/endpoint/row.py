@@ -188,6 +188,11 @@ class EndpointRow(Base):  # type: ignore[misc]
             unique=True,
             postgresql_where=(sa.column("lifecycle_stage") != EndpointLifecycle.DESTROYED.value),
         ),
+        sa.Index(
+            "ix_endpoints_lifecycle_sub_step",
+            "lifecycle_stage",
+            "sub_step",
+        ),
     )
 
     id: Mapped[EndpointId] = mapped_column(

@@ -21,7 +21,13 @@ def upgrade() -> None:
         "endpoints",
         sa.Column("sub_step", sa.String(length=32), nullable=True),
     )
+    op.create_index(
+        "ix_endpoints_lifecycle_sub_step",
+        "endpoints",
+        ["lifecycle_stage", "sub_step"],
+    )
 
 
 def downgrade() -> None:
+    op.drop_index("ix_endpoints_lifecycle_sub_step", table_name="endpoints")
     op.drop_column("endpoints", "sub_step")

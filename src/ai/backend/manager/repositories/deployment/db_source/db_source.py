@@ -2551,7 +2551,12 @@ class DeploymentDBSource:
         for sub_step, endpoint_ids in grouped.items():
             stmt = (
                 sa.update(EndpointRow)
-                .where(EndpointRow.id.in_(endpoint_ids))
+                .where(
+                    EndpointRow.id.in_(endpoint_ids),
+                    # Only update endpoints still in DEPLOYING — if the lifecycle
+                    # changed concurrently (e.g. to DESTROYING), skip the stale update.
+                    EndpointRow.lifecycle_stage == EndpointLifecycle.DEPLOYING,
+                )
                 .values(sub_step=sub_step)
             )
             await db_sess.execute(stmt)
