@@ -154,8 +154,9 @@ class DeployingInProgressHandler(DeploymentHandler):
     @classmethod
     @override
     def status_transitions(cls) -> DeploymentStatusTransitions:
-        # Stay in DEPLOYING — no transition.
-        return DeploymentStatusTransitions()
+        return DeploymentStatusTransitions(
+            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DEPLOYING),
+        )
 
     @override
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
