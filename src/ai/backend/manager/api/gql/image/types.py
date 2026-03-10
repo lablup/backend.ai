@@ -365,6 +365,13 @@ class ImageV2GQL(Node):
         description="UUID of the container registry where this image is stored."
     )
 
+    @strawberry.field(  # type: ignore[misc]
+        description="Added in 26.3.0. Timestamp of the most recent session created with this image. Returns null if the image has never been used.",
+    )
+    async def last_used(self, info: Info[StrawberryGQLContext]) -> datetime | None:
+        """Get the timestamp of the most recent session created with this image."""
+        return await info.context.data_loaders.image_last_used_loader.load(self._image_id)
+
     @strawberry.field(description="Added in 26.2.0. Aliases for this image.")  # type: ignore[misc]
     async def aliases(
         self,
@@ -559,6 +566,14 @@ class ImageV2FilterGQL(GQLFilter):
         default=None,
         description="Added in 26.3.0. Filter by nested alias conditions.",
     )
+    never_used: bool | None = strawberry.field(
+        default=None,
+        description=(
+            "Added in 26.3.0. "
+            "If true, return only images that have never been used to create a session. "
+            "If false, return only images that have been used at least once."
+        ),
+    )
 
     AND: list[ImageV2FilterGQL] | None = None
     OR: list[ImageV2FilterGQL] | None = None
@@ -604,6 +619,13 @@ class ImageV2FilterGQL(GQLFilter):
         if self.alias:
             field_conditions.extend(self.alias.build_conditions())
 
+        # Apply never_used filter
+        if self.never_used is not None:
+            if self.never_used:
+                field_conditions.append(ImageConditions.by_never_used())
+            else:
+                field_conditions.append(ImageConditions.by_ever_used())
+
         # Handle AND logical operator
         if self.AND:
             for sub_filter in self.AND:
@@ -639,6 +661,7 @@ class ImageV2FilterGQL(GQLFilter):
 class ImageV2OrderFieldGQL(enum.Enum):
     NAME = "NAME"
     CREATED_AT = "CREATED_AT"
+    LAST_USED = "LAST_USED"
 
 
 @strawberry.input(
@@ -660,6 +683,8 @@ class ImageV2OrderByGQL(GQLOrderBy):
                 return ImageOrders.name(ascending)
             case ImageV2OrderFieldGQL.CREATED_AT:
                 return ImageOrders.created_at(ascending)
+            case ImageV2OrderFieldGQL.LAST_USED:
+                return ImageOrders.last_used(ascending)
 
 
 # =============================================================================

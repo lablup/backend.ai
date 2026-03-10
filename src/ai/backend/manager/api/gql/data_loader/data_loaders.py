@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from functools import cached_property, partial
 from typing import TYPE_CHECKING
 
@@ -62,7 +63,7 @@ from .deployment import (
 )
 from .domain import load_domains_by_names
 from .huggingface_registry import load_huggingface_registries_by_ids
-from .image import load_alias_by_ids, load_images_by_ids
+from .image import load_alias_by_ids, load_image_last_used_by_ids, load_images_by_ids
 from .kernel import load_kernels_by_ids
 from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
@@ -239,6 +240,13 @@ class DataLoaders:
         self,
     ) -> DataLoader[SessionId, SessionData | None]:
         return DataLoader(load_fn=partial(load_sessions_by_ids, self._processors.session))
+
+    @cached_property
+    def image_last_used_loader(
+        self,
+    ) -> DataLoader[ImageID, datetime | None]:
+        """Load the most recent session creation timestamp for an image."""
+        return DataLoader(load_fn=partial(load_image_last_used_by_ids, self._processors.image))
 
     @cached_property
     def image_alias_loader(
