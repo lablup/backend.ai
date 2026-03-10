@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -32,9 +33,9 @@ from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role i
 
 class TestAdminBulkAssignRole:
     @pytest.fixture(autouse=True)
-    def _bypass_admin_check(self) -> None:
+    def _bypass_admin_check(self) -> Generator[None]:
         with patch("ai.backend.manager.api.gql.rbac.resolver.role.check_admin_only"):
-            yield  # type: ignore[misc]
+            yield
 
     @pytest.fixture
     def mock_processor(self) -> AsyncMock:
@@ -115,9 +116,9 @@ class TestAdminBulkAssignRole:
 
 class TestAdminBulkRevokeRole:
     @pytest.fixture(autouse=True)
-    def _bypass_admin_check(self) -> None:
+    def _bypass_admin_check(self) -> Generator[None]:
         with patch("ai.backend.manager.api.gql.rbac.resolver.role.check_admin_only"):
-            yield  # type: ignore[misc]
+            yield
 
     @pytest.fixture
     def mock_processor(self) -> AsyncMock:
