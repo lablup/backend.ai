@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .resolver import (
     admin_assign_role,
+    admin_bulk_assign_role,
+    admin_bulk_revoke_role,
     admin_create_permission,
     admin_create_role,
     admin_delete_permission,
@@ -20,6 +22,10 @@ from .resolver import (
 )
 from .types import (
     AssignRoleInput,
+    BulkAssignRoleInputGQL,
+    BulkAssignRolePayloadGQL,
+    BulkRevokeRoleInputGQL,
+    BulkRevokeRolePayloadGQL,
     CreatePermissionInput,
     CreateRoleInput,
     EntityConnection,
@@ -75,6 +81,11 @@ __all__ = (
     "UpdatePermissionInput",
     "AssignRoleInput",
     "RevokeRoleInput",
+    "BulkAssignRoleInputGQL",
+    "BulkRevokeRoleInputGQL",
+    # Payloads
+    "BulkAssignRolePayloadGQL",
+    "BulkRevokeRolePayloadGQL",
     # Connections
     "RoleConnection",
     "PermissionConnection",
@@ -98,4 +109,6 @@ __all__ = (
     "admin_delete_permission",
     "admin_assign_role",
     "admin_revoke_role",
+    "admin_bulk_assign_role",
+    "admin_bulk_revoke_role",
 )
