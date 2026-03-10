@@ -12,6 +12,7 @@ from ai.backend.manager.api.gql.rbac.types import (
     EntityOrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only
 
 
 @strawberry.field(
@@ -29,6 +30,7 @@ async def admin_entities(
     offset: int | None = None,
 ) -> EntityConnection:
     """Search entity associations with filtering, ordering, and pagination."""
+    check_admin_only(info)
     return await fetch_entities(
         info,
         filter=filter,
