@@ -722,45 +722,57 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 ssh_dir.mkdir(parents=True, exist_ok=True)
                 paths_to_chown: list[Path] = []
 
-                # Generate dropbear host key for container SSH server
+                # Generate dropbear host key for container SSH server.
+                # The dropbearmulti binary is a Linux ELF executable, so we can
+                # only run it on Linux hosts.  On non-Linux platforms (e.g. macOS)
+                # the container will generate its own host key at startup via
+                # /opt/kernel/dropbearmulti inside the container.
                 host_key_path = ssh_dir / "dropbear_rsa_host_key"
-                arch = get_arch_name()
-                dropbearmulti_path = self.resolve_krunner_filepath(
-                    f"runner/dropbearmulti.{arch}.bin"
-                )
-                if not dropbearmulti_path.exists():
-                    raise FileNotFoundError(
-                        f"dropbearmulti binary not found at {dropbearmulti_path}"
+                if sys.platform == "linux":
+                    arch = get_arch_name()
+                    dropbearmulti_path = self.resolve_krunner_filepath(
+                        f"runner/dropbearmulti.{arch}.bin"
                     )
-                # If the host key already exists, we assume it's valid and skip generation.
-                if not host_key_path.is_file():
-                    try:
-                        subprocess_run(
-                            [
-                                str(dropbearmulti_path),
-                                "dropbearkey",
-                                "-t",
-                                "rsa",
-                                "-s",
-                                "2048",
-                                "-f",
-                                str(host_key_path),
-                            ],
-                            check=True,
-                            capture_output=True,
+                    if not dropbearmulti_path.exists():
+                        raise FileNotFoundError(
+                            f"dropbearmulti binary not found at {dropbearmulti_path}"
                         )
-                    except CalledProcessError as e:
-                        stderr = e.stderr.decode("utf-8", "replace") if e.stderr else ""
-                        stdout = e.stdout.decode("utf-8", "replace") if e.stdout else ""
-                        log.error(
-                            "dropbearkey failed with return code {code}, stdout: {stdout}, stderr: {stderr}",
-                            code=e.returncode,
-                            stdout=stdout,
-                            stderr=stderr,
-                        )
-                        raise
-                    host_key_path.chmod(0o600)
-                paths_to_chown.append(host_key_path)
+                    # If the host key already exists, we assume it's valid and skip generation.
+                    if not host_key_path.is_file():
+                        try:
+                            subprocess_run(
+                                [
+                                    str(dropbearmulti_path),
+                                    "dropbearkey",
+                                    "-t",
+                                    "rsa",
+                                    "-s",
+                                    "2048",
+                                    "-f",
+                                    str(host_key_path),
+                                ],
+                                check=True,
+                                capture_output=True,
+                            )
+                        except CalledProcessError as e:
+                            stderr = e.stderr.decode("utf-8", "replace") if e.stderr else ""
+                            stdout = e.stdout.decode("utf-8", "replace") if e.stdout else ""
+                            log.error(
+                                "dropbearkey failed with return code {code}, stdout: {stdout}, stderr: {stderr}",
+                                code=e.returncode,
+                                stdout=stdout,
+                                stderr=stderr,
+                            )
+                            raise
+                        host_key_path.chmod(0o600)
+                    paths_to_chown.append(host_key_path)
+                else:
+                    log.warning(
+                        "Skipping dropbearmulti host key generation on non-Linux"
+                        " platform ({}); the container will generate its own host"
+                        " key at startup.",
+                        sys.platform,
+                    )
 
                 # Write provided SSH keypair for cluster access if exists
                 if sshkey is not None:
