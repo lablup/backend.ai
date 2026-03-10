@@ -168,23 +168,43 @@ class StrategyTransaction:
     def __init__(
         self,
         db_sess: SASession,
-        apply_sub_step_assignments: Any,
     ) -> None:
         self._db_sess = db_sess
-        self._apply_sub_step_assignments = apply_sub_step_assignments
 
-    async def apply_strategy_evaluation(
+    async def update_sub_steps(
         self,
         assignments: dict[uuid.UUID, DeploymentSubStep],
-        rollout: BulkCreator[RoutingRow],
-        drain: BatchUpdater[RoutingRow] | None,
     ) -> None:
-        """Update sub_steps and apply route changes."""
-        await self._apply_sub_step_assignments(self._db_sess, assignments)
-        if rollout.specs:
-            await execute_bulk_creator(self._db_sess, rollout)
-        if drain:
-            await execute_batch_updater(self._db_sess, drain)
+        """Bulk-update the sub_step column, grouped by sub_step value."""
+        grouped: dict[DeploymentSubStep, list[uuid.UUID]] = {}
+        for endpoint_id, sub_step in assignments.items():
+            grouped.setdefault(sub_step, []).append(endpoint_id)
+        for sub_step, endpoint_ids in grouped.items():
+            stmt = (
+                sa.update(EndpointRow)
+                .where(
+                    EndpointRow.id.in_(endpoint_ids),
+                    # Only update endpoints still in DEPLOYING — if the lifecycle
+                    # changed concurrently (e.g. to DESTROYING), skip the stale update.
+                    EndpointRow.lifecycle_stage == EndpointLifecycle.DEPLOYING,
+                )
+                .values(sub_step=sub_step)
+            )
+            await self._db_sess.execute(stmt)
+
+    async def create_routes(
+        self,
+        rollout: BulkCreator[RoutingRow],
+    ) -> None:
+        """Bulk-create new-revision routes."""
+        await execute_bulk_creator(self._db_sess, rollout)
+
+    async def drain_routes(
+        self,
+        drain: BatchUpdater[RoutingRow],
+    ) -> None:
+        """Mark old-revision routes for draining."""
+        await execute_batch_updater(self._db_sess, drain)
 
     async def complete_deployment_revision_swap(
         self,
@@ -2407,47 +2427,6 @@ class DeploymentDBSource:
         async with self._begin_session_read_committed() as db_sess:
             return await execute_purger(db_sess, purger)
 
-    async def update_sub_steps(
-        self,
-        assignments: dict[uuid.UUID, DeploymentSubStep],
-    ) -> None:
-        """Bulk-update the sub_step column for multiple endpoints.
-
-        Args:
-            assignments: Mapping from endpoint ID to the sub_step value to set.
-        """
-        async with self._begin_session_read_committed() as db_sess:
-            await self._apply_sub_step_assignments(db_sess, assignments)
-
-    async def apply_strategy_evaluation(
-        self,
-        assignments: dict[uuid.UUID, DeploymentSubStep],
-        rollout: BulkCreator[RoutingRow],
-        drain: BatchUpdater[RoutingRow] | None,
-    ) -> None:
-        """Atomically update sub_steps and apply route changes in a single transaction.
-
-        This prevents an inconsistent state where sub_step is updated (e.g. COMPLETED)
-        but route mutations fail, which could cause the handler to swap revisions
-        without the expected routes being in place.
-
-        Args:
-            assignments: Mapping from endpoint ID to sub_step value.
-            rollout: Bulk creator for new-revision routes.
-            drain: Batch updater for draining old-revision routes.
-        """
-        async with self._begin_session_read_committed() as db_sess:
-            # 1. Update sub_steps
-            await self._apply_sub_step_assignments(db_sess, assignments)
-
-            # 2. Rollout new routes
-            if rollout.specs:
-                await execute_bulk_creator(db_sess, rollout)
-
-            # 3. Drain old routes
-            if drain:
-                await execute_batch_updater(db_sess, drain)
-
     @actxmgr
     async def begin_strategy_transaction(self) -> AsyncIterator[StrategyTransaction]:
         """Begin a transaction that spans multiple strategy-related DB operations.
@@ -2457,29 +2436,7 @@ class DeploymentDBSource:
         route mutations, revision swap, and deploying_revision clear.
         """
         async with self._begin_session_read_committed() as db_sess:
-            yield StrategyTransaction(db_sess, self._apply_sub_step_assignments)
-
-    @staticmethod
-    async def _apply_sub_step_assignments(
-        db_sess: SASession,
-        assignments: dict[uuid.UUID, DeploymentSubStep],
-    ) -> None:
-        """Group assignments by sub_step and execute bulk UPDATEs."""
-        grouped: dict[DeploymentSubStep, list[uuid.UUID]] = {}
-        for endpoint_id, sub_step in assignments.items():
-            grouped.setdefault(sub_step, []).append(endpoint_id)
-        for sub_step, endpoint_ids in grouped.items():
-            stmt = (
-                sa.update(EndpointRow)
-                .where(
-                    EndpointRow.id.in_(endpoint_ids),
-                    # Only update endpoints still in DEPLOYING — if the lifecycle
-                    # changed concurrently (e.g. to DESTROYING), skip the stale update.
-                    EndpointRow.lifecycle_stage == EndpointLifecycle.DEPLOYING,
-                )
-                .values(sub_step=sub_step)
-            )
-            await db_sess.execute(stmt)
+            yield StrategyTransaction(db_sess)
 
     # ========== Access Token Operations ==========
 

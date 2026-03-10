@@ -94,15 +94,16 @@ class StrategyResultApplier:
 
         # All DB mutations in a single transaction via StrategyTransaction.
         async with self._deployment_repo.begin_strategy_transaction() as txn:
-            # 1. Sub-step assignments + route rollout/drain
-            await txn.apply_strategy_evaluation(summary.assignments, rollout, drain)
+            await txn.update_sub_steps(summary.assignments)
 
-            # 2. Revision swap for COMPLETED deployments
+            if rollout.specs:
+                await txn.create_routes(rollout)
+            if drain:
+                await txn.drain_routes(drain)
+
             swapped = 0
             if completed_ids:
                 swapped = await txn.complete_deployment_revision_swap(completed_ids)
-
-            # 3. Clear deploying_revision for ROLLED_BACK deployments
             if rolled_back_ids:
                 await txn.clear_deploying_revision(rolled_back_ids)
 

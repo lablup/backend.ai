@@ -1222,28 +1222,6 @@ class DeploymentRepository:
         """
         return await self._db_source.delete_deployment_policy(purger)
 
-    @deployment_repository_resilience.apply()
-    async def update_sub_steps(
-        self,
-        assignments: dict[uuid.UUID, DeploymentSubStep],
-    ) -> None:
-        """Bulk-update the sub_step column for multiple endpoints."""
-        await self._db_source.update_sub_steps(assignments)
-
-    @deployment_repository_resilience.apply()
-    async def apply_strategy_evaluation(
-        self,
-        assignments: dict[uuid.UUID, DeploymentSubStep],
-        rollout: BulkCreator[RoutingRow],
-        drain: BatchUpdater[RoutingRow] | None,
-    ) -> None:
-        """Atomically apply sub_step assignments and route mutations in a single transaction."""
-        await self._db_source.apply_strategy_evaluation(
-            assignments,
-            rollout,
-            drain,
-        )
-
     def begin_strategy_transaction(self) -> AsyncContextManager[StrategyTransaction]:
         """Begin a transaction that spans multiple strategy-related DB operations.
 

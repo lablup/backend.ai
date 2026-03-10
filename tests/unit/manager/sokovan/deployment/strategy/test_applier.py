@@ -10,9 +10,6 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.manager.data.deployment.types import DeploymentSubStep
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.sokovan.deployment.strategy.applier import (
     StrategyApplyResult,
     StrategyResultApplier,
@@ -45,7 +42,9 @@ def _build_summary(
 @pytest.fixture
 def mock_txn() -> AsyncMock:
     txn = AsyncMock()
-    txn.apply_strategy_evaluation = AsyncMock()
+    txn.update_sub_steps = AsyncMock()
+    txn.create_routes = AsyncMock()
+    txn.drain_routes = AsyncMock()
     txn.complete_deployment_revision_swap = AsyncMock(return_value=0)
     txn.clear_deploying_revision = AsyncMock()
     return txn
@@ -54,7 +53,6 @@ def mock_txn() -> AsyncMock:
 @pytest.fixture
 def mock_deployment_repo(mock_txn: AsyncMock) -> AsyncMock:
     repo = AsyncMock()
-    repo.apply_strategy_evaluation = AsyncMock()
 
     @asynccontextmanager
     async def _begin_strategy_transaction() -> AsyncIterator[AsyncMock]:
@@ -149,7 +147,9 @@ class TestStrategyResultApplier:
     ) -> None:
         result = await applier.apply(empty_summary)
 
-        mock_txn.apply_strategy_evaluation.assert_not_called()
+        mock_txn.update_sub_steps.assert_not_called()
+        mock_txn.create_routes.assert_not_called()
+        mock_txn.drain_routes.assert_not_called()
         mock_txn.complete_deployment_revision_swap.assert_not_called()
         mock_txn.clear_deploying_revision.assert_not_called()
         assert result.completed_ids == set()
@@ -157,7 +157,7 @@ class TestStrategyResultApplier:
         assert result.routes_created == 0
         assert result.routes_drained == 0
 
-    async def test_assignments_only_calls_apply_strategy_evaluation(
+    async def test_assignments_only(
         self,
         applier: StrategyResultApplier,
         mock_txn: AsyncMock,
@@ -165,13 +165,15 @@ class TestStrategyResultApplier:
     ) -> None:
         result = await applier.apply(provisioning_summary)
 
-        mock_txn.apply_strategy_evaluation.assert_called_once()
+        mock_txn.update_sub_steps.assert_called_once()
+        mock_txn.create_routes.assert_called_once()
+        mock_txn.drain_routes.assert_not_called()
         mock_txn.complete_deployment_revision_swap.assert_not_called()
         mock_txn.clear_deploying_revision.assert_not_called()
         assert result.routes_created == 0
         assert result.routes_drained == 0
 
-    async def test_rollout_specs_creates_bulk_creator(
+    async def test_rollout_calls_create_routes(
         self,
         applier: StrategyResultApplier,
         mock_txn: AsyncMock,
@@ -179,13 +181,12 @@ class TestStrategyResultApplier:
     ) -> None:
         result = await applier.apply(summary_with_rollout)
 
-        mock_txn.apply_strategy_evaluation.assert_called_once()
-        args = mock_txn.apply_strategy_evaluation.call_args
-        rollout_arg: BulkCreator[RoutingRow] = args[0][1]
+        mock_txn.create_routes.assert_called_once()
+        rollout_arg = mock_txn.create_routes.call_args[0][0]
         assert len(rollout_arg.specs) == 1
         assert result.routes_created == 1
 
-    async def test_drain_route_ids_creates_batch_updater(
+    async def test_drain_calls_drain_routes(
         self,
         applier: StrategyResultApplier,
         mock_txn: AsyncMock,
@@ -193,13 +194,10 @@ class TestStrategyResultApplier:
     ) -> None:
         result = await applier.apply(summary_with_drain)
 
-        mock_txn.apply_strategy_evaluation.assert_called_once()
-        args = mock_txn.apply_strategy_evaluation.call_args
-        drain_arg: BatchUpdater[RoutingRow] | None = args[0][2]
-        assert drain_arg is not None
+        mock_txn.drain_routes.assert_called_once()
         assert result.routes_drained == 1
 
-    async def test_no_drain_routes_passes_none(
+    async def test_no_drain_routes_skips_drain(
         self,
         applier: StrategyResultApplier,
         mock_txn: AsyncMock,
@@ -207,9 +205,7 @@ class TestStrategyResultApplier:
     ) -> None:
         await applier.apply(provisioning_summary)
 
-        args = mock_txn.apply_strategy_evaluation.call_args
-        drain_arg = args[0][2]
-        assert drain_arg is None
+        mock_txn.drain_routes.assert_not_called()
 
     async def test_completed_calls_revision_swap(
         self,
@@ -222,7 +218,7 @@ class TestStrategyResultApplier:
 
         result = await applier.apply(summary)
 
-        mock_txn.apply_strategy_evaluation.assert_called_once()
+        mock_txn.update_sub_steps.assert_called_once()
         mock_txn.complete_deployment_revision_swap.assert_called_once_with(completed_ids)
         mock_txn.clear_deploying_revision.assert_not_called()
         assert result.completed_ids == completed_ids
@@ -237,7 +233,7 @@ class TestStrategyResultApplier:
 
         result = await applier.apply(summary)
 
-        mock_txn.apply_strategy_evaluation.assert_called_once()
+        mock_txn.update_sub_steps.assert_called_once()
         mock_txn.clear_deploying_revision.assert_called_once_with(rolled_back_ids)
         mock_txn.complete_deployment_revision_swap.assert_not_called()
         assert result.rolled_back_ids == rolled_back_ids
@@ -253,7 +249,9 @@ class TestStrategyResultApplier:
 
         result = await applier.apply(summary)
 
-        mock_txn.apply_strategy_evaluation.assert_called_once()
+        mock_txn.update_sub_steps.assert_called_once()
+        mock_txn.create_routes.assert_called_once()
+        mock_txn.drain_routes.assert_called_once()
         mock_txn.complete_deployment_revision_swap.assert_called_once_with({completed_id})
         mock_txn.clear_deploying_revision.assert_called_once_with({rolled_back_id})
         assert result.completed_ids == {completed_id}
