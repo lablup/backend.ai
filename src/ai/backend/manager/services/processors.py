@@ -7,268 +7,268 @@ from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpe
 
 # fmt: off
 if TYPE_CHECKING:
-    from ai.backend.common.bgtask.bgtask import BackgroundTaskManager  # pants: no-infer-dep
-    from ai.backend.common.clients.prometheus.client import PrometheusClient  # pants: no-infer-dep
+    from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+    from ai.backend.common.clients.prometheus.client import PrometheusClient
     from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
-        ValkeyArtifactDownloadTrackingClient,  # pants: no-infer-dep
+        ValkeyArtifactDownloadTrackingClient,
     )
     from ai.backend.common.clients.valkey_client.valkey_live.client import (
-        ValkeyLiveClient,  # pants: no-infer-dep
+        ValkeyLiveClient,
     )
     from ai.backend.common.clients.valkey_client.valkey_stat.client import (
-        ValkeyStatClient,  # pants: no-infer-dep
+        ValkeyStatClient,
     )
-    from ai.backend.common.etcd import AsyncEtcd  # pants: no-infer-dep
+    from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.common.events.dispatcher import (
-        EventDispatcher,  # pants: no-infer-dep
-        EventProducer,  # pants: no-infer-dep
+        EventDispatcher,
+        EventProducer,
     )
-    from ai.backend.common.events.fetcher import EventFetcher  # pants: no-infer-dep
-    from ai.backend.common.events.hub.hub import EventHub  # pants: no-infer-dep
-    from ai.backend.common.plugin.hook import HookPluginContext  # pants: no-infer-dep
-    from ai.backend.common.plugin.monitor import ErrorPluginContext  # pants: no-infer-dep
-    from ai.backend.manager.agent_cache import AgentRPCCache  # pants: no-infer-dep
-    from ai.backend.manager.clients.appproxy.client import AppProxyClientPool  # pants: no-infer-dep
-    from ai.backend.manager.config.provider import ManagerConfigProvider  # pants: no-infer-dep
-    from ai.backend.manager.idle import IdleCheckerHost  # pants: no-infer-dep
-    from ai.backend.manager.models.storage import StorageSessionManager  # pants: no-infer-dep
-    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine  # pants: no-infer-dep
-    from ai.backend.manager.notification import NotificationCenter  # pants: no-infer-dep
-    from ai.backend.manager.registry import AgentRegistry  # pants: no-infer-dep
-    from ai.backend.manager.repositories.repositories import Repositories  # pants: no-infer-dep
+    from ai.backend.common.events.fetcher import EventFetcher
+    from ai.backend.common.events.hub.hub import EventHub
+    from ai.backend.common.plugin.hook import HookPluginContext
+    from ai.backend.common.plugin.monitor import ErrorPluginContext
+    from ai.backend.manager.agent_cache import AgentRPCCache
+    from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
+    from ai.backend.manager.config.provider import ManagerConfigProvider
+    from ai.backend.manager.idle import IdleCheckerHost
+    from ai.backend.manager.models.storage import StorageSessionManager
+    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+    from ai.backend.manager.notification import NotificationCenter
+    from ai.backend.manager.registry import AgentRegistry
+    from ai.backend.manager.repositories.repositories import Repositories
     from ai.backend.manager.service.container_registry.harbor import (
-        AbstractPerProjectContainerRegistryQuotaService,  # pants: no-infer-dep
+        AbstractPerProjectContainerRegistryQuotaService,
     )
-    from ai.backend.manager.services.agent.processors import AgentProcessors  # pants: no-infer-dep
-    from ai.backend.manager.services.agent.service import AgentService  # pants: no-infer-dep
+    from ai.backend.manager.services.agent.processors import AgentProcessors
+    from ai.backend.manager.services.agent.service import AgentService
     from ai.backend.manager.services.app_config.processors import (
-        AppConfigProcessors,  # pants: no-infer-dep
+        AppConfigProcessors,
     )
     from ai.backend.manager.services.app_config.service import (
-        AppConfigService,  # pants: no-infer-dep
+        AppConfigService,
     )
     from ai.backend.manager.services.artifact.processors import (
-        ArtifactProcessors,  # pants: no-infer-dep
+        ArtifactProcessors,
     )
-    from ai.backend.manager.services.artifact.service import ArtifactService  # pants: no-infer-dep
+    from ai.backend.manager.services.artifact.service import ArtifactService
     from ai.backend.manager.services.artifact_registry.processors import (
-        ArtifactRegistryProcessors,  # pants: no-infer-dep
+        ArtifactRegistryProcessors,
     )
     from ai.backend.manager.services.artifact_registry.service import (
-        ArtifactRegistryService,  # pants: no-infer-dep
+        ArtifactRegistryService,
     )
     from ai.backend.manager.services.artifact_revision.processors import (
-        ArtifactRevisionProcessors,  # pants: no-infer-dep
+        ArtifactRevisionProcessors,
     )
     from ai.backend.manager.services.artifact_revision.service import (
-        ArtifactRevisionService,  # pants: no-infer-dep
+        ArtifactRevisionService,
     )
     from ai.backend.manager.services.audit_log.processors import (
-        AuditLogProcessors,  # pants: no-infer-dep
+        AuditLogProcessors,
     )
-    from ai.backend.manager.services.audit_log.service import AuditLogService  # pants: no-infer-dep
-    from ai.backend.manager.services.auth.processors import AuthProcessors  # pants: no-infer-dep
-    from ai.backend.manager.services.auth.service import AuthService  # pants: no-infer-dep
+    from ai.backend.manager.services.audit_log.service import AuditLogService
+    from ai.backend.manager.services.auth.processors import AuthProcessors
+    from ai.backend.manager.services.auth.service import AuthService
     from ai.backend.manager.services.container_registry.processors import (
-        ContainerRegistryProcessors,  # pants: no-infer-dep
+        ContainerRegistryProcessors,
     )
     from ai.backend.manager.services.container_registry.service import (
-        ContainerRegistryService,  # pants: no-infer-dep
+        ContainerRegistryService,
     )
     from ai.backend.manager.services.deployment.processors import (
-        DeploymentProcessors,  # pants: no-infer-dep
+        DeploymentProcessors,
     )
     from ai.backend.manager.services.deployment.service import (
-        DeploymentService,  # pants: no-infer-dep
+        DeploymentService,
     )
     from ai.backend.manager.services.domain.processors import (
-        DomainProcessors,  # pants: no-infer-dep
+        DomainProcessors,
     )
-    from ai.backend.manager.services.domain.service import DomainService  # pants: no-infer-dep
+    from ai.backend.manager.services.domain.service import DomainService
     from ai.backend.manager.services.dotfile.processors import (
-        DotfileProcessors,  # pants: no-infer-dep
+        DotfileProcessors,
     )
-    from ai.backend.manager.services.dotfile.service import DotfileService  # pants: no-infer-dep
+    from ai.backend.manager.services.dotfile.service import DotfileService
     from ai.backend.manager.services.error_log.processors import (
-        ErrorLogProcessors,  # pants: no-infer-dep
+        ErrorLogProcessors,
     )
-    from ai.backend.manager.services.error_log.service import ErrorLogService  # pants: no-infer-dep
+    from ai.backend.manager.services.error_log.service import ErrorLogService
     from ai.backend.manager.services.etcd_config.processors import (
-        EtcdConfigProcessors,  # pants: no-infer-dep
+        EtcdConfigProcessors,
     )
     from ai.backend.manager.services.etcd_config.service import (
-        EtcdConfigService,  # pants: no-infer-dep
+        EtcdConfigService,
     )
     from ai.backend.manager.services.events.processors import (
-        EventsProcessors,  # pants: no-infer-dep
+        EventsProcessors,
     )
-    from ai.backend.manager.services.events.service import EventsService  # pants: no-infer-dep
+    from ai.backend.manager.services.events.service import EventsService
     from ai.backend.manager.services.export.processors import (
-        ExportProcessors,  # pants: no-infer-dep
+        ExportProcessors,
     )
-    from ai.backend.manager.services.export.service import ExportService  # pants: no-infer-dep
+    from ai.backend.manager.services.export.service import ExportService
     from ai.backend.manager.services.fair_share.processors import (
-        FairShareProcessors,  # pants: no-infer-dep
+        FairShareProcessors,
     )
     from ai.backend.manager.services.fair_share.service import (
-        FairShareService,  # pants: no-infer-dep
+        FairShareService,
     )
-    from ai.backend.manager.services.group.processors import GroupProcessors  # pants: no-infer-dep
-    from ai.backend.manager.services.group.service import GroupService  # pants: no-infer-dep
-    from ai.backend.manager.services.image.processors import ImageProcessors  # pants: no-infer-dep
-    from ai.backend.manager.services.image.service import ImageService  # pants: no-infer-dep
+    from ai.backend.manager.services.group.processors import GroupProcessors
+    from ai.backend.manager.services.group.service import GroupService
+    from ai.backend.manager.services.image.processors import ImageProcessors
+    from ai.backend.manager.services.image.service import ImageService
     from ai.backend.manager.services.keypair_resource_policy.processors import (
-        KeypairResourcePolicyProcessors,  # pants: no-infer-dep
+        KeypairResourcePolicyProcessors,
     )
     from ai.backend.manager.services.keypair_resource_policy.service import (
-        KeypairResourcePolicyService,  # pants: no-infer-dep
+        KeypairResourcePolicyService,
     )
     from ai.backend.manager.services.manager_admin.processors import (
-        ManagerAdminProcessors,  # pants: no-infer-dep
+        ManagerAdminProcessors,
     )
     from ai.backend.manager.services.manager_admin.service import (
-        ManagerAdminService,  # pants: no-infer-dep
+        ManagerAdminService,
     )
     from ai.backend.manager.services.metric.processors.utilization_metric import (
-        UtilizationMetricProcessors,  # pants: no-infer-dep
+        UtilizationMetricProcessors,
     )
     from ai.backend.manager.services.metric.root_service import (
-        UtilizationMetricService,  # pants: no-infer-dep
+        UtilizationMetricService,
     )
     from ai.backend.manager.services.model_serving.processors.auto_scaling import (
-        ModelServingAutoScalingProcessors,  # pants: no-infer-dep
+        ModelServingAutoScalingProcessors,
     )
     from ai.backend.manager.services.model_serving.processors.model_serving import (
-        ModelServingProcessors,  # pants: no-infer-dep
+        ModelServingProcessors,
     )
     from ai.backend.manager.services.model_serving.services.auto_scaling import (
-        AutoScalingService,  # pants: no-infer-dep
+        AutoScalingService,
     )
     from ai.backend.manager.services.model_serving.services.model_serving import (
-        ModelServingService,  # pants: no-infer-dep
+        ModelServingService,
     )
     from ai.backend.manager.services.notification.processors import (
-        NotificationProcessors,  # pants: no-infer-dep
+        NotificationProcessors,
     )
     from ai.backend.manager.services.notification.service import (
-        NotificationService,  # pants: no-infer-dep
+        NotificationService,
     )
     from ai.backend.manager.services.object_storage.processors import (
-        ObjectStorageProcessors,  # pants: no-infer-dep
+        ObjectStorageProcessors,
     )
     from ai.backend.manager.services.object_storage.service import (
-        ObjectStorageService,  # pants: no-infer-dep
+        ObjectStorageService,
     )
     from ai.backend.manager.services.permission_contoller.processors import (
-        PermissionControllerProcessors,  # pants: no-infer-dep
+        PermissionControllerProcessors,
     )
     from ai.backend.manager.services.permission_contoller.service import (
-        PermissionControllerService,  # pants: no-infer-dep
+        PermissionControllerService,
     )
     from ai.backend.manager.services.project_resource_policy.processors import (
-        ProjectResourcePolicyProcessors,  # pants: no-infer-dep
+        ProjectResourcePolicyProcessors,
     )
     from ai.backend.manager.services.project_resource_policy.service import (
-        ProjectResourcePolicyService,  # pants: no-infer-dep
+        ProjectResourcePolicyService,
     )
     from ai.backend.manager.services.prometheus_query_preset.processors import (
-        PrometheusQueryPresetProcessors,  # pants: no-infer-dep
+        PrometheusQueryPresetProcessors,
     )
     from ai.backend.manager.services.prometheus_query_preset.service import (
-        PrometheusQueryPresetService,  # pants: no-infer-dep
+        PrometheusQueryPresetService,
     )
     from ai.backend.manager.services.resource_preset.processors import (
-        ResourcePresetProcessors,  # pants: no-infer-dep
+        ResourcePresetProcessors,
     )
     from ai.backend.manager.services.resource_preset.service import (
-        ResourcePresetService,  # pants: no-infer-dep
+        ResourcePresetService,
     )
     from ai.backend.manager.services.resource_slot.processors import (
-        ResourceSlotProcessors,  # pants: no-infer-dep
+        ResourceSlotProcessors,
     )
     from ai.backend.manager.services.resource_slot.service import (
-        ResourceSlotService,  # pants: no-infer-dep
+        ResourceSlotService,
     )
     from ai.backend.manager.services.resource_usage.processors import (
-        ResourceUsageProcessors,  # pants: no-infer-dep
+        ResourceUsageProcessors,
     )
     from ai.backend.manager.services.resource_usage.service import (
-        ResourceUsageService,  # pants: no-infer-dep
+        ResourceUsageService,
     )
     from ai.backend.manager.services.scaling_group.processors import (
-        ScalingGroupProcessors,  # pants: no-infer-dep
+        ScalingGroupProcessors,
     )
     from ai.backend.manager.services.scaling_group.service import (
-        ScalingGroupService,  # pants: no-infer-dep
+        ScalingGroupService,
     )
     from ai.backend.manager.services.scheduling_history.processors import (
-        SchedulingHistoryProcessors,  # pants: no-infer-dep
+        SchedulingHistoryProcessors,
     )
     from ai.backend.manager.services.scheduling_history.service import (
-        SchedulingHistoryService,  # pants: no-infer-dep
+        SchedulingHistoryService,
     )
     from ai.backend.manager.services.service_catalog.processors import (
-        ServiceCatalogProcessors,  # pants: no-infer-dep
+        ServiceCatalogProcessors,
     )
     from ai.backend.manager.services.service_catalog.service import (
-        ServiceCatalogService,  # pants: no-infer-dep
+        ServiceCatalogService,
     )
     from ai.backend.manager.services.session.processors import (
-        SessionProcessors,  # pants: no-infer-dep
+        SessionProcessors,
     )
-    from ai.backend.manager.services.session.service import SessionService  # pants: no-infer-dep
+    from ai.backend.manager.services.session.service import SessionService
     from ai.backend.manager.services.storage_namespace.processors import (
-        StorageNamespaceProcessors,  # pants: no-infer-dep
+        StorageNamespaceProcessors,
     )
     from ai.backend.manager.services.storage_namespace.service import (
-        StorageNamespaceService,  # pants: no-infer-dep
+        StorageNamespaceService,
     )
     from ai.backend.manager.services.stream.processors import (
-        StreamProcessors,  # pants: no-infer-dep
+        StreamProcessors,
     )
-    from ai.backend.manager.services.stream.service import StreamService  # pants: no-infer-dep
+    from ai.backend.manager.services.stream.service import StreamService
     from ai.backend.manager.services.template.processors import (
-        TemplateProcessors,  # pants: no-infer-dep
+        TemplateProcessors,
     )
-    from ai.backend.manager.services.template.service import TemplateService  # pants: no-infer-dep
-    from ai.backend.manager.services.user.processors import UserProcessors  # pants: no-infer-dep
-    from ai.backend.manager.services.user.service import UserService  # pants: no-infer-dep
+    from ai.backend.manager.services.template.service import TemplateService
+    from ai.backend.manager.services.user.processors import UserProcessors
+    from ai.backend.manager.services.user.service import UserService
     from ai.backend.manager.services.user_resource_policy.processors import (
-        UserResourcePolicyProcessors,  # pants: no-infer-dep
+        UserResourcePolicyProcessors,
     )
     from ai.backend.manager.services.user_resource_policy.service import (
-        UserResourcePolicyService,  # pants: no-infer-dep
+        UserResourcePolicyService,
     )
     from ai.backend.manager.services.vfolder.processors import (
-        VFolderFileProcessors,  # pants: no-infer-dep
-        VFolderInviteProcessors,  # pants: no-infer-dep
-        VFolderProcessors,  # pants: no-infer-dep
-        VFolderSharingProcessors,  # pants: no-infer-dep
+        VFolderFileProcessors,
+        VFolderInviteProcessors,
+        VFolderProcessors,
+        VFolderSharingProcessors,
     )
     from ai.backend.manager.services.vfolder.services.file import (
-        VFolderFileService,  # pants: no-infer-dep
+        VFolderFileService,
     )
     from ai.backend.manager.services.vfolder.services.invite import (
-        VFolderInviteService,  # pants: no-infer-dep
+        VFolderInviteService,
     )
     from ai.backend.manager.services.vfolder.services.sharing import (
-        VFolderSharingService,  # pants: no-infer-dep
+        VFolderSharingService,
     )
     from ai.backend.manager.services.vfolder.services.vfolder import (
-        VFolderService,  # pants: no-infer-dep
+        VFolderService,
     )
     from ai.backend.manager.services.vfs_storage.processors import (
-        VFSStorageProcessors,  # pants: no-infer-dep
+        VFSStorageProcessors,
     )
     from ai.backend.manager.services.vfs_storage.service import (
-        VFSStorageService,  # pants: no-infer-dep
+        VFSStorageService,
     )
-    from ai.backend.manager.sokovan.deployment import DeploymentController  # pants: no-infer-dep
+    from ai.backend.manager.sokovan.deployment import DeploymentController
     from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-        RevisionGeneratorRegistry,  # pants: no-infer-dep
+        RevisionGeneratorRegistry,
     )
     from ai.backend.manager.sokovan.scheduling_controller import (
-        SchedulingController,  # pants: no-infer-dep
+        SchedulingController,
     )
 # fmt: on
 
