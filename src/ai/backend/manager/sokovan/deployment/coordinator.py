@@ -34,7 +34,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentSubStep,
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
-from ai.backend.manager.defs import SERVICE_MAX_RETRIES
+from ai.backend.manager.defs import SERVICE_MAX_RETRIES, LockID
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
