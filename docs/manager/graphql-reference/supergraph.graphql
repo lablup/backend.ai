@@ -7507,6 +7507,9 @@ type Mutation
   """Added in 26.3.0. Create a scoped permission (admin only)."""
   adminCreatePermission(input: CreatePermissionInput!): Permission! @join__field(graph: STRAWBERRY)
 
+  """Added in 26.3.0. Update a scoped permission (admin only)."""
+  adminUpdatePermission(input: UpdatePermissionInput!): Permission! @join__field(graph: STRAWBERRY)
+
   """Added in 26.3.0. Delete a scoped permission (admin only)."""
   adminDeletePermission(input: DeletePermissionInput!): DeletePermissionPayload! @join__field(graph: STRAWBERRY)
 
@@ -11992,6 +11995,17 @@ type UpdateObjectStoragePayload
   @join__type(graph: STRAWBERRY)
 {
   objectStorage: ObjectStorage!
+}
+
+"""Added in 26.3.0. Input for updating a scoped permission"""
+input UpdatePermissionInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: UUID!
+  scopeType: RBACElementType = null
+  scopeId: String = null
+  entityType: RBACElementType = null
+  operation: OperationType = null
 }
 
 """Added in 25.14.0"""
