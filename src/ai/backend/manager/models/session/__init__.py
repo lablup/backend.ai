@@ -1,7 +1,6 @@
 from ai.backend.common.types import SessionId, SessionResult, SessionTypes
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.types import QueryCondition, QueryOption
-from ai.backend.manager.services.session.lifecycle import SessionLifecycleManager
 
 from .row import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
@@ -50,7 +49,6 @@ __all__ = (
     "QueryOption",
     "SessionDependencyRow",
     "SessionId",
-    "SessionLifecycleManager",
     "SessionResult",
     "SessionRow",
     "SessionStatus",

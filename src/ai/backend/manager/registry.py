@@ -160,7 +160,6 @@ from .models.session import (
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     ConcurrencyUsed,
     KernelLoadingStrategy,
-    SessionLifecycleManager,
     SessionRow,
     handle_session_exception,
 )
@@ -174,6 +173,7 @@ from .models.utils import (
     sql_json_merge,
 )
 from .models.vfolder import VFolderRow, verify_vfolder_name
+from .repositories.session.lifecycle import SessionLifecycleManager
 from .scheduler.types import KernelAgentBinding
 from .types import UserScope
 
