@@ -16,7 +16,7 @@ if TYPE_CHECKING:
         UUIDEqualMatchSpec,
         UUIDInMatchSpec,
     )
-    from ai.backend.manager.api.gql.kernel.types import KernelStatusInMatchSpec
+    from ai.backend.manager.data.kernel.types import KernelStatusInMatchSpec
 
 from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
