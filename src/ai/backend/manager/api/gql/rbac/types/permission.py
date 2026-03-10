@@ -23,11 +23,14 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import PermissionCreatorSpec
 from ai.backend.manager.repositories.permission_controller.options import (
     ScopedPermissionConditions,
     ScopedPermissionOrders,
 )
+from ai.backend.manager.repositories.permission_controller.updaters import PermissionUpdaterSpec
+from ai.backend.manager.types import OptionalState
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
@@ -331,6 +334,40 @@ class CreatePermissionInput:
                 operation=self.operation.to_internal(),
             )
         )
+
+
+@strawberry.input(description="Added in 26.3.0. Input for updating a scoped permission")
+class UpdatePermissionInput:
+    id: uuid.UUID
+    scope_type: RBACElementTypeGQL | None = None
+    scope_id: str | None = None
+    entity_type: RBACElementTypeGQL | None = None
+    operation: OperationTypeGQL | None = None
+
+    def to_updater(self) -> Updater[PermissionRow]:
+        spec = PermissionUpdaterSpec(
+            scope_type=(
+                OptionalState.update(self.scope_type.to_element().to_scope_type())
+                if self.scope_type is not None
+                else OptionalState.nop()
+            ),
+            scope_id=(
+                OptionalState.update(self.scope_id)
+                if self.scope_id is not None
+                else OptionalState.nop()
+            ),
+            entity_type=(
+                OptionalState.update(self.entity_type.to_element().to_entity_type())
+                if self.entity_type is not None
+                else OptionalState.nop()
+            ),
+            operation=(
+                OptionalState.update(self.operation.to_internal())
+                if self.operation is not None
+                else OptionalState.nop()
+            ),
+        )
+        return Updater(spec=spec, pk_value=self.id)
 
 
 @strawberry.input(description="Added in 26.3.0. Input for deleting a scoped permission")
