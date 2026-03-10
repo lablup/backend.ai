@@ -97,10 +97,10 @@ class DeploymentStrategyEvaluator:
             changes = cycle_result.route_changes
             result.route_changes.rollout_specs.extend(changes.rollout_specs)
             result.route_changes.drain_route_ids.extend(changes.drain_route_ids)
-            self._record_route_changes(deployment, changes)
+            DeploymentStrategyEvaluator._record_route_changes(deployment, changes)
 
             # Classify into assignments
-            result.assignments[cycle_result.sub_step].add(deployment.id)
+            result.assignments[deployment.id] = cycle_result.sub_step
 
         return result
 

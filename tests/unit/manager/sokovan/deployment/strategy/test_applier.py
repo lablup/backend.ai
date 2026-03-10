@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -21,22 +20,17 @@ from ai.backend.manager.sokovan.deployment.strategy.types import (
     StrategyEvaluationSummary,
 )
 
-
 # =============================================================================
 # Helpers
 # =============================================================================
 
 
 def _build_summary(
-    assignments: dict[DeploymentSubStep, set[UUID]] | None = None,
+    assignments: dict[UUID, DeploymentSubStep] | None = None,
     route_changes: RouteChanges | None = None,
 ) -> StrategyEvaluationSummary:
-    assignment_map: defaultdict[DeploymentSubStep, set[UUID]] = defaultdict(set)
-    if assignments:
-        for sub_step, endpoint_ids in assignments.items():
-            assignment_map[sub_step] = endpoint_ids
     return StrategyEvaluationSummary(
-        assignments=assignment_map,
+        assignments=assignments or {},
         route_changes=route_changes or RouteChanges(),
     )
 
@@ -67,13 +61,13 @@ def empty_summary() -> StrategyEvaluationSummary:
 
 @pytest.fixture
 def provisioning_summary() -> StrategyEvaluationSummary:
-    return _build_summary({DeploymentSubStep.PROVISIONING: {uuid4()}})
+    return _build_summary({uuid4(): DeploymentSubStep.PROVISIONING})
 
 
 @pytest.fixture
 def summary_with_rollout() -> StrategyEvaluationSummary:
     return _build_summary(
-        {DeploymentSubStep.PROVISIONING: {uuid4()}},
+        {uuid4(): DeploymentSubStep.PROVISIONING},
         route_changes=RouteChanges(rollout_specs=[MagicMock()]),
     )
 
@@ -81,21 +75,28 @@ def summary_with_rollout() -> StrategyEvaluationSummary:
 @pytest.fixture
 def summary_with_drain() -> StrategyEvaluationSummary:
     return _build_summary(
-        {DeploymentSubStep.PROGRESSING: {uuid4()}},
+        {uuid4(): DeploymentSubStep.PROGRESSING},
         route_changes=RouteChanges(drain_route_ids=[uuid4()]),
     )
 
 
 @pytest.fixture
 def completed_summary() -> tuple[StrategyEvaluationSummary, set[UUID]]:
-    ids = {uuid4(), uuid4()}
-    return _build_summary({DeploymentSubStep.COMPLETED: ids}), ids
+    ep_id_1 = uuid4()
+    ep_id_2 = uuid4()
+    completed_ids = {ep_id_1, ep_id_2}
+    summary = _build_summary({
+        ep_id_1: DeploymentSubStep.COMPLETED,
+        ep_id_2: DeploymentSubStep.COMPLETED,
+    })
+    return summary, completed_ids
 
 
 @pytest.fixture
 def rolled_back_summary() -> tuple[StrategyEvaluationSummary, set[UUID]]:
-    ids = {uuid4()}
-    return _build_summary({DeploymentSubStep.ROLLED_BACK: ids}), ids
+    ep_id = uuid4()
+    summary = _build_summary({ep_id: DeploymentSubStep.ROLLED_BACK})
+    return summary, {ep_id}
 
 
 @pytest.fixture
@@ -105,9 +106,9 @@ def mixed_summary() -> tuple[StrategyEvaluationSummary, UUID, UUID, UUID]:
     rolled_back_id = uuid4()
     summary = _build_summary(
         {
-            DeploymentSubStep.PROVISIONING: {provisioning_id},
-            DeploymentSubStep.COMPLETED: {completed_id},
-            DeploymentSubStep.ROLLED_BACK: {rolled_back_id},
+            provisioning_id: DeploymentSubStep.PROVISIONING,
+            completed_id: DeploymentSubStep.COMPLETED,
+            rolled_back_id: DeploymentSubStep.ROLLED_BACK,
         },
         route_changes=RouteChanges(
             rollout_specs=[MagicMock()],
@@ -236,9 +237,9 @@ class TestStrategyResultApplier:
         result = await applier.apply(summary)
 
         mock_deployment_repo.apply_strategy_evaluation.assert_called_once()
-        mock_deployment_repo.complete_deployment_revision_swap.assert_called_once_with(
-            {completed_id}
-        )
+        mock_deployment_repo.complete_deployment_revision_swap.assert_called_once_with({
+            completed_id
+        })
         mock_deployment_repo.clear_deploying_revision.assert_called_once_with({rolled_back_id})
         assert result.completed_ids == {completed_id}
         assert result.rolled_back_ids == {rolled_back_id}

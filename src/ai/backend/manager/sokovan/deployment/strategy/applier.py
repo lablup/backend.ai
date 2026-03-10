@@ -56,9 +56,17 @@ class StrategyResultApplier:
 
     async def apply(self, summary: StrategyEvaluationSummary) -> StrategyApplyResult:
         changes = summary.route_changes
+        completed_ids: set[UUID] = set()
+        rolled_back_ids: set[UUID] = set()
+        for endpoint_id, sub_step in summary.assignments.items():
+            if sub_step == DeploymentSubStep.COMPLETED:
+                completed_ids.add(endpoint_id)
+            elif sub_step == DeploymentSubStep.ROLLED_BACK:
+                rolled_back_ids.add(endpoint_id)
+
         result = StrategyApplyResult(
-            completed_ids=summary.assignments.get(DeploymentSubStep.COMPLETED, set()),
-            rolled_back_ids=summary.assignments.get(DeploymentSubStep.ROLLED_BACK, set()),
+            completed_ids=completed_ids,
+            rolled_back_ids=rolled_back_ids,
             routes_created=len(changes.rollout_specs),
             routes_drained=len(changes.drain_route_ids),
         )
@@ -85,7 +93,7 @@ class StrategyResultApplier:
                 drain,
             )
             log.debug(
-                "Applied evaluation: {} sub_step groups, {} routes created, {} routes drained",
+                "Applied evaluation: {} assignments, {} routes created, {} routes drained",
                 len(summary.assignments),
                 result.routes_created,
                 result.routes_drained,

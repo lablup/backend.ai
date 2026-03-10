@@ -2393,28 +2393,19 @@ class DeploymentDBSource:
 
     async def update_sub_steps(
         self,
-        sub_step_map: dict[DeploymentSubStep, set[uuid.UUID]],
+        assignments: dict[uuid.UUID, DeploymentSubStep],
     ) -> None:
         """Bulk-update the sub_step column for multiple endpoints.
 
         Args:
-            sub_step_map: Mapping from sub_step value to the set of endpoint IDs
-                that should be set to that sub_step.
+            assignments: Mapping from endpoint ID to the sub_step value to set.
         """
         async with self._begin_session_read_committed() as db_sess:
-            for sub_step, endpoint_ids in sub_step_map.items():
-                if not endpoint_ids:
-                    continue
-                stmt = (
-                    sa.update(EndpointRow)
-                    .where(EndpointRow.id.in_(endpoint_ids))
-                    .values(sub_step=sub_step)
-                )
-                await db_sess.execute(stmt)
+            await self._apply_sub_step_assignments(db_sess, assignments)
 
     async def apply_strategy_evaluation(
         self,
-        sub_step_map: dict[DeploymentSubStep, set[uuid.UUID]],
+        assignments: dict[uuid.UUID, DeploymentSubStep],
         rollout: BulkCreator[RoutingRow],
         drain: BatchUpdater[RoutingRow] | None,
     ) -> None:
@@ -2425,21 +2416,13 @@ class DeploymentDBSource:
         without the expected routes being in place.
 
         Args:
-            sub_step_map: Mapping from sub_step value to endpoint IDs.
+            assignments: Mapping from endpoint ID to sub_step value.
             rollout: Bulk creator for new-revision routes.
             drain: Batch updater for draining old-revision routes.
         """
         async with self._begin_session_read_committed() as db_sess:
             # 1. Update sub_steps
-            for sub_step, endpoint_ids in sub_step_map.items():
-                if not endpoint_ids:
-                    continue
-                stmt = (
-                    sa.update(EndpointRow)
-                    .where(EndpointRow.id.in_(endpoint_ids))
-                    .values(sub_step=sub_step)
-                )
-                await db_sess.execute(stmt)
+            await self._apply_sub_step_assignments(db_sess, assignments)
 
             # 2. Rollout new routes
             if rollout.specs:
@@ -2448,6 +2431,23 @@ class DeploymentDBSource:
             # 3. Drain old routes
             if drain:
                 await execute_batch_updater(db_sess, drain)
+
+    @staticmethod
+    async def _apply_sub_step_assignments(
+        db_sess: SASession,
+        assignments: dict[uuid.UUID, DeploymentSubStep],
+    ) -> None:
+        """Group assignments by sub_step and execute bulk UPDATEs."""
+        grouped: dict[DeploymentSubStep, list[uuid.UUID]] = {}
+        for endpoint_id, sub_step in assignments.items():
+            grouped.setdefault(sub_step, []).append(endpoint_id)
+        for sub_step, endpoint_ids in grouped.items():
+            stmt = (
+                sa.update(EndpointRow)
+                .where(EndpointRow.id.in_(endpoint_ids))
+                .values(sub_step=sub_step)
+            )
+            await db_sess.execute(stmt)
 
     # ========== Access Token Operations ==========
 
