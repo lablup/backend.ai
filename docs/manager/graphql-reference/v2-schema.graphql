@@ -2790,11 +2790,6 @@ input ImageV2FilterGQL {
 
   """Added in 26.3.0. Filter by nested alias conditions."""
   alias: ImageAliasNestedFilter = null
-
-  """
-  Added in 26.3.0. If true, return only images that have never been used to create a session. If false, return only images that have been used at least once.
-  """
-  neverUsed: Boolean = null
   AND: [ImageV2FilterGQL!] = null
   OR: [ImageV2FilterGQL!] = null
   NOT: [ImageV2FilterGQL!] = null
