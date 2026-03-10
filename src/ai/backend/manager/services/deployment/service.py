@@ -150,6 +150,10 @@ from ai.backend.manager.services.deployment.actions.update_deployment import (
     UpdateDeploymentActionResult,
 )
 from ai.backend.manager.sokovan.deployment import DeploymentController
+from ai.backend.manager.sokovan.deployment.exceptions import (
+    DeploymentAlreadyInProgress,
+    InvalidEndpointState,
+)
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
 )
@@ -660,12 +664,25 @@ class DeploymentService:
         # 1. Validate revision exists (raises exception if not found)
         _revision = await self._deployment_repository.get_revision(action.revision_id)
 
-        # 2. Set deploying_revision and transition to DEPLOYING lifecycle
+        # 2. Validate deployment state
+        deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
+        if deployment_info.deploying_revision_id is not None:
+            raise DeploymentAlreadyInProgress(
+                f"Deployment {action.deployment_id} already has deploying_revision "
+                f"{deployment_info.deploying_revision_id} in progress."
+            )
+        if deployment_info.current_revision_id == action.revision_id:
+            raise InvalidEndpointState(
+                f"Revision {action.revision_id} is already the current revision "
+                f"of deployment {action.deployment_id}."
+            )
+
+        # 3. Set deploying_revision and transition to DEPLOYING lifecycle
         previous_revision_id = await self._deployment_repository.set_deploying_revision(
             action.deployment_id, action.revision_id
         )
 
-        # 3. Trigger DEPLOYING lifecycle to start strategy execution
+        # 4. Trigger DEPLOYING lifecycle to start strategy execution
         await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.DEPLOYING)
 
         log.info(
@@ -675,7 +692,7 @@ class DeploymentService:
             previous_revision_id,
         )
 
-        # 4. Get updated deployment info
+        # 5. Get updated deployment info
         deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
 
         return ActivateRevisionActionResult(
