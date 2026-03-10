@@ -22,6 +22,9 @@ from ai.backend.manager.api.gql.fair_share.types.common import (
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.scaling_group.types import (
+    PreemptionConfig as DataPreemptionConfig,
+)
+from ai.backend.manager.data.scaling_group.types import (
     ResourceInfo,
     ScalingGroupData,
     SchedulerType,
@@ -43,6 +46,8 @@ from ai.backend.manager.services.scaling_group.actions.get_resource_info import 
 
 __all__ = (
     "FairShareScalingGroupSpecGQL",
+    "PreemptionConfigGQL",
+    "PreemptionConfigInput",
     "PreemptionModeGQL",
     "PreemptionOrderGQL",
     "ResourceGroupFilterGQL",
@@ -96,7 +101,7 @@ class PreemptionModeGQL(StrEnum):
     """Preemption mode enumeration for GraphQL."""
 
     TERMINATE = "terminate"
-    SUSPEND = "suspend"
+    RESCHEDULE = "reschedule"
 
     @classmethod
     def from_preemption_mode(cls, mode: PreemptionMode) -> PreemptionModeGQL:
@@ -104,8 +109,8 @@ class PreemptionModeGQL(StrEnum):
         match mode:
             case PreemptionMode.TERMINATE:
                 return cls.TERMINATE
-            case PreemptionMode.SUSPEND:
-                return cls.SUSPEND
+            case PreemptionMode.RESCHEDULE:
+                return cls.RESCHEDULE
             case _:
                 assert_never(mode)
 
@@ -130,6 +135,43 @@ class PreemptionOrderGQL(StrEnum):
                 return cls.NEWEST
             case _:
                 assert_never(order)
+
+
+@strawberry.type(
+    name="PreemptionConfig",
+    description="Added in 26.3.0. Preemption configuration for a resource group.",
+)
+class PreemptionConfigGQL:
+    """Preemption configuration for GraphQL."""
+
+    preemptible_priority: int = strawberry.field(
+        description=(
+            "Sessions with priority <= this value are eligible for preemption. Default is 5."
+        )
+    )
+    order: PreemptionOrderGQL = strawberry.field(
+        description=(
+            "Tie-breaking order for sessions with the same priority during preemption. "
+            "'oldest' preempts the oldest session first, 'newest' preempts the newest. "
+            "Default is 'oldest'."
+        )
+    )
+    mode: PreemptionModeGQL = strawberry.field(
+        description=(
+            "How to preempt a session when preemption is triggered. "
+            "'terminate' destroys the session, 'reschedule' queues it for rescheduling. "
+            "Default is 'terminate'."
+        )
+    )
+
+    @classmethod
+    def from_dataclass(cls, data: DataPreemptionConfig) -> Self:
+        """Convert from data layer PreemptionConfig to GQL type."""
+        return cls(
+            preemptible_priority=data.preemptible_priority,
+            order=PreemptionOrderGQL.from_preemption_order(data.order),
+            mode=PreemptionModeGQL.from_preemption_mode(data.mode),
+        )
 
 
 @strawberry.type(
@@ -187,25 +229,8 @@ class ResourceGroupSchedulerConfigGQL:
     type: SchedulerTypeGQL = strawberry.field(
         description="Type of scheduler used for session scheduling (fifo, lifo, drf, fair-share)."
     )
-    preemptible_priority: int = strawberry.field(
-        description=(
-            "Added in 26.3.0. Sessions with priority <= this value are eligible for preemption. "
-            "Default is 5."
-        )
-    )
-    preemption_order: PreemptionOrderGQL = strawberry.field(
-        description=(
-            "Added in 26.3.0. Tie-breaking order for sessions with the same priority during "
-            "preemption. 'oldest' preempts the oldest session first, 'newest' preempts the newest. "
-            "Default is 'oldest'."
-        )
-    )
-    preemption_mode: PreemptionModeGQL = strawberry.field(
-        description=(
-            "Added in 26.3.0. How to preempt a session when preemption is triggered. "
-            "'terminate' destroys the session, 'suspend' saves state for resumption. "
-            "Default is 'terminate'."
-        )
+    preemption: PreemptionConfigGQL = strawberry.field(
+        description="Added in 26.3.0. Preemption configuration for this resource group."
     )
 
 
@@ -380,13 +405,7 @@ class ResourceGroupGQL(Node):
             ),
             scheduler=ResourceGroupSchedulerConfigGQL(
                 type=SchedulerTypeGQL.from_scheduler_type(data.scheduler.name),
-                preemptible_priority=data.scheduler.options.preemptible_priority,
-                preemption_order=PreemptionOrderGQL.from_preemption_order(
-                    data.scheduler.options.preemption_order
-                ),
-                preemption_mode=PreemptionModeGQL.from_preemption_mode(
-                    data.scheduler.options.preemption_mode
-                ),
+                preemption=PreemptionConfigGQL.from_dataclass(data.scheduler.options.preemption),
             ),
             _fair_share_spec_data=data.fair_share_spec,
         )
@@ -567,6 +586,29 @@ class ResourceGroupOrderByGQL(GQLOrderBy):
                 return ScalingGroupOrders.is_active(ascending)
 
 
+@strawberry.input(
+    name="PreemptionConfigInput",
+    description="Added in 26.3.0. Input for preemption configuration.",
+)
+class PreemptionConfigInput:
+    """Input for preemption configuration. Replaces entire preemption config when provided."""
+
+    preemptible_priority: int = strawberry.field(
+        default=5,
+        description=("Sessions with priority <= this value are preemptible. Default is 5."),
+    )
+    order: PreemptionOrderGQL = strawberry.field(
+        default=PreemptionOrderGQL.OLDEST,
+        description=(
+            "Tie-breaking order for same-priority sessions (OLDEST, NEWEST). Default is OLDEST."
+        ),
+    )
+    mode: PreemptionModeGQL = strawberry.field(
+        default=PreemptionModeGQL.TERMINATE,
+        description=("How to preempt sessions (TERMINATE, RESCHEDULE). Default is TERMINATE."),
+    )
+
+
 # Mutation Input/Payload types
 
 
@@ -703,25 +745,11 @@ class UpdateResourceGroupInput:
             "Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Leave null to keep existing value."
         ),
     )
-    preemptible_priority: int | None = strawberry.field(
+    preemption: PreemptionConfigInput | None = strawberry.field(
         default=None,
         description=(
-            "Added in 26.3.0. Sessions with priority <= this value are preemptible. "
-            "Leave null to keep existing value."
-        ),
-    )
-    preemption_order: PreemptionOrderGQL | None = strawberry.field(
-        default=None,
-        description=(
-            "Added in 26.3.0. Tie-breaking order for same-priority sessions (OLDEST, NEWEST). "
-            "Leave null to keep existing value."
-        ),
-    )
-    preemption_mode: PreemptionModeGQL | None = strawberry.field(
-        default=None,
-        description=(
-            "Added in 26.3.0. How to preempt sessions (TERMINATE, SUSPEND). "
-            "Leave null to keep existing value."
+            "Added in 26.3.0. Preemption configuration. When provided, replaces the entire "
+            "preemption config. Leave null to keep existing value."
         ),
     )
 

@@ -1898,7 +1898,7 @@ class AgentSelectionStrategy(enum.StrEnum):
 
 class PreemptionMode(enum.StrEnum):
     TERMINATE = "terminate"
-    SUSPEND = "suspend"
+    RESCHEDULE = "reschedule"
 
 
 class PreemptionOrder(enum.StrEnum):
