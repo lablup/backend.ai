@@ -19,7 +19,6 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
-from ai.backend.common.defs.session import SESSION_IS_PREEMPTIBLE_DEFAULT
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
@@ -665,7 +664,7 @@ class SessionService:
         image = params["image"]
         architecture = params["architecture"]
         priority = params["priority"]
-        is_preemptible = params.get("is_preemptible", SESSION_IS_PREEMPTIBLE_DEFAULT)
+        is_preemptible = params.get("is_preemptible", True)
         bootstrap_script = params["bootstrap_script"]
         dependencies = params["dependencies"]
         startup_command = params["startup_command"]

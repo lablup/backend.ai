@@ -46,7 +46,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
-from ai.backend.common.defs.session import SESSION_IS_PREEMPTIBLE_DEFAULT, SESSION_PRIORITY_DEFAULT
+from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -371,7 +371,7 @@ class AgentRegistry:
         enqueue_only: bool = False,
         max_wait_seconds: int = 0,
         priority: int = SESSION_PRIORITY_DEFAULT,
-        is_preemptible: bool = SESSION_IS_PREEMPTIBLE_DEFAULT,
+        is_preemptible: bool = True,
         bootstrap_script: str | None = None,
         dependencies: list[uuid.UUID] | None = None,
         startup_command: str | None = None,
@@ -976,7 +976,7 @@ class AgentRegistry:
         *,
         user_scope: UserScope,
         priority: int = SESSION_PRIORITY_DEFAULT,
-        is_preemptible: bool = SESSION_IS_PREEMPTIBLE_DEFAULT,
+        is_preemptible: bool = True,
         public_sgroup_only: bool = True,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
         cluster_size: int = 1,

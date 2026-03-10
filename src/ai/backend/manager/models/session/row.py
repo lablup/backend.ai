@@ -39,7 +39,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-from ai.backend.common.defs.session import SESSION_IS_PREEMPTIBLE_DEFAULT, SESSION_PRIORITY_DEFAULT
+from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
@@ -695,7 +695,7 @@ class SessionRow(Base):  # type: ignore[misc]
         "is_preemptible",
         sa.Boolean(),
         nullable=False,
-        default=SESSION_IS_PREEMPTIBLE_DEFAULT,
+        default=True,
         server_default=sa.text("true"),
     )
 

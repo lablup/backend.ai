@@ -9,7 +9,7 @@ from uuid import UUID
 
 import yarl
 
-from ai.backend.common.defs.session import SESSION_IS_PREEMPTIBLE_DEFAULT, SESSION_PRIORITY_DEFAULT
+from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
@@ -92,7 +92,7 @@ class SessionCreationSpec:
     creation_spec: dict[str, Any]
 
     # Optional parameters
-    is_preemptible: bool = SESSION_IS_PREEMPTIBLE_DEFAULT
+    is_preemptible: bool = True
     scaling_group: str | None = None
     session_tag: str | None = None
     starts_at: datetime | None = None

@@ -15,7 +15,6 @@ from pydantic import AliasChoices, Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.defs.session import (
-    SESSION_IS_PREEMPTIBLE_DEFAULT,
     SESSION_PRIORITY_DEFAULT,
     SESSION_PRIORITY_MAX,
     SESSION_PRIORITY_MIN,
@@ -69,7 +68,7 @@ class CreateFromTemplateRequest(BaseRequestModel):
         ge=SESSION_PRIORITY_MIN,
         le=SESSION_PRIORITY_MAX,
     )
-    is_preemptible: bool = Field(default=SESSION_IS_PREEMPTIBLE_DEFAULT)
+    is_preemptible: bool = Field(default=True)
     image: str | None = Field(
         default=None,
         validation_alias=AliasChoices("image", "lang"),
@@ -149,7 +148,7 @@ class CreateFromParamsRequest(BaseRequestModel):
         ge=SESSION_PRIORITY_MIN,
         le=SESSION_PRIORITY_MAX,
     )
-    is_preemptible: bool = Field(default=SESSION_IS_PREEMPTIBLE_DEFAULT)
+    is_preemptible: bool = Field(default=True)
     image: str = Field(
         validation_alias=AliasChoices("image", "lang"),
     )
