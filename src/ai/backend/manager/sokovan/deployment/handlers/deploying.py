@@ -13,12 +13,8 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from datetime import UTC, datetime
 from typing import override
 
-from ai.backend.common.data.notification import NotificationRuleType
-from ai.backend.common.data.notification.messages import EndpointLifecycleChangedMessage
-from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -51,37 +47,6 @@ from ai.backend.manager.sokovan.deployment.types import (
 from .base import DeploymentHandler
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-
-# ---------------------------------------------------------------------------
-# Notification helper
-# ---------------------------------------------------------------------------
-
-
-def build_lifecycle_notification_event(
-    deployment: DeploymentInfo,
-    from_status: EndpointLifecycle | None,
-    to_status: EndpointLifecycle,
-    transition_result: str,
-    timestamp: str,
-) -> NotificationTriggeredEvent:
-    """Build a notification event for a lifecycle transition."""
-    message = EndpointLifecycleChangedMessage(
-        endpoint_id=str(deployment.id),
-        endpoint_name=deployment.metadata.name,
-        domain=deployment.metadata.domain,
-        project_id=str(deployment.metadata.project),
-        resource_group=deployment.metadata.resource_group,
-        from_status=from_status.value if from_status else None,
-        to_status=to_status.value,
-        transition_result=transition_result,
-        event_timestamp=timestamp,
-    )
-    return NotificationTriggeredEvent(
-        rule_type=NotificationRuleType.ENDPOINT_LIFECYCLE_CHANGED.value,
-        timestamp=datetime.now(UTC),
-        notification_data=message.model_dump(),
-    )
 
 
 # ---------------------------------------------------------------------------

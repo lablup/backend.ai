@@ -8,7 +8,6 @@ from .deploying import (
     DeployingInProgressHandler,
     DeployingProgressingHandler,
     DeployingProvisioningHandler,
-    build_lifecycle_notification_event,
 )
 from .destroying import DestroyingDeploymentHandler
 from .pending import CheckPendingDeploymentHandler
@@ -27,5 +26,4 @@ __all__ = [
     "DestroyingDeploymentHandler",
     "ReconcileDeploymentHandler",
     "ScalingDeploymentHandler",
-    "build_lifecycle_notification_event",
 ]

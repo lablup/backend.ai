@@ -17,6 +17,8 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeySchedu
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.data.notification import NotificationRuleType
+from ai.backend.common.data.notification.messages import EndpointLifecycleChangedMessage
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.common.events.event_types.schedule.anycast import (
@@ -67,7 +69,6 @@ from .handlers import (
     DestroyingDeploymentHandler,
     ReconcileDeploymentHandler,
     ScalingDeploymentHandler,
-    build_lifecycle_notification_event,
 )
 from .strategy.blue_green import BlueGreenStrategy
 from .strategy.evaluator import DeploymentStrategyEvaluator
@@ -552,7 +553,7 @@ class DeploymentCoordinator:
                 for d in deployments
             )
             notification_events.extend(
-                build_lifecycle_notification_event(
+                self._build_lifecycle_notification_event(
                     deployment=d,
                     from_status=from_status,
                     to_status=next_lifecycle,
@@ -580,7 +581,7 @@ class DeploymentCoordinator:
                 for e in errors
             )
             notification_events.extend(
-                build_lifecycle_notification_event(
+                self._build_lifecycle_notification_event(
                     deployment=e.deployment_info,
                     from_status=from_status,
                     to_status=next_lifecycle,
@@ -681,6 +682,32 @@ class DeploymentCoordinator:
                 )
             )
         return sub_steps
+
+    @staticmethod
+    def _build_lifecycle_notification_event(
+        deployment: DeploymentInfo,
+        from_status: EndpointLifecycle | None,
+        to_status: EndpointLifecycle,
+        transition_result: str,
+        timestamp: str,
+    ) -> NotificationTriggeredEvent:
+        """Build a notification event for a lifecycle transition."""
+        message = EndpointLifecycleChangedMessage(
+            endpoint_id=str(deployment.id),
+            endpoint_name=deployment.metadata.name,
+            domain=deployment.metadata.domain,
+            project_id=str(deployment.metadata.project),
+            resource_group=deployment.metadata.resource_group,
+            from_status=from_status.value if from_status else None,
+            to_status=to_status.value,
+            transition_result=transition_result,
+            event_timestamp=timestamp,
+        )
+        return NotificationTriggeredEvent(
+            rule_type=NotificationRuleType.ENDPOINT_LIFECYCLE_CHANGED.value,
+            timestamp=datetime.now(UTC),
+            notification_data=message.model_dump(),
+        )
 
     async def process_if_needed(self, lifecycle_type: DeploymentLifecycleType) -> None:
         """Process deployment lifecycle operation if needed (based on internal state)."""
