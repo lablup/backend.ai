@@ -73,7 +73,9 @@ class TestAdminBulkAssignRole:
             )
         )
 
-        input_data = BulkAssignRoleInputGQL(role_id=role_id, user_ids=[user_id_success, user_id_fail])
+        input_data = BulkAssignRoleInputGQL(
+            role_id=role_id, user_ids=[user_id_success, user_id_fail]
+        )
 
         resolver_fn = role_resolver.admin_bulk_assign_role.base_resolver
         result = await resolver_fn(mock_info, input_data)
@@ -153,7 +155,9 @@ class TestAdminBulkRevokeRole:
             )
         )
 
-        input_data = BulkRevokeRoleInputGQL(role_id=role_id, user_ids=[user_id_success, user_id_fail])
+        input_data = BulkRevokeRoleInputGQL(
+            role_id=role_id, user_ids=[user_id_success, user_id_fail]
+        )
 
         resolver_fn = role_resolver.admin_bulk_revoke_role.base_resolver
         result = await resolver_fn(mock_info, input_data)

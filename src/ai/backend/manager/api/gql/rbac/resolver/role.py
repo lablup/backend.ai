@@ -38,8 +38,8 @@ from ai.backend.manager.api.gql.rbac.types import (
     RoleOrderBy,
     UpdateRoleInput,
 )
-from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
