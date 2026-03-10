@@ -17,7 +17,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.types import ImageID
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.image.types import (
@@ -365,6 +365,13 @@ class ImageV2GQL(Node):
         description="UUID of the container registry where this image is stored."
     )
 
+    @strawberry.field(  # type: ignore[misc]
+        description="Added in 26.3.0. Timestamp of the most recent session created with this image. Returns null if the image has never been used.",
+    )
+    async def last_used(self, info: Info[StrawberryGQLContext]) -> datetime | None:
+        """Get the timestamp of the most recent session created with this image."""
+        return await info.context.data_loaders.image_last_used_loader.load(self._image_id)
+
     @strawberry.field(description="Added in 26.2.0. Aliases for this image.")  # type: ignore[misc]
     async def aliases(
         self,
@@ -559,7 +566,10 @@ class ImageV2FilterGQL(GQLFilter):
         default=None,
         description="Added in 26.3.0. Filter by nested alias conditions.",
     )
-
+    last_used: DateTimeFilter | None = strawberry.field(
+        default=None,
+        description="Added in 26.3.0. Filter by last used datetime (before/after).",
+    )
     AND: list[ImageV2FilterGQL] | None = None
     OR: list[ImageV2FilterGQL] | None = None
     NOT: list[ImageV2FilterGQL] | None = None
@@ -604,6 +614,15 @@ class ImageV2FilterGQL(GQLFilter):
         if self.alias:
             field_conditions.extend(self.alias.build_conditions())
 
+        # Apply last_used filter
+        if self.last_used:
+            last_used_condition = self.last_used.build_query_condition(
+                before_factory=ImageConditions.by_last_used_before,
+                after_factory=ImageConditions.by_last_used_after,
+            )
+            if last_used_condition:
+                field_conditions.append(last_used_condition)
+
         # Handle AND logical operator
         if self.AND:
             for sub_filter in self.AND:
@@ -639,6 +658,7 @@ class ImageV2FilterGQL(GQLFilter):
 class ImageV2OrderFieldGQL(enum.Enum):
     NAME = "NAME"
     CREATED_AT = "CREATED_AT"
+    LAST_USED = "LAST_USED"
 
 
 @strawberry.input(
@@ -660,6 +680,8 @@ class ImageV2OrderByGQL(GQLOrderBy):
                 return ImageOrders.name(ascending)
             case ImageV2OrderFieldGQL.CREATED_AT:
                 return ImageOrders.created_at(ascending)
+            case ImageV2OrderFieldGQL.LAST_USED:
+                return ImageOrders.last_used(ascending)
 
 
 # =============================================================================

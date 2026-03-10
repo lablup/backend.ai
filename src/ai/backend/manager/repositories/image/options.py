@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Collection
+from datetime import datetime
 
 import sqlalchemy as sa
 
@@ -11,6 +12,7 @@ from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import ImageID
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 
@@ -158,6 +160,35 @@ class ImageConditions:
 
         return inner
 
+    # DateTime filter factories for last_used (computed from KernelRow)
+    @staticmethod
+    def _last_used_subquery() -> sa.ScalarSelect[datetime | None]:
+        return (
+            sa.select(sa.func.max(KernelRow.created_at))
+            .where(
+                sa.and_(
+                    KernelRow.image == ImageRow.name,
+                    KernelRow.architecture == ImageRow.architecture,
+                )
+            )
+            .correlate(ImageRow)
+            .scalar_subquery()
+        )
+
+    @staticmethod
+    def by_last_used_before(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ImageConditions._last_used_subquery() < dt
+
+        return inner
+
+    @staticmethod
+    def by_last_used_after(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ImageConditions._last_used_subquery() > dt
+
+        return inner
+
     # String filter factories for alias (exists subquery-based)
     @staticmethod
     def by_alias_contains(spec: StringMatchSpec) -> QueryCondition:
@@ -264,6 +295,13 @@ class ImageOrders:
         if ascending:
             return ImageRow.status.asc()
         return ImageRow.status.desc()
+
+    @staticmethod
+    def last_used(ascending: bool = True) -> QueryOrder:
+        last_used_subq = ImageConditions._last_used_subquery()
+        if ascending:
+            return last_used_subq.asc()
+        return last_used_subq.desc()
 
 
 class ImageAliasConditions:
