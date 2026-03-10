@@ -10,6 +10,8 @@ from .permission import (
 )
 from .role import (
     admin_assign_role,
+    admin_bulk_assign_role,
+    admin_bulk_revoke_role,
     admin_create_role,
     admin_delete_role,
     admin_purge_role,
@@ -43,4 +45,6 @@ __all__ = [
     "admin_purge_role",
     "admin_assign_role",
     "admin_revoke_role",
+    "admin_bulk_assign_role",
+    "admin_bulk_revoke_role",
 ]
