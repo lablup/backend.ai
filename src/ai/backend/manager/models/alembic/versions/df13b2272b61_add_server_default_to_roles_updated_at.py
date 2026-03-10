@@ -1,7 +1,7 @@
 """Add server_default to roles.updated_at
 
 Revision ID: df13b2272b61
-Revises: ffcf0ed13a26
+Revises: b1009fe7f865
 Create Date: 2026-03-10 00:00:00.000000
 
 """
@@ -12,7 +12,7 @@ from sqlalchemy.sql import text
 
 # revision identifiers, used by Alembic.
 revision = "df13b2272b61"
-down_revision = "ffcf0ed13a26"
+down_revision = "b1009fe7f865"
 branch_labels = None
 depends_on = None
 
