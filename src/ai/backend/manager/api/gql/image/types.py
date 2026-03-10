@@ -566,15 +566,6 @@ class ImageV2FilterGQL(GQLFilter):
         default=None,
         description="Added in 26.3.0. Filter by nested alias conditions.",
     )
-    never_used: bool | None = strawberry.field(
-        default=None,
-        description=(
-            "Added in 26.3.0. "
-            "If true, return only images that have never been used to create a session. "
-            "If false, return only images that have been used at least once."
-        ),
-    )
-
     AND: list[ImageV2FilterGQL] | None = None
     OR: list[ImageV2FilterGQL] | None = None
     NOT: list[ImageV2FilterGQL] | None = None
@@ -618,13 +609,6 @@ class ImageV2FilterGQL(GQLFilter):
         # Apply alias filter
         if self.alias:
             field_conditions.extend(self.alias.build_conditions())
-
-        # Apply never_used filter
-        if self.never_used is not None:
-            if self.never_used:
-                field_conditions.append(ImageConditions.by_never_used())
-            else:
-                field_conditions.append(ImageConditions.by_ever_used())
 
         # Handle AND logical operator
         if self.AND:

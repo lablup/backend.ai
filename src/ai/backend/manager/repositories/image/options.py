@@ -159,44 +159,6 @@ class ImageConditions:
 
         return inner
 
-    @staticmethod
-    def by_never_used() -> QueryCondition:
-        """Filter images that have never been used to create a session."""
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subq = (
-                sa.select(sa.literal(1))
-                .where(
-                    sa.and_(
-                        KernelRow.image == ImageRow.name,
-                        KernelRow.architecture == ImageRow.architecture,
-                    )
-                )
-                .correlate(ImageRow)
-            )
-            return ~sa.exists(subq)
-
-        return inner
-
-    @staticmethod
-    def by_ever_used() -> QueryCondition:
-        """Filter images that have been used at least once to create a session."""
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subq = (
-                sa.select(sa.literal(1))
-                .where(
-                    sa.and_(
-                        KernelRow.image == ImageRow.name,
-                        KernelRow.architecture == ImageRow.architecture,
-                    )
-                )
-                .correlate(ImageRow)
-            )
-            return sa.exists(subq)
-
-        return inner
-
     # String filter factories for alias (exists subquery-based)
     @staticmethod
     def by_alias_contains(spec: StringMatchSpec) -> QueryCondition:
