@@ -351,6 +351,7 @@ class ScheduleDBSource:
                     domain_name=row.domain_name,
                     scaling_group_name=row.scaling_group_name,
                     priority=row.priority,
+                    is_preemptible=row.is_preemptible,
                     session_type=row.session_type,
                     cluster_mode=row.cluster_mode,
                     starts_at=row.starts_at,

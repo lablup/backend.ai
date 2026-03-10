@@ -65,6 +65,7 @@ def create_session_data(
         id=session_id or uuid4(),
         session_type=SessionTypes.INTERACTIVE,
         priority=0,
+        is_preemptible=True,
         cluster_mode=ClusterMode.SINGLE_NODE,
         cluster_size=1,
         domain_name="default",

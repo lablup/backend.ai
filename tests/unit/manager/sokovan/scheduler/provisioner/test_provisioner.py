@@ -75,6 +75,7 @@ def _create_scheduling_data_with_strategy(
         session_type=SessionTypes.INTERACTIVE,
         cluster_mode=ClusterMode.SINGLE_NODE,
         priority=0,
+        is_preemptible=True,
         starts_at=None,
         is_private=False,
         kernels=[],

@@ -371,6 +371,7 @@ class AgentRegistry:
         enqueue_only: bool = False,
         max_wait_seconds: int = 0,
         priority: int = SESSION_PRIORITY_DEFAULT,
+        is_preemptible: bool = True,
         bootstrap_script: str | None = None,
         dependencies: list[uuid.UUID] | None = None,
         startup_command: str | None = None,
@@ -576,6 +577,7 @@ class AgentRegistry:
                         resource_policy,
                         user_scope=user_scope,
                         priority=priority,
+                        is_preemptible=is_preemptible,
                         cluster_mode=cluster_mode,
                         cluster_size=cluster_size,
                         session_tag=tag,
@@ -923,6 +925,7 @@ class AgentRegistry:
         sudo_session_enabled: bool,
         network: NetworkRow | None,
         startup_command: str | None,
+        is_preemptible: bool,
     ) -> SessionId:
         """Enqueue session using Sokovan scheduling controller."""
         kernel_enqueue_configs: list[KernelEnqueueingConfig] = session_enqueue_configs[
@@ -955,6 +958,7 @@ class AgentRegistry:
             internal_data=internal_data,
             public_sgroup_only=public_sgroup_only,
             startup_command=startup_command,
+            is_preemptible=is_preemptible,
         )
 
         # Delegate to scheduling controller
@@ -972,6 +976,7 @@ class AgentRegistry:
         *,
         user_scope: UserScope,
         priority: int = SESSION_PRIORITY_DEFAULT,
+        is_preemptible: bool = True,
         public_sgroup_only: bool = True,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
         cluster_size: int = 1,
@@ -997,6 +1002,7 @@ class AgentRegistry:
             resource_policy=resource_policy,
             user_scope=user_scope,
             priority=priority,
+            is_preemptible=is_preemptible,
             public_sgroup_only=public_sgroup_only,
             cluster_mode=cluster_mode,
             cluster_size=cluster_size,
