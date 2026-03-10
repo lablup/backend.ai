@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import uuid
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from ai.backend.manager.api.gql.rbac.resolver import role as role_resolver
 from ai.backend.manager.api.gql.rbac.types import (
-    BulkAssignRoleInput,
+    BulkAssignRoleInputGQL,
     BulkAssignRolePayloadGQL,
-    BulkRevokeRoleInput,
+    BulkRevokeRoleInputGQL,
     BulkRevokeRolePayloadGQL,
 )
 from ai.backend.manager.data.permission.role import (
@@ -31,6 +31,11 @@ from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role i
 
 
 class TestAdminBulkAssignRole:
+    @pytest.fixture(autouse=True)
+    def _bypass_admin_check(self) -> None:
+        with patch("ai.backend.manager.api.gql.rbac.resolver.role.check_admin_only"):
+            yield  # type: ignore[misc]
+
     @pytest.fixture
     def mock_processor(self) -> AsyncMock:
         processor = AsyncMock()
@@ -68,7 +73,7 @@ class TestAdminBulkAssignRole:
             )
         )
 
-        input_data = BulkAssignRoleInput(role_id=role_id, user_ids=[user_id_success, user_id_fail])
+        input_data = BulkAssignRoleInputGQL(role_id=role_id, user_ids=[user_id_success, user_id_fail])
 
         resolver_fn = role_resolver.admin_bulk_assign_role.base_resolver
         result = await resolver_fn(mock_info, input_data)
@@ -92,7 +97,7 @@ class TestAdminBulkAssignRole:
             data=BulkRoleAssignmentResultData(successes=[], failures=[])
         )
 
-        input_data = BulkAssignRoleInput(role_id=role_id, user_ids=user_ids)
+        input_data = BulkAssignRoleInputGQL(role_id=role_id, user_ids=user_ids)
 
         resolver_fn = role_resolver.admin_bulk_assign_role.base_resolver
         await resolver_fn(mock_info, input_data)
@@ -107,6 +112,11 @@ class TestAdminBulkAssignRole:
 
 
 class TestAdminBulkRevokeRole:
+    @pytest.fixture(autouse=True)
+    def _bypass_admin_check(self) -> None:
+        with patch("ai.backend.manager.api.gql.rbac.resolver.role.check_admin_only"):
+            yield  # type: ignore[misc]
+
     @pytest.fixture
     def mock_processor(self) -> AsyncMock:
         processor = AsyncMock()
@@ -143,7 +153,7 @@ class TestAdminBulkRevokeRole:
             )
         )
 
-        input_data = BulkRevokeRoleInput(role_id=role_id, user_ids=[user_id_success, user_id_fail])
+        input_data = BulkRevokeRoleInputGQL(role_id=role_id, user_ids=[user_id_success, user_id_fail])
 
         resolver_fn = role_resolver.admin_bulk_revoke_role.base_resolver
         result = await resolver_fn(mock_info, input_data)
@@ -167,7 +177,7 @@ class TestAdminBulkRevokeRole:
             data=BulkRoleRevocationResultData(successes=[], failures=[])
         )
 
-        input_data = BulkRevokeRoleInput(role_id=role_id, user_ids=user_ids)
+        input_data = BulkRevokeRoleInputGQL(role_id=role_id, user_ids=user_ids)
 
         resolver_fn = role_resolver.admin_bulk_revoke_role.base_resolver
         await resolver_fn(mock_info, input_data)
