@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Self, override
+from typing import Self, assert_never, override
 
 import strawberry
 from strawberry import Info
@@ -106,6 +106,8 @@ class PreemptionModeGQL(StrEnum):
                 return cls.TERMINATE
             case PreemptionMode.SUSPEND:
                 return cls.SUSPEND
+            case _:
+                assert_never(mode)
 
 
 @strawberry.enum(
@@ -126,6 +128,8 @@ class PreemptionOrderGQL(StrEnum):
                 return cls.OLDEST
             case PreemptionOrder.NEWEST:
                 return cls.NEWEST
+            case _:
+                assert_never(order)
 
 
 @strawberry.type(

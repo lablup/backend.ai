@@ -72,9 +72,9 @@ class ScalingGroupSchedulerOptions:
     enforce_spreading_endpoint_replica: bool
     allow_fractional_resource_fragmentation: bool
     route_cleanup_target_statuses: list[str]
-    preemptible_priority: int
-    preemption_order: PreemptionOrder
-    preemption_mode: PreemptionMode
+    preemptible_priority: int = 5
+    preemption_order: PreemptionOrder = PreemptionOrder.OLDEST
+    preemption_mode: PreemptionMode = PreemptionMode.TERMINATE
 
     def to_json(self) -> dict[str, Any]:
         """Convert scheduler options to JSON-serializable dict."""

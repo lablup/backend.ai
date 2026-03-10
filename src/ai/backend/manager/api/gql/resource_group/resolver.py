@@ -16,6 +16,7 @@ from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.data.scaling_group.types import SchedulerType
+from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.updater import Updater
@@ -368,6 +369,8 @@ async def admin_update_resource_group(
                 )
             )
         )
+        if not current_result.scaling_groups:
+            raise ScalingGroupNotFound(input.resource_group_name)
         current_opts = current_result.scaling_groups[0].scheduler.options
         merged_opts = ScalingGroupOpts(
             allowed_session_types=current_opts.allowed_session_types,
