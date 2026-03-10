@@ -89,6 +89,14 @@ DEPLOYMENT_STATUS_TIMEOUT_MAP: dict[EndpointLifecycle, float] = {
 
 
 @dataclass
+class _PhaseInfo:
+    """Phase tracking info from scheduling history (not part of DeploymentInfo)."""
+
+    attempts: int = 0
+    started_at: datetime | None = None
+
+
+@dataclass
 class FailureClassificationResult:
     """Result of classifying failures into give_up, expired, and need_retry.
 
@@ -373,26 +381,30 @@ class DeploymentCoordinator:
 
         deployment_ids = [d.id for d in deployments]
 
-        # Populate phase_attempts and phase_started_at from scheduling history
+        # Build phase info from scheduling history (kept separate from DeploymentInfo)
         handler_name = handler.name()
         history_map = await self._deployment_repository.get_last_deployment_histories(
             deployment_ids
         )
+        phase_map: dict[UUID, _PhaseInfo] = {}
         for deployment in deployments:
             history = history_map.get(deployment.id)
             if history and history.phase == handler_name:
-                deployment.phase_attempts = history.attempts
-                deployment.phase_started_at = history.created_at
+                phase_map[deployment.id] = _PhaseInfo(
+                    attempts=history.attempts,
+                    started_at=history.created_at,
+                )
             else:
-                deployment.phase_attempts = 0
-                deployment.phase_started_at = None
+                phase_map[deployment.id] = _PhaseInfo()
 
         with DeploymentRecorderContext.scope(
             lifecycle_type.value, entity_ids=deployment_ids
         ) as pool:
             result = await handler.execute(deployments)
             all_records = pool.build_all_records()
-            await self._handle_status_transitions(handler, result, all_records, deployments)
+            await self._handle_status_transitions(
+                handler, result, all_records, deployments, phase_map
+            )
 
         try:
             await handler.post_process(result)
@@ -405,6 +417,7 @@ class DeploymentCoordinator:
         result: DeploymentExecutionResult,
         records: Mapping[UUID, ExecutionRecord],
         deployments: list[DeploymentInfo],
+        phase_map: dict[UUID, _PhaseInfo] | None = None,
     ) -> None:
         """Handle status transitions with history recording.
 
@@ -449,7 +462,7 @@ class DeploymentCoordinator:
         # Classify and handle failure transitions
         if result.errors:
             current_time = await self._deployment_repository.get_db_now()
-            classified = self._classify_failures(result.errors, deployments, current_time)
+            classified = self._classify_failures(result.errors, phase_map or {}, current_time)
 
             if classified.give_up and transitions.give_up:
                 self._collect_transition(
@@ -614,7 +627,7 @@ class DeploymentCoordinator:
     @staticmethod
     def _classify_failures(
         errors: list[DeploymentExecutionError],
-        deployments: list[DeploymentInfo],
+        phase_map: dict[UUID, _PhaseInfo],
         current_time: datetime,
     ) -> FailureClassificationResult:
         """Classify failures into give_up, expired, need_retry.
@@ -626,31 +639,28 @@ class DeploymentCoordinator:
 
         Args:
             errors: Failed deployment execution errors
-            deployments: Original deployments with phase_attempts and phase_started_at populated
+            phase_map: Phase tracking info (attempts, started_at) per deployment
             current_time: Current database time for timeout comparison
 
         Returns:
             FailureClassificationResult with give_up, expired, need_retry lists
         """
-        deployment_map = {d.id: d for d in deployments}
-
         give_up_errors: list[DeploymentExecutionError] = []
         expired_errors: list[DeploymentExecutionError] = []
         retry_errors: list[DeploymentExecutionError] = []
 
         for error in errors:
-            deployment = deployment_map.get(error.deployment_info.id)
-            if not deployment:
-                continue
+            deployment_id = error.deployment_info.id
+            phase = phase_map.get(deployment_id, _PhaseInfo())
 
             # 1. Check max retries exceeded → give_up
-            if deployment.phase_attempts >= SERVICE_MAX_RETRIES:
+            if phase.attempts >= SERVICE_MAX_RETRIES:
                 give_up_errors.append(error)
                 continue
 
             # 2. Check timeout exceeded → expired
-            if deployment.phase_started_at:
-                lifecycle = deployment.state.lifecycle
+            if phase.started_at:
+                lifecycle = error.deployment_info.state.lifecycle
                 timeout = DEPLOYMENT_STATUS_TIMEOUT_MAP.get(lifecycle)
                 if timeout:
                     # Normalise both to UTC to avoid timezone-naive vs -aware
@@ -661,9 +671,9 @@ class DeploymentCoordinator:
                         else current_time.replace(tzinfo=UTC)
                     )
                     ps = (
-                        deployment.phase_started_at.astimezone(UTC)
-                        if deployment.phase_started_at.tzinfo
-                        else deployment.phase_started_at.replace(tzinfo=UTC)
+                        phase.started_at.astimezone(UTC)
+                        if phase.started_at.tzinfo
+                        else phase.started_at.replace(tzinfo=UTC)
                     )
                     elapsed = (ct - ps).total_seconds()
                     if elapsed > timeout:
