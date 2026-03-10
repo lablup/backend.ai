@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -13,7 +14,6 @@ from ai.backend.common.data.permission.types import (
     OperationType,
     ScopeType,
 )
-from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.api.gql.rbac.resolver import permission as permission_resolver
 from ai.backend.manager.api.gql.rbac.types import PermissionGQL, UpdatePermissionInput
 from ai.backend.manager.api.gql.rbac.types.permission import (
@@ -22,7 +22,6 @@ from ai.backend.manager.api.gql.rbac.types.permission import (
 )
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.errors.common import ObjectNotFound
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.permission_contoller.actions.update_permission import (
     UpdatePermissionAction,
     UpdatePermissionActionResult,
@@ -64,7 +63,7 @@ def _create_mock_info(context: MagicMock) -> MagicMock:
 
 class TestAdminUpdatePermission:
     @pytest.fixture(autouse=True)
-    def _bypass_admin_check(self) -> None:
+    def _bypass_admin_check(self) -> Generator[None]:
         with patch("ai.backend.manager.api.gql.rbac.resolver.permission.check_admin_only"):
             yield
 
@@ -232,14 +231,6 @@ class TestAdminUpdatePermission:
 
 class TestAdminUpdatePermissionAccessControl:
     async def test_rejects_non_superadmin(self) -> None:
-        non_admin_user = UserData(
-            user_id=uuid.uuid4(),
-            is_authorized=True,
-            is_admin=False,
-            is_superadmin=False,
-            role=UserRole.USER,
-            domain_name="default",
-        )
         context = MagicMock()
         info = _create_mock_info(context)
         input_data = UpdatePermissionInput(
@@ -248,11 +239,5 @@ class TestAdminUpdatePermissionAccessControl:
         )
 
         resolver_fn = permission_resolver.admin_update_permission.base_resolver
-        with (
-            patch(
-                "ai.backend.manager.api.gql.utils.current_user",
-                return_value=non_admin_user,
-            ),
-            pytest.raises(HTTPForbidden),
-        ):
+        with pytest.raises(HTTPForbidden):
             await resolver_fn(info=info, input=input_data)
