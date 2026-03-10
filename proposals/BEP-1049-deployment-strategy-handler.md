@@ -424,36 +424,6 @@ This enables:
 
 On strategy failure (all new routes fail), automatic rollback always occurs.
 
-## Decision Log
-
-### 2026-03-04: Unified coordinator code path via composite handler pattern
-
-**Context**: PR #9566 review identified that the coordinator treated DEPLOYING as a special case with a separate method (`process_deploying_lifecycle`) and separate code path. This created two parallel flows, a union type for handler keys (`DeploymentLifecycleType | (DeploymentLifecycleType, DeploymentSubStep)`), and DEPLOYING-specific branching in the event handler.
-
-**Decision**: Refactor to a flat registry with pre-step pattern.
-
-Three design principles drove the change:
-
-1. **DEPLOYING generalization**: DEPLOYING is no longer a special lifecycle type. The coordinator processes it through the same `process_deployment_lifecycle()` as all other types. No `if DEPLOYING` branches exist in the coordinator or event handler.
-
-2. **Flat handler registry**: All handlers — including DEPLOYING sub-step handlers — are registered in a single `HandlerRegistry` with `(lifecycle_type, sub_step)` keys. The coordinator derives sub-steps from registered keys and dispatches to each handler independently.
-
-3. **Pre-step for evaluation**: Instead of a composite handler owning the evaluator, a `DeployingEvaluatePreStep` runs before handler dispatch. It evaluates the strategy FSM, updates the `sub_step` column in DB, and applies route mutations. This separates evaluation from execution cleanly.
-
-**Changes**:
-- New `HandlerRegistry` dataclass: holds flat handler map and pre-steps
-- `DeployingEvaluatePreStep`: evaluates strategy, updates sub_steps, applies route changes
-- DEPLOYING sub-step handlers registered directly in the handler map
-- `DeploymentCoordinator`: two-path dispatch (simple vs sub-step lifecycle)
-- Handler base class: removed `target_sub_step()` — sub-step comes from registry key
-- `EndpointLifecycleBatchUpdaterSpec`: passes `sub_status` from `status_transitions()` to preserve `sub_step` column
-
-### 2026-03-09: Remove target_sub_step() redundancy
-
-**Context**: `target_sub_step()` on handler base class duplicated information already present in the registry key and `status_transitions().success.sub_status`.
-
-**Decision**: Remove `target_sub_step()` entirely. The coordinator passes `sub_step` from the registry key to `_run_handler()`, which uses it for DB filtering. No handler needs to declare its own sub-step.
-
 ## References
 
 - [BEP-1006: Service Deployment Strategy](BEP-1006-service-deployment-strategy.md) — High-level design for Blue-Green and Rolling Update
