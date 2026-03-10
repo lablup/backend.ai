@@ -9,12 +9,15 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge
 
+from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.types import PreemptionMode, PreemptionOrder
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.data.scaling_group.types import SchedulerType
-from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
+from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group.options import (
     ScalingGroupConditions,
@@ -340,12 +343,66 @@ async def admin_update_resource_group(
     if input.scheduler_type is not None:
         scheduler_value = SchedulerType(input.scheduler_type.value).value
 
+    # Handle preemption fields: fetch current opts if any preemption field is provided
+    scheduler_opts_state: OptionalState[ScalingGroupOpts] = OptionalState.nop()
+    any_preemption_field = (
+        input.preemptible_priority is not None
+        or input.preemption_order is not None
+        or input.preemption_mode is not None
+    )
+    if any_preemption_field:
+        current_result = await processors.scaling_group.search_scaling_groups.wait_for_complete(
+            SearchScalingGroupsAction(
+                querier=BatchQuerier(
+                    pagination=OffsetPagination(limit=1),
+                    conditions=[
+                        ScalingGroupConditions.by_name_equals(
+                            StringMatchSpec(
+                                value=input.resource_group_name,
+                                case_insensitive=False,
+                                negated=False,
+                            )
+                        )
+                    ],
+                    orders=[ScalingGroupOrders.name()],
+                )
+            )
+        )
+        current_opts = current_result.scaling_groups[0].scheduler.options
+        merged_opts = ScalingGroupOpts(
+            allowed_session_types=current_opts.allowed_session_types,
+            pending_timeout=current_opts.pending_timeout,
+            config=dict(current_opts.config),
+            agent_selection_strategy=current_opts.agent_selection_strategy,
+            agent_selector_config=dict(current_opts.agent_selector_config),
+            enforce_spreading_endpoint_replica=current_opts.enforce_spreading_endpoint_replica,
+            allow_fractional_resource_fragmentation=current_opts.allow_fractional_resource_fragmentation,
+            route_cleanup_target_statuses=current_opts.route_cleanup_target_statuses,
+            preemptible_priority=(
+                input.preemptible_priority
+                if input.preemptible_priority is not None
+                else current_opts.preemptible_priority
+            ),
+            preemption_order=(
+                PreemptionOrder(input.preemption_order.value)
+                if input.preemption_order is not None
+                else current_opts.preemption_order
+            ),
+            preemption_mode=(
+                PreemptionMode(input.preemption_mode.value)
+                if input.preemption_mode is not None
+                else current_opts.preemption_mode
+            ),
+        )
+        scheduler_opts_state = OptionalState.update(merged_opts)
+
     scheduler_spec = ScalingGroupSchedulerConfigUpdaterSpec(
         scheduler=(
             OptionalState.update(scheduler_value)
             if scheduler_value is not None
             else OptionalState.nop()
         ),
+        scheduler_opts=scheduler_opts_state,
     )
 
     # Composite spec (excludes fair_share - use separate mutation)

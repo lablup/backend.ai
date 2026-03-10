@@ -699,6 +699,27 @@ class UpdateResourceGroupInput:
             "Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Leave null to keep existing value."
         ),
     )
+    preemptible_priority: int | None = strawberry.field(
+        default=None,
+        description=(
+            "Added in 26.3.0. Sessions with priority <= this value are preemptible. "
+            "Leave null to keep existing value."
+        ),
+    )
+    preemption_order: PreemptionOrderGQL | None = strawberry.field(
+        default=None,
+        description=(
+            "Added in 26.3.0. Tie-breaking order for same-priority sessions (OLDEST, NEWEST). "
+            "Leave null to keep existing value."
+        ),
+    )
+    preemption_mode: PreemptionModeGQL | None = strawberry.field(
+        default=None,
+        description=(
+            "Added in 26.3.0. How to preempt sessions (TERMINATE, SUSPEND). "
+            "Leave null to keep existing value."
+        ),
+    )
 
 
 @strawberry.type(
