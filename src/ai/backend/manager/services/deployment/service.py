@@ -21,6 +21,7 @@ from ai.backend.manager.data.deployment.creator import ModelRevisionCreator
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     DeploymentInfo,
+    DeploymentSubStep,
     ExtraVFolderMountData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
@@ -683,7 +684,9 @@ class DeploymentService:
         )
 
         # 4. Trigger DEPLOYING lifecycle to start strategy execution
-        await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.DEPLOYING)
+        await self._deployment_controller.mark_lifecycle_needed(
+            DeploymentLifecycleType.DEPLOYING, sub_step=DeploymentSubStep.PROVISIONING
+        )
 
         log.info(
             "Started deploying revision {} for deployment {} (current: {})",

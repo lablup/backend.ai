@@ -9,7 +9,6 @@ from collections.abc import Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Protocol
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
@@ -35,7 +34,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentSubStep,
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
-from ai.backend.manager.defs import SERVICE_MAX_RETRIES, LockID
+from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
@@ -62,7 +61,6 @@ from .executor import DeploymentExecutor
 from .handlers import (
     CheckPendingDeploymentHandler,
     CheckReplicaDeploymentHandler,
-    DeployingEvaluatePreStep,
     DeployingProgressingHandler,
     DeployingProvisioningHandler,
     DeploymentHandler,
@@ -70,6 +68,7 @@ from .handlers import (
     ReconcileDeploymentHandler,
     ScalingDeploymentHandler,
 )
+from .strategy.applier import StrategyResultApplier
 from .strategy.blue_green import BlueGreenStrategy
 from .strategy.evaluator import DeploymentStrategyEvaluator
 from .strategy.rolling_update import RollingUpdateStrategy
@@ -125,18 +124,11 @@ class _TransitionResult:
     notification_events: list[NotificationTriggeredEvent]
 
 
-class LifecyclePreStep(Protocol):
-    """Protocol for optional pre-steps that run before handler dispatch."""
-
-    async def run(self) -> None: ...
-
-
 @dataclass
 class HandlerRegistry:
-    """Registry holding flat handler map and pre-steps."""
+    """Registry holding flat handler map."""
 
     handlers: dict[HandlerKey, DeploymentHandler]
-    pre_steps: dict[DeploymentLifecycleType, LifecyclePreStep]
 
     def sub_steps_for(self, lifecycle_type: DeploymentLifecycleType) -> list[DeploymentSubStep]:
         """Derive sub-steps from registered handler keys."""
@@ -249,7 +241,7 @@ class DeploymentCoordinator:
         return registry
 
     def _init_handlers(self, executor: DeploymentExecutor) -> HandlerRegistry:
-        """Initialize the flat handler registry and pre-steps.
+        """Initialize the flat handler registry.
 
         Registry keys are derived from each handler's ``target_statuses()``.
         """
@@ -258,6 +250,7 @@ class DeploymentCoordinator:
             deployment_repo=self._deployment_repository,
             strategy_registry=strategy_registry,
         )
+        applier = StrategyResultApplier(deployment_repo=self._deployment_repository)
 
         handler_list: list[tuple[DeploymentLifecycleType, DeploymentHandler]] = [
             # -- simple lifecycle handlers --
@@ -304,6 +297,8 @@ class DeploymentCoordinator:
                 DeployingProvisioningHandler(
                     deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
+                    evaluator=evaluator,
+                    applier=applier,
                 ),
             ),
             (
@@ -311,7 +306,8 @@ class DeploymentCoordinator:
                 DeployingProgressingHandler(
                     deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
-                    deployment_repo=self._deployment_repository,
+                    evaluator=evaluator,
+                    applier=applier,
                 ),
             ),
         ]
@@ -321,14 +317,7 @@ class DeploymentCoordinator:
             key = self._derive_handler_key(lifecycle_type, handler)
             handlers[key] = handler
 
-        pre_steps: dict[DeploymentLifecycleType, LifecyclePreStep] = {
-            DeploymentLifecycleType.DEPLOYING: DeployingEvaluatePreStep(
-                evaluator=evaluator,
-                deployment_repo=self._deployment_repository,
-            ),
-        }
-
-        return HandlerRegistry(handlers=handlers, pre_steps=pre_steps)
+        return HandlerRegistry(handlers=handlers)
 
     @staticmethod
     def _derive_handler_key(
@@ -363,30 +352,12 @@ class DeploymentCoordinator:
             )
             return
 
-        has_pre_step = lifecycle_type in self._registry.pre_steps
-        if has_pre_step:
-            # Lifecycle with pre-step — acquire lifecycle-level lock,
-            # then run pre-step + handler atomically.
-            lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
-            async with self._lock_factory(LockID.LOCKID_DEPLOYMENT_DEPLOYING, lock_lifetime):
-                await self._run_pre_step(lifecycle_type)
-                await self._run_handler(handler, lifecycle_type)
-        else:
-            # Simple lifecycle — handler manages its own lock
-            lock_id = handler.lock_id
-            async with AsyncExitStack() as stack:
-                if lock_id is not None:
-                    lock_lifetime = (
-                        self._config_provider.config.manager.session_schedule_lock_lifetime
-                    )
-                    await stack.enter_async_context(self._lock_factory(lock_id, lock_lifetime))
-                await self._run_handler(handler, lifecycle_type)
-
-    async def _run_pre_step(self, lifecycle_type: DeploymentLifecycleType) -> None:
-        """Run the optional pre-step for a lifecycle type."""
-        pre_step = self._registry.pre_steps.get(lifecycle_type)
-        if pre_step is not None:
-            await pre_step.run()
+        lock_id = handler.lock_id
+        async with AsyncExitStack() as stack:
+            if lock_id is not None:
+                lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
+                await stack.enter_async_context(self._lock_factory(lock_id, lock_lifetime))
+            await self._run_handler(handler, lifecycle_type)
 
     async def _run_handler(
         self,

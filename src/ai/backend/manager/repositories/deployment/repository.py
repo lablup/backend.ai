@@ -1245,14 +1245,14 @@ class DeploymentRepository:
         await self._db_source.update_sub_steps(sub_step_map)
 
     @deployment_repository_resilience.apply()
-    async def apply_deploying_pre_step(
+    async def apply_strategy_evaluation(
         self,
         sub_step_map: dict[DeploymentSubStep, set[uuid.UUID]],
         rollout: BulkCreator[RoutingRow],
         drain: BatchUpdater[RoutingRow] | None,
     ) -> None:
         """Atomically update sub_steps and apply route changes in a single transaction."""
-        await self._db_source.apply_deploying_pre_step(
+        await self._db_source.apply_strategy_evaluation(
             sub_step_map,
             rollout,
             drain,

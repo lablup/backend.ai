@@ -2412,7 +2412,7 @@ class DeploymentDBSource:
                 )
                 await db_sess.execute(stmt)
 
-    async def apply_deploying_pre_step(
+    async def apply_strategy_evaluation(
         self,
         sub_step_map: dict[DeploymentSubStep, set[uuid.UUID]],
         rollout: BulkCreator[RoutingRow],

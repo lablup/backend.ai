@@ -4,9 +4,9 @@ All sub-step handlers are registered flat in the coordinator alongside other
 lifecycle handlers.  The coordinator dispatches by sub-step using the
 ``(lifecycle_type, sub_step)`` registry key.
 
-Before the sub-step handlers run, the coordinator executes
-``DeployingEvaluatePreStep`` to evaluate the strategy FSM, update the
-``sub_step`` column, and apply route mutations.
+Each handler calls the strategy evaluator in ``execute()`` to evaluate
+the deployment FSM, then uses ``StrategyResultApplier`` to persist
+sub_step assignments and route mutations.
 """
 
 from __future__ import annotations
@@ -21,23 +21,13 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentLifecycleStatus,
     DeploymentStatusTransitions,
     DeploymentSubStep,
-    RouteStatus,
-    RouteTrafficStatus,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.updater import BatchUpdater
-from ai.backend.manager.repositories.deployment.creators import (
-    RouteBatchUpdaterSpec,
-)
-from ai.backend.manager.repositories.deployment.options import RouteConditions
-from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
-from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
+from ai.backend.manager.sokovan.deployment.strategy.applier import StrategyResultApplier
 from ai.backend.manager.sokovan.deployment.strategy.evaluator import DeploymentStrategyEvaluator
 from ai.backend.manager.sokovan.deployment.types import (
     DeploymentExecutionError,
@@ -51,76 +41,6 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 # ---------------------------------------------------------------------------
-# Evaluate pre-step (runs before sub-step handlers)
-# ---------------------------------------------------------------------------
-
-
-class DeployingEvaluatePreStep:
-    """Evaluates strategy for all DEPLOYING deployments.
-
-    This is NOT a handler.  The coordinator runs it once before dispatching
-    to individual sub-step handlers.
-
-    - Updates the ``sub_step`` column in DB (including COMPLETED/ROLLED_BACK).
-    - Applies route mutations (rollout / drain).
-    """
-
-    def __init__(
-        self,
-        evaluator: DeploymentStrategyEvaluator,
-        deployment_repo: DeploymentRepository,
-    ) -> None:
-        self._evaluator = evaluator
-        self._deployment_repo = deployment_repo
-
-    async def run(self) -> None:
-        """Run evaluation and apply side-effects (sub_step update + route changes).
-
-        Sub-step updates and route mutations are applied in a single transaction
-        via ``apply_deploying_pre_step`` to prevent inconsistent state where
-        sub_step is updated (e.g. COMPLETED) but route creation fails.
-        """
-        deployments = await self._deployment_repo.get_endpoints_by_statuses([
-            EndpointLifecycle.DEPLOYING
-        ])
-        if not deployments:
-            return
-        log.info("pre-step evaluate: processing {} deployments", len(deployments))
-        deployment_ids = [d.id for d in deployments]
-        with DeploymentRecorderContext.scope("deploying-pre-step", entity_ids=deployment_ids):
-            eval_result = await self._evaluator.evaluate(deployments)
-
-        changes = eval_result.route_changes
-        drain: BatchUpdater[RoutingRow] | None = None
-        if changes.drain_route_ids:
-            drain = BatchUpdater(
-                spec=RouteBatchUpdaterSpec(
-                    status=RouteStatus.TERMINATING,
-                    traffic_ratio=0.0,
-                    traffic_status=RouteTrafficStatus.INACTIVE,
-                ),
-                conditions=[RouteConditions.by_ids(changes.drain_route_ids)],
-            )
-
-        # Apply sub_step updates and route mutations atomically
-        rollout: BulkCreator[RoutingRow] = BulkCreator(
-            specs=[c.spec for c in changes.rollout_specs],
-        )
-        if eval_result.assignments or rollout.specs or drain:
-            await self._deployment_repo.apply_deploying_pre_step(
-                eval_result.assignments,
-                rollout,
-                drain,
-            )
-            log.debug(
-                "Applied pre-step: {} sub_step groups, {} routes created, {} routes drained",
-                len(eval_result.assignments),
-                len(changes.rollout_specs),
-                len(changes.drain_route_ids),
-            )
-
-
-# ---------------------------------------------------------------------------
 # DEPLOYING sub-step handlers
 # ---------------------------------------------------------------------------
 
@@ -129,7 +49,7 @@ class DeployingProvisioningHandler(DeploymentHandler):
     """Handler for DEPLOYING / PROVISIONING sub-step.
 
     New-revision routes are being created; waiting for them to become HEALTHY.
-    execute() returns success for all supplied deployments (no-op pass-through).
+    execute() evaluates strategy FSM and applies route mutations via applier.
     post_process() re-schedules the DEPLOYING/PROVISIONING cycle and triggers route provisioning.
     """
 
@@ -137,9 +57,13 @@ class DeployingProvisioningHandler(DeploymentHandler):
         self,
         deployment_controller: DeploymentController,
         route_controller: RouteController,
+        evaluator: DeploymentStrategyEvaluator,
+        applier: StrategyResultApplier,
     ) -> None:
         self._deployment_controller = deployment_controller
         self._route_controller = route_controller
+        self._evaluator = evaluator
+        self._applier = applier
 
     @classmethod
     @override
@@ -149,7 +73,7 @@ class DeployingProvisioningHandler(DeploymentHandler):
     @property
     @override
     def lock_id(self) -> LockID | None:
-        return None
+        return LockID.LOCKID_DEPLOYMENT_DEPLOYING
 
     @classmethod
     @override
@@ -173,6 +97,8 @@ class DeployingProvisioningHandler(DeploymentHandler):
 
     @override
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
+        result = await self._evaluator.evaluate(deployments)
+        await self._applier.apply(result)
         return DeploymentExecutionResult(successes=list(deployments))
 
     @override
@@ -186,22 +112,24 @@ class DeployingProvisioningHandler(DeploymentHandler):
 class DeployingProgressingHandler(DeploymentHandler):
     """Handler for DEPLOYING / PROGRESSING sub-step (including terminal states).
 
-    Handles three sub-steps set by the pre-step evaluator:
+    Handles three sub-steps determined by strategy evaluation:
 
     - **PROGRESSING**: Actively replacing routes — no-op, re-schedule next cycle.
-    - **COMPLETED**: All strategy conditions met — revision swap → success (→ READY).
-    - **ROLLED_BACK**: All new routes failed — clear deploying_revision → failure (→ READY).
+    - **COMPLETED**: All strategy conditions met — applier swaps revision → success (→ READY).
+    - **ROLLED_BACK**: All new routes failed — applier clears deploying_revision → failure (→ READY).
     """
 
     def __init__(
         self,
         deployment_controller: DeploymentController,
         route_controller: RouteController,
-        deployment_repo: DeploymentRepository,
+        evaluator: DeploymentStrategyEvaluator,
+        applier: StrategyResultApplier,
     ) -> None:
         self._deployment_controller = deployment_controller
         self._route_controller = route_controller
-        self._deployment_repo = deployment_repo
+        self._evaluator = evaluator
+        self._applier = applier
 
     @classmethod
     @override
@@ -211,7 +139,7 @@ class DeployingProgressingHandler(DeploymentHandler):
     @property
     @override
     def lock_id(self) -> LockID | None:
-        return None
+        return LockID.LOCKID_DEPLOYMENT_DEPLOYING
 
     @classmethod
     @override
@@ -244,9 +172,16 @@ class DeployingProgressingHandler(DeploymentHandler):
 
     @override
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
-        completed, rolled_back = self._classify_deployments(deployments)
-        await self._apply_completed(completed)
-        await self._apply_rolled_back(rolled_back)
+        summary = await self._evaluator.evaluate(deployments)
+        apply_result = await self._applier.apply(summary)
+
+        deployment_map = {d.id: d for d in deployments}
+        completed = [
+            deployment_map[eid] for eid in apply_result.completed_ids if eid in deployment_map
+        ]
+        rolled_back = [
+            deployment_map[eid] for eid in apply_result.rolled_back_ids if eid in deployment_map
+        ]
 
         return DeploymentExecutionResult(
             successes=completed,
@@ -259,60 +194,6 @@ class DeployingProgressingHandler(DeploymentHandler):
                 for deployment in rolled_back
             ],
         )
-
-    @staticmethod
-    def _classify_deployments(
-        deployments: Sequence[DeploymentInfo],
-    ) -> tuple[list[DeploymentInfo], list[DeploymentInfo]]:
-        """Classify deployments into completed and rolled_back.
-
-        Skips deployments marked for destruction to prevent resurrecting them.
-        PROGRESSING deployments are excluded from both lists so no transition occurs.
-        """
-        completed: list[DeploymentInfo] = []
-        rolled_back: list[DeploymentInfo] = []
-
-        for deployment in deployments:
-            if deployment.state.lifecycle in (
-                EndpointLifecycle.DESTROYING,
-                EndpointLifecycle.DESTROYED,
-            ):
-                log.warning(
-                    "deployment {}: skipping — lifecycle is {} during DEPLOYING",
-                    deployment.id,
-                    deployment.state.lifecycle,
-                )
-                continue
-
-            match deployment.sub_step:
-                case DeploymentSubStep.COMPLETED:
-                    completed.append(deployment)
-                case DeploymentSubStep.ROLLED_BACK:
-                    rolled_back.append(deployment)
-                case _:
-                    pass
-
-        return completed, rolled_back
-
-    async def _apply_completed(self, completed: list[DeploymentInfo]) -> None:
-        """Swap revision for completed deployments."""
-        if not completed:
-            return
-        endpoint_ids = {d.id for d in completed}
-        swapped = await self._deployment_repo.complete_deployment_revision_swap(endpoint_ids)
-        log.info(
-            "Swapped revision for {}/{} completed deployments",
-            swapped,
-            len(endpoint_ids),
-        )
-
-    async def _apply_rolled_back(self, rolled_back: list[DeploymentInfo]) -> None:
-        """Clear deploying_revision for rolled-back deployments."""
-        if not rolled_back:
-            return
-        endpoint_ids = {d.id for d in rolled_back}
-        await self._deployment_repo.clear_deploying_revision(endpoint_ids)
-        log.info("Cleared deploying_revision for {} rolled-back deployments", len(endpoint_ids))
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
