@@ -1416,6 +1416,38 @@ input BlueGreenConfigInput
   promoteDelaySeconds: Int! = 0
 }
 
+"""
+Added in 26.3.0. Error information for a failed user in bulk role assignment.
+"""
+type BulkAssignRoleError
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the user that failed."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""Added in 26.3.0. Input for bulk assigning a role to multiple users"""
+input BulkAssignRoleInput
+  @join__type(graph: STRAWBERRY)
+{
+  roleId: UUID!
+  userIds: [UUID!]!
+}
+
+"""Added in 26.3.0. Payload for bulk role assignment mutation."""
+type BulkAssignRolePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """List of successfully created role assignments."""
+  assigned: [RoleAssignment!]!
+
+  """List of errors for users that failed to be assigned."""
+  failed: [BulkAssignRoleError!]!
+}
+
 """Added in 26.2.0. Payload for bulk user creation mutation."""
 type BulkCreateUsersV2Payload
   @join__type(graph: STRAWBERRY)
@@ -1500,6 +1532,38 @@ type BulkPurgeUserV2Error
 
   """Error message describing the failure."""
   message: String!
+}
+
+"""
+Added in 26.3.0. Error information for a failed user in bulk role revocation.
+"""
+type BulkRevokeRoleError
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the user that failed."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""Added in 26.3.0. Input for bulk revoking a role from multiple users"""
+input BulkRevokeRoleInput
+  @join__type(graph: STRAWBERRY)
+{
+  roleId: UUID!
+  userIds: [UUID!]!
+}
+
+"""Added in 26.3.0. Payload for bulk role revocation mutation."""
+type BulkRevokeRolePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """List of successfully revoked role assignments."""
+  revoked: [RoleAssignment!]!
+
+  """List of errors for users that failed to be revoked."""
+  failed: [BulkRevokeRoleError!]!
 }
 
 """Added in 26.3.0. Payload for bulk user update mutation."""
@@ -7518,6 +7582,12 @@ type Mutation
 
   """Added in 26.3.0. Revoke a role from a user (admin only)."""
   adminRevokeRole(input: RevokeRoleInput!): RoleAssignment! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.3.0. Bulk assign a role to multiple users (admin only)."""
+  adminBulkAssignRole(input: BulkAssignRoleInput!): BulkAssignRolePayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.3.0. Bulk revoke a role from multiple users (admin only)."""
+  adminBulkRevokeRole(input: BulkRevokeRoleInput!): BulkRevokeRolePayload! @join__field(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0."""

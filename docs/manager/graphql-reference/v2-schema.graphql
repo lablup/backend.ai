@@ -903,6 +903,32 @@ input BlueGreenConfigInput {
   promoteDelaySeconds: Int! = 0
 }
 
+"""
+Added in 26.3.0. Error information for a failed user in bulk role assignment.
+"""
+type BulkAssignRoleError {
+  """UUID of the user that failed."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""Added in 26.3.0. Input for bulk assigning a role to multiple users"""
+input BulkAssignRoleInput {
+  roleId: UUID!
+  userIds: [UUID!]!
+}
+
+"""Added in 26.3.0. Payload for bulk role assignment mutation."""
+type BulkAssignRolePayload {
+  """List of successfully created role assignments."""
+  assigned: [RoleAssignment!]!
+
+  """List of errors for users that failed to be assigned."""
+  failed: [BulkAssignRoleError!]!
+}
+
 """Added in 26.2.0. Error information for a failed user in bulk creation."""
 type BulkCreateUserV2Error {
   """Original position in the input list."""
@@ -973,6 +999,32 @@ type BulkPurgeUsersV2Payload {
 
   """List of errors for users that failed to purge."""
   failed: [BulkPurgeUserV2Error!]!
+}
+
+"""
+Added in 26.3.0. Error information for a failed user in bulk role revocation.
+"""
+type BulkRevokeRoleError {
+  """UUID of the user that failed."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""Added in 26.3.0. Input for bulk revoking a role from multiple users"""
+input BulkRevokeRoleInput {
+  roleId: UUID!
+  userIds: [UUID!]!
+}
+
+"""Added in 26.3.0. Payload for bulk role revocation mutation."""
+type BulkRevokeRolePayload {
+  """List of successfully revoked role assignments."""
+  revoked: [RoleAssignment!]!
+
+  """List of errors for users that failed to be revoked."""
+  failed: [BulkRevokeRoleError!]!
 }
 
 """Added in 26.3.0. Error information for a failed user in bulk update."""
@@ -3951,6 +4003,12 @@ type Mutation {
 
   """Added in 26.3.0. Revoke a role from a user (admin only)."""
   adminRevokeRole(input: RevokeRoleInput!): RoleAssignment!
+
+  """Added in 26.3.0. Bulk assign a role to multiple users (admin only)."""
+  adminBulkAssignRole(input: BulkAssignRoleInput!): BulkAssignRolePayload!
+
+  """Added in 26.3.0. Bulk revoke a role from multiple users (admin only)."""
+  adminBulkRevokeRole(input: BulkRevokeRoleInput!): BulkRevokeRolePayload!
 }
 
 """An object with a Globally Unique ID"""
