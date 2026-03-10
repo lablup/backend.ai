@@ -267,13 +267,35 @@ class DeployingProgressingHandler(DeploymentHandler):
 
     @override
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
+        completed, rolled_back = self._classify_deployments(deployments)
+        await self._apply_completed(completed)
+        await self._apply_rolled_back(rolled_back)
+
+        return DeploymentExecutionResult(
+            successes=completed,
+            errors=[
+                DeploymentExecutionError(
+                    deployment_info=deployment,
+                    reason="Deployment rolled back — all new routes failed",
+                    error_detail="Strategy FSM determined rollback",
+                )
+                for deployment in rolled_back
+            ],
+        )
+
+    @staticmethod
+    def _classify_deployments(
+        deployments: Sequence[DeploymentInfo],
+    ) -> tuple[list[DeploymentInfo], list[DeploymentInfo]]:
+        """Classify deployments into completed and rolled_back.
+
+        Skips deployments marked for destruction to prevent resurrecting them.
+        PROGRESSING deployments are excluded from both lists so no transition occurs.
+        """
         completed: list[DeploymentInfo] = []
         rolled_back: list[DeploymentInfo] = []
 
         for deployment in deployments:
-            # Skip deployments that have been marked for destruction during DEPLOYING.
-            # Without this guard, a COMPLETED sub_step would swap revisions and
-            # transition the deployment back to READY, resurrecting it.
             if deployment.state.lifecycle in (
                 EndpointLifecycle.DESTROYING,
                 EndpointLifecycle.DESTROYED,
@@ -291,36 +313,29 @@ class DeployingProgressingHandler(DeploymentHandler):
                 case DeploymentSubStep.ROLLED_BACK:
                     rolled_back.append(deployment)
                 case _:
-                    # PROVISIONING / PROGRESSING: still in progress — intentionally
-                    # excluded from successes/errors so no lifecycle transition occurs.
-                    # The next coordinator cycle will re-evaluate via the pre-step.
                     pass
 
-        if completed:
-            endpoint_ids = {deployment.id for deployment in completed}
-            swapped = await self._deployment_repo.complete_deployment_revision_swap(endpoint_ids)
-            log.info(
-                "Swapped revision for {}/{} completed deployments",
-                swapped,
-                len(endpoint_ids),
-            )
+        return completed, rolled_back
 
-        if rolled_back:
-            endpoint_ids = {deployment.id for deployment in rolled_back}
-            await self._deployment_repo.clear_deploying_revision(endpoint_ids)
-            log.info("Cleared deploying_revision for {} rolled-back deployments", len(endpoint_ids))
-
-        return DeploymentExecutionResult(
-            successes=completed,
-            errors=[
-                DeploymentExecutionError(
-                    deployment_info=deployment,
-                    reason="Deployment rolled back — all new routes failed",
-                    error_detail="Strategy FSM determined rollback",
-                )
-                for deployment in rolled_back
-            ],
+    async def _apply_completed(self, completed: list[DeploymentInfo]) -> None:
+        """Swap revision for completed deployments."""
+        if not completed:
+            return
+        endpoint_ids = {d.id for d in completed}
+        swapped = await self._deployment_repo.complete_deployment_revision_swap(endpoint_ids)
+        log.info(
+            "Swapped revision for {}/{} completed deployments",
+            swapped,
+            len(endpoint_ids),
         )
+
+    async def _apply_rolled_back(self, rolled_back: list[DeploymentInfo]) -> None:
+        """Clear deploying_revision for rolled-back deployments."""
+        if not rolled_back:
+            return
+        endpoint_ids = {d.id for d in rolled_back}
+        await self._deployment_repo.clear_deploying_revision(endpoint_ids)
+        log.info("Cleared deploying_revision for {} rolled-back deployments", len(endpoint_ids))
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:

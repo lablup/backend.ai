@@ -58,7 +58,6 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
 from ai.backend.manager.types import DistributedLockFactory
 
 from .deployment_controller import DeploymentController
-from .exceptions import DeploymentError
 from .executor import DeploymentExecutor
 from .handlers import (
     CheckPendingDeploymentHandler,
@@ -449,10 +448,8 @@ class DeploymentCoordinator:
 
         transitions = handler.status_transitions()
 
-        # Success transitions
-        if transitions.success is None:
-            raise DeploymentError(f"handler {handler_name} must define status_transitions.success")
-        if result.successes:
+        # Success transitions (None = stay in current state)
+        if transitions.success is not None and result.successes:
             t = self._build_success_transition(
                 handler_name=handler_name,
                 deployments=result.successes,
@@ -484,13 +481,8 @@ class DeploymentCoordinator:
             for errors, lifecycle_status, scheduling_result, label in failure_categories:
                 if not errors:
                     continue
+                # No transition defined → stay in current state
                 if not lifecycle_status:
-                    log.error(
-                        "handler {}: {} errors classified as '{}' but no transition defined — dropped",
-                        handler_name,
-                        len(errors),
-                        label,
-                    )
                     continue
                 t = self._build_failure_transition(
                     handler_name=handler_name,
