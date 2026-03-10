@@ -32,6 +32,8 @@ from sqlalchemy.sql.expression import true
 
 from ai.backend.common.types import (
     AgentSelectionStrategy,
+    PreemptionMode,
+    PreemptionOrder,
     SessionTypes,
 )
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
@@ -106,6 +108,15 @@ class ScalingGroupOpts(BaseModel):
     route_cleanup_target_statuses: list[str] = Field(default_factory=lambda: ["unhealthy"])
     """List of route statuses that should be automatically cleaned up. Valid values: healthy, unhealthy, degraded"""
 
+    preemptible_priority: int = 5
+    """Sessions with priority <= this value are preemptible"""
+
+    preemption_order: PreemptionOrder = PreemptionOrder.OLDEST
+    """Tie-breaking order for same-priority sessions"""
+
+    preemption_mode: PreemptionMode = PreemptionMode.TERMINATE
+    """How to preempt sessions"""
+
     @field_serializer("allowed_session_types", mode="plain")
     def serialize_allowed_session_types(self, value: list[SessionTypes]) -> list[str]:
         return [item.value for item in value]
@@ -116,6 +127,14 @@ class ScalingGroupOpts(BaseModel):
 
     @field_serializer("agent_selection_strategy", mode="plain")
     def serialize_agent_selection_strategy(self, value: AgentSelectionStrategy) -> str:
+        return value.value
+
+    @field_serializer("preemption_order", mode="plain")
+    def serialize_preemption_order(self, value: PreemptionOrder) -> str:
+        return value.value
+
+    @field_serializer("preemption_mode", mode="plain")
+    def serialize_preemption_mode(self, value: PreemptionMode) -> str:
         return value.value
 
 
