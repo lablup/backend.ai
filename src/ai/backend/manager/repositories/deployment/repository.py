@@ -4,6 +4,7 @@ import logging
 import uuid
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
+from contextlib import AbstractAsyncContextManager as AsyncContextManager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, DecimalException
@@ -50,6 +51,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
+    DeploymentSubStep,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
@@ -86,7 +88,7 @@ from ai.backend.manager.repositories.base.updater import BatchUpdater, Updater
 from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
-from .db_source import DeploymentDBSource
+from .db_source import DeploymentDBSource, StrategyTransaction
 from .storage_source import DeploymentStorageSource
 from .types import RouteData, RouteServiceDiscoveryInfo
 
@@ -285,9 +287,10 @@ class DeploymentRepository:
     async def get_endpoints_by_statuses(
         self,
         statuses: list[EndpointLifecycle],
+        sub_steps: list[DeploymentSubStep] | None = None,
     ) -> list[DeploymentInfo]:
-        """Get endpoints by lifecycle statuses."""
-        return await self._db_source.get_endpoints_by_statuses(statuses)
+        """Get endpoints by lifecycle statuses, optionally filtered by sub_steps."""
+        return await self._db_source.get_endpoints_by_statuses(statuses, sub_steps=sub_steps)
 
     @deployment_repository_resilience.apply()
     async def get_endpoint_info(
@@ -1128,17 +1131,18 @@ class DeploymentRepository:
         return await self._db_source.update_endpoint(updater)
 
     @deployment_repository_resilience.apply()
-    async def update_current_revision(
+    async def set_deploying_revision(
         self,
         endpoint_id: uuid.UUID,
         revision_id: uuid.UUID,
-    ) -> uuid.UUID | None:
-        """Update the current revision of a deployment.
+    ) -> tuple[uuid.UUID | None, int]:
+        """Set deploying_revision and transition lifecycle to DEPLOYING.
 
         Returns:
-            The previous revision ID, or None if there was no previous revision.
+            Tuple of (previous_revision_id, rowcount).
+            Callers must check ``rowcount > 0`` to confirm the update was applied.
         """
-        return await self._db_source.update_current_revision(endpoint_id, revision_id)
+        return await self._db_source.set_deploying_revision(endpoint_id, revision_id)
 
     # ========== Deployment Auto-Scaling Policy Operations ==========
 
@@ -1217,6 +1221,33 @@ class DeploymentRepository:
             PurgerResult containing the deleted row, or None if no policy existed.
         """
         return await self._db_source.delete_deployment_policy(purger)
+
+    def begin_strategy_transaction(self) -> AsyncContextManager[StrategyTransaction]:
+        """Begin a transaction that spans multiple strategy-related DB operations.
+
+        All operations on the yielded ``StrategyTransaction`` share a single
+        DB session/transaction, ensuring atomicity across sub_step assignment,
+        route mutations, revision swap, and deploying_revision clear.
+        """
+        return self._db_source.begin_strategy_transaction()
+
+    @deployment_repository_resilience.apply()
+    async def get_last_deployment_histories(
+        self,
+        deployment_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, DeploymentHistoryRow]:
+        """Get last history records for multiple deployments.
+
+        Returns the most recent history record for each deployment. The caller
+        should compare history.phase with the current phase to determine
+        if attempts should be used or reset to 0.
+        """
+        return await self._db_source.get_last_deployment_histories(deployment_ids)
+
+    @deployment_repository_resilience.apply()
+    async def get_db_now(self) -> datetime:
+        """Get current database server time."""
+        return await self._db_source.get_db_now()
 
     # ===================
     # Route operations

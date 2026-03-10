@@ -45,6 +45,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
+    DeploymentSubStep,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
@@ -108,6 +109,7 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.base.creator import (
     BulkCreator,
+    execute_bulk_creator,
 )
 from ai.backend.manager.repositories.base.purger import (
     Purger,
@@ -153,6 +155,100 @@ class EndpointWithRoutesRawData:
 
     endpoint_row: EndpointRow
     route_rows: list[RoutingRow]
+
+
+class StrategyTransaction:
+    """A shared-session handle for strategy-related DB operations.
+
+    All methods execute on the same underlying DB session so that sub_step
+    assignment, route mutations, revision swap, and deploying_revision clear
+    are committed atomically.
+    """
+
+    def __init__(
+        self,
+        db_sess: SASession,
+    ) -> None:
+        self._db_sess = db_sess
+
+    async def update_sub_steps(
+        self,
+        assignments: dict[uuid.UUID, DeploymentSubStep],
+    ) -> None:
+        """Bulk-update the sub_step column, grouped by sub_step value."""
+        grouped: dict[DeploymentSubStep, list[uuid.UUID]] = {}
+        for endpoint_id, sub_step in assignments.items():
+            grouped.setdefault(sub_step, []).append(endpoint_id)
+        for sub_step, endpoint_ids in grouped.items():
+            stmt = (
+                sa.update(EndpointRow)
+                .where(
+                    EndpointRow.id.in_(endpoint_ids),
+                    # Only update endpoints still in DEPLOYING — if the lifecycle
+                    # changed concurrently (e.g. to DESTROYING), skip the stale update.
+                    EndpointRow.lifecycle_stage == EndpointLifecycle.DEPLOYING,
+                )
+                .values(sub_step=sub_step)
+            )
+            await self._db_sess.execute(stmt)
+
+    async def create_routes(
+        self,
+        rollout: BulkCreator[RoutingRow],
+    ) -> None:
+        """Bulk-create new-revision routes."""
+        await execute_bulk_creator(self._db_sess, rollout)
+
+    async def drain_routes(
+        self,
+        drain: BatchUpdater[RoutingRow],
+    ) -> None:
+        """Mark old-revision routes for draining."""
+        await execute_batch_updater(self._db_sess, drain)
+
+    async def complete_deployment_revision_swap(
+        self,
+        endpoint_ids: set[uuid.UUID],
+    ) -> int:
+        """Swap deploying_revision → current_revision. Returns rowcount."""
+        if not endpoint_ids:
+            return 0
+        stmt = (
+            sa.update(EndpointRow)
+            .where(
+                EndpointRow.id.in_(endpoint_ids),
+                EndpointRow.deploying_revision.isnot(None),
+                # Only operate on DEPLOYING endpoints — if the lifecycle changed
+                # concurrently (e.g. to DESTROYING), swapping the revision would
+                # orphan the old revision's routes from their cleanup flow.
+                EndpointRow.lifecycle_stage == EndpointLifecycle.DEPLOYING,
+            )
+            .values(
+                current_revision=EndpointRow.deploying_revision,
+                deploying_revision=None,
+            )
+        )
+        cursor_result = cast(CursorResult[Any], await self._db_sess.execute(stmt))
+        return cursor_result.rowcount
+
+    async def clear_deploying_revision(
+        self,
+        endpoint_ids: set[uuid.UUID],
+    ) -> None:
+        """Clear deploying_revision for rolled-back deployments."""
+        if not endpoint_ids:
+            return
+        stmt = (
+            sa.update(EndpointRow)
+            .where(
+                EndpointRow.id.in_(endpoint_ids),
+                # Only operate on DEPLOYING endpoints — if the lifecycle changed
+                # concurrently, leave deploying_revision for the new flow to manage.
+                EndpointRow.lifecycle_stage == EndpointLifecycle.DEPLOYING,
+            )
+            .values(deploying_revision=None)
+        )
+        await self._db_sess.execute(stmt)
 
 
 class DeploymentDBSource:
@@ -429,6 +525,7 @@ class DeploymentDBSource:
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
+                    selectinload(EndpointRow.deployment_policy),
                 )
             )
             result = await db_sess.execute(query)
@@ -476,26 +573,32 @@ class DeploymentDBSource:
             return cleanup_configs
 
     async def get_endpoints_by_statuses(
-        self, statuses: list[EndpointLifecycle]
+        self,
+        statuses: list[EndpointLifecycle],
+        sub_steps: list[DeploymentSubStep] | None = None,
     ) -> list[DeploymentInfo]:
-        """Get all active endpoints."""
+        """Get endpoints by lifecycle statuses, optionally filtered by sub_steps."""
         async with self._begin_readonly_session_read_committed() as db_sess:
-            rows = await self._get_endpoints_by_statuses(db_sess, statuses)
-
-        return [row.to_deployment_info() for row in rows]
+            rows = await self._get_endpoints_by_statuses(db_sess, statuses, sub_steps)
+            return [row.to_deployment_info() for row in rows]
 
     async def _get_endpoints_by_statuses(
         self,
         db_sess: SASession,
         statuses: list[EndpointLifecycle],
+        sub_steps: list[DeploymentSubStep] | None = None,
     ) -> list[EndpointRow]:
-        """Fetch endpoints by lifecycle statuses."""
+        """Fetch endpoints by lifecycle statuses, optionally filtered by sub_steps."""
+        where_clause: sa.ColumnElement[bool] = EndpointRow.lifecycle_stage.in_(statuses)
+        if sub_steps is not None:
+            where_clause = sa.and_(where_clause, EndpointRow.sub_step.in_(sub_steps))
         query = (
             sa.select(EndpointRow)
-            .where(EndpointRow.lifecycle_stage.in_(statuses))
+            .where(where_clause)
             .options(
                 selectinload(EndpointRow.image_row),
                 selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
+                selectinload(EndpointRow.deployment_policy),
             )
         )
         result = await db_sess.execute(query)
@@ -707,6 +810,28 @@ class DeploymentDBSource:
         result = await db_sess.execute(query)
         rows = result.scalars().all()
         return {row.deployment_id: row for row in rows}
+
+    async def get_last_deployment_histories(
+        self,
+        deployment_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, DeploymentHistoryRow]:
+        """Get last history records for multiple deployments (regardless of phase).
+
+        Returns the most recent history record for each deployment. The caller
+        should compare history.phase with the current phase to determine
+        if attempts should be used or reset to 0.
+        """
+        if not deployment_ids:
+            return {}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            return await self._get_last_deployment_histories_bulk(db_sess, deployment_ids)
+
+    async def get_db_now(self) -> datetime:
+        """Get current database server time."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            result = await db_sess.execute(sa.select(sa.func.now()))
+            return result.scalar_one()
 
     async def delete_endpoint_with_routes(
         self,
@@ -2143,28 +2268,40 @@ class DeploymentDBSource:
 
             return row.to_deployment_info()
 
-    async def update_current_revision(
+    async def set_deploying_revision(
         self,
         endpoint_id: uuid.UUID,
         revision_id: uuid.UUID,
-    ) -> uuid.UUID | None:
-        """Update the current_revision of an endpoint and return the previous revision ID."""
+    ) -> tuple[uuid.UUID | None, int]:
+        """Set deploying_revision and transition lifecycle to DEPLOYING.
+
+        Returns a tuple of (previous_revision_id, rowcount).
+        The caller **must** check ``rowcount > 0`` to confirm the update was applied;
+        a zero rowcount means another deployment was already in progress
+        (the ``deploying_revision IS NULL`` WHERE guard prevented the write).
+        """
         async with self._begin_session_read_committed() as db_sess:
             # Get current revision first
             query = sa.select(EndpointRow.current_revision).where(EndpointRow.id == endpoint_id)
             result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
-            previous_revision_id = row
+            previous_revision_id = result.scalar_one_or_none()
 
-            # Update to new revision
+            # Set deploying_revision and transition to DEPLOYING.
+            # The deploying_revision IS NULL guard prevents concurrent activations.
             update_query = (
                 sa.update(EndpointRow)
-                .where(EndpointRow.id == endpoint_id)
-                .values(current_revision=revision_id)
+                .where(
+                    EndpointRow.id == endpoint_id,
+                    EndpointRow.deploying_revision.is_(None),
+                )
+                .values(
+                    deploying_revision=revision_id,
+                    lifecycle_stage=EndpointLifecycle.DEPLOYING,
+                )
             )
-            await db_sess.execute(update_query)
+            cursor_result = cast(CursorResult[Any], await db_sess.execute(update_query))
 
-            return previous_revision_id
+            return previous_revision_id, cursor_result.rowcount
 
     # -------------------------------------------------------------------------
     # Auto-Scaling Policy Methods (DeploymentAutoScalingPolicyRow)
@@ -2289,6 +2426,17 @@ class DeploymentDBSource:
         """
         async with self._begin_session_read_committed() as db_sess:
             return await execute_purger(db_sess, purger)
+
+    @actxmgr
+    async def begin_strategy_transaction(self) -> AsyncIterator[StrategyTransaction]:
+        """Begin a transaction that spans multiple strategy-related DB operations.
+
+        All operations on the yielded ``StrategyTransaction`` share a single
+        DB session/transaction, ensuring atomicity across sub_step assignment,
+        route mutations, revision swap, and deploying_revision clear.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            yield StrategyTransaction(db_sess)
 
     # ========== Access Token Operations ==========
 
