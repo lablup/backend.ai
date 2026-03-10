@@ -5077,6 +5077,9 @@ input ImageV2FilterGQL
 
   """Added in 26.3.0. Filter by nested alias conditions."""
   alias: ImageAliasNestedFilter = null
+
+  """Added in 26.3.0. Filter by last used datetime (before/after)."""
+  lastUsed: DateTimeFilter = null
   AND: [ImageV2FilterGQL!] = null
   OR: [ImageV2FilterGQL!] = null
   NOT: [ImageV2FilterGQL!] = null
