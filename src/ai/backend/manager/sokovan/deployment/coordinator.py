@@ -428,7 +428,7 @@ class DeploymentCoordinator:
         handler: DeploymentHandler,
         result: DeploymentExecutionResult,
         records: Mapping[UUID, ExecutionRecord],
-        phase_map: dict[UUID, _PhaseInfo] | None = None,
+        phase_map: dict[UUID, _PhaseInfo],
     ) -> None:
         """Handle status transitions with history recording.
 
@@ -439,7 +439,6 @@ class DeploymentCoordinator:
         handler_name = handler.name()
         target_statuses = handler.target_statuses()
         target_lifecycles = list({s.lifecycle for s in target_statuses})
-        from_status = target_lifecycles[0] if target_lifecycles else None
 
         batch_updaters: list[BatchUpdater[EndpointRow]] = []
         all_history_specs: list[DeploymentHistoryCreatorSpec] = []
@@ -454,7 +453,6 @@ class DeploymentCoordinator:
                 handler_name=handler_name,
                 deployments=result.successes,
                 lifecycle_status=transitions.success,
-                from_status=from_status,
                 target_lifecycles=target_lifecycles,
                 records=records,
                 timestamp_now=timestamp_now,
@@ -466,7 +464,7 @@ class DeploymentCoordinator:
         # Failure transitions
         if result.errors:
             current_time = await self._deployment_repository.get_db_now()
-            classified = self._classify_failures(result.errors, phase_map or {}, current_time)
+            classified = self._classify_failures(result.errors, phase_map, current_time)
 
             failure_categories = [
                 (classified.give_up, transitions.give_up, SchedulingResult.GIVE_UP, "give_up"),
@@ -489,7 +487,6 @@ class DeploymentCoordinator:
                     errors=errors,
                     lifecycle_status=lifecycle_status,
                     scheduling_result=scheduling_result,
-                    from_status=from_status,
                     target_lifecycles=target_lifecycles,
                     records=records,
                     timestamp_now=timestamp_now,
@@ -535,7 +532,6 @@ class DeploymentCoordinator:
         handler_name: str,
         deployments: list[DeploymentInfo],
         lifecycle_status: DeploymentLifecycleStatus,
-        from_status: EndpointLifecycle | None,
         target_lifecycles: list[EndpointLifecycle],
         records: Mapping[UUID, ExecutionRecord],
         timestamp_now: str,
@@ -548,7 +544,7 @@ class DeploymentCoordinator:
                 phase=handler_name,
                 result=SchedulingResult.SUCCESS,
                 message=f"{handler_name} completed successfully",
-                from_status=from_status,
+                from_status=d.state.lifecycle,
                 to_status=next_lifecycle,
                 sub_steps=self._build_history_sub_steps(
                     d.id, records, d.sub_step, SchedulingResult.SUCCESS
@@ -559,7 +555,7 @@ class DeploymentCoordinator:
         events = [
             self._build_lifecycle_notification_event(
                 deployment=d,
-                from_status=from_status,
+                from_status=d.state.lifecycle,
                 to_status=next_lifecycle,
                 transition_result="success",
                 timestamp=timestamp_now,
@@ -580,7 +576,6 @@ class DeploymentCoordinator:
         errors: list[DeploymentExecutionError],
         lifecycle_status: DeploymentLifecycleStatus,
         scheduling_result: SchedulingResult,
-        from_status: EndpointLifecycle | None,
         target_lifecycles: list[EndpointLifecycle],
         records: Mapping[UUID, ExecutionRecord],
         timestamp_now: str,
@@ -594,7 +589,7 @@ class DeploymentCoordinator:
                 phase=handler_name,
                 result=scheduling_result,
                 message=e.reason,
-                from_status=from_status,
+                from_status=e.deployment_info.state.lifecycle,
                 to_status=next_lifecycle,
                 error_code=e.error_code,
                 sub_steps=self._build_history_sub_steps(
@@ -606,7 +601,7 @@ class DeploymentCoordinator:
         events = [
             self._build_lifecycle_notification_event(
                 deployment=e.deployment_info,
-                from_status=from_status,
+                from_status=e.deployment_info.state.lifecycle,
                 to_status=next_lifecycle,
                 transition_result=transition_label,
                 timestamp=timestamp_now,
@@ -709,7 +704,7 @@ class DeploymentCoordinator:
     @staticmethod
     def _build_lifecycle_notification_event(
         deployment: DeploymentInfo,
-        from_status: EndpointLifecycle | None,
+        from_status: EndpointLifecycle,
         to_status: EndpointLifecycle,
         transition_result: str,
         timestamp: str,
@@ -721,7 +716,7 @@ class DeploymentCoordinator:
             domain=deployment.metadata.domain,
             project_id=str(deployment.metadata.project),
             resource_group=deployment.metadata.resource_group,
-            from_status=from_status.value if from_status else None,
+            from_status=from_status.value,
             to_status=to_status.value,
             transition_result=transition_result,
             event_timestamp=timestamp,
