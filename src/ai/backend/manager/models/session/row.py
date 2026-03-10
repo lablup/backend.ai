@@ -696,6 +696,7 @@ class SessionRow(Base):  # type: ignore[misc]
         sa.Boolean(),
         nullable=False,
         default=SESSION_IS_PREEMPTIBLE_DEFAULT,
+        server_default=sa.text("true"),
     )
 
     cluster_mode: Mapped[str] = mapped_column(
