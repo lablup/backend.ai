@@ -19,7 +19,6 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
     ArtifactDataWithRevisions,
-    ArtifactFilterOptions,
     ArtifactListResult,
     ArtifactRevisionData,
     ArtifactStatus,
@@ -58,9 +57,6 @@ from ai.backend.manager.services.artifact.actions.get import (
 from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
 )
-from ai.backend.manager.services.artifact.actions.list_with_revisions import (
-    ListArtifactsWithRevisionsAction,
-)
 from ai.backend.manager.services.artifact.actions.restore_multi import (
     RestoreArtifactsAction,
 )
@@ -87,8 +83,6 @@ from ai.backend.manager.services.artifact.actions.upsert_multi import (
 )
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.types import (
-    OffsetBasedPaginationOptions,
-    PaginationOptions,
     TriState,
 )
 
@@ -1342,101 +1336,6 @@ class TestGetArtifactRevisionsAction:
         result = await artifact_service.get_revisions(action)
 
         assert result.revisions == []
-
-
-class TestListArtifactsWithRevisionsAction:
-    """Test cases for ListArtifactsWithRevisionsAction"""
-
-    @pytest.fixture
-    def mock_artifact_repository(self) -> MagicMock:
-        return MagicMock(spec=ArtifactRepository)
-
-    @pytest.fixture
-    def artifact_service(self, mock_artifact_repository: MagicMock) -> ArtifactService:
-        return ArtifactService(
-            artifact_repository=mock_artifact_repository,
-            artifact_registry_repository=MagicMock(spec=ArtifactRegistryRepository),
-            object_storage_repository=MagicMock(spec=ObjectStorageRepository),
-            vfs_storage_repository=MagicMock(spec=VFSStorageRepository),
-            huggingface_registry_repository=MagicMock(spec=HuggingFaceRepository),
-            reservoir_registry_repository=MagicMock(spec=ReservoirRegistryRepository),
-            storage_manager=MagicMock(),
-            config_provider=MagicMock(),
-        )
-
-    def _make_artifact_with_revisions(self, name: str) -> ArtifactDataWithRevisions:
-        now = datetime.now(UTC)
-        rid = uuid4()
-        return ArtifactDataWithRevisions(
-            id=uuid4(),
-            name=name,
-            type=ArtifactType.MODEL,
-            description=None,
-            registry_id=rid,
-            source_registry_id=rid,
-            registry_type=ArtifactRegistryType.HUGGINGFACE,
-            source_registry_type=ArtifactRegistryType.HUGGINGFACE,
-            availability=ArtifactAvailability.ALIVE,
-            scanned_at=now,
-            updated_at=now,
-            readonly=True,
-            extra=None,
-            revisions=[],
-        )
-
-    async def test_pagination_returns_correct_subset(
-        self,
-        artifact_service: ArtifactService,
-        mock_artifact_repository: MagicMock,
-    ) -> None:
-        """Pagination (offset/limit) returns correct subset + total_count"""
-        items = [self._make_artifact_with_revisions(f"m{i}") for i in range(3)]
-        mock_artifact_repository.list_artifacts_with_revisions_paginated = AsyncMock(
-            return_value=(items, 10)
-        )
-
-        pagination = PaginationOptions(offset=OffsetBasedPaginationOptions(offset=0, limit=3))
-        action = ListArtifactsWithRevisionsAction(pagination=pagination)
-        result = await artifact_service.list_with_revisions(action)
-
-        assert len(result.data) == 3
-        assert result.total_count == 10
-
-    async def test_name_type_filter_applied(
-        self,
-        artifact_service: ArtifactService,
-        mock_artifact_repository: MagicMock,
-    ) -> None:
-        """Name/type filter applied"""
-        items = [self._make_artifact_with_revisions("filtered-model")]
-        mock_artifact_repository.list_artifacts_with_revisions_paginated = AsyncMock(
-            return_value=(items, 1)
-        )
-
-        filters = ArtifactFilterOptions(artifact_type=[ArtifactType.MODEL])
-        action = ListArtifactsWithRevisionsAction(filters=filters)
-        result = await artifact_service.list_with_revisions(action)
-
-        assert len(result.data) == 1
-        call_kwargs = mock_artifact_repository.list_artifacts_with_revisions_paginated.call_args
-        assert call_kwargs.kwargs["filters"] == filters
-
-    async def test_pagination_none_returns_all(
-        self,
-        artifact_service: ArtifactService,
-        mock_artifact_repository: MagicMock,
-    ) -> None:
-        """Pagination=None returns all"""
-        items = [self._make_artifact_with_revisions(f"m{i}") for i in range(5)]
-        mock_artifact_repository.list_artifacts_with_revisions_paginated = AsyncMock(
-            return_value=(items, 5)
-        )
-
-        action = ListArtifactsWithRevisionsAction(pagination=None)
-        result = await artifact_service.list_with_revisions(action)
-
-        assert len(result.data) == 5
-        assert result.total_count == 5
 
 
 class TestSearchArtifactsWithRevisionsAction:
