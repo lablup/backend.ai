@@ -176,11 +176,30 @@ class DeployingProgressingHandler(DeploymentHandler):
         apply_result = await self._applier.apply(summary)
 
         deployment_map = {d.id: d for d in deployments}
+
+        # Filter out deployments that have been marked for destruction during DEPLOYING.
+        # Without this guard, a COMPLETED sub_step would swap revisions and
+        # transition the deployment back to READY, resurrecting it.
+        destroying_ids = {
+            d.id
+            for d in deployments
+            if d.state.lifecycle in (EndpointLifecycle.DESTROYING, EndpointLifecycle.DESTROYED)
+        }
+        if destroying_ids:
+            log.warning(
+                "Skipping {} deployments with DESTROYING/DESTROYED lifecycle during DEPLOYING",
+                len(destroying_ids),
+            )
+
         completed = [
-            deployment_map[eid] for eid in apply_result.completed_ids if eid in deployment_map
+            deployment_map[eid]
+            for eid in apply_result.completed_ids
+            if eid in deployment_map and eid not in destroying_ids
         ]
         rolled_back = [
-            deployment_map[eid] for eid in apply_result.rolled_back_ids if eid in deployment_map
+            deployment_map[eid]
+            for eid in apply_result.rolled_back_ids
+            if eid in deployment_map and eid not in destroying_ids
         ]
 
         return DeploymentExecutionResult(
