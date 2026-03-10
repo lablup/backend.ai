@@ -6,7 +6,13 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
-from ai.backend.common.types import AgentSelectionStrategy, SessionTypes, SlotQuantity
+from ai.backend.common.types import (
+    AgentSelectionStrategy,
+    PreemptionMode,
+    PreemptionOrder,
+    SessionTypes,
+    SlotQuantity,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
@@ -66,6 +72,9 @@ class ScalingGroupSchedulerOptions:
     enforce_spreading_endpoint_replica: bool
     allow_fractional_resource_fragmentation: bool
     route_cleanup_target_statuses: list[str]
+    preemptible_priority: int
+    preemption_order: PreemptionOrder
+    preemption_mode: PreemptionMode
 
     def to_json(self) -> dict[str, Any]:
         """Convert scheduler options to JSON-serializable dict."""
@@ -78,6 +87,9 @@ class ScalingGroupSchedulerOptions:
             "enforce_spreading_endpoint_replica": self.enforce_spreading_endpoint_replica,
             "allow_fractional_resource_fragmentation": self.allow_fractional_resource_fragmentation,
             "route_cleanup_target_statuses": self.route_cleanup_target_statuses,
+            "preemptible_priority": self.preemptible_priority,
+            "preemption_order": self.preemption_order.value,
+            "preemption_mode": self.preemption_mode.value,
         }
 
 
