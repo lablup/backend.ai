@@ -412,7 +412,7 @@ class DeploymentCoordinator:
                 phase_map[deployment.id] = _PhaseInfo()
 
         with DeploymentRecorderContext.scope(
-            lifecycle_type.value, entity_ids=deployment_ids
+            handler_name, entity_ids=deployment_ids
         ) as pool:
             result = await handler.execute(deployments)
             all_records = pool.build_all_records()
