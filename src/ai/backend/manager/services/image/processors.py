@@ -195,4 +195,5 @@ class ImageProcessors(AbstractProcessorPackage):
             ClearImageCustomResourceLimitAction.spec(),
             ClearImageCustomResourceLimitByIdAction.spec(),
             SetImageResourceLimitByIdAction.spec(),
+            LoadImageLastUsedAction.spec(),
         ]
