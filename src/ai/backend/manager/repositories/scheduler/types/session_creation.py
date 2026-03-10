@@ -9,7 +9,7 @@ from uuid import UUID
 
 import yarl
 
-from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
+from ai.backend.common.defs.session import SESSION_IS_PREEMPTIBLE_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
@@ -92,6 +92,7 @@ class SessionCreationSpec:
     creation_spec: dict[str, Any]
 
     # Optional parameters
+    is_preemptible: bool = SESSION_IS_PREEMPTIBLE_DEFAULT
     scaling_group: str | None = None
     session_tag: str | None = None
     starts_at: datetime | None = None
@@ -262,6 +263,7 @@ class SessionEnqueueData:
     cluster_mode: str  # Store as string for DB
     cluster_size: int
     priority: int
+    is_preemptible: bool
     status: str  # SessionStatus.PENDING
     status_history: dict[str, str]
     requested_slots: ResourceSlot

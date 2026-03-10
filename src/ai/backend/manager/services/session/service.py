@@ -464,6 +464,7 @@ class SessionService:
         image = action.params.image
         architecture = action.params.architecture
         priority = action.params.priority
+        is_preemptible = action.params.is_preemptible
         bootstrap_script = action.params.bootstrap_script
         dependencies = action.params.dependencies
         startup_command = action.params.startup_command
@@ -509,6 +510,7 @@ class SessionService:
                 cluster_size,
                 reuse=reuse_if_exists,
                 priority=priority,
+                is_preemptible=is_preemptible,
                 enqueue_only=enqueue_only,
                 max_wait_seconds=max_wait_seconds,
                 bootstrap_script=bootstrap_script,
@@ -662,6 +664,7 @@ class SessionService:
         image = params["image"]
         architecture = params["architecture"]
         priority = params["priority"]
+        is_preemptible = params["is_preemptible"]
         bootstrap_script = params["bootstrap_script"]
         dependencies = params["dependencies"]
         startup_command = params["startup_command"]
@@ -708,6 +711,7 @@ class SessionService:
                 cluster_size,
                 reuse=reuse_if_exists,
                 priority=priority,
+                is_preemptible=is_preemptible,
                 enqueue_only=enqueue_only,
                 max_wait_seconds=max_wait_seconds,
                 bootstrap_script=bootstrap_script,
