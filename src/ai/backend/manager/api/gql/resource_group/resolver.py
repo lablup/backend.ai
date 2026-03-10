@@ -9,11 +9,17 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge
 
+from ai.backend.common.types import PreemptionMode, PreemptionOrder
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.data.scaling_group.types import SchedulerType
+from ai.backend.manager.data.scaling_group.types import (
+    PreemptionConfig as DataPreemptionConfig,
+)
+from ai.backend.manager.data.scaling_group.types import (
+    SchedulerType,
+)
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group.options import (
@@ -340,12 +346,24 @@ async def admin_update_resource_group(
     if input.scheduler_type is not None:
         scheduler_value = SchedulerType(input.scheduler_type.value).value
 
+    # Handle preemption config update
+    preemption_config_state: OptionalState[DataPreemptionConfig] = OptionalState.nop()
+    if input.preemption is not None:
+        preemption_config_state = OptionalState.update(
+            DataPreemptionConfig(
+                preemptible_priority=input.preemption.preemptible_priority,
+                order=PreemptionOrder(input.preemption.order.value),
+                mode=PreemptionMode(input.preemption.mode.value),
+            )
+        )
+
     scheduler_spec = ScalingGroupSchedulerConfigUpdaterSpec(
         scheduler=(
             OptionalState.update(scheduler_value)
             if scheduler_value is not None
             else OptionalState.nop()
         ),
+        preemption_config=preemption_config_state,
     )
 
     # Composite spec (excludes fair_share - use separate mutation)

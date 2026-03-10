@@ -144,6 +144,8 @@ class ImageAdapter(BaseFilterAdapter):
                     result.append(ImageOrders.name(ascending))
                 case ImageOrderField.CREATED_AT:
                     result.append(ImageOrders.created_at(ascending))
+                case ImageOrderField.LAST_USED:
+                    result.append(ImageOrders.last_used(ascending))
         return result
 
     @staticmethod

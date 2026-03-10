@@ -691,6 +691,13 @@ class SessionRow(Base):  # type: ignore[misc]
         default=SESSION_PRIORITY_DEFAULT,
         index=True,
     )
+    is_preemptible: Mapped[bool] = mapped_column(
+        "is_preemptible",
+        sa.Boolean(),
+        nullable=False,
+        default=True,
+        server_default=sa.text("true"),
+    )
 
     cluster_mode: Mapped[str] = mapped_column(
         "cluster_mode",
@@ -968,6 +975,7 @@ class SessionRow(Base):  # type: ignore[misc]
             name=self.name,
             session_type=self.session_type,
             priority=self.priority,
+            is_preemptible=self.is_preemptible,
             cluster_mode=ClusterMode(self.cluster_mode),
             cluster_size=self.cluster_size,
             agent_ids=self.agent_ids,

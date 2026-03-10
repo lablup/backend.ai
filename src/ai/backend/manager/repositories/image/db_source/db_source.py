@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from datetime import datetime
 from typing import cast
 from uuid import UUID
 
@@ -42,6 +43,7 @@ from ai.backend.manager.models.image import (
     rescan_images,
     scan_single_image,
 )
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import execute_creator
@@ -467,3 +469,34 @@ class ImageDBSource:
             project,
             reporter=reporter,
         )
+
+    async def load_image_last_used(
+        self,
+        image_ids: Sequence[ImageID],
+    ) -> Mapping[ImageID, datetime]:
+        """Load the most recent session creation timestamp for each image.
+
+        Queries the kernels table to find the latest created_at for sessions
+        that used each image (matched by canonical name and architecture).
+
+        Returns a mapping of ImageID to the most recent session created_at.
+        Images that have never been used will not appear in the mapping.
+        """
+        async with self._db.begin_readonly_session_read_committed() as session:
+            stmt = (
+                sa.select(
+                    ImageRow.id,
+                    sa.func.max(KernelRow.created_at).label("last_used"),
+                )
+                .join(
+                    KernelRow,
+                    sa.and_(
+                        KernelRow.image == ImageRow.name,
+                        KernelRow.architecture == ImageRow.architecture,
+                    ),
+                )
+                .where(ImageRow.id.in_(image_ids))
+                .group_by(ImageRow.id)
+            )
+            result = await session.execute(stmt)
+            return {ImageID(row.id): row.last_used for row in result if row.last_used is not None}

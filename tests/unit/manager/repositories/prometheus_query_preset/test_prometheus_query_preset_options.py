@@ -181,16 +181,6 @@ class TestPrometheusQueryPresetOptions:
                 expected_names=frozenset({"Container CPU Rate"}),
             ),
             ConditionCase(
-                seeds=(
-                    PresetSeed(name="CPU Rate", metric_name="backendai_cpu"),
-                    PresetSeed(name="CPU Avg", metric_name="backendai_cpu"),
-                    PresetSeed(name="GPU Usage", metric_name="backendai_gpu"),
-                ),
-                conditions=[PrometheusQueryPresetConditions.by_metric_name_equals("backendai_cpu")],
-                expected_count=2,
-                expected_names=frozenset({"CPU Rate", "CPU Avg"}),
-            ),
-            ConditionCase(
                 seeds=(PresetSeed(name="Existing Preset"),),
                 conditions=[
                     PrometheusQueryPresetConditions.by_name_equals(

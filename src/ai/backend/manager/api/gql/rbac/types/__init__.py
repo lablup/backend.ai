@@ -22,9 +22,16 @@ from .permission import (
     PermissionOrderField,
     RBACElementTypeGQL,
     ScopeEntityCombinationGQL,
+    UpdatePermissionInput,
 )
 from .role import (
     AssignRoleInput,
+    BulkAssignRoleErrorGQL,
+    BulkAssignRoleInputGQL,
+    BulkAssignRolePayloadGQL,
+    BulkRevokeRoleErrorGQL,
+    BulkRevokeRoleInputGQL,
+    BulkRevokeRolePayloadGQL,
     CreateRoleInput,
     DeleteRoleInput,
     DeleteRolePayload,
@@ -79,6 +86,7 @@ __all__ = [
     "EntityOrderBy",
     # Inputs
     "CreatePermissionInput",
+    "UpdatePermissionInput",
     "DeletePermissionInput",
     "CreateRoleInput",
     "UpdateRoleInput",
@@ -86,10 +94,16 @@ __all__ = [
     "PurgeRoleInput",
     "AssignRoleInput",
     "RevokeRoleInput",
+    "BulkAssignRoleInputGQL",
+    "BulkRevokeRoleInputGQL",
     # Payloads
     "DeletePermissionPayload",
     "DeleteRolePayload",
     "PurgeRolePayload",
+    "BulkAssignRoleErrorGQL",
+    "BulkAssignRolePayloadGQL",
+    "BulkRevokeRoleErrorGQL",
+    "BulkRevokeRolePayloadGQL",
     # Connections
     "PermissionConnection",
     "PermissionEdge",

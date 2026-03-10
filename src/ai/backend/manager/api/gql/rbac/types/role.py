@@ -20,6 +20,7 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
+    BulkUserRoleRevocationInput,
     RoleData,
     RoleDetailData,
     UserRoleAssignmentData,
@@ -28,10 +29,14 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
-from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.permission_controller.creators import RoleCreatorSpec
+from ai.backend.manager.repositories.permission_controller.creators import (
+    RoleCreatorSpec,
+    UserRoleCreatorSpec,
+)
 from ai.backend.manager.repositories.permission_controller.options import (
     AssignedUserConditions,
     AssignedUserOrders,
@@ -526,6 +531,34 @@ class RevokeRoleInput:
         )
 
 
+@strawberry.input(
+    name="BulkAssignRoleInput",
+    description="Added in 26.3.0. Input for bulk assigning a role to multiple users",
+)
+class BulkAssignRoleInputGQL:
+    role_id: uuid.UUID
+    user_ids: list[uuid.UUID]
+
+    def to_bulk_creator(self) -> BulkCreator[UserRoleRow]:
+        specs = [UserRoleCreatorSpec(user_id=uid, role_id=self.role_id) for uid in self.user_ids]
+        return BulkCreator(specs=specs)
+
+
+@strawberry.input(
+    name="BulkRevokeRoleInput",
+    description="Added in 26.3.0. Input for bulk revoking a role from multiple users",
+)
+class BulkRevokeRoleInputGQL:
+    role_id: uuid.UUID
+    user_ids: list[uuid.UUID]
+
+    def to_input(self) -> BulkUserRoleRevocationInput:
+        return BulkUserRoleRevocationInput(
+            role_id=self.role_id,
+            user_ids=self.user_ids,
+        )
+
+
 @strawberry.input(description="Added in 26.3.0. Input for soft-deleting a role")
 class DeleteRoleInput:
     id: uuid.UUID
@@ -547,6 +580,50 @@ class DeleteRolePayload:
 @strawberry.type(description="Added in 26.3.0. Payload for purge role mutation")
 class PurgeRolePayload:
     id: ID
+
+
+@strawberry.type(
+    name="BulkAssignRoleError",
+    description="Added in 26.3.0. Error information for a failed user in bulk role assignment.",
+)
+class BulkAssignRoleErrorGQL:
+    user_id: uuid.UUID = strawberry.field(description="UUID of the user that failed.")
+    message: str = strawberry.field(description="Error message describing the failure.")
+
+
+@strawberry.type(
+    name="BulkAssignRolePayload",
+    description="Added in 26.3.0. Payload for bulk role assignment mutation.",
+)
+class BulkAssignRolePayloadGQL:
+    assigned: list[RoleAssignmentGQL] = strawberry.field(
+        description="List of successfully created role assignments."
+    )
+    failed: list[BulkAssignRoleErrorGQL] = strawberry.field(
+        description="List of errors for users that failed to be assigned."
+    )
+
+
+@strawberry.type(
+    name="BulkRevokeRoleError",
+    description="Added in 26.3.0. Error information for a failed user in bulk role revocation.",
+)
+class BulkRevokeRoleErrorGQL:
+    user_id: uuid.UUID = strawberry.field(description="UUID of the user that failed.")
+    message: str = strawberry.field(description="Error message describing the failure.")
+
+
+@strawberry.type(
+    name="BulkRevokeRolePayload",
+    description="Added in 26.3.0. Payload for bulk role revocation mutation.",
+)
+class BulkRevokeRolePayloadGQL:
+    revoked: list[RoleAssignmentGQL] = strawberry.field(
+        description="List of successfully revoked role assignments."
+    )
+    failed: list[BulkRevokeRoleErrorGQL] = strawberry.field(
+        description="List of errors for users that failed to be revoked."
+    )
 
 
 # ==================== Connection Types ====================

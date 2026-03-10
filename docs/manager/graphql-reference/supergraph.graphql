@@ -1416,6 +1416,38 @@ input BlueGreenConfigInput
   promoteDelaySeconds: Int! = 0
 }
 
+"""
+Added in 26.3.0. Error information for a failed user in bulk role assignment.
+"""
+type BulkAssignRoleError
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the user that failed."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""Added in 26.3.0. Input for bulk assigning a role to multiple users"""
+input BulkAssignRoleInput
+  @join__type(graph: STRAWBERRY)
+{
+  roleId: UUID!
+  userIds: [UUID!]!
+}
+
+"""Added in 26.3.0. Payload for bulk role assignment mutation."""
+type BulkAssignRolePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """List of successfully created role assignments."""
+  assigned: [RoleAssignment!]!
+
+  """List of errors for users that failed to be assigned."""
+  failed: [BulkAssignRoleError!]!
+}
+
 """Added in 26.2.0. Payload for bulk user creation mutation."""
 type BulkCreateUsersV2Payload
   @join__type(graph: STRAWBERRY)
@@ -1500,6 +1532,38 @@ type BulkPurgeUserV2Error
 
   """Error message describing the failure."""
   message: String!
+}
+
+"""
+Added in 26.3.0. Error information for a failed user in bulk role revocation.
+"""
+type BulkRevokeRoleError
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the user that failed."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""Added in 26.3.0. Input for bulk revoking a role from multiple users"""
+input BulkRevokeRoleInput
+  @join__type(graph: STRAWBERRY)
+{
+  roleId: UUID!
+  userIds: [UUID!]!
+}
+
+"""Added in 26.3.0. Payload for bulk role revocation mutation."""
+type BulkRevokeRolePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """List of successfully revoked role assignments."""
+  revoked: [RoleAssignment!]!
+
+  """List of errors for users that failed to be revoked."""
+  failed: [BulkRevokeRoleError!]!
 }
 
 """Added in 26.3.0. Payload for bulk user update mutation."""
@@ -4939,6 +5003,11 @@ type ImageV2 implements Node
   """UUID of the container registry where this image is stored."""
   registryId: UUID!
 
+  """
+  Added in 26.3.0. Timestamp of the most recent session created with this image. Returns null if the image has never been used.
+  """
+  lastUsed: DateTime
+
   """Added in 26.2.0. Aliases for this image."""
   aliases(filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageV2AliasConnection!
 }
@@ -5072,6 +5141,9 @@ input ImageV2FilterGQL
 
   """Added in 26.3.0. Filter by nested alias conditions."""
   alias: ImageAliasNestedFilter = null
+
+  """Added in 26.3.0. Filter by last used datetime (before/after)."""
+  lastUsed: DateTimeFilter = null
   AND: [ImageV2FilterGQL!] = null
   OR: [ImageV2FilterGQL!] = null
   NOT: [ImageV2FilterGQL!] = null
@@ -5164,6 +5236,7 @@ enum ImageV2OrderField
 {
   NAME @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  LAST_USED @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -7507,6 +7580,9 @@ type Mutation
   """Added in 26.3.0. Create a scoped permission (admin only)."""
   adminCreatePermission(input: CreatePermissionInput!): Permission! @join__field(graph: STRAWBERRY)
 
+  """Added in 26.3.0. Update a scoped permission (admin only)."""
+  adminUpdatePermission(input: UpdatePermissionInput!): Permission! @join__field(graph: STRAWBERRY)
+
   """Added in 26.3.0. Delete a scoped permission (admin only)."""
   adminDeletePermission(input: DeletePermissionInput!): DeletePermissionPayload! @join__field(graph: STRAWBERRY)
 
@@ -7515,6 +7591,12 @@ type Mutation
 
   """Added in 26.3.0. Revoke a role from a user (admin only)."""
   adminRevokeRole(input: RevokeRoleInput!): RoleAssignment! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.3.0. Bulk assign a role to multiple users (admin only)."""
+  adminBulkAssignRole(input: BulkAssignRoleInput!): BulkAssignRolePayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.3.0. Bulk revoke a role from multiple users (admin only)."""
+  adminBulkRevokeRole(input: BulkRevokeRoleInput!): BulkRevokeRolePayload! @join__field(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0."""
@@ -7901,6 +7983,62 @@ type PredefinedAtomicPermission
   @join__type(graph: GRAPHENE)
 {
   vfolder_host_permission_list: [String]
+}
+
+"""Added in 26.3.0. Preemption configuration for a resource group."""
+type PreemptionConfig
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Sessions with priority <= this value are eligible for preemption. Default is 5.
+  """
+  preemptiblePriority: Int!
+
+  """
+  Tie-breaking order for sessions with the same priority during preemption. 'oldest' preempts the oldest session first, 'newest' preempts the newest. Default is 'oldest'.
+  """
+  order: PreemptionOrder!
+
+  """
+  How to preempt a session when preemption is triggered. 'terminate' destroys the session, 'reschedule' queues it for rescheduling. Default is 'terminate'.
+  """
+  mode: PreemptionMode!
+}
+
+"""Added in 26.3.0. Input for preemption configuration."""
+input PreemptionConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Sessions with priority <= this value are preemptible. Default is 5."""
+  preemptiblePriority: Int! = 5
+
+  """
+  Tie-breaking order for same-priority sessions (OLDEST, NEWEST). Default is OLDEST.
+  """
+  order: PreemptionOrder! = OLDEST
+
+  """How to preempt sessions (TERMINATE, RESCHEDULE). Default is TERMINATE."""
+  mode: PreemptionMode! = TERMINATE
+}
+
+"""
+Added in 26.3.0. How to preempt a session when preemption is triggered.
+"""
+enum PreemptionMode
+  @join__type(graph: STRAWBERRY)
+{
+  TERMINATE @join__enumValue(graph: STRAWBERRY)
+  RESCHEDULE @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.3.0. Tie-breaking order for same-priority sessions during preemption.
+"""
+enum PreemptionOrder
+  @join__type(graph: STRAWBERRY)
+{
+  OLDEST @join__enumValue(graph: STRAWBERRY)
+  NEWEST @join__enumValue(graph: STRAWBERRY)
 }
 
 type PreloadImage
@@ -10009,6 +10147,9 @@ type ResourceGroupSchedulerConfig
   Type of scheduler used for session scheduling (fifo, lifo, drf, fair-share).
   """
   type: SchedulerType!
+
+  """Added in 26.3.0. Preemption configuration for this resource group."""
+  preemption: PreemptionConfig!
 }
 
 """Added in 26.2.0. Status information for a resource group."""
@@ -11448,6 +11589,11 @@ type SessionV2MetadataInfo
   """Scheduling priority of the session."""
   priority: Int!
 
+  """
+  Whether this session is eligible for preemption by higher-priority sessions.
+  """
+  isPreemptible: Boolean!
+
   """Optional user-provided tag for the session."""
   tag: String
 }
@@ -11994,6 +12140,17 @@ type UpdateObjectStoragePayload
   objectStorage: ObjectStorage!
 }
 
+"""Added in 26.3.0. Input for updating a scoped permission"""
+input UpdatePermissionInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: UUID!
+  scopeType: RBACElementType = null
+  scopeId: String = null
+  entityType: RBACElementType = null
+  operation: OperationType = null
+}
+
 """Added in 25.14.0"""
 input UpdateReservoirRegistryInput
   @join__type(graph: STRAWBERRY)
@@ -12089,6 +12246,11 @@ input UpdateResourceGroupInput
   Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Leave null to keep existing value.
   """
   schedulerType: SchedulerType = null
+
+  """
+  Added in 26.3.0. Preemption configuration. When provided, replaces the entire preemption config. Leave null to keep existing value.
+  """
+  preemption: PreemptionConfigInput = null
 }
 
 """Added in 26.2.0. Payload for resource group update mutation."""

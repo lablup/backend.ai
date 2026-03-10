@@ -1,4 +1,4 @@
-.TH ALL-SMI 1 "November 2025" "all-smi 0.11.0" "User Commands"
+.TH ALL-SMI 1 "March 2026" "all-smi 0.17.3" "User Commands"
 .SH NAME
 all-smi \- Command-line utility for monitoring GPU hardware
 .SH SYNOPSIS
@@ -15,9 +15,11 @@ all-smi \- Command-line utility for monitoring GPU hardware
 \fBhelp\fR [\fICOMMAND\fR]
 .SH DESCRIPTION
 .B all-smi
-is a comprehensive hardware monitoring tool that provides real-time information about GPU/NPU utilization, 
-memory usage, temperature, power consumption, and other metrics. It supports various hardware platforms 
-including NVIDIA GPUs, Apple Silicon, NVIDIA Jetson, Tenstorrent NPUs, Rebellions NPUs, and Furiosa NPUs.
+is a comprehensive hardware monitoring tool that provides real-time information about GPU/NPU utilization,
+memory usage, temperature, power consumption, chassis-level metrics, and other system information. It supports various hardware platforms
+including NVIDIA GPUs, AMD GPUs, Apple Silicon, NVIDIA Jetson, Google Cloud TPUs, Tenstorrent NPUs, Rebellions NPUs, and Furiosa NPUs.
+Chassis monitoring provides node-level power consumption tracking (CPU+GPU+ANE), thermal pressure monitoring (Apple Silicon),
+and BMC sensor integration for inlet/outlet temperatures and fan speeds on server systems.
 
 The tool can run in three primary modes:
 .TP
@@ -33,7 +35,7 @@ A Prometheus-compatible metrics endpoint for integration with monitoring systems
 .TP
 .B local
 Run in local mode, monitoring local GPUs/NPUs with an interactive TUI. This is the default mode if no command is specified.
-Requires sudo permissions on macOS for Apple Silicon metrics.
+No sudo required on macOS (uses native APIs).
 .TP
 .B view
 Run in remote view mode, monitoring remote nodes via API endpoints. Requires either --hosts or --hostfile option.
@@ -41,7 +43,7 @@ Does not require sudo permissions.
 .TP
 .B api
 Run in API mode, exposing metrics in Prometheus format via HTTP endpoint.
-Requires sudo permissions on macOS for Apple Silicon metrics.
+No sudo required on macOS (uses native APIs).
 .TP
 .B help
 Display help information about all-smi or a specific command.
@@ -84,17 +86,30 @@ If not specified, uses adaptive interval based on node count:
 .SS API Mode Options
 .TP
 .B \-p, \-\-port \fIPORT\fR
-The port to listen on for the API server (default: 9090)
+The port to listen on for the API server (default: 9090). Use 0 to disable TCP listener when using Unix socket.
 .TP
 .B \-i, \-\-interval \fISECONDS\fR
 The interval in seconds at which to update the hardware information (default: 3)
 .TP
 .B \-\-processes
 Include the process list in the API output
+.TP
+.B \-s, \-\-socket \fR[\fIPATH\fR]
+Unix domain socket path for local IPC (Unix only). When specified without a path, uses platform default:
+.RS
+.IP \(bu 3
+Linux: /var/run/all-smi.sock (fallback to /tmp/all-smi.sock if no write permission)
+.IP \(bu 3
+macOS: /tmp/all-smi.sock
+.RE
+.RS
+Socket permissions are set to 0600 (owner-only access) for security.
+Can be used together with --port for simultaneous TCP and Unix socket listeners.
+.RE
 .SH INTERACTIVE CONTROLS (LOCAL/VIEW MODE)
 .TP
 .B Tab / Shift+Tab
-Navigate between different tabs (GPU, CPU, Memory, Network, Disk)
+Navigate between different tabs (GPU, CPU, Memory, Chassis, Network, Disk)
 .TP
 .B Up/Down Arrow Keys, j/k
 Navigate through items in the current tab
@@ -112,7 +127,28 @@ Jump to the first/last item
 Refresh the display immediately
 .TP
 .B d
-Toggle debug log visibility
+Sort by default (hostname+index)
+.TP
+.B f
+Toggle GPU process filter (show only processes with GPU memory usage)
+.TP
+.B g
+Sort by GPU memory usage
+.TP
+.B m
+Sort by memory percentage
+.TP
+.B p
+Sort by PID
+.TP
+.B u
+Sort by utilization
+.TP
+.B c
+Toggle per-core CPU display
+.TP
+.B h / 1
+Toggle help screen
 .TP
 .B q, Ctrl+C
 Quit the application
@@ -121,11 +157,17 @@ Quit the application
 .B NVIDIA GPUs
 Full support via nvidia-smi, including CUDA information, PCIe status, and performance states
 .TP
+.B AMD GPUs
+Support for Radeon and Instinct GPUs via ROCm/libamdgpu_top, including VRAM/GTT memory tracking and fdinfo-based process monitoring
+.TP
 .B Apple Silicon
 Native support for M1/M2/M3/M4 series with Metal API integration, ANE power monitoring, and thermal pressure tracking
 .TP
 .B NVIDIA Jetson
 Tegra-specific metrics with DLA (Deep Learning Accelerator) support
+.TP
+.B Google Cloud TPUs
+Support for TPU v2-v7/Ironwood architectures, HBM memory tracking, and integration with libtpu/JAX workflows
 .TP
 .B Tenstorrent NPUs
 Support for Grayskull and Wormhole architectures with multiple temperature sensors and clock domains
@@ -160,6 +202,18 @@ Start API server on default port 9090:
 Start API server on custom port with 5-second interval:
 .B all-smi api --port 8080 --interval 5
 .TP
+Start API server with Unix socket (default path):
+.B all-smi api --socket
+.TP
+Start API server with TCP and Unix socket simultaneously:
+.B all-smi api --port 9090 --socket /tmp/all-smi.sock
+.TP
+Start API server with Unix socket only (no TCP):
+.B all-smi api --port 0 --socket
+.TP
+Access metrics via Unix socket:
+.B curl --unix-socket /tmp/all-smi.sock http://localhost/metrics
+.TP
 Monitor local hardware with custom interval:
 .B all-smi local --interval 5
 .TP
@@ -188,7 +242,7 @@ https://node003:9443
 Set logging level (e.g., debug, info, warn, error)
 .SH NOTES
 .IP \(bu 3
-On macOS, sudo permissions are required for accessing hardware metrics via the powermetrics command
+On macOS, no sudo permissions are required (uses native APIs: IOReport, SMC, NSProcessInfo)
 .IP \(bu 3
 Remote monitoring requires the target hosts to be running all-smi in API mode
 .IP \(bu 3
@@ -209,7 +263,7 @@ Interrupted by Ctrl+C (SIGINT)
 .B 143
 Terminated by SIGTERM
 .SH BUGS
-Report bugs at: https://github.com/inureyes/all-smi/issues
+Report bugs at: https://github.com/lablup/all-smi/issues
 .SH AUTHOR
 Written by Jeongkyu Shin <inureyes@gmail.com>
 .SH COPYRIGHT
@@ -220,7 +274,6 @@ License: MIT OR Apache-2.0
 This is free software: you are free to change and redistribute it.
 There is NO WARRANTY, to the extent permitted by law.
 .SH SEE ALSO
-.BR nvidia-smi (1),
-.BR powermetrics (1)
+.BR nvidia-smi (1)
 
-Project homepage: https://github.com/inureyes/all-smi
+Project homepage: https://github.com/lablup/all-smi

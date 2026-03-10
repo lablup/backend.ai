@@ -137,6 +137,7 @@ class SessionData:
     id: UUID
     session_type: SessionTypes
     priority: int
+    is_preemptible: bool
     cluster_mode: ClusterMode
     cluster_size: int
     domain_name: str
