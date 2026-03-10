@@ -27,6 +27,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment.creators import (
     RouteBatchUpdaterSpec,
@@ -102,10 +103,13 @@ class DeployingEvaluatePreStep:
             )
 
         # Apply sub_step updates and route mutations atomically
-        if eval_result.assignments or changes.rollout_specs or drain:
+        rollout: BulkCreator[RoutingRow] = BulkCreator(
+            specs=[c.spec for c in changes.rollout_specs],
+        )
+        if eval_result.assignments or rollout.specs or drain:
             await self._deployment_repo.apply_deploying_pre_step(
                 eval_result.assignments,
-                changes.rollout_specs,
+                rollout,
                 drain,
             )
             log.debug(

@@ -109,6 +109,7 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.base.creator import (
     BulkCreator,
+    execute_bulk_creator,
 )
 from ai.backend.manager.repositories.base.purger import (
     Purger,
@@ -2414,7 +2415,7 @@ class DeploymentDBSource:
     async def apply_deploying_pre_step(
         self,
         sub_step_map: dict[DeploymentSubStep, set[uuid.UUID]],
-        rollout: Sequence[Creator[RoutingRow]],
+        rollout: BulkCreator[RoutingRow],
         drain: BatchUpdater[RoutingRow] | None,
     ) -> None:
         """Atomically update sub_steps and apply route changes in a single transaction.
@@ -2425,7 +2426,7 @@ class DeploymentDBSource:
 
         Args:
             sub_step_map: Mapping from sub_step value to endpoint IDs.
-            rollout: Route creators for new-revision routes.
+            rollout: Bulk creator for new-revision routes.
             drain: Batch updater for draining old-revision routes.
         """
         async with self._begin_session_read_committed() as db_sess:
@@ -2441,8 +2442,8 @@ class DeploymentDBSource:
                 await db_sess.execute(stmt)
 
             # 2. Rollout new routes
-            for creator in rollout:
-                await execute_creator(db_sess, creator)
+            if rollout.specs:
+                await execute_bulk_creator(db_sess, rollout)
 
             # 3. Drain old routes
             if drain:

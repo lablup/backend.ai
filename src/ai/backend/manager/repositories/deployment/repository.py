@@ -1244,10 +1244,11 @@ class DeploymentRepository:
         """Bulk-update the sub_step column for multiple endpoints."""
         await self._db_source.update_sub_steps(sub_step_map)
 
+    @deployment_repository_resilience.apply()
     async def apply_deploying_pre_step(
         self,
         sub_step_map: dict[DeploymentSubStep, set[uuid.UUID]],
-        rollout: Sequence[Creator[RoutingRow]],
+        rollout: BulkCreator[RoutingRow],
         drain: BatchUpdater[RoutingRow] | None,
     ) -> None:
         """Atomically update sub_steps and apply route changes in a single transaction."""
