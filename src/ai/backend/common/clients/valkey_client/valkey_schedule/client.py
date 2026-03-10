@@ -137,13 +137,16 @@ class ValkeyScheduleClient:
         """
         return f"schedule:{schedule_type}"
 
-    def _get_deployment_key(self, lifecycle_type: str) -> str:
+    def _get_deployment_key(self, lifecycle_type: str, sub_step: str | None = None) -> str:
         """
         Generate the Redis key for the given deployment lifecycle type.
 
         :param lifecycle_type: The type of deployment lifecycle
+        :param sub_step: Optional sub-step for finer-grained marks
         :return: The formatted key string
         """
+        if sub_step is not None:
+            return f"deployment:{lifecycle_type}:{sub_step}"
         return f"deployment:{lifecycle_type}"
 
     def _get_route_key(self, lifecycle_type: str) -> str:
@@ -400,26 +403,32 @@ class ValkeyScheduleClient:
         ]
 
     @valkey_schedule_resilience.apply()
-    async def mark_deployment_needed(self, lifecycle_type: str) -> None:
+    async def mark_deployment_needed(
+        self, lifecycle_type: str, sub_step: str | None = None
+    ) -> None:
         """
         Mark that a deployment lifecycle operation is needed.
         Simply sets a flag that will be checked in the next scheduling loop.
 
         :param lifecycle_type: The type of deployment lifecycle to mark
+        :param sub_step: Optional sub-step for finer-grained marks
         """
-        key = self._get_deployment_key(lifecycle_type)
+        key = self._get_deployment_key(lifecycle_type, sub_step)
         await self._client.client.set(key, b"1")
 
     @valkey_schedule_resilience.apply()
-    async def load_and_delete_deployment_mark(self, lifecycle_type: str) -> bool:
+    async def load_and_delete_deployment_mark(
+        self, lifecycle_type: str, sub_step: str | None = None
+    ) -> bool:
         """
         Check if a deployment lifecycle mark exists and atomically delete it.
         This ensures that only one scheduler processes the mark.
 
         :param lifecycle_type: The type of deployment lifecycle to check
+        :param sub_step: Optional sub-step for finer-grained marks
         :return: True if a mark existed (and was deleted), False otherwise
         """
-        key = self._get_deployment_key(lifecycle_type)
+        key = self._get_deployment_key(lifecycle_type, sub_step)
         # Use Batch for atomic GET and DELETE
         batch = Batch(is_atomic=True)
         batch.get(key)

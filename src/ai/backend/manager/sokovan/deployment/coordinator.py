@@ -152,27 +152,42 @@ class DeploymentTaskSpec:
     """Specification for a deployment lifecycle periodic task."""
 
     lifecycle_type: DeploymentLifecycleType
+    sub_step: DeploymentSubStep | None = None
     short_interval: float | None = None  # None means no short-cycle task
     long_interval: float = 60.0
     initial_delay: float = 30.0
 
+    def _sub_step_value(self) -> str | None:
+        return self.sub_step.value if self.sub_step is not None else None
+
     def create_if_needed_event(self) -> DoDeploymentLifecycleIfNeededEvent:
         """Create event for checking if processing is needed."""
-        return DoDeploymentLifecycleIfNeededEvent(self.lifecycle_type.value)
+        return DoDeploymentLifecycleIfNeededEvent(
+            self.lifecycle_type.value, sub_step=self._sub_step_value()
+        )
 
     def create_process_event(self) -> DoDeploymentLifecycleEvent:
         """Create event for forced processing."""
-        return DoDeploymentLifecycleEvent(self.lifecycle_type.value)
+        return DoDeploymentLifecycleEvent(
+            self.lifecycle_type.value, sub_step=self._sub_step_value()
+        )
+
+    @property
+    def _suffix(self) -> str:
+        base = self.lifecycle_type.value
+        if self.sub_step is not None:
+            return f"{base}_{self.sub_step.value}"
+        return base
 
     @property
     def short_task_name(self) -> str:
         """Name for the short-cycle task."""
-        return f"deployment_process_if_needed_{self.lifecycle_type.value}"
+        return f"deployment_process_if_needed_{self._suffix}"
 
     @property
     def long_task_name(self) -> str:
         """Name for the long-cycle task."""
-        return f"deployment_process_{self.lifecycle_type.value}"
+        return f"deployment_process_{self._suffix}"
 
 
 class DeploymentCoordinator:
@@ -337,16 +352,27 @@ class DeploymentCoordinator:
     async def process_deployment_lifecycle(
         self,
         lifecycle_type: DeploymentLifecycleType,
+        sub_step: DeploymentSubStep | None = None,
     ) -> None:
-        sub_steps = self._registry.sub_steps_for(lifecycle_type)
-        if not sub_steps:
-            # Simple lifecycle — single handler with sub_step=None
-            handler = self._registry.handlers.get((lifecycle_type, None))
-            if handler is None:
-                log.warning("No handler for deployment lifecycle type: {}", lifecycle_type.value)
-                return
+        handler = self._registry.handlers.get((lifecycle_type, sub_step))
+        if handler is None:
+            log.warning(
+                "No handler for deployment lifecycle ({}, {})",
+                lifecycle_type.value,
+                sub_step,
+            )
+            return
 
-            # Acquire the lock from the handler that declares one
+        has_pre_step = lifecycle_type in self._registry.pre_steps
+        if has_pre_step:
+            # Lifecycle with pre-step — acquire lifecycle-level lock,
+            # then run pre-step + handler atomically.
+            lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
+            async with self._lock_factory(LockID.LOCKID_DEPLOYMENT_DEPLOYING, lock_lifetime):
+                await self._run_pre_step(lifecycle_type)
+                await self._run_handler(handler, lifecycle_type)
+        else:
+            # Simple lifecycle — handler manages its own lock
             lock_id = handler.lock_id
             async with AsyncExitStack() as stack:
                 if lock_id is not None:
@@ -355,17 +381,6 @@ class DeploymentCoordinator:
                     )
                     await stack.enter_async_context(self._lock_factory(lock_id, lock_lifetime))
                 await self._run_handler(handler, lifecycle_type)
-        else:
-            # Lifecycle with sub-steps — acquire distributed lock, then
-            # run pre-step + all sub-step handlers atomically to prevent
-            # concurrent coordinator instances from re-assigning sub_steps
-            # or processing the same deployments in parallel.
-            lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
-            async with self._lock_factory(LockID.LOCKID_DEPLOYMENT_DEPLOYING, lock_lifetime):
-                await self._run_pre_step(lifecycle_type)
-                for sub_step in sub_steps:
-                    handler = self._registry.handlers[(lifecycle_type, sub_step)]
-                    await self._run_handler(handler, lifecycle_type)
 
     async def _run_pre_step(self, lifecycle_type: DeploymentLifecycleType) -> None:
         """Run the optional pre-step for a lifecycle type."""
@@ -411,9 +426,7 @@ class DeploymentCoordinator:
             else:
                 phase_map[deployment.id] = _PhaseInfo()
 
-        with DeploymentRecorderContext.scope(
-            handler_name, entity_ids=deployment_ids
-        ) as pool:
+        with DeploymentRecorderContext.scope(handler_name, entity_ids=deployment_ids) as pool:
             result = await handler.execute(deployments)
             all_records = pool.build_all_records()
             await self._handle_status_transitions(handler, result, all_records, phase_map)
@@ -727,16 +740,26 @@ class DeploymentCoordinator:
             notification_data=message.model_dump(),
         )
 
-    async def process_if_needed(self, lifecycle_type: DeploymentLifecycleType) -> None:
+    async def process_if_needed(
+        self,
+        lifecycle_type: DeploymentLifecycleType,
+        sub_step: DeploymentSubStep | None = None,
+    ) -> None:
         """Process deployment lifecycle operation if needed (based on internal state)."""
-        if not await self._valkey_schedule.load_and_delete_deployment_mark(lifecycle_type.value):
+        sub_step_value = sub_step.value if sub_step is not None else None
+        if not await self._valkey_schedule.load_and_delete_deployment_mark(
+            lifecycle_type.value, sub_step_value
+        ):
             return
-        await self.process_deployment_lifecycle(lifecycle_type)
+        await self.process_deployment_lifecycle(lifecycle_type, sub_step)
 
-    @staticmethod
-    def _create_task_specs() -> list[DeploymentTaskSpec]:
-        """Create task specifications for all deployment lifecycle types."""
-        return [
+    def _create_task_specs(self) -> list[DeploymentTaskSpec]:
+        """Create task specifications for all deployment lifecycle types.
+
+        Simple lifecycles get a single spec with sub_step=None.
+        Lifecycles with sub-step handlers get one spec per sub-step.
+        """
+        specs: list[DeploymentTaskSpec] = [
             # Check pending deployments frequently with both short and long cycles
             DeploymentTaskSpec(
                 DeploymentLifecycleType.CHECK_PENDING,
@@ -764,13 +787,6 @@ class DeploymentCoordinator:
                 long_interval=30.0,
                 initial_delay=10.0,
             ),
-            # Deploying (rolling update) - both short and long cycles
-            DeploymentTaskSpec(
-                DeploymentLifecycleType.DEPLOYING,
-                short_interval=5.0,
-                long_interval=30.0,
-                initial_delay=10.0,
-            ),
             # Check destroying deployments - only long cycle
             DeploymentTaskSpec(
                 DeploymentLifecycleType.DESTROYING,
@@ -779,6 +795,18 @@ class DeploymentCoordinator:
                 initial_delay=25.0,
             ),
         ]
+        # Deploying — one task per sub-step
+        for sub_step in self._registry.sub_steps_for(DeploymentLifecycleType.DEPLOYING):
+            specs.append(
+                DeploymentTaskSpec(
+                    DeploymentLifecycleType.DEPLOYING,
+                    sub_step=sub_step,
+                    short_interval=5.0,
+                    long_interval=30.0,
+                    initial_delay=10.0,
+                )
+            )
+        return specs
 
     def create_task_specs(self) -> list[EventTaskSpec]:
         """Create task specifications for deployment lifecycle events."""

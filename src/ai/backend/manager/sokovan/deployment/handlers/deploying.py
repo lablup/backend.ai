@@ -121,15 +121,16 @@ class DeployingEvaluatePreStep:
 
 
 # ---------------------------------------------------------------------------
-# In-progress handlers (PROVISIONING / PROGRESSING)
+# DEPLOYING sub-step handlers
 # ---------------------------------------------------------------------------
 
 
-class DeployingInProgressHandler(DeploymentHandler):
-    """Base handler for in-progress DEPLOYING sub-steps.
+class DeployingProvisioningHandler(DeploymentHandler):
+    """Handler for DEPLOYING / PROVISIONING sub-step.
 
-    execute() returns success for all supplied deployments.
-    post_process() re-schedules the DEPLOYING cycle and triggers route provisioning.
+    New-revision routes are being created; waiting for them to become HEALTHY.
+    execute() returns success for all supplied deployments (no-op pass-through).
+    post_process() re-schedules the DEPLOYING/PROVISIONING cycle and triggers route provisioning.
     """
 
     def __init__(
@@ -143,47 +144,12 @@ class DeployingInProgressHandler(DeploymentHandler):
     @classmethod
     @override
     def name(cls) -> str:
-        return "deploying-in-progress"
+        return "deploying-provisioning"
 
     @property
     @override
     def lock_id(self) -> LockID | None:
         return None
-
-    @classmethod
-    @override
-    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
-        return [DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DEPLOYING)]
-
-    @classmethod
-    @override
-    def status_transitions(cls) -> DeploymentStatusTransitions:
-        return DeploymentStatusTransitions(
-            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DEPLOYING),
-        )
-
-    @override
-    async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
-        return DeploymentExecutionResult(successes=list(deployments))
-
-    @override
-    async def post_process(self, result: DeploymentExecutionResult) -> None:
-        # Re-schedule DEPLOYING for the next coordinator cycle
-        await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.DEPLOYING)
-        # Trigger route provisioning so new routes get sessions
-        await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)
-
-
-class DeployingProvisioningHandler(DeployingInProgressHandler):
-    """Handler for DEPLOYING / PROVISIONING sub-step.
-
-    New-revision routes are being created; waiting for them to become HEALTHY.
-    """
-
-    @classmethod
-    @override
-    def name(cls) -> str:
-        return "deploying-provisioning"
 
     @classmethod
     @override
@@ -204,6 +170,17 @@ class DeployingProvisioningHandler(DeployingInProgressHandler):
                 sub_status=DeploymentSubStep.PROVISIONING,
             ),
         )
+
+    @override
+    async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
+        return DeploymentExecutionResult(successes=list(deployments))
+
+    @override
+    async def post_process(self, result: DeploymentExecutionResult) -> None:
+        await self._deployment_controller.mark_lifecycle_needed(
+            DeploymentLifecycleType.DEPLOYING, sub_step=DeploymentSubStep.PROVISIONING
+        )
+        await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)
 
 
 class DeployingProgressingHandler(DeploymentHandler):
@@ -340,5 +317,7 @@ class DeployingProgressingHandler(DeploymentHandler):
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         # Re-schedule DEPLOYING for still-progressing deployments
-        await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.DEPLOYING)
+        await self._deployment_controller.mark_lifecycle_needed(
+            DeploymentLifecycleType.DEPLOYING, sub_step=DeploymentSubStep.PROGRESSING
+        )
         await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)
