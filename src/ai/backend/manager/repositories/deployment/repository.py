@@ -1223,22 +1223,6 @@ class DeploymentRepository:
         return await self._db_source.delete_deployment_policy(purger)
 
     @deployment_repository_resilience.apply()
-    async def complete_deployment_revision_swap(
-        self,
-        endpoint_ids: set[uuid.UUID],
-    ) -> int:
-        """Swap deploying_revision to current_revision for completed deployments."""
-        return await self._db_source.complete_deployment_revision_swap(endpoint_ids)
-
-    @deployment_repository_resilience.apply()
-    async def clear_deploying_revision(
-        self,
-        endpoint_ids: set[uuid.UUID],
-    ) -> None:
-        """Clear deploying_revision for rolled-back deployments."""
-        await self._db_source.clear_deploying_revision(endpoint_ids)
-
-    @deployment_repository_resilience.apply()
     async def update_sub_steps(
         self,
         assignments: dict[uuid.UUID, DeploymentSubStep],

@@ -198,14 +198,10 @@ class StrategyTransaction:
             .where(
                 EndpointRow.id.in_(endpoint_ids),
                 EndpointRow.deploying_revision.isnot(None),
-                # Skip DESTROYING/DESTROYED deployments — routes being torn down
-                # belong to the old revision and should remain under current_revision.
-                # Swapping would reassign current_revision to the new revision,
-                # orphaning the old routes from their original revision.
-                EndpointRow.lifecycle_stage.notin_([
-                    EndpointLifecycle.DESTROYING,
-                    EndpointLifecycle.DESTROYED,
-                ]),
+                # Only operate on DEPLOYING endpoints — if the lifecycle changed
+                # concurrently (e.g. to DESTROYING), swapping the revision would
+                # orphan the old revision's routes from their cleanup flow.
+                EndpointRow.lifecycle_stage == EndpointLifecycle.DEPLOYING,
             )
             .values(
                 current_revision=EndpointRow.deploying_revision,
@@ -226,13 +222,9 @@ class StrategyTransaction:
             sa.update(EndpointRow)
             .where(
                 EndpointRow.id.in_(endpoint_ids),
-                # Skip DESTROYING/DESTROYED deployments — the deployment was
-                # terminated mid-deploy, so leave deploying_revision as-is
-                # rather than clearing it for a rollback that will never complete.
-                EndpointRow.lifecycle_stage.notin_([
-                    EndpointLifecycle.DESTROYING,
-                    EndpointLifecycle.DESTROYED,
-                ]),
+                # Only operate on DEPLOYING endpoints — if the lifecycle changed
+                # concurrently, leave deploying_revision for the new flow to manage.
+                EndpointRow.lifecycle_stage == EndpointLifecycle.DEPLOYING,
             )
             .values(deploying_revision=None)
         )
@@ -2414,78 +2406,6 @@ class DeploymentDBSource:
         """
         async with self._begin_session_read_committed() as db_sess:
             return await execute_purger(db_sess, purger)
-
-    async def complete_deployment_revision_swap(
-        self,
-        endpoint_ids: set[uuid.UUID],
-    ) -> int:
-        """Swap deploying_revision to current_revision for completed deployments.
-
-        Sets current_revision = deploying_revision and deploying_revision = NULL
-        for the given endpoints.
-
-        Args:
-            endpoint_ids: Set of endpoint IDs to swap revisions for.
-
-        Returns:
-            Number of rows actually updated.  A value less than ``len(endpoint_ids)``
-            indicates that some deployments had already been swapped (e.g. by a
-            concurrent handler invocation) or had their deploying_revision cleared.
-        """
-        if not endpoint_ids:
-            return 0
-        async with self._begin_session_read_committed() as db_sess:
-            stmt = (
-                sa.update(EndpointRow)
-                .where(
-                    EndpointRow.id.in_(endpoint_ids),
-                    EndpointRow.deploying_revision.isnot(None),
-                    # Skip DESTROYING/DESTROYED deployments — routes being torn down
-                    # belong to the old revision and should remain under current_revision.
-                    # Swapping would reassign current_revision to the new revision,
-                    # orphaning the old routes from their original revision.
-                    EndpointRow.lifecycle_stage.notin_([
-                        EndpointLifecycle.DESTROYING,
-                        EndpointLifecycle.DESTROYED,
-                    ]),
-                )
-                .values(
-                    current_revision=EndpointRow.deploying_revision,
-                    deploying_revision=None,
-                )
-            )
-            cursor_result = cast(CursorResult[Any], await db_sess.execute(stmt))
-            return cursor_result.rowcount
-
-    async def clear_deploying_revision(
-        self,
-        endpoint_ids: set[uuid.UUID],
-    ) -> None:
-        """Clear deploying_revision for rolled-back deployments.
-
-        Sets deploying_revision = NULL without modifying current_revision.
-
-        Args:
-            endpoint_ids: Set of endpoint IDs to clear deploying revision for.
-        """
-        if not endpoint_ids:
-            return
-        async with self._begin_session_read_committed() as db_sess:
-            stmt = (
-                sa.update(EndpointRow)
-                .where(
-                    EndpointRow.id.in_(endpoint_ids),
-                    # Skip DESTROYING/DESTROYED deployments — the deployment was
-                    # terminated mid-deploy, so leave deploying_revision as-is
-                    # rather than clearing it for a rollback that will never complete.
-                    EndpointRow.lifecycle_stage.notin_([
-                        EndpointLifecycle.DESTROYING,
-                        EndpointLifecycle.DESTROYED,
-                    ]),
-                )
-                .values(deploying_revision=None)
-            )
-            await db_sess.execute(stmt)
 
     async def update_sub_steps(
         self,
