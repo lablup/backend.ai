@@ -7903,6 +7903,26 @@ type PredefinedAtomicPermission
   vfolder_host_permission_list: [String]
 }
 
+"""
+Added in 26.3.0. How to preempt a session when preemption is triggered.
+"""
+enum PreemptionMode
+  @join__type(graph: STRAWBERRY)
+{
+  TERMINATE @join__enumValue(graph: STRAWBERRY)
+  SUSPEND @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.3.0. Tie-breaking order for same-priority sessions during preemption.
+"""
+enum PreemptionOrder
+  @join__type(graph: STRAWBERRY)
+{
+  OLDEST @join__enumValue(graph: STRAWBERRY)
+  NEWEST @join__enumValue(graph: STRAWBERRY)
+}
+
 type PreloadImage
   @join__type(graph: GRAPHENE)
 {
@@ -10009,6 +10029,21 @@ type ResourceGroupSchedulerConfig
   Type of scheduler used for session scheduling (fifo, lifo, drf, fair-share).
   """
   type: SchedulerType!
+
+  """
+  Added in 26.3.0. Sessions with priority <= this value are eligible for preemption. Default is 5.
+  """
+  preemptiblePriority: Int!
+
+  """
+  Added in 26.3.0. Tie-breaking order for sessions with the same priority during preemption. 'oldest' preempts the oldest session first, 'newest' preempts the newest. Default is 'oldest'.
+  """
+  preemptionOrder: PreemptionOrder!
+
+  """
+  Added in 26.3.0. How to preempt a session when preemption is triggered. 'terminate' destroys the session, 'suspend' saves state for resumption. Default is 'terminate'.
+  """
+  preemptionMode: PreemptionMode!
 }
 
 """Added in 26.2.0. Status information for a resource group."""
@@ -12089,6 +12124,21 @@ input UpdateResourceGroupInput
   Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Leave null to keep existing value.
   """
   schedulerType: SchedulerType = null
+
+  """
+  Added in 26.3.0. Sessions with priority <= this value are preemptible. Leave null to keep existing value.
+  """
+  preemptiblePriority: Int = null
+
+  """
+  Added in 26.3.0. Tie-breaking order for same-priority sessions (OLDEST, NEWEST). Leave null to keep existing value.
+  """
+  preemptionOrder: PreemptionOrder = null
+
+  """
+  Added in 26.3.0. How to preempt sessions (TERMINATE, SUSPEND). Leave null to keep existing value.
+  """
+  preemptionMode: PreemptionMode = null
 }
 
 """Added in 26.2.0. Payload for resource group update mutation."""
