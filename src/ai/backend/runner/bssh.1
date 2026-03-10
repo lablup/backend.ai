@@ -1,6 +1,6 @@
 .\" Manpage for bssh
 .\" Contact the maintainers to correct errors or typos.
-.TH BSSH 1 "October 2025" "v1.2.2" "bssh Manual"
+.TH BSSH 1 "January 2026" "v1.7.0" "bssh Manual"
 
 .SH NAME
 bssh \- Broadcast SSH - SSH-compatible client with parallel execution capabilities
@@ -24,7 +24,10 @@ common SSH options and automatically starting an interactive shell when no comma
 
 .B Multi-Server Mode:
 When used with clusters (-C) or multiple hosts (-H), bssh executes commands across multiple nodes
-simultaneously with real-time output streaming.
+simultaneously with real-time output monitoring. In interactive terminals, bssh automatically
+launches a Terminal User Interface (TUI) with multiple view modes (Summary, Detail, Split, Diff)
+for real-time monitoring. The TUI can be disabled with --stream (real-time text output) or
+--output-dir (save to files).
 
 The tool provides secure file transfer capabilities using SFTP protocol, supports multiple authentication
 methods (SSH keys with passphrase support, SSH agent, password), and automatically detects Backend.AI
@@ -110,7 +113,29 @@ Example: -D 1080 (SOCKS5 proxy on localhost:1080), -D *:1080/4 (SOCKS4 on all in
 .TP
 .BR \-H ", " \-\-hosts " " \fIHOSTS\fR
 Comma-separated list of hosts in [user@]hostname[:port] format.
-Example: user1@host1:2222,user2@host2
+Supports pdsh-style hostlist expressions for range expansion.
+.RS
+.PP
+Simple host list:
+.IP \[bu] 2
+-H "user1@host1:2222,user2@host2"
+.PP
+Hostlist expressions (range expansion):
+.IP \[bu] 2
+-H "node[1-5]" \[->] node1, node2, node3, node4, node5
+.IP \[bu] 2
+-H "node[01-05]" \[->] node01, node02, ... (zero-padded)
+.IP \[bu] 2
+-H "node[1,3,5]" \[->] node1, node3, node5 (specific values)
+.IP \[bu] 2
+-H "rack[1-2]-node[1-3]" \[->] 6 hosts (cartesian product)
+.IP \[bu] 2
+-H "web[1-3].example.com" \[->] web1.example.com, web2.example.com, ...
+.IP \[bu] 2
+-H "admin@web[1-3]:22" \[->] expands with user and port preserved
+.IP \[bu] 2
+-H "^/path/to/hostfile" \[->] read hosts from file
+.RE
 
 .TP
 .BR \-C ", " \-\-cluster " " \fICLUSTER\fR
@@ -135,10 +160,76 @@ prompt for the password securely without echoing it to the terminal.
 This is useful for systems that don't have SSH keys configured.
 
 .TP
+.BR \-S ", " \-\-sudo\-password
+Prompt for sudo password to automatically respond to sudo prompts.
+When this option is specified, bssh will:
+.RS
+.IP \[bu] 2
+Securely prompt for sudo password before execution (no terminal echo)
+.IP \[bu] 2
+Detect sudo password prompts in command output
+.IP \[bu] 2
+Automatically inject the password when prompted
+.RE
+.IP
+Alternatively, set the
+.B BSSH_SUDO_PASSWORD
+environment variable (not recommended for security reasons).
+.IP
+Security notes:
+.RS
+.IP \[bu] 2
+Password is stored using secure memory handling (secrecy crate)
+.IP \[bu] 2
+Password is cleared from memory immediately after use
+.IP \[bu] 2
+Password is never logged or printed in any output
+.RE
+
+.TP
 .BR \-f ", " \-\-filter " " \fIPATTERN\fR
-Filter hosts by pattern (supports wildcards like 'web*').
+Filter hosts by pattern. Supports both wildcards and hostlist expressions.
 Use with -H or -C to execute on a subset of hosts.
-Example: -f "web*" matches web01, web02, etc.
+.RS
+.PP
+Examples:
+.IP \[bu] 2
+-f "web*" \[->] matches web01, web02, etc. (glob pattern)
+.IP \[bu] 2
+-f "node[1-5]" \[->] matches node1 through node5 (hostlist expression)
+.IP \[bu] 2
+-f "node[1,3,5]" \[->] matches node1, node3, node5 (specific values)
+.RE
+
+.TP
+.BR \-\-exclude " " \fIHOSTS\fR
+Exclude hosts from target list (comma-separated).
+Supports wildcards, glob patterns, and hostlist expressions.
+Applied after --filter option.
+.RS
+.PP
+Glob patterns:
+.IP \[bu] 2
+--exclude "db*" \[->] exclude hosts starting with 'db'
+.IP \[bu] 2
+--exclude "*-backup" \[->] exclude backup nodes
+.IP \[bu] 2
+--exclude "web[12]" \[->] exclude web1 and web2 (glob character class)
+.PP
+Hostlist expressions:
+.IP \[bu] 2
+--exclude "node[3-5]" \[->] exclude node3, node4, node5 (range)
+.IP \[bu] 2
+--exclude "node[1,3,5]" \[->] exclude node1, node3, node5 (specific values)
+.IP \[bu] 2
+--exclude "rack[1-2]-node[1-3]" \[->] exclude 6 hosts (cartesian product)
+.PP
+Simple patterns:
+.IP \[bu] 2
+--exclude "node2" \[->] exclude single host
+.IP \[bu] 2
+--exclude "web1,web2" \[->] exclude multiple hosts
+.RE
 
 .TP
 .BR \-\-parallel " " \fIPARALLEL\fR
@@ -146,9 +237,74 @@ Maximum parallel connections for multi-server mode (default: 10)
 Note: -p is now used for port (SSH compatibility)
 
 .TP
+.BR \-\-timeout " " \fISECONDS\fR
+Command execution timeout in seconds. Set to 0 for unlimited execution time.
+Default is 300 seconds (5 minutes).
+.br
+Example: --timeout 60 (1 minute timeout)
+
+.TP
+.BR \-\-connect\-timeout " " \fISECONDS\fR
+SSH connection timeout in seconds. This is the time to wait for the initial
+SSH connection to be established, separate from the command execution timeout.
+Minimum value is 1 second. Default is 30 seconds.
+.br
+This option is useful for:
+.RS
+.IP \[bu] 2
+Fast failure detection on unreachable hosts
+.IP \[bu] 2
+Adjusting timeout for high-latency networks
+.IP \[bu] 2
+Setting different timeouts for connection vs command execution
+.RE
+.IP
+Example: --connect-timeout 10 (10 second connection timeout)
+
+.TP
 .BR \-\-output\-dir " " \fIOUTPUT_DIR\fR
 Output directory for command results. When specified, saves command outputs
-to separate files for each node with stdout, stderr, and execution summary
+to separate files for each node with stdout, stderr, and execution summary.
+Creates timestamped files:
+.I hostname_TIMESTAMP.stdout
+(command output),
+.I hostname_TIMESTAMP.stderr
+(error output)
+
+.TP
+.BR \-\-stream
+Stream output in real-time with [node] prefixes. Each line of output is
+prefixed with the node hostname and displayed as it arrives. Useful for
+monitoring long-running commands across multiple nodes. Automatically
+disabled when output is piped or in CI environments. This disables the
+interactive TUI mode.
+
+.TP
+.BR \-N ", " \-\-no\-prefix
+Disable hostname prefix in output lines (pdsh -N compatibility). When
+specified, output lines are displayed without the [hostname] prefix,
+which is useful for programmatic parsing or cleaner display. Works
+with both stream mode (--stream) and file mode (--output-dir).
+Example: bssh -H host1,host2 --stream -N "uname -a"
+
+.TP
+.BR \-k ", " \-\-fail\-fast
+Stop execution immediately on first failure (pdsh -k compatible).
+When enabled, bssh cancels pending commands when any node fails due to
+connection error or non-zero exit code. This is useful for:
+.RS
+.IP \[bu] 2
+Critical operations where partial execution is unacceptable
+.IP \[bu] 2
+Deployment scripts where all nodes must succeed
+.IP \[bu] 2
+Validation checks across clusters
+.RE
+.IP
+Running tasks are terminated gracefully, and the error message clearly
+indicates which node caused the failure. Can be combined with
+.B --require-all-success
+for strict error handling.
 
 .TP
 .BR \-v ", " \-\-verbose
@@ -269,6 +425,7 @@ defaults:
   port: 22
   ssh_key: ~/.ssh/id_rsa
   parallel: 10
+  jump_host: bastion.example.com      # Global default jump host
 
 # Global interactive mode settings (optional)
 interactive:
@@ -287,6 +444,7 @@ clusters:
       - web2.example.com
       - user@web3.example.com:2222
     ssh_key: ~/.ssh/prod_key
+    jump_host: prod-bastion.example.com   # Cluster-level jump host
     # Cluster-specific interactive settings (overrides global)
     interactive:
       default_mode: single_node
@@ -298,8 +456,52 @@ clusters:
       - host: staging1.example.com
         port: 2200
         user: deploy
+        jump_host: staging-bastion.example.com  # Node-level jump host
       - staging2.example.com
     user: staging_user
+    jump_host: ""   # Empty string disables jump host for this cluster
+.fi
+
+.SS Jump Host Configuration in YAML
+Jump hosts can be configured at three levels with the following priority:
+
+.IP 1. 4
+\fBNode-level\fR (highest priority) - applies to specific node only
+.IP 2. 4
+\fBCluster-level\fR - applies to all nodes in the cluster
+.IP 3. 4
+\fBGlobal defaults\fR - applies to all clusters without explicit jump_host
+
+.PP
+The CLI \fB-J\fR option always takes precedence over configuration file settings.
+
+.PP
+Special values:
+.IP \[bu] 2
+Empty string (\fB""\fR) - explicitly disables jump host inheritance
+.IP \[bu] 2
+Environment variables supported: \fB${VAR}\fR or \fB$VAR\fR syntax
+
+.PP
+Example with all levels:
+.nf
+defaults:
+  jump_host: global-bastion.example.com
+
+clusters:
+  production:
+    nodes:
+      - host: web1.internal
+        jump_host: special-bastion.example.com   # Uses special-bastion
+      - host: web2.internal                       # Uses prod-bastion
+      - host: direct.example.com
+        jump_host: ""                             # Direct connection (no jump)
+    jump_host: prod-bastion.example.com
+
+  direct_cluster:
+    nodes:
+      - host: external.example.com
+    jump_host: ""   # Cluster disables inherited global jump_host
 .fi
 
 .SH SSH CONFIGURATION OPTIONS
@@ -884,6 +1086,82 @@ Host legacy.example.com
     RequiredRSASize 1024
 .fi
 
+.SH PDSH COMPATIBILITY MODE
+.B bssh
+supports pdsh compatibility mode, enabling it to act as a drop-in replacement for pdsh.
+This allows seamless migration from pdsh without modifying existing scripts.
+
+.SS Activation Methods
+
+.TP
+.B Binary symlink (recommended)
+Create a symlink to use bssh as pdsh:
+.nf
+  sudo ln -s /usr/bin/bssh /usr/local/bin/pdsh
+  pdsh -w host1,host2 "uptime"
+.fi
+
+.TP
+.B Environment variable
+Set BSSH_PDSH_COMPAT to enable pdsh mode:
+.nf
+  BSSH_PDSH_COMPAT=1 bssh -w host1,host2 "uptime"
+.fi
+
+.TP
+.B CLI flag
+Use --pdsh-compat flag:
+.nf
+  bssh --pdsh-compat -w host1,host2 "uptime"
+.fi
+
+.SS pdsh Option Mapping
+
+.TS
+l l l.
+pdsh option	bssh equivalent	Description
+_
+-w hosts	-H hosts	Target hosts
+-x hosts	--exclude hosts	Exclude hosts
+-f N	--parallel N	Fanout (default: 32)
+-l user	-l user	Remote username
+-t N	--connect-timeout N	Connection timeout
+-u N	--timeout N	Command timeout
+-N	--no-prefix	No hostname prefix
+-b	--batch	Batch mode
+-k	--fail-fast	Stop on first failure
+-q	(query mode)	Show hosts and exit
+-S	--any-failure	Return largest exit code
+.TE
+
+.SS pdsh Mode Examples
+
+.TP
+Basic command execution:
+.B pdsh -w node1,node2,node3 "uptime"
+
+.TP
+With fanout limit:
+.B pdsh -w nodes -f 10 "df -h"
+
+.TP
+Exclude specific hosts:
+.B pdsh -w node1,node2,node3 -x node2 "hostname"
+
+.TP
+Query mode (show hosts without executing):
+.B pdsh -w host1,host2,host3 -x host2 -q
+.RS
+Shows only host1 and host3
+.RE
+
+.TP
+Query mode with glob patterns:
+.B pdsh -w web1,web2,db1,db2 -x "db*" -q
+.RS
+Shows web1 and web2 (db* pattern excludes db1 and db2)
+.RE
+
 .SH BACKEND.AI INTEGRATION
 When running inside a Backend.AI multi-node session, bssh automatically detects cluster configuration
 from environment variables:
@@ -901,6 +1179,79 @@ Current node's hostname
 Current node's role (main or sub)
 
 Note: Backend.AI multi-node clusters use SSH port 2200 by default, which is automatically configured.
+
+.SH HOSTLIST EXPRESSIONS
+Hostlist expressions provide a compact way to specify multiple hosts using range notation,
+compatible with pdsh syntax. This allows efficient targeting of large numbers of hosts
+without listing each one individually.
+
+.SS Basic Syntax
+.TP
+.B Simple range
+.B node[1-5]
+expands to node1, node2, node3, node4, node5
+.TP
+.B Zero-padded range
+.B node[01-05]
+expands to node01, node02, node03, node04, node05
+.TP
+.B Comma-separated values
+.B node[1,3,5]
+expands to node1, node3, node5
+.TP
+.B Mixed ranges and values
+.B node[1-3,7,9-10]
+expands to node1, node2, node3, node7, node9, node10
+
+.SS Advanced Patterns
+.TP
+.B Multiple ranges (cartesian product)
+.B rack[1-2]-node[1-3]
+expands to rack1-node1, rack1-node2, rack1-node3, rack2-node1, rack2-node2, rack2-node3
+.TP
+.B Domain suffix
+.B web[1-3].example.com
+expands to web1.example.com, web2.example.com, web3.example.com
+.TP
+.B With user and port
+.B admin@server[1-3]:2222
+expands to admin@server1:2222, admin@server2:2222, admin@server3:2222
+
+.SS File Input
+.TP
+.B ^/path/to/hostfile
+Reads hosts from file, one per line. Lines starting with # are comments.
+Maximum file size: 1MB, maximum lines: 100,000.
+
+.SS Using with Options
+Hostlist expressions can be used with:
+.TP
+.B -H, --hosts
+Specify target hosts:
+.B bssh -H "node[1-10]" "uptime"
+.TP
+.B --filter
+Include only matching hosts:
+.B bssh -c cluster --filter "web[1-5]" "systemctl status nginx"
+.TP
+.B --exclude
+Exclude matching hosts:
+.B bssh -c cluster --exclude "node[1,3,5]" "df -h"
+
+.SS Examples
+.nf
+# Execute on 100 nodes
+bssh -H "compute[001-100]" "hostname"
+
+# Target specific racks
+bssh -H "rack[A-C]-node[1-8]" "uptime"
+
+# Use hosts from file
+bssh -H "^/etc/cluster/hosts" "date"
+
+# Combine with exclusions
+bssh -H "node[1-20]" --exclude "node[5,10,15]" "ps aux"
+.fi
 
 .SH EXAMPLES
 
@@ -1009,6 +1360,25 @@ Executes command only on database nodes in the production cluster
 .RE
 
 .TP
+Exclude specific hosts from execution:
+.B bssh -H "node1,node2,node3" --exclude "node2" "uptime"
+.RS
+Executes command on node1 and node3, excluding node2
+.RE
+
+.TP
+.B bssh -C production --exclude "db*" "systemctl restart nginx"
+.RS
+Executes command on all production hosts except database servers
+.RE
+
+.TP
+.B bssh -C production --exclude "web1,web2" "apt update"
+.RS
+Excludes specific hosts web1 and web2 from the cluster operation
+.RE
+
+.TP
 Test connectivity:
 .B bssh -C production ping
 .RS
@@ -1051,6 +1421,20 @@ Prompts for password interactively
 .RE
 
 .TP
+Execute sudo commands with automatic password injection:
+.B bssh -S -C production "sudo apt update && sudo apt upgrade -y"
+.RS
+Prompts for sudo password once, then automatically responds to sudo prompts on all nodes
+.RE
+
+.TP
+Combine sudo with SSH agent authentication:
+.B bssh -A -S -C production "sudo systemctl restart nginx"
+.RS
+Uses SSH agent for connection and sudo password for privilege escalation
+.RE
+
+.TP
 Use encrypted SSH key:
 .B bssh -i ~/.ssh/encrypted_key -C production "df -h"
 .RS
@@ -1066,12 +1450,83 @@ Creates timestamped files per node:
 - hostname_TIMESTAMP.stdout (standard output)
 .br
 - hostname_TIMESTAMP.stderr (error output)
-.br  
+.br
 - hostname_TIMESTAMP.error (connection errors)
 .br
 - summary_TIMESTAMP.txt (execution summary)
 .RE
 
+.TP
+Interactive TUI mode (default in terminals):
+.B bssh -C production "apt-get update"
+.RS
+Automatically launches Terminal UI with real-time monitoring.
+.br
+TUI features:
+.br
+- Summary view: All nodes with progress bars
+.br
+- Detail view (press 1-9): Full output from specific node
+.br
+- Split view (press s): Monitor 2-4 nodes simultaneously
+.br
+- Diff view (press d): Compare outputs side-by-side
+.br
+- Log panel (press l): Toggle in-TUI log display
+.br
+- Keyboard navigation: arrows, PgUp/PgDn, Home/End
+.br
+- Auto-scroll (press f): Toggle automatic scrolling
+.br
+- Help (press ?): Show all keyboard shortcuts
+.br
+Log panel keys (when visible):
+.br
+- j/k: Scroll log entries up/down
+.br
+- +/-: Adjust panel height (3-10 lines)
+.br
+- t: Toggle timestamps
+.RE
+
+.TP
+Stream mode with real-time prefixes:
+.B bssh -C production --stream "tail -f /var/log/syslog"
+.RS
+Disables TUI and streams output with [node] prefixes in real-time.
+.br
+Example output:
+.br
+[host1] Oct 30 10:15:23 systemd[1]: Started nginx
+.br
+[host2] Oct 30 10:15:24 kernel: [UFW BLOCK] IN=eth0
+.br
+Useful for monitoring long-running commands or when piping output.
+.RE
+
+.SS Fail-Fast Mode Examples
+.TP
+Stop on first failure during critical deployment:
+.B bssh -k -C production "deploy.sh"
+.RS
+Execution stops immediately if any node fails the deployment script
+.RE
+
+.TP
+Combine fail-fast with require-all-success:
+.B bssh --fail-fast --require-all-success -C production "service-restart.sh"
+.RS
+Stops early on failure AND ensures final exit code reflects any failures
+.RE
+
+.TP
+Sequential fail-fast with limited parallelism:
+.B bssh -k --parallel 1 -H "node1,node2,node3" "critical-operation"
+.RS
+Runs commands one at a time, stopping on first failure
+.RE
+
+.SS File Transfer Examples
 .TP
 Upload configuration file to all nodes:
 .B bssh -H "node1,node2,node3" upload /etc/myapp.conf /etc/myapp.conf
@@ -1332,6 +1787,29 @@ fall back to the default. This setting helps prevent resource exhaustion
 attacks while allowing flexible jump host configurations.
 .br
 Example: BSSH_MAX_JUMP_HOSTS=20 bssh -J host1,host2,...,host20 target
+
+.TP
+.B BSSH_SUDO_PASSWORD
+Sudo password for automated sudo authentication. When set along with the
+.B -S
+flag, bssh will use this password instead of prompting interactively.
+.br
+.B WARNING:
+Using environment variables for passwords is not recommended for production
+use as they may be visible in process listings, shell history, or logs.
+Prefer the interactive prompt for security-sensitive operations.
+.br
+Example: BSSH_SUDO_PASSWORD=mypassword bssh -S -C cluster "sudo apt update"
+
+.TP
+.B BSSH_TUI_LOG_MAX_ENTRIES
+Maximum number of log entries to keep in the TUI log panel buffer.
+.br
+Default: 1000
+.br
+Maximum: 10000 (prevents memory exhaustion)
+.br
+Example: BSSH_TUI_LOG_MAX_ENTRIES=5000 bssh -C cluster "command"
 
 .TP
 .B USER
