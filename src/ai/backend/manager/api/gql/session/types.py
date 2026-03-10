@@ -260,6 +260,9 @@ class SessionV2MetadataInfoGQL:
     )
     cluster_size: int = strawberry.field(description="Number of nodes in the cluster.")
     priority: int = strawberry.field(description="Scheduling priority of the session.")
+    is_preemptible: bool = strawberry.field(
+        description="Whether this session is eligible for preemption by higher-priority sessions."
+    )
     tag: str | None = strawberry.field(description="Optional user-provided tag for the session.")
 
 
@@ -501,6 +504,7 @@ class SessionV2GQL(Node):
                 cluster_mode=ClusterModeGQL.from_internal(data.cluster_mode),
                 cluster_size=data.cluster_size,
                 priority=data.priority,
+                is_preemptible=data.is_preemptible,
                 tag=data.tag,
             ),
             resource=SessionV2ResourceInfoGQL(
