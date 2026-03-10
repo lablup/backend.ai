@@ -48,7 +48,7 @@ async def admin_user_v2(
     Raises:
         UserNotFound: If the user with the given UUID does not exist.
     """
-    check_admin_only(info.context)
+    check_admin_only()
     processors = info.context.processors
 
     # Execute GetUserAction via processor
@@ -92,7 +92,7 @@ async def admin_users_v2(
     Returns:
         UserV2Connection with paginated user records.
     """
-    check_admin_only(info.context)
+    check_admin_only()
     return await fetch_admin_users(
         info,
         filter=filter,

@@ -50,7 +50,7 @@ async def admin_permissions(
     limit: int | None = None,
     offset: int | None = None,
 ) -> PermissionConnection:
-    check_admin_only(info.context)
+    check_admin_only()
     return await fetch_permissions(
         info,
         filter=filter,
@@ -88,7 +88,7 @@ async def admin_create_permission(
     info: Info[StrawberryGQLContext],
     input: CreatePermissionInput,
 ) -> PermissionGQL:
-    check_admin_only(info.context)
+    check_admin_only()
     action_result = (
         await info.context.processors.permission_controller.create_permission.wait_for_complete(
             CreatePermissionAction(creator=input.to_creator())
@@ -102,7 +102,7 @@ async def admin_update_permission(
     info: Info[StrawberryGQLContext],
     input: UpdatePermissionInput,
 ) -> PermissionGQL:
-    check_admin_only(info.context)
+    check_admin_only()
     action_result = (
         await info.context.processors.permission_controller.update_permission.wait_for_complete(
             UpdatePermissionAction(updater=input.to_updater())
@@ -116,7 +116,7 @@ async def admin_delete_permission(
     info: Info[StrawberryGQLContext],
     input: DeletePermissionInput,
 ) -> DeletePermissionPayload:
-    check_admin_only(info.context)
+    check_admin_only()
     purger = Purger(row_class=PermissionRow, pk_value=input.id)
     await info.context.processors.permission_controller.delete_permission.wait_for_complete(
         DeletePermissionAction(purger=purger)
