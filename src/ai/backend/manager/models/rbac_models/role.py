@@ -71,8 +71,12 @@ class RoleRow(Base):  # type: ignore[misc]
     created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        "updated_at", sa.DateTime(timezone=True), nullable=True
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.func.now(),
+        onupdate=sa.func.now(),
+        nullable=False,
     )
     deleted_at: Mapped[datetime | None] = mapped_column(
         "deleted_at", sa.DateTime(timezone=True), nullable=True
