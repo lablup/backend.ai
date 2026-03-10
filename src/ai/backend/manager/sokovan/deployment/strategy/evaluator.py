@@ -75,7 +75,11 @@ class DeploymentStrategyEvaluator:
             )
         )
         policy_map = {p.endpoint: p for p in policy_search.items}
-        route_map = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(endpoint_ids)
+        # Use deploying-aware route fetch that includes FAILED_TO_START routes.
+        # Without failed routes, the strategy cannot detect rollback conditions
+        # (e.g. after a coordinator crash where new routes failed but the FSM
+        # never saw them because active-only fetch excludes FAILED_TO_START).
+        route_map = await self._deployment_repo.fetch_deploying_routes_by_endpoint_ids(endpoint_ids)
 
         # -- 2. Per-deployment evaluation --
         for deployment in deployments:

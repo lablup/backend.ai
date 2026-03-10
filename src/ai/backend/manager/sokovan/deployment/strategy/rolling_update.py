@@ -27,7 +27,6 @@ from .types import AbstractDeploymentStrategy, RouteChanges, StrategyCycleResult
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
-
 class RollingUpdateStrategy(AbstractDeploymentStrategy):
     """Rolling update deployment strategy FSM."""
 
@@ -59,6 +58,7 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
         old_active: list[RouteInfo] = []
         new_provisioning: list[RouteInfo] = []
         new_healthy: list[RouteInfo] = []
+        new_unhealthy: list[RouteInfo] = []
         new_failed: list[RouteInfo] = []
 
         for r in routes:
@@ -72,12 +72,12 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
                 new_provisioning.append(r)
             elif r.status == RouteStatus.HEALTHY:
                 new_healthy.append(r)
+            elif r.status in (RouteStatus.UNHEALTHY, RouteStatus.DEGRADED):
+                new_unhealthy.append(r)
             elif r.status in (RouteStatus.FAILED_TO_START, RouteStatus.TERMINATED):
                 new_failed.append(r)
-            elif r.status.is_active():
-                new_healthy.append(r)
 
-        total_new_live = len(new_provisioning) + len(new_healthy)
+        total_new_live = len(new_provisioning) + len(new_healthy) + len(new_unhealthy)
 
         # -- 2. PROVISIONING: wait for in-flight routes --
         if new_provisioning:
@@ -99,12 +99,21 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
                 sub_step=DeploymentSubStep.COMPLETED,
             )
 
-        # -- 4. Rolled back: every new route failed --
+        # -- 4. Rolled back: every new route failed or is unhealthy --
         if total_new_live == 0 and new_failed:
             log.warning(
                 "deployment {}: all {} new routes failed — rolling back",
                 deployment.id,
                 len(new_failed),
+            )
+            return StrategyCycleResult(sub_step=DeploymentSubStep.ROLLED_BACK)
+
+        # All new routes are unhealthy (none healthy, none provisioning)
+        if len(new_healthy) == 0 and len(new_provisioning) == 0 and new_unhealthy:
+            log.warning(
+                "deployment {}: all {} new routes unhealthy — rolling back",
+                deployment.id,
+                len(new_unhealthy),
             )
             return StrategyCycleResult(sub_step=DeploymentSubStep.ROLLED_BACK)
 
@@ -130,10 +139,25 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
         if to_create > 0:
             route_changes.rollout_specs = _build_route_creators(deployment, to_create)
 
-        # Decide how many old routes to terminate
+        # Decide how many old routes to terminate.
+        # Only count truly healthy routes as available (not UNHEALTHY/DEGRADED).
         available_count = len(new_healthy) + len(old_active)
         can_terminate = available_count - min_available
         to_terminate = max(0, min(can_terminate, len(old_active)))
+
+        # Safety guard: when max_unavailable < desired the operator expects at
+        # least *some* routes to stay available.  Never terminate ALL old routes
+        # in that case until at least one new route is healthy — otherwise the
+        # deployment suffers a complete traffic outage.
+        # When max_unavailable >= desired (min_available == 0), the operator has
+        # explicitly opted into full unavailability, so we honour that.
+        if (
+            min_available > 0
+            and len(new_healthy) == 0
+            and to_terminate >= len(old_active)
+            and len(old_active) > 0
+        ):
+            to_terminate = len(old_active) - 1
 
         if to_terminate > 0:
             # Terminate old routes with lowest termination priority first
@@ -143,12 +167,13 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
 
         log.debug(
             "deployment {}: PROGRESSING create={}, terminate={}, "
-            "old_active={}, new_healthy={}, new_prov={}",
+            "old_active={}, new_healthy={}, new_unhealthy={}, new_prov={}",
             deployment.id,
             to_create,
             to_terminate,
             len(old_active),
             len(new_healthy),
+            len(new_unhealthy),
             len(new_provisioning),
         )
 

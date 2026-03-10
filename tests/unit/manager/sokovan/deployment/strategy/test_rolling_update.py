@@ -13,6 +13,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+import pytest
+
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
@@ -31,7 +33,7 @@ from ai.backend.manager.repositories.deployment.creators import RouteCreatorSpec
 from ai.backend.manager.sokovan.deployment.strategy.rolling_update import (
     RollingUpdateStrategy,
 )
-from ai.backend.manager.sokovan.deployment.strategy.types import CycleEvaluationResult
+from ai.backend.manager.sokovan.deployment.strategy.types import StrategyCycleResult
 
 ENDPOINT_ID = UUID("aaaaaaaa-0000-0000-0000-aaaaaaaaaaaa")
 OLD_REV = UUID("11111111-1111-1111-1111-111111111111")
@@ -99,11 +101,11 @@ def make_route(
 # ---------------------------------------------------------------------------
 
 
-def _count_rollout(result: CycleEvaluationResult) -> int:
+def _count_rollout(result: StrategyCycleResult) -> int:
     return len(result.route_changes.rollout_specs)
 
 
-def _drain_ids(result: CycleEvaluationResult) -> list[UUID]:
+def _drain_ids(result: StrategyCycleResult) -> list[UUID]:
     return result.route_changes.drain_route_ids
 
 
@@ -123,7 +125,6 @@ class TestBasicFSMStates:
         result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, [])
 
         assert result.sub_step == DeploymentSubStep.PROGRESSING
-        assert not result.completed
         assert _count_rollout(result) == 1
         assert len(_drain_ids(result)) == 0
 
@@ -139,7 +140,6 @@ class TestBasicFSMStates:
         result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
 
         assert result.sub_step == DeploymentSubStep.PROVISIONING
-        assert not result.completed
         assert _count_rollout(result) == 0
         assert len(_drain_ids(result)) == 0
 
@@ -154,8 +154,7 @@ class TestBasicFSMStates:
 
         result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
 
-        assert result.completed
-        assert result.sub_step == DeploymentSubStep.PROGRESSING
+        assert result.sub_step == DeploymentSubStep.COMPLETED
 
     def test_rollback_when_all_new_failed(self) -> None:
         """All new routes failed → ROLLED_BACK."""
@@ -169,7 +168,6 @@ class TestBasicFSMStates:
         result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
 
         assert result.sub_step == DeploymentSubStep.ROLLED_BACK
-        assert not result.completed
 
     def test_rollback_with_terminated_new_routes(self) -> None:
         """New routes in TERMINATED also count as failed."""
@@ -218,22 +216,10 @@ class TestMaxSurge:
 
         assert _count_rollout(result) == 2
 
-    def test_surge_0_desired_3_no_create_without_unavailable(self) -> None:
-        """surge=0, unavailable=0: cannot create new (no budget)."""
-        deployment = make_deployment(desired=3)
-        spec = RollingUpdateSpec(max_surge=0, max_unavailable=0)
-        routes = [
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-        ]
-
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
-
-        # max_total = 3+0 = 3, current_total = 3, can_create = 0
-        assert _count_rollout(result) == 0
-        # min_available = 3-0 = 3, available=3, can_terminate = 0
-        assert len(_drain_ids(result)) == 0
+    def test_surge_0_unavailable_0_rejected_at_spec_creation(self) -> None:
+        """surge=0, unavailable=0: rejected by Pydantic validation."""
+        with pytest.raises(ValueError, match="max_surge or max_unavailable must be positive"):
+            RollingUpdateSpec(max_surge=0, max_unavailable=0)
 
     def test_surge_3_desired_2_caps_at_desired(self) -> None:
         """surge=3, desired=2: creates at most desired - already_new."""
@@ -470,7 +456,7 @@ class TestMultiCycleProgression:
 
         result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
 
-        assert result.completed
+        assert result.sub_step == DeploymentSubStep.COMPLETED
 
     def test_not_completed_when_old_still_exists(self) -> None:
         """Even with enough new, old still exists → not completed."""
@@ -484,7 +470,7 @@ class TestMultiCycleProgression:
 
         result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
 
-        assert not result.completed
+        assert result.sub_step == DeploymentSubStep.PROGRESSING
         # Should terminate the old route
         assert len(_drain_ids(result)) == 1
 
@@ -497,8 +483,12 @@ class TestMultiCycleProgression:
 class TestMixedRouteStatuses:
     """Test with routes in various statuses."""
 
-    def test_degraded_new_counts_as_healthy(self) -> None:
-        """DEGRADED new routes count as active (is_active=True)."""
+    def test_degraded_new_triggers_rollback(self) -> None:
+        """DEGRADED new routes are classified as unhealthy, not healthy.
+
+        When all new routes are DEGRADED (none healthy, none provisioning),
+        the strategy rolls back instead of completing.
+        """
         deployment = make_deployment(desired=1)
         spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
         routes = [
@@ -507,10 +497,14 @@ class TestMixedRouteStatuses:
 
         result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
 
-        assert result.completed
+        assert result.sub_step == DeploymentSubStep.ROLLED_BACK
 
-    def test_unhealthy_new_counts_as_healthy(self) -> None:
-        """UNHEALTHY new routes count as active."""
+    def test_unhealthy_new_triggers_rollback(self) -> None:
+        """UNHEALTHY new routes trigger rollback, not completion.
+
+        When all new routes are UNHEALTHY (none healthy, none provisioning),
+        the strategy rolls back to prevent serving traffic through broken routes.
+        """
         deployment = make_deployment(desired=1)
         spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
         routes = [
@@ -519,7 +513,7 @@ class TestMixedRouteStatuses:
 
         result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
 
-        assert result.completed
+        assert result.sub_step == DeploymentSubStep.ROLLED_BACK
 
     def test_old_terminating_not_counted_as_active(self) -> None:
         """Old routes in TERMINATING are not counted as old_active."""
@@ -533,7 +527,7 @@ class TestMixedRouteStatuses:
         result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
 
         # old_active = 0 (terminating doesn't count), new_healthy = 1 >= desired
-        assert result.completed
+        assert result.sub_step == DeploymentSubStep.COMPLETED
 
     def test_old_terminated_not_counted(self) -> None:
         """Old routes in TERMINATED are not counted as old_active."""
@@ -546,7 +540,7 @@ class TestMixedRouteStatuses:
 
         result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
 
-        assert result.completed
+        assert result.sub_step == DeploymentSubStep.COMPLETED
 
     def test_mixed_old_statuses_counts_only_active(self) -> None:
         """Only active old routes are counted in old_active."""
@@ -578,7 +572,6 @@ class TestMixedRouteStatuses:
 
         # total_new_live = 1 (healthy) > 0, so NOT rolled back
         assert result.sub_step == DeploymentSubStep.PROGRESSING
-        assert not result.completed
 
 
 # ===========================================================================
@@ -665,7 +658,7 @@ class TestEdgeCases:
 
         result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, [])
 
-        assert result.completed
+        assert result.sub_step == DeploymentSubStep.COMPLETED
 
     def test_more_new_healthy_than_desired_still_completes(self) -> None:
         """new_healthy > desired and no old → completed."""
@@ -679,7 +672,7 @@ class TestEdgeCases:
 
         result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
 
-        assert result.completed
+        assert result.sub_step == DeploymentSubStep.COMPLETED
 
     def test_no_routes_no_failed_creates_new(self) -> None:
         """Empty routes list → PROGRESSING with scale out."""
@@ -767,7 +760,6 @@ class TestEdgeCases:
 
         # Even though new_healthy >= desired, PROVISIONING takes precedence
         assert result.sub_step == DeploymentSubStep.PROVISIONING
-        assert not result.completed
 
 
 # ===========================================================================
@@ -876,7 +868,7 @@ class TestRealisticScenario:
         # can_create = 0 (still_needed = 0), can_terminate = 1
         assert _count_rollout(r4) == 0
         assert len(_drain_ids(r4)) == 1
-        assert not r4.completed
+        assert r4.sub_step == DeploymentSubStep.PROGRESSING
 
         # Cycle 5: 0 old, 5 new healthy → completed
         routes_c5 = [
@@ -888,7 +880,7 @@ class TestRealisticScenario:
         ]
         r5 = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes_c5)
 
-        assert r5.completed
+        assert r5.sub_step == DeploymentSubStep.COMPLETED
 
 
 # ===========================================================================
@@ -899,26 +891,14 @@ class TestRealisticScenario:
 class TestDeadlockAndStall:
     """Test scenarios where the FSM could potentially stall."""
 
-    def test_surge_0_unavailable_0_deadlock(self) -> None:
-        """Both surge=0 and unavailable=0 → no progress possible (deadlock).
+    def test_surge_0_unavailable_0_rejected_by_validation(self) -> None:
+        """Both surge=0 and unavailable=0 → rejected at spec creation.
 
-        This is a configuration error: at least one must be > 0 for progress.
-        The FSM correctly returns PROGRESSING with no changes.
+        At least one of max_surge or max_unavailable must be positive
+        to avoid a deadlock where no progress is possible.
         """
-        deployment = make_deployment(desired=3)
-        spec = RollingUpdateSpec(max_surge=0, max_unavailable=0)
-        routes = [
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-        ]
-
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
-
-        assert result.sub_step == DeploymentSubStep.PROGRESSING
-        assert _count_rollout(result) == 0
-        assert len(_drain_ids(result)) == 0
-        # This is a known deadlock — no progress is possible.
+        with pytest.raises(ValueError, match="max_surge or max_unavailable must be positive"):
+            RollingUpdateSpec(max_surge=0, max_unavailable=0)
 
     def test_surge_0_unavailable_1_terminates_first_then_creates(self) -> None:
         """surge=0, unavailable=1 → terminate 1, then next cycle creates 1.
@@ -1027,7 +1007,7 @@ class TestDesiredReplicaCount:
 
         result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
 
-        assert result.completed
+        assert result.sub_step == DeploymentSubStep.COMPLETED
 
 
 # ===========================================================================
@@ -1125,4 +1105,3 @@ class TestConcurrentOperations:
 
         # old_active = 2 (both PROVISIONING and HEALTHY are active)
         assert result.sub_step == DeploymentSubStep.PROGRESSING
-        assert not result.completed
