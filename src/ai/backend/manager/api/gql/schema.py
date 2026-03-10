@@ -2,7 +2,7 @@ import strawberry
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
-from ai.backend.manager.api.gql.extensions import GQLLoggingExtension
+from ai.backend.manager.api.gql.extensions import GQLLoggingExtension, GQLValidationExtension
 
 from .agent import (
     agent_stats,
@@ -514,5 +514,6 @@ schema = CustomizedSchema(
     enable_federation_2=True,
     extensions=[
         GQLLoggingExtension,
+        GQLValidationExtension,
     ],
 )

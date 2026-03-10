@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, Any, Final, cast
 import graphene
 from graphene.validation import depth_limit_validator
 from graphql import ValidationRule, parse, validate
-from graphql.error import GraphQLError
 from graphql.execution import ExecutionResult
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam
@@ -30,13 +29,13 @@ from ai.backend.manager.api.gql_legacy.schema import (
     GQLMutationPrivilegeCheckMiddleware,
     GraphQueryContext,
 )
+from ai.backend.manager.api.graphql_rules import CustomIntrospectionRule
 from ai.backend.manager.api.rest.types import GQLContextDeps
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import GraphQLError as BackendGQLError
 from ai.backend.manager.errors.common import ServerFrozen
 
 if TYPE_CHECKING:
-    from graphql import FieldNode
     from strawberry.federation import Schema as StrawberrySchema
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -66,17 +65,6 @@ class GQLLoggingMiddleware:
                 info.operation.name,
             )
         return next(root, info, **args)
-
-
-class CustomIntrospectionRule(ValidationRule):
-    def enter_field(self, node: FieldNode, *_args: Any) -> None:
-        field_name = node.name.value
-        if field_name.startswith("__"):
-            if field_name == "__typename":
-                return
-            self.report_error(
-                GraphQLError(f"Cannot query '{field_name}': introspection is disabled.", node)
-            )
 
 
 class AdminHandler:
