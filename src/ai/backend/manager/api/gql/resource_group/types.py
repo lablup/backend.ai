@@ -12,7 +12,7 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Node, NodeID
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import PreemptionMode, PreemptionOrder, ResourceSlot
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.fair_share.types.common import (
     ResourceSlotGQL,
@@ -43,6 +43,8 @@ from ai.backend.manager.services.scaling_group.actions.get_resource_info import 
 
 __all__ = (
     "FairShareScalingGroupSpecGQL",
+    "PreemptionModeGQL",
+    "PreemptionOrderGQL",
     "ResourceGroupFilterGQL",
     "ResourceGroupGQL",
     "ResourceGroupMetadataGQL",
@@ -84,6 +86,46 @@ class SchedulerTypeGQL(StrEnum):
                 return cls.DRF
             case SchedulerType.FAIR_SHARE:
                 return cls.FAIR_SHARE
+
+
+@strawberry.enum(
+    name="PreemptionMode",
+    description="Added in 26.3.0. How to preempt a session when preemption is triggered.",
+)
+class PreemptionModeGQL(StrEnum):
+    """Preemption mode enumeration for GraphQL."""
+
+    TERMINATE = "terminate"
+    SUSPEND = "suspend"
+
+    @classmethod
+    def from_preemption_mode(cls, mode: PreemptionMode) -> PreemptionModeGQL:
+        """Convert from internal PreemptionMode to GQL type."""
+        match mode:
+            case PreemptionMode.TERMINATE:
+                return cls.TERMINATE
+            case PreemptionMode.SUSPEND:
+                return cls.SUSPEND
+
+
+@strawberry.enum(
+    name="PreemptionOrder",
+    description="Added in 26.3.0. Tie-breaking order for same-priority sessions during preemption.",
+)
+class PreemptionOrderGQL(StrEnum):
+    """Preemption order enumeration for GraphQL."""
+
+    OLDEST = "oldest"
+    NEWEST = "newest"
+
+    @classmethod
+    def from_preemption_order(cls, order: PreemptionOrder) -> PreemptionOrderGQL:
+        """Convert from internal PreemptionOrder to GQL type."""
+        match order:
+            case PreemptionOrder.OLDEST:
+                return cls.OLDEST
+            case PreemptionOrder.NEWEST:
+                return cls.NEWEST
 
 
 @strawberry.type(
@@ -140,6 +182,26 @@ class ResourceGroupSchedulerConfigGQL:
 
     type: SchedulerTypeGQL = strawberry.field(
         description="Type of scheduler used for session scheduling (fifo, lifo, drf, fair-share)."
+    )
+    preemptible_priority: int = strawberry.field(
+        description=(
+            "Added in 26.3.0. Sessions with priority <= this value are eligible for preemption. "
+            "Default is 5."
+        )
+    )
+    preemption_order: PreemptionOrderGQL = strawberry.field(
+        description=(
+            "Added in 26.3.0. Tie-breaking order for sessions with the same priority during "
+            "preemption. 'oldest' preempts the oldest session first, 'newest' preempts the newest. "
+            "Default is 'oldest'."
+        )
+    )
+    preemption_mode: PreemptionModeGQL = strawberry.field(
+        description=(
+            "Added in 26.3.0. How to preempt a session when preemption is triggered. "
+            "'terminate' destroys the session, 'suspend' saves state for resumption. "
+            "Default is 'terminate'."
+        )
     )
 
 
@@ -314,6 +376,13 @@ class ResourceGroupGQL(Node):
             ),
             scheduler=ResourceGroupSchedulerConfigGQL(
                 type=SchedulerTypeGQL.from_scheduler_type(data.scheduler.name),
+                preemptible_priority=data.scheduler.options.preemptible_priority,
+                preemption_order=PreemptionOrderGQL.from_preemption_order(
+                    data.scheduler.options.preemption_order
+                ),
+                preemption_mode=PreemptionModeGQL.from_preemption_mode(
+                    data.scheduler.options.preemption_mode
+                ),
             ),
             _fair_share_spec_data=data.fair_share_spec,
         )
