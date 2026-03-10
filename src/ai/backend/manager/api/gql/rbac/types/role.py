@@ -531,8 +531,8 @@ class RevokeRoleInput:
         )
 
 
-@strawberry.input(description="Added in 26.3.0. Input for bulk assigning a role to multiple users")
-class BulkAssignRoleInput:
+@strawberry.input(name="BulkAssignRoleInput", description="Added in 26.3.0. Input for bulk assigning a role to multiple users")
+class BulkAssignRoleInputGQL:
     role_id: uuid.UUID
     user_ids: list[uuid.UUID]
 
@@ -541,8 +541,8 @@ class BulkAssignRoleInput:
         return BulkCreator(specs=specs)
 
 
-@strawberry.input(description="Added in 26.3.0. Input for bulk revoking a role from multiple users")
-class BulkRevokeRoleInput:
+@strawberry.input(name="BulkRevokeRoleInput", description="Added in 26.3.0. Input for bulk revoking a role from multiple users")
+class BulkRevokeRoleInputGQL:
     role_id: uuid.UUID
     user_ids: list[uuid.UUID]
 

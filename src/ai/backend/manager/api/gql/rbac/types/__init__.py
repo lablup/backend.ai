@@ -27,10 +27,10 @@ from .permission import (
 from .role import (
     AssignRoleInput,
     BulkAssignRoleErrorGQL,
-    BulkAssignRoleInput,
+    BulkAssignRoleInputGQL,
     BulkAssignRolePayloadGQL,
     BulkRevokeRoleErrorGQL,
-    BulkRevokeRoleInput,
+    BulkRevokeRoleInputGQL,
     BulkRevokeRolePayloadGQL,
     CreateRoleInput,
     DeleteRoleInput,
@@ -94,8 +94,8 @@ __all__ = [
     "PurgeRoleInput",
     "AssignRoleInput",
     "RevokeRoleInput",
-    "BulkAssignRoleInput",
-    "BulkRevokeRoleInput",
+    "BulkAssignRoleInputGQL",
+    "BulkRevokeRoleInputGQL",
     # Payloads
     "DeletePermissionPayload",
     "DeleteRolePayload",

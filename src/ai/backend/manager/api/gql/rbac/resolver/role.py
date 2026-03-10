@@ -14,13 +14,14 @@ from ai.backend.manager.api.gql.rbac.fetcher.role import (
     fetch_role_assignments,
     fetch_roles,
 )
+from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.api.gql.rbac.types import (
     AssignRoleInput,
     BulkAssignRoleErrorGQL,
-    BulkAssignRoleInput,
+    BulkAssignRoleInputGQL,
     BulkAssignRolePayloadGQL,
     BulkRevokeRoleErrorGQL,
-    BulkRevokeRoleInput,
+    BulkRevokeRoleInputGQL,
     BulkRevokeRolePayloadGQL,
     CreateRoleInput,
     DeleteRoleInput,
@@ -258,8 +259,9 @@ async def admin_revoke_role(
 )  # type: ignore[misc]
 async def admin_bulk_assign_role(
     info: Info[StrawberryGQLContext],
-    input: BulkAssignRoleInput,
+    input: BulkAssignRoleInputGQL,
 ) -> BulkAssignRolePayloadGQL:
+    check_admin_only()
     action_result = (
         await info.context.processors.permission_controller.bulk_assign_role.wait_for_complete(
             BulkAssignRoleAction(bulk_creator=input.to_bulk_creator())
@@ -279,8 +281,9 @@ async def admin_bulk_assign_role(
 )  # type: ignore[misc]
 async def admin_bulk_revoke_role(
     info: Info[StrawberryGQLContext],
-    input: BulkRevokeRoleInput,
+    input: BulkRevokeRoleInputGQL,
 ) -> BulkRevokeRolePayloadGQL:
+    check_admin_only()
     action_result = (
         await info.context.processors.permission_controller.bulk_revoke_role.wait_for_complete(
             BulkRevokeRoleAction(input=input.to_input())

@@ -22,9 +22,9 @@ from .resolver import (
 )
 from .types import (
     AssignRoleInput,
-    BulkAssignRoleInput,
+    BulkAssignRoleInputGQL,
     BulkAssignRolePayloadGQL,
-    BulkRevokeRoleInput,
+    BulkRevokeRoleInputGQL,
     BulkRevokeRolePayloadGQL,
     CreatePermissionInput,
     CreateRoleInput,
@@ -81,8 +81,8 @@ __all__ = (
     "UpdatePermissionInput",
     "AssignRoleInput",
     "RevokeRoleInput",
-    "BulkAssignRoleInput",
-    "BulkRevokeRoleInput",
+    "BulkAssignRoleInputGQL",
+    "BulkRevokeRoleInputGQL",
     # Payloads
     "BulkAssignRolePayloadGQL",
     "BulkRevokeRolePayloadGQL",
