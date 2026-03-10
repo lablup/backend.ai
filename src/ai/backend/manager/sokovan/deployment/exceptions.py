@@ -79,3 +79,31 @@ class ServiceInfoRetrievalFailed(DeploymentError):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class DeploymentAlreadyInProgress(DeploymentError):
+    """Raised when trying to activate a revision while another deployment is in progress."""
+
+    error_type = "https://api.backend.ai/probs/deployment-already-in-progress"
+    error_title = "Another deployment is already in progress."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class InvalidRollingUpdateConfig(DeploymentError):
+    """Raised when rolling update config is invalid (e.g. max_surge + max_unavailable < 1)."""
+
+    error_type = "https://api.backend.ai/probs/invalid-rolling-update-config"
+    error_title = "Invalid rolling update configuration."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )

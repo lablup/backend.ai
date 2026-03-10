@@ -37,7 +37,6 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import Deployme
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.manager.sokovan.deployment.strategy.evaluator import DeploymentStrategyEvaluator
-from ai.backend.manager.sokovan.deployment.strategy.types import StrategyEvaluationSummary
 from ai.backend.manager.sokovan.deployment.types import (
     DeploymentExecutionError,
     DeploymentExecutionResult,
@@ -73,7 +72,12 @@ class DeployingEvaluatePreStep:
         self._deployment_repo = deployment_repo
 
     async def run(self) -> None:
-        """Run evaluation and apply side-effects (sub_step update + route changes)."""
+        """Run evaluation and apply side-effects (sub_step update + route changes).
+
+        Sub-step updates and route mutations are applied in a single transaction
+        via ``apply_deploying_pre_step`` to prevent inconsistent state where
+        sub_step is updated (e.g. COMPLETED) but route creation fails.
+        """
         deployments = await self._deployment_repo.get_endpoints_by_statuses([
             EndpointLifecycle.DEPLOYING
         ])
@@ -81,20 +85,8 @@ class DeployingEvaluatePreStep:
             return
         log.info("pre-step evaluate: processing {} deployments", len(deployments))
         eval_result = await self._evaluator.evaluate(deployments)
-        await self._update_sub_steps(eval_result)
-        await self._apply_route_changes(eval_result)
 
-    async def _update_sub_steps(self, eval_result: StrategyEvaluationSummary) -> None:
-        """Bulk-update the sub_step column based on evaluation results."""
-        if eval_result.assignments:
-            await self._deployment_repo.update_sub_steps(eval_result.assignments)
-
-    async def _apply_route_changes(self, eval_result: StrategyEvaluationSummary) -> None:
-        """Apply aggregated route mutations from the evaluation result."""
         changes = eval_result.route_changes
-        if not changes.rollout_specs and not changes.drain_route_ids:
-            return
-
         scale_in_updater: BatchUpdater[RoutingRow] | None = None
         if changes.drain_route_ids:
             scale_in_updater = BatchUpdater(
@@ -106,12 +98,19 @@ class DeployingEvaluatePreStep:
                 conditions=[RouteConditions.by_ids(changes.drain_route_ids)],
             )
 
-        await self._deployment_repo.scale_routes(changes.rollout_specs, scale_in_updater)
-        log.debug(
-            "Applied route changes: {} created, {} terminated",
-            len(changes.rollout_specs),
-            len(changes.drain_route_ids),
-        )
+        # Apply sub_step updates and route mutations atomically
+        if eval_result.assignments or changes.rollout_specs or scale_in_updater:
+            await self._deployment_repo.apply_deploying_pre_step(
+                eval_result.assignments,
+                changes.rollout_specs,
+                scale_in_updater,
+            )
+            log.debug(
+                "Applied pre-step: {} sub_step groups, {} routes created, {} routes drained",
+                len(eval_result.assignments),
+                len(changes.rollout_specs),
+                len(changes.drain_route_ids),
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -264,6 +263,20 @@ class DeployingProgressingHandler(DeploymentHandler):
         rolled_back: list[DeploymentInfo] = []
 
         for deployment in deployments:
+            # Skip deployments that have been marked for destruction during DEPLOYING.
+            # Without this guard, a COMPLETED sub_step would swap revisions and
+            # transition the deployment back to READY, resurrecting it.
+            if deployment.state.lifecycle in (
+                EndpointLifecycle.DESTROYING,
+                EndpointLifecycle.DESTROYED,
+            ):
+                log.warning(
+                    "deployment {}: skipping — lifecycle is {} during DEPLOYING",
+                    deployment.id,
+                    deployment.state.lifecycle,
+                )
+                continue
+
             match deployment.sub_step:
                 case DeploymentSubStep.COMPLETED:
                     completed.append(deployment)
@@ -274,8 +287,12 @@ class DeployingProgressingHandler(DeploymentHandler):
 
         if completed:
             endpoint_ids = {deployment.id for deployment in completed}
-            await self._deployment_repo.complete_deployment_revision_swap(endpoint_ids)
-            log.info("Swapped revision for {} completed deployments", len(endpoint_ids))
+            swapped = await self._deployment_repo.complete_deployment_revision_swap(endpoint_ids)
+            log.info(
+                "Swapped revision for {}/{} completed deployments",
+                swapped,
+                len(endpoint_ids),
+            )
 
         if rolled_back:
             endpoint_ids = {deployment.id for deployment in rolled_back}

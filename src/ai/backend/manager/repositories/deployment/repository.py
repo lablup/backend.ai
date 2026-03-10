@@ -552,6 +552,13 @@ class DeploymentRepository:
         """Fetch routes for multiple endpoints."""
         return await self._db_source.fetch_active_routes_by_endpoint_ids(endpoint_ids)
 
+    async def fetch_deploying_routes_by_endpoint_ids(
+        self,
+        endpoint_ids: set[uuid.UUID],
+    ) -> Mapping[uuid.UUID, list[RouteInfo]]:
+        """Fetch all non-terminated routes for DEPLOYING endpoints (includes FAILED_TO_START)."""
+        return await self._db_source.fetch_deploying_routes_by_endpoint_ids(endpoint_ids)
+
     @deployment_repository_resilience.apply()
     async def scale_routes(
         self,
@@ -1224,9 +1231,9 @@ class DeploymentRepository:
     async def complete_deployment_revision_swap(
         self,
         endpoint_ids: set[uuid.UUID],
-    ) -> None:
+    ) -> int:
         """Swap deploying_revision to current_revision for completed deployments."""
-        await self._db_source.complete_deployment_revision_swap(endpoint_ids)
+        return await self._db_source.complete_deployment_revision_swap(endpoint_ids)
 
     @deployment_repository_resilience.apply()
     async def clear_deploying_revision(
@@ -1243,6 +1250,19 @@ class DeploymentRepository:
     ) -> None:
         """Bulk-update the sub_step column for multiple endpoints."""
         await self._db_source.update_sub_steps(sub_step_map)
+
+    async def apply_deploying_pre_step(
+        self,
+        sub_step_map: dict[DeploymentSubStep, set[uuid.UUID]],
+        scale_out_creators: Sequence[Creator[RoutingRow]],
+        scale_in_updater: BatchUpdater[RoutingRow] | None,
+    ) -> None:
+        """Atomically update sub_steps and apply route changes in a single transaction."""
+        await self._db_source.apply_deploying_pre_step(
+            sub_step_map,
+            scale_out_creators,
+            scale_in_updater,
+        )
 
     @deployment_repository_resilience.apply()
     async def get_last_deployment_histories(

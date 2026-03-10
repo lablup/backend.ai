@@ -1452,6 +1452,37 @@ class DeploymentDBSource:
                 routes_by_endpoint[row.endpoint].append(row.to_route_info())
             return routes_by_endpoint
 
+    async def fetch_deploying_routes_by_endpoint_ids(
+        self,
+        endpoint_ids: set[uuid.UUID],
+    ) -> Mapping[uuid.UUID, list[RouteInfo]]:
+        """Fetch all non-terminated routes for DEPLOYING endpoints.
+
+        Unlike ``fetch_active_routes_by_endpoint_ids``, this also includes
+        ``FAILED_TO_START`` routes so the rolling update strategy can detect
+        failures and trigger rollback correctly.  ``TERMINATED`` routes are
+        excluded because they are already cleaned up.
+        """
+        if not endpoint_ids:
+            return {}
+
+        # All statuses except TERMINATED
+        included_statuses = {s for s in RouteStatus if s != RouteStatus.TERMINATED}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(RoutingRow).where(
+                sa.and_(
+                    RoutingRow.endpoint.in_(endpoint_ids),
+                    RoutingRow.status.in_(included_statuses),
+                )
+            )
+            result = await db_sess.execute(query)
+            rows: Sequence[RoutingRow] = result.scalars().all()
+            routes_by_endpoint: defaultdict[uuid.UUID, list[RouteInfo]] = defaultdict(list)
+            for row in rows:
+                routes_by_endpoint[row.endpoint].append(row.to_route_info())
+            return routes_by_endpoint
+
     async def scale_routes(
         self,
         scale_out_creators: Sequence[Creator[RoutingRow]],
@@ -2182,6 +2213,11 @@ class DeploymentDBSource:
 
         Returns the current (previous) revision ID for reference.
         The coordinator will swap deploying_revision → current_revision on completion.
+
+        The caller (service layer) should check ``deploying_revision`` is ``None``
+        before calling this method.  As an additional safety net, the UPDATE WHERE
+        clause includes ``deploying_revision IS NULL`` so that a concurrent write
+        becomes a no-op rather than silently overwriting.
         """
         async with self._begin_session_read_committed() as db_sess:
             # Get current revision first
@@ -2189,10 +2225,14 @@ class DeploymentDBSource:
             result = await db_sess.execute(query)
             previous_revision_id = result.scalar_one_or_none()
 
-            # Set deploying_revision and transition to DEPLOYING
+            # Set deploying_revision and transition to DEPLOYING.
+            # The deploying_revision IS NULL guard prevents concurrent activations.
             update_query = (
                 sa.update(EndpointRow)
-                .where(EndpointRow.id == endpoint_id)
+                .where(
+                    EndpointRow.id == endpoint_id,
+                    EndpointRow.deploying_revision.is_(None),
+                )
                 .values(
                     deploying_revision=revision_id,
                     lifecycle_stage=EndpointLifecycle.DEPLOYING,
@@ -2329,7 +2369,7 @@ class DeploymentDBSource:
     async def complete_deployment_revision_swap(
         self,
         endpoint_ids: set[uuid.UUID],
-    ) -> None:
+    ) -> int:
         """Swap deploying_revision to current_revision for completed deployments.
 
         Sets current_revision = deploying_revision and deploying_revision = NULL
@@ -2337,9 +2377,14 @@ class DeploymentDBSource:
 
         Args:
             endpoint_ids: Set of endpoint IDs to swap revisions for.
+
+        Returns:
+            Number of rows actually updated.  A value less than ``len(endpoint_ids)``
+            indicates that some deployments had already been swapped (e.g. by a
+            concurrent handler invocation) or had their deploying_revision cleared.
         """
         if not endpoint_ids:
-            return
+            return 0
         async with self._begin_session_read_committed() as db_sess:
             stmt = (
                 sa.update(EndpointRow)
@@ -2352,7 +2397,8 @@ class DeploymentDBSource:
                     deploying_revision=None,
                 )
             )
-            await db_sess.execute(stmt)
+            cursor_result = cast(CursorResult[Any], await db_sess.execute(stmt))
+            return cursor_result.rowcount
 
     async def clear_deploying_revision(
         self,
@@ -2395,6 +2441,43 @@ class DeploymentDBSource:
                     .values(sub_step=sub_step)
                 )
                 await db_sess.execute(stmt)
+
+    async def apply_deploying_pre_step(
+        self,
+        sub_step_map: dict[DeploymentSubStep, set[uuid.UUID]],
+        scale_out_creators: Sequence[Creator[RoutingRow]],
+        scale_in_updater: BatchUpdater[RoutingRow] | None,
+    ) -> None:
+        """Atomically update sub_steps and apply route changes in a single transaction.
+
+        This prevents an inconsistent state where sub_step is updated (e.g. COMPLETED)
+        but route mutations fail, which could cause the handler to swap revisions
+        without the expected routes being in place.
+
+        Args:
+            sub_step_map: Mapping from sub_step value to endpoint IDs.
+            scale_out_creators: Route creators for new routes.
+            scale_in_updater: Batch updater for draining old routes.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            # 1. Update sub_steps
+            for sub_step, endpoint_ids in sub_step_map.items():
+                if not endpoint_ids:
+                    continue
+                stmt = (
+                    sa.update(EndpointRow)
+                    .where(EndpointRow.id.in_(endpoint_ids))
+                    .values(sub_step=sub_step)
+                )
+                await db_sess.execute(stmt)
+
+            # 2. Scale out routes
+            for creator in scale_out_creators:
+                await execute_creator(db_sess, creator)
+
+            # 3. Scale in routes
+            if scale_in_updater:
+                await execute_batch_updater(db_sess, scale_in_updater)
 
     # ========== Access Token Operations ==========
 
