@@ -1,6 +1,7 @@
 from ai.backend.common.types import SessionId, SessionResult, SessionTypes
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.types import QueryCondition, QueryOption
+from ai.backend.manager.services.session.lifecycle import SessionLifecycleManager
 
 from .row import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
@@ -14,7 +15,6 @@ from .row import (
     ConcurrencyUsed,
     KernelLoadingStrategy,
     SessionDependencyRow,
-    SessionLifecycleManager,
     SessionRow,
     by_domain_name,
     by_raw_filter,
