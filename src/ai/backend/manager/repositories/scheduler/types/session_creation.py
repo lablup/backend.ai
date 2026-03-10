@@ -92,6 +92,7 @@ class SessionCreationSpec:
     creation_spec: dict[str, Any]
 
     # Optional parameters
+    is_preemptible: bool = True
     scaling_group: str | None = None
     session_tag: str | None = None
     starts_at: datetime | None = None
@@ -262,6 +263,7 @@ class SessionEnqueueData:
     cluster_mode: str  # Store as string for DB
     cluster_size: int
     priority: int
+    is_preemptible: bool
     status: str  # SessionStatus.PENDING
     status_history: dict[str, str]
     requested_slots: ResourceSlot

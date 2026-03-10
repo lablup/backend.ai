@@ -99,6 +99,8 @@ class SessionWorkload:
     starts_at: datetime | None = None
     # Whether this is a private session (SFTP)
     is_private: bool = False
+    # Whether this session can be preempted
+    is_preemptible: bool = True
     # Kernels to be scheduled for this session
     kernels: list[KernelWorkload] = field(default_factory=list)
     # Manually designated agent (for superadmin)

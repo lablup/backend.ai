@@ -323,6 +323,7 @@ class TestEnqueueSessionSchedulingHistory:
             cluster_mode=ClusterMode.SINGLE_NODE.name,
             cluster_size=1,
             priority=0,
+            is_preemptible=True,
             status=SessionStatus.PENDING.name,
             status_history={SessionStatus.PENDING.name: now.isoformat()},
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),

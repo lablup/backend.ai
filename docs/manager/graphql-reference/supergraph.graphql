@@ -11589,6 +11589,11 @@ type SessionV2MetadataInfo
   """Scheduling priority of the session."""
   priority: Int!
 
+  """
+  Whether this session is eligible for preemption by higher-priority sessions.
+  """
+  isPreemptible: Boolean!
+
   """Optional user-provided tag for the session."""
   tag: String
 }

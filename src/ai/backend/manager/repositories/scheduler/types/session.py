@@ -51,6 +51,7 @@ class PendingSessionData:
     domain_name: str
     scaling_group_name: str
     priority: int
+    is_preemptible: bool
     session_type: SessionTypes
     cluster_mode: ClusterMode
     starts_at: datetime | None
@@ -74,6 +75,7 @@ class PendingSessionData:
             cluster_mode=self.cluster_mode,
             starts_at=self.starts_at,
             is_private=self.is_private,
+            is_preemptible=self.is_preemptible,
             kernels=kernel_workloads,
             designated_agent_ids=self.designated_agent_ids,
         )
