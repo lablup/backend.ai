@@ -14,7 +14,9 @@ import pytest
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.group.row import GroupRow as GroupRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
+from ai.backend.manager.models.session.row import SessionRow as SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.image.options import ImageConditions
