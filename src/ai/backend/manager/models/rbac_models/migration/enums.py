@@ -118,7 +118,6 @@ class EntityType(enum.StrEnum):
     NOTIFICATION_CHANNEL = "notification_channel"
     NOTIFICATION_RULE = "notification_rule"
     MODEL_DEPLOYMENT = "model_deployment"
-    AGENT = "agent"
 
     def to_original(self) -> OriginalEntityType:
         return OriginalEntityType(self.value)
