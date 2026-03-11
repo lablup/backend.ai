@@ -157,6 +157,21 @@ class DeploymentSubStatus(enum.StrEnum):
     """
 
 
+class DeploymentSubStep(DeploymentSubStatus):
+    """Sub-steps for the DEPLOYING lifecycle phase.
+
+    - PROVISIONING: New revision routes are being provisioned; waiting for readiness.
+    - PROGRESSING: Actively replacing old routes with new routes.
+    - COMPLETED: All strategy conditions satisfied; ready for revision swap.
+    - ROLLED_BACK: All new routes failed; ready for rollback cleanup.
+    """
+
+    PROVISIONING = "provisioning"
+    PROGRESSING = "progressing"
+    COMPLETED = "completed"
+    ROLLED_BACK = "rolled_back"
+
+
 @dataclass(frozen=True)
 class DeploymentLifecycleStatus:
     """Target lifecycle state for a deployment status transition.
@@ -179,15 +194,23 @@ class DeploymentLifecycleStatus:
 class DeploymentStatusTransitions:
     """Status transitions for deployment handlers.
 
-    Deployment handlers only have success/failure outcomes (no expired/give_up).
+    Simple handlers use ``success`` / ``failure``.
+    Handlers with retry classification use ``need_retry`` / ``expired`` / ``give_up``
+    instead of ``failure``.
 
     Attributes:
         success: Target lifecycle when handler succeeds, None means no change
-        failure: Target lifecycle when handler fails, None means no change
+        failure: Target lifecycle when handler fails (simple handlers)
+        need_retry: Target lifecycle when handler fails but can retry
+        expired: Target lifecycle when time elapsed in current state
+        give_up: Target lifecycle when retry count exceeded
     """
 
     success: DeploymentLifecycleStatus | None = None
     failure: DeploymentLifecycleStatus | None = None
+    need_retry: DeploymentLifecycleStatus | None = None
+    expired: DeploymentLifecycleStatus | None = None
+    give_up: DeploymentLifecycleStatus | None = None
 
 
 @dataclass(frozen=True)
