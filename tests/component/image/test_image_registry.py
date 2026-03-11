@@ -10,7 +10,6 @@ from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.image.request import RescanImagesRequest
 from ai.backend.common.dto.manager.image.response import RescanImagesResponse
-from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageID
 from ai.backend.manager.data.image.types import ResourceLimitInput
 from ai.backend.manager.errors.image import ImageNotFound
@@ -28,6 +27,7 @@ from .conftest import ImageFactoryHelper
 
 class TestImageRescan:
     @pytest.mark.xfail(reason="Requires live container registry", strict=False)
+    @pytest.mark.timeout(10)
     async def test_rescan_returns_response(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -115,7 +115,9 @@ class TestSetImageResourceLimit:
         result = await image_processors.set_image_resource_limit_by_id.wait_for_complete(action)
         mem_limit = next((r for r in result.image_data.resource_limits if r.key == "mem"), None)
         assert mem_limit is not None
-        assert str(mem_limit.min) == "536870912"
+        # INTRINSIC_SLOTS_MIN["mem"] = "1073741824" (1 GiB) > "536870912" (512 MiB),
+        # so the resources property takes max(mins) and returns the intrinsic minimum.
+        assert str(mem_limit.min) == "1073741824"
         assert str(mem_limit.max) == "8589934592"
 
     async def test_set_multiple_limits_sequentially(
@@ -210,7 +212,14 @@ class TestClearImageResourceLimit:
         result = await image_processors.clear_image_custom_resource_limit_by_id.wait_for_complete(
             action
         )
-        assert result.image_data.resource_limits == []
+        # After clearing _resources, only label-derived intrinsic defaults remain (cpu, mem).
+        # Custom max values from the fixture (cpu: "4", mem: "4294967296") are cleared.
+        # ResourceLimit.max is typed as Decimal but is actually None for label defaults,
+        # so compare via str() to avoid mypy unreachable-statement errors.
+        by_key = {r.key: r for r in result.image_data.resource_limits}
+        assert set(by_key.keys()) == {"cpu", "mem"}
+        assert str(by_key["cpu"].max) == "None"
+        assert str(by_key["mem"].max) == "None"
 
     async def test_clear_idempotent_when_no_custom_limits(
         self,
@@ -226,7 +235,11 @@ class TestClearImageResourceLimit:
         result = await image_processors.clear_image_custom_resource_limit_by_id.wait_for_complete(
             action
         )
-        assert result.image_data.resource_limits == []
+        # After clearing twice, only label-derived intrinsic defaults remain.
+        by_key = {r.key: r for r in result.image_data.resource_limits}
+        assert set(by_key.keys()) == {"cpu", "mem"}
+        assert str(by_key["cpu"].max) == "None"
+        assert str(by_key["mem"].max) == "None"
 
     async def test_clear_by_canonical_name(
         self,
@@ -241,7 +254,11 @@ class TestClearImageResourceLimit:
             architecture="x86_64",
         )
         result = await image_processors.clear_image_custom_resource_limit.wait_for_complete(action)
-        assert result.image_data.resource_limits == []
+        # After clearing _resources, only label-derived intrinsic defaults remain (cpu, mem).
+        by_key = {r.key: r for r in result.image_data.resource_limits}
+        assert set(by_key.keys()) == {"cpu", "mem"}
+        assert str(by_key["cpu"].max) == "None"
+        assert str(by_key["mem"].max) == "None"
 
     async def test_clear_limit_by_nonexistent_image_id(
         self,
@@ -258,10 +275,10 @@ class TestClearImageResourceLimit:
         image_processors: ImageProcessors,
         image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
     ) -> None:
-        """F-CLEAR-2: Clear by non-existent canonical name → UnknownImageReference."""
+        """F-CLEAR-2: Clear by non-existent canonical name → ImageNotFound."""
         action = ClearImageCustomResourceLimitAction(
             image_canonical="nonexistent.registry/nonexistent/image:notfound",
             architecture="x86_64",
         )
-        with pytest.raises(UnknownImageReference):
+        with pytest.raises(ImageNotFound):
             await image_processors.clear_image_custom_resource_limit.wait_for_complete(action)
