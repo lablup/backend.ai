@@ -55,11 +55,13 @@ class DestroyingDeploymentHandler(DeploymentHandler):
         """Define state transitions for destroying deployment handler (BEP-1030).
 
         - success: Deployment → DESTROYED
-        - need_retry: Deployment → DESTROYED (always proceed to destroyed)
+        - failure (all): Deployment → DESTROYED (always proceed to destroyed)
         """
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
             need_retry=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
+            expired=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
+            give_up=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
         )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:

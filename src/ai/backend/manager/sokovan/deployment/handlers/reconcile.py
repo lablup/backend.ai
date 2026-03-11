@@ -57,11 +57,13 @@ class ReconcileDeploymentHandler(DeploymentHandler):
         """Define state transitions for reconcile deployment handler (BEP-1030).
 
         - success: None (stays READY)
-        - need_retry: Deployment → SCALING (replica-route mismatch needs re-scaling)
+        - failure: Deployment → SCALING (replica-route mismatch needs re-scaling)
         """
         return DeploymentStatusTransitions(
             success=None,
             need_retry=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
+            expired=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
+            give_up=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
         )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:

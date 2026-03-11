@@ -54,11 +54,10 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         """Define state transitions for check replica deployment handler (BEP-1030).
 
         - success: Deployment → SCALING
-        - need_retry: None (stays in current state)
+        - failure: None (stays in current state for all failure categories)
         """
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
-            need_retry=None,
         )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
