@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.rbac.request import (
     DeleteRoleRequest,
     PurgeRoleRequest,
     RoleFilter,
+    RoleOrder,
     SearchRolesRequest,
     UpdateRoleRequest,
 )
@@ -21,7 +22,12 @@ from ai.backend.common.dto.manager.rbac.response import (
     SearchRolesResponse,
     UpdateRoleResponse,
 )
-from ai.backend.common.dto.manager.rbac.types import RoleSource, RoleStatus
+from ai.backend.common.dto.manager.rbac.types import (
+    OrderDirection,
+    RoleOrderField,
+    RoleSource,
+    RoleStatus,
+)
 
 from .conftest import RoleFactory
 
@@ -167,3 +173,165 @@ class TestRoleCRUD:
         # 404 after purge
         with pytest.raises(NotFoundError):
             await admin_registry.rbac.get_role(role_id)
+
+
+class TestRoleSearch:
+    """Search roles with status filters, name filtering, ordering, and pagination."""
+
+    async def test_search_active_roles_excludes_deleted(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+    ) -> None:
+        unique = secrets.token_hex(4)
+        prefix = f"search-active-{unique}"
+        active_role = await role_factory(name=f"{prefix}-a")
+        deleted_role = await role_factory(name=f"{prefix}-d")
+
+        # Soft-delete one
+        await admin_registry.rbac.delete_role(DeleteRoleRequest(role_id=deleted_role.role.id))
+
+        result = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(
+                filter=RoleFilter(
+                    name=StringFilter(contains=prefix),
+                    statuses=[RoleStatus.ACTIVE],
+                ),
+            )
+        )
+        assert isinstance(result, SearchRolesResponse)
+        role_ids = [r.id for r in result.roles]
+        assert active_role.role.id in role_ids
+        assert deleted_role.role.id not in role_ids
+
+    async def test_search_deleted_roles_excludes_active(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+    ) -> None:
+        unique = secrets.token_hex(4)
+        prefix = f"search-deleted-{unique}"
+        active_role = await role_factory(name=f"{prefix}-a")
+        deleted_role = await role_factory(name=f"{prefix}-d")
+
+        await admin_registry.rbac.delete_role(DeleteRoleRequest(role_id=deleted_role.role.id))
+
+        result = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(
+                filter=RoleFilter(
+                    name=StringFilter(contains=prefix),
+                    statuses=[RoleStatus.DELETED],
+                ),
+            )
+        )
+        role_ids = [r.id for r in result.roles]
+        assert deleted_role.role.id in role_ids
+        assert active_role.role.id not in role_ids
+        assert all(r.status == RoleStatus.DELETED for r in result.roles)
+
+    async def test_search_by_name_filter(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+    ) -> None:
+        unique = secrets.token_hex(4)
+        marker = f"namefilter-{unique}"
+        created = await role_factory(name=marker)
+
+        result = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(
+                filter=RoleFilter(name=StringFilter(contains=marker)),
+            )
+        )
+        assert len(result.roles) >= 1
+        assert any(r.id == created.role.id for r in result.roles)
+        assert all(marker in r.name for r in result.roles)
+
+    async def test_search_pagination_limit_offset(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+    ) -> None:
+        unique = secrets.token_hex(4)
+        prefix = f"page-{unique}"
+        roles = []
+        for i in range(3):
+            r = await role_factory(name=f"{prefix}-{i:02d}")
+            roles.append(r)
+
+        # Fetch first page (limit=2)
+        page1 = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(
+                filter=RoleFilter(name=StringFilter(contains=prefix)),
+                order=[RoleOrder(field=RoleOrderField.NAME, direction=OrderDirection.ASC)],
+                limit=2,
+                offset=0,
+            )
+        )
+        assert len(page1.roles) == 2
+        assert page1.pagination.total >= 3
+        assert page1.pagination.offset == 0
+        assert page1.pagination.limit == 2
+
+        # Fetch second page (offset=2)
+        page2 = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(
+                filter=RoleFilter(name=StringFilter(contains=prefix)),
+                order=[RoleOrder(field=RoleOrderField.NAME, direction=OrderDirection.ASC)],
+                limit=2,
+                offset=2,
+            )
+        )
+        assert len(page2.roles) >= 1
+        assert page2.pagination.offset == 2
+
+        # No overlap between pages
+        page1_ids = {r.id for r in page1.roles}
+        page2_ids = {r.id for r in page2.roles}
+        assert page1_ids.isdisjoint(page2_ids)
+
+    async def test_search_returns_pagination_info(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+    ) -> None:
+        unique = secrets.token_hex(4)
+        marker = f"paginfo-{unique}"
+        await role_factory(name=marker)
+
+        result = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(
+                filter=RoleFilter(name=StringFilter(contains=marker)),
+            )
+        )
+        assert result.pagination.total >= 1
+        assert result.pagination.offset == 0
+
+    async def test_search_with_ordering(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+    ) -> None:
+        unique = secrets.token_hex(4)
+        prefix = f"order-{unique}"
+        await role_factory(name=f"{prefix}-b")
+        await role_factory(name=f"{prefix}-a")
+        await role_factory(name=f"{prefix}-c")
+
+        asc_result = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(
+                filter=RoleFilter(name=StringFilter(contains=prefix)),
+                order=[RoleOrder(field=RoleOrderField.NAME, direction=OrderDirection.ASC)],
+            )
+        )
+        names_asc = [r.name for r in asc_result.roles]
+        assert names_asc == sorted(names_asc)
+
+        desc_result = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(
+                filter=RoleFilter(name=StringFilter(contains=prefix)),
+                order=[RoleOrder(field=RoleOrderField.NAME, direction=OrderDirection.DESC)],
+            )
+        )
+        names_desc = [r.name for r in desc_result.roles]
+        assert names_desc == sorted(names_desc, reverse=True)
