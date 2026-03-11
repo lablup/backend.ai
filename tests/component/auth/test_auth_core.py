@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.user import users
 
 from .conftest import AuthUserFixtureData
@@ -203,7 +204,7 @@ class TestSignout:
                 )
             ).first()
             assert user_row is not None
-            assert str(user_row.status) == "inactive"
+            assert user_row.status == UserStatus.INACTIVE
 
             keypair_row = (
                 await conn.execute(
