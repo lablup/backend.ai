@@ -25,6 +25,20 @@ class DeploymentError(BackendAIError):
         )
 
 
+class DeploymentAlreadyInProgress(DeploymentError):
+    """Raised when a deployment already has a deploying revision in progress."""
+
+    error_type = "https://api.backend.ai/probs/deployment-already-in-progress"
+    error_title = "Deployment already in progress."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
 class InvalidEndpointState(DeploymentError):
     """Raised when an endpoint is in an invalid state for the requested operation."""
 

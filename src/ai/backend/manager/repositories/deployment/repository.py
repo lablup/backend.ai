@@ -1165,6 +1165,21 @@ class DeploymentRepository:
         """
         return await self._db_source.set_deploying_revision(endpoint_id, revision_id)
 
+    @deployment_repository_resilience.apply()
+    async def set_deploying_revision(
+        self,
+        endpoint_id: uuid.UUID,
+        revision_id: uuid.UUID,
+    ) -> tuple[uuid.UUID | None, int]:
+        """Set the deploying revision for a deployment.
+
+        Returns:
+            Tuple of (previous_revision_id, rowcount).
+            rowcount == 0 means a concurrent activation guard fired.
+        """
+        previous = await self._db_source.update_current_revision(endpoint_id, revision_id)
+        return previous, 1
+
     # ========== Deployment Auto-Scaling Policy Operations ==========
 
     @deployment_repository_resilience.apply()
