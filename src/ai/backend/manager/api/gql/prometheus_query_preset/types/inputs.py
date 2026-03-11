@@ -124,16 +124,28 @@ class MetricLabelEntryInput:
     key: str = strawberry.field(description="Label key.")
     value: str = strawberry.field(description="Label value.")
 
+
+@strawberry.input(
+    name="ExecuteQueryDefinitionOptionsInput",
+    description="Added in 26.3.0. Options for executing a query definition.",
+)
+class ExecuteQueryDefinitionOptionsInput:
+    filter_labels: list[MetricLabelEntryInput] | None = strawberry.field(
+        default=None, description="Label key-value pairs to filter by."
+    )
+    group_labels: list[str] | None = strawberry.field(
+        default=None, description="Label keys to group results by."
+    )
+
     @staticmethod
     def to_execute_options(
-        labels: list[MetricLabelEntryInput] | None,
-        group_labels: list[str] | None,
+        options: ExecuteQueryDefinitionOptionsInput | None,
     ) -> ExecutePresetOptions:
         filter_labels: dict[str, str] = {}
-        if labels:
-            for entry in labels:
+        if options and options.filter_labels:
+            for entry in options.filter_labels:
                 filter_labels[entry.key] = entry.value
         return ExecutePresetOptions(
             filter_labels=filter_labels,
-            group_labels=group_labels or [],
+            group_labels=(options.group_labels or []) if options else [],
         )

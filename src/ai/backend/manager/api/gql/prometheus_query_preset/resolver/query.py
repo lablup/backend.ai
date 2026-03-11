@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import uuid
+from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
@@ -13,7 +13,7 @@ from ai.backend.manager.api.gql.prometheus_query_preset.fetcher import (
     fetch_prometheus_query_presets,
 )
 from ai.backend.manager.api.gql.prometheus_query_preset.types import (
-    MetricLabelEntryInput,
+    ExecuteQueryDefinitionOptionsInput,
     QueryDefinitionConnection,
     QueryDefinitionFilter,
     QueryDefinitionGQL,
@@ -31,7 +31,7 @@ async def admin_prometheus_query_preset(
     id: ID,
 ) -> QueryDefinitionGQL | None:
     check_admin_only()
-    return await fetch_prometheus_query_preset(info, preset_id=uuid.UUID(id))
+    return await fetch_prometheus_query_preset(info, preset_id=UUID(id))
 
 
 @strawberry.field(
@@ -69,17 +69,15 @@ async def admin_prometheus_query_preset_result(
     info: Info[StrawberryGQLContext],
     id: ID,
     time_range: QueryTimeRangeInput | None = None,
-    labels: list[MetricLabelEntryInput] | None = None,
-    group_labels: list[str] | None = None,
+    options: ExecuteQueryDefinitionOptionsInput | None = None,
     time_window: str | None = None,
 ) -> QueryDefinitionResultGQL:
     check_admin_only()
-    options = MetricLabelEntryInput.to_execute_options(labels, group_labels)
 
     return await fetch_prometheus_query_preset_result(
         info,
-        preset_id=uuid.UUID(id),
-        options=options,
+        preset_id=UUID(id),
+        options=ExecuteQueryDefinitionOptionsInput.to_execute_options(options),
         time_window=time_window,
         time_range=time_range.to_query_time_range() if time_range is not None else None,
     )

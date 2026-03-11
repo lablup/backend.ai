@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import uuid
+from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
@@ -50,7 +50,7 @@ async def admin_modify_prometheus_query_preset(
     check_admin_only()
     processors = info.context.processors
 
-    preset_id = uuid.UUID(id)
+    preset_id = UUID(id)
     action_result = await processors.prometheus_query_preset.modify_preset.wait_for_complete(
         ModifyPresetAction(preset_id=preset_id, updater=input.to_updater(preset_id))
     )
@@ -67,7 +67,7 @@ async def admin_delete_prometheus_query_preset(
     processors = info.context.processors
 
     await processors.prometheus_query_preset.delete_preset.wait_for_complete(
-        DeletePresetAction(preset_id=uuid.UUID(id))
+        DeletePresetAction(preset_id=UUID(id))
     )
 
     return DeleteQueryDefinitionPayload(id=id)

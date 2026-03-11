@@ -7,6 +7,7 @@ from .filters import (
 )
 from .inputs import (
     CreateQueryDefinitionInput,
+    ExecuteQueryDefinitionOptionsInput,
     MetricLabelEntryInput,
     ModifyQueryDefinitionInput,
     QueryTimeRangeInput,
@@ -41,6 +42,7 @@ __all__ = [
     "ModifyQueryDefinitionInput",
     "QueryTimeRangeInput",
     "MetricLabelEntryInput",
+    "ExecuteQueryDefinitionOptionsInput",
     # Payload and result types
     "QueryDefinitionOptionsGQL",
     "MetricLabelEntryGQL",
