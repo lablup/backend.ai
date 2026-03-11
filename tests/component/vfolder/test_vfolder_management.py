@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.dto.manager.vfolder import VFolderInvitationState
 from ai.backend.common.dto.manager.vfolder.request import (
     AcceptInvitationReq,
     DeleteInvitationReq,
@@ -16,7 +15,10 @@ from ai.backend.common.dto.manager.vfolder.request import (
     PurgeVFolderReq,
     RenameVFolderReq,
 )
-from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
+from ai.backend.manager.data.vfolder.types import (
+    VFolderInvitationState,
+    VFolderOperationStatus,
+)
 from ai.backend.manager.models.vfolder import vfolder_invitations, vfolders
 
 from .conftest import VFolderFactory
@@ -133,14 +135,14 @@ class TestVFolderInvitation:
         self,
         admin_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
-        user_fixture: Any,
+        regular_regular_user_fixture: Any,
         db_engine: SAEngine,
     ) -> None:
         """S-4: Owner invites user → invitation created with PENDING status."""
         vfolder = await vfolder_factory()
         vfolder_id = vfolder["id"]
         vfolder_name = vfolder["name"]
-        invitee_email = user_fixture.email
+        invitee_email = regular_regular_user_fixture.email
 
         # Invite user via SDK
         await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
@@ -160,14 +162,14 @@ class TestVFolderInvitation:
         admin_registry: BackendAIClientRegistry,
         user_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
-        user_fixture: Any,
+        regular_regular_user_fixture: Any,
         db_engine: SAEngine,
     ) -> None:
         """S-5: Invitee accepts invitation → invitation status ACCEPTED, vfolder shared."""
         vfolder = await vfolder_factory()
         vfolder_id = vfolder["id"]
         vfolder_name = vfolder["name"]
-        invitee_email = user_fixture.email
+        invitee_email = regular_regular_user_fixture.email
 
         # Owner invites user
         await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
@@ -201,14 +203,14 @@ class TestVFolderInvitation:
         admin_registry: BackendAIClientRegistry,
         user_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
-        user_fixture: Any,
+        regular_regular_user_fixture: Any,
         db_engine: SAEngine,
     ) -> None:
         """S-6: Invitee rejects invitation → invitation status REJECTED."""
         vfolder = await vfolder_factory()
         vfolder_id = vfolder["id"]
         vfolder_name = vfolder["name"]
-        invitee_email = user_fixture.email
+        invitee_email = regular_regular_user_fixture.email
 
         # Owner invites user
         await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
@@ -244,12 +246,12 @@ class TestVFolderInvitation:
         admin_registry: BackendAIClientRegistry,
         user_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
-        user_fixture: Any,
+        regular_regular_user_fixture: Any,
     ) -> None:
         """S-7: List pending invitations → returns invitations for the user."""
         vfolder = await vfolder_factory()
         vfolder_name = vfolder["name"]
-        invitee_email = user_fixture.email
+        invitee_email = regular_regular_user_fixture.email
 
         # Owner invites user
         await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
@@ -263,14 +265,14 @@ class TestVFolderInvitation:
         self,
         admin_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
-        user_fixture: Any,
+        regular_regular_user_fixture: Any,
         db_engine: SAEngine,
     ) -> None:
         """S-8: Owner cancels invitation → invitation removed."""
         vfolder = await vfolder_factory()
         vfolder_id = vfolder["id"]
         vfolder_name = vfolder["name"]
-        invitee_email = user_fixture.email
+        invitee_email = regular_regular_user_fixture.email
 
         # Owner invites user
         await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
@@ -303,14 +305,14 @@ class TestVFolderInvitation:
         admin_registry: BackendAIClientRegistry,
         user_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
-        user_fixture: Any,
+        regular_regular_user_fixture: Any,
         db_engine: SAEngine,
     ) -> None:
         """S-9: Re-invitation after rejection → new invitation created."""
         vfolder = await vfolder_factory()
         vfolder_id = vfolder["id"]
         vfolder_name = vfolder["name"]
-        invitee_email = user_fixture.email
+        invitee_email = regular_regular_user_fixture.email
 
         # Owner invites user
         await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
@@ -352,13 +354,13 @@ class TestVFolderInvitationPermissions:
         user_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
         admin_user_fixture: Any,
-        user_fixture: Any,
+        regular_user_fixture: Any,
     ) -> None:
         """E-3: Non-owner cannot invite → 403."""
         # Create vfolder owned by admin
         vfolder = await vfolder_factory(user=str(admin_user_fixture.user_uuid))
         vfolder_name = vfolder["name"]
-        invitee_email = user_fixture.email
+        invitee_email = regular_user_fixture.email
 
         # Try to invite as non-owner
         with pytest.raises(BackendAPIError) as exc:
@@ -372,7 +374,7 @@ class TestVFolderInvitationPermissions:
         admin_registry: BackendAIClientRegistry,
         user_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
-        admin_user_fixture: Any,
+        admin_regular_user_fixture: Any,
         db_engine: SAEngine,
     ) -> None:
         """E-4: Non-invitee cannot accept/reject → 403."""
@@ -404,11 +406,11 @@ class TestVFolderInvitationPermissions:
     async def test_invite_to_nonexistent_vfolder(
         self,
         admin_registry: BackendAIClientRegistry,
-        user_fixture: Any,
+        regular_user_fixture: Any,
     ) -> None:
         """E-5: Invite to non-existent vfolder → 404."""
         with pytest.raises(BackendAPIError) as exc:
             await admin_registry.vfolder.invite(
-                "nonexistent-vfolder", InviteVFolderReq(emails=[user_fixture.email])
+                "nonexistent-vfolder", InviteVFolderReq(emails=[regular_user_fixture.email])
             )
         assert exc.value.status == 404
