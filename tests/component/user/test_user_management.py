@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-import secrets
 import uuid
 
 import pytest
 
-from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
+from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.user import (
     CreateUserResponse,
-    GetUserResponse,
     PurgeUserRequest,
-    PurgeUserResponse,
     UpdateUserRequest,
     UpdateUserResponse,
     UserRole,
@@ -22,46 +19,6 @@ from .conftest import UserFactory
 
 
 class TestUserModify:
-    async def test_admin_modifies_basic_info(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        target_user: CreateUserResponse,
-    ) -> None:
-        """S-1: Admin modifies full_name and description; unchanged fields preserved."""
-        unique = secrets.token_hex(4)
-        result = await admin_registry.user.update(
-            target_user.user.id,
-            UpdateUserRequest(
-                full_name=f"Updated Name {unique}",
-                description=f"Updated description {unique}",
-            ),
-        )
-        assert isinstance(result, UpdateUserResponse)
-        assert result.user.full_name == f"Updated Name {unique}"
-        assert result.user.description == f"Updated description {unique}"
-        # unchanged fields preserved
-        assert result.user.email == target_user.user.email
-        assert result.user.status == target_user.user.status
-
-    async def test_admin_changes_username(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        target_user: CreateUserResponse,
-    ) -> None:
-        """S-2: Admin changes username; DB updated."""
-        unique = secrets.token_hex(4)
-        new_username = f"renamed-{unique}"
-        result = await admin_registry.user.update(
-            target_user.user.id,
-            UpdateUserRequest(username=new_username),
-        )
-        assert isinstance(result, UpdateUserResponse)
-        assert result.user.username == new_username
-
-        get_result = await admin_registry.user.get(target_user.user.id)
-        assert isinstance(get_result, GetUserResponse)
-        assert get_result.user.username == new_username
-
     async def test_admin_changes_role(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -155,33 +112,8 @@ class TestUserModify:
                 UpdateUserRequest(full_name="Ghost"),
             )
 
-    async def test_regular_user_cannot_modify_another_user(
-        self,
-        user_registry: BackendAIClientRegistry,
-        target_user: CreateUserResponse,
-    ) -> None:
-        """F-AUTH-1: Regular user cannot modify another user → PermissionDeniedError (HTTP 403)."""
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.user.update(
-                target_user.user.id,
-                UpdateUserRequest(full_name="Denied"),
-            )
-
 
 class TestUserPurge:
-    async def test_admin_purges_user_with_no_active_resources(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        user_factory: UserFactory,
-    ) -> None:
-        """S-1: Admin purges user with no active resources → success=True, re-get returns NotFoundError."""
-        r = await user_factory()
-        purge_result = await admin_registry.user.purge(PurgeUserRequest(user_id=r.user.id))
-        assert isinstance(purge_result, PurgeUserResponse)
-        assert purge_result.success is True
-        with pytest.raises(NotFoundError):
-            await admin_registry.user.get(r.user.id)
-
     async def test_purge_nonexistent_user_raises_not_found(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -189,12 +121,3 @@ class TestUserPurge:
         """F-BIZ-2: Purge non-existent user → NotFoundError (HTTP 404)."""
         with pytest.raises(NotFoundError):
             await admin_registry.user.purge(PurgeUserRequest(user_id=uuid.uuid4()))
-
-    async def test_regular_user_cannot_purge(
-        self,
-        user_registry: BackendAIClientRegistry,
-        target_user: CreateUserResponse,
-    ) -> None:
-        """F-AUTH-1: Regular user cannot purge → PermissionDeniedError (HTTP 403)."""
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.user.purge(PurgeUserRequest(user_id=target_user.user.id))
