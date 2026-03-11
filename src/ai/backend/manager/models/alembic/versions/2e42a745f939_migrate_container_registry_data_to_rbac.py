@@ -12,11 +12,6 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.engine import Connection
 
-from ai.backend.manager.models.rbac_models.migration.enums import (
-    EntityType,
-    OperationType,
-)
-
 # revision identifiers, used by Alembic.
 revision = "2e42a745f939"
 down_revision = "359f0bbd936c"
@@ -25,7 +20,21 @@ depends_on = None
 
 # Constants
 BATCH_SIZE = 1000
+ENTITY_TYPE_CONTAINER_REGISTRY = "container_registry"
 MEMBER_ROLE_SUFFIX = "member"
+MEMBER_OPS = ["read"]
+OWNER_OPS = sorted([
+    "create",
+    "read",
+    "update",
+    "soft-delete",
+    "hard-delete",
+    "grant:all",
+    "grant:read",
+    "grant:update",
+    "grant:soft-delete",
+    "grant:hard-delete",
+])
 
 
 def _add_entity_type_permissions(db_conn: Connection) -> None:
@@ -34,10 +43,6 @@ def _add_entity_type_permissions(db_conn: Connection) -> None:
     Uses a single set-based INSERT ... SELECT to derive CONTAINER_REGISTRY permissions
     for all role+scope combinations without application-side pagination.
     """
-    # Precompute operation lists (sorted for deterministic ordering)
-    member_ops = sorted(o.value for o in OperationType.member_operations())
-    owner_ops = sorted(o.value for o in OperationType.owner_operations())
-
     insert_query = sa.text("""
         WITH role_scopes AS (
             SELECT DISTINCT
@@ -84,10 +89,10 @@ def _add_entity_type_permissions(db_conn: Connection) -> None:
     db_conn.execute(
         insert_query,
         {
-            "member_ops": member_ops,
-            "owner_ops": owner_ops,
+            "member_ops": MEMBER_OPS,
+            "owner_ops": OWNER_OPS,
             "member_pattern": f"%{MEMBER_ROLE_SUFFIX}",
-            "entity_type": EntityType.CONTAINER_REGISTRY.value,
+            "entity_type": ENTITY_TYPE_CONTAINER_REGISTRY,
         },
     )
 
@@ -98,10 +103,6 @@ def _associate_non_global_container_registries_to_scope(db_conn: Connection) -> 
     Pages by registry IDs first, then JOINs to get all scope associations
     for each batch to avoid skipping rows in 1:N JOINs.
     """
-    entity_type = EntityType.CONTAINER_REGISTRY.value
-    scope_type = "project"
-    relation_type = "auto"
-
     insert_query = sa.text("""
         INSERT INTO association_scopes_entities
             (scope_type, scope_id, entity_type, entity_id, relation_type)
@@ -135,11 +136,11 @@ def _associate_non_global_container_registries_to_scope(db_conn: Connection) -> 
 
         values_list = [
             {
-                "scope_type": scope_type,
+                "scope_type": "project",
                 "scope_id": row.scope_id,
-                "entity_type": entity_type,
+                "entity_type": ENTITY_TYPE_CONTAINER_REGISTRY,
                 "entity_id": str(row.entity_id),
-                "relation_type": relation_type,
+                "relation_type": "auto",
             }
             for row in rows
         ]
@@ -155,10 +156,6 @@ def _associate_global_container_registries_to_scope(db_conn: Connection) -> None
     Pages by registry IDs first, then CROSS JOINs with groups to get
     all scope associations for each batch.
     """
-    entity_type = EntityType.CONTAINER_REGISTRY.value
-    scope_type = "project"
-    relation_type = "auto"
-
     insert_query = sa.text("""
         INSERT INTO association_scopes_entities
             (scope_type, scope_id, entity_type, entity_id, relation_type)
@@ -191,11 +188,11 @@ def _associate_global_container_registries_to_scope(db_conn: Connection) -> None
 
         values_list = [
             {
-                "scope_type": scope_type,
+                "scope_type": "project",
                 "scope_id": row.scope_id,
-                "entity_type": entity_type,
+                "entity_type": ENTITY_TYPE_CONTAINER_REGISTRY,
                 "entity_id": str(row.entity_id),
-                "relation_type": relation_type,
+                "relation_type": "auto",
             }
             for row in rows
         ]
@@ -206,9 +203,6 @@ def _associate_global_container_registries_to_scope(db_conn: Connection) -> None
 
 def _remove_container_registry_edges(db_conn: Connection) -> None:
     """Remove all CONTAINER_REGISTRY AUTO edges from association_scopes_entities."""
-    entity_type = EntityType.CONTAINER_REGISTRY.value
-    relation_type = "auto"
-
     while True:
         delete_query = sa.text("""
             DELETE FROM association_scopes_entities
@@ -221,7 +215,11 @@ def _remove_container_registry_edges(db_conn: Connection) -> None:
         """)
         result = db_conn.execute(
             delete_query,
-            {"entity_type": entity_type, "relation_type": relation_type, "limit": BATCH_SIZE},
+            {
+                "entity_type": ENTITY_TYPE_CONTAINER_REGISTRY,
+                "relation_type": "auto",
+                "limit": BATCH_SIZE,
+            },
         )
         if result.rowcount == 0:
             break
@@ -229,8 +227,6 @@ def _remove_container_registry_edges(db_conn: Connection) -> None:
 
 def _remove_container_registry_permissions(db_conn: Connection) -> None:
     """Remove all CONTAINER_REGISTRY entity-type permissions."""
-    entity_type = EntityType.CONTAINER_REGISTRY.value
-
     while True:
         delete_query = sa.text("""
             DELETE FROM permissions
@@ -242,7 +238,7 @@ def _remove_container_registry_permissions(db_conn: Connection) -> None:
         """)
         result = db_conn.execute(
             delete_query,
-            {"entity_type": entity_type, "limit": BATCH_SIZE},
+            {"entity_type": ENTITY_TYPE_CONTAINER_REGISTRY, "limit": BATCH_SIZE},
         )
         if result.rowcount == 0:
             break
