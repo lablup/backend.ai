@@ -511,16 +511,16 @@ class DeploymentCoordinator:
 
         for error in errors:
             deployment_id = error.deployment_info.id
-            attempt_ctx = attempt_ctx_map.get(deployment_id, _AttemptContext())
+            ctx = attempt_ctx_map.get(deployment_id, _AttemptContext())
 
             # 1. Check max retries exceeded → give_up
-            if attempt_ctx.attempts >= SERVICE_MAX_RETRIES:
+            if ctx.attempts >= SERVICE_MAX_RETRIES:
                 give_up_errors.append(error)
                 continue
 
             # 2. Check timeout exceeded → expired
             lifecycle = error.deployment_info.state.lifecycle
-            if _is_transition_timed_out(attempt_ctx.started_at, lifecycle, current_dbtime):
+            if _is_transition_timed_out(ctx.started_at, lifecycle, current_dbtime):
                 expired_errors.append(error)
                 continue
 
