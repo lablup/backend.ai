@@ -10,8 +10,8 @@ from collections.abc import Callable, Coroutine
 from typing import Any
 
 import pytest
-import sqlalchemy.exc
 
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
 from ai.backend.manager.repositories.storage_namespace.creators import StorageNamespaceCreatorSpec
 from ai.backend.manager.services.storage_namespace.actions.get_all import GetAllNamespacesAction
@@ -275,7 +275,7 @@ class TestStorageNamespaceSearch:
         )
 
         # Register same (storage_id, namespace) again — should fail
-        with pytest.raises(sqlalchemy.exc.IntegrityError):
+        with pytest.raises(UniqueConstraintViolationError):
             await storage_namespace_processors.register.wait_for_complete(
                 RegisterNamespaceAction(
                     creator=Creator(
