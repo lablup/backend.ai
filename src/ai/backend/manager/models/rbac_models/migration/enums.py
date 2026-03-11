@@ -145,7 +145,6 @@ class EntityType(enum.StrEnum):
             cls.NOTIFICATION_CHANNEL,
             cls.NOTIFICATION_RULE,
             cls.MODEL_DEPLOYMENT,
-            cls.AGENT,
         }
 
     @classmethod
