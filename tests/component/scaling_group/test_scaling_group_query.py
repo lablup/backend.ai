@@ -113,34 +113,57 @@ async def second_group_fixture(
 
 
 class TestScalingGroupProjectAssociation:
-    """Tests for scaling group and project (group) association operations."""
+    """Tests for scaling group and project (group) association operations.
+
+    Note: Project association tests use database operations directly since
+    SDK v2 does not yet provide REST API endpoints for these operations.
+    The GraphQL mutations exist but are tested through database verification.
+    """
 
     async def test_add_project_association(
         self,
-        admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
-        group_fixture: uuid.UUID,
+        second_group_fixture: uuid.UUID,
         db_engine: SAEngine,
     ) -> None:
         """Admin can associate a project with a scaling group."""
-        # Note: The actual API for adding project associations needs to be implemented
-        # For now, we verify the association exists via database query
+        # Create association via database (simulating API behavior)
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                sa.insert(sgroups_for_groups).values(
+                    scaling_group=scaling_group_fixture,
+                    group=second_group_fixture,
+                )
+            )
+
+        # Verify association exists
         async with db_engine.begin() as conn:
             result = await conn.execute(
                 sa.select(sgroups_for_groups).where(
                     sa.and_(
                         sgroups_for_groups.c.scaling_group == scaling_group_fixture,
-                        sgroups_for_groups.c.group == group_fixture,
+                        sgroups_for_groups.c.group == second_group_fixture,
                     )
                 )
             )
             rows = result.fetchall()
-            # The association may or may not exist depending on fixture setup
-            assert isinstance(rows, list)
+            assert len(rows) == 1
+            assert rows[0].scaling_group == scaling_group_fixture
+            assert rows[0].group == second_group_fixture
+
+        # Cleanup
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                sgroups_for_groups.delete().where(
+                    sa.and_(
+                        sgroups_for_groups.c.scaling_group == scaling_group_fixture,
+                        sgroups_for_groups.c.group == second_group_fixture,
+                    )
+                )
+            )
 
     async def test_remove_project_association(
         self,
-        admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
         second_group_fixture: uuid.UUID,
         db_engine: SAEngine,
@@ -191,6 +214,105 @@ class TestScalingGroupProjectAssociation:
             )
             rows = result.fetchall()
             assert len(rows) == 0
+
+    async def test_add_already_associated_project(
+        self,
+        scaling_group_fixture: str,
+        second_group_fixture: uuid.UUID,
+        db_engine: SAEngine,
+    ) -> None:
+        """Adding an already associated project should fail with unique constraint violation."""
+        # First create an association
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                sa.insert(sgroups_for_groups).values(
+                    scaling_group=scaling_group_fixture,
+                    group=second_group_fixture,
+                )
+            )
+
+        # Try to add the same association again - should fail
+        with pytest.raises(sa.exc.IntegrityError):
+            async with db_engine.begin() as conn:
+                await conn.execute(
+                    sa.insert(sgroups_for_groups).values(
+                        scaling_group=scaling_group_fixture,
+                        group=second_group_fixture,
+                    )
+                )
+
+        # Verify only one association exists
+        async with db_engine.begin() as conn:
+            result = await conn.execute(
+                sa.select(sgroups_for_groups).where(
+                    sa.and_(
+                        sgroups_for_groups.c.scaling_group == scaling_group_fixture,
+                        sgroups_for_groups.c.group == second_group_fixture,
+                    )
+                )
+            )
+            rows = result.fetchall()
+            assert len(rows) == 1
+
+        # Cleanup
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                sgroups_for_groups.delete().where(
+                    sa.and_(
+                        sgroups_for_groups.c.scaling_group == scaling_group_fixture,
+                        sgroups_for_groups.c.group == second_group_fixture,
+                    )
+                )
+            )
+
+    async def test_add_nonexistent_project(
+        self,
+        scaling_group_fixture: str,
+        db_engine: SAEngine,
+    ) -> None:
+        """Adding a non-existent project should fail with foreign key constraint."""
+        fake_project_id = uuid.uuid4()
+
+        # Try to associate with non-existent project - should fail
+        with pytest.raises(sa.exc.IntegrityError):
+            async with db_engine.begin() as conn:
+                await conn.execute(
+                    sa.insert(sgroups_for_groups).values(
+                        scaling_group=scaling_group_fixture,
+                        group=fake_project_id,
+                    )
+                )
+
+    async def test_remove_non_associated_project(
+        self,
+        scaling_group_fixture: str,
+        second_group_fixture: uuid.UUID,
+        db_engine: SAEngine,
+    ) -> None:
+        """Removing a non-associated project should be idempotent (delete 0 rows)."""
+        # Ensure no association exists
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                sgroups_for_groups.delete().where(
+                    sa.and_(
+                        sgroups_for_groups.c.scaling_group == scaling_group_fixture,
+                        sgroups_for_groups.c.group == second_group_fixture,
+                    )
+                )
+            )
+
+        # Try to remove non-existent association - should succeed (idempotent)
+        async with db_engine.begin() as conn:
+            result = await conn.execute(
+                sgroups_for_groups.delete().where(
+                    sa.and_(
+                        sgroups_for_groups.c.scaling_group == scaling_group_fixture,
+                        sgroups_for_groups.c.group == second_group_fixture,
+                    )
+                )
+            )
+            # Should delete 0 rows
+            assert result.rowcount == 0
 
 
 class TestScalingGroupFairShareSpec:
