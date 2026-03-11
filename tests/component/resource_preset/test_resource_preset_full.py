@@ -18,7 +18,6 @@ applicable at the REST layer.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Coroutine
 from typing import Any
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
@@ -51,7 +50,6 @@ from ai.backend.manager.services.resource_preset.processors import ResourcePrese
 from ai.backend.manager.types import OptionalState
 
 PresetFixtureData = dict[str, Any]
-PresetFactory = Callable[..., Coroutine[Any, Any, PresetFixtureData]]
 
 
 class TestPresetCRUD:
