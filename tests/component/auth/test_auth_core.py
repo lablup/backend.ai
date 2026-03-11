@@ -17,9 +17,9 @@ from ai.backend.common.dto.manager.auth.request import (
 from ai.backend.common.dto.manager.auth.response import AuthorizeResponse, SignupResponse
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.user import users
 
 from .conftest import AuthUserFixtureData
