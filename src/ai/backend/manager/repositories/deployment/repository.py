@@ -1134,12 +1134,11 @@ class DeploymentRepository:
         self,
         endpoint_id: uuid.UUID,
         revision_id: uuid.UUID,
-    ) -> tuple[uuid.UUID | None, int]:
+    ) -> uuid.UUID | None:
         """Set deploying_revision and transition lifecycle to DEPLOYING.
 
         Returns:
-            Tuple of (previous_revision_id, rowcount).
-            Callers must check ``rowcount > 0`` to confirm the update was applied.
+            The previous current_revision id (may be None for first deployment).
         """
         return await self._db_source.set_deploying_revision(endpoint_id, revision_id)
 

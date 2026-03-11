@@ -657,7 +657,7 @@ class DeploymentService:
         _revision = await self._deployment_repository.get_revision(action.revision_id)
 
         # 2. Update endpoint.current_revision and get previous revision
-        previous_revision_id, _rowcount = await self._deployment_repository.set_deploying_revision(
+        previous_revision_id = await self._deployment_repository.set_deploying_revision(
             action.deployment_id, action.revision_id
         )
 

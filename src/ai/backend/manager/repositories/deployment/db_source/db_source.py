@@ -2177,13 +2177,10 @@ class DeploymentDBSource:
         self,
         endpoint_id: uuid.UUID,
         revision_id: uuid.UUID,
-    ) -> tuple[uuid.UUID | None, int]:
+    ) -> uuid.UUID | None:
         """Set deploying_revision and transition lifecycle to DEPLOYING.
 
-        Returns a tuple of (previous_revision_id, rowcount).
-        The caller **must** check ``rowcount > 0`` to confirm the update was applied;
-        a zero rowcount means another deployment was already in progress
-        (the ``deploying_revision IS NULL`` WHERE guard prevented the write).
+        Returns the previous current_revision id (may be None for first deployment).
         """
         async with self._begin_session_read_committed() as db_sess:
             # Single UPDATE ... RETURNING to atomically set deploying_revision
@@ -2203,8 +2200,8 @@ class DeploymentDBSource:
             result = await db_sess.execute(update_query)
             row = result.one_or_none()
             if row is None:
-                return None, 0
-            return row[0], 1
+                return None
+            return row[0]
 
     # -------------------------------------------------------------------------
     # Auto-Scaling Policy Methods (DeploymentAutoScalingPolicyRow)
