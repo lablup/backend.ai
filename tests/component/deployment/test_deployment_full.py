@@ -27,6 +27,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy, ModelDeploymentStatus
 from ai.backend.common.dto.manager.deployment import (
+    AddRevisionRequest,
     CreateDeploymentRequest,
     DeploymentMetadataInput,
     DeploymentStrategyInput,
@@ -38,6 +39,8 @@ from ai.backend.common.dto.manager.deployment import (
     ResourceConfigInput,
     RevisionInput,
     SearchDeploymentsRequest,
+    SearchRevisionsRequest,
+    SearchRoutesRequest,
     UpdateDeploymentRequest,
 )
 from ai.backend.common.dto.manager.deployment.request import ClusterConfigInput
@@ -86,8 +89,6 @@ async def container_registry_fixture(
 async def image_factory(
     db_engine: SAEngine,
     container_registry_fixture: uuid.UUID,
-    domain_fixture: str,
-    admin_user_fixture: Any,
 ) -> AsyncIterator[ImageFactoryFunc]:
     """Factory that creates ImageRow entries for deployment tests."""
     created_ids: list[uuid.UUID] = []
@@ -234,7 +235,8 @@ class TestDeploymentLifecycle:
                 ),
             ),
         )
-        deployment = await admin_registry.deployment.create_deployment(request)
+        response = await admin_registry.deployment.create_deployment(request)
+        deployment = response.deployment
         assert deployment.id is not None
         assert deployment.name == request.metadata.name
         assert deployment.status is not None  # Should have initial status
@@ -278,7 +280,8 @@ class TestDeploymentLifecycle:
                 ),
             ),
         )
-        deployment = await admin_registry.deployment.create_deployment(request)
+        response = await admin_registry.deployment.create_deployment(request)
+        deployment = response.deployment
 
         # Update name and replicas
         new_name = f"updated-deployment-{secrets.token_hex(4)}"
@@ -288,9 +291,10 @@ class TestDeploymentLifecycle:
         )
 
         # Verify update
-        updated = await admin_registry.deployment.get_deployment(deployment.id)
+        updated_response = await admin_registry.deployment.get_deployment(deployment.id)
+        updated = updated_response.deployment
         assert updated.name == new_name
-        assert updated.desired_replica_count == 3
+        assert updated.replica_state.desired_replica_count == 3
 
     @pytest.mark.xfail(strict=True, reason="Requires deployment controller mocking")
     async def test_destroy_deployment(
@@ -331,7 +335,8 @@ class TestDeploymentLifecycle:
                 ),
             ),
         )
-        deployment = await admin_registry.deployment.create_deployment(request)
+        response = await admin_registry.deployment.create_deployment(request)
+        deployment = response.deployment
 
         # Destroy deployment
         await admin_registry.deployment.destroy_deployment(deployment.id)
@@ -388,8 +393,8 @@ class TestQueryOperations:
                     ),
                 ),
             )
-            deployment = await admin_registry.deployment.create_deployment(request)
-            deployment_ids.append(deployment.id)
+            response = await admin_registry.deployment.create_deployment(request)
+            deployment_ids.append(response.deployment.id)
 
         # Search with pagination
         result = await admin_registry.deployment.search_deployments(
@@ -437,13 +442,15 @@ class TestQueryOperations:
                 ),
             ),
         )
-        deployment = await admin_registry.deployment.create_deployment(request)
+        response = await admin_registry.deployment.create_deployment(request)
+        deployment = response.deployment
 
         # Get by ID
-        fetched = await admin_registry.deployment.get_deployment(deployment.id)
+        fetched_response = await admin_registry.deployment.get_deployment(deployment.id)
+        fetched = fetched_response.deployment
         assert fetched.id == deployment.id
         assert fetched.name == deployment.name
-        assert fetched.project_id == str(group_fixture)
+        assert fetched.project_id == group_fixture
 
     async def test_get_nonexistent_deployment_returns_404(
         self,
@@ -500,27 +507,31 @@ class TestRevisionManagement:
                 ),
             ),
         )
-        deployment = await admin_registry.deployment.create_deployment(request)
+        response = await admin_registry.deployment.create_deployment(request)
+        deployment = response.deployment
 
         # Add a second revision
-        revision2 = await admin_registry.deployment.add_revision(
+        revision2_response = await admin_registry.deployment.add_revision(
             deployment.id,
-            RevisionInput(
-                name="v2",
-                cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
-                resource_config=ResourceConfigInput(
-                    resource_group=scaling_group_fixture,
-                    resource_slots={"cpu": "2", "mem": "2147483648"},
-                ),
-                image=ImageInput(id=image_id),
-                model_runtime_config=ModelRuntimeConfigInput(),
-                model_mount_config=ModelMountConfigInput(
-                    vfolder_id=vfolder_id,
-                    mount_destination="/models",
-                    definition_path="model-definition.yaml",
+            AddRevisionRequest(
+                revision=RevisionInput(
+                    name="v2",
+                    cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
+                    resource_config=ResourceConfigInput(
+                        resource_group=scaling_group_fixture,
+                        resource_slots={"cpu": "2", "mem": "2147483648"},
+                    ),
+                    image=ImageInput(id=image_id),
+                    model_runtime_config=ModelRuntimeConfigInput(),
+                    model_mount_config=ModelMountConfigInput(
+                        vfolder_id=vfolder_id,
+                        mount_destination="/models",
+                        definition_path="model-definition.yaml",
+                    ),
                 ),
             ),
         )
+        revision2 = revision2_response.revision
 
         # Activate revision2
         await admin_registry.deployment.activate_revision(deployment.id, revision2.id)
@@ -528,10 +539,13 @@ class TestRevisionManagement:
         # Get revisions and verify activation
         revisions_result = await admin_registry.deployment.search_revisions(
             deployment.id,
-            {"limit": 10, "offset": 0},
+            SearchRevisionsRequest(limit=10, offset=0),
         )
-        active_revisions = [r for r in revisions_result.revisions if r.status == "active"]
-        assert len(active_revisions) > 0
+        # Check that we have at least one revision returned
+        assert len(revisions_result.revisions) > 0
+        # Verify that the activated revision is in the list
+        revision_ids = [r.id for r in revisions_result.revisions]
+        assert revision2.id in revision_ids
 
         # Deactivate revision
         await admin_registry.deployment.deactivate_revision(deployment.id, revision2.id)
@@ -581,7 +595,8 @@ class TestReplicaManagement:
                 ),
             ),
         )
-        deployment = await admin_registry.deployment.create_deployment(request)
+        response = await admin_registry.deployment.create_deployment(request)
+        deployment = response.deployment
 
         # Scale to 5 replicas
         await admin_registry.deployment.update_deployment(
@@ -590,8 +605,9 @@ class TestReplicaManagement:
         )
 
         # Verify replica count updated
-        updated = await admin_registry.deployment.get_deployment(deployment.id)
-        assert updated.desired_replica_count == 5
+        updated_response = await admin_registry.deployment.get_deployment(deployment.id)
+        updated = updated_response.deployment
+        assert updated.replica_state.desired_replica_count == 5
 
 
 # ---------------------------------------------------------------------------
@@ -638,12 +654,13 @@ class TestRouteTrafficManagement:
                 ),
             ),
         )
-        deployment = await admin_registry.deployment.create_deployment(request)
+        response = await admin_registry.deployment.create_deployment(request)
+        deployment = response.deployment
 
         # Search routes
         routes_result = await admin_registry.deployment.search_routes(
             deployment.id,
-            {"limit": 10, "offset": 0},
+            SearchRoutesRequest(limit=10, offset=0),
         )
         assert routes_result is not None
         # Routes may be empty if not yet created, but API should succeed
