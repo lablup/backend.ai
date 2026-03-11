@@ -16,6 +16,8 @@ from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import (
     PrometheusQueryData,
+    PrometheusQueryInstantData,
+    PrometheusQueryInstantResponse,
     PrometheusQueryRangeResponse,
 )
 from ai.backend.common.exception import (
@@ -399,3 +401,66 @@ class TestPrometheusQueryPresetService:
         result = await service.execute_preset(action)
 
         assert result.response == prometheus_response
+
+    async def test_execute_preset_instant_query(
+        self,
+        service: PrometheusQueryPresetService,
+        mock_repository: MagicMock,
+        mock_prometheus_client: MagicMock,
+        preset_data: PrometheusQueryPresetData,
+    ) -> None:
+        """When time_range is None, calls query_instant() instead of query_range()."""
+        mock_repository.get_by_id = AsyncMock(return_value=preset_data)
+
+        prometheus_response = PrometheusQueryInstantResponse(
+            status="success",
+            data=PrometheusQueryInstantData(result_type="vector", result=[]),
+        )
+        mock_prometheus_client.query_instant = AsyncMock(return_value=prometheus_response)
+
+        action = ExecutePresetAction(
+            preset_id=preset_data.id,
+            options=ExecutePresetOptions(
+                filter_labels={"kernel_id": "test-kernel"},
+                group_labels=["kernel_id"],
+            ),
+            time_window="5m",
+            time_range=None,
+        )
+        result = await service.execute_preset(action)
+
+        assert result.response == prometheus_response
+        mock_prometheus_client.query_instant.assert_called_once()
+        mock_prometheus_client.query_range.assert_not_called()
+
+    async def test_execute_preset_range_query_does_not_call_instant(
+        self,
+        service: PrometheusQueryPresetService,
+        mock_repository: MagicMock,
+        mock_prometheus_client: MagicMock,
+        preset_data: PrometheusQueryPresetData,
+    ) -> None:
+        """When time_range is provided, calls query_range() and not query_instant()."""
+        mock_repository.get_by_id = AsyncMock(return_value=preset_data)
+
+        prometheus_response = PrometheusQueryRangeResponse(
+            status="success",
+            data=PrometheusQueryData(result_type="matrix", result=[]),
+        )
+        mock_prometheus_client.query_range = AsyncMock(return_value=prometheus_response)
+
+        time_range = QueryTimeRange(start="1704067200", end="1704153600", step="60s")
+        action = ExecutePresetAction(
+            preset_id=preset_data.id,
+            options=ExecutePresetOptions(
+                filter_labels={"kernel_id": "test-kernel"},
+                group_labels=["kernel_id"],
+            ),
+            time_window="5m",
+            time_range=time_range,
+        )
+        result = await service.execute_preset(action)
+
+        assert result.response == prometheus_response
+        mock_prometheus_client.query_range.assert_called_once()
+        mock_prometheus_client.query_instant.assert_not_called()

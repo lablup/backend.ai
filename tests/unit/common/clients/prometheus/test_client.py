@@ -10,6 +10,7 @@ from ai.backend.common.clients.prometheus import (
 )
 from ai.backend.common.dto.clients.prometheus import (
     LabelValueResponse,
+    PrometheusQueryInstantResponse,
     PrometheusQueryRangeResponse,
     QueryTimeRange,
 )
@@ -166,6 +167,116 @@ class TestQueryRange:
     ) -> None:
         with pytest.raises(PrometheusConnectionError):
             await prometheus_client.query_range(sample_preset, sample_time_range)
+
+
+class TestQueryInstant:
+    """Tests for PrometheusClient.query_instant() method."""
+
+    @pytest.fixture
+    def sample_preset(self) -> MetricPreset:
+        return MetricPreset(
+            template="sum(my_metric{{{labels}}}) by ({group_by})",
+            labels={"container_metric_name": "mem", "value_type": "current"},
+            group_by=frozenset({"value_type"}),
+            window="5m",
+        )
+
+    @pytest.fixture
+    def success_response(self, mock_session: Mock) -> AsyncMock:
+        response = create_mock_response(
+            status=200,
+            json_data={
+                "status": "success",
+                "data": {
+                    "resultType": "vector",
+                    "result": [
+                        {
+                            "metric": {"value_type": "current"},
+                            "value": [1704067200.0, "10.5"],
+                        }
+                    ],
+                },
+            },
+        )
+        mock_session.post.return_value = response
+        return response
+
+    async def test_success_returns_parsed_response(
+        self,
+        prometheus_client: PrometheusClient,
+        sample_preset: MetricPreset,
+        success_response: AsyncMock,
+    ) -> None:
+        result = await prometheus_client.query_instant(sample_preset)
+
+        assert isinstance(result, PrometheusQueryInstantResponse)
+        assert result.status == "success"
+        assert result.data.result_type == "vector"
+        assert len(result.data.result) == 1
+        assert result.data.result[0].value == (1704067200.0, "10.5")
+
+    async def test_with_time_parameter(
+        self,
+        prometheus_client: PrometheusClient,
+        mock_session: Mock,
+        sample_preset: MetricPreset,
+        success_response: AsyncMock,
+    ) -> None:
+        result = await prometheus_client.query_instant(sample_preset, time="1704067200.123")
+
+        assert isinstance(result, PrometheusQueryInstantResponse)
+        mock_session.post.assert_called_once()
+
+    @pytest.fixture
+    def error_4xx_response(self, mock_session: Mock) -> AsyncMock:
+        response = create_mock_response(
+            status=400,
+            json_data={"status": "error", "error": "Bad Request: Invalid query"},
+        )
+        mock_session.post.return_value = response
+        return response
+
+    async def test_http_4xx_raises_failed_to_get_metric(
+        self,
+        prometheus_client: PrometheusClient,
+        sample_preset: MetricPreset,
+        error_4xx_response: AsyncMock,
+    ) -> None:
+        with pytest.raises(FailedToGetMetric, match="Bad Request: Invalid query"):
+            await prometheus_client.query_instant(sample_preset)
+
+    @pytest.fixture
+    def error_5xx_response(self, mock_session: Mock) -> AsyncMock:
+        response = create_mock_response(
+            status=500,
+            json_data={"status": "error", "error": "Internal Server Error"},
+        )
+        mock_session.post.return_value = response
+        return response
+
+    async def test_http_5xx_raises_failed_to_get_metric(
+        self,
+        prometheus_client: PrometheusClient,
+        sample_preset: MetricPreset,
+        error_5xx_response: AsyncMock,
+    ) -> None:
+        with pytest.raises(FailedToGetMetric):
+            await prometheus_client.query_instant(sample_preset)
+
+    @pytest.fixture
+    def connection_error_response(self, mock_session: Mock) -> AsyncMock:
+        response = create_mock_response(status=200, connection_error=True)
+        mock_session.post.return_value = response
+        return response
+
+    async def test_connection_error_raises_prometheus_connection_error(
+        self,
+        prometheus_client: PrometheusClient,
+        sample_preset: MetricPreset,
+        connection_error_response: AsyncMock,
+    ) -> None:
+        with pytest.raises(PrometheusConnectionError):
+            await prometheus_client.query_instant(sample_preset)
 
 
 class TestTimeout:
