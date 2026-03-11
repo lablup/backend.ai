@@ -22,27 +22,30 @@ from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
 from ai.backend.manager.types import OptionalState, TriState
 
 
-@strawberry.input(name="PrometheusPresetOptionsInput", description="Options for preset labels.")
+@strawberry.input(
+    name="QueryDefinitionOptionsInput",
+    description="Added in 26.3.0. Options for query definition labels.",
+)
 class PrometheusPresetOptionsInput:
     filter_labels: list[str] = strawberry.field(description="Allowed filter label keys.")
     group_labels: list[str] = strawberry.field(description="Allowed group-by label keys.")
 
 
 @strawberry.input(
-    name="CreatePrometheusQueryPresetInput",
-    description="Input for creating a new prometheus query preset.",
+    name="CreateQueryDefinitionInput",
+    description="Added in 26.3.0. Input for creating a new query definition.",
 )
 class CreatePrometheusQueryPresetInput:
-    name: str = strawberry.field(description="Human-readable preset identifier (must be unique).")
+    name: str = strawberry.field(description="Human-readable identifier (must be unique).")
     metric_name: str = strawberry.field(description="Prometheus metric name.")
     query_template: str = strawberry.field(
         description="PromQL template with {labels}, {window}, {group_by} placeholders."
     )
     time_window: str | None = strawberry.field(
-        default=None, description="Preset-specific default window."
+        default=None, description="Default time window."
     )
     options: PrometheusPresetOptionsInput = strawberry.field(
-        description="Preset options including filter and group labels."
+        description="Query definition options including filter and group labels."
     )
 
     def to_creator(self) -> Creator[PrometheusQueryPresetRow]:
@@ -59,18 +62,18 @@ class CreatePrometheusQueryPresetInput:
 
 
 @strawberry.input(
-    name="ModifyPrometheusQueryPresetInput",
-    description="Input for modifying an existing prometheus query preset.",
+    name="ModifyQueryDefinitionInput",
+    description="Added in 26.3.0. Input for modifying an existing query definition.",
 )
 class ModifyPrometheusQueryPresetInput:
-    name: str | None = strawberry.field(default=UNSET, description="New preset name.")
+    name: str | None = strawberry.field(default=UNSET, description="New name.")
     metric_name: str | None = strawberry.field(default=UNSET, description="New metric name.")
     query_template: str | None = strawberry.field(default=UNSET, description="New PromQL template.")
     time_window: str | None = strawberry.field(
         default=UNSET, description="New default time window."
     )
     options: PrometheusPresetOptionsInput | None = strawberry.field(
-        default=UNSET, description="New preset options."
+        default=UNSET, description="New query definition options."
     )
 
     def to_updater(self, preset_id: UUID) -> Updater[PrometheusQueryPresetRow]:
@@ -98,7 +101,10 @@ class ModifyPrometheusQueryPresetInput:
         return Updater(pk_value=preset_id, spec=spec)
 
 
-@strawberry.input(name="QueryTimeRangeInput", description="Time range for Prometheus query.")
+@strawberry.input(
+    name="QueryTimeRangeInput",
+    description="Added in 26.3.0. Time range for Prometheus query.",
+)
 class QueryTimeRangeInput:
     start: datetime = strawberry.field(description="Start of the time range.")
     end: datetime = strawberry.field(description="End of the time range.")
@@ -112,7 +118,10 @@ class QueryTimeRangeInput:
         )
 
 
-@strawberry.input(name="MetricLabelEntryInput", description="Key-value label entry for queries.")
+@strawberry.input(
+    name="MetricLabelEntryInput",
+    description="Added in 26.3.0. Key-value label entry for queries.",
+)
 class MetricLabelEntryInput:
     key: str = strawberry.field(description="Label key.")
     value: str = strawberry.field(description="Label value.")

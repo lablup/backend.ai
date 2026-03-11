@@ -111,7 +111,7 @@ async def fetch_prometheus_query_preset_result(
     info: Info[StrawberryGQLContext],
     preset_id: UUID,
     options: ExecutePresetOptions,
-    window: str | None,
+    time_window: str | None,
     time_range: QueryTimeRange | None,
 ) -> PrometheusQueryResultGQL:
     processors = info.context.processors
@@ -120,7 +120,7 @@ async def fetch_prometheus_query_preset_result(
         ExecutePresetAction(
             preset_id=preset_id,
             options=options,
-            window=window,
+            time_window=time_window,
             time_range=time_range,
         )
     )

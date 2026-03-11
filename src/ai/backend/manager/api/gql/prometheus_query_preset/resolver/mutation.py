@@ -24,7 +24,7 @@ from ai.backend.manager.services.prometheus_query_preset.actions import (
 )
 
 
-@strawberry.mutation(description="Create a new prometheus query preset (admin only).")  # type: ignore[misc]
+@strawberry.mutation(description="Added in 26.3.0. Create a new query definition (admin only).")  # type: ignore[misc]
 async def admin_create_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     input: CreatePrometheusQueryPresetInput,
@@ -41,7 +41,7 @@ async def admin_create_prometheus_query_preset(
     )
 
 
-@strawberry.mutation(description="Modify an existing prometheus query preset (admin only).")  # type: ignore[misc]
+@strawberry.mutation(description="Added in 26.3.0. Modify an existing query definition (admin only).")  # type: ignore[misc]
 async def admin_modify_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     id: ID,
@@ -60,7 +60,7 @@ async def admin_modify_prometheus_query_preset(
     )
 
 
-@strawberry.mutation(description="Delete a prometheus query preset (admin only).")  # type: ignore[misc]
+@strawberry.mutation(description="Added in 26.3.0. Delete a query definition (admin only).")  # type: ignore[misc]
 async def admin_delete_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     id: ID,

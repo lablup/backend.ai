@@ -25,13 +25,13 @@ from ai.backend.manager.repositories.prometheus_query_preset.options import (
 
 
 @strawberry.input(
-    name="PrometheusQueryPresetFilter",
-    description="Filter input for querying prometheus query presets.",
+    name="QueryDefinitionFilter",
+    description="Added in 26.3.0. Filter input for querying query definitions.",
 )
 class PrometheusQueryPresetFilter(GQLFilter):
     name: StringFilter | None = strawberry.field(
         default=None,
-        description="Filter by preset name.",
+        description="Filter by name.",
     )
 
     AND: list[PrometheusQueryPresetFilter] | None = strawberry.field(
@@ -89,8 +89,8 @@ class PrometheusQueryPresetFilter(GQLFilter):
 
 
 @strawberry.enum(
-    name="PrometheusQueryPresetOrderField",
-    description="Fields available for ordering prometheus query preset results.",
+    name="QueryDefinitionOrderField",
+    description="Added in 26.3.0. Fields available for ordering query definition results.",
 )
 class PrometheusQueryPresetOrderField(StrEnum):
     CREATED_AT = "created_at"
@@ -99,8 +99,8 @@ class PrometheusQueryPresetOrderField(StrEnum):
 
 
 @strawberry.input(
-    name="PrometheusQueryPresetOrderBy",
-    description="Specifies ordering for prometheus query preset results.",
+    name="QueryDefinitionOrderBy",
+    description="Added in 26.3.0. Specifies ordering for query definition results.",
 )
 class PrometheusQueryPresetOrderBy(GQLOrderBy):
     field: PrometheusQueryPresetOrderField = strawberry.field(description="The field to order by.")

@@ -6,14 +6,18 @@ import strawberry
 from strawberry import ID
 
 
-@strawberry.type(name="PrometheusPresetOptions", description="Preset options for label governance.")
+@strawberry.type(
+    name="QueryDefinitionOptions",
+    description="Added in 26.3.0. Options for query definition label governance.",
+)
 class PrometheusPresetOptionsGQL:
     filter_labels: list[str] = strawberry.field(description="Allowed filter label keys.")
     group_labels: list[str] = strawberry.field(description="Allowed group-by label keys.")
 
 
 @strawberry.type(
-    name="MetricLabelEntry", description="Key-value label entry from Prometheus result."
+    name="MetricLabelEntry",
+    description="Added in 26.3.0. Key-value label entry from Prometheus result.",
 )
 class MetricLabelEntryGQL:
     key: str
@@ -21,14 +25,18 @@ class MetricLabelEntryGQL:
 
 
 @strawberry.type(
-    name="MetricResultValue", description="Single timestamp-value pair from Prometheus."
+    name="MetricResultValue",
+    description="Added in 26.3.0. Single timestamp-value pair from Prometheus.",
 )
 class MetricResultValueGQL:
     timestamp: float
     value: str
 
 
-@strawberry.type(name="MetricResult", description="Single metric result from Prometheus query.")
+@strawberry.type(
+    name="MetricResult",
+    description="Added in 26.3.0. Single metric result from Prometheus query.",
+)
 class MetricResultGQL:
     metric: list[MetricLabelEntryGQL] = strawberry.field(
         description="Metric labels as key-value entries."
@@ -37,7 +45,8 @@ class MetricResultGQL:
 
 
 @strawberry.type(
-    name="PrometheusQueryResult", description="Result from executing a prometheus query preset."
+    name="QueryDefinitionExecuteResult",
+    description="Added in 26.3.0. Result from executing a query definition.",
 )
 class PrometheusQueryResultGQL:
     status: str = strawberry.field(description="Prometheus response status.")
@@ -46,8 +55,8 @@ class PrometheusQueryResultGQL:
 
 
 @strawberry.type(
-    name="DeletePrometheusQueryPresetPayload",
-    description="Payload returned after deleting a preset.",
+    name="DeleteQueryDefinitionPayload",
+    description="Added in 26.3.0. Payload returned after deleting a query definition.",
 )
 class DeletePrometheusQueryPresetPayload:
-    id: ID = strawberry.field(description="ID of the deleted preset.")
+    id: ID = strawberry.field(description="ID of the deleted query definition.")
