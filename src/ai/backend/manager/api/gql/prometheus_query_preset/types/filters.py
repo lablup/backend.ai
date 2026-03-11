@@ -28,21 +28,21 @@ from ai.backend.manager.repositories.prometheus_query_preset.options import (
     name="QueryDefinitionFilter",
     description="Added in 26.3.0. Filter input for querying query definitions.",
 )
-class PrometheusQueryPresetFilter(GQLFilter):
+class QueryDefinitionFilter(GQLFilter):
     name: StringFilter | None = strawberry.field(
         default=None,
         description="Filter by name.",
     )
 
-    AND: list[PrometheusQueryPresetFilter] | None = strawberry.field(
+    AND: list[QueryDefinitionFilter] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with AND logic.",
     )
-    OR: list[PrometheusQueryPresetFilter] | None = strawberry.field(
+    OR: list[QueryDefinitionFilter] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with OR logic.",
     )
-    NOT: list[PrometheusQueryPresetFilter] | None = strawberry.field(
+    NOT: list[QueryDefinitionFilter] | None = strawberry.field(
         default=None,
         description="Negate the specified filters.",
     )
@@ -92,7 +92,7 @@ class PrometheusQueryPresetFilter(GQLFilter):
     name="QueryDefinitionOrderField",
     description="Added in 26.3.0. Fields available for ordering query definition results.",
 )
-class PrometheusQueryPresetOrderField(StrEnum):
+class QueryDefinitionOrderField(StrEnum):
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
     NAME = "name"
@@ -102,8 +102,8 @@ class PrometheusQueryPresetOrderField(StrEnum):
     name="QueryDefinitionOrderBy",
     description="Added in 26.3.0. Specifies ordering for query definition results.",
 )
-class PrometheusQueryPresetOrderBy(GQLOrderBy):
-    field: PrometheusQueryPresetOrderField = strawberry.field(description="The field to order by.")
+class QueryDefinitionOrderBy(GQLOrderBy):
+    field: QueryDefinitionOrderField = strawberry.field(description="The field to order by.")
     direction: OrderDirection = strawberry.field(
         default=OrderDirection.DESC,
         description="Sort direction.",
@@ -113,9 +113,9 @@ class PrometheusQueryPresetOrderBy(GQLOrderBy):
     def to_query_order(self) -> QueryOrder:
         ascending = self.direction == OrderDirection.ASC
         match self.field:
-            case PrometheusQueryPresetOrderField.CREATED_AT:
+            case QueryDefinitionOrderField.CREATED_AT:
                 return PrometheusQueryPresetOrders.created_at(ascending)
-            case PrometheusQueryPresetOrderField.UPDATED_AT:
+            case QueryDefinitionOrderField.UPDATED_AT:
                 return PrometheusQueryPresetOrders.updated_at(ascending)
-            case PrometheusQueryPresetOrderField.NAME:
+            case QueryDefinitionOrderField.NAME:
                 return PrometheusQueryPresetOrders.name(ascending)

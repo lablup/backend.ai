@@ -26,7 +26,7 @@ from ai.backend.manager.types import OptionalState, TriState
     name="QueryDefinitionOptionsInput",
     description="Added in 26.3.0. Options for query definition labels.",
 )
-class PrometheusPresetOptionsInput:
+class QueryDefinitionOptionsInput:
     filter_labels: list[str] = strawberry.field(description="Allowed filter label keys.")
     group_labels: list[str] = strawberry.field(description="Allowed group-by label keys.")
 
@@ -35,14 +35,14 @@ class PrometheusPresetOptionsInput:
     name="CreateQueryDefinitionInput",
     description="Added in 26.3.0. Input for creating a new query definition.",
 )
-class CreatePrometheusQueryPresetInput:
+class CreateQueryDefinitionInput:
     name: str = strawberry.field(description="Human-readable identifier (must be unique).")
     metric_name: str = strawberry.field(description="Prometheus metric name.")
     query_template: str = strawberry.field(
         description="PromQL template with {labels}, {window}, {group_by} placeholders."
     )
     time_window: str | None = strawberry.field(default=None, description="Default time window.")
-    options: PrometheusPresetOptionsInput = strawberry.field(
+    options: QueryDefinitionOptionsInput = strawberry.field(
         description="Query definition options including filter and group labels."
     )
 
@@ -63,14 +63,14 @@ class CreatePrometheusQueryPresetInput:
     name="ModifyQueryDefinitionInput",
     description="Added in 26.3.0. Input for modifying an existing query definition.",
 )
-class ModifyPrometheusQueryPresetInput:
+class ModifyQueryDefinitionInput:
     name: str | None = strawberry.field(default=UNSET, description="New name.")
     metric_name: str | None = strawberry.field(default=UNSET, description="New metric name.")
     query_template: str | None = strawberry.field(default=UNSET, description="New PromQL template.")
     time_window: str | None = strawberry.field(
         default=UNSET, description="New default time window."
     )
-    options: PrometheusPresetOptionsInput | None = strawberry.field(
+    options: QueryDefinitionOptionsInput | None = strawberry.field(
         default=UNSET, description="New query definition options."
     )
 

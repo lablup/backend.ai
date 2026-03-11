@@ -14,11 +14,11 @@ from ai.backend.manager.api.gql.prometheus_query_preset.fetcher import (
 )
 from ai.backend.manager.api.gql.prometheus_query_preset.types import (
     MetricLabelEntryInput,
-    PrometheusQueryPresetConnection,
-    PrometheusQueryPresetFilter,
-    PrometheusQueryPresetGQL,
-    PrometheusQueryPresetOrderBy,
-    PrometheusQueryResultGQL,
+    QueryDefinitionConnection,
+    QueryDefinitionFilter,
+    QueryDefinitionGQL,
+    QueryDefinitionOrderBy,
+    QueryDefinitionResultGQL,
     QueryTimeRangeInput,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -29,7 +29,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 async def admin_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     id: ID,
-) -> PrometheusQueryPresetGQL | None:
+) -> QueryDefinitionGQL | None:
     check_admin_only()
     return await fetch_admin_prometheus_query_preset(info, preset_id=uuid.UUID(id))
 
@@ -39,15 +39,15 @@ async def admin_prometheus_query_preset(
 )  # type: ignore[misc]
 async def admin_prometheus_query_presets(
     info: Info[StrawberryGQLContext],
-    filter: PrometheusQueryPresetFilter | None = None,
-    order_by: list[PrometheusQueryPresetOrderBy] | None = None,
+    filter: QueryDefinitionFilter | None = None,
+    order_by: list[QueryDefinitionOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> PrometheusQueryPresetConnection | None:
+) -> QueryDefinitionConnection | None:
     check_admin_only()
     return await fetch_admin_prometheus_query_presets(
         info,
@@ -72,7 +72,7 @@ async def admin_prometheus_query_preset_result(
     labels: list[MetricLabelEntryInput] | None = None,
     group_labels: list[str] | None = None,
     time_window: str | None = None,
-) -> PrometheusQueryResultGQL:
+) -> QueryDefinitionResultGQL:
     check_admin_only()
     options = MetricLabelEntryInput.to_execute_options(labels, group_labels)
 

@@ -1,53 +1,53 @@
 """Prometheus query preset GQL types."""
 
 from .filters import (
-    PrometheusQueryPresetFilter,
-    PrometheusQueryPresetOrderBy,
-    PrometheusQueryPresetOrderField,
+    QueryDefinitionFilter,
+    QueryDefinitionOrderBy,
+    QueryDefinitionOrderField,
 )
 from .inputs import (
-    CreatePrometheusQueryPresetInput,
+    CreateQueryDefinitionInput,
     MetricLabelEntryInput,
-    ModifyPrometheusQueryPresetInput,
+    ModifyQueryDefinitionInput,
     QueryTimeRangeInput,
 )
 from .node import (
-    CreatePrometheusQueryPresetPayload,
-    ModifyPrometheusQueryPresetPayload,
-    PrometheusQueryPresetConnection,
-    PrometheusQueryPresetEdge,
-    PrometheusQueryPresetGQL,
+    CreateQueryDefinitionPayload,
+    ModifyQueryDefinitionPayload,
+    QueryDefinitionConnection,
+    QueryDefinitionEdge,
+    QueryDefinitionGQL,
 )
 from .payloads import (
-    DeletePrometheusQueryPresetPayload,
+    DeleteQueryDefinitionPayload,
     MetricLabelEntryGQL,
     MetricResultGQL,
     MetricResultValueGQL,
-    PrometheusPresetOptionsGQL,
-    PrometheusQueryResultGQL,
+    QueryDefinitionOptionsGQL,
+    QueryDefinitionResultGQL,
 )
 
 __all__ = [
     # Node types
-    "PrometheusQueryPresetGQL",
-    "PrometheusQueryPresetEdge",
-    "PrometheusQueryPresetConnection",
+    "QueryDefinitionGQL",
+    "QueryDefinitionEdge",
+    "QueryDefinitionConnection",
     # Filter and OrderBy
-    "PrometheusQueryPresetFilter",
-    "PrometheusQueryPresetOrderBy",
-    "PrometheusQueryPresetOrderField",
+    "QueryDefinitionFilter",
+    "QueryDefinitionOrderBy",
+    "QueryDefinitionOrderField",
     # Input types
-    "CreatePrometheusQueryPresetInput",
-    "ModifyPrometheusQueryPresetInput",
+    "CreateQueryDefinitionInput",
+    "ModifyQueryDefinitionInput",
     "QueryTimeRangeInput",
     "MetricLabelEntryInput",
     # Payload and result types
-    "PrometheusPresetOptionsGQL",
+    "QueryDefinitionOptionsGQL",
     "MetricLabelEntryGQL",
     "MetricResultValueGQL",
     "MetricResultGQL",
-    "PrometheusQueryResultGQL",
-    "CreatePrometheusQueryPresetPayload",
-    "ModifyPrometheusQueryPresetPayload",
-    "DeletePrometheusQueryPresetPayload",
+    "QueryDefinitionResultGQL",
+    "CreateQueryDefinitionPayload",
+    "ModifyQueryDefinitionPayload",
+    "DeleteQueryDefinitionPayload",
 ]

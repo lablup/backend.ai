@@ -9,7 +9,7 @@ import strawberry
 from strawberry import ID
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from .payloads import PrometheusPresetOptionsGQL
+from .payloads import QueryDefinitionOptionsGQL
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     name="QueryDefinition",
     description="Added in 26.3.0. Prometheus query definition entity implementing Relay Node pattern.",
 )
-class PrometheusQueryPresetGQL(Node):
+class QueryDefinitionGQL(Node):
     id: NodeID[str] = strawberry.field(description="Query definition UUID (primary key).")
     name: str = strawberry.field(description="Human-readable query definition identifier.")
     metric_name: str = strawberry.field(description="Prometheus metric name.")
@@ -27,7 +27,7 @@ class PrometheusQueryPresetGQL(Node):
     time_window: str | None = strawberry.field(
         description="Default time window. Falls back to server config if null."
     )
-    options: PrometheusPresetOptionsGQL = strawberry.field(
+    options: QueryDefinitionOptionsGQL = strawberry.field(
         description="Query definition options including filter and group labels."
     )
     created_at: datetime = strawberry.field(description="Creation timestamp.")
@@ -41,7 +41,7 @@ class PrometheusQueryPresetGQL(Node):
             metric_name=data.metric_name,
             query_template=data.query_template,
             time_window=data.time_window,
-            options=PrometheusPresetOptionsGQL(
+            options=QueryDefinitionOptionsGQL(
                 filter_labels=data.filter_labels,
                 group_labels=data.group_labels,
             ),
@@ -50,13 +50,13 @@ class PrometheusQueryPresetGQL(Node):
         )
 
 
-PrometheusQueryPresetEdge = Edge[PrometheusQueryPresetGQL]
+QueryDefinitionEdge = Edge[QueryDefinitionGQL]
 
 
 @strawberry.type(
     description="Added in 26.3.0. Paginated connection for query definition records.",
 )
-class PrometheusQueryPresetConnection(Connection[PrometheusQueryPresetGQL]):
+class QueryDefinitionConnection(Connection[QueryDefinitionGQL]):
     count: int = strawberry.field(
         description="Total number of query definition records matching the query criteria."
     )
@@ -70,13 +70,13 @@ class PrometheusQueryPresetConnection(Connection[PrometheusQueryPresetGQL]):
     name="CreateQueryDefinitionPayload",
     description="Added in 26.3.0. Payload returned after creating a query definition.",
 )
-class CreatePrometheusQueryPresetPayload:
-    preset: PrometheusQueryPresetGQL
+class CreateQueryDefinitionPayload:
+    preset: QueryDefinitionGQL
 
 
 @strawberry.type(
     name="ModifyQueryDefinitionPayload",
     description="Added in 26.3.0. Payload returned after modifying a query definition.",
 )
-class ModifyPrometheusQueryPresetPayload:
-    preset: PrometheusQueryPresetGQL
+class ModifyQueryDefinitionPayload:
+    preset: QueryDefinitionGQL

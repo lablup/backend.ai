@@ -10,7 +10,7 @@ from strawberry import ID
     name="QueryDefinitionOptions",
     description="Added in 26.3.0. Options for query definition label governance.",
 )
-class PrometheusPresetOptionsGQL:
+class QueryDefinitionOptionsGQL:
     filter_labels: list[str] = strawberry.field(description="Allowed filter label keys.")
     group_labels: list[str] = strawberry.field(description="Allowed group-by label keys.")
 
@@ -48,7 +48,7 @@ class MetricResultGQL:
     name="QueryDefinitionExecuteResult",
     description="Added in 26.3.0. Result from executing a query definition.",
 )
-class PrometheusQueryResultGQL:
+class QueryDefinitionResultGQL:
     status: str = strawberry.field(description="Prometheus response status.")
     result_type: str = strawberry.field(description="Result type (e.g., matrix).")
     result: list[MetricResultGQL] = strawberry.field(description="Metric result entries.")
@@ -58,5 +58,5 @@ class PrometheusQueryResultGQL:
     name="DeleteQueryDefinitionPayload",
     description="Added in 26.3.0. Payload returned after deleting a query definition.",
 )
-class DeletePrometheusQueryPresetPayload:
+class DeleteQueryDefinitionPayload:
     id: ID = strawberry.field(description="ID of the deleted query definition.")

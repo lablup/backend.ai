@@ -8,12 +8,12 @@ import strawberry
 from strawberry import ID, Info
 
 from ai.backend.manager.api.gql.prometheus_query_preset.types import (
-    CreatePrometheusQueryPresetInput,
-    CreatePrometheusQueryPresetPayload,
-    DeletePrometheusQueryPresetPayload,
-    ModifyPrometheusQueryPresetInput,
-    ModifyPrometheusQueryPresetPayload,
-    PrometheusQueryPresetGQL,
+    CreateQueryDefinitionInput,
+    CreateQueryDefinitionPayload,
+    DeleteQueryDefinitionPayload,
+    ModifyQueryDefinitionInput,
+    ModifyQueryDefinitionPayload,
+    QueryDefinitionGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -27,8 +27,8 @@ from ai.backend.manager.services.prometheus_query_preset.actions import (
 @strawberry.mutation(description="Added in 26.3.0. Create a new query definition (admin only).")  # type: ignore[misc]
 async def admin_create_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
-    input: CreatePrometheusQueryPresetInput,
-) -> CreatePrometheusQueryPresetPayload:
+    input: CreateQueryDefinitionInput,
+) -> CreateQueryDefinitionPayload:
     check_admin_only()
     processors = info.context.processors
 
@@ -36,9 +36,7 @@ async def admin_create_prometheus_query_preset(
         CreatePresetAction(creator=input.to_creator())
     )
 
-    return CreatePrometheusQueryPresetPayload(
-        preset=PrometheusQueryPresetGQL.from_data(action_result.preset)
-    )
+    return CreateQueryDefinitionPayload(preset=QueryDefinitionGQL.from_data(action_result.preset))
 
 
 @strawberry.mutation(
@@ -47,8 +45,8 @@ async def admin_create_prometheus_query_preset(
 async def admin_modify_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     id: ID,
-    input: ModifyPrometheusQueryPresetInput,
-) -> ModifyPrometheusQueryPresetPayload:
+    input: ModifyQueryDefinitionInput,
+) -> ModifyQueryDefinitionPayload:
     check_admin_only()
     processors = info.context.processors
 
@@ -57,16 +55,14 @@ async def admin_modify_prometheus_query_preset(
         ModifyPresetAction(preset_id=preset_id, updater=input.to_updater(preset_id))
     )
 
-    return ModifyPrometheusQueryPresetPayload(
-        preset=PrometheusQueryPresetGQL.from_data(action_result.preset)
-    )
+    return ModifyQueryDefinitionPayload(preset=QueryDefinitionGQL.from_data(action_result.preset))
 
 
 @strawberry.mutation(description="Added in 26.3.0. Delete a query definition (admin only).")  # type: ignore[misc]
 async def admin_delete_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     id: ID,
-) -> DeletePrometheusQueryPresetPayload:
+) -> DeleteQueryDefinitionPayload:
     check_admin_only()
     processors = info.context.processors
 
@@ -74,4 +70,4 @@ async def admin_delete_prometheus_query_preset(
         DeletePresetAction(preset_id=uuid.UUID(id))
     )
 
-    return DeletePrometheusQueryPresetPayload(id=id)
+    return DeleteQueryDefinitionPayload(id=id)

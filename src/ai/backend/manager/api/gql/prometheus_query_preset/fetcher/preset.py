@@ -15,12 +15,12 @@ from ai.backend.manager.api.gql.prometheus_query_preset.types import (
     MetricLabelEntryGQL,
     MetricResultGQL,
     MetricResultValueGQL,
-    PrometheusQueryPresetConnection,
-    PrometheusQueryPresetEdge,
-    PrometheusQueryPresetFilter,
-    PrometheusQueryPresetGQL,
-    PrometheusQueryPresetOrderBy,
-    PrometheusQueryResultGQL,
+    QueryDefinitionConnection,
+    QueryDefinitionEdge,
+    QueryDefinitionFilter,
+    QueryDefinitionGQL,
+    QueryDefinitionOrderBy,
+    QueryDefinitionResultGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.prometheus_query_preset import ExecutePresetOptions
@@ -50,25 +50,25 @@ def get_preset_pagination_spec() -> PaginationSpec:
 async def fetch_admin_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     preset_id: UUID,
-) -> PrometheusQueryPresetGQL:
+) -> QueryDefinitionGQL:
     processors = info.context.processors
     action_result = await processors.prometheus_query_preset.get_preset.wait_for_complete(
         GetPresetAction(preset_id=preset_id)
     )
-    return PrometheusQueryPresetGQL.from_data(action_result.preset)
+    return QueryDefinitionGQL.from_data(action_result.preset)
 
 
 async def fetch_admin_prometheus_query_presets(
     info: Info[StrawberryGQLContext],
-    filter: PrometheusQueryPresetFilter | None = None,
-    order_by: list[PrometheusQueryPresetOrderBy] | None = None,
+    filter: QueryDefinitionFilter | None = None,
+    order_by: list[QueryDefinitionOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> PrometheusQueryPresetConnection:
+) -> QueryDefinitionConnection:
     processors = info.context.processors
 
     querier = info.context.gql_adapter.build_querier(
@@ -90,12 +90,10 @@ async def fetch_admin_prometheus_query_presets(
         SearchPresetsAction(querier=querier)
     )
 
-    nodes = [PrometheusQueryPresetGQL.from_data(data) for data in action_result.items]
-    edges = [
-        PrometheusQueryPresetEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
-    ]
+    nodes = [QueryDefinitionGQL.from_data(data) for data in action_result.items]
+    edges = [QueryDefinitionEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
 
-    return PrometheusQueryPresetConnection(
+    return QueryDefinitionConnection(
         edges=edges,
         page_info=PageInfo(
             has_next_page=action_result.has_next_page,
@@ -113,7 +111,7 @@ async def fetch_prometheus_query_preset_result(
     options: ExecutePresetOptions,
     time_window: str | None,
     time_range: QueryTimeRange | None,
-) -> PrometheusQueryResultGQL:
+) -> QueryDefinitionResultGQL:
     processors = info.context.processors
 
     action_result = await processors.prometheus_query_preset.execute_preset.wait_for_complete(
@@ -137,7 +135,7 @@ async def fetch_prometheus_query_preset_result(
         ]
         result_entries.append(MetricResultGQL(metric=metric_labels, values=values))
 
-    return PrometheusQueryResultGQL(
+    return QueryDefinitionResultGQL(
         status=response.status,
         result_type=response.data.result_type,
         result=result_entries,
