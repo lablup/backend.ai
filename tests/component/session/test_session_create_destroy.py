@@ -550,6 +550,79 @@ class TestSessionCreation:
                 )
             )
 
+    async def test_session_name_already_exists_with_reuse_false_returns_409(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        running_session_seed: tuple[SessionId, str, uuid.UUID],
+        image_seed: str,
+    ) -> None:
+        """Session name already exists (reuse_if_exists=false) → 409 conflict.
+
+        When attempting to create a session with a name that already exists
+        and reuse_if_exists=False (or not specified), the API should return
+        HTTP 409 conflict error.
+        """
+        _, session_name, _ = running_session_seed
+        # Try to create with same name, reuse_if_exists=False
+        with pytest.raises(Exception) as exc_info:
+            await admin_registry.session.create_from_params(
+                CreateFromParamsRequest(
+                    session_name=session_name,
+                    image=image_seed,
+                    session_type=SessionTypes.INTERACTIVE,
+                    reuse_if_exists=False,
+                    config={},
+                )
+            )
+        # Should be conflict or already exists error
+        assert (
+            "already exists" in str(exc_info.value).lower()
+            or "conflict" in str(exc_info.value).lower()
+        )
+
+    async def test_regular_user_cannot_perform_admin_operations(
+        self,
+        user_registry: BackendAIClientRegistry,
+        admin_user_fixture: UserFixtureData,
+        image_seed: str,
+    ) -> None:
+        """Regular user insufficient role for admin operations → 403.
+
+        When a regular user attempts to perform admin-only operations like
+        owner delegation (creating sessions for other users), the API should
+        return HTTP 403 PermissionDeniedError.
+        """
+        unique = secrets.token_hex(4)
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.session.create_from_params(
+                CreateFromParamsRequest(
+                    session_name=f"test-admin-op-{unique}",
+                    image=image_seed,
+                    session_type=SessionTypes.INTERACTIVE,
+                    owner_access_key=admin_user_fixture.keypair.access_key,
+                    config={},
+                )
+            )
+
+    async def test_cross_domain_access_denied(
+        self,
+        user_registry: BackendAIClientRegistry,
+        running_session_seed: tuple[SessionId, str, uuid.UUID],
+    ) -> None:
+        """Cross-domain access attempt → 403 or 404.
+
+        When a user attempts to access a session from a different domain,
+        the API should return HTTP 403 PermissionDeniedError or 404 NotFoundError.
+
+        NOTE: The running_session_seed belongs to admin_user in the default domain.
+        The user_fixture is also in the same domain by default, so we test by
+        attempting to destroy a session owned by another user (admin).
+        """
+        _, session_name, _ = running_session_seed
+        # User tries to access admin's session - should be denied
+        with pytest.raises((PermissionDeniedError, NotFoundError)):
+            await user_registry.session.destroy(session_name)
+
 
 # ============================================================================
 # Session Destruction Tests
