@@ -6,6 +6,9 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
+import pytest
+from pydantic import ValidationError
+
 from ai.backend.common.dto.manager.image.response import (
     AliasImageResponse,
     ForgetImageResponse,
@@ -190,3 +193,7 @@ class TestPaginationInfo:
     def test_limit_optional(self) -> None:
         p = PaginationInfo(total=50, offset=0)
         assert p.limit is None
+
+    def test_limit_rejects_non_positive(self) -> None:
+        with pytest.raises(ValidationError):
+            PaginationInfo(total=50, offset=0, limit=0)
