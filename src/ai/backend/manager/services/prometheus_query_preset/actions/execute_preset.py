@@ -3,7 +3,10 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
-from ai.backend.common.dto.clients.prometheus.response import PrometheusQueryRangeResponse
+from ai.backend.common.dto.clients.prometheus.response import (
+    PrometheusQueryInstantResponse,
+    PrometheusQueryRangeResponse,
+)
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.prometheus_query_preset import ExecutePresetOptions
@@ -31,7 +34,7 @@ class ExecutePresetAction(PrometheusQueryPresetAction):
 
 @dataclass
 class ExecutePresetActionResult(BaseActionResult):
-    response: PrometheusQueryRangeResponse
+    response: PrometheusQueryRangeResponse | PrometheusQueryInstantResponse
 
     @override
     def entity_id(self) -> str | None:
