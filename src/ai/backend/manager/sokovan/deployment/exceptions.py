@@ -93,17 +93,3 @@ class DeploymentAlreadyInProgress(DeploymentError):
             operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
-
-
-class InvalidRollingUpdateConfig(DeploymentError):
-    """Raised when rolling update config is invalid (e.g. max_surge + max_unavailable < 1)."""
-
-    error_type = "https://api.backend.ai/probs/invalid-rolling-update-config"
-    error_title = "Invalid rolling update configuration."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.BAD_REQUEST,
-        )
