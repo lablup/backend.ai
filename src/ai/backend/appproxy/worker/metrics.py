@@ -85,9 +85,21 @@ async def gather_prometheus_inference_measures(
         )
         client_session = client_pool.load_client_session(client_key)
 
-        async with client_session.get(request_path) as resp:
-            resp.raise_for_status()
-            metrics_text = await resp.text()
+        try:
+            async with client_session.get(request_path) as resp:
+                resp.raise_for_status()
+                metrics_text = await resp.text()
+        except Exception:
+            log.warning(
+                "Failed to collect metrics from route {} ({}:{}), skipping",
+                route.route_id,
+                route.current_kernel_host,
+                route.kernel_port,
+                exc_info=True,
+            )
+            continue
+
+        try:
             metric_families = text_string_to_metric_families(metrics_text)
             for metric_family in metric_families:
                 metric_name = metric_family.name
@@ -121,6 +133,15 @@ async def gather_prometheus_inference_measures(
                         except IndexError:
                             continue
                         counter_metrics[metric_name][route.route_id] = Decimal(value)
+        except Exception:
+            log.warning(
+                "Failed to parse metrics from route {} ({}:{}), skipping",
+                route.route_id,
+                route.current_kernel_host,
+                route.kernel_port,
+                exc_info=True,
+            )
+            continue
 
     measures: list[InferenceMeasurement[Measurement | HistogramMeasurement]] = []
     for metric_name, per_route_histogram_metrics in histogram_bucket_metrics.items():
