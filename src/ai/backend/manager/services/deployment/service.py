@@ -13,6 +13,7 @@ from ai.backend.common.data.model_deployment.types import (
     ReadinessStatus,
 )
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.dto.manager.deployment.response import ModelDefinitionDTO
 from ai.backend.common.types import (
     ResourceSlot,
 )
@@ -632,10 +633,13 @@ class DeploymentService:
     async def get_model_definition(
         self, action: GetModelDefinitionAction
     ) -> GetModelDefinitionActionResult:
-        model_definition = await self._deployment_repository.get_model_definition_by_deployment_id(
-            action.deployment_id
+        model_definition_dict = (
+            await self._deployment_repository.get_model_definition_by_deployment_id(
+                action.deployment_id
+            )
         )
-        return GetModelDefinitionActionResult(model_definition=model_definition)
+        model_definition_dto = ModelDefinitionDTO.model_validate(model_definition_dict)
+        return GetModelDefinitionActionResult(model_definition=model_definition_dto)
 
     async def search_revisions(self, action: SearchRevisionsAction) -> SearchRevisionsActionResult:
         """Search revisions with filtering and pagination.

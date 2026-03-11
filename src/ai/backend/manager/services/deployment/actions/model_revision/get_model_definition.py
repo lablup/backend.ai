@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from typing import Any, override
+from typing import override
 from uuid import UUID
 
+from ai.backend.common.dto.manager.deployment.response import ModelDefinitionDTO
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.deployment.actions.model_revision.base import (
@@ -25,7 +26,7 @@ class GetModelDefinitionAction(ModelRevisionBaseAction):
 
 @dataclass
 class GetModelDefinitionActionResult(BaseActionResult):
-    model_definition: dict[str, Any]
+    model_definition: ModelDefinitionDTO
 
     @override
     def entity_id(self) -> str | None:

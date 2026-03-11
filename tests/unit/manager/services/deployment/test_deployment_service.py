@@ -616,11 +616,18 @@ class TestGetModelDefinition(DeploymentServiceBaseFixtures):
         return uuid.uuid4()
 
     @pytest.fixture
-    def sample_model_definition(self) -> dict[str, Any]:
+    def sample_model_definition_dict(self) -> dict[str, Any]:
         return {
-            "name": "test-model",
-            "model_path": "/models/test",
-            "runtime": "vllm",
+            "models": [
+                {
+                    "name": "test-model",
+                    "model_path": "/models/test",
+                    "service": {
+                        "start_command": ["python", "serve.py"],
+                        "port": 8000,
+                    },
+                }
+            ],
         }
 
     async def test_get_model_definition_success(
@@ -628,17 +635,19 @@ class TestGetModelDefinition(DeploymentServiceBaseFixtures):
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
         deployment_id: uuid.UUID,
-        sample_model_definition: dict[str, Any],
+        sample_model_definition_dict: dict[str, Any],
     ) -> None:
         """Should return model definition from the current active revision."""
         mock_deployment_repository.get_model_definition_by_deployment_id = AsyncMock(
-            return_value=sample_model_definition
+            return_value=sample_model_definition_dict
         )
 
         action = GetModelDefinitionAction(deployment_id=deployment_id)
         result = await processors.get_model_definition.wait_for_complete(action)
 
-        assert result.model_definition == sample_model_definition
+        assert len(result.model_definition.models) == 1
+        assert result.model_definition.models[0].name == "test-model"
+        assert result.model_definition.models[0].model_path == "/models/test"
         mock_deployment_repository.get_model_definition_by_deployment_id.assert_called_once_with(
             deployment_id
         )
