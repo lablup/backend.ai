@@ -46,6 +46,7 @@ from .response import (
     DestroyDeploymentResponse,
     GetDeploymentPolicyResponse,
     GetDeploymentResponse,
+    GetModelDefinitionResponse,
     GetRevisionResponse,
     ListDeploymentPoliciesResponse,
     ListDeploymentsResponse,
@@ -132,6 +133,7 @@ __all__ = (
     # Response DTOs - Get/List responses
     "GetDeploymentResponse",
     "GetDeploymentPolicyResponse",
+    "GetModelDefinitionResponse",
     "ListDeploymentPoliciesResponse",
     "ListDeploymentsResponse",
     "UpdateDeploymentResponse",

@@ -115,6 +115,10 @@ from ai.backend.manager.services.deployment.actions.model_revision.add_model_rev
     AddModelRevisionAction,
     AddModelRevisionActionResult,
 )
+from ai.backend.manager.services.deployment.actions.model_revision.get_model_definition import (
+    GetModelDefinitionAction,
+    GetModelDefinitionActionResult,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
     GetRevisionByIdActionResult,
@@ -624,6 +628,14 @@ class DeploymentService:
     ) -> GetRevisionByIdActionResult:
         revision = await self._deployment_repository.get_revision(action.revision_id)
         return GetRevisionByIdActionResult(data=revision)
+
+    async def get_model_definition(
+        self, action: GetModelDefinitionAction
+    ) -> GetModelDefinitionActionResult:
+        model_definition = await self._deployment_repository.get_model_definition_by_deployment_id(
+            action.deployment_id
+        )
+        return GetModelDefinitionActionResult(model_definition=model_definition)
 
     async def search_revisions(self, action: SearchRevisionsAction) -> SearchRevisionsActionResult:
         """Search revisions with filtering and pagination.

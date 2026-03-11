@@ -59,6 +59,7 @@ from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.errors.deployment import (
+    DefinitionFileNotFound,
     DeploymentHasNoTargetRevision,
     DeploymentRevisionNotFound,
     UserNotFoundInDeployment,
@@ -2023,6 +2024,46 @@ class DeploymentDBSource:
             if row is None:
                 raise DeploymentRevisionNotFound(f"Deployment revision {revision_id} not found")
             return row.to_data()
+
+    async def get_model_definition_by_deployment_id(
+        self,
+        deployment_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        """Get model definition from the current active revision of a deployment.
+
+        Raises:
+            EndpointNotFound: If the deployment does not exist.
+            DeploymentHasNoTargetRevision: If no active revision exists.
+            DefinitionFileNotFound: If the revision has no model definition.
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            endpoint_query = sa.select(
+                EndpointRow.current_revision,
+            ).where(EndpointRow.id == deployment_id)
+            result = await db_sess.execute(endpoint_query)
+            row = result.one_or_none()
+            if row is None:
+                raise EndpointNotFound(f"Deployment {deployment_id} not found")
+            current_revision_id = row[0]
+            if current_revision_id is None:
+                raise DeploymentHasNoTargetRevision(
+                    f"Deployment {deployment_id} has no active revision"
+                )
+            revision_query = sa.select(
+                DeploymentRevisionRow.model_definition,
+            ).where(DeploymentRevisionRow.id == current_revision_id)
+            revision_result = await db_sess.execute(revision_query)
+            revision_row = revision_result.one_or_none()
+            if revision_row is None:
+                raise DeploymentRevisionNotFound(
+                    f"Deployment revision {current_revision_id} not found"
+                )
+            model_definition = revision_row[0]
+            if model_definition is None:
+                raise DefinitionFileNotFound(
+                    f"No model definition found for revision {current_revision_id}"
+                )
+            return cast(dict[str, Any], model_definition)
 
     async def get_revision_by_route_id(
         self,

@@ -36,6 +36,14 @@ def register_deployment_routes(
         middlewares=[auth_required],
     )
 
+    # Model definition route
+    reg.add(
+        "GET",
+        "/{deployment_id}/model-definition",
+        handler.get_model_definition,
+        middlewares=[auth_required],
+    )
+
     # Revision routes (nested under deployment)
     reg.add(
         "POST",

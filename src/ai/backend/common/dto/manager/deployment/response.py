@@ -38,6 +38,7 @@ __all__ = (
     "UpsertDeploymentPolicyResponse",
     "GetDeploymentResponse",
     "GetDeploymentPolicyResponse",
+    "GetModelDefinitionResponse",
     "ListDeploymentPoliciesResponse",
     "ListDeploymentsResponse",
     "UpdateDeploymentResponse",
@@ -165,6 +166,12 @@ class DestroyDeploymentResponse(BaseResponseModel):
     """Response for destroying a deployment."""
 
     deleted: bool = Field(description="Whether the deployment was deleted")
+
+
+class GetModelDefinitionResponse(BaseResponseModel):
+    """Response for getting the model definition of a deployment's active revision."""
+
+    model_definition: dict[str, Any] = Field(description="Parsed model definition content")
 
 
 class GetRevisionResponse(BaseResponseModel):

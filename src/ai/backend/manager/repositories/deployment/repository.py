@@ -1062,6 +1062,20 @@ class DeploymentRepository:
         return await self._db_source.get_revision(revision_id)
 
     @deployment_repository_resilience.apply()
+    async def get_model_definition_by_deployment_id(
+        self,
+        deployment_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        """Get model definition from the current active revision of a deployment.
+
+        Raises:
+            EndpointNotFound: If the deployment does not exist.
+            DeploymentHasNoTargetRevision: If no active revision exists.
+            DefinitionFileNotFound: If the revision has no model definition.
+        """
+        return await self._db_source.get_model_definition_by_deployment_id(deployment_id)
+
+    @deployment_repository_resilience.apply()
     async def get_revision_by_route_id(
         self,
         route_id: uuid.UUID,

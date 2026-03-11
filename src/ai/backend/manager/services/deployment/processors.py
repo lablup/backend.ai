@@ -68,6 +68,10 @@ from ai.backend.manager.services.deployment.actions.model_revision.add_model_rev
     AddModelRevisionAction,
     AddModelRevisionActionResult,
 )
+from ai.backend.manager.services.deployment.actions.model_revision.get_model_definition import (
+    GetModelDefinitionAction,
+    GetModelDefinitionActionResult,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
     GetRevisionByIdActionResult,
@@ -132,6 +136,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
     # Revision operations
     add_model_revision: ActionProcessor[AddModelRevisionAction, AddModelRevisionActionResult]
     get_revision_by_id: ActionProcessor[GetRevisionByIdAction, GetRevisionByIdActionResult]
+    get_model_definition: ActionProcessor[GetModelDefinitionAction, GetModelDefinitionActionResult]
     search_revisions: ActionProcessor[SearchRevisionsAction, SearchRevisionsActionResult]
     activate_revision: ActionProcessor[ActivateRevisionAction, ActivateRevisionActionResult]
 
@@ -191,6 +196,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
         # Revision operations
         self.add_model_revision = ActionProcessor(service.add_model_revision, action_monitors)
         self.get_revision_by_id = ActionProcessor(service.get_revision_by_id, action_monitors)
+        self.get_model_definition = ActionProcessor(service.get_model_definition, action_monitors)
         self.search_revisions = ActionProcessor(service.search_revisions, action_monitors)
         self.activate_revision = ActionProcessor(service.activate_revision, action_monitors)
 
@@ -240,6 +246,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
             # Revision operations
             AddModelRevisionAction.spec(),
             GetRevisionByIdAction.spec(),
+            GetModelDefinitionAction.spec(),
             SearchRevisionsAction.spec(),
             ActivateRevisionAction.spec(),
             # Route operations

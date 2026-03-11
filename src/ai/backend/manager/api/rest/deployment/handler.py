@@ -25,6 +25,7 @@ from ai.backend.common.dto.manager.deployment import (
     DestroyDeploymentResponse,
     GetDeploymentPolicyResponse,
     GetDeploymentResponse,
+    GetModelDefinitionResponse,
     GetRevisionResponse,
     ListDeploymentsResponse,
     ListRevisionsResponse,
@@ -70,6 +71,9 @@ from ai.backend.manager.services.deployment.actions.get_deployment_by_id import 
 )
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
+)
+from ai.backend.manager.services.deployment.actions.model_revision.get_model_definition import (
+    GetModelDefinitionAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
@@ -331,6 +335,22 @@ class DeploymentAPIHandler:
         # Build response
         resp = GetRevisionResponse(
             revision=self._revision_adapter.convert_to_dto(action_result.data)
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    async def get_model_definition(
+        self,
+        path: PathParam[DeploymentPathParam],
+    ) -> APIResponse:
+        """Get model definition from the current active revision of a deployment."""
+        deployment_processors = self._get_deployment_processors()
+
+        action_result = await deployment_processors.get_model_definition.wait_for_complete(
+            GetModelDefinitionAction(deployment_id=path.parsed.deployment_id)
+        )
+
+        resp = GetModelDefinitionResponse(
+            model_definition=action_result.model_definition,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 

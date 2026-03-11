@@ -9,6 +9,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -40,6 +41,10 @@ from ai.backend.manager.data.deployment.types import (
     ResourceSpec,
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
+from ai.backend.manager.errors.deployment import (
+    DefinitionFileNotFound,
+    DeploymentHasNoTargetRevision,
+)
 from ai.backend.manager.models.deployment_policy import (
     BlueGreenSpec,
     RollingUpdateSpec,
@@ -52,6 +57,9 @@ from ai.backend.manager.services.deployment.actions.deployment_policy import (
 )
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
+)
+from ai.backend.manager.services.deployment.actions.model_revision.get_model_definition import (
+    GetModelDefinitionAction,
 )
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
@@ -598,3 +606,61 @@ class TestServiceDefinitionMerge(ModelRevisionFixtures):
         spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
         assert spec.environ == revision_creator.execution.environ
         assert spec.resource_slots == ResourceSlot(revision_creator.resource_spec.resource_slots)
+
+
+class TestGetModelDefinition(DeploymentServiceBaseFixtures):
+    """Tests for DeploymentService.get_model_definition"""
+
+    async def test_get_model_definition_success(
+        self,
+        processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
+    ) -> None:
+        """Should return model definition from the current active revision."""
+        deployment_id = uuid.uuid4()
+        expected_definition: dict[str, Any] = {
+            "name": "test-model",
+            "model_path": "/models/test",
+            "runtime": "vllm",
+        }
+        mock_deployment_repository.get_model_definition_by_deployment_id = AsyncMock(
+            return_value=expected_definition
+        )
+
+        action = GetModelDefinitionAction(deployment_id=deployment_id)
+        result = await processors.get_model_definition.wait_for_complete(action)
+
+        assert result.model_definition == expected_definition
+        mock_deployment_repository.get_model_definition_by_deployment_id.assert_called_once_with(
+            deployment_id
+        )
+
+    async def test_get_model_definition_no_active_revision(
+        self,
+        processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
+    ) -> None:
+        """Should raise when deployment has no active revision."""
+        deployment_id = uuid.uuid4()
+        mock_deployment_repository.get_model_definition_by_deployment_id = AsyncMock(
+            side_effect=DeploymentHasNoTargetRevision("No active revision")
+        )
+
+        action = GetModelDefinitionAction(deployment_id=deployment_id)
+        with pytest.raises(DeploymentHasNoTargetRevision):
+            await processors.get_model_definition.wait_for_complete(action)
+
+    async def test_get_model_definition_no_definition_file(
+        self,
+        processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
+    ) -> None:
+        """Should raise when revision has no model definition."""
+        deployment_id = uuid.uuid4()
+        mock_deployment_repository.get_model_definition_by_deployment_id = AsyncMock(
+            side_effect=DefinitionFileNotFound("No model definition")
+        )
+
+        action = GetModelDefinitionAction(deployment_id=deployment_id)
+        with pytest.raises(DefinitionFileNotFound):
+            await processors.get_model_definition.wait_for_complete(action)
