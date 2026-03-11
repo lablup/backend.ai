@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -54,66 +53,36 @@ class MetricInstantResponse(BaseMetricResponse):
         return [self.value]
 
 
-class BasePrometheusQueryData(BaseModel, ABC):
-    """Base class for Prometheus query data."""
+class PrometheusQueryData(BaseModel):
+    """Data field from Prometheus query_range response."""
 
     result_type: str = Field(validation_alias="resultType")
+    result: list[MetricResponse]
 
     model_config = ConfigDict(populate_by_name=True)
 
-    @property
-    @abstractmethod
-    def metric_results(self) -> Sequence[BaseMetricResponse]: ...
 
-
-class PrometheusQueryData(BasePrometheusQueryData):
-    """Data field from Prometheus query_range response."""
-
-    result: list[MetricResponse]
-
-    @property
-    def metric_results(self) -> Sequence[BaseMetricResponse]:
-        return self.result
-
-
-class PrometheusQueryInstantData(BasePrometheusQueryData):
-    """Data field from Prometheus instant query response."""
-
-    result: list[MetricInstantResponse]
-
-    @property
-    def metric_results(self) -> Sequence[BaseMetricResponse]:
-        return self.result
-
-
-class BasePrometheusQueryResponse(BaseModel, ABC):
-    """Base class for Prometheus query responses."""
-
-    status: str
-
-    @property
-    @abstractmethod
-    def query_data(self) -> BasePrometheusQueryData: ...
-
-
-class PrometheusQueryRangeResponse(BasePrometheusQueryResponse):
+class PrometheusQueryRangeResponse(BaseModel):
     """Response from Prometheus query_range API."""
 
+    status: str
     data: PrometheusQueryData
 
-    @property
-    def query_data(self) -> BasePrometheusQueryData:
-        return self.data
+
+class PrometheusQueryInstantData(BaseModel):
+    """Data field from Prometheus instant query response."""
+
+    result_type: str = Field(validation_alias="resultType")
+    result: list[MetricInstantResponse]
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
-class PrometheusQueryInstantResponse(BasePrometheusQueryResponse):
+class PrometheusQueryInstantResponse(BaseModel):
     """Response from Prometheus instant query API."""
 
+    status: str
     data: PrometheusQueryInstantData
-
-    @property
-    def query_data(self) -> BasePrometheusQueryData:
-        return self.data
 
 
 class LabelValueResponse(BaseModel):
