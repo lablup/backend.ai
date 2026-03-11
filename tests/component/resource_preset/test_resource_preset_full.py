@@ -7,6 +7,12 @@ serialization.
 
 TestCheckPresets verifies the check_presets endpoint returns presets with
 allocatability flags and resource limits/occupancy for keypair and group scopes.
+
+TestPresetPermissions verifies that regular (non-admin) users can list
+and check presets.  Resource preset CRUD (create/modify/delete) is only
+exposed through the legacy GraphQL API with SUPERADMIN restriction — the
+REST API has no CRUD endpoints, so 403 testing for those mutations is not
+applicable at the REST layer.
 """
 
 from __future__ import annotations
@@ -512,3 +518,46 @@ class TestCheckPresets:
         assert "resource_slots" in our_preset
         assert "allocatable" in our_preset
         assert our_preset["resource_slots"]["cpu"] == "8"
+
+
+class TestPresetPermissions:
+    """Permission tests for resource preset endpoints.
+
+    Verifies that regular (non-admin) users can list and check presets,
+    as both REST endpoints use ``auth_required`` (not ``superadmin_required``).
+
+    Note: Resource preset CRUD (create/modify/delete) is only exposed through
+    the legacy GraphQL API with ``allowed_roles = (UserRole.SUPERADMIN,)``.
+    The REST API has no CRUD endpoints, so 403 permission testing for
+    create/modify/delete is not applicable at the REST/SDK layer.
+    """
+
+    async def test_regular_user_can_list_presets(
+        self,
+        user_registry: BackendAIClientRegistry,
+        target_preset: PresetFixtureData,
+    ) -> None:
+        """Regular user can list presets (read-only access via auth_required)."""
+        result = await user_registry.infra.list_presets()
+        assert isinstance(result, ListPresetsResponse)
+        assert isinstance(result.presets, list)
+        # The pre-seeded preset should be visible to the regular user
+        preset_names = [p["name"] for p in result.presets]
+        assert target_preset["name"] in preset_names
+
+    async def test_regular_user_can_check_presets(
+        self,
+        user_registry: BackendAIClientRegistry,
+        group_name_fixture: str,
+        target_preset: PresetFixtureData,
+    ) -> None:
+        """Regular user can check presets allocatability (auth_required)."""
+        result = await user_registry.infra.check_presets(
+            CheckPresetsRequest(group=group_name_fixture)
+        )
+        assert isinstance(result, CheckPresetsResponse)
+        assert isinstance(result.presets, list)
+        # Response should contain resource limit/usage data
+        assert isinstance(result.keypair_limits, dict)
+        assert isinstance(result.keypair_using, dict)
+        assert isinstance(result.keypair_remaining, dict)
