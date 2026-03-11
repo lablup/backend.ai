@@ -280,8 +280,15 @@ class DeploymentCoordinator:
     ) -> None:
         """Run a single handler: fetch filtered deployments -> execute -> transitions -> post_process."""
         target_statuses = handler.target_statuses()
+        lifecycles = list({status.lifecycle for status in target_statuses})
+        sub_steps = [
+            status.sub_status
+            for status in target_statuses
+            if isinstance(status.sub_status, DeploymentSubStep)
+        ]
         deployments = await self._deployment_repository.get_endpoints_by_statuses(
-            target_statuses,
+            lifecycles,
+            sub_steps=sub_steps or None,
         )
         if not deployments:
             log.trace("No deployments to process for handler: {}", handler.name())
@@ -326,7 +333,7 @@ class DeploymentCoordinator:
         to ensure atomicity.
         """
         handler_name = handler.name()
-        target_lifecycles = handler.target_statuses()
+        target_lifecycles = list({status.lifecycle for status in handler.target_statuses()})
 
         batch_updaters: list[BatchUpdater[EndpointRow]] = []
         all_history_specs: list[DeploymentHistoryCreatorSpec] = []

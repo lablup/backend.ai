@@ -24,7 +24,6 @@ class DeploymentLifecycleType(StrEnum):
     RECONCILE = "reconcile"
     DEPLOYING = "deploying"
     DESTROYING = "destroying"
-    DEPLOYING = "deploying"
 
 
 @dataclass
