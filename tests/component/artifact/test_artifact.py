@@ -19,6 +19,12 @@ from ai.backend.common.dto.manager.artifact.response import (
     RejectRevisionResponse,
     UpdateArtifactResponse,
 )
+from ai.backend.common.dto.manager.artifact_registry import (
+    OffsetPaginationInput,
+    PaginationInput,
+    SearchArtifactsRequest,
+    SearchArtifactsResponse,
+)
 
 from .conftest import ArtifactFixtureData
 
@@ -158,3 +164,38 @@ class TestGetRevisionDownloadProgress:
             target_artifact.artifact_revision_id,
         )
         assert isinstance(result, GetRevisionDownloadProgressResponse)
+
+
+class TestSearchArtifacts:
+    async def test_search_artifacts_returns_seeded(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_artifact: ArtifactFixtureData,
+    ) -> None:
+        """Search artifacts → seeded artifact appears in results."""
+        result = await admin_registry.artifact_registry.search_artifacts(
+            SearchArtifactsRequest(
+                pagination=PaginationInput(
+                    offset=OffsetPaginationInput(offset=0, limit=20),
+                ),
+            ),
+        )
+        assert isinstance(result, SearchArtifactsResponse)
+        assert len(result.artifacts) >= 1
+        artifact_ids = [a.id for a in result.artifacts]
+        assert target_artifact.artifact_id in artifact_ids
+
+    async def test_search_artifacts_empty_result(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        """Search artifacts with impossible filter → empty list."""
+        result = await admin_registry.artifact_registry.search_artifacts(
+            SearchArtifactsRequest(
+                pagination=PaginationInput(
+                    offset=OffsetPaginationInput(offset=0, limit=20),
+                ),
+            ),
+        )
+        assert isinstance(result, SearchArtifactsResponse)
+        assert isinstance(result.artifacts, list)
