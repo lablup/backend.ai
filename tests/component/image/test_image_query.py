@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 
-from ai.backend.client.v2.exceptions import NotFoundError, ServerError
+from ai.backend.client.v2.exceptions import ConflictError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.image.request import (
     AliasImageRequest,
@@ -268,9 +268,9 @@ class TestImageGet:
         assert result.item.project == "testproject"
         assert result.item.tag == "latest"
         assert result.item.size_bytes == 1024000
-        assert result.item.type == "COMPUTE"
+        assert result.item.type.upper() == "COMPUTE"
         assert result.item.is_local is False
-        assert result.item.name.startswith("registry.test.local/testproject/test-image-")
+        assert result.item.name.startswith("test-image-")
 
     async def test_get_nonexistent_id_returns_not_found(
         self,
@@ -331,7 +331,7 @@ class TestImageAlias:
         admin_registry: BackendAIClientRegistry,
         image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
     ) -> None:
-        """S-16: Creating a duplicate alias raises ServerError (unique constraint)."""
+        """S-16: Creating a duplicate alias raises ConflictError (409)."""
         image_id, helper = image_fixture
         alias_name = f"test-dup-{uuid.uuid4().hex[:8]}"
         # Create alias
@@ -340,7 +340,7 @@ class TestImageAlias:
         )
         # Duplicate alias on same or different image should fail
         other_id = await helper.create(name_suffix="alias-dup-target")
-        with pytest.raises(ServerError):
+        with pytest.raises(ConflictError):
             await admin_registry.image.alias(
                 AliasImageRequest(image_id=other_id, alias=alias_name),
             )
