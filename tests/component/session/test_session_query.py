@@ -28,6 +28,7 @@ from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.session.request import MatchSessionsRequest
 from ai.backend.common.dto.manager.session.response import (
     GetDirectAccessInfoResponse,
+    GetSessionInfoResponse,
     GetStatusHistoryResponse,
     MatchSessionsResponse,
 )
@@ -416,6 +417,36 @@ class TestSessionStatusHistory:
         """F-BIZ-1: Nonexistent session raises NotFoundError (HTTP 404)."""
         with pytest.raises(NotFoundError):
             await admin_registry.session.get_status_history("nonexistent-session-xyz-99999")
+
+
+class TestSessionInfo:
+    """Tests for GET /{session_name} (session info)."""
+
+    async def test_session_info_returns_running_status_and_domain(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        session_seed: SessionSeedData,
+    ) -> None:
+        """S-7: Session info returns LegacySessionInfo with status=RUNNING, domainName."""
+        result = await admin_registry.session.get_info(session_seed.session_name)
+        assert isinstance(result, GetSessionInfoResponse)
+        assert result.root["status"] == "RUNNING"
+        assert "domainName" in result.root
+        assert result.root["domainName"] == session_seed.domain_name
+
+    async def test_different_user_session_raises_not_found(
+        self,
+        user_registry: BackendAIClientRegistry,
+        session_seed: SessionSeedData,
+    ) -> None:
+        """F-AUTH-2: Different user's session info → SessionNotFound.
+
+        The session is owned by admin_user_fixture. When a regular user
+        (user_registry) tries to access it, the owner_access_key mismatch
+        results in SessionNotFound (HTTP 404).
+        """
+        with pytest.raises(NotFoundError):
+            await user_registry.session.get_info(session_seed.session_name)
 
 
 class TestSessionDirectAccessInfo:
