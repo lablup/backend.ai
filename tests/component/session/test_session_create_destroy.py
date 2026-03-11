@@ -31,6 +31,7 @@ from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.session.request import (
     CreateFromParamsRequest,
     CreateFromTemplateRequest,
+    DestroySessionRequest,
 )
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -597,3 +598,180 @@ class TestSessionDestruction:
         _, session_name, _ = running_session_seed
         with pytest.raises(PermissionDeniedError):
             await unauthenticated_registry.session.destroy(session_name)
+
+    async def test_normal_destroy_of_running_session(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        running_session_seed: tuple[SessionId, str, uuid.UUID],
+        db_engine: SAEngine,
+    ) -> None:
+        """Normal destroy of RUNNING session → session transitions to TERMINATING.
+
+        When destroying a RUNNING session normally, the session should transition
+        to TERMINATING status and be marked for graceful shutdown.
+
+        NOTE: Component tests cannot verify the full lifecycle (requires live agents),
+        but we can validate the API accepts the destroy request and returns success.
+        """
+        _, session_name, _ = running_session_seed
+
+        # Normal destroy (graceful shutdown)
+        response = await admin_registry.session.destroy(
+            session_name,
+            DestroySessionRequest(forced=False, recursive=False),
+        )
+
+        # API should return success response
+        assert response is not None
+
+    async def test_forced_destroy(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        running_session_seed: tuple[SessionId, str, uuid.UUID],
+    ) -> None:
+        """Forced destroy → session terminated regardless of state.
+
+        When destroying a session with forced=True, the session should be
+        terminated immediately without graceful shutdown.
+
+        NOTE: Component tests cannot verify the full lifecycle (requires live agents),
+        but we can validate the API accepts the forced flag.
+        """
+        _, session_name, _ = running_session_seed
+
+        # Forced destroy (immediate termination)
+        response = await admin_registry.session.destroy(
+            session_name,
+            DestroySessionRequest(forced=True, recursive=False),
+        )
+
+        # API should return success response
+        assert response is not None
+
+    async def test_cancel_pending_session(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        pending_session_seed: tuple[SessionId, str],
+    ) -> None:
+        """Cancel pending session → PENDING session cancelled.
+
+        When destroying a PENDING session (not yet scheduled), the session
+        should be cancelled before resource allocation.
+
+        NOTE: Component tests cannot verify the full lifecycle (requires live agents),
+        but we can validate the API accepts the destroy request for PENDING sessions.
+        """
+        _, session_name = pending_session_seed
+
+        # Cancel pending session
+        response = await admin_registry.session.destroy(
+            session_name,
+            DestroySessionRequest(forced=False, recursive=False),
+        )
+
+        # API should return success response
+        assert response is not None
+
+    async def test_recursive_destroy_of_session_with_dependencies(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        db_engine: SAEngine,
+        domain_fixture: str,
+        group_fixture: uuid.UUID,
+        admin_user_fixture: UserFixtureData,
+        scaling_group_fixture: str,
+        dependency_session_seed: tuple[SessionId, str],
+    ) -> None:
+        """Recursive destroy → all dependent sessions destroyed.
+
+        When destroying a session with recursive=True, all sessions that depend
+        on this session should also be destroyed.
+
+        NOTE: Component tests cannot verify the full lifecycle (requires live agents),
+        but we can validate the API accepts the recursive flag.
+        """
+        # Create a parent session that will have a dependent
+        dep_id, dep_name = dependency_session_seed
+
+        # Create a dependent session in DB
+        unique = secrets.token_hex(4)
+        dependent_id = SessionId(uuid.uuid4())
+        dependent_name = f"test-dependent-{unique}"
+        kernel_id = uuid.uuid4()
+        now = datetime.now(tzutc())
+
+        status_history: dict[str, Any] = {
+            SessionStatus.PENDING.name: now.isoformat(),
+            SessionStatus.RUNNING.name: now.isoformat(),
+        }
+
+        async with db_engine.begin() as conn:
+            # Insert dependent session with dependency
+            await conn.execute(
+                sa.insert(SessionRow.__table__).values(
+                    id=dependent_id,
+                    creation_id=f"cid-{unique}",
+                    name=dependent_name,
+                    session_type=SessionTypes.INTERACTIVE,
+                    cluster_size=1,
+                    cluster_mode="single-node",
+                    domain_name=domain_fixture,
+                    group_id=group_fixture,
+                    user_uuid=admin_user_fixture.user_uuid,
+                    access_key=admin_user_fixture.keypair.access_key,
+                    scaling_group_name=scaling_group_fixture,
+                    status=SessionStatus.RUNNING,
+                    status_info="",
+                    status_history=status_history,
+                    occupying_slots=ResourceSlot(),
+                    requested_slots=ResourceSlot(),
+                    created_at=now,
+                    # Link to parent session as dependency
+                    dependencies=[dep_id],
+                )
+            )
+            await conn.execute(
+                sa.insert(kernels).values(
+                    id=kernel_id,
+                    session_id=dependent_id,
+                    session_creation_id=f"cid-{unique}",
+                    session_name=dependent_name,
+                    session_type=SessionTypes.INTERACTIVE,
+                    cluster_role="main",
+                    cluster_idx=0,
+                    cluster_hostname="main0",
+                    cluster_mode="single-node",
+                    cluster_size=1,
+                    domain_name=domain_fixture,
+                    group_id=group_fixture,
+                    user_uuid=admin_user_fixture.user_uuid,
+                    access_key=admin_user_fixture.keypair.access_key,
+                    scaling_group=scaling_group_fixture,
+                    status=KernelStatus.RUNNING,
+                    status_info="",
+                    occupied_slots=ResourceSlot(),
+                    requested_slots=ResourceSlot(),
+                    repl_in_port=0,
+                    repl_out_port=0,
+                    stdin_port=0,
+                    stdout_port=0,
+                    created_at=now,
+                )
+            )
+
+        try:
+            # Recursive destroy should destroy both parent and dependent
+            response = await admin_registry.session.destroy(
+                dep_name,
+                DestroySessionRequest(forced=False, recursive=True),
+            )
+
+            # API should return success response
+            assert response is not None
+        finally:
+            # Cleanup dependent session
+            async with db_engine.begin() as conn:
+                await conn.execute(kernels.delete().where(kernels.c.id == kernel_id))
+                await conn.execute(
+                    SessionRow.__table__.delete().where(SessionRow.__table__.c.id == dependent_id)
+                )
