@@ -25,6 +25,9 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.repository import AgentRepository
+from ai.backend.manager.repositories.container_registry.db_source.db_source import (
+    ContainerRegistryDBSource,
+)
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -55,7 +58,8 @@ PresetFactory = Callable[..., Coroutine[Any, Any, PresetFixtureData]]
 def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
 ) -> ContainerRegistryProcessors:
-    repo = ContainerRegistryRepository(database_engine)
+    db_source = ContainerRegistryDBSource(database_engine)
+    repo = ContainerRegistryRepository(db_source)
     service = ContainerRegistryService(database_engine, repo)
     return ContainerRegistryProcessors(
         service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)

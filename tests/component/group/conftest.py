@@ -18,6 +18,9 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.container_registry.db_source.db_source import (
+    ContainerRegistryDBSource,
+)
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -57,7 +60,8 @@ class InMemoryQuotaService:
 def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
 ) -> ContainerRegistryProcessors:
-    repo = ContainerRegistryRepository(database_engine)
+    db_source = ContainerRegistryDBSource(database_engine)
+    repo = ContainerRegistryRepository(db_source)
     quota_service = cast(AbstractPerProjectContainerRegistryQuotaService, InMemoryQuotaService())
     service = ContainerRegistryService(database_engine, repo, quota_service=quota_service)
     return ContainerRegistryProcessors(
