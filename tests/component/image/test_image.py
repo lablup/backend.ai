@@ -274,10 +274,6 @@ class TestImagePermissions:
         with pytest.raises(PermissionDeniedError):
             await user_registry.image.get(image_id)
 
-    @pytest.mark.xfail(
-        reason="Handler may return 400 instead of 403 depending on middleware chain",
-        strict=False,
-    )
     async def test_regular_user_cannot_forget_image(
         self,
         user_registry: BackendAIClientRegistry,
@@ -290,10 +286,6 @@ class TestImagePermissions:
                 ForgetImageRequest(image_id=image_id),
             )
 
-    @pytest.mark.xfail(
-        reason="Handler may return 400 instead of 403 depending on middleware chain",
-        strict=False,
-    )
     async def test_regular_user_cannot_purge_image(
         self,
         user_registry: BackendAIClientRegistry,
