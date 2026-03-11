@@ -160,7 +160,6 @@ from .models.session import (
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     ConcurrencyUsed,
     KernelLoadingStrategy,
-    SessionLifecycleManager,
     SessionRow,
     handle_session_exception,
 )
@@ -175,6 +174,7 @@ from .models.utils import (
 )
 from .models.vfolder import VFolderRow, verify_vfolder_name
 from .scheduler.types import KernelAgentBinding
+from .services.session.lifecycle import SessionLifecycleManager
 from .types import UserScope
 
 type MSetType = Mapping[str | bytes, bytes | float | int | str]
