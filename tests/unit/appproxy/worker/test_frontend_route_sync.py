@@ -98,7 +98,7 @@ class TwoReplicaScenario(NamedTuple):
 
     circuit: Circuit
     healthy_route: RouteInfo
-    target_route: RouteInfo
+    scaled_in_route: RouteInfo
 
 
 class SingleReplicaScenario(NamedTuple):
@@ -122,11 +122,11 @@ class TestUpdateCircuitRouteInfo:
 
     @pytest.fixture
     def two_replica_scenario(self) -> TwoReplicaScenario:
-        """Two-replica circuit: healthy_route stays, target_route gets removed on scale-in."""
+        """Two-replica circuit: healthy_route stays, scaled_in_route gets removed on scale-in."""
         healthy_route = _make_route(kernel_host="10.0.0.1", kernel_port=8080)
-        target_route = _make_route(kernel_host="10.0.0.2", kernel_port=8081)
-        circuit = _make_circuit([healthy_route, target_route], port=self.FRONTEND_PORT)
-        return TwoReplicaScenario(circuit, healthy_route, target_route)
+        scaled_in_route = _make_route(kernel_host="10.0.0.2", kernel_port=8081)
+        circuit = _make_circuit([healthy_route, scaled_in_route], port=self.FRONTEND_PORT)
+        return TwoReplicaScenario(circuit, healthy_route, scaled_in_route)
 
     @pytest.fixture
     def single_replica_scenario(self) -> SingleReplicaScenario:
@@ -160,7 +160,7 @@ class TestUpdateCircuitRouteInfo:
         """
         frontend, scenario = registered_two_replica_frontend
 
-        # Scale-in: remove target_route
+        # Scale-in: remove scaled_in_route
         new_routes = [scenario.healthy_route]
         await frontend.update_circuit_route_info(scenario.circuit, new_routes)
 
@@ -179,8 +179,8 @@ class TestUpdateCircuitRouteInfo:
     ) -> None:
         """Verify route_info is updated only after backend update succeeds.
 
-        Circuit starts with [healthy_route, target_route].
-        Scale-in removes target_route -> new_routes = [healthy_route].
+        Circuit starts with [healthy_route, scaled_in_route].
+        Scale-in removes scaled_in_route -> new_routes = [healthy_route].
         During update_backend, route_info should still be the old 2-route list.
         """
         scenario = two_replica_scenario
@@ -197,7 +197,7 @@ class TestUpdateCircuitRouteInfo:
 
         mocker.patch.object(port_frontend, "update_backend", side_effect=capture_update_backend)
 
-        # Scale-in: remove target_route
+        # Scale-in: remove scaled_in_route
         new_routes = [scenario.healthy_route]
         await port_frontend.update_circuit_route_info(scenario.circuit, new_routes)
 
@@ -278,17 +278,17 @@ class TestUpdateCircuitRouteInfo:
         """Regression: the full bug chain from stale route_info to metric failure.
 
         This test verifies the end-to-end scenario:
-        1. Scale-in removes target_route via update_circuit_route_info
+        1. Scale-in removes scaled_in_route via update_circuit_route_info
         2. Metric collector (gather_inference_measures) reads circuit.route_info
-        3. Only healthy_route's endpoint is accessed; target_route's is never contacted
+        3. Only healthy_route's endpoint is accessed; scaled_in_route's is never contacted
 
-        Before the fix, circuit.route_info stayed [healthy, target] after
+        Before the fix, circuit.route_info stayed [healthy, scaled_in] after
         scale-in, so the metric collector would try to scrape the terminated
-        target_route's /metrics endpoint, causing collection failure.
+        scaled_in_route's /metrics endpoint, causing collection failure.
         """
         frontend, scenario = registered_two_replica_frontend
 
-        # Step 1: Scale-in removes target_route
+        # Step 1: Scale-in removes scaled_in_route
         await frontend.update_circuit_route_info(scenario.circuit, [scenario.healthy_route])
 
         # Step 2: Metric collector runs — track which endpoints are accessed
@@ -314,16 +314,16 @@ class TestUpdateCircuitRouteInfo:
         updated_circuit = frontend.circuits[self.FRONTEND_PORT]
         measures = await gather_inference_measures(client_pool, updated_circuit)
 
-        # Step 3: Verify only healthy_route was accessed, target_route was NOT
+        # Step 3: Verify only healthy_route was accessed, scaled_in_route was NOT
         healthy_endpoint = (
             f"http://{scenario.healthy_route.current_kernel_host}"
             f":{scenario.healthy_route.kernel_port}"
         )
-        target_endpoint = (
-            f"http://{scenario.target_route.current_kernel_host}"
-            f":{scenario.target_route.kernel_port}"
+        scaled_in_endpoint = (
+            f"http://{scenario.scaled_in_route.current_kernel_host}"
+            f":{scenario.scaled_in_route.kernel_port}"
         )
         assert healthy_endpoint in accessed_endpoints
-        assert target_endpoint not in accessed_endpoints
+        assert scaled_in_endpoint not in accessed_endpoints
         assert measures is not None
         assert len(measures) > 0

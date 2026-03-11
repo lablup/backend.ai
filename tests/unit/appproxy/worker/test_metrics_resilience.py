@@ -13,8 +13,9 @@ try/except that logs a warning and continues to the next route on failure.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, NamedTuple
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -103,198 +104,182 @@ def _make_client_pool(
     return pool
 
 
-class PartialFailureScenario(NamedTuple):
-    """One healthy route + one unreachable route for resilience testing."""
+@dataclass(frozen=True)
+class RouteInput:
+    """Configuration for a single route in a test scenario."""
 
-    healthy_route: RouteInfo
-    unreachable_route: RouteInfo
-
-
-class AllFailureScenario(NamedTuple):
-    """All routes unreachable."""
-
-    connection_refused_route: RouteInfo
-    timed_out_route: RouteInfo
+    kernel_host: str
+    kernel_port: int
+    health_status: ModelServiceStatus | None
+    mock_response: str | Exception
 
 
-class TwoHealthyRoutesScenario(NamedTuple):
-    """Two healthy routes returning valid metrics."""
+@dataclass(frozen=True)
+class MetricsScenario:
+    """Describes a metric collection test case."""
 
-    first_route: RouteInfo
-    second_route: RouteInfo
-
-
-class HealthyUnhealthyScenario(NamedTuple):
-    """One healthy route + one unhealthy route (health check failed)."""
-
-    healthy_route: RouteInfo
-    unhealthy_route: RouteInfo
+    routes: list[RouteInfo]
+    responses: dict[str, str | Exception]
+    # None means measures should be empty
+    expected_num_requests_running: Decimal | None
+    expected_collected_replica_count: int
 
 
-class MalformedPayloadScenario(NamedTuple):
-    """One healthy route + one route returning malformed metrics text."""
-
-    healthy_route: RouteInfo
-    malformed_route: RouteInfo
+def _create_metrics_scenario(
+    route_configs: list[RouteInput],
+    *,
+    expected_num_requests_running: Decimal | None,
+    expected_collected_replica_count: int,
+) -> MetricsScenario:
+    """Build a scenario from (host, port, health_status, response) tuples."""
+    routes: list[RouteInfo] = []
+    responses: dict[str, str | Exception] = {}
+    for cfg in route_configs:
+        route = _make_route(
+            kernel_host=cfg.kernel_host,
+            kernel_port=cfg.kernel_port,
+            health_status=cfg.health_status,
+        )
+        routes.append(route)
+        responses[_route_endpoint(route)] = cfg.mock_response
+    return MetricsScenario(
+        routes=routes,
+        responses=responses,
+        expected_num_requests_running=expected_num_requests_running,
+        expected_collected_replica_count=expected_collected_replica_count,
+    )
 
 
 class TestGatherPrometheusInferenceMeasures:
     """Regression tests for per-route error resilience in metric collection."""
 
-    @pytest.fixture
-    def partial_failure_scenario(self) -> PartialFailureScenario:
-        """One route returns metrics, the other raises ConnectionError."""
-        return PartialFailureScenario(
-            healthy_route=_make_route(kernel_host="10.0.0.1", kernel_port=8080),
-            unreachable_route=_make_route(kernel_host="10.0.0.2", kernel_port=8081),
-        )
-
-    @pytest.fixture
-    def all_failure_scenario(self) -> AllFailureScenario:
-        """Both routes fail with different errors."""
-        return AllFailureScenario(
-            connection_refused_route=_make_route(kernel_host="10.0.0.1", kernel_port=8080),
-            timed_out_route=_make_route(kernel_host="10.0.0.2", kernel_port=8081),
-        )
-
-    @pytest.fixture
-    def two_healthy_routes_scenario(self) -> TwoHealthyRoutesScenario:
-        """Both routes healthy and returning valid metrics."""
-        return TwoHealthyRoutesScenario(
-            first_route=_make_route(kernel_host="10.0.0.1", kernel_port=8080),
-            second_route=_make_route(kernel_host="10.0.0.2", kernel_port=8081),
-        )
-
-    @pytest.fixture
-    def healthy_unhealthy_scenario(self) -> HealthyUnhealthyScenario:
-        """One healthy route + one route marked UNHEALTHY by health check."""
-        return HealthyUnhealthyScenario(
-            healthy_route=_make_route(kernel_host="10.0.0.1", kernel_port=8080),
-            unhealthy_route=_make_route(
-                kernel_host="10.0.0.2",
-                kernel_port=8081,
-                health_status=ModelServiceStatus.UNHEALTHY,
+    @pytest.mark.parametrize(
+        "scenario",
+        [
+            pytest.param(
+                _create_metrics_scenario(
+                    [
+                        RouteInput(
+                            kernel_host="10.0.0.1",
+                            kernel_port=8080,
+                            health_status=ModelServiceStatus.HEALTHY,
+                            mock_response=SAMPLE_PROMETHEUS_OUTPUT,
+                        ),
+                        RouteInput(
+                            kernel_host="10.0.0.2",
+                            kernel_port=8081,
+                            health_status=ModelServiceStatus.HEALTHY,
+                            mock_response=ConnectionError("Connection refused"),
+                        ),
+                    ],
+                    expected_num_requests_running=Decimal(3),
+                    expected_collected_replica_count=1,
+                ),
+                id="partial-failure-connection-error",
             ),
-        )
-
-    @pytest.fixture
-    def malformed_payload_scenario(self) -> MalformedPayloadScenario:
-        """One healthy route + one route returning invalid prometheus text."""
-        return MalformedPayloadScenario(
-            healthy_route=_make_route(kernel_host="10.0.0.1", kernel_port=8080),
-            malformed_route=_make_route(kernel_host="10.0.0.3", kernel_port=8082),
-        )
-
-    async def test_unreachable_route_does_not_block_others(
-        self,
-        partial_failure_scenario: PartialFailureScenario,
-    ) -> None:
-        """Regression: one dead route must not prevent collection from healthy ones.
-
-        Before the fix, a ConnectionError from a terminated route would
-        propagate and abort the entire collection.
-        """
-        scenario = partial_failure_scenario
-        client_pool = _make_client_pool({
-            _route_endpoint(scenario.healthy_route): SAMPLE_PROMETHEUS_OUTPUT,
-            _route_endpoint(scenario.unreachable_route): ConnectionError("Connection refused"),
-        })
-
-        measures = await gather_prometheus_inference_measures(
-            client_pool, [scenario.healthy_route, scenario.unreachable_route]
-        )
-
-        assert len(measures) > 0
-        metric_keys = {m.key for m in measures}
-        assert "vllm:num_requests_running" in metric_keys
-
-    async def test_all_routes_unreachable_returns_empty(
-        self,
-        all_failure_scenario: AllFailureScenario,
-    ) -> None:
-        """When all routes fail, should return empty list without raising."""
-        scenario = all_failure_scenario
-        client_pool = _make_client_pool({
-            _route_endpoint(scenario.connection_refused_route): ConnectionError(
-                "Connection refused"
+            pytest.param(
+                _create_metrics_scenario(
+                    [
+                        RouteInput(
+                            kernel_host="10.0.0.1",
+                            kernel_port=8080,
+                            health_status=ModelServiceStatus.HEALTHY,
+                            mock_response=ConnectionError("Connection refused"),
+                        ),
+                        RouteInput(
+                            kernel_host="10.0.0.2",
+                            kernel_port=8081,
+                            health_status=ModelServiceStatus.HEALTHY,
+                            mock_response=TimeoutError("Timed out"),
+                        ),
+                    ],
+                    expected_num_requests_running=None,
+                    expected_collected_replica_count=0,
+                ),
+                id="all-routes-unreachable",
             ),
-            _route_endpoint(scenario.timed_out_route): TimeoutError("Timed out"),
-        })
+            pytest.param(
+                _create_metrics_scenario(
+                    [
+                        RouteInput(
+                            kernel_host="10.0.0.1",
+                            kernel_port=8080,
+                            health_status=ModelServiceStatus.HEALTHY,
+                            mock_response=SAMPLE_PROMETHEUS_OUTPUT,
+                        ),
+                        RouteInput(
+                            kernel_host="10.0.0.2",
+                            kernel_port=8081,
+                            health_status=ModelServiceStatus.HEALTHY,
+                            mock_response=SAMPLE_PROMETHEUS_OUTPUT,
+                        ),
+                    ],
+                    expected_num_requests_running=Decimal(6),
+                    expected_collected_replica_count=2,
+                ),
+                id="two-healthy-routes",
+            ),
+            pytest.param(
+                _create_metrics_scenario(
+                    [
+                        RouteInput(
+                            kernel_host="10.0.0.1",
+                            kernel_port=8080,
+                            health_status=ModelServiceStatus.HEALTHY,
+                            mock_response=SAMPLE_PROMETHEUS_OUTPUT,
+                        ),
+                        RouteInput(
+                            kernel_host="10.0.0.2",
+                            kernel_port=8081,
+                            health_status=ModelServiceStatus.UNHEALTHY,
+                            mock_response=SAMPLE_PROMETHEUS_OUTPUT,
+                        ),
+                    ],
+                    expected_num_requests_running=Decimal(3),
+                    expected_collected_replica_count=1,
+                ),
+                id="unhealthy-route-skipped",
+            ),
+            pytest.param(
+                _create_metrics_scenario(
+                    [
+                        RouteInput(
+                            kernel_host="10.0.0.1",
+                            kernel_port=8080,
+                            health_status=ModelServiceStatus.HEALTHY,
+                            mock_response=SAMPLE_PROMETHEUS_OUTPUT,
+                        ),
+                        RouteInput(
+                            kernel_host="10.0.0.3",
+                            kernel_port=8082,
+                            health_status=ModelServiceStatus.HEALTHY,
+                            mock_response=MALFORMED_PROMETHEUS_OUTPUT,
+                        ),
+                    ],
+                    expected_num_requests_running=Decimal(3),
+                    expected_collected_replica_count=1,
+                ),
+                id="malformed-payload",
+            ),
+        ],
+    )
+    async def test_metric_collection(self, scenario: MetricsScenario) -> None:
+        client_pool = _make_client_pool(scenario.responses)
 
-        measures = await gather_prometheus_inference_measures(
-            client_pool,
-            [scenario.connection_refused_route, scenario.timed_out_route],
-        )
+        measures = await gather_prometheus_inference_measures(client_pool, scenario.routes)
 
-        assert measures == []
-
-    async def test_healthy_routes_collected_successfully(
-        self,
-        two_healthy_routes_scenario: TwoHealthyRoutesScenario,
-    ) -> None:
-        """Verify normal collection with all routes healthy."""
-        scenario = two_healthy_routes_scenario
-        client_pool = _make_client_pool({
-            _route_endpoint(scenario.first_route): SAMPLE_PROMETHEUS_OUTPUT,
-            _route_endpoint(scenario.second_route): SAMPLE_PROMETHEUS_OUTPUT,
-        })
-
-        measures = await gather_prometheus_inference_measures(
-            client_pool, [scenario.first_route, scenario.second_route]
-        )
-
-        assert len(measures) > 0
-        # With 2 routes each reporting 3 running requests, aggregated = 6
-        for m in measures:
-            if m.key == "vllm:num_requests_running":
-                assert isinstance(m.per_app, Measurement)
-                assert m.per_app.value == Decimal(6)
-                assert len(m.per_replica) == 2
-
-    async def test_unhealthy_route_skipped(
-        self,
-        healthy_unhealthy_scenario: HealthyUnhealthyScenario,
-    ) -> None:
-        """Routes with non-HEALTHY status should be skipped entirely."""
-        scenario = healthy_unhealthy_scenario
-        client_pool = _make_client_pool({
-            _route_endpoint(scenario.healthy_route): SAMPLE_PROMETHEUS_OUTPUT,
-            _route_endpoint(scenario.unhealthy_route): SAMPLE_PROMETHEUS_OUTPUT,
-        })
-
-        measures = await gather_prometheus_inference_measures(
-            client_pool, [scenario.healthy_route, scenario.unhealthy_route]
-        )
-
-        # Only the healthy route should contribute
-        for m in measures:
-            if m.key == "vllm:num_requests_running":
-                assert isinstance(m.per_app, Measurement)
-                assert m.per_app.value == Decimal(3)
-                assert len(m.per_replica) == 1
-
-    async def test_malformed_metrics_payload_does_not_block_others(
-        self,
-        malformed_payload_scenario: MalformedPayloadScenario,
-    ) -> None:
-        """A route returning malformed /metrics text must not abort the entire collection.
-
-        The parsing try/except should catch the error and skip that route,
-        allowing other routes' metrics to be collected normally.
-        """
-        scenario = malformed_payload_scenario
-        client_pool = _make_client_pool({
-            _route_endpoint(scenario.healthy_route): SAMPLE_PROMETHEUS_OUTPUT,
-            _route_endpoint(scenario.malformed_route): MALFORMED_PROMETHEUS_OUTPUT,
-        })
-
-        measures = await gather_prometheus_inference_measures(
-            client_pool, [scenario.healthy_route, scenario.malformed_route]
-        )
-
-        assert len(measures) > 0
-        metric_keys = {m.key for m in measures}
-        assert "vllm:num_requests_running" in metric_keys
+        if scenario.expected_num_requests_running is None:
+            assert measures == []
+        else:
+            running_measures = [m for m in measures if m.key == "vllm:num_requests_running"]
+            assert len(running_measures) == 1, (
+                f"Expected exactly 1 'vllm:num_requests_running' measure, "
+                f"got {len(running_measures)}"
+            )
+            running_measure = running_measures[0]
+            assert isinstance(running_measure.per_app, Measurement)
+            assert running_measure.per_app.value == scenario.expected_num_requests_running
+            assert len(running_measure.per_replica) == scenario.expected_collected_replica_count
 
     async def test_route_without_route_id_skipped(self) -> None:
         """Routes with route_id=None (temporary) should be skipped."""
