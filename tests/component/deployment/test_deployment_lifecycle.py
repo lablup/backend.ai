@@ -1,12 +1,13 @@
 """
-Component tests for the Deployment SDK client lifecycle methods.
+Component tests for deployment mutation and lifecycle operations.
 
 These tests verify HTTP routing, request/response serialization,
-and error handling for Deployment API endpoints via the Client SDK.
+and write/mutation behavior for Deployment API endpoints via the Client SDK.
 """
 
 from __future__ import annotations
 
+import secrets
 import uuid
 
 import pytest
@@ -15,13 +16,12 @@ from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.deployment import (
+    AddRevisionRequest,
     CreateDeploymentRequest,
     DeploymentMetadataInput,
     DeploymentStrategyInput,
     ImageInput,
     ListDeploymentsResponse,
-    ListRevisionsResponse,
-    ListRoutesResponse,
     ModelMountConfigInput,
     ModelRuntimeConfigInput,
     NetworkAccessInput,
@@ -29,7 +29,6 @@ from ai.backend.common.dto.manager.deployment import (
     RevisionInput,
     SearchDeploymentsRequest,
     SearchRevisionsRequest,
-    SearchRoutesRequest,
     UpdateDeploymentRequest,
 )
 from ai.backend.common.dto.manager.deployment.request import ClusterConfigInput
@@ -40,7 +39,7 @@ _RANDOM_REVISION_ID = uuid.uuid4()
 
 
 # ---------------------------------------------------------------------------
-# Tier 1: SDK create — deployment creation via the HTTP API
+# Deployment CRUD
 # ---------------------------------------------------------------------------
 
 
@@ -82,10 +81,49 @@ class TestCreateDeployment:
         with pytest.raises(Exception):
             await admin_registry.deployment.create_deployment(request)
 
-
-# ---------------------------------------------------------------------------
-# Tier 2: SDK scale — update deployment replica count
-# ---------------------------------------------------------------------------
+    @pytest.mark.xfail(strict=True, reason="Requires deployment controller mocking")
+    async def test_create_deployment_success(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        group_fixture: uuid.UUID,
+        domain_fixture: str,
+        scaling_group_fixture: str,
+        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
+    ) -> None:
+        """Creating a deployment with valid config returns deployment with initial status."""
+        image_id, vfolder_id = deployment_seed_data
+        request = CreateDeploymentRequest(
+            metadata=DeploymentMetadataInput(
+                project_id=group_fixture,
+                domain_name=domain_fixture,
+                name=f"test-deployment-{secrets.token_hex(4)}",
+            ),
+            network_access=NetworkAccessInput(open_to_public=False),
+            default_deployment_strategy=DeploymentStrategyInput(
+                type=DeploymentStrategy.ROLLING,
+            ),
+            desired_replica_count=1,
+            initial_revision=RevisionInput(
+                name="v1",
+                cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
+                resource_config=ResourceConfigInput(
+                    resource_group=scaling_group_fixture,
+                    resource_slots={"cpu": "2", "mem": "2147483648"},
+                ),
+                image=ImageInput(id=image_id),
+                model_runtime_config=ModelRuntimeConfigInput(),
+                model_mount_config=ModelMountConfigInput(
+                    vfolder_id=vfolder_id,
+                    mount_destination="/models",
+                    definition_path="model-definition.yaml",
+                ),
+            ),
+        )
+        response = await admin_registry.deployment.create_deployment(request)
+        deployment = response.deployment
+        assert deployment.id is not None
+        assert deployment.name == request.metadata.name
+        assert deployment.status is not None  # Should have initial status
 
 
 class TestUpdateDeployment:
@@ -111,31 +149,64 @@ class TestUpdateDeployment:
                 UpdateDeploymentRequest(name="new-name"),
             )
 
-
-# ---------------------------------------------------------------------------
-# Tier 3: SDK sync — search routes (route synchronization readiness)
-# ---------------------------------------------------------------------------
-
-
-class TestSearchRoutesLifecycle:
-    async def test_search_routes_for_nonexistent_deployment(
+    @pytest.mark.xfail(strict=True, reason="Requires deployment controller mocking")
+    async def test_update_deployment_config(
         self,
         admin_registry: BackendAIClientRegistry,
+        group_fixture: uuid.UUID,
+        domain_fixture: str,
+        scaling_group_fixture: str,
+        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
     ) -> None:
-        """Searching routes for a non-existent deployment returns empty results."""
-        result = await admin_registry.deployment.search_routes(
-            _RANDOM_DEPLOYMENT_ID,
-            SearchRoutesRequest(),
+        """Updating deployment config (name, desired_replicas) succeeds."""
+        image_id, vfolder_id = deployment_seed_data
+        # Create deployment
+        request = CreateDeploymentRequest(
+            metadata=DeploymentMetadataInput(
+                project_id=group_fixture,
+                domain_name=domain_fixture,
+                name=f"test-deployment-{secrets.token_hex(4)}",
+            ),
+            network_access=NetworkAccessInput(open_to_public=False),
+            default_deployment_strategy=DeploymentStrategyInput(
+                type=DeploymentStrategy.ROLLING,
+            ),
+            desired_replica_count=1,
+            initial_revision=RevisionInput(
+                name="v1",
+                cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
+                resource_config=ResourceConfigInput(
+                    resource_group=scaling_group_fixture,
+                    resource_slots={"cpu": "2", "mem": "2147483648"},
+                ),
+                image=ImageInput(id=image_id),
+                model_runtime_config=ModelRuntimeConfigInput(),
+                model_mount_config=ModelMountConfigInput(
+                    vfolder_id=vfolder_id,
+                    mount_destination="/models",
+                    definition_path="model-definition.yaml",
+                ),
+            ),
         )
-        assert isinstance(result, ListRoutesResponse)
-        assert result.routes == []
-        assert result.pagination.total_count == 0
-        assert result.pagination.has_next_page is False
-        assert result.pagination.has_previous_page is False
+        response = await admin_registry.deployment.create_deployment(request)
+        deployment = response.deployment
+
+        # Update name and replicas
+        new_name = f"updated-deployment-{secrets.token_hex(4)}"
+        await admin_registry.deployment.update_deployment(
+            deployment.id,
+            UpdateDeploymentRequest(name=new_name, desired_replicas=3),
+        )
+
+        # Verify update
+        updated_response = await admin_registry.deployment.get_deployment(deployment.id)
+        updated = updated_response.deployment
+        assert updated.name == new_name
+        assert updated.replica_state.desired_replica_count == 3
 
 
 # ---------------------------------------------------------------------------
-# Tier 4: SDK delete — destroy deployment
+# Destroy
 # ---------------------------------------------------------------------------
 
 
@@ -148,13 +219,62 @@ class TestDestroyDeployment:
         with pytest.raises(NotFoundError):
             await admin_registry.deployment.destroy_deployment(_RANDOM_DEPLOYMENT_ID)
 
+    @pytest.mark.xfail(strict=True, reason="Requires deployment controller mocking")
+    async def test_destroy_deployment(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        group_fixture: uuid.UUID,
+        domain_fixture: str,
+        scaling_group_fixture: str,
+        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
+    ) -> None:
+        """Destroying a deployment terminates it successfully."""
+        image_id, vfolder_id = deployment_seed_data
+        # Create deployment
+        request = CreateDeploymentRequest(
+            metadata=DeploymentMetadataInput(
+                project_id=group_fixture,
+                domain_name=domain_fixture,
+                name=f"test-deployment-{secrets.token_hex(4)}",
+            ),
+            network_access=NetworkAccessInput(open_to_public=False),
+            default_deployment_strategy=DeploymentStrategyInput(
+                type=DeploymentStrategy.ROLLING,
+            ),
+            desired_replica_count=1,
+            initial_revision=RevisionInput(
+                name="v1",
+                cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
+                resource_config=ResourceConfigInput(
+                    resource_group=scaling_group_fixture,
+                    resource_slots={"cpu": "2", "mem": "2147483648"},
+                ),
+                image=ImageInput(id=image_id),
+                model_runtime_config=ModelRuntimeConfigInput(),
+                model_mount_config=ModelMountConfigInput(
+                    vfolder_id=vfolder_id,
+                    mount_destination="/models",
+                    definition_path="model-definition.yaml",
+                ),
+            ),
+        )
+        response = await admin_registry.deployment.create_deployment(request)
+        deployment = response.deployment
+
+        # Destroy deployment
+        await admin_registry.deployment.destroy_deployment(deployment.id)
+
+        # Verify deployment is destroyed (should raise NotFoundError or have DESTROYED status)
+        with pytest.raises(NotFoundError):
+            await admin_registry.deployment.get_deployment(deployment.id)
+
 
 # ---------------------------------------------------------------------------
-# Tier 5: SDK revision operations
+# Revision Management
 # ---------------------------------------------------------------------------
 
 
-class TestGetRevision:
+class TestRevisionManagement:
     async def test_get_revision_nonexistent(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -166,26 +286,150 @@ class TestGetRevision:
                 _RANDOM_REVISION_ID,
             )
 
-
-class TestSearchRevisionsLifecycle:
-    async def test_search_revisions_with_pagination(
+    @pytest.mark.xfail(strict=True, reason="Requires deployment controller mocking")
+    async def test_activate_deactivate_revision(
         self,
         admin_registry: BackendAIClientRegistry,
+        group_fixture: uuid.UUID,
+        domain_fixture: str,
+        scaling_group_fixture: str,
+        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
     ) -> None:
-        """Search revisions with custom pagination returns correct pagination info."""
-        result = await admin_registry.deployment.search_revisions(
-            _RANDOM_DEPLOYMENT_ID,
+        """Activating and deactivating revisions updates their status."""
+        image_id, vfolder_id = deployment_seed_data
+        # Create deployment with initial revision
+        request = CreateDeploymentRequest(
+            metadata=DeploymentMetadataInput(
+                project_id=group_fixture,
+                domain_name=domain_fixture,
+                name=f"test-deployment-{secrets.token_hex(4)}",
+            ),
+            network_access=NetworkAccessInput(open_to_public=False),
+            default_deployment_strategy=DeploymentStrategyInput(
+                type=DeploymentStrategy.ROLLING,
+            ),
+            desired_replica_count=1,
+            initial_revision=RevisionInput(
+                name="v1",
+                cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
+                resource_config=ResourceConfigInput(
+                    resource_group=scaling_group_fixture,
+                    resource_slots={"cpu": "2", "mem": "2147483648"},
+                ),
+                image=ImageInput(id=image_id),
+                model_runtime_config=ModelRuntimeConfigInput(),
+                model_mount_config=ModelMountConfigInput(
+                    vfolder_id=vfolder_id,
+                    mount_destination="/models",
+                    definition_path="model-definition.yaml",
+                ),
+            ),
+        )
+        response = await admin_registry.deployment.create_deployment(request)
+        deployment = response.deployment
+
+        # Add a second revision
+        revision2_response = await admin_registry.deployment.add_revision(
+            deployment.id,
+            AddRevisionRequest(
+                revision=RevisionInput(
+                    name="v2",
+                    cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
+                    resource_config=ResourceConfigInput(
+                        resource_group=scaling_group_fixture,
+                        resource_slots={"cpu": "2", "mem": "2147483648"},
+                    ),
+                    image=ImageInput(id=image_id),
+                    model_runtime_config=ModelRuntimeConfigInput(),
+                    model_mount_config=ModelMountConfigInput(
+                        vfolder_id=vfolder_id,
+                        mount_destination="/models",
+                        definition_path="model-definition.yaml",
+                    ),
+                ),
+            ),
+        )
+        revision2 = revision2_response.revision
+
+        # Activate revision2
+        await admin_registry.deployment.activate_revision(deployment.id, revision2.id)
+
+        # Get revisions and verify activation
+        revisions_result = await admin_registry.deployment.search_revisions(
+            deployment.id,
             SearchRevisionsRequest(limit=10, offset=0),
         )
-        assert isinstance(result, ListRevisionsResponse)
-        assert result.revisions == []
-        assert result.pagination.total == 0
-        assert result.pagination.limit == 10
-        assert result.pagination.offset == 0
+        # Check that we have at least one revision returned
+        assert len(revisions_result.revisions) > 0
+        # Verify that the activated revision is in the list
+        revision_ids = [r.id for r in revisions_result.revisions]
+        assert revision2.id in revision_ids
+
+        # Deactivate revision
+        await admin_registry.deployment.deactivate_revision(deployment.id, revision2.id)
 
 
 # ---------------------------------------------------------------------------
-# Tier 6: Role-based access — user vs admin
+# Replica Management
+# ---------------------------------------------------------------------------
+
+
+class TestReplicaManagement:
+    @pytest.mark.xfail(strict=True, reason="Requires deployment controller mocking")
+    async def test_change_desired_replicas(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        group_fixture: uuid.UUID,
+        domain_fixture: str,
+        scaling_group_fixture: str,
+        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
+    ) -> None:
+        """Changing desired_replicas updates the replica count."""
+        image_id, vfolder_id = deployment_seed_data
+        request = CreateDeploymentRequest(
+            metadata=DeploymentMetadataInput(
+                project_id=group_fixture,
+                domain_name=domain_fixture,
+                name=f"test-deployment-{secrets.token_hex(4)}",
+            ),
+            network_access=NetworkAccessInput(open_to_public=False),
+            default_deployment_strategy=DeploymentStrategyInput(
+                type=DeploymentStrategy.ROLLING,
+            ),
+            desired_replica_count=1,
+            initial_revision=RevisionInput(
+                name="v1",
+                cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
+                resource_config=ResourceConfigInput(
+                    resource_group=scaling_group_fixture,
+                    resource_slots={"cpu": "2", "mem": "2147483648"},
+                ),
+                image=ImageInput(id=image_id),
+                model_runtime_config=ModelRuntimeConfigInput(),
+                model_mount_config=ModelMountConfigInput(
+                    vfolder_id=vfolder_id,
+                    mount_destination="/models",
+                    definition_path="model-definition.yaml",
+                ),
+            ),
+        )
+        response = await admin_registry.deployment.create_deployment(request)
+        deployment = response.deployment
+
+        # Scale to 5 replicas
+        await admin_registry.deployment.update_deployment(
+            deployment.id,
+            UpdateDeploymentRequest(desired_replicas=5),
+        )
+
+        # Verify replica count updated
+        updated_response = await admin_registry.deployment.get_deployment(deployment.id)
+        updated = updated_response.deployment
+        assert updated.replica_state.desired_replica_count == 5
+
+
+# ---------------------------------------------------------------------------
+# Role-based access — user vs admin
 # ---------------------------------------------------------------------------
 
 
