@@ -1,7 +1,7 @@
 """migrate_session_data_to_rbac
 
 Revision ID: 30c8308738ee
-Revises: 3f5c20f7bb07
+Revises: df13b2272b61
 Create Date: 2026-03-05 03:10:36.273207
 
 """
@@ -19,7 +19,7 @@ from ai.backend.manager.models.rbac_models.migration.enums import (
 
 # revision identifiers, used by Alembic.
 revision = "30c8308738ee"
-down_revision = "3f5c20f7bb07"
+down_revision = "df13b2272b61"
 branch_labels = None
 depends_on = None
 
@@ -34,9 +34,9 @@ def _add_entity_type_permissions(db_conn: Connection) -> None:
     Uses a single set-based INSERT ... SELECT to derive SESSION permissions
     for all role+scope combinations without application-side pagination.
     """
-    # Precompute operation lists
-    member_ops = [op.value for op in OperationType.member_operations()]
-    owner_ops = [op.value for op in OperationType.owner_operations()]
+    # Precompute operation lists (sorted for deterministic ordering)
+    member_ops = sorted(o.value for o in OperationType.member_operations())
+    owner_ops = sorted(o.value for o in OperationType.owner_operations())
 
     # Insert SESSION permissions in a single set-based query
     #
@@ -98,23 +98,29 @@ def _add_entity_type_permissions(db_conn: Connection) -> None:
     )
 
 
-def _associate_sessions_to_scopes(db_conn: Connection) -> None:
-    """Associate all sessions to their owner scopes (USER and PROJECT).
+def _associate_sessions_to_scope(
+    db_conn: Connection,
+    scope_type: str,
+    scope_id_column: str,
+) -> None:
+    """Associate sessions to a given scope type using keyset pagination.
 
-    Creates AUTO edges from:
-    - User scope (user_uuid) → Session
-    - Project scope (group_id) → Session
-
-    Uses keyset pagination for scalability.
+    Creates AUTO edges from the specified scope to each session.
     """
     entity_type = EntityType.SESSION.value
     relation_type = "auto"
 
-    # Process User scope edges
+    insert_query = sa.text("""
+        INSERT INTO association_scopes_entities
+            (scope_type, scope_id, entity_type, entity_id, relation_type)
+        VALUES (:scope_type, :scope_id, :entity_type, :entity_id, :relation_type)
+        ON CONFLICT (scope_type, scope_id, entity_id) DO NOTHING
+    """)
+
     last_id = UUID("00000000-0000-0000-0000-000000000000")
     while True:
-        query = sa.text("""
-            SELECT id, user_uuid
+        query = sa.text(f"""
+            SELECT id, {scope_id_column} AS scope_id
             FROM sessions
             WHERE id > :last_id
             ORDER BY id
@@ -126,11 +132,10 @@ def _associate_sessions_to_scopes(db_conn: Connection) -> None:
 
         last_id = rows[-1].id
 
-        # Bulk insert using parameterized query
         values_list = [
             {
-                "scope_type": "user",
-                "scope_id": str(row.user_uuid),
+                "scope_type": scope_type,
+                "scope_id": str(row.scope_id),
                 "entity_type": entity_type,
                 "entity_id": str(row.id),
                 "relation_type": relation_type,
@@ -139,50 +144,7 @@ def _associate_sessions_to_scopes(db_conn: Connection) -> None:
         ]
 
         if values_list:
-            insert_query = sa.text("""
-                INSERT INTO association_scopes_entities (scope_type, scope_id, entity_type, entity_id, relation_type)
-                VALUES (:scope_type, :scope_id, :entity_type, :entity_id, :relation_type)
-                ON CONFLICT (scope_type, scope_id, entity_id) DO NOTHING
-            """)
-            for values in values_list:
-                db_conn.execute(insert_query, values)
-
-    # Process Project scope edges
-    last_id = UUID("00000000-0000-0000-0000-000000000000")
-    while True:
-        query = sa.text("""
-            SELECT id, group_id
-            FROM sessions
-            WHERE id > :last_id
-            ORDER BY id
-            LIMIT :limit
-        """)
-        rows = db_conn.execute(query, {"last_id": last_id, "limit": BATCH_SIZE}).all()
-        if not rows:
-            break
-
-        last_id = rows[-1].id
-
-        # Bulk insert using parameterized query
-        values_list = [
-            {
-                "scope_type": "project",
-                "scope_id": str(row.group_id),
-                "entity_type": entity_type,
-                "entity_id": str(row.id),
-                "relation_type": relation_type,
-            }
-            for row in rows
-        ]
-
-        if values_list:
-            insert_query = sa.text("""
-                INSERT INTO association_scopes_entities (scope_type, scope_id, entity_type, entity_id, relation_type)
-                VALUES (:scope_type, :scope_id, :entity_type, :entity_id, :relation_type)
-                ON CONFLICT (scope_type, scope_id, entity_id) DO NOTHING
-            """)
-            for values in values_list:
-                db_conn.execute(insert_query, values)
+            db_conn.execute(insert_query, values_list)
 
 
 def _remove_session_permissions(db_conn: Connection) -> None:
@@ -190,7 +152,6 @@ def _remove_session_permissions(db_conn: Connection) -> None:
     entity_type = EntityType.SESSION.value
 
     while True:
-        # Delete permissions in batches using a parameterized subquery
         delete_query = sa.text("""
             DELETE FROM permissions
             WHERE id IN (
@@ -210,20 +171,21 @@ def _remove_session_permissions(db_conn: Connection) -> None:
 def _remove_session_edges(db_conn: Connection) -> None:
     """Remove all SESSION AUTO edges from association_scopes_entities."""
     entity_type = EntityType.SESSION.value
+    relation_type = "auto"
 
     while True:
-        # Delete associations in batches using a parameterized subquery
         delete_query = sa.text("""
             DELETE FROM association_scopes_entities
             WHERE id IN (
                 SELECT id FROM association_scopes_entities
                 WHERE entity_type = :entity_type
+                  AND relation_type = :relation_type
                 LIMIT :limit
             )
         """)
         result = db_conn.execute(
             delete_query,
-            {"entity_type": entity_type, "limit": BATCH_SIZE},
+            {"entity_type": entity_type, "relation_type": relation_type, "limit": BATCH_SIZE},
         )
         if result.rowcount == 0:
             break
@@ -232,7 +194,8 @@ def _remove_session_edges(db_conn: Connection) -> None:
 def upgrade() -> None:
     conn = op.get_bind()
     _add_entity_type_permissions(conn)
-    _associate_sessions_to_scopes(conn)
+    _associate_sessions_to_scope(conn, "user", "user_uuid")
+    _associate_sessions_to_scope(conn, "project", "group_id")
 
 
 def downgrade() -> None:
