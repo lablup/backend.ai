@@ -80,14 +80,16 @@ class TestUserCreateCrud:
 
         assert result.user.status == UserStatus.INACTIVE
 
-        # Verify keypair is inactive
+        # Verify all keypairs are inactive
         async with db_engine.begin() as conn:
             row = await conn.execute(
                 sa.select(keypairs.c.is_active).where(keypairs.c.user == str(result.user.id))
             )
-            kp = row.fetchone()
-        assert kp is not None, "Keypair should exist even for INACTIVE user"
-        assert kp.is_active is False, "Keypair should be inactive when user status is INACTIVE"
+            kp_actives = row.scalars().all()
+        assert len(kp_actives) > 0, "Keypair should exist even for INACTIVE user"
+        assert all(not active for active in kp_actives), (
+            "All keypairs should be inactive when user status is INACTIVE"
+        )
 
     async def test_s5_create_with_container_uid_gid(
         self,
@@ -130,8 +132,8 @@ class TestUserCreateCrud:
         resource_policy_fixture: str,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        """F-BIZ-2: Non-existent domain → error."""
-        with pytest.raises((InvalidRequestError, NotFoundError)):
+        """F-BIZ-2: Non-existent domain → InvalidRequestError (400)."""
+        with pytest.raises(InvalidRequestError):
             await admin_registry.user.create(
                 CreateUserRequest(
                     email="no-domain@test.local",
@@ -147,8 +149,8 @@ class TestUserCreateCrud:
         domain_fixture: str,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        """F-BIZ-3: Non-existent resource_policy → error."""
-        with pytest.raises((InvalidRequestError, NotFoundError)):
+        """F-BIZ-3: Non-existent resource_policy → ConflictError (409, FK violation)."""
+        with pytest.raises(ConflictError):
             await admin_registry.user.create(
                 CreateUserRequest(
                     email="no-policy@test.local",
@@ -255,12 +257,15 @@ class TestUserDeleteCrud:
             user_status = user_row.scalar()
             assert user_status == UserStatus.DELETED
 
-            # Verify keypairs deactivated
+            # Verify all keypairs deactivated
             kp_row = await conn.execute(
                 sa.select(keypairs.c.is_active).where(keypairs.c.user == str(created.user.id))
             )
-            kp_active = kp_row.scalar()
-            assert kp_active is False, "Keypairs should be deactivated after soft delete"
+            kp_actives = kp_row.scalars().all()
+            assert len(kp_actives) > 0, "Should have at least one keypair"
+            assert all(not active for active in kp_actives), (
+                "All keypairs should be deactivated after soft delete"
+            )
 
     async def test_s2_soft_delete_inactive_user(
         self,
@@ -308,15 +313,10 @@ class TestUserDeleteCrud:
         admin_registry: BackendAIClientRegistry,
         user_factory: UserFactory,
     ) -> None:
-        """F-BIZ-2: Delete already DELETED user → verify behavior (error or idempotent)."""
+        """F-BIZ-2: Delete already DELETED user → idempotent success."""
         created = await user_factory()
         await admin_registry.user.delete(DeleteUserRequest(user_id=created.user.id))
 
-        # Second delete on already-deleted user: expect either error or success (idempotent)
-        try:
-            result = await admin_registry.user.delete(DeleteUserRequest(user_id=created.user.id))
-            # Idempotent: no error raised
-            assert result.success is True
-        except (NotFoundError, InvalidRequestError, ConflictError):
-            # Error case is also acceptable
-            pass
+        # Second delete on already-deleted user is idempotent (UPDATE without status filter)
+        result = await admin_registry.user.delete(DeleteUserRequest(user_id=created.user.id))
+        assert result.success is True
