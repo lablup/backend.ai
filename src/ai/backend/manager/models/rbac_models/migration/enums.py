@@ -115,6 +115,7 @@ class EntityType(enum.StrEnum):
     ARTIFACT = "artifact"
     ARTIFACT_REGISTRY = "artifact_registry"
     APP_CONFIG = "app_config"
+    KEYPAIR = "keypair"
     NOTIFICATION_CHANNEL = "notification_channel"
     NOTIFICATION_RULE = "notification_rule"
     MODEL_DEPLOYMENT = "model_deployment"
@@ -141,6 +142,7 @@ class EntityType(enum.StrEnum):
             cls.ARTIFACT,
             cls.ARTIFACT_REGISTRY,
             cls.APP_CONFIG,
+            cls.KEYPAIR,
             cls.NOTIFICATION_CHANNEL,
             cls.NOTIFICATION_RULE,
             cls.MODEL_DEPLOYMENT,
