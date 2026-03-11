@@ -12,9 +12,7 @@ from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.prometheus_query_preset.types import (
-    MetricLabelEntryGQL,
     MetricResultGQL,
-    MetricResultValueGQL,
     QueryDefinitionConnection,
     QueryDefinitionEdge,
     QueryDefinitionFilter,
@@ -126,19 +124,12 @@ async def fetch_prometheus_query_preset_result(
     )
 
     response = action_result.response
-    result_entries: list[MetricResultGQL] = []
-    for metric_response in response.data.result:
-        metric_labels = [
-            MetricLabelEntryGQL(key=k, value=str(v))
-            for k, v in metric_response.metric.model_dump(exclude_none=True).items()
-        ]
-        values = [
-            MetricResultValueGQL(timestamp=ts, value=val) for ts, val in metric_response.values
-        ]
-        result_entries.append(MetricResultGQL(metric=metric_labels, values=values))
 
     return QueryDefinitionResultGQL(
         status=response.status,
         result_type=response.data.result_type,
-        result=result_entries,
+        result=[
+            MetricResultGQL.from_metric_response(metric_response)
+            for metric_response in response.data.result
+        ],
     )

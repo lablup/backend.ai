@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any, Self
+
 import strawberry
 from strawberry import ID
+
+if TYPE_CHECKING:
+    from ai.backend.common.dto.clients.prometheus.response import MetricResponse
 
 
 @strawberry.type(
@@ -22,6 +27,10 @@ class QueryDefinitionOptionsGQL:
 class MetricLabelEntryGQL:
     key: str
     value: str
+
+    @classmethod
+    def from_metric_dict(cls, metric: dict[str, Any]) -> list[Self]:
+        return [cls(key=k, value=str(v)) for k, v in metric.items()]
 
 
 @strawberry.type(
@@ -42,6 +51,17 @@ class MetricResultGQL:
         description="Metric labels as key-value entries."
     )
     values: list[MetricResultValueGQL] = strawberry.field(description="Time-series values.")
+
+    @classmethod
+    def from_metric_response(cls, metric_response: MetricResponse) -> Self:
+        return cls(
+            metric=MetricLabelEntryGQL.from_metric_dict(
+                metric_response.metric.model_dump(exclude_none=True)
+            ),
+            values=[
+                MetricResultValueGQL(timestamp=ts, value=val) for ts, val in metric_response.values
+            ],
+        )
 
 
 @strawberry.type(
