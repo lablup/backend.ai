@@ -1,4 +1,4 @@
-"""Component tests for image search/query with filters, name patterns, and pagination."""
+"""Component tests for image search/query with filters, name patterns, pagination, and alias management."""
 
 from __future__ import annotations
 
@@ -6,14 +6,20 @@ import uuid
 
 import pytest
 
-from ai.backend.client.v2.exceptions import NotFoundError
+from ai.backend.client.v2.exceptions import NotFoundError, ServerError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.image.request import (
+    AliasImageRequest,
+    DealiasImageRequest,
     ImageFilter,
     ImageOrder,
     SearchImagesRequest,
 )
-from ai.backend.common.dto.manager.image.response import GetImageResponse, SearchImagesResponse
+from ai.backend.common.dto.manager.image.response import (
+    AliasImageResponse,
+    GetImageResponse,
+    SearchImagesResponse,
+)
 from ai.backend.common.dto.manager.image.types import ImageOrderField, OrderDirection
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.manager.data.image.types import ImageStatus
@@ -274,3 +280,78 @@ class TestImageGet:
         """S-13: Get with random UUID raises NotFoundError (404)."""
         with pytest.raises(NotFoundError):
             await admin_registry.image.get(uuid.uuid4())
+
+
+class TestImageAlias:
+    """Alias set, unset, and error handling."""
+
+    async def test_alias_set_returns_response(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
+    ) -> None:
+        """S-14: Alias set returns alias_id, alias string, and image_id."""
+        image_id, _ = image_fixture
+        alias_name = f"test-alias-{uuid.uuid4().hex[:8]}"
+        result = await admin_registry.image.alias(
+            AliasImageRequest(image_id=image_id, alias=alias_name),
+        )
+        assert isinstance(result, AliasImageResponse)
+        assert result.alias_id is not None
+        assert result.alias == alias_name
+        assert result.image_id == image_id
+
+    async def test_dealias_removes_alias(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
+    ) -> None:
+        """S-15: Dealias removes the alias; re-dealias raises NotFoundError."""
+        image_id, _ = image_fixture
+        alias_name = f"test-dealias-{uuid.uuid4().hex[:8]}"
+        # Create alias
+        await admin_registry.image.alias(
+            AliasImageRequest(image_id=image_id, alias=alias_name),
+        )
+        # Dealias
+        result = await admin_registry.image.dealias(
+            DealiasImageRequest(alias=alias_name),
+        )
+        assert isinstance(result, AliasImageResponse)
+        assert result.alias == alias_name
+        assert result.image_id == image_id
+        # Verify alias is gone: re-dealias should fail
+        with pytest.raises(NotFoundError):
+            await admin_registry.image.dealias(
+                DealiasImageRequest(alias=alias_name),
+            )
+
+    async def test_duplicate_alias_raises_error(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
+    ) -> None:
+        """S-16: Creating a duplicate alias raises ServerError (unique constraint)."""
+        image_id, helper = image_fixture
+        alias_name = f"test-dup-{uuid.uuid4().hex[:8]}"
+        # Create alias
+        await admin_registry.image.alias(
+            AliasImageRequest(image_id=image_id, alias=alias_name),
+        )
+        # Duplicate alias on same or different image should fail
+        other_id = await helper.create(name_suffix="alias-dup-target")
+        with pytest.raises(ServerError):
+            await admin_registry.image.alias(
+                AliasImageRequest(image_id=other_id, alias=alias_name),
+            )
+
+    async def test_dealias_nonexistent_alias_raises_not_found(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
+    ) -> None:
+        """S-17: Dealiasing a non-existent alias raises NotFoundError."""
+        with pytest.raises(NotFoundError):
+            await admin_registry.image.dealias(
+                DealiasImageRequest(alias=f"no-such-alias-{uuid.uuid4().hex[:8]}"),
+            )
