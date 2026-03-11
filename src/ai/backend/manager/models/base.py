@@ -825,6 +825,10 @@ async def populate_fixture(
                         if col.name in row:
                             if row[col.name] is not None:
                                 row[col.name] = isoparse(row[col.name])
+                            elif not col.nullable and col.server_default is not None:
+                                # Remove the key so PostgreSQL applies the server default
+                                # instead of explicitly inserting NULL into a NOT NULL column.
+                                del row[col.name]
                             else:
                                 row[col.name] = None
                 if isinstance(col.type, EnumType):
