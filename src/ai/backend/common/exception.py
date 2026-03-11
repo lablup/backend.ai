@@ -181,6 +181,7 @@ class ErrorDomain(enum.StrEnum):
     KEYPAIR_RESOURCE_POLICY = "keypair-resource-policy"
     DATABASE = "database"
     USER_RESOURCE_POLICY = "user-resource-policy"
+    PROMETHEUS_QUERY_PRESET = "prometheus-query-preset"
 
     EXTERNAL_SYSTEM = "external-system"  # Errors from external systems
 
