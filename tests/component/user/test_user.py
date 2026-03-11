@@ -363,3 +363,43 @@ class TestUserPurge:
     ) -> None:
         with pytest.raises(PermissionDeniedError):
             await user_registry.user.purge(PurgeUserRequest(user_id=target_user.user.id))
+
+
+class TestUserBulkOperations:
+    """Bulk operation actions/services/repositories exist but REST API v2
+    endpoints are not wired yet.  Fill in once UserClient bulk methods are added."""
+
+    @pytest.mark.xfail(reason="UserClient.bulk_create not implemented yet")
+    async def test_bulk_create_all_success(self) -> None:
+        """Bulk create all success -> all users created, correct count."""
+        pytest.fail("Not implemented")
+
+    @pytest.mark.xfail(reason="UserClient.bulk_create not implemented yet")
+    async def test_bulk_create_partial_failure_duplicate_email(self) -> None:
+        """Bulk create partial failure (duplicate email) -> success + failure lists with indices."""
+        pytest.fail("Not implemented")
+
+    @pytest.mark.xfail(reason="UserClient.bulk_create not implemented yet")
+    async def test_bulk_create_empty_list(self) -> None:
+        """Bulk create empty list -> empty result (no error)."""
+        pytest.fail("Not implemented")
+
+    @pytest.mark.xfail(reason="UserClient.bulk_modify not implemented yet")
+    async def test_bulk_modify_all_success(self) -> None:
+        """Bulk modify all success -> all users updated."""
+        pytest.fail("Not implemented")
+
+    @pytest.mark.xfail(reason="UserClient.bulk_modify not implemented yet")
+    async def test_bulk_modify_partial_failure_nonexistent_user(self) -> None:
+        """Bulk modify partial failure (non-existent user) -> success + failure with indices."""
+        pytest.fail("Not implemented")
+
+    @pytest.mark.xfail(reason="UserClient.bulk_purge not implemented yet")
+    async def test_bulk_purge_partial_failure(self) -> None:
+        """Bulk purge partial failure (vfolder mount blocking) -> success + failure with indices."""
+        pytest.fail("Not implemented")
+
+    @pytest.mark.xfail(reason="UserClient bulk operations not implemented yet")
+    async def test_failure_index_tracking(self) -> None:
+        """Failure index tracking -> each failure has correct index and error message."""
+        pytest.fail("Not implemented")
