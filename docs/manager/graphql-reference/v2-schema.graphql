@@ -4987,18 +4987,6 @@ input ProjectWeightInputItem {
   weight: Decimal = null
 }
 
-"""Added in 26.3.0. Paginated connection for query definition records."""
-type PrometheusQueryPresetConnection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [QueryDefinitionEdge!]!
-
-  """Total number of query definition records matching the query criteria."""
-  count: Int!
-}
-
 """Added in 26.3.0. Input for purging a role"""
 input PurgeRoleInput {
   id: UUID!
@@ -5273,7 +5261,7 @@ type Query {
   """
   Added in 26.3.0. List query definitions with filtering and pagination (admin only).
   """
-  adminPrometheusQueryPresets(filter: QueryDefinitionFilter = null, orderBy: [QueryDefinitionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PrometheusQueryPresetConnection
+  adminPrometheusQueryPresets(filter: QueryDefinitionFilter = null, orderBy: [QueryDefinitionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): QueryDefinitionConnection
 
   """
   Added in 26.3.0. Execute a query definition by ID and return the result (admin only).
@@ -5548,6 +5536,18 @@ type QueryDefinition implements Node {
 
   """Last update timestamp."""
   updatedAt: DateTime!
+}
+
+"""Added in 26.3.0. Paginated connection for query definition records."""
+type QueryDefinitionConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [QueryDefinitionEdge!]!
+
+  """Total number of query definition records matching the query criteria."""
+  count: Int!
 }
 
 """An edge in a connection."""
