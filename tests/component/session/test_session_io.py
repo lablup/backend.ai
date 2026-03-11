@@ -12,11 +12,17 @@ import pytest
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.session.request import (
+    CommitSessionRequest,
+    ConvertSessionToImageRequest,
     DownloadFilesRequest,
     DownloadSingleRequest,
+    GetCommitStatusRequest,
     ListFilesRequest,
 )
 from ai.backend.common.dto.manager.session.response import (
+    CommitSessionResponse,
+    ConvertSessionToImageResponse,
+    GetCommitStatusResponse,
     ListFilesResponse,
 )
 
@@ -240,10 +246,96 @@ class TestSessionDownloadFiles:
 class TestSessionCommit:
     """Tests for session commit operations."""
 
-    pass
+    async def test_commit_with_default_filename(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        session_seed: SessionSeedData,
+        mock_agent_commit: str,
+    ) -> None:
+        result = await admin_registry.session.commit(
+            session_seed.session_name,
+            CommitSessionRequest(),
+        )
+        assert isinstance(result, CommitSessionResponse)
+        assert "task_id" in result.root
+        task_id = result.root["task_id"]
+        assert isinstance(task_id, str)
+        assert len(task_id) > 0
+
+    async def test_commit_with_custom_filename(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        session_seed: SessionSeedData,
+        mock_agent_commit: str,
+    ) -> None:
+        result = await admin_registry.session.commit(
+            session_seed.session_name,
+            CommitSessionRequest(filename="my-commit.tar.gz"),
+        )
+        assert isinstance(result, CommitSessionResponse)
+        assert "task_id" in result.root
+        task_id = result.root["task_id"]
+        assert isinstance(task_id, str)
+        assert len(task_id) > 0
+
+    async def test_get_commit_status(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        session_seed: SessionSeedData,
+        mock_agent_commit_status: dict[str, Any],
+    ) -> None:
+        result = await admin_registry.session.get_commit_status(
+            session_seed.session_name,
+            GetCommitStatusRequest(),
+        )
+        assert isinstance(result, GetCommitStatusResponse)
+        assert "status" in result.root
+        assert result.root["status"] == "completed"
+        assert result.root["progress"] == 100
+
+    async def test_commit_on_dead_session_returns_error(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        terminated_session_seed: SessionSeedData,
+        agent_registry: AsyncMock,
+    ) -> None:
+        # Make agent registry raise an error for terminated session
+        agent_registry.request_to_all_kernels.side_effect = RuntimeError("Session is not running")
+        with pytest.raises(Exception):  # Should raise RuntimeError or similar
+            await admin_registry.session.commit(
+                terminated_session_seed.session_name,
+                CommitSessionRequest(),
+            )
 
 
 class TestSessionConvertToImage:
     """Tests for session convert-to-image operations."""
 
-    pass
+    async def test_convert_to_image(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        session_seed: SessionSeedData,
+        mock_agent_convert_to_image: str,
+    ) -> None:
+        result = await admin_registry.session.convert_to_image(
+            session_seed.session_name,
+            ConvertSessionToImageRequest(image_name="my-custom-image"),
+        )
+        assert isinstance(result, ConvertSessionToImageResponse)
+        assert hasattr(result, "task_id")
+        assert isinstance(result.task_id, str)
+        assert len(result.task_id) > 0
+
+    async def test_convert_to_image_on_dead_session_returns_error(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        terminated_session_seed: SessionSeedData,
+        agent_registry: AsyncMock,
+    ) -> None:
+        # Make agent registry raise an error for terminated session
+        agent_registry.request_to_all_kernels.side_effect = RuntimeError("Session is not running")
+        with pytest.raises(Exception):  # Should raise RuntimeError or similar
+            await admin_registry.session.convert_to_image(
+                terminated_session_seed.session_name,
+                ConvertSessionToImageRequest(image_name="my-image"),
+            )
