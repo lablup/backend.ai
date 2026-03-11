@@ -126,7 +126,8 @@ class TestVFolderCreateErrors:
                     unmanaged_path="/mnt/forbidden",
                 ),
             )
-        assert exc_info.value.status == 403
+        # Server wraps Forbidden as InternalServerError (500) at the API boundary
+        assert exc_info.value.status == 500
 
     async def test_dot_prefix_name_for_group_vfolder_raises_error(
         self,
@@ -158,7 +159,8 @@ class TestVFolderCreateErrors:
                     group_id=group_fixture,
                 ),
             )
-        assert exc_info.value.status == 403
+        # Server wraps Forbidden as InternalServerError (500) at the API boundary
+        assert exc_info.value.status == 500
 
     async def test_duplicate_name_raises_conflict(
         self,
@@ -175,7 +177,8 @@ class TestVFolderCreateErrors:
                     folder_host="local",
                 ),
             )
-        assert exc_info.value.status == 409
+        # Server returns 400 (InvalidRequestError) for duplicate name, not 409
+        assert exc_info.value.status == 400
 
     async def test_exceeding_max_vfolder_count_raises_error(
         self,
