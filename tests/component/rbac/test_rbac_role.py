@@ -5,11 +5,12 @@ from typing import Any
 
 import pytest
 
-from ai.backend.client.v2.exceptions import ConflictError, NotFoundError
+from ai.backend.client.v2.exceptions import ConflictError, NotFoundError, PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.rbac.request import (
     AssignRoleRequest,
+    CreateRoleRequest,
     DeleteRoleRequest,
     PurgeRoleRequest,
     RevokeRoleRequest,
@@ -468,3 +469,42 @@ class TestRoleAssignment:
                 role_id=target_role.role.id,
             )
         )
+
+
+class TestRolePermissions:
+    """Regular (non-admin) user cannot manage roles: create, delete, assign → 403."""
+
+    async def test_regular_user_cannot_create_role(
+        self,
+        user_registry: BackendAIClientRegistry,
+    ) -> None:
+        unique = secrets.token_hex(4)
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.rbac.create_role(
+                CreateRoleRequest(
+                    name=f"denied-role-{unique}",
+                    description="Should be denied",
+                )
+            )
+
+    async def test_regular_user_cannot_delete_role(
+        self,
+        user_registry: BackendAIClientRegistry,
+        target_role: CreateRoleResponse,
+    ) -> None:
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.rbac.delete_role(DeleteRoleRequest(role_id=target_role.role.id))
+
+    async def test_regular_user_cannot_assign_role(
+        self,
+        user_registry: BackendAIClientRegistry,
+        target_role: CreateRoleResponse,
+        regular_user_fixture: Any,
+    ) -> None:
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.rbac.assign_role(
+                AssignRoleRequest(
+                    user_id=regular_user_fixture.user_uuid,
+                    role_id=target_role.role.id,
+                )
+            )
