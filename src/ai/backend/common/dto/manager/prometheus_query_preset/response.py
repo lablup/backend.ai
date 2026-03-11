@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.pagination import PaginationInfo
 
 __all__ = (
     "CreateQueryDefinitionResponse",
@@ -47,14 +48,6 @@ class QueryDefinitionDTO(BaseModel):
     options: QueryDefinitionOptionsDTO = Field(description="Query definition options")
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
-
-
-class PaginationInfo(BaseModel):
-    """Pagination information."""
-
-    total: int = Field(description="Total count of items")
-    offset: int = Field(description="Current offset")
-    limit: int = Field(description="Current limit")
 
 
 class CreateQueryDefinitionResponse(BaseResponseModel):

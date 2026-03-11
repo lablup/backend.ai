@@ -715,20 +715,36 @@ class MemoryPlugin(AbstractComputePlugin):
             sandbox_key = data["NetworkSettings"]["SandboxKey"]
             net_rx_bytes = 0
             net_tx_bytes = 0
-            try:
-                nstat = await netstat_ns(sandbox_key)
-            except OSError as e:
+            if not sandbox_key:
                 log.warning(
-                    "MemoryPlugin: cannot read net stats for container {0}: {1!r}",
+                    "MemoryPlugin: empty SandboxKey for container {0},"
+                    " skipping net stat collection",
                     container_id[:7],
-                    e,
                 )
-                return None
-            for name, net_stat in nstat.items():
-                if name == "lo":
-                    continue
-                net_rx_bytes += net_stat.bytes_recv
-                net_tx_bytes += net_stat.bytes_sent
+            else:
+                ns_path = Path(sandbox_key)
+                if not ns_path.exists():
+                    log.warning(
+                        "MemoryPlugin: network namespace path does not exist for container"
+                        " {0} (sandbox_key={1!r}), skipping net stat collection",
+                        container_id[:7],
+                        sandbox_key,
+                    )
+                else:
+                    try:
+                        nstat = await netstat_ns(ns_path)
+                    except OSError as e:
+                        log.warning(
+                            "MemoryPlugin: cannot read net stats for container {0}: {1!r}",
+                            container_id[:7],
+                            e,
+                        )
+                        return None
+                    for name, net_stat in nstat.items():
+                        if name == "lo":
+                            continue
+                        net_rx_bytes += net_stat.bytes_recv
+                        net_tx_bytes += net_stat.bytes_sent
             loop = current_loop()
             scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
             return (

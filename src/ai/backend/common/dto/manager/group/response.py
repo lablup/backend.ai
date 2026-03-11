@@ -12,7 +12,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.dto.manager.deployment.response import PaginationInfo
+from ai.backend.common.dto.manager.pagination import PaginationInfo
 
 __all__ = (
     # DTOs
