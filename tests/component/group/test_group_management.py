@@ -17,7 +17,11 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.client.v2.exceptions import BackendAPIError, InvalidAPIParameters, NotFoundError
+from ai.backend.client.v2.exceptions import (
+    BackendAPIError,
+    InvalidRequestError,
+    NotFoundError,
+)
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.deployment.types import OrderDirection
 from ai.backend.common.dto.manager.group.request import GroupFilter, SearchGroupsRequest
@@ -573,7 +577,7 @@ class TestGroupUsageStats:
     ) -> None:
         """F-BIZ-1: 100-day max range enforced → error if range exceeds 100 days."""
         # 101 days: 20260101 to 20260412 (Jan 1 to Apr 12 = 101 days)
-        with pytest.raises(InvalidAPIParameters) as exc_info:
+        with pytest.raises(InvalidRequestError) as exc_info:
             await admin_registry.infra.get_usage_per_period(
                 UsagePerPeriodRequest(
                     project_id=str(test_group_for_deletion),
@@ -595,7 +599,7 @@ class TestGroupUsageStats:
     ) -> None:
         """F-BIZ-2: end_date > start_date validation → error if end_date <= start_date."""
         # end_date same as start_date
-        with pytest.raises(InvalidAPIParameters) as exc_info:
+        with pytest.raises(InvalidRequestError) as exc_info:
             await admin_registry.infra.get_usage_per_period(
                 UsagePerPeriodRequest(
                     project_id=str(test_group_for_deletion),
@@ -606,7 +610,7 @@ class TestGroupUsageStats:
         assert "end_date must be later than start_date" in str(exc_info.value).lower()
 
         # end_date before start_date
-        with pytest.raises(InvalidAPIParameters) as exc_info:
+        with pytest.raises(InvalidRequestError) as exc_info:
             await admin_registry.infra.get_usage_per_period(
                 UsagePerPeriodRequest(
                     project_id=str(test_group_for_deletion),
