@@ -12,8 +12,6 @@ import logging
 from http import HTTPStatus
 from typing import Final
 
-from aiohttp import web
-
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.auto_scaling_rule import (
     CreateAutoScalingRuleRequest,
@@ -59,17 +57,9 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class AutoScalingRuleHandler:
     """Auto-scaling rule API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, deployment: DeploymentProcessors | None) -> None:
+    def __init__(self, *, deployment: DeploymentProcessors) -> None:
         self._deployment = deployment
         self._adapter = AutoScalingRuleAdapter()
-
-    def _get_deployment_processors(self) -> DeploymentProcessors:
-        """Get deployment processors, raising ServiceUnavailable if not available."""
-        if self._deployment is None:
-            raise web.HTTPServiceUnavailable(
-                reason="Deployment service is not available on this manager"
-            )
-        return self._deployment
 
     async def create(
         self,
@@ -77,7 +67,6 @@ class AutoScalingRuleHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Create a new auto-scaling rule."""
-        deployment_processors = self._get_deployment_processors()
         log.info("AUTO_SCALING_RULE.CREATE (ak:{})", ctx.access_key)
 
         creator = ModelDeploymentAutoScalingRuleCreator(
@@ -92,7 +81,7 @@ class AutoScalingRuleHandler:
             max_replicas=body.parsed.max_replicas,
         )
 
-        action_result = await deployment_processors.create_auto_scaling_rule.wait_for_complete(
+        action_result = await self._deployment.create_auto_scaling_rule.wait_for_complete(
             CreateAutoScalingRuleAction(creator=creator)
         )
 
@@ -107,10 +96,9 @@ class AutoScalingRuleHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Get a specific auto-scaling rule."""
-        deployment_processors = self._get_deployment_processors()
         log.info("AUTO_SCALING_RULE.GET (ak:{})", ctx.access_key)
 
-        action_result = await deployment_processors.get_auto_scaling_rule.wait_for_complete(
+        action_result = await self._deployment.get_auto_scaling_rule.wait_for_complete(
             GetAutoScalingRuleAction(auto_scaling_rule_id=path.parsed.rule_id)
         )
 
@@ -125,12 +113,11 @@ class AutoScalingRuleHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search auto-scaling rules with filters, orders, and pagination."""
-        deployment_processors = self._get_deployment_processors()
         log.info("AUTO_SCALING_RULE.SEARCH (ak:{})", ctx.access_key)
 
         querier = self._adapter.build_querier(body.parsed)
 
-        action_result = await deployment_processors.search_auto_scaling_rules.wait_for_complete(
+        action_result = await self._deployment.search_auto_scaling_rules.wait_for_complete(
             SearchAutoScalingRulesAction(querier=querier)
         )
 
@@ -151,13 +138,12 @@ class AutoScalingRuleHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Update an existing auto-scaling rule."""
-        deployment_processors = self._get_deployment_processors()
         log.info("AUTO_SCALING_RULE.UPDATE (ak:{})", ctx.access_key)
 
         rule_id = path.parsed.rule_id
         modifier = self._adapter.build_modifier(body.parsed)
 
-        action_result = await deployment_processors.update_auto_scaling_rule.wait_for_complete(
+        action_result = await self._deployment.update_auto_scaling_rule.wait_for_complete(
             UpdateAutoScalingRuleAction(
                 auto_scaling_rule_id=rule_id,
                 modifier=modifier,
@@ -175,10 +161,9 @@ class AutoScalingRuleHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Delete an auto-scaling rule."""
-        deployment_processors = self._get_deployment_processors()
         log.info("AUTO_SCALING_RULE.DELETE (ak:{})", ctx.access_key)
 
-        action_result = await deployment_processors.delete_auto_scaling_rule.wait_for_complete(
+        action_result = await self._deployment.delete_auto_scaling_rule.wait_for_complete(
             DeleteAutoScalingRuleAction(auto_scaling_rule_id=body.parsed.rule_id)
         )
 
