@@ -16,7 +16,7 @@ class PrometheusPresetOptionsGQL:
 
 
 @strawberry.type(
-    name="MetricLabelEntry",
+    name="QueryDefinitionMetricLabelEntry",
     description="Added in 26.3.0. Key-value label entry from Prometheus result.",
 )
 class MetricLabelEntryGQL:
@@ -25,7 +25,7 @@ class MetricLabelEntryGQL:
 
 
 @strawberry.type(
-    name="MetricResultValue",
+    name="QueryDefinitionMetricResultValue",
     description="Added in 26.3.0. Single timestamp-value pair from Prometheus.",
 )
 class MetricResultValueGQL:
@@ -34,7 +34,7 @@ class MetricResultValueGQL:
 
 
 @strawberry.type(
-    name="MetricResult",
+    name="QueryDefinitionMetricResult",
     description="Added in 26.3.0. Single metric result from Prometheus query.",
 )
 class MetricResultGQL:
