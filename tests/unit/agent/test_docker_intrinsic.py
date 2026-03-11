@@ -433,7 +433,9 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
         return plugin
 
     @pytest.fixture
-    def sysfs_mocks(self, cgroup_stat_context: MagicMock) -> Generator[_SysfsMocks, None, None]:
+    def sysfs_mocks(
+        self, cgroup_stat_context: MagicMock, tmp_path: Path
+    ) -> Generator[_SysfsMocks, None, None]:
         """Fully patched sysfs_impl environment with default happy-path behavior.
 
         Tests override specific mock side_effects before calling the target function.
@@ -451,8 +453,10 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
         io_path.__truediv__ = MagicMock(return_value=io_stat)
         ctx.agent.get_cgroup_path = lambda subsys, cid: mem_path if subsys == "memory" else io_path
 
+        fake_ns = tmp_path / "fake_netns"
+        fake_ns.touch()
         container_data: dict[str, Any] = {
-            "NetworkSettings": {"SandboxKey": "/var/run/docker/netns/fake"},
+            "NetworkSettings": {"SandboxKey": str(fake_ns)},
         }
 
         with (
