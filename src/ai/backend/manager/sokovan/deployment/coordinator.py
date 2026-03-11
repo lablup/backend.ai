@@ -173,8 +173,10 @@ class DeploymentCoordinator:
             if handler.lock_id is not None:
                 lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
                 await stack.enter_async_context(self._lock_factory(handler.lock_id, lock_lifetime))
+            target_statuses = handler.target_statuses()
+            lifecycle_stages = [s.lifecycle for s in target_statuses]
             deployments = await self._deployment_repository.get_endpoints_by_statuses(
-                handler.target_statuses()
+                lifecycle_stages
             )
             if not deployments:
                 log.trace("No deployments to process for handler: {}", handler.name())
@@ -215,7 +217,8 @@ class DeploymentCoordinator:
         """
         handler_name = handler.name()
         target_statuses = handler.target_statuses()
-        from_status = target_statuses[0] if target_statuses else None
+        from_status = target_statuses[0].lifecycle if target_statuses else None
+        target_lifecycle_stages = [s.lifecycle for s in target_statuses]
 
         # Collect all batch updaters and history specs
         batch_updaters: list[BatchUpdater[EndpointRow]] = []
@@ -246,7 +249,7 @@ class DeploymentCoordinator:
                     spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=next_lifecycle),
                     conditions=[
                         DeploymentConditions.by_ids(endpoint_ids),
-                        DeploymentConditions.by_lifecycle_stages(target_statuses),
+                        DeploymentConditions.by_lifecycle_stages(target_lifecycle_stages),
                     ],
                 )
             )
@@ -285,7 +288,7 @@ class DeploymentCoordinator:
                     spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=failure_lifecycle),
                     conditions=[
                         DeploymentConditions.by_ids(endpoint_ids),
-                        DeploymentConditions.by_lifecycle_stages(target_statuses),
+                        DeploymentConditions.by_lifecycle_stages(target_lifecycle_stages),
                     ],
                 )
             )
