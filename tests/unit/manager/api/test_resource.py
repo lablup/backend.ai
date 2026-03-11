@@ -13,7 +13,6 @@ re-export used by rest/etcd/handler.py.
 
 from __future__ import annotations
 
-import json
 import uuid
 from decimal import Decimal
 from http import HTTPStatus
@@ -323,21 +322,21 @@ class TestCheckPresets:
         assert response_body is not None
         assert isinstance(response_body, dict)
         assert response_body["presets"] == [{"name": "small"}]
-        expected_json = '{"cpu": "1", "mem": "1073741824"}'
-        assert response_body["keypair_limits"] == expected_json
-        assert response_body["keypair_using"] == expected_json
-        assert response_body["keypair_remaining"] == expected_json
-        assert response_body["group_limits"] == expected_json
-        assert response_body["group_using"] == expected_json
-        assert response_body["group_remaining"] == expected_json
-        assert response_body["scaling_group_remaining"] == expected_json
+        expected_dict = {"cpu": "1", "mem": "1073741824"}
+        assert response_body["keypair_limits"] == expected_dict
+        assert response_body["keypair_using"] == expected_dict
+        assert response_body["keypair_remaining"] == expected_dict
+        assert response_body["group_limits"] == expected_dict
+        assert response_body["group_using"] == expected_dict
+        assert response_body["group_remaining"] == expected_dict
+        assert response_body["scaling_group_remaining"] == expected_dict
 
-    async def test_converts_resource_slots_to_json(
+    async def test_converts_resource_slots_to_dict(
         self,
         handler: ResourceHandler,
         mock_processors: MagicMock,
     ) -> None:
-        """Verify list[SlotQuantity] is converted to JSON string in response."""
+        """Verify list[SlotQuantity] is converted to dict in response."""
         user_uuid = uuid.uuid4()
         body: BodyParam[CheckPresetsRequest] = BodyParam(CheckPresetsRequest)
         body.from_body({"scaling_group": "sg-test", "group": "default"})
@@ -376,6 +375,4 @@ class TestCheckPresets:
             "scaling_group_remaining",
         ]
         for field in resource_slot_fields:
-            assert isinstance(response_body[field], str)
-            parsed = json.loads(response_body[field])
-            assert isinstance(parsed, dict)
+            assert isinstance(response_body[field], dict)
