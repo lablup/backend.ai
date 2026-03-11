@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.dto.manager.query import StringFilter, StringFilterMode
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.user import (
     OrderDirection,
     SearchUsersRequest,
@@ -57,12 +57,7 @@ class TestUserSearch:
 
         result = await admin_registry.user.search(
             SearchUsersRequest(
-                filter=UserFilter(
-                    email=StringFilter(
-                        mode=StringFilterMode.CONTAINS,
-                        value="search-test",
-                    )
-                ),
+                filter=UserFilter(email=StringFilter(contains="search-test")),
                 limit=50,
             )
         )
@@ -84,12 +79,7 @@ class TestUserSearch:
 
         result = await admin_registry.user.search(
             SearchUsersRequest(
-                filter=UserFilter(
-                    username=StringFilter(
-                        mode=StringFilterMode.EXACT,
-                        value="specific-username-xyz",
-                    )
-                ),
+                filter=UserFilter(username=StringFilter(equals="specific-username-xyz")),
                 limit=50,
             )
         )
@@ -196,12 +186,7 @@ class TestUserSearch:
 
         result = await admin_registry.user.search(
             SearchUsersRequest(
-                filter=UserFilter(
-                    email=StringFilter(
-                        mode=StringFilterMode.CONTAINS,
-                        value="@test.local",
-                    )
-                ),
+                filter=UserFilter(email=StringFilter(contains="@test.local")),
                 order=[UserOrder(field=UserOrderField.EMAIL, direction=OrderDirection.ASC)],
                 limit=50,
             )
@@ -223,12 +208,7 @@ class TestUserSearch:
 
         result = await admin_registry.user.search(
             SearchUsersRequest(
-                filter=UserFilter(
-                    email=StringFilter(
-                        mode=StringFilterMode.CONTAINS,
-                        value="@test.local",
-                    )
-                ),
+                filter=UserFilter(email=StringFilter(contains="@test.local")),
                 order=[UserOrder(field=UserOrderField.EMAIL, direction=OrderDirection.DESC)],
                 limit=50,
             )
@@ -257,10 +237,7 @@ class TestUserSearch:
         result = await admin_registry.user.search(
             SearchUsersRequest(
                 filter=UserFilter(
-                    email=StringFilter(
-                        mode=StringFilterMode.CONTAINS,
-                        value="compound-test",
-                    ),
+                    email=StringFilter(contains="compound-test"),
                     status=[UserStatus.ACTIVE],
                     role=[UserRole.USER],
                 ),
@@ -285,10 +262,7 @@ class TestUserSearch:
         result = await admin_registry.user.search(
             SearchUsersRequest(
                 filter=UserFilter(
-                    email=StringFilter(
-                        mode=StringFilterMode.EXACT,
-                        value="nonexistent-user-email-xyz@test.local",
-                    )
+                    email=StringFilter(equals="nonexistent-user-email-xyz@test.local")
                 ),
                 limit=50,
             )
