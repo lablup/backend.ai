@@ -13,6 +13,9 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.container_registry.db_source.db_source import (
+    ContainerRegistryDBSource,
+)
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -27,7 +30,8 @@ from ai.backend.manager.services.etcd_config.service import EtcdConfigService
 def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
 ) -> ContainerRegistryProcessors:
-    repo = ContainerRegistryRepository(database_engine)
+    db_source = ContainerRegistryDBSource(database_engine)
+    repo = ContainerRegistryRepository(db_source)
     service = ContainerRegistryService(database_engine, repo)
     return ContainerRegistryProcessors(
         service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
