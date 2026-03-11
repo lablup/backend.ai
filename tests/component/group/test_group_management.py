@@ -1,0 +1,527 @@
+"""Component tests for group management operations.
+
+Tests for:
+- Group delete (soft delete)
+- Group purge (hard delete with validation)
+- Project search (filters, pagination, sorting)
+- Usage statistics (per period with date validation)
+"""
+
+from __future__ import annotations
+
+import secrets
+import uuid
+from collections.abc import AsyncIterator
+
+import pytest
+import sqlalchemy as sa
+from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
+
+from ai.backend.client.v2.exceptions import BackendAPIError, NotFoundError
+from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.dto.manager.group.request import SearchGroupsRequest
+from ai.backend.common.dto.manager.group.response import (
+    DeleteGroupResponse,
+    SearchGroupsResponse,
+)
+from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.kernel import KernelRow, KernelStatus
+from ai.backend.manager.models.vfolder import VFolderRow
+
+
+@pytest.fixture()
+async def test_group_for_deletion(
+    db_engine: SAEngine,
+    domain_fixture: str,
+    resource_policy_fixture: str,
+) -> AsyncIterator[uuid.UUID]:
+    """Create a test group specifically for deletion/purge tests."""
+    group_id = uuid.uuid4()
+    group_name = f"delete-test-{secrets.token_hex(4)}"
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(GroupRow.__table__).values(
+                id=group_id,
+                name=group_name,
+                description=f"Group for deletion test {group_name}",
+                is_active=True,
+                domain_name=domain_fixture,
+                resource_policy=resource_policy_fixture,
+            )
+        )
+    yield group_id
+    # Cleanup: force delete if still exists
+    async with db_engine.begin() as conn:
+        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+
+
+@pytest.fixture()
+async def group_with_vfolder_mounted(
+    db_engine: SAEngine,
+    domain_fixture: str,
+    resource_policy_fixture: str,
+    user_fixture: uuid.UUID,
+) -> AsyncIterator[uuid.UUID]:
+    """Create group with vfolder mounted to active kernel."""
+    group_id = uuid.uuid4()
+    group_name = f"group-vf-{secrets.token_hex(4)}"
+    vfolder_id = uuid.uuid4()
+    kernel_id = uuid.uuid4()
+
+    async with db_engine.begin() as conn:
+        # Create group
+        await conn.execute(
+            sa.insert(GroupRow.__table__).values(
+                id=group_id,
+                name=group_name,
+                description="Group with mounted vfolder",
+                is_active=True,
+                domain_name=domain_fixture,
+                resource_policy=resource_policy_fixture,
+            )
+        )
+        # Create vfolder
+        await conn.execute(
+            sa.insert(VFolderRow.__table__).values(
+                id=vfolder_id,
+                name=f"vf-{secrets.token_hex(4)}",
+                user=user_fixture,
+                group=group_id,
+                host="local",
+            )
+        )
+        # Create active kernel with mount
+        await conn.execute(
+            sa.insert(KernelRow.__table__).values(
+                id=kernel_id,
+                session_id=uuid.uuid4(),
+                group_id=group_id,
+                user_uuid=user_fixture,
+                status=KernelStatus.RUNNING,
+                image="python:3.9",
+                mounts=[["vfolder", f"vf-{secrets.token_hex(4)}", str(vfolder_id)]],
+            )
+        )
+
+    yield group_id
+
+    # Cleanup
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            KernelRow.__table__.delete().where(KernelRow.__table__.c.id == kernel_id)
+        )
+        await conn.execute(
+            VFolderRow.__table__.delete().where(VFolderRow.__table__.c.id == vfolder_id)
+        )
+        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+
+
+@pytest.fixture()
+async def group_with_active_kernel(
+    db_engine: SAEngine,
+    domain_fixture: str,
+    resource_policy_fixture: str,
+    user_fixture: uuid.UUID,
+) -> AsyncIterator[uuid.UUID]:
+    """Create group with active kernel."""
+    group_id = uuid.uuid4()
+    group_name = f"group-ak-{secrets.token_hex(4)}"
+    kernel_id = uuid.uuid4()
+
+    async with db_engine.begin() as conn:
+        # Create group
+        await conn.execute(
+            sa.insert(GroupRow.__table__).values(
+                id=group_id,
+                name=group_name,
+                description="Group with active kernel",
+                is_active=True,
+                domain_name=domain_fixture,
+                resource_policy=resource_policy_fixture,
+            )
+        )
+        # Create active kernel
+        await conn.execute(
+            sa.insert(KernelRow.__table__).values(
+                id=kernel_id,
+                session_id=uuid.uuid4(),
+                group_id=group_id,
+                user_uuid=user_fixture,
+                status=KernelStatus.RUNNING,
+                image="python:3.9",
+            )
+        )
+
+    yield group_id
+
+    # Cleanup
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            KernelRow.__table__.delete().where(KernelRow.__table__.c.id == kernel_id)
+        )
+        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+
+
+@pytest.fixture()
+async def group_with_active_endpoint(
+    db_engine: SAEngine,
+    domain_fixture: str,
+    resource_policy_fixture: str,
+    user_fixture: uuid.UUID,
+) -> AsyncIterator[uuid.UUID]:
+    """Create group with active endpoint."""
+    group_id = uuid.uuid4()
+    group_name = f"group-ep-{secrets.token_hex(4)}"
+    endpoint_id = uuid.uuid4()
+
+    async with db_engine.begin() as conn:
+        # Create group
+        await conn.execute(
+            sa.insert(GroupRow.__table__).values(
+                id=group_id,
+                name=group_name,
+                description="Group with active endpoint",
+                is_active=True,
+                domain_name=domain_fixture,
+                resource_policy=resource_policy_fixture,
+            )
+        )
+        # Create active endpoint
+        await conn.execute(
+            sa.insert(EndpointRow.__table__).values(
+                id=endpoint_id,
+                name=f"ep-{secrets.token_hex(4)}",
+                project=group_id,
+                domain=domain_fixture,
+                user=user_fixture,
+                lifecycle_stage=EndpointLifecycle.CREATED,
+            )
+        )
+
+    yield group_id
+
+    # Cleanup
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            EndpointRow.__table__.delete().where(EndpointRow.__table__.c.id == endpoint_id)
+        )
+        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+
+
+@pytest.fixture()
+async def multiple_test_groups(
+    db_engine: SAEngine,
+    domain_fixture: str,
+    resource_policy_fixture: str,
+) -> AsyncIterator[list[uuid.UUID]]:
+    """Create multiple test groups for search tests."""
+    group_ids = []
+    unique = secrets.token_hex(4)
+
+    async with db_engine.begin() as conn:
+        for i in range(5):
+            group_id = uuid.uuid4()
+            await conn.execute(
+                sa.insert(GroupRow.__table__).values(
+                    id=group_id,
+                    name=f"search-test-{unique}-{i}",
+                    description=f"Search test group {i}",
+                    is_active=True,
+                    domain_name=domain_fixture,
+                    resource_policy=resource_policy_fixture,
+                )
+            )
+            group_ids.append(group_id)
+
+    yield group_ids
+
+    # Cleanup
+    async with db_engine.begin() as conn:
+        for group_id in group_ids:
+            await conn.execute(
+                GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id)
+            )
+
+
+class TestGroupDelete:
+    """Tests for soft delete (DELETE /groups/{id})."""
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="REST /groups/{id} DELETE route not yet implemented",
+        raises=NotFoundError,
+    )
+    async def test_admin_soft_deletes_group(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        test_group_for_deletion: uuid.UUID,
+    ) -> None:
+        """S-1: Admin soft deletes group → group status transitions to inactive."""
+        result = await admin_registry.group.delete(test_group_for_deletion)
+        assert isinstance(result, DeleteGroupResponse)
+        assert result.deleted is True
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="REST /groups/{id} DELETE route not yet implemented",
+        raises=NotFoundError,
+    )
+    async def test_delete_nonexistent_group_raises_404(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        """F-BIZ-1: Delete non-existent group → 404."""
+        nonexistent_id = uuid.uuid4()
+        with pytest.raises(NotFoundError):
+            await admin_registry.group.delete(nonexistent_id)
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="REST /groups/{id} DELETE route not yet implemented",
+        raises=NotFoundError,
+    )
+    async def test_regular_user_cannot_delete_group(
+        self,
+        user_registry: BackendAIClientRegistry,
+        test_group_for_deletion: uuid.UUID,
+    ) -> None:
+        """F-AUTH-1: Regular user cannot delete group → 403."""
+        with pytest.raises(BackendAPIError) as exc_info:
+            await user_registry.group.delete(test_group_for_deletion)
+        assert exc_info.value.status == 403
+
+
+class TestGroupPurge:
+    """Tests for hard purge with validation."""
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Purge action not exposed via REST API yet",
+        raises=NotFoundError,
+    )
+    async def test_admin_hard_purges_group(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        test_group_for_deletion: uuid.UUID,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-1: Admin hard purges group → group removed from DB."""
+        # Purge via action (would need GraphQL or processor call)
+        # For now, this is xfail as purge is not exposed via REST
+        # TODO: Implement when purge action is exposed
+        pass
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Purge action not exposed via REST API yet",
+        raises=NotFoundError,
+    )
+    async def test_purge_group_with_vfolder_mounts_blocked(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        group_with_vfolder_mounted: uuid.UUID,
+    ) -> None:
+        """F-BIZ-1: Purge group with vfolder mounts → blocked with error."""
+        # Would call purge action and expect ProjectHasVFoldersMountedError
+        pass
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Purge action not exposed via REST API yet",
+        raises=NotFoundError,
+    )
+    async def test_purge_group_with_active_kernels_blocked(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        group_with_active_kernel: uuid.UUID,
+    ) -> None:
+        """F-BIZ-2: Purge group with active kernels → blocked with error."""
+        # Would call purge action and expect ProjectHasActiveKernelsError
+        pass
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Purge action not exposed via REST API yet",
+        raises=NotFoundError,
+    )
+    async def test_purge_group_with_active_endpoints_blocked(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        group_with_active_endpoint: uuid.UUID,
+    ) -> None:
+        """F-BIZ-3: Purge group with active endpoints → blocked with error."""
+        # Would call purge action and expect ProjectHasActiveEndpointsError
+        pass
+
+
+class TestGroupSearch:
+    """Tests for project search with filters and pagination."""
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="REST /groups search route not yet implemented",
+        raises=NotFoundError,
+    )
+    async def test_search_all_projects_returns_paginated_list(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        multiple_test_groups: list[uuid.UUID],
+    ) -> None:
+        """S-1: Search all projects → returns paginated list."""
+        result = await admin_registry.group.search(
+            SearchGroupsRequest(limit=10, offset=0),
+        )
+        assert isinstance(result, SearchGroupsResponse)
+        assert len(result.groups) > 0
+        assert result.pagination.total_count >= len(multiple_test_groups)
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="REST /groups search route not yet implemented",
+        raises=NotFoundError,
+    )
+    async def test_search_with_name_filter(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        multiple_test_groups: list[uuid.UUID],
+    ) -> None:
+        """S-2: Search with name filter → matching groups."""
+        result = await admin_registry.group.search(
+            SearchGroupsRequest(
+                filter={"name": {"eq": "search-test"}},
+                limit=10,
+            ),
+        )
+        assert isinstance(result, SearchGroupsResponse)
+        # Should only return groups matching the filter
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="REST /groups search route not yet implemented",
+        raises=NotFoundError,
+    )
+    async def test_search_with_domain_filter(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        domain_fixture: str,
+    ) -> None:
+        """S-3: Search with domain filter → groups in domain."""
+        result = await admin_registry.group.search(
+            SearchGroupsRequest(
+                filter={"domain_name": {"eq": domain_fixture}},
+                limit=10,
+            ),
+        )
+        assert isinstance(result, SearchGroupsResponse)
+        for group in result.groups:
+            assert group.domain_name == domain_fixture
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="REST /groups search route not yet implemented",
+        raises=NotFoundError,
+    )
+    async def test_search_with_pagination(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        multiple_test_groups: list[uuid.UUID],
+    ) -> None:
+        """S-4: Search with pagination → correct page."""
+        # Page 1
+        page1 = await admin_registry.group.search(
+            SearchGroupsRequest(limit=2, offset=0),
+        )
+        # Page 2
+        page2 = await admin_registry.group.search(
+            SearchGroupsRequest(limit=2, offset=2),
+        )
+        assert isinstance(page1, SearchGroupsResponse)
+        assert isinstance(page2, SearchGroupsResponse)
+        # Ensure pages are different
+        page1_ids = {g.id for g in page1.groups}
+        page2_ids = {g.id for g in page2.groups}
+        assert page1_ids != page2_ids
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="REST /groups search route not yet implemented",
+        raises=NotFoundError,
+    )
+    async def test_search_empty_result(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        """S-5: Empty result → total=0, empty items."""
+        result = await admin_registry.group.search(
+            SearchGroupsRequest(
+                filter={"name": {"eq": "nonexistent-group-name"}},
+            ),
+        )
+        assert isinstance(result, SearchGroupsResponse)
+        assert result.pagination.total_count == 0
+        assert len(result.groups) == 0
+
+
+class TestGroupUsageStats:
+    """Tests for usage statistics per period."""
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Usage per period action not exposed via REST API yet",
+        raises=NotFoundError,
+    )
+    async def test_get_usage_per_period(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_group: uuid.UUID,
+    ) -> None:
+        """S-1: Get usage per period → returns usage data."""
+        # Would call usage_per_period action with valid date range
+        # start_date = "20260101", end_date = "20260131"
+        pass
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Usage per period action not exposed via REST API yet",
+        raises=NotFoundError,
+    )
+    async def test_usage_100_day_max_range_enforced(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_group: uuid.UUID,
+    ) -> None:
+        """F-BIZ-1: 100-day max range enforced → error if range exceeds 100 days."""
+        # Would call with start_date and end_date more than 100 days apart
+        # Expect InvalidAPIParameters error
+        pass
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Usage per period action not exposed via REST API yet",
+        raises=NotFoundError,
+    )
+    async def test_usage_end_date_validation(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_group: uuid.UUID,
+    ) -> None:
+        """F-BIZ-2: end_date > start_date validation → error if end_date <= start_date."""
+        # Would call with end_date <= start_date
+        # Expect InvalidAPIParameters error
+        pass
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Usage per period action not exposed via REST API yet",
+        raises=NotFoundError,
+    )
+    async def test_usage_for_group_with_no_sessions(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        test_group_for_deletion: uuid.UUID,
+    ) -> None:
+        """S-2: Usage for group with no sessions → empty/zero usage."""
+        # Would call usage_per_period for group with no sessions
+        # Expect empty result list
+        pass
