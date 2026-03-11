@@ -1,25 +1,32 @@
 from __future__ import annotations
 
 import secrets
+from typing import Any
 
 import pytest
 
-from ai.backend.client.v2.exceptions import NotFoundError
+from ai.backend.client.v2.exceptions import ConflictError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.rbac.request import (
+    AssignRoleRequest,
     DeleteRoleRequest,
     PurgeRoleRequest,
+    RevokeRoleRequest,
     RoleFilter,
     RoleOrder,
     SearchRolesRequest,
+    SearchUsersAssignedToRoleRequest,
     UpdateRoleRequest,
 )
 from ai.backend.common.dto.manager.rbac.response import (
+    AssignRoleResponse,
     CreateRoleResponse,
     DeleteRoleResponse,
     GetRoleResponse,
+    RevokeRoleResponse,
     SearchRolesResponse,
+    SearchUsersAssignedToRoleResponse,
     UpdateRoleResponse,
 )
 from ai.backend.common.dto.manager.rbac.types import (
@@ -335,3 +342,129 @@ class TestRoleSearch:
         )
         names_desc = [r.name for r in desc_result.roles]
         assert names_desc == sorted(names_desc, reverse=True)
+
+
+class TestRoleAssignment:
+    """Role assignment: assign, revoke, search assigned users, duplicate detection."""
+
+    async def test_assign_role_to_user(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_role: CreateRoleResponse,
+        admin_user_fixture: Any,
+    ) -> None:
+        result = await admin_registry.rbac.assign_role(
+            AssignRoleRequest(
+                user_id=admin_user_fixture.user_uuid,
+                role_id=target_role.role.id,
+            )
+        )
+        assert isinstance(result, AssignRoleResponse)
+        assert result.user_id == admin_user_fixture.user_uuid
+        assert result.role_id == target_role.role.id
+
+        # Clean up
+        await admin_registry.rbac.revoke_role(
+            RevokeRoleRequest(
+                user_id=admin_user_fixture.user_uuid,
+                role_id=target_role.role.id,
+            )
+        )
+
+    async def test_revoke_role_from_user(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_role: CreateRoleResponse,
+        admin_user_fixture: Any,
+    ) -> None:
+        # Assign first
+        await admin_registry.rbac.assign_role(
+            AssignRoleRequest(
+                user_id=admin_user_fixture.user_uuid,
+                role_id=target_role.role.id,
+            )
+        )
+
+        # Revoke
+        revoke_result = await admin_registry.rbac.revoke_role(
+            RevokeRoleRequest(
+                user_id=admin_user_fixture.user_uuid,
+                role_id=target_role.role.id,
+            )
+        )
+        assert isinstance(revoke_result, RevokeRoleResponse)
+        assert revoke_result.user_id == admin_user_fixture.user_uuid
+        assert revoke_result.role_id == target_role.role.id
+
+        # Verify user no longer in assigned list
+        search_result = await admin_registry.rbac.search_assigned_users(
+            target_role.role.id,
+            SearchUsersAssignedToRoleRequest(),
+        )
+        assert not any(u.user_id == admin_user_fixture.user_uuid for u in search_result.users)
+
+    async def test_search_assigned_users(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_role: CreateRoleResponse,
+        admin_user_fixture: Any,
+    ) -> None:
+        # Assign role
+        await admin_registry.rbac.assign_role(
+            AssignRoleRequest(
+                user_id=admin_user_fixture.user_uuid,
+                role_id=target_role.role.id,
+            )
+        )
+
+        # Search assigned users
+        result = await admin_registry.rbac.search_assigned_users(
+            target_role.role.id,
+            SearchUsersAssignedToRoleRequest(),
+        )
+        assert isinstance(result, SearchUsersAssignedToRoleResponse)
+        assert result.pagination.total >= 1
+        assert any(u.user_id == admin_user_fixture.user_uuid for u in result.users)
+
+        # Verify assigned user has granted_at
+        assigned = next(u for u in result.users if u.user_id == admin_user_fixture.user_uuid)
+        assert assigned.granted_at is not None
+
+        # Clean up
+        await admin_registry.rbac.revoke_role(
+            RevokeRoleRequest(
+                user_id=admin_user_fixture.user_uuid,
+                role_id=target_role.role.id,
+            )
+        )
+
+    async def test_duplicate_assignment_raises_conflict(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_role: CreateRoleResponse,
+        admin_user_fixture: Any,
+    ) -> None:
+        # First assignment
+        await admin_registry.rbac.assign_role(
+            AssignRoleRequest(
+                user_id=admin_user_fixture.user_uuid,
+                role_id=target_role.role.id,
+            )
+        )
+
+        # Duplicate assignment should raise ConflictError
+        with pytest.raises(ConflictError):
+            await admin_registry.rbac.assign_role(
+                AssignRoleRequest(
+                    user_id=admin_user_fixture.user_uuid,
+                    role_id=target_role.role.id,
+                )
+            )
+
+        # Clean up
+        await admin_registry.rbac.revoke_role(
+            RevokeRoleRequest(
+                user_id=admin_user_fixture.user_uuid,
+                role_id=target_role.role.id,
+            )
+        )
