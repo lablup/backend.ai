@@ -1,7 +1,7 @@
 """add sub_step column to endpoints
 
 Revision ID: 359f0bbd936c
-Revises: b1009fe7f865
+Revises: df13b2272b61
 Create Date: 2026-03-09 00:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "359f0bbd936c"
-down_revision = "b1009fe7f865"
+down_revision = "df13b2272b61"
 branch_labels = None
 depends_on = None
 
