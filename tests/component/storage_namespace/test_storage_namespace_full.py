@@ -9,11 +9,17 @@ from __future__ import annotations
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-from ai.backend.manager.repositories.base import Creator
+import pytest
+import sqlalchemy.exc
+
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
 from ai.backend.manager.repositories.storage_namespace.creators import StorageNamespaceCreatorSpec
 from ai.backend.manager.services.storage_namespace.actions.get_all import GetAllNamespacesAction
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
 from ai.backend.manager.services.storage_namespace.actions.register import RegisterNamespaceAction
+from ai.backend.manager.services.storage_namespace.actions.search import (
+    SearchStorageNamespacesAction,
+)
 from ai.backend.manager.services.storage_namespace.actions.unregister import (
     UnregisterNamespaceAction,
 )
@@ -173,3 +179,110 @@ class TestStorageNamespace:
             GetNamespacesAction(storage_id=storage["id"])
         )
         assert "lifecycle-ns" not in [n.namespace for n in after.result]
+
+
+class TestStorageNamespaceSearch:
+    """BatchQuerier search with pagination and duplicate registration error tests."""
+
+    async def test_search_namespaces(
+        self,
+        storage_namespace_processors: StorageNamespaceProcessors,
+        object_storage_factory: ObjectStorageFactory,
+        storage_namespace_factory: StorageNamespaceFactory,
+    ) -> None:
+        """Search namespaces with BatchQuerier returns matching results."""
+        storage = await object_storage_factory()
+        await storage_namespace_factory(storage_id=storage["id"], namespace="search-ns-a")
+        await storage_namespace_factory(storage_id=storage["id"], namespace="search-ns-b")
+        await storage_namespace_factory(storage_id=storage["id"], namespace="search-ns-c")
+
+        action = SearchStorageNamespacesAction(
+            querier=BatchQuerier(
+                pagination=OffsetPagination(limit=10, offset=0),
+                conditions=[],
+                orders=[],
+            )
+        )
+        result = await storage_namespace_processors.search_storage_namespaces.wait_for_complete(
+            action
+        )
+
+        assert result.total_count >= 3
+        ns_names = [ns.namespace for ns in result.namespaces]
+        assert "search-ns-a" in ns_names
+        assert "search-ns-b" in ns_names
+        assert "search-ns-c" in ns_names
+
+    async def test_search_namespaces_pagination(
+        self,
+        storage_namespace_processors: StorageNamespaceProcessors,
+        object_storage_factory: ObjectStorageFactory,
+        storage_namespace_factory: StorageNamespaceFactory,
+    ) -> None:
+        """Search with small page size returns correct pagination metadata."""
+        storage = await object_storage_factory()
+        for i in range(5):
+            await storage_namespace_factory(storage_id=storage["id"], namespace=f"page-ns-{i}")
+
+        # First page (limit=2)
+        first_page = await storage_namespace_processors.search_storage_namespaces.wait_for_complete(
+            SearchStorageNamespacesAction(
+                querier=BatchQuerier(
+                    pagination=OffsetPagination(limit=2, offset=0),
+                    conditions=[],
+                    orders=[],
+                )
+            )
+        )
+        assert len(first_page.namespaces) == 2
+        assert first_page.total_count >= 5
+        assert first_page.has_next_page is True
+        assert first_page.has_previous_page is False
+
+        # Second page (limit=2, offset=2)
+        second_page = (
+            await storage_namespace_processors.search_storage_namespaces.wait_for_complete(
+                SearchStorageNamespacesAction(
+                    querier=BatchQuerier(
+                        pagination=OffsetPagination(limit=2, offset=2),
+                        conditions=[],
+                        orders=[],
+                    )
+                )
+            )
+        )
+        assert len(second_page.namespaces) == 2
+        assert second_page.has_previous_page is True
+
+    async def test_duplicate_namespace_registration(
+        self,
+        storage_namespace_processors: StorageNamespaceProcessors,
+        object_storage_factory: ObjectStorageFactory,
+    ) -> None:
+        """Registering duplicate (storage_id, namespace) raises IntegrityError."""
+        storage = await object_storage_factory()
+
+        # Register first time — should succeed
+        await storage_namespace_processors.register.wait_for_complete(
+            RegisterNamespaceAction(
+                creator=Creator(
+                    spec=StorageNamespaceCreatorSpec(
+                        storage_id=storage["id"],
+                        bucket="duplicate-ns",
+                    ),
+                ),
+            )
+        )
+
+        # Register same (storage_id, namespace) again — should fail
+        with pytest.raises(sqlalchemy.exc.IntegrityError):
+            await storage_namespace_processors.register.wait_for_complete(
+                RegisterNamespaceAction(
+                    creator=Creator(
+                        spec=StorageNamespaceCreatorSpec(
+                            storage_id=storage["id"],
+                            bucket="duplicate-ns",
+                        ),
+                    ),
+                )
+            )
