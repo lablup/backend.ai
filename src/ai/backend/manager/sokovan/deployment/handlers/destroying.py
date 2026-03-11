@@ -46,20 +46,21 @@ class DestroyingDeploymentHandler(DeploymentHandler):
         return LockID.LOCKID_DEPLOYMENT_DESTROYING
 
     @classmethod
-    def target_statuses(cls) -> list[EndpointLifecycle]:
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
         """Get the target deployment statuses for this handler."""
-        return [EndpointLifecycle.DESTROYING]
+        return [DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYING)]
 
     @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
         """Define state transitions for destroying deployment handler (BEP-1030).
 
         - success: Deployment → DESTROYED
-        - failure: Deployment → DESTROYED (always proceed to destroyed)
+        - All failure categories → DESTROYED (always proceed to destroyed)
         """
+        destroyed = DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED)
         return DeploymentStatusTransitions(
-            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
-            failure=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
+            success=destroyed,
+            failure=destroyed,
         )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
