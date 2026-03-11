@@ -27,10 +27,10 @@ VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
 class TestVFolderCreateViaSDK:
     """Success scenarios for VFolder creation via SDK.
 
-    All require a live storage-proxy (marked xfail).
+    All require storage-proxy mocking (marked xfail strict=True).
     """
 
-    @pytest.mark.xfail(strict=False, reason="Requires live storage-proxy")
+    @pytest.mark.xfail(strict=True, reason="Requires storage-proxy mocking in component tests")
     async def test_admin_creates_user_owned_vfolder(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -41,7 +41,7 @@ class TestVFolderCreateViaSDK:
             VFolderCreateReq(name="crud-s1-user-owned", folder_host="local"),
         )
 
-    @pytest.mark.xfail(strict=False, reason="Requires live storage-proxy")
+    @pytest.mark.xfail(strict=True, reason="Requires storage-proxy mocking in component tests")
     async def test_admin_creates_group_owned_vfolder(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -57,7 +57,7 @@ class TestVFolderCreateViaSDK:
             ),
         )
 
-    @pytest.mark.xfail(strict=False, reason="Requires live storage-proxy")
+    @pytest.mark.xfail(strict=True, reason="Requires storage-proxy mocking in component tests")
     async def test_admin_creates_unmanaged_vfolder(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -72,7 +72,7 @@ class TestVFolderCreateViaSDK:
             ),
         )
 
-    @pytest.mark.xfail(strict=False, reason="Requires live storage-proxy")
+    @pytest.mark.xfail(strict=True, reason="Requires storage-proxy mocking in component tests")
     async def test_user_creates_local_special_vfolder(
         self,
         user_registry: BackendAIClientRegistry,
@@ -83,7 +83,7 @@ class TestVFolderCreateViaSDK:
             VFolderCreateReq(name=".local", folder_host="local"),
         )
 
-    @pytest.mark.xfail(strict=False, reason="Requires live storage-proxy")
+    @pytest.mark.xfail(strict=True, reason="Requires storage-proxy mocking in component tests")
     async def test_user_creates_cloneable_vfolder(
         self,
         user_registry: BackendAIClientRegistry,
@@ -253,8 +253,8 @@ class TestVFolderGetInfo:
     """Get-info scenarios for VFolder."""
 
     @pytest.mark.xfail(
-        strict=False,
-        reason="get_info fetches usage data from storage-proxy, not available in component tests",
+        strict=True,
+        reason="Requires storage-proxy mocking in component tests (get_info fetches usage data)",
     )
     async def test_admin_gets_own_vfolder_info(
         self,
@@ -267,8 +267,8 @@ class TestVFolderGetInfo:
         assert result.item.name == target_vfolder["name"]
 
     @pytest.mark.xfail(
-        strict=False,
-        reason="get_info fetches usage data from storage-proxy, not available in component tests",
+        strict=True,
+        reason="Requires storage-proxy mocking in component tests (get_info fetches usage data)",
     )
     async def test_admin_gets_another_users_vfolder_info(
         self,
