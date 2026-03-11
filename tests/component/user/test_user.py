@@ -190,6 +190,98 @@ class TestUserSearch:
         assert result.pagination.limit == 1
         assert len(result.items) <= 1
 
+    async def test_search_with_username_filter(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        user_factory: UserFactory,
+    ) -> None:
+        unique = secrets.token_hex(4)
+        target = await user_factory(username=f"unamef-{unique}")
+        await user_factory(username=f"other-{unique}")
+
+        result = await admin_registry.user.search(
+            SearchUsersRequest(
+                filter=UserFilter(username=StringFilter(equals=f"unamef-{unique}")),
+            )
+        )
+        assert result.pagination.total == 1
+        assert result.items[0].username == target.user.username
+
+    async def test_search_with_role_filter(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        user_factory: UserFactory,
+    ) -> None:
+        unique = secrets.token_hex(4)
+        user_role = await user_factory(
+            email=f"rolef-{unique}@test.local",
+            username=f"rolef-{unique}",
+            role=UserRole.USER,
+        )
+
+        result = await admin_registry.user.search(
+            SearchUsersRequest(
+                filter=UserFilter(
+                    email=StringFilter(contains=f"rolef-{unique}"),
+                    role=[UserRole.USER],
+                ),
+            )
+        )
+        assert result.pagination.total >= 1
+        found = [u for u in result.items if u.id == user_role.user.id]
+        assert len(found) == 1
+        assert found[0].role == UserRole.USER
+
+    async def test_search_with_compound_filters(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        user_factory: UserFactory,
+    ) -> None:
+        unique = secrets.token_hex(4)
+        marker = f"compf-{unique}"
+        target = await user_factory(
+            email=f"{marker}@test.local",
+            username=marker,
+            status=UserStatus.ACTIVE,
+            role=UserRole.USER,
+        )
+        await user_factory(
+            email=f"{marker}-inactive@test.local",
+            username=f"{marker}-inactive",
+            status=UserStatus.INACTIVE,
+        )
+
+        result = await admin_registry.user.search(
+            SearchUsersRequest(
+                filter=UserFilter(
+                    email=StringFilter(contains=marker),
+                    status=[UserStatus.ACTIVE],
+                    role=[UserRole.USER],
+                ),
+            )
+        )
+        assert result.pagination.total >= 1
+        user_ids = {u.id for u in result.items}
+        assert target.user.id in user_ids
+        for user in result.items:
+            assert marker in user.email
+            assert user.status == UserStatus.ACTIVE
+            assert user.role == UserRole.USER
+
+    async def test_search_with_empty_result(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        result = await admin_registry.user.search(
+            SearchUsersRequest(
+                filter=UserFilter(
+                    email=StringFilter(equals="nonexistent-xyz-999@test.local"),
+                ),
+            )
+        )
+        assert len(result.items) == 0
+        assert result.pagination.total == 0
+
     async def test_regular_user_cannot_search_users(
         self,
         user_registry: BackendAIClientRegistry,
