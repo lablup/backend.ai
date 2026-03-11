@@ -260,7 +260,9 @@ class TestVFSStorageQuota:
             "get_proxy_and_volume",
             MagicMock(return_value=("proxy1", "volume1")),
         )
-        storage_manager.get_manager_facing_client.return_value = mock_client
+        monkeypatch.setattr(
+            storage_manager, "get_manager_facing_client", MagicMock(return_value=mock_client)
+        )
         return mock_client
 
     async def test_get_quota_scope(
