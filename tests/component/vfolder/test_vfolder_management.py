@@ -9,6 +9,13 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.vfolder import VFolderInvitationState
+from ai.backend.common.dto.manager.vfolder.request import (
+    AcceptInvitationReq,
+    DeleteInvitationReq,
+    InviteVFolderReq,
+    PurgeVFolderReq,
+    RenameVFolderReq,
+)
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.models.vfolder import vfolder_invitations, vfolders
 
@@ -30,7 +37,7 @@ class TestVFolderUpdate:
         new_name = f"{old_name}-renamed"
 
         # Rename via SDK
-        await admin_registry.vfolder.rename(old_name, new_name)
+        await admin_registry.vfolder.rename(old_name, RenameVFolderReq(new_name=new_name))
 
         # Verify: get by new name should work
         info = await admin_registry.vfolder.get_info(new_name)
@@ -47,7 +54,9 @@ class TestVFolderUpdate:
     ) -> None:
         """E-1: Rename non-existent vfolder → 404."""
         with pytest.raises(BackendAPIError) as exc:
-            await admin_registry.vfolder.rename("nonexistent-vfolder", "new-name")
+            await admin_registry.vfolder.rename(
+                "nonexistent-vfolder", RenameVFolderReq(new_name="new-name")
+            )
         assert exc.value.status == 404
 
 
@@ -89,7 +98,7 @@ class TestVFolderDelete:
         vfolder_name = vfolder["name"]
 
         # Purge via SDK
-        await admin_registry.vfolder.purge(vfolder_name)
+        await admin_registry.vfolder.purge(PurgeVFolderReq(vfolder_id=vfolder_id))
 
         # Verify: vfolder should be removed from DB
         async with db_engine.begin() as conn:
@@ -135,7 +144,9 @@ class TestVFolderInvitation:
         invitee_email = user_fixture.email
 
         # Invite user via SDK
-        await admin_registry.vfolder.invite(vfolder_name, invitee_email)
+        await admin_registry.vfolder.invite(
+            vfolder_name, InviteVFolderReq(emails=[invitee_email])
+        )
 
         # Verify: invitation exists with PENDING status
         async with db_engine.begin() as conn:
@@ -174,7 +185,7 @@ class TestVFolderInvitation:
             invitation_id = result.scalar_one()
 
         # Invitee accepts invitation via SDK
-        await user_registry.vfolder.accept_invitation(str(invitation_id))
+        await user_registry.vfolder.accept_invitation(AcceptInvitationReq(inv_id=str(invitation_id)))
 
         # Verify: invitation status is ACCEPTED
         async with db_engine.begin() as conn:
@@ -213,7 +224,7 @@ class TestVFolderInvitation:
             invitation_id = result.scalar_one()
 
         # Invitee rejects invitation via SDK
-        await user_registry.vfolder.delete_invitation(str(invitation_id))
+        await user_registry.vfolder.delete_invitation(DeleteInvitationReq(inv_id=str(invitation_id)))
 
         # Verify: invitation status is REJECTED (or removed)
         async with db_engine.begin() as conn:
@@ -273,7 +284,7 @@ class TestVFolderInvitation:
             invitation_id = result.scalar_one()
 
         # Owner cancels invitation
-        await admin_registry.vfolder.delete_invitation(str(invitation_id))
+        await admin_registry.vfolder.delete_invitation(DeleteInvitationReq(inv_id=str(invitation_id)))
 
         # Verify: invitation is removed or CANCELED
         async with db_engine.begin() as conn:
@@ -346,7 +357,9 @@ class TestVFolderInvitationPermissions:
 
         # Try to invite as non-owner
         with pytest.raises(BackendAPIError) as exc:
-            await user_registry.vfolder.invite(vfolder_name, invitee_email)
+            await user_registry.vfolder.invite(
+                vfolder_name, InviteVFolderReq(emails=[invitee_email])
+            )
         assert exc.value.status == 403
 
     async def test_non_invitee_cannot_accept_reject(
@@ -378,7 +391,9 @@ class TestVFolderInvitationPermissions:
 
         # Try to accept as non-invitee (user_registry is different user)
         with pytest.raises(BackendAPIError) as exc:
-            await user_registry.vfolder.accept_invitation(str(invitation_id))
+            await user_registry.vfolder.accept_invitation(
+                AcceptInvitationReq(inv_id=str(invitation_id))
+            )
         assert exc.value.status == 403
 
     async def test_invite_to_nonexistent_vfolder(
@@ -388,5 +403,7 @@ class TestVFolderInvitationPermissions:
     ) -> None:
         """E-5: Invite to non-existent vfolder → 404."""
         with pytest.raises(BackendAPIError) as exc:
-            await admin_registry.vfolder.invite("nonexistent-vfolder", user_fixture.email)
+            await admin_registry.vfolder.invite(
+                "nonexistent-vfolder", InviteVFolderReq(emails=[user_fixture.email])
+            )
         assert exc.value.status == 404
