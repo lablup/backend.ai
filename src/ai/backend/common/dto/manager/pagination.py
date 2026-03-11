@@ -10,8 +10,8 @@ __all__ = ("PaginationInfo",)
 
 
 class PaginationInfo(BaseModel):
-    """Pagination information."""
+    """Pagination information for list responses."""
 
-    total: int = Field(description="Total number of items")
-    offset: int = Field(description="Number of items skipped")
-    limit: int | None = Field(default=None, description="Maximum items returned")
+    total: int = Field(description="Total number of items", ge=0)
+    offset: int = Field(description="Number of items skipped", ge=0)
+    limit: int = Field(description="Maximum items returned", ge=1)

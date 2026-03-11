@@ -187,6 +187,6 @@ class TestPaginationInfo:
         assert p.offset == 10
         assert p.limit == 50
 
-    def test_limit_optional(self) -> None:
-        p = PaginationInfo(total=50, offset=0)
-        assert p.limit is None
+    def test_limit_required(self) -> None:
+        p = PaginationInfo(total=50, offset=0, limit=20)
+        assert p.limit == 20
