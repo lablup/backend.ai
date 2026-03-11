@@ -173,7 +173,7 @@ from .models.utils import (
     sql_json_merge,
 )
 from .models.vfolder import VFolderRow, verify_vfolder_name
-from .repositories.session.lifecycle import SessionLifecycleManager
+from .services.session.lifecycle import SessionLifecycleManager
 from .scheduler.types import KernelAgentBinding
 from .types import UserScope
 
