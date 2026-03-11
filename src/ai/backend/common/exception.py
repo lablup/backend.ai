@@ -170,6 +170,7 @@ class ErrorDomain(enum.StrEnum):
     METRIC = "metric"
     STORAGE_PROXY = "storage-proxy"
     MESSAGE_QUEUE = "message-queue"
+    EXTERNAL_SYSTEM = "external-system"
 
 
 class ErrorOperation(enum.StrEnum):
@@ -697,7 +698,8 @@ class CloudDetectionError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/cloud-detection-failed"
     error_title = "Cloud Provider Detection Failed"
 
-    def error_code(self) -> ErrorCode:
+    @classmethod
+    def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.EXTERNAL_SYSTEM,
             operation=ErrorOperation.READ,

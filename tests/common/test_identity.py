@@ -6,7 +6,6 @@ import secrets
 import socket
 from collections.abc import AsyncGenerator, Generator
 from dataclasses import dataclass
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiodns
