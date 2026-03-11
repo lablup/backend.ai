@@ -373,8 +373,8 @@ class DeploymentInfo:
     network: DeploymentNetworkSpec
     model_revisions: list[ModelRevisionSpec]
     current_revision_id: UUID | None = None
-    deploying_revision_id: UUID | None = None
     policy: DeploymentPolicyData | None = None
+    deploying_revision_id: UUID | None = None
     sub_step: DeploymentSubStep | None = None
 
     def target_revision(self) -> ModelRevisionSpec | None:

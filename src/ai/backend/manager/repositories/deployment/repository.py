@@ -1153,7 +1153,6 @@ class DeploymentRepository:
         return await self._db_source.update_endpoint(updater)
 
     @deployment_repository_resilience.apply()
-    @deployment_repository_resilience.apply()
     async def set_deploying_revision(
         self,
         endpoint_id: uuid.UUID,
