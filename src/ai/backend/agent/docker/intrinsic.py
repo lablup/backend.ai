@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any, cast
 
 import aiohttp
-import async_timeout
 import psutil
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
@@ -283,7 +282,7 @@ class CPUPlugin(AbstractComputePlugin):
         async def api_impl(container_id: str) -> float | None:
             container = DockerContainer(self._docker, id=container_id)
             try:
-                async with async_timeout.timeout(_CONTAINER_STAT_TIMEOUT):
+                async with asyncio.timeout(_CONTAINER_STAT_TIMEOUT):
                     ret = await fetch_api_stats(container)
             except TimeoutError:
                 return None
@@ -780,7 +779,7 @@ class MemoryPlugin(AbstractComputePlugin):
         ) -> tuple[int, int, int, int, int, int, int] | None:
             container = DockerContainer(self._docker, id=container_id)
             try:
-                async with async_timeout.timeout(_CONTAINER_STAT_TIMEOUT):
+                async with asyncio.timeout(_CONTAINER_STAT_TIMEOUT):
                     ret = await fetch_api_stats(container)
             except TimeoutError:
                 return None
