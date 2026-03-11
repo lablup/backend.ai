@@ -34,11 +34,13 @@ from ai.backend.common.dto.manager.session.request import (
     DestroySessionRequest,
 )
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
+from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.image import images
+from ai.backend.manager.models.container_registry import ContainerRegistryRow, ContainerRegistryType
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 
 from .conftest import UserFixtureData
 
@@ -48,35 +50,72 @@ from .conftest import UserFixtureData
 
 
 @pytest.fixture()
+async def container_registry_seed(db_engine: SAEngine) -> AsyncIterator[uuid.UUID]:
+    """Create a test container registry for image references."""
+    registry_id = uuid.uuid4()
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(ContainerRegistryRow.__table__).values(
+                id=registry_id,
+                url="https://registry.test.local",
+                registry_name=f"test-registry-{registry_id.hex[:8]}",
+                type=ContainerRegistryType.DOCKER,
+            )
+        )
+    yield registry_id
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            ContainerRegistryRow.__table__.delete().where(
+                ContainerRegistryRow.__table__.c.id == registry_id
+            )
+        )
+
+
+@pytest.fixture()
 async def image_seed(
     db_engine: SAEngine,
-) -> AsyncIterator[str]:
+    container_registry_seed: uuid.UUID,
+) -> AsyncIterator[tuple[uuid.UUID, str]]:
     """Seed a test image for session creation.
 
     Component tests cannot actually create sessions (requires live agents),
     but we can test error paths like image-not-found by seeding a valid image.
+    Returns tuple of (image_id, canonical_image_name).
     """
-    unique = secrets.token_hex(4)
-    image_name = f"test-image-{unique}:latest"
+    image_id = uuid.uuid4()
+    suffix = image_id.hex[:8]
+    image_name = f"test-image-{suffix}"
+    canonical = f"registry.test.local/testproject/{image_name}:latest"
 
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(images).values(
-                name=image_name,
-                registry="index.docker.io",
+            sa.insert(ImageRow.__table__).values(
+                id=image_id,
+                name=canonical,
+                project="testproject",
+                image=image_name,
+                tag="latest",
+                registry="registry.test.local",
+                registry_id=container_registry_seed,
                 architecture="x86_64",
+                config_digest=f"sha256:{image_id.hex * 2}",
+                size_bytes=1024000,
                 is_local=False,
-                size_bytes=1024 * 1024,
-                config_digest="sha256:fake",
-                supported_accelerators=[],
-                resource_limits=[],
+                type=ImageType.COMPUTE,
+                accelerators=None,
+                labels={},
+                resources={
+                    "cpu": {"min": "1", "max": "4"},
+                    "mem": {"min": "268435456", "max": "4294967296"},
+                },
+                status=ImageStatus.ALIVE,
             )
         )
 
-    yield image_name
+    yield (image_id, canonical)
 
     async with db_engine.begin() as conn:
-        await conn.execute(images.delete().where(images.c.name == image_name))
+        await conn.execute(ImageRow.__table__.delete().where(ImageRow.__table__.c.id == image_id))
 
 
 @pytest.fixture()
@@ -363,7 +402,7 @@ class TestSessionCreation:
     async def test_param_based_creation_request_structure(
         self,
         admin_registry: BackendAIClientRegistry,
-        image_seed: str,
+        image_seed: tuple[uuid.UUID, str],
     ) -> None:
         """Param-based creation validates request structure.
 
@@ -371,13 +410,14 @@ class TestSessionCreation:
         like image name, session_type, and config options.
         Component test cannot verify actual session creation (requires live agents).
         """
+        _, image_name = image_seed
         unique = secrets.token_hex(4)
         # This will fail due to no agents, but validates request structure
         with pytest.raises((NotFoundError, Exception)):
             await admin_registry.session.create_from_params(
                 CreateFromParamsRequest(
                     session_name=f"test-param-{unique}",
-                    image=image_seed,
+                    image=image_name,
                     session_type=SessionTypes.INTERACTIVE,
                     config={},
                 )
@@ -386,7 +426,7 @@ class TestSessionCreation:
     async def test_cluster_creation_request_structure(
         self,
         admin_registry: BackendAIClientRegistry,
-        image_seed: str,
+        image_seed: tuple[uuid.UUID, str],
     ) -> None:
         """Cluster creation validates multi-node request structure.
 
@@ -394,13 +434,14 @@ class TestSessionCreation:
         and cluster_mode parameters for multi-container sessions.
         Component test cannot verify actual cluster creation (requires live agents).
         """
+        _, image_name = image_seed
         unique = secrets.token_hex(4)
         # This will fail due to no agents, but validates request structure
         with pytest.raises((NotFoundError, Exception)):
             await admin_registry.session.create_from_params(
                 CreateFromParamsRequest(
                     session_name=f"test-cluster-{unique}",
-                    image=image_seed,
+                    image=image_name,
                     session_type=SessionTypes.INTERACTIVE,
                     cluster_size=3,
                     cluster_mode="multi-node",
@@ -411,7 +452,7 @@ class TestSessionCreation:
     async def test_creation_with_priority_and_preemptible_flags(
         self,
         admin_registry: BackendAIClientRegistry,
-        image_seed: str,
+        image_seed: tuple[uuid.UUID, str],
     ) -> None:
         """Creation with priority/preemptible flags validates request structure.
 
@@ -419,13 +460,14 @@ class TestSessionCreation:
         like priority and is_preemptible flags.
         Component test cannot verify actual scheduling (requires live agents).
         """
+        _, image_name = image_seed
         unique = secrets.token_hex(4)
         # This will fail due to no agents, but validates request structure
         with pytest.raises((NotFoundError, Exception)):
             await admin_registry.session.create_from_params(
                 CreateFromParamsRequest(
                     session_name=f"test-priority-{unique}",
-                    image=image_seed,
+                    image=image_name,
                     session_type=SessionTypes.INTERACTIVE,
                     priority=10,
                     is_preemptible=True,
@@ -436,7 +478,7 @@ class TestSessionCreation:
     async def test_creation_with_dependencies(
         self,
         admin_registry: BackendAIClientRegistry,
-        image_seed: str,
+        image_seed: tuple[uuid.UUID, str],
         dependency_session_seed: tuple[SessionId, str],
     ) -> None:
         """Creation with dependencies validates request structure.
@@ -445,6 +487,7 @@ class TestSessionCreation:
         to link sessions together.
         Component test cannot verify actual dependency linking (requires live agents).
         """
+        _, image_name = image_seed
         unique = secrets.token_hex(4)
         dep_id, _ = dependency_session_seed
         # This will fail due to no agents, but validates request structure
@@ -452,7 +495,7 @@ class TestSessionCreation:
             await admin_registry.session.create_from_params(
                 CreateFromParamsRequest(
                     session_name=f"test-dep-{unique}",
-                    image=image_seed,
+                    image=image_name,
                     session_type=SessionTypes.INTERACTIVE,
                     dependencies=[dep_id],
                     config={},
@@ -462,7 +505,7 @@ class TestSessionCreation:
     async def test_creation_with_bootstrap_script(
         self,
         admin_registry: BackendAIClientRegistry,
-        image_seed: str,
+        image_seed: tuple[uuid.UUID, str],
     ) -> None:
         """Creation with bootstrap script validates request structure.
 
@@ -470,6 +513,7 @@ class TestSessionCreation:
         for session initialization.
         Component test cannot verify actual bootstrap execution (requires live agents).
         """
+        _, image_name = image_seed
         unique = secrets.token_hex(4)
         bootstrap_script = "#!/bin/bash\necho 'Bootstrap'"
         # This will fail due to no agents, but validates request structure
@@ -477,7 +521,7 @@ class TestSessionCreation:
             await admin_registry.session.create_from_params(
                 CreateFromParamsRequest(
                     session_name=f"test-bootstrap-{unique}",
-                    image=image_seed,
+                    image=image_name,
                     session_type=SessionTypes.INTERACTIVE,
                     bootstrap_script=bootstrap_script,
                     config={},
@@ -487,7 +531,7 @@ class TestSessionCreation:
     async def test_creation_with_git_clone_config(
         self,
         admin_registry: BackendAIClientRegistry,
-        image_seed: str,
+        image_seed: tuple[uuid.UUID, str],
     ) -> None:
         """Creation with git clone config validates request structure.
 
@@ -495,6 +539,7 @@ class TestSessionCreation:
         for git clone operations during session startup.
         Component test cannot verify actual git clone (requires live agents).
         """
+        _, image_name = image_seed
         unique = secrets.token_hex(4)
         startup_command = "git clone https://github.com/example/repo.git /home/work/repo"
         # This will fail due to no agents, but validates request structure
@@ -502,7 +547,7 @@ class TestSessionCreation:
             await admin_registry.session.create_from_params(
                 CreateFromParamsRequest(
                     session_name=f"test-git-{unique}",
-                    image=image_seed,
+                    image=image_name,
                     session_type=SessionTypes.INTERACTIVE,
                     startup_command=startup_command,
                     config={},
@@ -513,7 +558,7 @@ class TestSessionCreation:
         self,
         admin_registry: BackendAIClientRegistry,
         user_fixture: UserFixtureData,
-        image_seed: str,
+        image_seed: tuple[uuid.UUID, str],
     ) -> None:
         """Owner delegation validates admin can create session for another user.
 
@@ -521,13 +566,14 @@ class TestSessionCreation:
         for admin to create sessions on behalf of other users.
         Component test cannot verify actual session ownership (requires live agents).
         """
+        _, image_name = image_seed
         unique = secrets.token_hex(4)
         # This will fail due to no agents, but validates request structure
         with pytest.raises((NotFoundError, Exception)):
             await admin_registry.session.create_from_params(
                 CreateFromParamsRequest(
                     session_name=f"test-delegated-{unique}",
-                    image=image_seed,
+                    image=image_name,
                     session_type=SessionTypes.INTERACTIVE,
                     owner_access_key=user_fixture.keypair.access_key,
                     config={},
@@ -554,7 +600,7 @@ class TestSessionCreation:
         self,
         admin_registry: BackendAIClientRegistry,
         running_session_seed: tuple[SessionId, str, uuid.UUID],
-        image_seed: str,
+        image_seed: tuple[uuid.UUID, str],
     ) -> None:
         """Session name already exists (reuse_if_exists=false) → 409 conflict.
 
@@ -562,13 +608,14 @@ class TestSessionCreation:
         and reuse_if_exists=False (or not specified), the API should return
         HTTP 409 conflict error.
         """
+        _, image_name = image_seed
         _, session_name, _ = running_session_seed
         # Try to create with same name, reuse_if_exists=False
         with pytest.raises(Exception) as exc_info:
             await admin_registry.session.create_from_params(
                 CreateFromParamsRequest(
                     session_name=session_name,
-                    image=image_seed,
+                    image=image_name,
                     session_type=SessionTypes.INTERACTIVE,
                     reuse_if_exists=False,
                     config={},
@@ -584,7 +631,7 @@ class TestSessionCreation:
         self,
         user_registry: BackendAIClientRegistry,
         admin_user_fixture: UserFixtureData,
-        image_seed: str,
+        image_seed: tuple[uuid.UUID, str],
     ) -> None:
         """Regular user insufficient role for admin operations → 403.
 
@@ -592,12 +639,13 @@ class TestSessionCreation:
         owner delegation (creating sessions for other users), the API should
         return HTTP 403 PermissionDeniedError.
         """
+        _, image_name = image_seed
         unique = secrets.token_hex(4)
         with pytest.raises(PermissionDeniedError):
             await user_registry.session.create_from_params(
                 CreateFromParamsRequest(
                     session_name=f"test-admin-op-{unique}",
-                    image=image_seed,
+                    image=image_name,
                     session_type=SessionTypes.INTERACTIVE,
                     owner_access_key=admin_user_fixture.keypair.access_key,
                     config={},
@@ -799,8 +847,13 @@ class TestSessionDestruction:
                     occupying_slots=ResourceSlot(),
                     requested_slots=ResourceSlot(),
                     created_at=now,
-                    # Link to parent session as dependency
-                    dependencies=[dep_id],
+                )
+            )
+            # Link dependent session to parent session via session_dependencies table
+            await conn.execute(
+                sa.insert(SessionDependencyRow.__table__).values(
+                    session_id=dependent_id,
+                    depends_on=dep_id,
                 )
             )
             await conn.execute(
