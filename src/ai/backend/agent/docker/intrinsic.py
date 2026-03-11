@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any, cast
 
 import aiohttp
-import async_timeout
 import psutil
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
@@ -72,6 +71,9 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # Note that psutil's linux implementation automatically filters out "non-device" filesystems by
 # checking /proc/filesystems so we don't have to put all the details virtual filesystems like
 # "sockfs", "debugfs", etc.
+_CONTAINER_STAT_TIMEOUT: float = 2.0
+
+# The list of pruned fstype when checking the filesystem usage statistics.
 pruned_disk_types = frozenset([
     "vfat",
     "lxcfs",
@@ -280,7 +282,7 @@ class CPUPlugin(AbstractComputePlugin):
         async def api_impl(container_id: str) -> float | None:
             container = DockerContainer(self._docker, id=container_id)
             try:
-                async with async_timeout.timeout(2.0):
+                async with asyncio.timeout(_CONTAINER_STAT_TIMEOUT):
                     ret = await fetch_api_stats(container)
             except TimeoutError:
                 return None
@@ -711,8 +713,16 @@ class MemoryPlugin(AbstractComputePlugin):
                 )
                 return None
             container = DockerContainer(self._docker, id=container_id)
-            data = await container.show()
-            sandbox_key = data["NetworkSettings"]["SandboxKey"]
+            try:
+                async with asyncio.timeout(_CONTAINER_STAT_TIMEOUT):
+                    data = await container.show()
+                    sandbox_key = data["NetworkSettings"]["SandboxKey"]
+            except TimeoutError:
+                log.warning(
+                    "MemoryPlugin: timeout reading container info for container {0}",
+                    container_id[:7],
+                )
+                return None
             net_rx_bytes = 0
             net_tx_bytes = 0
             if not sandbox_key:
@@ -732,7 +742,14 @@ class MemoryPlugin(AbstractComputePlugin):
                     )
                 else:
                     try:
-                        nstat = await netstat_ns(ns_path)
+                        async with asyncio.timeout(_CONTAINER_STAT_TIMEOUT):
+                            nstat = await netstat_ns(ns_path)
+                    except TimeoutError:
+                        log.warning(
+                            "MemoryPlugin: timeout reading net stats for container {0}",
+                            container_id[:7],
+                        )
+                        return None
                     except OSError as e:
                         log.warning(
                             "MemoryPlugin: cannot read net stats for container {0}: {1!r}",
@@ -762,7 +779,7 @@ class MemoryPlugin(AbstractComputePlugin):
         ) -> tuple[int, int, int, int, int, int, int] | None:
             container = DockerContainer(self._docker, id=container_id)
             try:
-                async with async_timeout.timeout(2.0):
+                async with asyncio.timeout(_CONTAINER_STAT_TIMEOUT):
                     ret = await fetch_api_stats(container)
             except TimeoutError:
                 return None
@@ -810,10 +827,17 @@ class MemoryPlugin(AbstractComputePlugin):
         tasks = []
         for cid in container_ids:
             tasks.append(asyncio.create_task(impl(cid)))
-        results = await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
         for cid, result in zip(container_ids, results, strict=True):
             if result is None:
                 continue
+            if isinstance(result, Exception):
+                log.warning(
+                    "gather_container_measures: error collecting stats for {}: {}", cid, result
+                )
+                continue
+            if isinstance(result, BaseException):
+                raise result
             per_container_mem_used_bytes[cid] = Measurement(
                 Decimal(result[0]), capacity=Decimal(result[1])
             )
