@@ -173,8 +173,8 @@ from .models.utils import (
     sql_json_merge,
 )
 from .models.vfolder import VFolderRow, verify_vfolder_name
-from .services.session.lifecycle import SessionLifecycleManager
 from .scheduler.types import KernelAgentBinding
+from .services.session.lifecycle import SessionLifecycleManager
 from .types import UserScope
 
 type MSetType = Mapping[str | bytes, bytes | float | int | str]
