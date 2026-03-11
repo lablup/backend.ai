@@ -61,7 +61,7 @@ class ReconcileDeploymentHandler(DeploymentHandler):
         """
         return DeploymentStatusTransitions(
             success=None,
-            need_retry=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
+            failure=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
         )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:

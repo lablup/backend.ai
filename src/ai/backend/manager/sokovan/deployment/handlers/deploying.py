@@ -178,9 +178,7 @@ class DeployingProgressingHandler(DeploymentHandler):
         ready = DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY)
         return DeploymentStatusTransitions(
             success=ready,
-            need_retry=ready,
-            expired=ready,
-            give_up=ready,
+            failure=ready,
         )
 
     @override

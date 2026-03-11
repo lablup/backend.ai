@@ -3,11 +3,13 @@
 import logging
 import uuid
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, DecimalException
 from typing import Any, cast
+from uuid import UUID
 
 import tomli
 from pydantic import HttpUrl
@@ -50,6 +52,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
+    DeploymentSubStep,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
@@ -118,6 +121,49 @@ deployment_repository_resilience = Resilience(
         ),
     ]
 )
+
+
+class StrategyTransaction:
+    """Stub for atomic strategy evaluation persistence operations.
+
+    Wraps a single database transaction and exposes high-level methods
+    for applying ``StrategyEvaluationSummary`` results to the database.
+    """
+
+    async def update_sub_steps(
+        self,
+        assignments: Mapping[UUID, DeploymentSubStep],
+    ) -> None:
+        """Update sub-step assignments for deployments."""
+        raise NotImplementedError
+
+    async def create_routes(
+        self,
+        rollout: BulkCreator[RoutingRow],
+    ) -> None:
+        """Create new routes for rollout."""
+        raise NotImplementedError
+
+    async def drain_routes(
+        self,
+        drain: BatchUpdater[RoutingRow],
+    ) -> None:
+        """Mark routes for draining."""
+        raise NotImplementedError
+
+    async def complete_deployment_revision_swap(
+        self,
+        completed_ids: set[UUID],
+    ) -> int:
+        """Swap revision for completed deployments. Returns number of swapped deployments."""
+        raise NotImplementedError
+
+    async def clear_deploying_revision(
+        self,
+        rolled_back_ids: set[UUID],
+    ) -> None:
+        """Clear deploying_revision for rolled-back deployments."""
+        raise NotImplementedError
 
 
 class DeploymentRepository:
@@ -1359,3 +1405,12 @@ class DeploymentRepository:
             DeploymentPolicySearchResult with items, total_count, and pagination info.
         """
         return await self._db_source.search_deployment_policies(querier)
+
+    @asynccontextmanager
+    async def begin_strategy_transaction(self) -> AsyncIterator[StrategyTransaction]:
+        """Begin a strategy transaction for atomic strategy evaluation persistence.
+
+        Yields a ``StrategyTransaction`` that provides methods for applying
+        sub_step assignments, route mutations, and revision swaps atomically.
+        """
+        yield StrategyTransaction()

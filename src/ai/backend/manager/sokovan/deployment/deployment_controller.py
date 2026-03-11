@@ -14,6 +14,7 @@ from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalin
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentPolicyData,
+    DeploymentSubStep,
     RouteInfo,
     RouteSearchResult,
     RouteTrafficStatus,
@@ -198,7 +199,11 @@ class DeploymentController:
             rule_id,
         )
 
-    async def mark_lifecycle_needed(self, lifecycle_type: DeploymentLifecycleType) -> None:
+    async def mark_lifecycle_needed(
+        self,
+        lifecycle_type: DeploymentLifecycleType,
+        sub_step: DeploymentSubStep | None = None,
+    ) -> None:
         """
         Mark that a deployment lifecycle operation is needed for the next cycle.
 
@@ -207,6 +212,7 @@ class DeploymentController:
 
         Args:
             lifecycle_type: Type of deployment lifecycle to mark as needed
+            sub_step: Optional sub-step within the lifecycle to mark as needed
         """
         await self._valkey_schedule.mark_deployment_needed(lifecycle_type.value)
         log.debug("Marked deployment lifecycle needed for type: {}", lifecycle_type.value)

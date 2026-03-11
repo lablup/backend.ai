@@ -60,9 +60,7 @@ class DestroyingDeploymentHandler(DeploymentHandler):
         destroyed = DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED)
         return DeploymentStatusTransitions(
             success=destroyed,
-            need_retry=destroyed,
-            expired=destroyed,
-            give_up=destroyed,
+            failure=destroyed,
         )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:

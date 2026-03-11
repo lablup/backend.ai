@@ -17,6 +17,7 @@ class DeploymentLifecycleType(StrEnum):
     SCALING = "scaling"
     RECONCILE = "reconcile"
     DESTROYING = "destroying"
+    DEPLOYING = "deploying"
 
 
 @dataclass
