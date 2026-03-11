@@ -150,10 +150,10 @@ def _associate_non_global_container_registries_to_scope(db_conn: Connection) -> 
 
 
 def _associate_global_container_registries_to_scope(db_conn: Connection) -> None:
-    """Associate global container registries to ALL project scopes.
+    """Associate global container registries to ALL domain scopes.
 
-    Global registries (is_global = true) are available to all projects.
-    Pages by registry IDs first, then CROSS JOINs with groups to get
+    Global registries (is_global = true) are available to all domains.
+    Pages by registry IDs first, then CROSS JOINs with domains to get
     all scope associations for each batch.
     """
     insert_query = sa.text("""
@@ -179,16 +179,16 @@ def _associate_global_container_registries_to_scope(db_conn: Connection) -> None
         entity_ids = [row.id for row in id_rows]
 
         assoc_query = sa.text("""
-            SELECT cr.id AS entity_id, g.id::text AS scope_id
+            SELECT cr.id AS entity_id, d.name AS scope_id
             FROM container_registries cr
-            CROSS JOIN groups g
+            CROSS JOIN domains d
             WHERE cr.id = ANY(:entity_ids)
         """)
         rows = db_conn.execute(assoc_query, {"entity_ids": entity_ids}).all()
 
         values_list = [
             {
-                "scope_type": "project",
+                "scope_type": "domain",
                 "scope_id": row.scope_id,
                 "entity_type": ENTITY_TYPE_CONTAINER_REGISTRY,
                 "entity_id": str(row.entity_id),
