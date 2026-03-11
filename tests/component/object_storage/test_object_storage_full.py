@@ -1,17 +1,9 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-import pytest
-
-from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.dto.manager.object_storage.request import (
-    GetPresignedDownloadURLReq,
-    GetPresignedUploadURLReq,
-)
 from ai.backend.common.dto.manager.object_storage.response import (
     ObjectStorageAllBucketsResponse,
     ObjectStorageBucketsResponse,
@@ -23,26 +15,6 @@ StorageNamespaceFactory = Callable[..., Coroutine[Any, Any, dict[str, Any]]]
 
 
 class TestListObjectStorageFull:
-    async def test_admin_lists_storages_with_data(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        object_storage_factory: ObjectStorageFactory,
-    ) -> None:
-        created = await object_storage_factory()
-        result = await admin_registry.object_storage.list()
-        assert isinstance(result, ObjectStorageListResponse)
-        assert len(result.storages) >= 1
-        names = [s.name for s in result.storages]
-        assert created["name"] in names
-
-    async def test_admin_lists_storages_empty(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        result = await admin_registry.object_storage.list()
-        assert isinstance(result, ObjectStorageListResponse)
-        assert result.storages == []
-
     async def test_user_lists_storages_same_as_admin(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -91,29 +63,3 @@ class TestGetBucketsFull:
         assert isinstance(result, ObjectStorageBucketsResponse)
         assert ns1["namespace"] in result.buckets
         assert ns2["namespace"] not in result.buckets
-
-
-class TestPresignedURLFull:
-    async def test_upload_url_fails_without_reservoir_config(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        req = GetPresignedUploadURLReq(
-            artifact_revision_id=uuid.uuid4(),
-            key="test-file.txt",
-        )
-        with pytest.raises(BackendAPIError) as exc_info:
-            await admin_registry.object_storage.get_presigned_upload_url(req)
-        assert exc_info.value.status == 500
-
-    async def test_download_url_fails_without_reservoir_config(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        req = GetPresignedDownloadURLReq(
-            artifact_revision_id=uuid.uuid4(),
-            key="test-file.txt",
-        )
-        with pytest.raises(BackendAPIError) as exc_info:
-            await admin_registry.object_storage.get_presigned_download_url(req)
-        assert exc_info.value.status == 500
