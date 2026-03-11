@@ -22,6 +22,7 @@ from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.group.request import SearchGroupsRequest
 from ai.backend.common.dto.manager.group.response import (
     DeleteGroupResponse,
+    PurgeGroupResponse,
     SearchGroupsResponse,
 )
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
@@ -307,10 +308,24 @@ class TestGroupPurge:
         db_engine: SAEngine,
     ) -> None:
         """S-1: Admin hard purges group → group removed from DB."""
-        # Purge via action (would need GraphQL or processor call)
-        # For now, this is xfail as purge is not exposed via REST
-        # TODO: Implement when purge action is exposed
-        pass
+        # Verify group exists before purge
+        group = await admin_registry.group.get(test_group_for_deletion)
+        assert group.group.id == test_group_for_deletion
+
+        # Purge the group
+        result = await admin_registry.group.purge(test_group_for_deletion)
+        assert isinstance(result, PurgeGroupResponse)
+        assert result.purged is True
+
+        # Verify group is completely removed from DB
+        async with db_engine.begin() as conn:
+            query_result = await conn.execute(
+                sa.select(GroupRow.__table__).where(
+                    GroupRow.__table__.c.id == test_group_for_deletion
+                )
+            )
+            row = query_result.fetchone()
+            assert row is None, "Group should be completely removed from DB after purge"
 
     @pytest.mark.xfail(
         strict=True,
@@ -323,8 +338,10 @@ class TestGroupPurge:
         group_with_vfolder_mounted: uuid.UUID,
     ) -> None:
         """F-BIZ-1: Purge group with vfolder mounts → blocked with error."""
-        # Would call purge action and expect ProjectHasVFoldersMountedError
-        pass
+        with pytest.raises(BackendAPIError) as exc_info:
+            await admin_registry.group.purge(group_with_vfolder_mounted)
+        # Verify error indicates vfolder mount blocking
+        assert exc_info.value.status in (400, 409)  # Bad Request or Conflict
 
     @pytest.mark.xfail(
         strict=True,
@@ -337,8 +354,10 @@ class TestGroupPurge:
         group_with_active_kernel: uuid.UUID,
     ) -> None:
         """F-BIZ-2: Purge group with active kernels → blocked with error."""
-        # Would call purge action and expect ProjectHasActiveKernelsError
-        pass
+        with pytest.raises(BackendAPIError) as exc_info:
+            await admin_registry.group.purge(group_with_active_kernel)
+        # Verify error indicates active kernel blocking
+        assert exc_info.value.status in (400, 409)  # Bad Request or Conflict
 
     @pytest.mark.xfail(
         strict=True,
@@ -351,8 +370,10 @@ class TestGroupPurge:
         group_with_active_endpoint: uuid.UUID,
     ) -> None:
         """F-BIZ-3: Purge group with active endpoints → blocked with error."""
-        # Would call purge action and expect ProjectHasActiveEndpointsError
-        pass
+        with pytest.raises(BackendAPIError) as exc_info:
+            await admin_registry.group.purge(group_with_active_endpoint)
+        # Verify error indicates active endpoint blocking
+        assert exc_info.value.status in (400, 409)  # Bad Request or Conflict
 
 
 class TestGroupSearch:
