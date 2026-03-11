@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from http import HTTPStatus
 
-from aiohttp import web
-
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
@@ -109,7 +107,7 @@ class DeploymentAPIHandler:
     def __init__(
         self,
         *,
-        deployment: DeploymentProcessors | None,
+        deployment: DeploymentProcessors,
     ) -> None:
         self._deployment = deployment
         self._deployment_adapter = DeploymentAdapter()
@@ -119,14 +117,6 @@ class DeploymentAPIHandler:
         self._policy_adapter = DeploymentPolicyAdapter()
         self._add_revision_adapter = AddRevisionAdapter()
 
-    def _get_deployment_processors(self) -> DeploymentProcessors:
-        """Get deployment processors, raising ServiceUnavailable if not available."""
-        if self._deployment is None:
-            raise web.HTTPServiceUnavailable(
-                reason="Deployment service is not available on this manager"
-            )
-        return self._deployment
-
     # Deployment Endpoints
 
     async def create_deployment(
@@ -135,8 +125,6 @@ class DeploymentAPIHandler:
         user_ctx: UserContext,
     ) -> APIResponse:
         """Create a new deployment."""
-        deployment_processors = self._get_deployment_processors()
-
         # Build creator from request using adapter
         creator = self._create_deployment_adapter.build_creator(
             body.parsed,
@@ -144,7 +132,7 @@ class DeploymentAPIHandler:
         )
 
         # Call service action
-        action_result = await deployment_processors.create_deployment.wait_for_complete(
+        action_result = await self._deployment.create_deployment.wait_for_complete(
             CreateDeploymentAction(creator=creator)
         )
 
@@ -159,13 +147,11 @@ class DeploymentAPIHandler:
         body: BodyParam[SearchDeploymentsRequest],
     ) -> APIResponse:
         """Search deployments with filters, orders, and pagination."""
-        deployment_processors = self._get_deployment_processors()
-
         # Build querier using adapter
         querier = self._deployment_adapter.build_querier(body.parsed)
 
         # Call service action
-        action_result = await deployment_processors.search_deployments.wait_for_complete(
+        action_result = await self._deployment.search_deployments.wait_for_complete(
             SearchDeploymentsAction(querier=querier)
         )
 
@@ -187,10 +173,8 @@ class DeploymentAPIHandler:
         path: PathParam[DeploymentPathParam],
     ) -> APIResponse:
         """Get a specific deployment."""
-        deployment_processors = self._get_deployment_processors()
-
         # Call service action - raises EndpointNotFound if not found
-        action_result = await deployment_processors.get_deployment_by_id.wait_for_complete(
+        action_result = await self._deployment.get_deployment_by_id.wait_for_complete(
             GetDeploymentByIdAction(deployment_id=path.parsed.deployment_id)
         )
 
@@ -206,8 +190,6 @@ class DeploymentAPIHandler:
         body: BodyParam[UpdateDeploymentRequest],
     ) -> APIResponse:
         """Update an existing deployment."""
-        deployment_processors = self._get_deployment_processors()
-
         # Build sub-specs only if fields are provided
         metadata_spec: DeploymentMetadataUpdaterSpec | None = None
         if body.parsed.name is not None:
@@ -231,7 +213,7 @@ class DeploymentAPIHandler:
         )
 
         # Call service action
-        action_result = await deployment_processors.update_deployment.wait_for_complete(
+        action_result = await self._deployment.update_deployment.wait_for_complete(
             UpdateDeploymentAction(updater=updater)
         )
 
@@ -246,10 +228,8 @@ class DeploymentAPIHandler:
         path: PathParam[DeploymentPathParam],
     ) -> APIResponse:
         """Destroy a deployment."""
-        deployment_processors = self._get_deployment_processors()
-
         # Call service action
-        action_result = await deployment_processors.destroy_deployment.wait_for_complete(
+        action_result = await self._deployment.destroy_deployment.wait_for_complete(
             DestroyDeploymentAction(endpoint_id=path.parsed.deployment_id)
         )
 
@@ -265,13 +245,11 @@ class DeploymentAPIHandler:
         body: BodyParam[AddRevisionRequest],
     ) -> APIResponse:
         """Add a new revision to an existing deployment."""
-        deployment_processors = self._get_deployment_processors()
-
         # Build revision creator from request using adapter
         revision_creator = self._add_revision_adapter.build_revision_creator(body.parsed.revision)
 
         # Call service action
-        action_result = await deployment_processors.add_model_revision.wait_for_complete(
+        action_result = await self._deployment.add_model_revision.wait_for_complete(
             AddModelRevisionAction(
                 model_deployment_id=path.parsed.deployment_id,
                 adder=revision_creator,
@@ -290,8 +268,6 @@ class DeploymentAPIHandler:
         body: BodyParam[SearchRevisionsRequest],
     ) -> APIResponse:
         """Search revisions for a deployment with filters, orders, and pagination."""
-        deployment_processors = self._get_deployment_processors()
-
         # Build querier using adapter, adding deployment filter
         if body.parsed.filter is None:
             body.parsed.filter = RevisionFilter(deployment_id=path.parsed.deployment_id)
@@ -301,7 +277,7 @@ class DeploymentAPIHandler:
         querier = self._revision_adapter.build_querier(body.parsed)
 
         # Call service action
-        action_result = await deployment_processors.search_revisions.wait_for_complete(
+        action_result = await self._deployment.search_revisions.wait_for_complete(
             SearchRevisionsAction(querier=querier)
         )
 
@@ -321,10 +297,8 @@ class DeploymentAPIHandler:
         path: PathParam[RevisionPathParam],
     ) -> APIResponse:
         """Get a specific revision."""
-        deployment_processors = self._get_deployment_processors()
-
         # Call service action - raises DeploymentRevisionNotFound if not found
-        action_result = await deployment_processors.get_revision_by_id.wait_for_complete(
+        action_result = await self._deployment.get_revision_by_id.wait_for_complete(
             GetRevisionByIdAction(revision_id=path.parsed.revision_id)
         )
 
@@ -339,10 +313,8 @@ class DeploymentAPIHandler:
         path: PathParam[RevisionPathParam],
     ) -> APIResponse:
         """Activate a revision to make it the current active revision."""
-        deployment_processors = self._get_deployment_processors()
-
         # Call service action
-        await deployment_processors.activate_revision.wait_for_complete(
+        await self._deployment.activate_revision.wait_for_complete(
             ActivateRevisionAction(
                 deployment_id=path.parsed.deployment_id,
                 revision_id=path.parsed.revision_id,
@@ -371,8 +343,6 @@ class DeploymentAPIHandler:
         body: BodyParam[SearchRoutesRequest],
     ) -> APIResponse:
         """Search routes for a deployment with filters, orders, and pagination."""
-        deployment_processors = self._get_deployment_processors()
-
         # Build querier using adapter, adding deployment filter
         if body.parsed.filter is None:
             body.parsed.filter = RouteFilter(deployment_id=path.parsed.deployment_id)
@@ -382,7 +352,7 @@ class DeploymentAPIHandler:
         querier = self._route_adapter.build_querier(body.parsed)
 
         # Call service action
-        action_result = await deployment_processors.search_routes.wait_for_complete(
+        action_result = await self._deployment.search_routes.wait_for_complete(
             SearchRoutesAction(querier=querier)
         )
 
@@ -403,13 +373,11 @@ class DeploymentAPIHandler:
         body: BodyParam[UpdateRouteTrafficStatusRequest],
     ) -> APIResponse:
         """Update traffic status of a route."""
-        deployment_processors = self._get_deployment_processors()
-
         # Convert common type to manager type
         manager_traffic_status = ManagerRouteTrafficStatus(body.parsed.traffic_status.value)
 
         # Call service action
-        action_result = await deployment_processors.update_route_traffic_status.wait_for_complete(
+        action_result = await self._deployment.update_route_traffic_status.wait_for_complete(
             UpdateRouteTrafficStatusAction(
                 route_id=path.parsed.route_id,
                 traffic_status=manager_traffic_status,
@@ -433,11 +401,10 @@ class DeploymentAPIHandler:
 
         Uses PostgreSQL ON CONFLICT to atomically insert or update.
         """
-        deployment_processors = self._get_deployment_processors()
         upserter = self._policy_adapter.build_upserter(
             body.parsed, deployment_id=path.parsed.deployment_id
         )
-        result = await deployment_processors.upsert_deployment_policy.wait_for_complete(
+        result = await self._deployment.upsert_deployment_policy.wait_for_complete(
             UpsertDeploymentPolicyAction(upserter=upserter)
         )
         resp = UpsertDeploymentPolicyResponse(
@@ -452,9 +419,7 @@ class DeploymentAPIHandler:
         path: PathParam[DeploymentPolicyPathParam],
     ) -> APIResponse:
         """Get a deployment policy for a deployment."""
-        deployment_processors = self._get_deployment_processors()
-
-        action_result = await deployment_processors.get_deployment_policy.wait_for_complete(
+        action_result = await self._deployment.get_deployment_policy.wait_for_complete(
             GetDeploymentPolicyAction(endpoint_id=path.parsed.deployment_id)
         )
 

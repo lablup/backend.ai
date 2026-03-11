@@ -446,7 +446,7 @@ class Processors(AbstractProcessorPackage):
             *self.artifact_registry.supported_actions(),
             *self.artifact_revision.supported_actions(),
             *self.artifact.supported_actions(),
-            *(self.deployment.supported_actions() if self.deployment else []),
+            *self.deployment.supported_actions(),
             *self.storage_namespace.supported_actions(),
             *self.audit_log.supported_actions(),
             *self.scheduling_history.supported_actions(),
