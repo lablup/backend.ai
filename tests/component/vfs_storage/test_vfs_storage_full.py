@@ -3,6 +3,7 @@
 Tests create, get by ID/name, search, update, and delete operations
 through the VFSStorageProcessors layer with a real database.
 Verifies HTTP API visibility where applicable (list/get by name).
+Quota management tests use AsyncMock of StorageProxyManagerFacingClient.
 """
 
 from __future__ import annotations
@@ -10,8 +11,12 @@ from __future__ import annotations
 from collections.abc import Callable, Coroutine
 from pathlib import Path
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
@@ -27,6 +32,15 @@ from ai.backend.manager.services.vfs_storage.actions import (
     ListVFSStorageAction,
     SearchVFSStoragesAction,
     UpdateVFSStorageAction,
+)
+from ai.backend.manager.services.vfs_storage.actions.get_quota_scope import (
+    GetQuotaScopeAction,
+)
+from ai.backend.manager.services.vfs_storage.actions.set_quota_scope import (
+    SetQuotaScopeAction,
+)
+from ai.backend.manager.services.vfs_storage.actions.unset_quota_scope import (
+    UnsetQuotaScopeAction,
 )
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.types import OptionalState
@@ -224,3 +238,93 @@ class TestVFSStorageCRUD:
         # Verify deleted via list
         list_after = await admin_registry.storage.list_vfs_storages()
         assert "lifecycle-test" not in [s.name for s in list_after.storages]
+
+
+class TestVFSStorageQuota:
+    """Quota get/set/unset tests with mocked storage-proxy client.
+
+    Uses AsyncMock of StorageProxyManagerFacingClient instead of xfail,
+    since no live storage-proxy is available in component tests.
+    """
+
+    @pytest.fixture()
+    def mock_storage_proxy_client(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        storage_manager: StorageSessionManager,
+    ) -> AsyncMock:
+        """Configure storage_manager mock with a mock manager-facing client."""
+        mock_client = AsyncMock()
+        monkeypatch.setattr(
+            StorageSessionManager,
+            "get_proxy_and_volume",
+            MagicMock(return_value=("proxy1", "volume1")),
+        )
+        storage_manager.get_manager_facing_client.return_value = mock_client
+        return mock_client
+
+    async def test_get_quota_scope(
+        self,
+        vfs_storage_processors: VFSStorageProcessors,
+        mock_storage_proxy_client: AsyncMock,
+    ) -> None:
+        """Get quota via storage-proxy mock returns used_bytes/limit_bytes."""
+        mock_storage_proxy_client.get_quota_scope.return_value = {
+            "used_bytes": 1024,
+            "limit_bytes": 4096,
+        }
+
+        action = GetQuotaScopeAction(
+            storage_host_name="proxy1:volume1",
+            quota_scope_id="scope-1",
+        )
+        result = await vfs_storage_processors.get_quota_scope.wait_for_complete(action)
+
+        assert result.quota_scope_id == "scope-1"
+        assert result.storage_host_name == "proxy1:volume1"
+        assert result.usage_bytes == 1024
+        assert result.hard_limit_bytes == 4096
+        mock_storage_proxy_client.get_quota_scope.assert_called_once_with("volume1", "scope-1")
+
+    async def test_set_quota_scope(
+        self,
+        vfs_storage_processors: VFSStorageProcessors,
+        mock_storage_proxy_client: AsyncMock,
+    ) -> None:
+        """Set quota via storage-proxy mock updates quota limit."""
+        mock_storage_proxy_client.get_quota_scope.return_value = {
+            "used_bytes": 512,
+            "limit_bytes": 8192,
+        }
+
+        action = SetQuotaScopeAction(
+            storage_host_name="proxy1:volume1",
+            quota_scope_id="scope-1",
+            hard_limit_bytes=8192,
+        )
+        result = await vfs_storage_processors.set_quota_scope.wait_for_complete(action)
+
+        assert result.quota_scope_id == "scope-1"
+        assert result.usage_bytes == 512
+        assert result.hard_limit_bytes == 8192
+        mock_storage_proxy_client.update_quota_scope.assert_called_once_with(
+            "volume1", "scope-1", 8192
+        )
+
+    async def test_unset_quota_scope(
+        self,
+        vfs_storage_processors: VFSStorageProcessors,
+        mock_storage_proxy_client: AsyncMock,
+    ) -> None:
+        """Unset quota via storage-proxy mock removes quota limit."""
+        action = UnsetQuotaScopeAction(
+            storage_host_name="proxy1:volume1",
+            quota_scope_id="scope-1",
+        )
+        result = await vfs_storage_processors.unset_quota_scope.wait_for_complete(action)
+
+        assert result.quota_scope_id == "scope-1"
+        assert result.storage_host_name == "proxy1:volume1"
+        mock_storage_proxy_client.delete_quota_scope_quota.assert_called_once_with(
+            "volume1", "scope-1"
+        )
