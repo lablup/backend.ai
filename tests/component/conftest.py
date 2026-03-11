@@ -901,6 +901,7 @@ class _TestConfigProvider(ManagerConfigProvider):
                 SlotName("mem"): SlotTypes("bytes"),
             }
         )
+        mock_etcd_loader.get_raw = AsyncMock(return_value="true")
         mock_etcd_loader.update_manager_status = AsyncMock()
         mock_etcd_loader.get_manager_nodes_info = AsyncMock(return_value={})
         mock_etcd_loader.register_myself = AsyncMock()

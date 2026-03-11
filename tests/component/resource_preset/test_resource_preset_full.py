@@ -1,9 +1,12 @@
-"""Component tests for Resource Preset CRUD lifecycle.
+"""Component tests for Resource Preset CRUD lifecycle and check_presets.
 
 Tests create, list (get), modify, and delete operations through the
 service/processor layer with a real database.  List/get verification
 also goes through the HTTP API via the SDK client to confirm end-to-end
 serialization.
+
+TestCheckPresets verifies the check_presets endpoint returns presets with
+allocatability flags and resource limits/occupancy for keypair and group scopes.
 """
 
 from __future__ import annotations
@@ -13,7 +16,11 @@ from collections.abc import Callable, Coroutine
 from typing import Any
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.dto.manager.infra import ListPresetsResponse
+from ai.backend.common.dto.manager.infra import (
+    CheckPresetsRequest,
+    CheckPresetsResponse,
+    ListPresetsResponse,
+)
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.repositories.base.creator import Creator
@@ -73,7 +80,7 @@ class TestPresetCRUD:
                 )
             )
         )
-        result = await processors.create_preset(action)
+        result = await processors.create_preset.wait_for_complete(action)
         return result.resource_preset
 
     async def _list_presets_via_processor(
@@ -87,7 +94,7 @@ class TestPresetCRUD:
             access_key=access_key,
             scaling_group=scaling_group,
         )
-        result = await processors.list_presets(action)
+        result = await processors.list_presets.wait_for_complete(action)
         return result.presets
 
     # ------------------------------------------------------------------
@@ -202,7 +209,9 @@ class TestPresetCRUD:
             id=preset.id,
             name=None,
         )
-        modify_result = await resource_preset_processors.modify_preset(modify_action)
+        modify_result = await resource_preset_processors.modify_preset.wait_for_complete(
+            modify_action
+        )
         assert isinstance(modify_result, ModifyResourcePresetActionResult)
         assert modify_result.resource_preset.name == "crud-modify-s5-new"
 
@@ -237,7 +246,9 @@ class TestPresetCRUD:
             id=preset.id,
             name=None,
         )
-        modify_result = await resource_preset_processors.modify_preset(modify_action)
+        modify_result = await resource_preset_processors.modify_preset.wait_for_complete(
+            modify_action
+        )
         assert modify_result.resource_preset.resource_slots["cpu"] is not None
 
         # Verify via SDK
@@ -265,7 +276,9 @@ class TestPresetCRUD:
             id=preset.id,
             name=None,
         )
-        delete_result = await resource_preset_processors.delete_preset(delete_action)
+        delete_result = await resource_preset_processors.delete_preset.wait_for_complete(
+            delete_action
+        )
         assert isinstance(delete_result, DeleteResourcePresetActionResult)
         assert delete_result.resource_preset.name == "crud-delete-s7"
 
@@ -290,7 +303,9 @@ class TestPresetCRUD:
             id=None,
             name="crud-delete-s8",
         )
-        delete_result = await resource_preset_processors.delete_preset(delete_action)
+        delete_result = await resource_preset_processors.delete_preset.wait_for_complete(
+            delete_action
+        )
         assert delete_result.resource_preset.name == "crud-delete-s8"
 
         # Verify removal via SDK
@@ -298,63 +313,202 @@ class TestPresetCRUD:
         names = [p["name"] for p in result.presets]
         assert "crud-delete-s8" not in names
 
+
+class TestCheckPresets:
+    """Tests for check_presets with resource policy matching.
+
+    Verifies that the check_presets endpoint returns presets with
+    allocatability flags and resource limit/occupancy data for
+    keypair and group scopes.
+    """
+
     # ------------------------------------------------------------------
-    # FULL LIFECYCLE
+    # helpers
     # ------------------------------------------------------------------
 
-    async def test_s9_full_crud_lifecycle(
+    async def _create_preset(
+        self,
+        processors: ResourcePresetProcessors,
+        *,
+        name: str | None = None,
+        resource_slots: ResourceSlot | None = None,
+    ) -> ResourcePresetData:
+        """Create a preset through the processor and return the data."""
+        if name is None:
+            name = f"test-check-{uuid.uuid4().hex[:8]}"
+        if resource_slots is None:
+            resource_slots = ResourceSlot({"cpu": "2", "mem": "2147483648"})
+
+        action = CreateResourcePresetAction(
+            creator=Creator(
+                spec=ResourcePresetCreatorSpec(
+                    name=name,
+                    resource_slots=resource_slots,
+                    shared_memory=None,
+                    scaling_group_name=None,
+                )
+            )
+        )
+        result = await processors.create_preset.wait_for_complete(action)
+        return result.resource_preset
+
+    # ------------------------------------------------------------------
+    # check_presets: allocatability
+    # ------------------------------------------------------------------
+
+    async def test_s1_check_presets_returns_preset_with_allocatable(
         self,
         resource_preset_processors: ResourcePresetProcessors,
         admin_registry: BackendAIClientRegistry,
+        group_name_fixture: str,
         database_fixture: None,
     ) -> None:
-        """S-9: Create → List → Modify → List → Delete → List (full lifecycle)."""
-        # CREATE
-        preset = await self._create_preset(
+        """S-1: Created preset appears in check_presets with allocatable flag."""
+        await self._create_preset(
             resource_preset_processors,
-            name="crud-lifecycle-s9",
-            resource_slots=ResourceSlot({"cpu": "2", "mem": "2147483648"}),
+            name="check-s1-preset",
+            resource_slots=ResourceSlot({"cpu": "4", "mem": "4294967296"}),
         )
-        assert preset.id is not None
 
-        # LIST - visible
-        result = await admin_registry.infra.list_presets()
-        names = [p["name"] for p in result.presets]
-        assert "crud-lifecycle-s9" in names
-
-        # MODIFY
-        modify_action = ModifyResourcePresetAction(
-            updater=Updater(
-                spec=ResourcePresetUpdaterSpec(
-                    name=OptionalState.update("crud-lifecycle-s9-modified"),
-                    resource_slots=OptionalState.update(
-                        ResourceSlot({"cpu": "4", "mem": "4294967296"})
-                    ),
-                ),
-                pk_value=preset.id,
-            ),
-            id=preset.id,
-            name=None,
+        result = await admin_registry.infra.check_presets(
+            CheckPresetsRequest(group=group_name_fixture)
         )
-        await resource_preset_processors.modify_preset(modify_action)
+        assert isinstance(result, CheckPresetsResponse)
+        preset_names = [p["name"] for p in result.presets]
+        assert "check-s1-preset" in preset_names
 
-        # LIST - verify modification
-        result = await admin_registry.infra.list_presets()
-        names = [p["name"] for p in result.presets]
-        assert "crud-lifecycle-s9-modified" in names
-        assert "crud-lifecycle-s9" not in names
+        our_preset = next(p for p in result.presets if p["name"] == "check-s1-preset")
+        assert "allocatable" in our_preset
+        assert isinstance(our_preset["allocatable"], bool)
 
-        presets_by_name = {p["name"]: p for p in result.presets}
-        assert presets_by_name["crud-lifecycle-s9-modified"]["resource_slots"]["cpu"] == "4"
-
-        # DELETE
-        delete_action = DeleteResourcePresetAction(
-            id=preset.id,
-            name=None,
+    async def test_s2_check_presets_no_agents_not_allocatable(
+        self,
+        resource_preset_processors: ResourcePresetProcessors,
+        admin_registry: BackendAIClientRegistry,
+        group_name_fixture: str,
+        database_fixture: None,
+    ) -> None:
+        """S-2: Without agents, presets should not be allocatable."""
+        await self._create_preset(
+            resource_preset_processors,
+            name="check-s2-no-agents",
         )
-        await resource_preset_processors.delete_preset(delete_action)
 
-        # LIST - verify deletion
-        result = await admin_registry.infra.list_presets()
-        names = [p["name"] for p in result.presets]
-        assert "crud-lifecycle-s9-modified" not in names
+        result = await admin_registry.infra.check_presets(
+            CheckPresetsRequest(group=group_name_fixture)
+        )
+        our_preset = next(p for p in result.presets if p["name"] == "check-s2-no-agents")
+        assert our_preset["allocatable"] is False
+
+    # ------------------------------------------------------------------
+    # check_presets: resource limits and occupancy
+    # ------------------------------------------------------------------
+
+    async def test_s3_check_presets_keypair_resource_limits(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        group_name_fixture: str,
+        database_fixture: None,
+    ) -> None:
+        """S-3: Response contains keypair resource limits and occupancy as dicts."""
+        result = await admin_registry.infra.check_presets(
+            CheckPresetsRequest(group=group_name_fixture)
+        )
+        assert isinstance(result.keypair_limits, dict)
+        assert isinstance(result.keypair_using, dict)
+        assert isinstance(result.keypair_remaining, dict)
+
+    async def test_s4_check_presets_group_resource_limits(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        group_name_fixture: str,
+        database_fixture: None,
+    ) -> None:
+        """S-4: Response contains group resource limits and occupancy as dicts."""
+        result = await admin_registry.infra.check_presets(
+            CheckPresetsRequest(group=group_name_fixture)
+        )
+        assert isinstance(result.group_limits, dict)
+        assert isinstance(result.group_using, dict)
+        assert isinstance(result.group_remaining, dict)
+
+    async def test_s5_check_presets_scaling_group_data(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        group_name_fixture: str,
+        database_fixture: None,
+    ) -> None:
+        """S-5: Response contains scaling group remaining and per-SG breakdown."""
+        result = await admin_registry.infra.check_presets(
+            CheckPresetsRequest(group=group_name_fixture)
+        )
+        assert isinstance(result.scaling_group_remaining, dict)
+        assert isinstance(result.scaling_groups, dict)
+
+    async def test_s6_check_presets_with_scaling_group_filter(
+        self,
+        resource_preset_processors: ResourcePresetProcessors,
+        admin_registry: BackendAIClientRegistry,
+        group_name_fixture: str,
+        scaling_group_fixture: str,
+        database_fixture: None,
+    ) -> None:
+        """S-6: check_presets with scaling_group filter returns only that SG."""
+        await self._create_preset(
+            resource_preset_processors,
+            name="check-s6-sg-filter",
+        )
+
+        result = await admin_registry.infra.check_presets(
+            CheckPresetsRequest(
+                group=group_name_fixture,
+                scaling_group=scaling_group_fixture,
+            )
+        )
+        assert isinstance(result, CheckPresetsResponse)
+        assert isinstance(result.presets, list)
+        # When filtered, scaling_groups should contain only the specified SG
+        if result.scaling_groups:
+            assert scaling_group_fixture in result.scaling_groups
+            assert len(result.scaling_groups) == 1
+
+    async def test_s7_check_presets_no_sessions_zero_usage(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        group_name_fixture: str,
+        database_fixture: None,
+    ) -> None:
+        """S-7: With no active sessions, keypair and group usage should be zero-valued."""
+        result = await admin_registry.infra.check_presets(
+            CheckPresetsRequest(group=group_name_fixture)
+        )
+        # Usage values should all be "0" (no sessions running)
+        for slot_value in result.keypair_using.values():
+            assert slot_value == "0"
+        for slot_value in result.group_using.values():
+            # Group using might be "0" or NaN (if group_resource_visibility is False)
+            assert slot_value in ("0", "NaN")
+
+    async def test_s8_check_presets_preset_contains_resource_slots(
+        self,
+        resource_preset_processors: ResourcePresetProcessors,
+        admin_registry: BackendAIClientRegistry,
+        group_name_fixture: str,
+        database_fixture: None,
+    ) -> None:
+        """S-8: Each preset in check_presets response contains id, name, resource_slots."""
+        await self._create_preset(
+            resource_preset_processors,
+            name="check-s8-fields",
+            resource_slots=ResourceSlot({"cpu": "8", "mem": "8589934592"}),
+        )
+
+        result = await admin_registry.infra.check_presets(
+            CheckPresetsRequest(group=group_name_fixture)
+        )
+        our_preset = next(p for p in result.presets if p["name"] == "check-s8-fields")
+        assert "id" in our_preset
+        assert "name" in our_preset
+        assert "resource_slots" in our_preset
+        assert "allocatable" in our_preset
+        assert our_preset["resource_slots"]["cpu"] == "8"
