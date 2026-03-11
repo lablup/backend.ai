@@ -157,6 +157,13 @@ class DeploymentSubStatus(enum.StrEnum):
     """
 
 
+class DeploymentSubStep(DeploymentSubStatus):
+    """Sub-steps for the DEPLOYING lifecycle phase."""
+
+    PROVISIONING = "provisioning"
+    PROGRESSING = "progressing"
+
+
 @dataclass(frozen=True)
 class DeploymentLifecycleStatus:
     """Target lifecycle state for a deployment status transition.

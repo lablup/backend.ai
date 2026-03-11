@@ -14,6 +14,7 @@ from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalin
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentPolicyData,
+    DeploymentSubStep,
     RouteInfo,
     RouteSearchResult,
     RouteTrafficStatus,
@@ -29,7 +30,6 @@ from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators.endpoint import LegacyEndpointCreatorSpec
 from ai.backend.manager.repositories.deployment.options import RouteConditions
 from ai.backend.manager.repositories.deployment.updaters import (
-    DeploymentPolicyUpdaterSpec,
     DeploymentUpdaterSpec,
     RouteUpdaterSpec,
 )
@@ -199,7 +199,11 @@ class DeploymentController:
             rule_id,
         )
 
-    async def mark_lifecycle_needed(self, lifecycle_type: DeploymentLifecycleType) -> None:
+    async def mark_lifecycle_needed(
+        self,
+        lifecycle_type: DeploymentLifecycleType,
+        sub_step: DeploymentSubStep | None = None,
+    ) -> None:
         """
         Mark that a deployment lifecycle operation is needed for the next cycle.
 
@@ -208,6 +212,7 @@ class DeploymentController:
 
         Args:
             lifecycle_type: Type of deployment lifecycle to mark as needed
+            sub_step: Optional sub-step within the lifecycle to mark as needed
         """
         await self._valkey_schedule.mark_deployment_needed(lifecycle_type.value)
         log.debug("Marked deployment lifecycle needed for type: {}", lifecycle_type.value)
@@ -227,26 +232,6 @@ class DeploymentController:
             DeploymentPolicyData: Policy data
         """
         return await self._deployment_repository.get_deployment_policy(endpoint_id)
-
-    async def update_deployment_policy(
-        self,
-        endpoint_id: uuid.UUID,
-        updater_spec: DeploymentPolicyUpdaterSpec,
-    ) -> DeploymentPolicyData:
-        """Update the deployment policy for an endpoint.
-
-        Args:
-            endpoint_id: ID of the endpoint
-            updater_spec: Policy update specification
-
-        Returns:
-            DeploymentPolicyData: Updated policy data
-        """
-        # First get the policy to find its ID (primary key)
-        policy = await self._deployment_repository.get_deployment_policy(endpoint_id)
-        return await self._deployment_repository.update_deployment_policy(
-            Updater(spec=updater_spec, pk_value=policy.id)
-        )
 
     # Route operations
 

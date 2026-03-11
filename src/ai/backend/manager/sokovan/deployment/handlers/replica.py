@@ -45,20 +45,18 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         return LockID.LOCKID_DEPLOYMENT_CHECK_REPLICA
 
     @classmethod
-    def target_statuses(cls) -> list[EndpointLifecycle]:
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
         """Get the target deployment statuses for this handler."""
-        return [EndpointLifecycle.READY]
+        return [DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY)]
 
     @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
         """Define state transitions for check replica deployment handler (BEP-1030).
 
         - success: Deployment → SCALING
-        - failure: None (stays in current state)
         """
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
-            failure=None,
         )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
