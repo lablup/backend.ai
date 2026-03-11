@@ -1,10 +1,9 @@
+import json
 import sys
-from typing import Any
 from uuid import UUID
 
 import click
 
-from ai.backend.cli.params import JSONParamType
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.pretty import print_done
@@ -21,11 +20,20 @@ def prometheus_query_preset() -> None:
 
 @prometheus_query_preset.command()
 @pass_ctx_obj
-def list(ctx: CLIContext) -> None:
-    """List all prometheus query presets."""
+@click.option("--filter-name", type=str, default=None, help="Filter by name (contains match).")
+@click.option("--offset", type=int, default=0, help="Number of items to skip.")
+@click.option("--limit", type=int, default=20, help="Maximum items to return.")
+def search(ctx: CLIContext, filter_name: str | None, offset: int, limit: int) -> None:
+    """Search prometheus query presets."""
     with Session() as session:
         try:
-            items = session.PrometheusQueryPreset.list_presets()
+            data = session.PrometheusQueryPreset.search(
+                filter_name=filter_name,
+                offset=offset,
+                limit=limit,
+            )
+            items = data.get("items", [])
+            pagination = data.get("pagination", {})
             if not items:
                 print("No presets found.")
                 return
@@ -36,6 +44,10 @@ def list(ctx: CLIContext) -> None:
                 print(f"  Time Window: {preset.get('time_window', '-')}")
                 print(f"  Created: {preset['created_at']}")
                 print()
+            total = pagination.get("total", "?")
+            print(
+                f"Total: {total} (offset={pagination.get('offset', 0)}, limit={pagination.get('limit', limit)})"
+            )
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -71,10 +83,16 @@ def info(ctx: CLIContext, preset_id: str) -> None:
 @click.option("--query-template", type=str, required=True, help="PromQL template.")
 @click.option("--time-window", type=str, default=None, help="Default time window (e.g. 5m).")
 @click.option(
-    "--options",
-    type=JSONParamType(),
-    default=None,
-    help='Preset options JSON (e.g. \'{"filter_labels":["k"],"group_labels":["k"]}\').',
+    "--filter-labels",
+    type=str,
+    default="",
+    help="Comma-separated allowed filter label keys.",
+)
+@click.option(
+    "--group-labels",
+    type=str,
+    default="",
+    help="Comma-separated allowed group-by label keys.",
 )
 def add(
     ctx: CLIContext,
@@ -82,17 +100,21 @@ def add(
     metric_name: str,
     query_template: str,
     time_window: str | None,
-    options: dict[str, Any] | None,
+    filter_labels: str,
+    group_labels: str,
 ) -> None:
     """Create a new prometheus query preset."""
     with Session() as session:
         try:
+            fl = [s.strip() for s in filter_labels.split(",") if s.strip()] if filter_labels else []
+            gl = [s.strip() for s in group_labels.split(",") if s.strip()] if group_labels else []
             result = session.PrometheusQueryPreset.create(
                 name,
                 metric_name,
                 query_template,
                 time_window=time_window,
-                options=options,
+                filter_labels=fl,
+                group_labels=gl,
             )
             print(f"Created preset: {result['id']}")
             print_done("Done.")
@@ -109,10 +131,16 @@ def add(
 @click.option("--query-template", type=str, default=None, help="New PromQL template.")
 @click.option("--time-window", type=str, default=None, help="New default time window.")
 @click.option(
-    "--options",
-    type=JSONParamType(),
+    "--filter-labels",
+    type=str,
     default=None,
-    help="New preset options JSON.",
+    help="Comma-separated allowed filter label keys.",
+)
+@click.option(
+    "--group-labels",
+    type=str,
+    default=None,
+    help="Comma-separated allowed group-by label keys.",
 )
 def modify(
     ctx: CLIContext,
@@ -121,18 +149,30 @@ def modify(
     metric_name: str | None,
     query_template: str | None,
     time_window: str | None,
-    options: dict[str, Any] | None,
+    filter_labels: str | None,
+    group_labels: str | None,
 ) -> None:
     """Modify an existing prometheus query preset."""
     with Session() as session:
         try:
+            fl = (
+                [s.strip() for s in filter_labels.split(",") if s.strip()]
+                if filter_labels is not None
+                else None
+            )
+            gl = (
+                [s.strip() for s in group_labels.split(",") if s.strip()]
+                if group_labels is not None
+                else None
+            )
             result = session.PrometheusQueryPreset.modify(
                 UUID(preset_id),
                 name=name,
                 metric_name=metric_name,
                 query_template=query_template,
                 time_window=time_window,
-                options=options,
+                filter_labels=fl,
+                group_labels=gl,
             )
             print(f"Modified preset: {result['id']}")
             print_done("Done.")
@@ -152,6 +192,72 @@ def delete(ctx: CLIContext, preset_id: str) -> None:
             _result = session.PrometheusQueryPreset.delete(UUID(preset_id))
             print(f"Deleted preset: {preset_id}")
             print_done("Done.")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@prometheus_query_preset.command()
+@pass_ctx_obj
+@click.argument("preset_id", type=str)
+@click.option("--start", type=str, default=None, help="Start time (ISO8601).")
+@click.option("--end", type=str, default=None, help="End time (ISO8601).")
+@click.option("--step", type=str, default=None, help="Step duration (e.g. 60s).")
+@click.option(
+    "--label",
+    "labels",
+    multiple=True,
+    type=str,
+    help="Label filter in key=value format (repeatable).",
+)
+@click.option(
+    "--group-labels",
+    type=str,
+    default=None,
+    help="Comma-separated group labels.",
+)
+@click.option("--time-window", type=str, default=None, help="Time window override.")
+def execute(
+    ctx: CLIContext,
+    preset_id: str,
+    start: str | None,
+    end: str | None,
+    step: str | None,
+    labels: tuple[str, ...],
+    group_labels: str | None,
+    time_window: str | None,
+) -> None:
+    """Execute a prometheus query preset."""
+    with Session() as session:
+        try:
+            filter_labels: list[dict[str, str]] | None = None
+            if labels:
+                filter_labels = []
+                for label in labels:
+                    if "=" not in label:
+                        print(
+                            f"Invalid label format: {label} (expected key=value)", file=sys.stderr
+                        )
+                        sys.exit(ExitCode.INVALID_ARGUMENT)
+                    key, value = label.split("=", 1)
+                    filter_labels.append({"key": key, "value": value})
+
+            group_labels_list: list[str] | None = None
+            if group_labels is not None:
+                group_labels_list = [gl.strip() for gl in group_labels.split(",") if gl.strip()]
+
+            time_range: dict[str, str] | None = None
+            if start is not None and end is not None and step is not None:
+                time_range = {"start": start, "end": end, "step": step}
+
+            response = session.PrometheusQueryPreset.execute(
+                UUID(preset_id),
+                filter_labels=filter_labels,
+                group_labels=group_labels_list,
+                time_window=time_window,
+                time_range=time_range,
+            )
+            print(json.dumps(response, indent=2, default=str))
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)

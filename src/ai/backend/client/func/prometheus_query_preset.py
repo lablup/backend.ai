@@ -2,23 +2,22 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from ai.backend.client.request import Request
-from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
-from ai.backend.common.dto.clients.prometheus.response import PrometheusQueryRangeResponse
 
 from .base import BaseFunction, api_function
 
 __all__ = ("PrometheusQueryPreset",)
 
+_BASE_PATH = "/resource/prometheus-query-definitions"
+
 
 class PrometheusQueryPreset(BaseFunction):
     """
     Provides functions to interact with prometheus query presets.
-    Admin CRUD requires superadmin privileges.
-    Execute is available to all authenticated users.
+    All operations require superadmin privileges.
     """
 
     @api_function
@@ -30,19 +29,44 @@ class PrometheusQueryPreset(BaseFunction):
         query_template: str,
         *,
         time_window: str | None = None,
-        options: dict[str, Any] | None = None,
+        filter_labels: list[str] | None = None,
+        group_labels: list[str] | None = None,
     ) -> dict[str, Any]:
         """Create a new prometheus query preset."""
         body: dict[str, Any] = {
             "name": name,
             "metric_name": metric_name,
             "query_template": query_template,
+            "options": {
+                "filter_labels": filter_labels or [],
+                "group_labels": group_labels or [],
+            },
         }
         if time_window is not None:
             body["time_window"] = time_window
-        if options is not None:
-            body["options"] = options
-        rqst = Request("POST", "/resource/prometheus-query-presets")
+        rqst = Request("POST", _BASE_PATH)
+        rqst.set_json(body)
+        async with rqst.fetch() as resp:
+            data: dict[str, Any] = await resp.json()
+            return cast(dict[str, Any], data["item"])
+
+    @api_function
+    @classmethod
+    async def search(
+        cls,
+        *,
+        filter_name: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Search prometheus query presets with optional filters and pagination."""
+        body: dict[str, Any] = {
+            "offset": offset,
+            "limit": limit,
+        }
+        if filter_name is not None:
+            body["filter"] = {"name": {"contains": filter_name}}
+        rqst = Request("POST", f"{_BASE_PATH}/search")
         rqst.set_json(body)
         async with rqst.fetch() as resp:
             data: dict[str, Any] = await resp.json()
@@ -50,21 +74,12 @@ class PrometheusQueryPreset(BaseFunction):
 
     @api_function
     @classmethod
-    async def list_presets(cls) -> list[dict[str, Any]]:
-        """List all prometheus query presets."""
-        rqst = Request("GET", "/resource/prometheus-query-presets")
-        async with rqst.fetch() as resp:
-            data: list[dict[str, Any]] = await resp.json()
-            return data
-
-    @api_function
-    @classmethod
     async def get(cls, preset_id: UUID) -> dict[str, Any]:
         """Get a prometheus query preset by ID."""
-        rqst = Request("GET", f"/resource/prometheus-query-presets/{preset_id}")
+        rqst = Request("GET", f"{_BASE_PATH}/{preset_id}")
         async with rqst.fetch() as resp:
             data: dict[str, Any] = await resp.json()
-            return data
+            return cast(dict[str, Any], data["item"])
 
     @api_function
     @classmethod
@@ -76,7 +91,8 @@ class PrometheusQueryPreset(BaseFunction):
         metric_name: str | None = None,
         query_template: str | None = None,
         time_window: str | None = None,
-        options: dict[str, Any] | None = None,
+        filter_labels: list[str] | None = None,
+        group_labels: list[str] | None = None,
     ) -> dict[str, Any]:
         """Modify an existing prometheus query preset."""
         body: dict[str, Any] = {}
@@ -88,19 +104,24 @@ class PrometheusQueryPreset(BaseFunction):
             body["query_template"] = query_template
         if time_window is not None:
             body["time_window"] = time_window
-        if options is not None:
+        options: dict[str, Any] = {}
+        if filter_labels is not None:
+            options["filter_labels"] = filter_labels
+        if group_labels is not None:
+            options["group_labels"] = group_labels
+        if options:
             body["options"] = options
-        rqst = Request("PATCH", f"/resource/prometheus-query-presets/{preset_id}")
+        rqst = Request("PATCH", f"{_BASE_PATH}/{preset_id}")
         rqst.set_json(body)
         async with rqst.fetch() as resp:
             data: dict[str, Any] = await resp.json()
-            return data
+            return cast(dict[str, Any], data["item"])
 
     @api_function
     @classmethod
     async def delete(cls, preset_id: UUID) -> dict[str, Any]:
         """Delete a prometheus query preset."""
-        rqst = Request("DELETE", f"/resource/prometheus-query-presets/{preset_id}")
+        rqst = Request("DELETE", f"{_BASE_PATH}/{preset_id}")
         async with rqst.fetch() as resp:
             data: dict[str, Any] = await resp.json()
             return data
@@ -111,25 +132,29 @@ class PrometheusQueryPreset(BaseFunction):
         cls,
         preset_id: UUID,
         *,
-        start: str,
-        end: str,
-        step: str,
-        labels: list[dict[str, str]] | None = None,
+        filter_labels: list[dict[str, str]] | None = None,
         group_labels: list[str] | None = None,
-        window: str | None = None,
-    ) -> PrometheusQueryRangeResponse:
-        """Execute a prometheus query preset."""
-        body: dict[str, Any] = {
-            "time_range": QueryTimeRange(start=start, end=end, step=step).model_dump(mode="json"),
-        }
-        if labels is not None:
-            body["labels"] = labels
+        time_window: str | None = None,
+        time_range: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        """Execute a prometheus query preset.
+
+        If *time_range* is ``None``, an instant query is executed.
+        """
+        body: dict[str, Any] = {}
+        options: dict[str, Any] = {}
+        if filter_labels is not None:
+            options["filter_labels"] = filter_labels
         if group_labels is not None:
-            body["group_labels"] = group_labels
-        if window is not None:
-            body["window"] = window
-        rqst = Request("POST", f"/resource/prometheus-query-presets/{preset_id}/execute")
+            options["group_labels"] = group_labels
+        if options:
+            body["options"] = options
+        if time_window is not None:
+            body["time_window"] = time_window
+        if time_range is not None:
+            body["time_range"] = time_range
+        rqst = Request("POST", f"{_BASE_PATH}/{preset_id}/execute")
         rqst.set_json(body)
         async with rqst.fetch() as resp:
-            data = await resp.json()
-            return PrometheusQueryRangeResponse.model_validate(data)
+            data: dict[str, Any] = await resp.json()
+            return data

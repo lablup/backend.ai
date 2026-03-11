@@ -55,14 +55,6 @@ def fair_share() -> None:
     """Fair share scheduler operations (superadmin only)"""
 
 
-@cli_main.group(
-    cls=LazyGroup,
-    import_name="ai.backend.client.cli.prometheus_query_preset:prometheus_query_preset",
-)
-def prometheus_query_preset() -> None:
-    """Prometheus query preset operations."""
-
-
 @cli_main.group(cls=LazyGroup, import_name="ai.backend.client.cli.resource_usage:resource_usage")
 def resource_usage() -> None:
     """Resource usage history operations (superadmin only)"""
