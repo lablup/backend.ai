@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import uuid
-from unittest.mock import AsyncMock, MagicMock
+from collections.abc import Generator
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from aiohttp.web_exceptions import HTTPForbidden
 
 from ai.backend.common.data.permission.types import (
     EntityType,
@@ -60,6 +62,11 @@ def _create_mock_info(context: MagicMock) -> MagicMock:
 
 
 class TestAdminUpdatePermission:
+    @pytest.fixture(autouse=True)
+    def _bypass_admin_check(self) -> Generator[None]:
+        with patch("ai.backend.manager.api.gql.rbac.resolver.permission.check_admin_only"):
+            yield
+
     @pytest.fixture
     def mock_processor(self) -> AsyncMock:
         processor = AsyncMock()
@@ -220,3 +227,17 @@ class TestAdminUpdatePermission:
         assert result.scope_id == "default"
         assert result.entity_type == RBACElementTypeGQL.VFOLDER
         assert result.operation == OperationTypeGQL.READ
+
+
+class TestAdminUpdatePermissionAccessControl:
+    async def test_rejects_non_superadmin(self) -> None:
+        context = MagicMock()
+        info = _create_mock_info(context)
+        input_data = UpdatePermissionInput(
+            id=uuid.uuid4(),
+            operation=OperationTypeGQL.READ,
+        )
+
+        resolver_fn = permission_resolver.admin_update_permission.base_resolver
+        with pytest.raises(HTTPForbidden):
+            await resolver_fn(info=info, input=input_data)
