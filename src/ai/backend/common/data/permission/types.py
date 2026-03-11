@@ -110,6 +110,7 @@ class EntityType(enum.StrEnum):
     RESOURCE_SLOT_TYPE = "resource_slot_type"
     RESOURCE_OVERVIEW = "resource_overview"
     RESOURCE_GROUP = "resource_group"
+    SCALING_GROUP = "scaling_group"
     PROMETHEUS_QUERY_PRESET = "prometheus_query_preset"
     RESOURCE_PRESET = "resource_preset"
     ROLE = "role"
