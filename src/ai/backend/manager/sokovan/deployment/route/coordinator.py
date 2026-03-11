@@ -19,6 +19,7 @@ from ai.backend.common.leader.tasks import EventTaskSpec
 from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
@@ -31,6 +32,7 @@ from ai.backend.manager.repositories.deployment.creators import RouteBatchUpdate
 from ai.backend.manager.repositories.scheduling_history.creators import RouteHistoryCreatorSpec
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.handlers import (
+    AppProxySyncHandler,
     HealthCheckRouteHandler,
     ProvisioningRouteHandler,
     RouteEvictionHandler,
@@ -145,6 +147,10 @@ class RouteCoordinator:
                 event_producer=self._event_producer,
             ),
             RouteLifecycleType.SERVICE_DISCOVERY_SYNC: ServiceDiscoverySyncHandler(
+                route_executor=executor,
+                event_producer=self._event_producer,
+            ),
+            RouteLifecycleType.APP_PROXY_SYNC: AppProxySyncHandler(
                 route_executor=executor,
                 event_producer=self._event_producer,
             ),
@@ -308,6 +314,21 @@ class RouteCoordinator:
                 batch_updaters, BulkCreator(specs=all_history_specs)
             )
 
+            # Mark App Proxy sync needed when routes transition to/from HEALTHY
+            healthy_related_statuses = {
+                RouteStatus.HEALTHY,
+                RouteStatus.UNHEALTHY,
+                RouteStatus.DEGRADED,
+            }
+            if (
+                (next_status in healthy_related_statuses and result.successes)
+                or (failure_status in healthy_related_statuses and result.errors)
+                or (stale_status in healthy_related_statuses and result.stale)
+            ):
+                await self._valkey_schedule.mark_route_needed(
+                    RouteLifecycleType.APP_PROXY_SYNC.value
+                )
+
     async def process_if_needed(self, lifecycle_type: RouteLifecycleType) -> None:
         """
         Process route lifecycle operation if needed (based on internal state).
@@ -368,6 +389,13 @@ class RouteCoordinator:
                 short_interval=None,  # No short-cycle for sync
                 long_interval=60.0,
                 initial_delay=30.0,
+            ),
+            # App Proxy route sync - short cycle for quick updates + long cycle
+            RouteTaskSpec(
+                RouteLifecycleType.APP_PROXY_SYNC,
+                short_interval=5.0,
+                long_interval=60.0,
+                initial_delay=15.0,
             ),
         ]
 

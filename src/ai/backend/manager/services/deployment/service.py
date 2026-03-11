@@ -647,6 +647,12 @@ class DeploymentService:
     ) -> ActivateRevisionActionResult:
         """Activate a specific revision to be the current revision.
 
+        When activating a new revision:
+        1. Validates the revision exists
+        2. Updates the current revision pointer
+        3. Deactivates traffic for old revision routes
+        4. Triggers lifecycle check to create new revision routes
+
         Args:
             action: Action containing deployment and revision IDs
 
@@ -661,7 +667,20 @@ class DeploymentService:
             action.deployment_id, action.revision_id
         )
 
-        # 3. Trigger lifecycle check to update routes with new revision
+        # 3. Deactivate traffic for old revision routes
+        if previous_revision_id is not None and previous_revision_id != action.revision_id:
+            deactivated_count = await self._deployment_repository.deactivate_routes_by_revision(
+                action.deployment_id, previous_revision_id
+            )
+            if deactivated_count > 0:
+                log.info(
+                    "Deactivated {} routes for previous revision {} of deployment {}",
+                    deactivated_count,
+                    previous_revision_id,
+                    action.deployment_id,
+                )
+
+        # 4. Trigger lifecycle check to update routes with new revision
         await self._deployment_controller.mark_lifecycle_needed(
             DeploymentLifecycleType.CHECK_REPLICA
         )
@@ -673,7 +692,7 @@ class DeploymentService:
             previous_revision_id,
         )
 
-        # 4. Get updated deployment info
+        # 5. Get updated deployment info
         deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
 
         return ActivateRevisionActionResult(

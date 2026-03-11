@@ -1,11 +1,15 @@
 """Route executor for handling route lifecycle operations."""
 
 import logging
+from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from typing import Any
 from uuid import UUID
 
-from ai.backend.common.clients.http_client.client_pool import ClientPool
+from ai.backend.common.clients.http_client.client_pool import (
+    ClientKey,
+    ClientPool,
+)
 from ai.backend.common.clients.valkey_client.valkey_schedule import (
     HealthCheckStatus,
     ValkeyScheduleClient,
@@ -15,6 +19,8 @@ from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.common.service_discovery.service_discovery import ModelServiceMetadata
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.clients.appproxy.client import AppProxyClient
+from ai.backend.manager.clients.appproxy.types import SyncRouteModel, SyncRoutesRequestBody
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteStatus
 from ai.backend.manager.errors.deployment import (
@@ -24,7 +30,7 @@ from ai.backend.manager.errors.deployment import (
     RouteUnhealthy,
 )
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.types import RouteData
+from ai.backend.manager.repositories.deployment.types import RouteAppProxySyncInfo, RouteData
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
 from ai.backend.manager.sokovan.deployment.route.types import (
@@ -305,6 +311,131 @@ class RouteExecutor:
             log.debug("No valid routes to sync to service discovery")
 
         return RouteExecutionResult(successes=[], errors=[])
+
+    async def sync_app_proxy(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
+        """
+        Sync healthy routes to App Proxy coordinator for traffic routing.
+
+        For each endpoint, collects route connection information and sends
+        it to the App Proxy coordinator so traffic can be routed to the correct
+        kernel instances.
+
+        Args:
+            routes: Healthy routes to sync
+
+        Returns:
+            Result indicating sync success/failure
+        """
+        # Filter routes that have sessions
+        route_ids_with_session = {
+            route.route_id for route in routes if route.session_id is not None
+        }
+
+        if not route_ids_with_session:
+            log.debug("No routes with sessions to sync to App Proxy")
+            return RouteExecutionResult(successes=[], errors=[])
+
+        # Phase 1: Load route and proxy information
+        with RouteRecorderContext.shared_phase("load_app_proxy_sync_data"):
+            with RouteRecorderContext.shared_step("load_route_sync_info"):
+                sync_infos = await self._deployment_repo.fetch_route_app_proxy_sync_info(
+                    route_ids_with_session
+                )
+
+            if not sync_infos:
+                log.debug("No valid routes to sync to App Proxy")
+                return RouteExecutionResult(successes=[], errors=[])
+
+            with RouteRecorderContext.shared_step("load_proxy_targets"):
+                resource_groups = {info.resource_group for info in sync_infos}
+                proxy_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
+                    resource_groups
+                )
+
+        # Group routes by endpoint for batched sync
+        endpoint_routes: defaultdict[UUID, list[RouteAppProxySyncInfo]] = defaultdict(list)
+        for info in sync_infos:
+            endpoint_routes[info.endpoint_id].append(info)
+
+        # Phase 2: Sync to App Proxy (per-endpoint)
+        successes: list[RouteData] = []
+        errors: list[RouteExecutionError] = []
+        route_data_map = {route.route_id: route for route in routes}
+
+        for endpoint_id, endpoint_sync_infos in endpoint_routes.items():
+            try:
+                # Find resource group for this endpoint
+                resource_group = endpoint_sync_infos[0].resource_group
+                target = proxy_targets.get(resource_group)
+                if not target:
+                    log.warning(
+                        "No proxy target for resource group {}, skipping endpoint {}",
+                        resource_group,
+                        endpoint_id,
+                    )
+                    continue
+
+                # Build sync request
+                sync_body = SyncRoutesRequestBody(
+                    routes=[
+                        SyncRouteModel(
+                            route_id=info.route_id,
+                            session_id=info.session_id,
+                            kernel_host=info.kernel_host,
+                            kernel_port=info.kernel_port,
+                            traffic_ratio=info.traffic_ratio,
+                        )
+                        for info in endpoint_sync_infos
+                    ]
+                )
+
+                # Send to App Proxy
+                app_proxy_client = self._load_app_proxy_client(target.addr, target.api_token)
+                await app_proxy_client.sync_routes(endpoint_id, sync_body)
+
+                # Mark all routes for this endpoint as successful
+                for info in endpoint_sync_infos:
+                    route_data = route_data_map.get(info.route_id)
+                    if route_data:
+                        successes.append(route_data)
+
+                log.debug(
+                    "Synced {} routes to App Proxy for endpoint {}",
+                    len(endpoint_sync_infos),
+                    endpoint_id,
+                )
+            except Exception as e:
+                log.warning(
+                    "Failed to sync routes to App Proxy for endpoint {}: {}",
+                    endpoint_id,
+                    e,
+                )
+                for info in endpoint_sync_infos:
+                    route_data = route_data_map.get(info.route_id)
+                    if route_data:
+                        errors.append(
+                            RouteExecutionError(
+                                route_info=route_data,
+                                reason="Failed to sync to App Proxy",
+                                error_detail=str(e),
+                                error_code=_extract_error_code(e),
+                            )
+                        )
+
+        if successes:
+            log.debug("Synced {} routes to App Proxy", len(successes))
+
+        return RouteExecutionResult(successes=successes, errors=errors)
+
+    def _load_app_proxy_client(self, address: str, token: str) -> AppProxyClient:
+        """Load or create an App Proxy client for the given address."""
+        client_session = self._client_pool.load_client_session(
+            ClientKey(
+                endpoint=address,
+                domain="appproxy",
+            )
+        )
+        return AppProxyClient(client_session, address, token)
 
     async def cleanup_routes_by_config(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """

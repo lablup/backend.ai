@@ -52,6 +52,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
+    RouteTrafficStatus,
     ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -135,6 +136,7 @@ from ai.backend.manager.repositories.deployment.creators import (
 )
 from ai.backend.manager.repositories.deployment.creators.endpoint import LegacyEndpointCreatorSpec
 from ai.backend.manager.repositories.deployment.types import (
+    RouteAppProxySyncInfo,
     RouteData,
     RouteServiceDiscoveryInfo,
 )
@@ -1145,6 +1147,79 @@ class DeploymentDBSource:
 
             return discovery_infos
 
+    async def fetch_route_app_proxy_sync_info(
+        self,
+        route_ids: set[uuid.UUID],
+    ) -> list[RouteAppProxySyncInfo]:
+        """Fetch route information needed for App Proxy synchronization.
+
+        Joins routes with kernels and endpoints to get connection details
+        and scaling group (resource group) for proxy target resolution.
+
+        Args:
+            route_ids: Set of route IDs to fetch information for
+
+        Returns:
+            List of RouteAppProxySyncInfo with kernel host/port and resource group
+        """
+        if not route_ids:
+            return []
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(
+                    RoutingRow.id.label("route_id"),
+                    RoutingRow.endpoint.label("endpoint_id"),
+                    RoutingRow.session.label("session_id"),
+                    RoutingRow.traffic_ratio,
+                    EndpointRow.resource_group,
+                    KernelRow.kernel_host,
+                    KernelRow.service_ports,
+                )
+                .select_from(RoutingRow)
+                .join(EndpointRow, RoutingRow.endpoint == EndpointRow.id)
+                .join(
+                    KernelRow,
+                    sa.and_(
+                        KernelRow.session_id == RoutingRow.session,
+                        KernelRow.cluster_role == "main",
+                    ),
+                )
+                .where(RoutingRow.id.in_(route_ids))
+            )
+
+            result = await db_sess.execute(query)
+            rows = result.all()
+
+            sync_infos: list[RouteAppProxySyncInfo] = []
+            for row in rows:
+                # Extract inference port from service_ports
+                inference_port: int | None = None
+                if row.service_ports:
+                    for port_info in row.service_ports:
+                        if port_info.get("is_inference", False):
+                            host_ports = port_info.get("host_ports", [])
+                            if host_ports:
+                                inference_port = host_ports[0]
+                            break
+
+                if not inference_port:
+                    continue
+
+                sync_infos.append(
+                    RouteAppProxySyncInfo(
+                        route_id=row.route_id,
+                        endpoint_id=row.endpoint_id,
+                        session_id=row.session_id,
+                        kernel_host=row.kernel_host,
+                        kernel_port=inference_port,
+                        traffic_ratio=row.traffic_ratio,
+                        resource_group=row.resource_group,
+                    )
+                )
+
+            return sync_infos
+
     async def _delete_routes_and_endpoint(
         self,
         db_sess: SASession,
@@ -1610,6 +1685,36 @@ class DeploymentDBSource:
                 .values(status=RouteStatus.TERMINATING)
             )
             await db_sess.execute(query)
+
+    async def deactivate_routes_by_revision(
+        self,
+        deployment_id: uuid.UUID,
+        revision_id: uuid.UUID,
+    ) -> int:
+        """Deactivate traffic for all active routes of a specific revision.
+
+        Sets traffic_status to INACTIVE for routes belonging to the given
+        deployment and revision that are currently in active statuses.
+
+        Args:
+            deployment_id: Deployment (endpoint) ID
+            revision_id: Revision ID whose routes should be deactivated
+
+        Returns:
+            Number of routes that were deactivated
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            query = (
+                sa.update(RoutingRow)
+                .where(
+                    RoutingRow.endpoint == deployment_id,
+                    RoutingRow.revision == revision_id,
+                    RoutingRow.status.in_(list(RouteStatus.active_route_statuses())),
+                )
+                .values(traffic_status=RouteTrafficStatus.INACTIVE)
+            )
+            result = await db_sess.execute(query)
+            return cast(CursorResult[Any], result).rowcount
 
     async def update_desired_replicas_bulk(
         self,

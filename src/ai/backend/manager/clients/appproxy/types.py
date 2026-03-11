@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -53,3 +54,23 @@ class CreateEndpointRequestBody(BaseModel):
     health_check: ModelHealthCheck | None = Field(
         default=None, description="Health check configuration"
     )
+
+
+class SyncRouteModel(BaseModel):
+    """Model for a single route in sync request."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    route_id: UUID
+    session_id: UUID
+    kernel_host: str | None = None
+    kernel_port: int
+    traffic_ratio: float = 1.0
+
+
+class SyncRoutesRequestBody(BaseModel):
+    """Request body for syncing routes to an endpoint in App Proxy."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    routes: list[SyncRouteModel] = Field(description="List of routes to sync")

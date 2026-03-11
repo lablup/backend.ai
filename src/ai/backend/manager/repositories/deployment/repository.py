@@ -88,7 +88,7 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import Dep
 
 from .db_source import DeploymentDBSource
 from .storage_source import DeploymentStorageSource
-from .types import RouteData, RouteServiceDiscoveryInfo
+from .types import RouteAppProxySyncInfo, RouteData, RouteServiceDiscoveryInfo
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -1016,6 +1016,38 @@ class DeploymentRepository:
             List of RouteServiceDiscoveryInfo containing kernel host/port and endpoint details
         """
         return await self._db_source.fetch_route_service_discovery_info(route_ids)
+
+    @deployment_repository_resilience.apply()
+    async def fetch_route_app_proxy_sync_info(
+        self,
+        route_ids: set[uuid.UUID],
+    ) -> list[RouteAppProxySyncInfo]:
+        """Fetch route information needed for App Proxy synchronization.
+
+        Args:
+            route_ids: Set of route IDs to fetch information for
+
+        Returns:
+            List of RouteAppProxySyncInfo with kernel host/port and resource group
+        """
+        return await self._db_source.fetch_route_app_proxy_sync_info(route_ids)
+
+    @deployment_repository_resilience.apply()
+    async def deactivate_routes_by_revision(
+        self,
+        deployment_id: uuid.UUID,
+        revision_id: uuid.UUID,
+    ) -> int:
+        """Deactivate traffic for all active routes of a specific revision.
+
+        Args:
+            deployment_id: Deployment (endpoint) ID
+            revision_id: Revision ID whose routes should be deactivated
+
+        Returns:
+            Number of routes that were deactivated
+        """
+        return await self._db_source.deactivate_routes_by_revision(deployment_id, revision_id)
 
     @deployment_repository_resilience.apply()
     async def get_default_architecture_from_scaling_group(

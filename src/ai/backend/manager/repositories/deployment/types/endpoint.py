@@ -70,3 +70,16 @@ class RouteServiceDiscoveryInfo:
     runtime_variant: str
     kernel_host: str
     kernel_port: int
+
+
+@dataclass
+class RouteAppProxySyncInfo:
+    """Route information needed for App Proxy synchronization."""
+
+    route_id: uuid.UUID
+    endpoint_id: uuid.UUID
+    session_id: SessionId
+    kernel_host: str
+    kernel_port: int
+    traffic_ratio: float
+    resource_group: str
