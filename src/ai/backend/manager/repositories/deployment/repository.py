@@ -3,11 +3,13 @@
 import logging
 import uuid
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, DecimalException
 from typing import Any, cast
+from uuid import UUID
 
 import tomli
 from pydantic import HttpUrl
@@ -120,6 +122,25 @@ deployment_repository_resilience = Resilience(
         ),
     ]
 )
+
+
+class StrategyTransaction:
+    """Stub for atomic strategy evaluation persistence operations."""
+
+    async def update_sub_steps(self, assignments: Mapping[UUID, Any]) -> None:
+        raise NotImplementedError
+
+    async def create_routes(self, rollout: Any) -> None:
+        raise NotImplementedError
+
+    async def drain_routes(self, drain: Any) -> None:
+        raise NotImplementedError
+
+    async def complete_deployment_revision_swap(self, completed_ids: set[UUID]) -> int:
+        raise NotImplementedError
+
+    async def clear_deploying_revision(self, rolled_back_ids: set[UUID]) -> None:
+        raise NotImplementedError
 
 
 class DeploymentRepository:
@@ -1401,3 +1422,8 @@ class DeploymentRepository:
             DeploymentPolicySearchResult with items, total_count, and pagination info.
         """
         return await self._db_source.search_deployment_policies(querier)
+
+    @asynccontextmanager
+    async def begin_strategy_transaction(self) -> AsyncIterator[StrategyTransaction]:
+        """Begin a strategy transaction for atomic strategy evaluation persistence."""
+        yield StrategyTransaction()
