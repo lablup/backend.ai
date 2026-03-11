@@ -37,7 +37,7 @@ class TestImageForgetLifecycle:
         admin_registry: BackendAIClientRegistry,
         image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
     ) -> None:
-        """Admin forgets image → status transitions to DELETED."""
+        """Admin forgets image → status transitions to DELETED (image becomes non-retrievable)."""
         image_id, _ = image_fixture
 
         # Get initial status
@@ -53,10 +53,9 @@ class TestImageForgetLifecycle:
         assert result.item.id == image_id
         assert result.item.status == ImageStatus.DELETED.name
 
-        # Verify status persisted
-        after = await admin_registry.image.get(image_id)
-        assert isinstance(after, GetImageResponse)
-        assert after.item.status == ImageStatus.DELETED.name
+        # Verify image is no longer retrievable (deleted images are filtered out by default)
+        with pytest.raises(NotFoundError):
+            await admin_registry.image.get(image_id)
 
     async def test_forget_nonexistent_image(
         self,
@@ -75,7 +74,7 @@ class TestImageForgetLifecycle:
         admin_registry: BackendAIClientRegistry,
         image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
     ) -> None:
-        """Forget already forgotten image → idempotent (no error)."""
+        """Forget already forgotten image → 404 (forgotten images are not retrievable)."""
         image_id, _ = image_fixture
 
         # Forget once
@@ -83,13 +82,11 @@ class TestImageForgetLifecycle:
             ForgetImageRequest(image_id=image_id),
         )
 
-        # Forget again - should succeed
-        result = await admin_registry.image.forget(
-            ForgetImageRequest(image_id=image_id),
-        )
-        assert isinstance(result, ForgetImageResponse)
-        assert result.item.id == image_id
-        assert result.item.status == ImageStatus.DELETED.name
+        # Trying to forget again should fail with 404 (image is no longer retrievable)
+        with pytest.raises(NotFoundError):
+            await admin_registry.image.forget(
+                ForgetImageRequest(image_id=image_id),
+            )
 
     @pytest.mark.xfail(
         reason="Handler may return 400 instead of 403 depending on middleware chain",
@@ -111,27 +108,22 @@ class TestImageForgetLifecycle:
 class TestImagePurgeLifecycle:
     """Test image purge operation (physical delete)."""
 
-    async def test_admin_purges_forgotten_image(
+    async def test_admin_purges_image(
         self,
         admin_registry: BackendAIClientRegistry,
         image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
     ) -> None:
-        """Admin purges forgotten image → image physically deleted."""
+        """Admin purges image → image physically deleted from database."""
         image_id, _ = image_fixture
 
-        # Forget first (best practice before purge)
-        await admin_registry.image.forget(
-            ForgetImageRequest(image_id=image_id),
-        )
-
-        # Purge the image
+        # Purge the image directly (no need to forget first - purge works on any status)
         result = await admin_registry.image.purge(
             PurgeImageRequest(image_id=image_id),
         )
         assert isinstance(result, PurgeImageResponse)
         assert result.item.id == image_id
 
-        # Verify image is actually gone
+        # Verify image is actually gone from database
         with pytest.raises(NotFoundError):
             await admin_registry.image.get(image_id)
 
