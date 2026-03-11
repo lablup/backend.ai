@@ -41,9 +41,7 @@ class CreatePrometheusQueryPresetInput:
     query_template: str = strawberry.field(
         description="PromQL template with {labels}, {window}, {group_by} placeholders."
     )
-    time_window: str | None = strawberry.field(
-        default=None, description="Default time window."
-    )
+    time_window: str | None = strawberry.field(default=None, description="Default time window.")
     options: PrometheusPresetOptionsInput = strawberry.field(
         description="Query definition options including filter and group labels."
     )

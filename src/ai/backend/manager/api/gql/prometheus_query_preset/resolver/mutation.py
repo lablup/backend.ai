@@ -41,7 +41,9 @@ async def admin_create_prometheus_query_preset(
     )
 
 
-@strawberry.mutation(description="Added in 26.3.0. Modify an existing query definition (admin only).")  # type: ignore[misc]
+@strawberry.mutation(
+    description="Added in 26.3.0. Modify an existing query definition (admin only)."
+)  # type: ignore[misc]
 async def admin_modify_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     id: ID,
