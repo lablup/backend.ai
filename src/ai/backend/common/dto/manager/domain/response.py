@@ -11,6 +11,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.pagination import PaginationInfo
 
 __all__ = (
     "CreateDomainResponse",
@@ -38,14 +39,6 @@ class DomainDTO(BaseModel):
     )
     allowed_docker_registries: list[str] = Field(description="Allowed docker registries")
     integration_id: str | None = Field(default=None, description="External integration ID")
-
-
-class PaginationInfo(BaseModel):
-    """Pagination information."""
-
-    total: int = Field(description="Total number of items")
-    offset: int = Field(description="Number of items skipped")
-    limit: int | None = Field(default=None, description="Maximum items returned")
 
 
 class CreateDomainResponse(BaseResponseModel):

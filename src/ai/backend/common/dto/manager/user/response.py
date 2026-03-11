@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.pagination import PaginationInfo
 
 from .types import UserRole, UserStatus
 
@@ -53,14 +54,6 @@ class UserDTO(BaseModel):
     container_uid: int | None = Field(default=None, description="Container UID")
     container_main_gid: int | None = Field(default=None, description="Container main GID")
     container_gids: list[int] | None = Field(default=None, description="Container additional GIDs")
-
-
-class PaginationInfo(BaseModel):
-    """Pagination information for search results."""
-
-    total: int = Field(description="Total number of items")
-    offset: int = Field(description="Number of items skipped")
-    limit: int = Field(description="Maximum items returned")
 
 
 class CreateUserResponse(BaseResponseModel):

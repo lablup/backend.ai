@@ -8,7 +8,8 @@ from typing import Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam
 from ai.backend.common.dto.manager.agent.request import SearchAgentsRequest
-from ai.backend.common.dto.manager.agent.response import PaginationInfo, SearchAgentsResponse
+from ai.backend.common.dto.manager.agent.response import SearchAgentsResponse
+from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
