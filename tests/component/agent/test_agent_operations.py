@@ -266,3 +266,101 @@ class TestAgentSearch:
 
         assert result.total == 0
         assert len(result.items) == 0
+
+
+class TestAgentResourceManagement:
+    """Test scenarios for agent resource management operations."""
+
+    async def test_get_total_resource_stats(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        agent_factory: AgentFactory,
+        scaling_group_fixture: str,
+    ) -> None:
+        """Get total resource stats returns aggregated resource data across agents."""
+        # Create agents with specific resource slots
+        await agent_factory(
+            scaling_group=scaling_group_fixture,
+            available_slots=ResourceSlot({"cpu": "8", "mem": "16g", "cuda.shares": "2"}),
+            occupied_slots=ResourceSlot({"cpu": "2", "mem": "4g", "cuda.shares": "0.5"}),
+        )
+        await agent_factory(
+            scaling_group=scaling_group_fixture,
+            available_slots=ResourceSlot({"cpu": "4", "mem": "8g", "cuda.shares": "1"}),
+            occupied_slots=ResourceSlot({"cpu": "1", "mem": "2g", "cuda.shares": "0.25"}),
+        )
+
+        # Query scaling group for total resource stats
+        from ai.backend.client.func.admin import Admin
+
+        query = """
+            query($name: String!) {
+                scaling_group(name: $name) {
+                    name
+                    agent_total_resource_slots_by_status(status: "ALIVE") {
+                        available_slots
+                        occupied_slots
+                    }
+                }
+            }
+        """
+        variables = {"name": scaling_group_fixture}
+        result = await admin_registry.Admin._query(query, variables)
+
+        sg_data = result["scaling_group"]
+        assert sg_data["name"] == scaling_group_fixture
+
+        resource_stats = sg_data["agent_total_resource_slots_by_status"]
+        assert resource_stats is not None
+
+        # Verify aggregated resources exist
+        available = resource_stats["available_slots"]
+        occupied = resource_stats["occupied_slots"]
+
+        # Should have cpu, mem, cuda.shares in aggregated data
+        assert "cpu" in available
+        assert "mem" in occupied
+
+    async def test_get_per_agent_resource_stats(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        agent_factory: AgentFactory,
+    ) -> None:
+        """Get per-agent resource stats returns individual agent resources."""
+        # Create agent with known resource slots
+        agent_data = await agent_factory(
+            available_slots=ResourceSlot({"cpu": "16", "mem": "32768", "cuda.shares": "4"}),
+            occupied_slots=ResourceSlot({"cpu": "4", "mem": "8192", "cuda.shares": "1"}),
+        )
+
+        # Query agent detail via GraphQL (SDK agent.detail returns dict from GraphQL)
+        from ai.backend.client.func.admin import Admin
+
+        query = """
+            query($agent_id: String!) {
+                agent(agent_id: $agent_id) {
+                    id
+                    available_slots
+                    occupied_slots
+                }
+            }
+        """
+        variables = {"agent_id": agent_data["id"]}
+        result = await admin_registry.Admin._query(query, variables)
+
+        agent = result["agent"]
+        assert agent["id"] == agent_data["id"]
+        assert "available_slots" in agent
+        assert "occupied_slots" in agent
+
+        # Verify the resource slots match what we set
+        available = agent["available_slots"]
+        occupied = agent["occupied_slots"]
+
+        assert available["cpu"] == "16"
+        assert available["mem"] == "32768"
+        assert available["cuda.shares"] == "4"
+
+        assert occupied["cpu"] == "4"
+        assert occupied["mem"] == "8192"
+        assert occupied["cuda.shares"] == "1"
