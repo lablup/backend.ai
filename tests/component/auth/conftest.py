@@ -4,6 +4,7 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -149,3 +150,217 @@ async def auth_user_registry(
         yield registry
     finally:
         await registry.close()
+
+
+@pytest.fixture()
+async def inactive_user_fixture(
+    db_engine: SAEngine,
+    group_fixture: uuid.UUID,
+    domain_fixture: str,
+    resource_policy_fixture: str,
+) -> AsyncIterator[AuthUserFixtureData]:
+    """Insert a user with INACTIVE status for authorization rejection tests."""
+    unique_id = secrets.token_hex(4)
+    email = f"auth-inactive-{unique_id}@test.local"
+    password = f"TestP@ss{unique_id}"
+    data = AuthUserFixtureData(
+        user_uuid=uuid.uuid4(),
+        access_key=f"AKTEST{secrets.token_hex(7).upper()}",
+        secret_key=secrets.token_hex(20),
+        password=password,
+        email=email,
+        domain_name=domain_fixture,
+    )
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(users).values(
+                uuid=str(data.user_uuid),
+                username=f"auth-inactive-{unique_id}",
+                email=email,
+                password=PasswordInfo(
+                    password=password,
+                    algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                    rounds=600_000,
+                    salt_size=32,
+                ),
+                need_password_change=False,
+                full_name=f"Inactive User {unique_id}",
+                description=f"Test inactive user {unique_id}",
+                status=UserStatus.INACTIVE,
+                status_info="admin-requested",
+                domain_name=domain_fixture,
+                resource_policy=resource_policy_fixture,
+                role=UserRole.USER,
+            )
+        )
+        await conn.execute(
+            sa.insert(keypairs).values(
+                user_id=email,
+                access_key=data.access_key,
+                secret_key=data.secret_key,
+                is_active=True,
+                resource_policy=resource_policy_fixture,
+                rate_limit=30000,
+                num_queries=0,
+                is_admin=False,
+                user=str(data.user_uuid),
+            )
+        )
+        await conn.execute(
+            sa.insert(association_groups_users).values(
+                group_id=str(group_fixture),
+                user_id=str(data.user_uuid),
+            )
+        )
+    yield data
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            association_groups_users.delete().where(
+                association_groups_users.c.user_id == str(data.user_uuid)
+            )
+        )
+        await conn.execute(keypairs.delete().where(keypairs.c.access_key == data.access_key))
+        await conn.execute(users.delete().where(users.c.uuid == str(data.user_uuid)))
+
+
+@pytest.fixture()
+async def before_verification_user_fixture(
+    db_engine: SAEngine,
+    group_fixture: uuid.UUID,
+    domain_fixture: str,
+    resource_policy_fixture: str,
+) -> AsyncIterator[AuthUserFixtureData]:
+    """Insert a user with BEFORE_VERIFICATION status for authorization rejection tests."""
+    unique_id = secrets.token_hex(4)
+    email = f"auth-unverified-{unique_id}@test.local"
+    password = f"TestP@ss{unique_id}"
+    data = AuthUserFixtureData(
+        user_uuid=uuid.uuid4(),
+        access_key=f"AKTEST{secrets.token_hex(7).upper()}",
+        secret_key=secrets.token_hex(20),
+        password=password,
+        email=email,
+        domain_name=domain_fixture,
+    )
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(users).values(
+                uuid=str(data.user_uuid),
+                username=f"auth-unverified-{unique_id}",
+                email=email,
+                password=PasswordInfo(
+                    password=password,
+                    algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                    rounds=600_000,
+                    salt_size=32,
+                ),
+                need_password_change=False,
+                full_name=f"Unverified User {unique_id}",
+                description=f"Test unverified user {unique_id}",
+                status=UserStatus.BEFORE_VERIFICATION,
+                status_info="admin-requested",
+                domain_name=domain_fixture,
+                resource_policy=resource_policy_fixture,
+                role=UserRole.USER,
+            )
+        )
+        await conn.execute(
+            sa.insert(keypairs).values(
+                user_id=email,
+                access_key=data.access_key,
+                secret_key=data.secret_key,
+                is_active=True,
+                resource_policy=resource_policy_fixture,
+                rate_limit=30000,
+                num_queries=0,
+                is_admin=False,
+                user=str(data.user_uuid),
+            )
+        )
+        await conn.execute(
+            sa.insert(association_groups_users).values(
+                group_id=str(group_fixture),
+                user_id=str(data.user_uuid),
+            )
+        )
+    yield data
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            association_groups_users.delete().where(
+                association_groups_users.c.user_id == str(data.user_uuid)
+            )
+        )
+        await conn.execute(keypairs.delete().where(keypairs.c.access_key == data.access_key))
+        await conn.execute(users.delete().where(users.c.uuid == str(data.user_uuid)))
+
+
+@pytest.fixture()
+async def expired_password_user_fixture(
+    db_engine: SAEngine,
+    group_fixture: uuid.UUID,
+    domain_fixture: str,
+    resource_policy_fixture: str,
+) -> AsyncIterator[AuthUserFixtureData]:
+    """Insert a user whose password_changed_at is far in the past for expiry tests."""
+    unique_id = secrets.token_hex(4)
+    email = f"auth-expired-{unique_id}@test.local"
+    password = f"TestP@ss{unique_id}"
+    data = AuthUserFixtureData(
+        user_uuid=uuid.uuid4(),
+        access_key=f"AKTEST{secrets.token_hex(7).upper()}",
+        secret_key=secrets.token_hex(20),
+        password=password,
+        email=email,
+        domain_name=domain_fixture,
+    )
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(users).values(
+                uuid=str(data.user_uuid),
+                username=f"auth-expired-{unique_id}",
+                email=email,
+                password=PasswordInfo(
+                    password=password,
+                    algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                    rounds=600_000,
+                    salt_size=32,
+                ),
+                need_password_change=False,
+                full_name=f"Expired Pass User {unique_id}",
+                description=f"Test expired password user {unique_id}",
+                status=UserStatus.ACTIVE,
+                status_info="admin-requested",
+                domain_name=domain_fixture,
+                resource_policy=resource_policy_fixture,
+                role=UserRole.USER,
+                password_changed_at=datetime(2020, 1, 1, tzinfo=UTC),
+            )
+        )
+        await conn.execute(
+            sa.insert(keypairs).values(
+                user_id=email,
+                access_key=data.access_key,
+                secret_key=data.secret_key,
+                is_active=True,
+                resource_policy=resource_policy_fixture,
+                rate_limit=30000,
+                num_queries=0,
+                is_admin=False,
+                user=str(data.user_uuid),
+            )
+        )
+        await conn.execute(
+            sa.insert(association_groups_users).values(
+                group_id=str(group_fixture),
+                user_id=str(data.user_uuid),
+            )
+        )
+    yield data
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            association_groups_users.delete().where(
+                association_groups_users.c.user_id == str(data.user_uuid)
+            )
+        )
+        await conn.execute(keypairs.delete().where(keypairs.c.access_key == data.access_key))
+        await conn.execute(users.delete().where(users.c.uuid == str(data.user_uuid)))
