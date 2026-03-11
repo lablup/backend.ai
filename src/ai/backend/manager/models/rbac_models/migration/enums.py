@@ -118,7 +118,6 @@ class EntityType(enum.StrEnum):
     NOTIFICATION_CHANNEL = "notification_channel"
     NOTIFICATION_RULE = "notification_rule"
     MODEL_DEPLOYMENT = "model_deployment"
-    SCALING_GROUP = "scaling_group"
 
     def to_original(self) -> OriginalEntityType:
         return OriginalEntityType(self.value)
@@ -145,7 +144,6 @@ class EntityType(enum.StrEnum):
             cls.NOTIFICATION_CHANNEL,
             cls.NOTIFICATION_RULE,
             cls.MODEL_DEPLOYMENT,
-            cls.SCALING_GROUP,
         }
 
     @classmethod
