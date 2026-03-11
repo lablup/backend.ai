@@ -10,6 +10,7 @@ from ai.backend.common.clients.http_client.client_pool import (
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import (
     LabelValueResponse,
+    PrometheusQueryInstantResponse,
     PrometheusQueryRangeResponse,
 )
 from ai.backend.common.exception import FailedToGetMetric, PrometheusConnectionError
@@ -60,6 +61,29 @@ class PrometheusClient:
         })
         result = await self._execute_request(HTTPMethod.POST, "query_range", data=form_data)
         return PrometheusQueryRangeResponse.model_validate(result)
+
+    async def query_instant(
+        self,
+        preset: MetricPreset,
+        *,
+        time: str | None = None,
+    ) -> PrometheusQueryInstantResponse:
+        """Execute an instant query against Prometheus.
+
+        Args:
+            preset: The metric preset containing query template and values.
+            time: Optional evaluation timestamp (RFC3339 or Unix timestamp).
+
+        Returns:
+            PrometheusQueryInstantResponse with query results.
+        """
+        query = preset.render()
+        form_fields: dict[str, str] = {"query": query}
+        if time is not None:
+            form_fields["time"] = time
+        form_data = aiohttp.FormData(form_fields)
+        result = await self._execute_request(HTTPMethod.POST, "query", data=form_data)
+        return PrometheusQueryInstantResponse.model_validate(result)
 
     async def query_label_values(
         self,
