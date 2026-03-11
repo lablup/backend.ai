@@ -1,17 +1,28 @@
+from __future__ import annotations
+
 from abc import abstractmethod
 from collections.abc import Sequence
 
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    DeploymentLifecycleStatus,
     DeploymentStatusTransitions,
 )
-from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.types import DeploymentExecutionResult
 
 
 class DeploymentHandler:
-    """Base class for deployment operation handlers using the generic interface."""
+    """Base class for deployment operation handlers.
+
+    Each handler targets deployments matching specific lifecycle statuses
+    and optionally a sub-step.  The coordinator queries the DB using these
+    filters and passes only the matching deployments to ``execute()``.
+
+    ``target_statuses()`` fully describes what each handler processes:
+    the coordinator derives both the DB query filter and the registry key
+    from the returned ``DeploymentLifecycleStatus`` list.
+    """
 
     @classmethod
     @abstractmethod
@@ -31,11 +42,15 @@ class DeploymentHandler:
 
     @classmethod
     @abstractmethod
-    def target_statuses(cls) -> list[EndpointLifecycle]:
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
         """Get the target deployment statuses for this handler.
 
+        Each entry pairs an ``EndpointLifecycle`` with an optional
+        ``DeploymentSubStatus`` (sub-step).  The coordinator uses these
+        to filter deployments from the DB and to build registry keys.
+
         Returns:
-            List of deployment statuses that this handler targets
+            List of lifecycle + sub-step pairs that this handler targets
         """
         raise NotImplementedError("Subclasses must implement target_statuses()")
 
@@ -64,9 +79,11 @@ class DeploymentHandler:
 
     @abstractmethod
     async def post_process(self, result: DeploymentExecutionResult) -> None:
-        """Handle post-processing after the operation.
+        """Per-handler post-processing after execute().
+
+        Typical use: reschedule the next lifecycle cycle, trigger dependent lifecycles.
 
         Args:
-            result: The result from execute()
+            result: The result from this handler's execute()
         """
         raise NotImplementedError("Subclasses must implement post_process()")

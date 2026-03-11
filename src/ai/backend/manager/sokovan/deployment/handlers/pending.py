@@ -45,9 +45,12 @@ class CheckPendingDeploymentHandler(DeploymentHandler):
         return LockID.LOCKID_DEPLOYMENT_CHECK_PENDING
 
     @classmethod
-    def target_statuses(cls) -> list[EndpointLifecycle]:
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
         """Get the target deployment statuses for this handler."""
-        return [EndpointLifecycle.PENDING, EndpointLifecycle.CREATED]
+        return [
+            DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.PENDING),
+            DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.CREATED),
+        ]
 
     @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:

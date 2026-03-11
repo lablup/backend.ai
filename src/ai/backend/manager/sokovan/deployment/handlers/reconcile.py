@@ -48,9 +48,9 @@ class ReconcileDeploymentHandler(DeploymentHandler):
         return None
 
     @classmethod
-    def target_statuses(cls) -> list[EndpointLifecycle]:
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
         """Get the target deployment statuses for this handler."""
-        return [EndpointLifecycle.READY]
+        return [DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY)]
 
     @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:

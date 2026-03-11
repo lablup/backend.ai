@@ -45,6 +45,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
+    DeploymentSubStep,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
@@ -429,6 +430,7 @@ class DeploymentDBSource:
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
+                    selectinload(EndpointRow.deployment_policy),
                 )
             )
             result = await db_sess.execute(query)
@@ -476,26 +478,32 @@ class DeploymentDBSource:
             return cleanup_configs
 
     async def get_endpoints_by_statuses(
-        self, statuses: list[EndpointLifecycle]
+        self,
+        statuses: list[EndpointLifecycle],
+        sub_steps: list[DeploymentSubStep] | None = None,
     ) -> list[DeploymentInfo]:
-        """Get all active endpoints."""
+        """Get endpoints by lifecycle statuses, optionally filtered by sub_steps."""
         async with self._begin_readonly_session_read_committed() as db_sess:
-            rows = await self._get_endpoints_by_statuses(db_sess, statuses)
-
-        return [row.to_deployment_info() for row in rows]
+            rows = await self._get_endpoints_by_statuses(db_sess, statuses, sub_steps)
+            return [row.to_deployment_info() for row in rows]
 
     async def _get_endpoints_by_statuses(
         self,
         db_sess: SASession,
         statuses: list[EndpointLifecycle],
+        sub_steps: list[DeploymentSubStep] | None = None,
     ) -> list[EndpointRow]:
-        """Fetch endpoints by lifecycle statuses."""
+        """Fetch endpoints by lifecycle statuses, optionally filtered by sub_steps."""
+        where_clause: sa.ColumnElement[bool] = EndpointRow.lifecycle_stage.in_(statuses)
+        if sub_steps is not None:
+            where_clause = sa.and_(where_clause, EndpointRow.sub_step.in_(sub_steps))
         query = (
             sa.select(EndpointRow)
-            .where(EndpointRow.lifecycle_stage.in_(statuses))
+            .where(where_clause)
             .options(
                 selectinload(EndpointRow.image_row),
                 selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
+                selectinload(EndpointRow.deployment_policy),
             )
         )
         result = await db_sess.execute(query)
@@ -707,6 +715,28 @@ class DeploymentDBSource:
         result = await db_sess.execute(query)
         rows = result.scalars().all()
         return {row.deployment_id: row for row in rows}
+
+    async def get_last_deployment_histories(
+        self,
+        deployment_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, DeploymentHistoryRow]:
+        """Get last history records for multiple deployments (regardless of phase).
+
+        Returns the most recent history record for each deployment. The caller
+        should compare history.phase with the current phase to determine
+        if attempts should be used or reset to 0.
+        """
+        if not deployment_ids:
+            return {}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            return await self._get_last_deployment_histories_bulk(db_sess, deployment_ids)
+
+    async def get_db_now(self) -> datetime:
+        """Get current database server time."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            result = await db_sess.execute(sa.select(sa.func.now()))
+            return result.scalar_one()
 
     async def delete_endpoint_with_routes(
         self,
@@ -2143,28 +2173,35 @@ class DeploymentDBSource:
 
             return row.to_deployment_info()
 
-    async def update_current_revision(
+    async def set_deploying_revision(
         self,
         endpoint_id: uuid.UUID,
         revision_id: uuid.UUID,
     ) -> uuid.UUID | None:
-        """Update the current_revision of an endpoint and return the previous revision ID."""
-        async with self._begin_session_read_committed() as db_sess:
-            # Get current revision first
-            query = sa.select(EndpointRow.current_revision).where(EndpointRow.id == endpoint_id)
-            result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
-            previous_revision_id = row
+        """Set deploying_revision and transition lifecycle to DEPLOYING.
 
-            # Update to new revision
+        Returns the previous current_revision id (may be None for first deployment).
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            # Single UPDATE ... RETURNING to atomically set deploying_revision
+            # and retrieve current_revision without TOCTOU race.
             update_query = (
                 sa.update(EndpointRow)
-                .where(EndpointRow.id == endpoint_id)
-                .values(current_revision=revision_id)
+                .where(
+                    EndpointRow.id == endpoint_id,
+                    EndpointRow.deploying_revision.is_(None),
+                )
+                .values(
+                    deploying_revision=revision_id,
+                    lifecycle_stage=EndpointLifecycle.DEPLOYING,
+                )
+                .returning(EndpointRow.current_revision)
             )
-            await db_sess.execute(update_query)
-
-            return previous_revision_id
+            result = await db_sess.execute(update_query)
+            row = result.one_or_none()
+            if row is None:
+                return None
+            return cast(uuid.UUID | None, row[0])
 
     # -------------------------------------------------------------------------
     # Auto-Scaling Policy Methods (DeploymentAutoScalingPolicyRow)
