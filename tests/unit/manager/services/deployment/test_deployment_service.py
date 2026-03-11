@@ -611,26 +611,34 @@ class TestServiceDefinitionMerge(ModelRevisionFixtures):
 class TestGetModelDefinition(DeploymentServiceBaseFixtures):
     """Tests for DeploymentService.get_model_definition"""
 
-    async def test_get_model_definition_success(
-        self,
-        processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
-    ) -> None:
-        """Should return model definition from the current active revision."""
-        deployment_id = uuid.uuid4()
-        expected_definition: dict[str, Any] = {
+    @pytest.fixture
+    def deployment_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def sample_model_definition(self) -> dict[str, Any]:
+        return {
             "name": "test-model",
             "model_path": "/models/test",
             "runtime": "vllm",
         }
+
+    async def test_get_model_definition_success(
+        self,
+        processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
+        deployment_id: uuid.UUID,
+        sample_model_definition: dict[str, Any],
+    ) -> None:
+        """Should return model definition from the current active revision."""
         mock_deployment_repository.get_model_definition_by_deployment_id = AsyncMock(
-            return_value=expected_definition
+            return_value=sample_model_definition
         )
 
         action = GetModelDefinitionAction(deployment_id=deployment_id)
         result = await processors.get_model_definition.wait_for_complete(action)
 
-        assert result.model_definition == expected_definition
+        assert result.model_definition == sample_model_definition
         mock_deployment_repository.get_model_definition_by_deployment_id.assert_called_once_with(
             deployment_id
         )
@@ -639,9 +647,9 @@ class TestGetModelDefinition(DeploymentServiceBaseFixtures):
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
+        deployment_id: uuid.UUID,
     ) -> None:
         """Should raise when deployment has no active revision."""
-        deployment_id = uuid.uuid4()
         mock_deployment_repository.get_model_definition_by_deployment_id = AsyncMock(
             side_effect=DeploymentHasNoTargetRevision("No active revision")
         )
@@ -654,9 +662,9 @@ class TestGetModelDefinition(DeploymentServiceBaseFixtures):
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
+        deployment_id: uuid.UUID,
     ) -> None:
         """Should raise when revision has no model definition."""
-        deployment_id = uuid.uuid4()
         mock_deployment_repository.get_model_definition_by_deployment_id = AsyncMock(
             side_effect=DefinitionFileNotFound("No model definition")
         )
