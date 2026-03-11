@@ -17,7 +17,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.client.v2.exceptions import BackendAPIError, NotFoundError
+from ai.backend.client.v2.exceptions import BackendAPIError, InvalidAPIParameters, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.deployment.types import OrderDirection
 from ai.backend.common.dto.manager.group.request import GroupFilter, SearchGroupsRequest
@@ -27,6 +27,8 @@ from ai.backend.common.dto.manager.group.response import (
     SearchGroupsResponse,
 )
 from ai.backend.common.dto.manager.group.types import GroupOrder, GroupOrderField
+from ai.backend.common.dto.manager.infra.request import UsagePerPeriodRequest
+from ai.backend.common.dto.manager.infra.response import UsagePerPeriodResponse
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
@@ -544,12 +546,20 @@ class TestGroupUsageStats:
     async def test_get_usage_per_period(
         self,
         admin_registry: BackendAIClientRegistry,
-        target_group: uuid.UUID,
+        test_group_for_deletion: uuid.UUID,
     ) -> None:
         """S-1: Get usage per period → returns usage data."""
-        # Would call usage_per_period action with valid date range
-        # start_date = "20260101", end_date = "20260131"
-        pass
+        # Valid 30-day period
+        result = await admin_registry.infra.get_usage_per_period(
+            UsagePerPeriodRequest(
+                project_id=str(test_group_for_deletion),
+                start_date="20260101",
+                end_date="20260131",
+            )
+        )
+        assert isinstance(result, UsagePerPeriodResponse)
+        assert isinstance(result.root, list)
+        # Empty result is expected since test group has no sessions
 
     @pytest.mark.xfail(
         strict=True,
@@ -559,12 +569,19 @@ class TestGroupUsageStats:
     async def test_usage_100_day_max_range_enforced(
         self,
         admin_registry: BackendAIClientRegistry,
-        target_group: uuid.UUID,
+        test_group_for_deletion: uuid.UUID,
     ) -> None:
         """F-BIZ-1: 100-day max range enforced → error if range exceeds 100 days."""
-        # Would call with start_date and end_date more than 100 days apart
-        # Expect InvalidAPIParameters error
-        pass
+        # 101 days: 20260101 to 20260412 (Jan 1 to Apr 12 = 101 days)
+        with pytest.raises(InvalidAPIParameters) as exc_info:
+            await admin_registry.infra.get_usage_per_period(
+                UsagePerPeriodRequest(
+                    project_id=str(test_group_for_deletion),
+                    start_date="20260101",
+                    end_date="20260412",  # More than 100 days after start_date
+                )
+            )
+        assert "100 days" in str(exc_info.value).lower()
 
     @pytest.mark.xfail(
         strict=True,
@@ -574,12 +591,30 @@ class TestGroupUsageStats:
     async def test_usage_end_date_validation(
         self,
         admin_registry: BackendAIClientRegistry,
-        target_group: uuid.UUID,
+        test_group_for_deletion: uuid.UUID,
     ) -> None:
         """F-BIZ-2: end_date > start_date validation → error if end_date <= start_date."""
-        # Would call with end_date <= start_date
-        # Expect InvalidAPIParameters error
-        pass
+        # end_date same as start_date
+        with pytest.raises(InvalidAPIParameters) as exc_info:
+            await admin_registry.infra.get_usage_per_period(
+                UsagePerPeriodRequest(
+                    project_id=str(test_group_for_deletion),
+                    start_date="20260115",
+                    end_date="20260115",  # Same date
+                )
+            )
+        assert "end_date must be later than start_date" in str(exc_info.value).lower()
+
+        # end_date before start_date
+        with pytest.raises(InvalidAPIParameters) as exc_info:
+            await admin_registry.infra.get_usage_per_period(
+                UsagePerPeriodRequest(
+                    project_id=str(test_group_for_deletion),
+                    start_date="20260115",
+                    end_date="20260110",  # Before start_date
+                )
+            )
+        assert "end_date must be later than start_date" in str(exc_info.value).lower()
 
     @pytest.mark.xfail(
         strict=True,
@@ -592,6 +627,13 @@ class TestGroupUsageStats:
         test_group_for_deletion: uuid.UUID,
     ) -> None:
         """S-2: Usage for group with no sessions → empty/zero usage."""
-        # Would call usage_per_period for group with no sessions
-        # Expect empty result list
-        pass
+        result = await admin_registry.infra.get_usage_per_period(
+            UsagePerPeriodRequest(
+                project_id=str(test_group_for_deletion),
+                start_date="20260101",
+                end_date="20260131",
+            )
+        )
+        assert isinstance(result, UsagePerPeriodResponse)
+        assert isinstance(result.root, list)
+        assert len(result.root) == 0, "Group with no sessions should return empty usage list"
