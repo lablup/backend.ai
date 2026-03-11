@@ -284,7 +284,7 @@ class TestVFSStorageQuota:
         assert result.storage_host_name == "proxy1:volume1"
         assert result.usage_bytes == 1024
         assert result.hard_limit_bytes == 4096
-        mock_storage_proxy_client.get_quota_scope.assert_called_once_with("volume1", "scope-1")
+        mock_storage_proxy_client.get_quota_scope.assert_awaited_once_with("volume1", "scope-1")
 
     async def test_set_quota_scope(
         self,
@@ -307,7 +307,7 @@ class TestVFSStorageQuota:
         assert result.quota_scope_id == "scope-1"
         assert result.usage_bytes == 512
         assert result.hard_limit_bytes == 8192
-        mock_storage_proxy_client.update_quota_scope.assert_called_once_with(
+        mock_storage_proxy_client.update_quota_scope.assert_awaited_once_with(
             "volume1", "scope-1", 8192
         )
 
@@ -325,6 +325,6 @@ class TestVFSStorageQuota:
 
         assert result.quota_scope_id == "scope-1"
         assert result.storage_host_name == "proxy1:volume1"
-        mock_storage_proxy_client.delete_quota_scope_quota.assert_called_once_with(
+        mock_storage_proxy_client.delete_quota_scope_quota.assert_awaited_once_with(
             "volume1", "scope-1"
         )

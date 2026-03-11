@@ -259,7 +259,7 @@ class TestStorageNamespaceSearch:
         storage_namespace_processors: StorageNamespaceProcessors,
         object_storage_factory: ObjectStorageFactory,
     ) -> None:
-        """Registering duplicate (storage_id, namespace) raises IntegrityError."""
+        """Registering duplicate (storage_id, namespace) raises UniqueConstraintViolationError."""
         storage = await object_storage_factory()
 
         # Register first time — should succeed
