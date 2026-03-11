@@ -4460,6 +4460,17 @@ input EnvironmentVariablesInput
   entries: [EnvironmentVariableEntryInput!]!
 }
 
+"""Added in 26.3.0. Options for executing a query definition."""
+input ExecuteQueryDefinitionOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Label key-value pairs to filter by."""
+  filterLabels: [MetricLabelEntryInput!] = null
+
+  """Label keys to group results by."""
+  groupLabels: [String!] = null
+}
+
 """Added in 24.03.4."""
 input ExtraMountInput
   @join__type(graph: GRAPHENE)
@@ -9571,7 +9582,7 @@ type Query
   """
   Added in 26.3.0. Execute a query definition by ID and return the result (admin only).
   """
-  adminPrometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, labels: [MetricLabelEntryInput!] = null, groupLabels: [String!] = null, timeWindow: String = null): QueryDefinitionExecuteResult! @join__field(graph: STRAWBERRY)
+  adminPrometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult! @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. Get a single role by ID (admin only)."""
   adminRole(id: UUID!): Role @join__field(graph: STRAWBERRY)
