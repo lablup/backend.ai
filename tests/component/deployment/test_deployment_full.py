@@ -23,7 +23,8 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy, ModelDeploymentStatus
 from ai.backend.common.dto.manager.deployment import (
     CreateDeploymentRequest,
     DeploymentMetadataInput,
@@ -50,6 +51,7 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.services.deployment.service import _map_lifecycle_to_status
 
 # Type aliases for fixture factories
 ImageFactoryFunc = Callable[[], Coroutine[Any, Any, uuid.UUID]]
@@ -638,3 +640,29 @@ class TestRouteTrafficManagement:
         assert routes_result is not None
         # Routes may be empty if not yet created, but API should succeed
         assert hasattr(routes_result, "routes")
+
+
+# ---------------------------------------------------------------------------
+# Tier 6: Status Mapping — EndpointLifecycle -> ModelDeploymentStatus
+# ---------------------------------------------------------------------------
+
+
+class TestStatusMapping:
+    def test_lifecycle_to_status_mapping(self) -> None:
+        """Verify EndpointLifecycle maps correctly to ModelDeploymentStatus."""
+        # Test all lifecycle states map to correct status
+        mapping = {
+            EndpointLifecycle.PENDING: ModelDeploymentStatus.PENDING,
+            EndpointLifecycle.CREATED: ModelDeploymentStatus.READY,
+            EndpointLifecycle.READY: ModelDeploymentStatus.READY,
+            EndpointLifecycle.SCALING: ModelDeploymentStatus.SCALING,
+            EndpointLifecycle.DEPLOYING: ModelDeploymentStatus.DEPLOYING,
+            EndpointLifecycle.DESTROYING: ModelDeploymentStatus.STOPPING,
+            EndpointLifecycle.DESTROYED: ModelDeploymentStatus.STOPPED,
+        }
+
+        for lifecycle, expected_status in mapping.items():
+            actual_status = _map_lifecycle_to_status(lifecycle)
+            assert actual_status == expected_status, (
+                f"EndpointLifecycle.{lifecycle.name} should map to ModelDeploymentStatus.{expected_status.name}, got {actual_status.name}"
+            )
