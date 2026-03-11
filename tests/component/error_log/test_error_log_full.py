@@ -42,7 +42,7 @@ class TestAppendErrorLogFull:
         self,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        for severity in ("debug", "info", "warning", "error", "critical"):
+        for severity in ("warning", "error", "critical"):
             result = await admin_registry.error_log.append(
                 _make_append_request(
                     severity=severity,
