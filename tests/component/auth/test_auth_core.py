@@ -9,7 +9,11 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.exceptions import AuthenticationError, InvalidRequestError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.dto.manager.auth.request import AuthorizeRequest, SignupRequest
+from ai.backend.common.dto.manager.auth.request import (
+    AuthorizeRequest,
+    SignoutRequest,
+    SignupRequest,
+)
 from ai.backend.common.dto.manager.auth.response import AuthorizeResponse, SignupResponse
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -175,3 +179,38 @@ class TestSignup:
                     password="AnyP@ssw0rd123",
                 ),
             )
+
+
+class TestSignout:
+    async def test_signout_deactivates_user_and_keypairs(
+        self,
+        auth_user_registry: BackendAIClientRegistry,
+        auth_user_fixture: AuthUserFixtureData,
+        db_engine: SAEngine,
+    ) -> None:
+        await auth_user_registry.auth.signout(
+            SignoutRequest(
+                email=auth_user_fixture.email,
+                password=auth_user_fixture.password,
+            ),
+        )
+        async with db_engine.begin() as conn:
+            user_row = (
+                await conn.execute(
+                    sa.select(users.c.status).where(
+                        users.c.uuid == str(auth_user_fixture.user_uuid)
+                    )
+                )
+            ).first()
+            assert user_row is not None
+            assert str(user_row.status) == "inactive"
+
+            keypair_row = (
+                await conn.execute(
+                    sa.select(keypairs.c.is_active).where(
+                        keypairs.c.access_key == auth_user_fixture.access_key
+                    )
+                )
+            ).first()
+            assert keypair_row is not None
+            assert keypair_row.is_active is False
