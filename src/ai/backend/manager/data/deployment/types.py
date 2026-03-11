@@ -194,20 +194,17 @@ class DeploymentLifecycleStatus:
 class DeploymentStatusTransitions:
     """Status transitions for deployment handlers.
 
-    Simple handlers use ``success`` / ``failure``.
-    Handlers with retry classification use ``need_retry`` / ``expired`` / ``give_up``
-    instead of ``failure``.
+    Mirrors the session-side ``StatusTransitions`` pattern with failure
+    classification into need_retry / expired / give_up.
 
     Attributes:
         success: Target lifecycle when handler succeeds, None means no change
-        failure: Target lifecycle when handler fails (simple handlers)
         need_retry: Target lifecycle when handler fails but can retry
         expired: Target lifecycle when time elapsed in current state
         give_up: Target lifecycle when retry count exceeded
     """
 
     success: DeploymentLifecycleStatus | None = None
-    failure: DeploymentLifecycleStatus | None = None
     need_retry: DeploymentLifecycleStatus | None = None
     expired: DeploymentLifecycleStatus | None = None
     give_up: DeploymentLifecycleStatus | None = None

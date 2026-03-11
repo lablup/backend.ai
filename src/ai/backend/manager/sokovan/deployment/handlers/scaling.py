@@ -55,11 +55,11 @@ class ScalingDeploymentHandler(DeploymentHandler):
         """Define state transitions for scaling deployment handler (BEP-1030).
 
         - success: Deployment → READY
-        - failure: None (stays in current state)
+        - need_retry: None (stays in current state)
         """
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
-            failure=None,
+            need_retry=None,
         )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
