@@ -1804,7 +1804,6 @@ class DeploymentDBSource:
             return {}
 
         async with self._begin_readonly_session_read_committed() as db_sess:
-            # LEFT JOIN으로 route와 session 정보를 한 번에 가져오기
             query = (
                 sa.select(
                     RoutingRow.id,
@@ -1818,7 +1817,6 @@ class DeploymentDBSource:
             result = await db_sess.execute(query)
             rows = result.all()
 
-            # 결과를 매핑으로 변환
             status_map: dict[uuid.UUID, SessionStatus | None] = {}
             for route_id, session_status in rows:
                 status_map[route_id] = session_status
@@ -2037,28 +2035,26 @@ class DeploymentDBSource:
             DefinitionFileNotFound: If the revision has no model definition.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            endpoint_query = sa.select(
-                EndpointRow.current_revision,
-            ).where(EndpointRow.id == deployment_id)
-            result = await db_sess.execute(endpoint_query)
+            query = (
+                sa.select(
+                    EndpointRow.current_revision,
+                    DeploymentRevisionRow.model_definition,
+                )
+                .outerjoin(
+                    DeploymentRevisionRow,
+                    EndpointRow.current_revision == DeploymentRevisionRow.id,
+                )
+                .where(EndpointRow.id == deployment_id)
+            )
+            result = await db_sess.execute(query)
             row = result.one_or_none()
             if row is None:
                 raise EndpointNotFound(f"Deployment {deployment_id} not found")
-            current_revision_id = row[0]
+            current_revision_id, model_definition = row
             if current_revision_id is None:
                 raise DeploymentHasNoTargetRevision(
                     f"Deployment {deployment_id} has no active revision"
                 )
-            revision_query = sa.select(
-                DeploymentRevisionRow.model_definition,
-            ).where(DeploymentRevisionRow.id == current_revision_id)
-            revision_result = await db_sess.execute(revision_query)
-            revision_row = revision_result.one_or_none()
-            if revision_row is None:
-                raise DeploymentRevisionNotFound(
-                    f"Deployment revision {current_revision_id} not found"
-                )
-            model_definition = revision_row[0]
             if model_definition is None:
                 raise DefinitionFileNotFound(
                     f"No model definition found for revision {current_revision_id}"
