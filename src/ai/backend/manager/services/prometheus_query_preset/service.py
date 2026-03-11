@@ -2,7 +2,7 @@ import logging
 
 from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.prometheus.preset import MetricPreset
-from ai.backend.common.exception import InvalidAPIParameters, PrometheusQueryPresetInvalidLabel
+from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.prometheus_query_preset import (
     ExecutePresetOptions,
@@ -102,10 +102,10 @@ class PrometheusQueryPresetService:
             window=time_window,
         )
         if action.time_range is None:
-            # TODO: Implement instant query execution (query_instant) in the Prometheus client and use it here.
-            raise InvalidAPIParameters("time_range is required for preset execution")
-        response = await self._prometheus_client.query_range(
-            preset=metric_preset,
-            time_range=action.time_range,
-        )
+            response = await self._prometheus_client.query_instant(preset=metric_preset)
+        else:
+            response = await self._prometheus_client.query_range(
+                preset=metric_preset,
+                time_range=action.time_range,
+            )
         return ExecutePresetActionResult(response=response)
