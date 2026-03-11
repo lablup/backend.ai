@@ -18,7 +18,7 @@ depends_on = None
 
 # Constants
 BATCH_SIZE = 1000
-ENTITY_TYPE_SCALING_GROUP = "scaling_group"
+ENTITY_TYPE_RESOURCE_GROUP = "resource_group"
 MEMBER_ROLE_SUFFIX = "member"
 MEMBER_OPS = ["read"]
 OWNER_OPS = sorted([
@@ -36,9 +36,9 @@ OWNER_OPS = sorted([
 
 
 def _add_entity_type_permissions(db_conn: Connection) -> None:
-    """Add SCALING_GROUP entity-type permissions to all role+scope combinations.
+    """Add RESOURCE_GROUP entity-type permissions to all role+scope combinations.
 
-    Uses a single set-based INSERT ... SELECT to derive SCALING_GROUP permissions
+    Uses a single set-based INSERT ... SELECT to derive RESOURCE_GROUP permissions
     for all role+scope combinations without application-side pagination.
     """
     insert_query = sa.text("""
@@ -90,13 +90,13 @@ def _add_entity_type_permissions(db_conn: Connection) -> None:
             "member_ops": MEMBER_OPS,
             "owner_ops": OWNER_OPS,
             "member_pattern": f"%{MEMBER_ROLE_SUFFIX}",
-            "entity_type": ENTITY_TYPE_SCALING_GROUP,
+            "entity_type": ENTITY_TYPE_RESOURCE_GROUP,
         },
     )
 
 
-def _associate_scaling_group_to_domain_scope(db_conn: Connection) -> None:
-    """Associate scaling_groups to domain scopes via sgroups_for_domains junction table.
+def _associate_resource_group_to_domain_scope(db_conn: Connection) -> None:
+    """Associate resource groups to domain scopes via sgroups_for_domains junction table.
 
     Pages by scaling group names first, then JOINs to get all scope associations
     for each batch to avoid skipping rows in 1:N JOINs.
@@ -135,7 +135,7 @@ def _associate_scaling_group_to_domain_scope(db_conn: Connection) -> None:
             {
                 "scope_type": "domain",
                 "scope_id": str(row.scope_id),
-                "entity_type": ENTITY_TYPE_SCALING_GROUP,
+                "entity_type": ENTITY_TYPE_RESOURCE_GROUP,
                 "entity_id": str(row.entity_id),
                 "relation_type": "auto",
             }
@@ -146,8 +146,8 @@ def _associate_scaling_group_to_domain_scope(db_conn: Connection) -> None:
             db_conn.execute(insert_query, values_list)
 
 
-def _associate_scaling_group_to_project_scope(db_conn: Connection) -> None:
-    """Associate scaling_groups to project scopes via sgroups_for_groups junction table.
+def _associate_resource_group_to_project_scope(db_conn: Connection) -> None:
+    """Associate resource groups to project scopes via sgroups_for_groups junction table.
 
     Pages by scaling group names first, then JOINs to get all scope associations
     for each batch to avoid skipping rows in 1:N JOINs.
@@ -186,7 +186,7 @@ def _associate_scaling_group_to_project_scope(db_conn: Connection) -> None:
             {
                 "scope_type": "project",
                 "scope_id": str(row.scope_id),
-                "entity_type": ENTITY_TYPE_SCALING_GROUP,
+                "entity_type": ENTITY_TYPE_RESOURCE_GROUP,
                 "entity_id": str(row.entity_id),
                 "relation_type": "auto",
             }
@@ -197,8 +197,8 @@ def _associate_scaling_group_to_project_scope(db_conn: Connection) -> None:
             db_conn.execute(insert_query, values_list)
 
 
-def _remove_scaling_group_edges(db_conn: Connection) -> None:
-    """Remove all SCALING_GROUP AUTO edges from association_scopes_entities."""
+def _remove_resource_group_edges(db_conn: Connection) -> None:
+    """Remove all RESOURCE_GROUP AUTO edges from association_scopes_entities."""
     while True:
         delete_query = sa.text("""
             DELETE FROM association_scopes_entities
@@ -212,7 +212,7 @@ def _remove_scaling_group_edges(db_conn: Connection) -> None:
         result = db_conn.execute(
             delete_query,
             {
-                "entity_type": ENTITY_TYPE_SCALING_GROUP,
+                "entity_type": ENTITY_TYPE_RESOURCE_GROUP,
                 "relation_type": "auto",
                 "limit": BATCH_SIZE,
             },
@@ -221,8 +221,8 @@ def _remove_scaling_group_edges(db_conn: Connection) -> None:
             break
 
 
-def _remove_scaling_group_permissions(db_conn: Connection) -> None:
-    """Remove all SCALING_GROUP entity-type permissions."""
+def _remove_resource_group_permissions(db_conn: Connection) -> None:
+    """Remove all RESOURCE_GROUP entity-type permissions."""
     while True:
         delete_query = sa.text("""
             DELETE FROM permissions
@@ -234,7 +234,7 @@ def _remove_scaling_group_permissions(db_conn: Connection) -> None:
         """)
         result = db_conn.execute(
             delete_query,
-            {"entity_type": ENTITY_TYPE_SCALING_GROUP, "limit": BATCH_SIZE},
+            {"entity_type": ENTITY_TYPE_RESOURCE_GROUP, "limit": BATCH_SIZE},
         )
         if result.rowcount == 0:
             break
@@ -243,11 +243,11 @@ def _remove_scaling_group_permissions(db_conn: Connection) -> None:
 def upgrade() -> None:
     conn = op.get_bind()
     _add_entity_type_permissions(conn)
-    _associate_scaling_group_to_domain_scope(conn)
-    _associate_scaling_group_to_project_scope(conn)
+    _associate_resource_group_to_domain_scope(conn)
+    _associate_resource_group_to_project_scope(conn)
 
 
 def downgrade() -> None:
     conn = op.get_bind()
-    _remove_scaling_group_edges(conn)
-    _remove_scaling_group_permissions(conn)
+    _remove_resource_group_edges(conn)
+    _remove_resource_group_permissions(conn)
