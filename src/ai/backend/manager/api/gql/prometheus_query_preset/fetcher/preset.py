@@ -25,6 +25,7 @@ from ai.backend.manager.api.gql.prometheus_query_preset.types import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.prometheus_query_preset import ExecutePresetOptions
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
+from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.prometheus_query_preset.options import (
     PrometheusQueryPresetConditions,
     PrometheusQueryPresetOrders,
@@ -68,6 +69,7 @@ async def fetch_prometheus_query_presets(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
+    base_conditions: list[QueryCondition] | None = None,
 ) -> QueryDefinitionConnection:
     processors = info.context.processors
 
@@ -83,7 +85,7 @@ async def fetch_prometheus_query_presets(
         get_preset_pagination_spec(),
         filter=filter,
         order_by=order_by,
-        base_conditions=None,
+        base_conditions=base_conditions,
     )
 
     action_result = await processors.prometheus_query_preset.search_presets.wait_for_complete(
