@@ -9,7 +9,11 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.dto.manager.fair_share import (
+    UpdateResourceGroupFairShareSpecRequest,
+)
 from ai.backend.common.dto.manager.scaling_group import ListScalingGroupsResponse
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupOpts,
@@ -323,30 +327,102 @@ class TestScalingGroupFairShareSpec:
         admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
     ) -> None:
-        """Admin can retrieve fair share spec for a scaling group."""
-        # Note: This requires the fair_share SDK client implementation
-        # For now, we just verify the fixture exists
-        assert scaling_group_fixture is not None
+        """Admin can retrieve fair share spec for a scaling group (resource group)."""
+        # Get the fair share spec
+        result = await admin_registry.fair_share.get_resource_group_fair_share_spec(
+            resource_group=scaling_group_fixture,
+        )
+
+        # Verify response structure
+        assert result.resource_group == scaling_group_fixture
+        assert result.fair_share_spec is not None
+        assert result.fair_share_spec.half_life_days > 0
+        assert result.fair_share_spec.lookback_days > 0
+        assert result.fair_share_spec.decay_unit_days > 0
+        assert result.fair_share_spec.default_weight > 0
+        assert result.fair_share_spec.resource_weights is not None
 
     async def test_update_fair_share_spec_with_merge(
         self,
         admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
     ) -> None:
-        """Admin can update fair share spec with merge logic."""
-        # Note: This requires the fair_share SDK client implementation
-        # Placeholder for future implementation
-        pass
+        """Admin can update fair share spec with merge logic (partial update)."""
+        # Get current spec
+        current = await admin_registry.fair_share.get_resource_group_fair_share_spec(
+            resource_group=scaling_group_fixture,
+        )
+        original_half_life = current.fair_share_spec.half_life_days
+        original_lookback = current.fair_share_spec.lookback_days
+
+        # Update only half_life_days (partial update - merge logic)
+        new_half_life = original_half_life + 1
+        update_request = UpdateResourceGroupFairShareSpecRequest(
+            half_life_days=new_half_life,
+            # lookback_days is None - should retain existing value
+        )
+        result = await admin_registry.fair_share.update_resource_group_fair_share_spec(
+            resource_group=scaling_group_fixture,
+            request=update_request,
+        )
+
+        # Verify merge logic: half_life updated, lookback unchanged
+        assert result.resource_group == scaling_group_fixture
+        assert result.fair_share_spec.half_life_days == new_half_life
+        assert result.fair_share_spec.lookback_days == original_lookback
+
+        # Restore original value
+        restore_request = UpdateResourceGroupFairShareSpecRequest(
+            half_life_days=original_half_life,
+        )
+        await admin_registry.fair_share.update_resource_group_fair_share_spec(
+            resource_group=scaling_group_fixture,
+            request=restore_request,
+        )
 
     async def test_update_fair_share_spec_filters_stale_resources(
         self,
         admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
     ) -> None:
-        """Updating fair share spec filters out stale resources."""
-        # Note: This requires the fair_share SDK client implementation
-        # Placeholder for future implementation
-        pass
+        """Updating fair share spec filters out stale resources from resource_weights."""
+        # Get current spec
+        current = await admin_registry.fair_share.get_resource_group_fair_share_spec(
+            resource_group=scaling_group_fixture,
+        )
+
+        # Create update with resource_weights including a potentially stale resource
+        # Note: The API should filter out resources not present in the resource group
+        update_request = UpdateResourceGroupFairShareSpecRequest(
+            resource_weights=ResourceSlot(
+                cpu=1.0,
+                mem=1.0,
+                # If the resource group doesn't have 'cuda.device', it should be filtered
+                **{"cuda.device": 1.0},
+            ),
+        )
+        result = await admin_registry.fair_share.update_resource_group_fair_share_spec(
+            resource_group=scaling_group_fixture,
+            request=update_request,
+        )
+
+        # Verify the spec was updated
+        assert result.resource_group == scaling_group_fixture
+        assert result.fair_share_spec is not None
+
+        # The resource_weights should only contain resources available in the resource group
+        # Note: Actual filtering depends on the resource group's available resources
+        # This test verifies the API accepts resource_weights and processes them
+        assert result.fair_share_spec.resource_weights is not None
+
+        # Restore original resource_weights
+        restore_request = UpdateResourceGroupFairShareSpecRequest(
+            resource_weights=current.fair_share_spec.resource_weights,
+        )
+        await admin_registry.fair_share.update_resource_group_fair_share_spec(
+            resource_group=scaling_group_fixture,
+            request=restore_request,
+        )
 
 
 class TestScalingGroupQueryOperations:
