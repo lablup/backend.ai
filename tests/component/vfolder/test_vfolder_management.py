@@ -95,7 +95,6 @@ class TestVFolderDelete:
         """S-3: Hard delete (purge) vfolder → vfolder removed from DB."""
         vfolder = await vfolder_factory()
         vfolder_id = vfolder["id"]
-        vfolder_name = vfolder["name"]
 
         # Purge via SDK
         await admin_registry.vfolder.purge(PurgeVFolderReq(vfolder_id=vfolder_id))
@@ -144,9 +143,7 @@ class TestVFolderInvitation:
         invitee_email = user_fixture.email
 
         # Invite user via SDK
-        await admin_registry.vfolder.invite(
-            vfolder_name, InviteVFolderReq(emails=[invitee_email])
-        )
+        await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
 
         # Verify: invitation exists with PENDING status
         async with db_engine.begin() as conn:
@@ -173,7 +170,7 @@ class TestVFolderInvitation:
         invitee_email = user_fixture.email
 
         # Owner invites user
-        await admin_registry.vfolder.invite(vfolder_name, invitee_email)
+        await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
 
         # Get invitation ID
         async with db_engine.begin() as conn:
@@ -185,7 +182,9 @@ class TestVFolderInvitation:
             invitation_id = result.scalar_one()
 
         # Invitee accepts invitation via SDK
-        await user_registry.vfolder.accept_invitation(AcceptInvitationReq(inv_id=str(invitation_id)))
+        await user_registry.vfolder.accept_invitation(
+            AcceptInvitationReq(inv_id=str(invitation_id))
+        )
 
         # Verify: invitation status is ACCEPTED
         async with db_engine.begin() as conn:
@@ -212,7 +211,7 @@ class TestVFolderInvitation:
         invitee_email = user_fixture.email
 
         # Owner invites user
-        await admin_registry.vfolder.invite(vfolder_name, invitee_email)
+        await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
 
         # Get invitation ID
         async with db_engine.begin() as conn:
@@ -224,7 +223,9 @@ class TestVFolderInvitation:
             invitation_id = result.scalar_one()
 
         # Invitee rejects invitation via SDK
-        await user_registry.vfolder.delete_invitation(DeleteInvitationReq(inv_id=str(invitation_id)))
+        await user_registry.vfolder.delete_invitation(
+            DeleteInvitationReq(inv_id=str(invitation_id))
+        )
 
         # Verify: invitation status is REJECTED (or removed)
         async with db_engine.begin() as conn:
@@ -251,7 +252,7 @@ class TestVFolderInvitation:
         invitee_email = user_fixture.email
 
         # Owner invites user
-        await admin_registry.vfolder.invite(vfolder_name, invitee_email)
+        await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
 
         # List invitations as invitee
         invitations = await user_registry.vfolder.list_invitations()
@@ -272,7 +273,7 @@ class TestVFolderInvitation:
         invitee_email = user_fixture.email
 
         # Owner invites user
-        await admin_registry.vfolder.invite(vfolder_name, invitee_email)
+        await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
 
         # Get invitation ID
         async with db_engine.begin() as conn:
@@ -284,7 +285,9 @@ class TestVFolderInvitation:
             invitation_id = result.scalar_one()
 
         # Owner cancels invitation
-        await admin_registry.vfolder.delete_invitation(DeleteInvitationReq(inv_id=str(invitation_id)))
+        await admin_registry.vfolder.delete_invitation(
+            DeleteInvitationReq(inv_id=str(invitation_id))
+        )
 
         # Verify: invitation is removed or CANCELED
         async with db_engine.begin() as conn:
@@ -310,7 +313,7 @@ class TestVFolderInvitation:
         invitee_email = user_fixture.email
 
         # Owner invites user
-        await admin_registry.vfolder.invite(vfolder_name, invitee_email)
+        await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
 
         # Get invitation ID and reject
         async with db_engine.begin() as conn:
@@ -322,7 +325,9 @@ class TestVFolderInvitation:
             first_invitation_id = result.scalar_one()
 
         # Invitee rejects
-        await user_registry.vfolder.delete_invitation(str(first_invitation_id))
+        await user_registry.vfolder.delete_invitation(
+            DeleteInvitationReq(inv_id=str(first_invitation_id))
+        )
 
         # Owner re-invites
         await admin_registry.vfolder.invite(vfolder_name, invitee_email)
@@ -378,7 +383,7 @@ class TestVFolderInvitationPermissions:
         other_email = "other-user@test.local"
 
         # Create invitation
-        await admin_registry.vfolder.invite(vfolder_name, other_email)
+        await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[other_email]))
 
         # Get invitation ID
         async with db_engine.begin() as conn:
