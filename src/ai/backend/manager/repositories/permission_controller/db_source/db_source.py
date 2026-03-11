@@ -427,8 +427,8 @@ class PermissionDBSource:
         scope_id: ScopeId,
         operation: OperationType,
     ) -> bool:
-        role_query = (
-            sa.select(sa.func.exist())
+        inner_query = (
+            sa.select(sa.literal(1))
             .select_from(
                 sa.join(RoleRow, UserRoleRow, RoleRow.id == UserRoleRow.role_id).join(
                     PermissionRow, RoleRow.id == PermissionRow.role_id
@@ -446,6 +446,7 @@ class PermissionDBSource:
                 )
             )
         )
+        role_query = sa.select(sa.exists(inner_query))
         async with self._db.begin_readonly_session_read_committed() as db_session:
             result = await db_session.scalar(role_query)
             return result or False
@@ -504,6 +505,7 @@ class PermissionDBSource:
                         PermissionRow.scope_id == AssociationScopesEntitiesRow.scope_id,
                         PermissionRow.scope_type == AssociationScopesEntitiesRow.scope_type,
                     ),
+                    isouter=True,
                 )
                 .join(ObjectPermissionRow, RoleRow.id == ObjectPermissionRow.role_id)
             )
@@ -543,7 +545,7 @@ class PermissionDBSource:
         )
         async with self._db.begin_readonly_session_read_committed() as db_session:
             result = await db_session.scalars(role_query)
-            role_rows = cast(list[RoleRow], result.all())
+            role_rows = cast(list[RoleRow], result.unique().all())
             return len(role_rows) > 0
 
     async def check_batch_object_permission_exist(
@@ -558,7 +560,7 @@ class PermissionDBSource:
         )
         async with self._db.begin_readonly_session_read_committed() as db_session:
             role_rows_result = await db_session.scalars(role_query)
-            role_rows = list(role_rows_result.all())
+            role_rows = list(role_rows_result.unique().all())
 
             for role in role_rows:
                 for op in role.object_permission_rows:

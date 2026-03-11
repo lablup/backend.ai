@@ -19,7 +19,6 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.data.permission.types import EntityType
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.repository import (
-    ForeignKeyViolationError,
     UniqueConstraintViolationError,
 )
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
@@ -311,24 +310,31 @@ class TestObjectPermissionCreate:
                 )
             )
 
-    async def test_create_object_permission_with_nonexistent_role_raises_fk_error(
+    async def test_create_object_permission_with_nonexistent_role_succeeds(
         self,
         permission_service: PermissionControllerService,
     ) -> None:
-        """F-BIZ-2: Create ObjectPermission with non-existent role_id → FK violation error."""
-        with pytest.raises(ForeignKeyViolationError):
-            await permission_service.create_object_permission(
-                CreateObjectPermissionAction(
-                    creator=Creator(
-                        spec=ObjectPermissionCreatorSpec(
-                            role_id=uuid.uuid4(),  # non-existent role
-                            entity_type=EntityType.SESSION,
-                            entity_id=str(uuid.uuid4()),
-                            operation=OperationType.READ,
-                        )
+        """F-BIZ-2: Create ObjectPermission with non-existent role_id → succeeds (no FK constraint on role_id column)."""
+        result = await permission_service.create_object_permission(
+            CreateObjectPermissionAction(
+                creator=Creator(
+                    spec=ObjectPermissionCreatorSpec(
+                        role_id=uuid.uuid4(),  # non-existent role — no FK constraint enforced
+                        entity_type=EntityType.SESSION,
+                        entity_id=str(uuid.uuid4()),
+                        operation=OperationType.READ,
                     )
                 )
             )
+        )
+        assert isinstance(result.data, ObjectPermissionData)
+
+        # Cleanup orphaned record
+        await permission_service.delete_object_permission(
+            DeleteObjectPermissionAction(
+                purger=Purger(row_class=ObjectPermissionRow, pk_value=result.data.id)
+            )
+        )
 
 
 class TestObjectPermissionDelete:
