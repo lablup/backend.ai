@@ -591,3 +591,34 @@ class TestUpdateResourceGroupFairShareSpec:
         assert isinstance(result, UpdateResourceGroupFairShareSpecResponse)
         assert result.resource_group == scaling_group_fixture
         assert result.fair_share_spec.half_life_days == 14
+
+    async def test_admin_partial_update_preserves_other_fields(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        scaling_group_fixture: str,
+    ) -> None:
+        """Partial update (merge logic) changes only the specified field."""
+        current = await admin_registry.fair_share.get_resource_group_fair_share_spec(
+            resource_group=scaling_group_fixture,
+        )
+        original_half_life = current.fair_share_spec.half_life_days
+        original_lookback = current.fair_share_spec.lookback_days
+
+        new_half_life = original_half_life + 1
+        result = await admin_registry.fair_share.update_resource_group_fair_share_spec(
+            resource_group=scaling_group_fixture,
+            request=UpdateResourceGroupFairShareSpecRequest(
+                half_life_days=new_half_life,
+            ),
+        )
+
+        assert result.fair_share_spec.half_life_days == new_half_life
+        assert result.fair_share_spec.lookback_days == original_lookback
+
+        # Restore
+        await admin_registry.fair_share.update_resource_group_fair_share_spec(
+            resource_group=scaling_group_fixture,
+            request=UpdateResourceGroupFairShareSpecRequest(
+                half_life_days=original_half_life,
+            ),
+        )
