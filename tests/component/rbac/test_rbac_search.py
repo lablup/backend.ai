@@ -11,7 +11,6 @@ Comprehensive search tests covering:
 from __future__ import annotations
 
 import secrets
-from typing import Any
 
 import pytest
 
@@ -325,7 +324,7 @@ class TestEntitySearch:
     async def test_search_entities_in_domain(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: Any,
+        domain_fixture: str,
     ) -> None:
         """Search entities within a domain scope."""
         # Search for users in the test domain
@@ -338,13 +337,13 @@ class TestEntitySearch:
 
         assert isinstance(result, SearchEntitiesResponse)
         # Test domain may be empty, just verify search works
-        assert result.pagination.total >= 0
+        assert result.pagination.total >= len(result.items)
         assert isinstance(result.items, list)
 
     async def test_search_entities_with_pagination(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: Any,
+        domain_fixture: str,
     ) -> None:
         """Search entities with pagination returns correct page."""
         result = await admin_registry.rbac.search_entities(
@@ -383,7 +382,7 @@ class TestSearchPermissionBoundaries:
     async def test_regular_user_cannot_search_entities(
         self,
         user_registry: BackendAIClientRegistry,
-        domain_fixture: Any,
+        domain_fixture: str,
     ) -> None:
         """Regular user cannot search entities."""
         # Entity search should be admin-only
