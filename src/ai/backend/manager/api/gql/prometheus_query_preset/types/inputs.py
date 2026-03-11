@@ -75,22 +75,12 @@ class ModifyQueryDefinitionInput:
     )
 
     def to_updater(self, preset_id: UUID) -> Updater[PrometheusQueryPresetRow]:
-        spec = PrometheusQueryPresetUpdaterSpec()
-
-        if self.name is not UNSET and self.name is not None:
-            spec.name = OptionalState.update(self.name)
-
-        if self.metric_name is not UNSET and self.metric_name is not None:
-            spec.metric_name = OptionalState.update(self.metric_name)
-
-        if self.query_template is not UNSET and self.query_template is not None:
-            spec.query_template = OptionalState.update(self.query_template)
-
-        if self.time_window is not UNSET:
-            if self.time_window is None:
-                spec.time_window = TriState.nullify()
-            else:
-                spec.time_window = TriState.update(self.time_window)
+        spec = PrometheusQueryPresetUpdaterSpec(
+            name=OptionalState[str].from_graphql(self.name),
+            metric_name=OptionalState[str].from_graphql(self.metric_name),
+            query_template=OptionalState[str].from_graphql(self.query_template),
+            time_window=TriState[str].from_graphql(self.time_window),
+        )
 
         if self.options is not UNSET and self.options is not None:
             spec.filter_labels = OptionalState.update(self.options.filter_labels)
@@ -108,7 +98,7 @@ class QueryTimeRangeInput:
     end: datetime = strawberry.field(description="End of the time range.")
     step: str = strawberry.field(description="Query resolution step (e.g., '60s').")
 
-    def to_query_time_range(self) -> QueryTimeRange:
+    def to_internal(self) -> QueryTimeRange:
         return QueryTimeRange(
             start=self.start.isoformat(),
             end=self.end.isoformat(),
@@ -137,15 +127,12 @@ class ExecuteQueryDefinitionOptionsInput:
         default=None, description="Label keys to group results by."
     )
 
-    @staticmethod
-    def to_execute_options(
-        options: ExecuteQueryDefinitionOptionsInput | None,
-    ) -> ExecutePresetOptions:
+    def to_internal(self) -> ExecutePresetOptions:
         filter_labels: dict[str, str] = {}
-        if options and options.filter_labels:
-            for entry in options.filter_labels:
+        if self.filter_labels:
+            for entry in self.filter_labels:
                 filter_labels[entry.key] = entry.value
         return ExecutePresetOptions(
             filter_labels=filter_labels,
-            group_labels=(options.group_labels or []) if options else [],
+            group_labels=self.group_labels or [],
         )

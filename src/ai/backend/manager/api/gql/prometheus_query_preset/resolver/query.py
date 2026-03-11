@@ -23,6 +23,7 @@ from ai.backend.manager.api.gql.prometheus_query_preset.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.data.prometheus_query_preset import ExecutePresetOptions
 
 
 @strawberry.field(description="Added in 26.3.0. Get a single query definition by ID (admin only).")  # type: ignore[misc]
@@ -73,11 +74,16 @@ async def admin_prometheus_query_preset_result(
     time_window: str | None = None,
 ) -> QueryDefinitionResultGQL:
     check_admin_only()
+    execute_options = (
+        options.to_internal()
+        if options is not None
+        else ExecutePresetOptions(filter_labels={}, group_labels=[])
+    )
 
     return await fetch_prometheus_query_preset_result(
         info,
         preset_id=UUID(id),
-        options=ExecuteQueryDefinitionOptionsInput.to_execute_options(options),
+        options=execute_options,
         time_window=time_window,
-        time_range=time_range.to_query_time_range() if time_range is not None else None,
+        time_range=time_range.to_internal() if time_range is not None else None,
     )
