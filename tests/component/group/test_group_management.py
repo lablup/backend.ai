@@ -19,12 +19,14 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.exceptions import BackendAPIError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.dto.manager.group.request import SearchGroupsRequest
+from ai.backend.common.dto.manager.deployment.types import OrderDirection
+from ai.backend.common.dto.manager.group.request import GroupFilter, SearchGroupsRequest
 from ai.backend.common.dto.manager.group.response import (
     DeleteGroupResponse,
     PurgeGroupResponse,
     SearchGroupsResponse,
 )
+from ai.backend.common.dto.manager.group.types import GroupOrder, GroupOrderField
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
@@ -406,16 +408,28 @@ class TestGroupSearch:
         self,
         admin_registry: BackendAIClientRegistry,
         multiple_test_groups: list[uuid.UUID],
+        db_engine: SAEngine,
     ) -> None:
         """S-2: Search with name filter → matching groups."""
+        # Get actual name of one of the test groups
+        async with db_engine.begin() as conn:
+            query_result = await conn.execute(
+                sa.select(GroupRow.__table__.c.name).where(
+                    GroupRow.__table__.c.id == multiple_test_groups[0]
+                )
+            )
+            group_name = query_result.scalar_one()
+
         result = await admin_registry.group.search(
             SearchGroupsRequest(
-                filter={"name": {"eq": "search-test"}},
+                filter=GroupFilter(name={"contains": group_name[:10]}),
                 limit=10,
             ),
         )
         assert isinstance(result, SearchGroupsResponse)
-        # Should only return groups matching the filter
+        # All returned groups should have names containing the filter
+        for group in result.groups:
+            assert group_name[:10] in group.name
 
     @pytest.mark.xfail(
         strict=True,
@@ -430,7 +444,7 @@ class TestGroupSearch:
         """S-3: Search with domain filter → groups in domain."""
         result = await admin_registry.group.search(
             SearchGroupsRequest(
-                filter={"domain_name": {"eq": domain_fixture}},
+                filter=GroupFilter(domain_name={"eq": domain_fixture}),
                 limit=10,
             ),
         )
@@ -443,12 +457,47 @@ class TestGroupSearch:
         reason="REST /groups search route not yet implemented",
         raises=NotFoundError,
     )
+    async def test_search_with_sorting(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        multiple_test_groups: list[uuid.UUID],
+    ) -> None:
+        """S-4: Search with sorting → correctly ordered."""
+        # Search with ascending name order
+        asc_result = await admin_registry.group.search(
+            SearchGroupsRequest(
+                order=GroupOrder(field=GroupOrderField.NAME, direction=OrderDirection.ASC),
+                limit=10,
+            ),
+        )
+        assert isinstance(asc_result, SearchGroupsResponse)
+        # Verify results are sorted by name ascending
+        names_asc = [g.name for g in asc_result.groups]
+        assert names_asc == sorted(names_asc)
+
+        # Search with descending name order
+        desc_result = await admin_registry.group.search(
+            SearchGroupsRequest(
+                order=GroupOrder(field=GroupOrderField.NAME, direction=OrderDirection.DESC),
+                limit=10,
+            ),
+        )
+        assert isinstance(desc_result, SearchGroupsResponse)
+        # Verify results are sorted by name descending
+        names_desc = [g.name for g in desc_result.groups]
+        assert names_desc == sorted(names_desc, reverse=True)
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="REST /groups search route not yet implemented",
+        raises=NotFoundError,
+    )
     async def test_search_with_pagination(
         self,
         admin_registry: BackendAIClientRegistry,
         multiple_test_groups: list[uuid.UUID],
     ) -> None:
-        """S-4: Search with pagination → correct page."""
+        """S-5: Search with pagination → correct page."""
         # Page 1
         page1 = await admin_registry.group.search(
             SearchGroupsRequest(limit=2, offset=0),
@@ -473,10 +522,10 @@ class TestGroupSearch:
         self,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        """S-5: Empty result → total=0, empty items."""
+        """S-6: Empty result → total=0, empty items."""
         result = await admin_registry.group.search(
             SearchGroupsRequest(
-                filter={"name": {"eq": "nonexistent-group-name"}},
+                filter=GroupFilter(name={"eq": f"nonexistent-group-{secrets.token_hex(16)}"}),
             ),
         )
         assert isinstance(result, SearchGroupsResponse)
