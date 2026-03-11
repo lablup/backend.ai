@@ -2,6 +2,10 @@ import logging
 
 from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.prometheus.preset import MetricPreset
+from ai.backend.common.dto.clients.prometheus.response import (
+    PrometheusQueryInstantResponse,
+    PrometheusQueryRangeResponse,
+)
 from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.prometheus_query_preset import (
@@ -101,6 +105,7 @@ class PrometheusQueryPresetService:
             group_by=set(action.options.group_labels),
             window=time_window,
         )
+        response: PrometheusQueryRangeResponse | PrometheusQueryInstantResponse
         if action.time_range is None:
             response = await self._prometheus_client.query_instant(preset=metric_preset)
         else:
