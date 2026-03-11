@@ -121,14 +121,14 @@ class TestBulkUpsertProjectWeights:
         assert isinstance(result, BulkUpsertProjectFairShareWeightResponse)
         assert result.upserted_count == 0
 
-    async def test_bulk_upsert_null_weight(
+    async def test_bulk_upsert_overwrite(
         self,
         admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
         group_fixture: uuid.UUID,
         domain_fixture: str,
     ) -> None:
-        """Bulk upsert with null weight → weight reset to default."""
+        """Bulk upsert overwrites existing weight."""
         await admin_registry.fair_share.upsert_project_fair_share_weight(
             resource_group=scaling_group_fixture,
             project_id=group_fixture,
@@ -138,6 +138,7 @@ class TestBulkUpsertProjectWeights:
             ),
         )
 
+        new_weight = Decimal("3.0")
         result = await admin_registry.fair_share.bulk_upsert_project_fair_share_weight(
             BulkUpsertProjectFairShareWeightRequest(
                 resource_group=scaling_group_fixture,
@@ -145,7 +146,7 @@ class TestBulkUpsertProjectWeights:
                     ProjectWeightEntryInput(
                         project_id=group_fixture,
                         domain_name=domain_fixture,
-                        weight=None,
+                        weight=new_weight,
                     ),
                 ],
             ),
@@ -158,7 +159,7 @@ class TestBulkUpsertProjectWeights:
             project_id=group_fixture,
         )
         assert get_result.item is not None
-        assert get_result.item.spec.weight == Decimal("1.0")
+        assert get_result.item.spec.weight == new_weight
 
 
 class TestProjectScopeAccessControl:
