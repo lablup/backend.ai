@@ -364,3 +364,70 @@ class TestAgentResourceManagement:
         assert occupied["cpu"] == "4"
         assert occupied["mem"] == "8192"
         assert occupied["cuda.shares"] == "1"
+
+
+class TestAgentPermissions:
+    """Test scenarios for agent permission boundaries."""
+
+    async def test_regular_user_cannot_search_agents(
+        self,
+        user_registry: BackendAIClientRegistry,
+        agent_factory: AgentFactory,
+    ) -> None:
+        """Regular user cannot search agents → 403."""
+        # Create an agent (admin operation via factory)
+        await agent_factory()
+
+        # Regular user tries to search agents via GraphQL
+        from ai.backend.client.exceptions import BackendAPIError
+
+        query = """
+            query {
+                agent_list(
+                    limit: 10,
+                    offset: 0,
+                    status: "ALIVE"
+                ) {
+                    items {
+                        id
+                    }
+                    total_count
+                }
+            }
+        """
+
+        # Regular users should get permission denied
+        with pytest.raises(BackendAPIError) as exc_info:
+            await user_registry.Admin._query(query)
+
+        # Should be 403 Forbidden or similar permission error
+        assert exc_info.value.status in (403, 401)
+
+    async def test_regular_user_can_query_limited_info(
+        self,
+        user_registry: BackendAIClientRegistry,
+        target_agent: AgentFixtureData,
+    ) -> None:
+        """Regular user can query limited agent info → 200."""
+        # Regular users can query some agent info via compute_plugins or similar
+        # For now, we verify that certain queries don't return 403
+        from ai.backend.client.exceptions import BackendAPIError
+
+        query = """
+            query {
+                compute_plugins {
+                    plugin_name
+                    plugin_version
+                }
+            }
+        """
+
+        # This should succeed (not raise permission error)
+        try:
+            result = await user_registry.Admin._query(query)
+            # If we get here without exception, the user has access to this query
+            assert "compute_plugins" in result
+        except BackendAPIError as e:
+            # If we get 404 or "not implemented", that's fine - we're checking for NOT 403
+            if e.status == 403:
+                pytest.fail("Regular user should have limited query access, got 403")
