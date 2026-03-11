@@ -12,6 +12,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.pagination import PaginationInfo
 
 __all__ = (
     "AliasImageResponse",
@@ -69,14 +70,6 @@ class ImageDTO(BaseModel):
     config_digest: str = Field(description="Image config digest")
     is_local: bool = Field(description="Whether the image is local")
     created_at: datetime | None = Field(default=None, description="Creation timestamp")
-
-
-class PaginationInfo(BaseModel):
-    """Pagination information."""
-
-    total: int = Field(description="Total number of items")
-    offset: int = Field(description="Number of items skipped")
-    limit: int | None = Field(default=None, description="Maximum items returned")
 
 
 class SearchImagesResponse(BaseResponseModel):
