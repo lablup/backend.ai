@@ -133,7 +133,7 @@ class ExecuteQueryDefinitionRequest(BaseRequestModel):
         default_factory=ExecuteQueryDefinitionOptionsRequest,
         description="Execution options (filter and group labels)",
     )
-    window: str | None = Field(
+    time_window: str | None = Field(
         default=None, pattern=PROMETHEUS_DURATION_PATTERN, description="Time window override"
     )
     time_range: QueryTimeRange | None = Field(

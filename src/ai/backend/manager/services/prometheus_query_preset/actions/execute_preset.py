@@ -16,7 +16,7 @@ from ai.backend.manager.services.prometheus_query_preset.actions.base import (
 class ExecutePresetAction(PrometheusQueryPresetAction):
     preset_id: UUID
     options: ExecutePresetOptions
-    window: str | None
+    time_window: str | None
     time_range: QueryTimeRange | None
 
     @override

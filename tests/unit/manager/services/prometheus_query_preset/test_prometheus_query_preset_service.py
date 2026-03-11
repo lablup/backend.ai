@@ -244,7 +244,7 @@ class TestPrometheusQueryPresetService:
                 filter_labels={"kernel_id": "test-kernel"},
                 group_labels=["kernel_id"],
             ),
-            window="5m",
+            time_window="5m",
             time_range=time_range,
         )
         result = await service.execute_preset(action)
@@ -268,7 +268,7 @@ class TestPrometheusQueryPresetService:
                 filter_labels={"invalid_label": "value"},
                 group_labels=[],
             ),
-            window="5m",
+            time_window="5m",
             time_range=time_range,
         )
 
@@ -290,7 +290,7 @@ class TestPrometheusQueryPresetService:
                 filter_labels={},
                 group_labels=["invalid_group"],
             ),
-            window="5m",
+            time_window="5m",
             time_range=time_range,
         )
 
@@ -321,7 +321,7 @@ class TestPrometheusQueryPresetService:
                 filter_labels={},
                 group_labels=[],
             ),
-            window=None,
+            time_window=None,
             time_range=time_range,
         )
         result = await service.execute_preset(action)
@@ -355,7 +355,7 @@ class TestPrometheusQueryPresetService:
                 filter_labels={},
                 group_labels=[],
             ),
-            window=None,
+            time_window=None,
             time_range=time_range,
         )
         result = await service.execute_preset(action)
@@ -393,7 +393,7 @@ class TestPrometheusQueryPresetService:
                 filter_labels={"any_label": "value"},
                 group_labels=["any_group"],
             ),
-            window="5m",
+            time_window="5m",
             time_range=time_range,
         )
         result = await service.execute_preset(action)
