@@ -2201,7 +2201,7 @@ class DeploymentDBSource:
             row = result.one_or_none()
             if row is None:
                 return None
-            return row[0]
+            return cast(uuid.UUID | None, row[0])
 
     # -------------------------------------------------------------------------
     # Auto-Scaling Policy Methods (DeploymentAutoScalingPolicyRow)
