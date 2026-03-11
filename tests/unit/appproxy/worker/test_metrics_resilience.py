@@ -12,11 +12,10 @@ try/except that logs a warning and continues to the next route on failure.
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -59,49 +58,6 @@ def _make_route(
 
 def _route_endpoint(route: RouteInfo) -> str:
     return f"http://{route.current_kernel_host}:{route.kernel_port}"
-
-
-def _make_client_pool(
-    responses: dict[str, str | Exception],
-) -> MagicMock:
-    """Create a mock ClientPool that returns different responses per endpoint.
-
-    Args:
-        responses: mapping of endpoint URL to response text or Exception.
-    """
-    pool = MagicMock()
-
-    def load_client_session(client_key: Any) -> MagicMock:
-        endpoint = client_key.endpoint
-        session = MagicMock()
-
-        resp_value = responses.get(endpoint)
-        if isinstance(resp_value, Exception):
-            exc: Exception = resp_value
-
-            def failing_get(path: str, _exc: Exception = exc) -> MagicMock:
-                cm = MagicMock()
-                cm.__aenter__ = AsyncMock(side_effect=_exc)
-                cm.__aexit__ = AsyncMock(return_value=False)
-                return cm
-
-            session.get = failing_get
-        else:
-            resp_text = responses.get(endpoint, "")
-
-            @asynccontextmanager
-            async def successful_get(path: str) -> Any:
-                resp = MagicMock()
-                resp.raise_for_status = MagicMock()
-                resp.text = AsyncMock(return_value=resp_text)
-                yield resp
-
-            session.get = successful_get
-
-        return session
-
-    pool.load_client_session = load_client_session
-    return pool
 
 
 @dataclass(frozen=True)
@@ -263,30 +219,31 @@ class TestGatherPrometheusInferenceMeasures:
             ),
         ],
     )
-    async def test_metric_collection(self, scenario: MetricsScenario) -> None:
-        client_pool = _make_client_pool(scenario.responses)
+    async def test_metric_collection(
+        self, scenario: MetricsScenario, mock_metrics_client_pool: Any
+    ) -> None:
+        async with mock_metrics_client_pool(scenario.responses) as (client_pool, _):
+            measures = await gather_prometheus_inference_measures(client_pool, scenario.routes)
 
-        measures = await gather_prometheus_inference_measures(client_pool, scenario.routes)
-
-        if scenario.expected_num_requests_running is None:
-            assert measures == []
-        else:
-            running_measures = [m for m in measures if m.key == "vllm:num_requests_running"]
-            assert len(running_measures) == 1, (
-                f"Expected exactly 1 'vllm:num_requests_running' measure, "
-                f"got {len(running_measures)}"
-            )
-            running_measure = running_measures[0]
-            assert isinstance(running_measure.per_app, Measurement)
-            assert running_measure.per_app.value == scenario.expected_num_requests_running
-            assert len(running_measure.per_replica) == scenario.expected_collected_replica_count
+            if scenario.expected_num_requests_running is None:
+                assert measures == []
+            else:
+                running_measures = [m for m in measures if m.key == "vllm:num_requests_running"]
+                assert len(running_measures) == 1, (
+                    f"Expected exactly 1 'vllm:num_requests_running' measure, "
+                    f"got {len(running_measures)}"
+                )
+                running_measure = running_measures[0]
+                assert isinstance(running_measure.per_app, Measurement)
+                assert running_measure.per_app.value == scenario.expected_num_requests_running
+                assert len(running_measure.per_replica) == scenario.expected_collected_replica_count
 
     async def test_route_without_route_id_skipped(self) -> None:
         """Routes with route_id=None (temporary) should be skipped."""
         route = _make_route()
         route.route_id = None
 
-        client_pool = _make_client_pool({})
+        client_pool = MagicMock()
 
         measures = await gather_prometheus_inference_measures(client_pool, [route])
 

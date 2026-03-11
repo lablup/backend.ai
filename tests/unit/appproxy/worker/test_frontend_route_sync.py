@@ -12,10 +12,9 @@ after updating the backend, keeping the circuit's route_info in sync.
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Any, NamedTuple
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -274,6 +273,7 @@ class TestUpdateCircuitRouteInfo:
     async def test_metric_collection_uses_updated_route_info(
         self,
         registered_two_replica_frontend: tuple[PortFrontend, TwoReplicaScenario],
+        mock_metrics_client_pool: Any,
     ) -> None:
         """Regression: the full bug chain from stale route_info to metric failure.
 
@@ -291,30 +291,7 @@ class TestUpdateCircuitRouteInfo:
         # Step 1: Scale-in removes scaled_in_route
         await frontend.update_circuit_route_info(scenario.circuit, [scenario.healthy_route])
 
-        # Step 2: Metric collector runs — track which endpoints are accessed
-        accessed_endpoints: list[str] = []
-
-        def mock_load_client_session(client_key: Any) -> MagicMock:
-            accessed_endpoints.append(client_key.endpoint)
-            session = MagicMock()
-
-            @asynccontextmanager
-            async def mock_get(path: str) -> Any:
-                resp = MagicMock()
-                resp.raise_for_status = MagicMock()
-                resp.text = AsyncMock(return_value=SAMPLE_PROMETHEUS_OUTPUT)
-                yield resp
-
-            session.get = mock_get
-            return session
-
-        client_pool = MagicMock()
-        client_pool.load_client_session = mock_load_client_session
-
-        updated_circuit = frontend.circuits[self.FRONTEND_PORT]
-        measures = await gather_inference_measures(client_pool, updated_circuit)
-
-        # Step 3: Verify only healthy_route was accessed, scaled_in_route was NOT
+        # Step 2: Metric collector runs with mocked HTTP responses
         healthy_endpoint = (
             f"http://{scenario.healthy_route.current_kernel_host}"
             f":{scenario.healthy_route.kernel_port}"
@@ -323,7 +300,19 @@ class TestUpdateCircuitRouteInfo:
             f"http://{scenario.scaled_in_route.current_kernel_host}"
             f":{scenario.scaled_in_route.kernel_port}"
         )
-        assert healthy_endpoint in accessed_endpoints
-        assert scaled_in_endpoint not in accessed_endpoints
-        assert measures is not None
-        assert len(measures) > 0
+
+        responses: dict[str, str | Exception] = {
+            healthy_endpoint: SAMPLE_PROMETHEUS_OUTPUT,
+            scaled_in_endpoint: SAMPLE_PROMETHEUS_OUTPUT,
+        }
+
+        async with mock_metrics_client_pool(responses) as (client_pool, mocked):
+            updated_circuit = frontend.circuits[self.FRONTEND_PORT]
+            measures = await gather_inference_measures(client_pool, updated_circuit)
+
+            # Step 3: Verify only healthy_route was accessed, scaled_in_route was NOT
+            called_urls = {str(url) for (_, url) in mocked.requests.keys()}
+            assert f"{healthy_endpoint}/metrics" in called_urls
+            assert f"{scaled_in_endpoint}/metrics" not in called_urls
+            assert measures is not None
+            assert len(measures) > 0
