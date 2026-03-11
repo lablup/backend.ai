@@ -177,8 +177,8 @@ from .prometheus_query_preset import (
     admin_delete_prometheus_query_preset,
     admin_modify_prometheus_query_preset,
     admin_prometheus_query_preset,
+    admin_prometheus_query_preset_result,
     admin_prometheus_query_presets,
-    prometheus_query_preset_result,
 )
 from .rbac import (
     admin_assign_role,
@@ -327,8 +327,7 @@ class Query:
     # Prometheus Query Preset Admin APIs
     admin_prometheus_query_preset = admin_prometheus_query_preset
     admin_prometheus_query_presets = admin_prometheus_query_presets
-    # Prometheus Query Preset - Execute (all authenticated users)
-    prometheus_query_preset_result = prometheus_query_preset_result
+    admin_prometheus_query_preset_result = admin_prometheus_query_preset_result
     # RBAC Admin APIs
     admin_role = admin_role
     admin_roles = admin_roles

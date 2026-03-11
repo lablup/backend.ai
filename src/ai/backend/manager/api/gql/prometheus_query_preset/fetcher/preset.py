@@ -112,7 +112,7 @@ async def fetch_prometheus_query_preset_result(
     preset_id: UUID,
     options: ExecutePresetOptions,
     window: str | None,
-    time_range: QueryTimeRange,
+    time_range: QueryTimeRange | None,
 ) -> PrometheusQueryResultGQL:
     processors = info.context.processors
 

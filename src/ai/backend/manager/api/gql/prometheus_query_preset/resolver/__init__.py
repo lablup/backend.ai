@@ -7,15 +7,15 @@ from .mutation import (
 )
 from .query import (
     admin_prometheus_query_preset,
+    admin_prometheus_query_preset_result,
     admin_prometheus_query_presets,
-    prometheus_query_preset_result,
 )
 
 __all__ = [
     # Queries
     "admin_prometheus_query_preset",
     "admin_prometheus_query_presets",
-    "prometheus_query_preset_result",
+    "admin_prometheus_query_preset_result",
     # Mutations
     "admin_create_prometheus_query_preset",
     "admin_modify_prometheus_query_preset",

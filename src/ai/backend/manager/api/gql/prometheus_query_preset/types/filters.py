@@ -8,7 +8,6 @@ from typing import override
 import strawberry
 
 from ai.backend.manager.api.gql.base import (
-    DateTimeFilter,
     OrderDirection,
     StringFilter,
 )
@@ -33,14 +32,6 @@ class PrometheusQueryPresetFilter(GQLFilter):
     name: StringFilter | None = strawberry.field(
         default=None,
         description="Filter by preset name.",
-    )
-    metric_name: str | None = strawberry.field(
-        default=None,
-        description="Filter by exact metric name.",
-    )
-    created_at: DateTimeFilter | None = strawberry.field(
-        default=None,
-        description="Filter by creation timestamp.",
     )
 
     AND: list[PrometheusQueryPresetFilter] | None = strawberry.field(
@@ -72,19 +63,6 @@ class PrometheusQueryPresetFilter(GQLFilter):
                 ends_with_factory=lambda spec: PrometheusQueryPresetConditions.by_name_ends_with(
                     spec
                 ),
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.metric_name is not None:
-            conditions.append(
-                PrometheusQueryPresetConditions.by_metric_name_equals(self.metric_name)
-            )
-
-        if self.created_at:
-            condition = self.created_at.build_query_condition(
-                before_factory=lambda dt: PrometheusQueryPresetConditions.by_created_at_before(dt),
-                after_factory=lambda dt: PrometheusQueryPresetConditions.by_created_at_after(dt),
             )
             if condition:
                 conditions.append(condition)
