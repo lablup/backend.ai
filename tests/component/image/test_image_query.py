@@ -28,7 +28,7 @@ from .conftest import ImageFactoryHelper
 
 
 class TestImageSearchNoFilter:
-    """Search with no filter returns ALIVE images."""
+    """Search with no filter returns all images regardless of status."""
 
     async def test_no_filter_returns_alive_images(
         self,
