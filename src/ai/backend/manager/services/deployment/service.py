@@ -680,11 +680,11 @@ class DeploymentService:
 
         # 3. Set deploying_revision and transition to DEPLOYING lifecycle.
         # The DB WHERE clause includes ``deploying_revision IS NULL`` to guard
-        # against concurrent activations; rowcount == 0 means the guard fired.
-        previous_revision_id, rowcount = await self._deployment_repository.set_deploying_revision(
+        # against concurrent activations; updated=False means the guard fired.
+        previous_revision_id, updated = await self._deployment_repository.set_deploying_revision(
             action.deployment_id, action.revision_id
         )
-        if rowcount == 0:
+        if not updated:
             raise DeploymentAlreadyInProgress(
                 f"Deployment {action.deployment_id} already has a deploying revision in progress "
                 f"(concurrent activation detected)."
