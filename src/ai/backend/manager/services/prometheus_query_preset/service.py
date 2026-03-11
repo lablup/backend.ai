@@ -93,13 +93,13 @@ class PrometheusQueryPresetService:
         preset_data = await self._repository.get_by_id(action.preset_id)
         self._validate_labels(action.options, preset_data)
         # Window fallback: request → preset → server default
-        window = action.window or preset_data.time_window or self._default_timewindow
+        time_window = action.time_window or preset_data.time_window or self._default_timewindow
 
         metric_preset = MetricPreset(
             template=preset_data.query_template,
             labels=action.options.filter_labels,
             group_by=set(action.options.group_labels),
-            window=window,
+            window=time_window,
         )
         if action.time_range is None:
             # TODO: Implement instant query execution (query_instant) in the Prometheus client and use it here.

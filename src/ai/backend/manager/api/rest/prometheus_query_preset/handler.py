@@ -163,7 +163,7 @@ class PrometheusQueryPresetHandler:
             ExecutePresetAction(
                 preset_id=path.parsed.id,
                 options=options,
-                window=body.parsed.window,
+                time_window=body.parsed.time_window,
                 time_range=body.parsed.time_range,
             )
         )

@@ -17,6 +17,7 @@ from ai.backend.manager.api.gql.domain_v2.types import (
     DomainV2OrderBy,
 )
 from ai.backend.manager.api.gql.types import ResourceGroupDomainScope, StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.repositories.domain.types import DomainSearchScope
 
 
@@ -77,6 +78,7 @@ async def admin_domains_v2(
     Returns:
         DomainV2Connection with paginated domain records.
     """
+    check_admin_only()
     return await fetch_admin_domains(
         info,
         filter=filter,
