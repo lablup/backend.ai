@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import subprocess
 import sys
 import time
 from collections.abc import Generator, Iterator
 from concurrent.futures import ProcessPoolExecutor
+from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -277,3 +280,169 @@ class TestNetstatNsWork:
             future = pool.submit(netstat_ns_work, Path("/dev/null"))
             with pytest.raises(OSError):
                 future.result()
+
+
+@dataclass
+class _SysfsMocks:
+    ctx: MagicMock
+    container: AsyncMock
+    netstat_ns: MagicMock
+    loop: MagicMock
+    container_data: dict[str, Any]
+
+
+class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
+    """Tests for timeout protection and error isolation in MemoryPlugin sysfs_impl."""
+
+    @pytest.fixture
+    def memory_plugin(self) -> MemoryPlugin:
+        plugin = MemoryPlugin.__new__(MemoryPlugin)
+        plugin.local_config = {"agent": {"docker-mode": "default"}}
+        plugin._docker = AsyncMock()
+        return plugin
+
+    @pytest.fixture
+    def sysfs_mocks(
+        self, cgroup_stat_context: MagicMock, tmp_path: Path
+    ) -> Generator[_SysfsMocks, None, None]:
+        """Fully patched sysfs_impl environment with default happy-path behavior.
+
+        Tests override specific mock side_effects before calling the target function.
+        """
+        ctx = cgroup_stat_context
+        ctx.agent.get_cgroup_version = MagicMock(return_value="2")
+
+        mem_path = MagicMock()
+        mem_stat = MagicMock()
+        mem_stat.read_text.return_value = "inactive_file 0\n"
+        mem_path.__truediv__ = MagicMock(return_value=mem_stat)
+        io_path = MagicMock()
+        io_stat = MagicMock()
+        io_stat.read_text.return_value = ""
+        io_path.__truediv__ = MagicMock(return_value=io_stat)
+        ctx.agent.get_cgroup_path = lambda subsys, cid: mem_path if subsys == "memory" else io_path
+
+        fake_ns = tmp_path / "fake_netns"
+        fake_ns.touch()
+        container_data: dict[str, Any] = {
+            "NetworkSettings": {"SandboxKey": str(fake_ns)},
+        }
+
+        with (
+            patch(
+                "ai.backend.agent.docker.intrinsic.DockerContainer",
+            ) as mock_container_cls,
+            patch("ai.backend.agent.docker.intrinsic.read_sysfs", return_value=1048576),
+            patch("ai.backend.agent.docker.intrinsic.netstat_ns", return_value={}) as mock_netstat,
+            patch("ai.backend.agent.docker.intrinsic.current_loop") as mock_loop,
+        ):
+            mock_container = AsyncMock()
+            mock_container.show.return_value = container_data
+            mock_container_cls.return_value = mock_container
+            mock_loop.return_value.run_in_executor = AsyncMock(return_value=0)
+
+            yield _SysfsMocks(
+                ctx=ctx,
+                container=mock_container,
+                netstat_ns=mock_netstat,
+                loop=mock_loop,
+                container_data=container_data,
+            )
+
+    async def test_slow_container_show_times_out(
+        self,
+        memory_plugin: MemoryPlugin,
+        sysfs_mocks: _SysfsMocks,
+    ) -> None:
+        """When container.show() hangs, the call times out and returns None
+        for that container while other containers succeed."""
+        call_count = 0
+
+        async def slow_show_for_first(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                await asyncio.sleep(10)
+            return sysfs_mocks.container_data
+
+        sysfs_mocks.container.show.side_effect = slow_show_for_first
+
+        results = await memory_plugin.gather_container_measures(
+            sysfs_mocks.ctx, ["slow_container", "normal_container"]
+        )
+
+        assert "slow_container" not in results[0].per_container
+        assert "normal_container" in results[0].per_container
+
+    async def test_slow_netstat_ns_times_out(
+        self,
+        memory_plugin: MemoryPlugin,
+        sysfs_mocks: _SysfsMocks,
+    ) -> None:
+        """When netstat_ns() hangs, the call times out and returns None
+        for that container while other containers succeed."""
+        call_count = 0
+
+        async def slow_netstat_for_first(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                await asyncio.sleep(10)
+            return {}
+
+        sysfs_mocks.netstat_ns.side_effect = slow_netstat_for_first
+
+        results = await memory_plugin.gather_container_measures(
+            sysfs_mocks.ctx, ["slow_container", "normal_container"]
+        )
+
+        assert "slow_container" not in results[0].per_container
+        assert "normal_container" in results[0].per_container
+
+    async def test_gather_isolates_container_failures(
+        self,
+        memory_plugin: MemoryPlugin,
+        sysfs_mocks: _SysfsMocks,
+    ) -> None:
+        """When one container raises an Exception subclass, it is logged and
+        skipped while other containers are still collected.
+
+        Uses RuntimeError (not OSError) because OSError is caught inside
+        sysfs_impl and returns None — it never reaches the Exception
+        branch in the results loop.
+        """
+
+        async def selective_run_in_executor(executor: Any, fn: Any, *args: Any) -> int:
+            if args and args[0] == "broken_container":
+                raise RuntimeError("unexpected executor failure")
+            return 0
+
+        sysfs_mocks.loop.return_value.run_in_executor = selective_run_in_executor
+
+        results = await memory_plugin.gather_container_measures(
+            sysfs_mocks.ctx, ["broken_container", "healthy_container"]
+        )
+
+        assert "broken_container" not in results[0].per_container
+        assert "healthy_container" in results[0].per_container
+
+    async def test_cancelled_error_is_reraised(
+        self,
+        memory_plugin: MemoryPlugin,
+        sysfs_mocks: _SysfsMocks,
+    ) -> None:
+        """When a container task raises CancelledError (a BaseException but not
+        Exception), it must propagate instead of being silently skipped.
+        This ensures shutdown signals are not swallowed by return_exceptions=True."""
+
+        async def cancel_on_first(executor: Any, fn: Any, *args: Any) -> int:
+            if args and args[0] == "cancelled_container":
+                raise asyncio.CancelledError()
+            return 0
+
+        sysfs_mocks.loop.return_value.run_in_executor = cancel_on_first
+
+        with pytest.raises(asyncio.CancelledError):
+            await memory_plugin.gather_container_measures(
+                sysfs_mocks.ctx, ["cancelled_container", "healthy_container"]
+            )
