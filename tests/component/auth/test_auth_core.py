@@ -1,15 +1,21 @@
 from __future__ import annotations
 
+import secrets
 from datetime import timedelta
 
 import pytest
+import sqlalchemy as sa
+from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.exceptions import AuthenticationError, InvalidRequestError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.dto.manager.auth.request import AuthorizeRequest
-from ai.backend.common.dto.manager.auth.response import AuthorizeResponse
+from ai.backend.common.dto.manager.auth.request import AuthorizeRequest, SignupRequest
+from ai.backend.common.dto.manager.auth.response import AuthorizeResponse, SignupResponse
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.models.group import association_groups_users
+from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.user import users
 
 from .conftest import AuthUserFixtureData
 
@@ -115,5 +121,57 @@ class TestAuthorize:
                     domain=auth_user_fixture.domain_name,
                     username=auth_user_fixture.email,
                     password=auth_user_fixture.password,
+                ),
+            )
+
+
+class TestSignup:
+    async def test_signup_returns_credentials(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        db_engine: SAEngine,
+        domain_fixture: str,
+    ) -> None:
+        unique_id = secrets.token_hex(4)
+        email = f"signup-test-{unique_id}@test.local"
+        password = f"TestP@ss{unique_id}"
+        result = await admin_registry.auth.signup(
+            SignupRequest(
+                domain=domain_fixture,
+                email=email,
+                password=password,
+            ),
+        )
+        try:
+            assert isinstance(result, SignupResponse)
+            assert result.access_key != ""
+            assert result.secret_key != ""
+        finally:
+            # Clean up the created user, keypair, and group association.
+            async with db_engine.begin() as conn:
+                user_row = (
+                    await conn.execute(sa.select(users.c.uuid).where(users.c.email == email))
+                ).first()
+                if user_row:
+                    user_uuid = str(user_row.uuid)
+                    await conn.execute(
+                        association_groups_users.delete().where(
+                            association_groups_users.c.user_id == user_uuid
+                        )
+                    )
+                await conn.execute(keypairs.delete().where(keypairs.c.user_id == email))
+                await conn.execute(users.delete().where(users.c.email == email))
+
+    async def test_duplicate_email_returns_400(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        auth_user_fixture: AuthUserFixtureData,
+    ) -> None:
+        with pytest.raises(InvalidRequestError):
+            await admin_registry.auth.signup(
+                SignupRequest(
+                    domain=auth_user_fixture.domain_name,
+                    email=auth_user_fixture.email,
+                    password="AnyP@ssw0rd123",
                 ),
             )
