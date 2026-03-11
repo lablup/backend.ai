@@ -8,9 +8,9 @@ import strawberry
 from strawberry import ID, Info
 
 from ai.backend.manager.api.gql.prometheus_query_preset.fetcher import (
-    fetch_admin_prometheus_query_preset,
-    fetch_admin_prometheus_query_presets,
+    fetch_prometheus_query_preset,
     fetch_prometheus_query_preset_result,
+    fetch_prometheus_query_presets,
 )
 from ai.backend.manager.api.gql.prometheus_query_preset.types import (
     MetricLabelEntryInput,
@@ -31,7 +31,7 @@ async def admin_prometheus_query_preset(
     id: ID,
 ) -> QueryDefinitionGQL | None:
     check_admin_only()
-    return await fetch_admin_prometheus_query_preset(info, preset_id=uuid.UUID(id))
+    return await fetch_prometheus_query_preset(info, preset_id=uuid.UUID(id))
 
 
 @strawberry.field(
@@ -49,7 +49,7 @@ async def admin_prometheus_query_presets(
     offset: int | None = None,
 ) -> QueryDefinitionConnection | None:
     check_admin_only()
-    return await fetch_admin_prometheus_query_presets(
+    return await fetch_prometheus_query_presets(
         info,
         filter=filter,
         order_by=order_by,

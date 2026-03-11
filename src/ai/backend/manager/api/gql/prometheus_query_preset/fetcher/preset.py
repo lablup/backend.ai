@@ -47,7 +47,7 @@ def get_preset_pagination_spec() -> PaginationSpec:
     )
 
 
-async def fetch_admin_prometheus_query_preset(
+async def fetch_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     preset_id: UUID,
 ) -> QueryDefinitionGQL:
@@ -58,7 +58,7 @@ async def fetch_admin_prometheus_query_preset(
     return QueryDefinitionGQL.from_data(action_result.preset)
 
 
-async def fetch_admin_prometheus_query_presets(
+async def fetch_prometheus_query_presets(
     info: Info[StrawberryGQLContext],
     filter: QueryDefinitionFilter | None = None,
     order_by: list[QueryDefinitionOrderBy] | None = None,
