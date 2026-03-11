@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
+
+from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.image.request import (
     ImageFilter,
     ImageOrder,
     SearchImagesRequest,
 )
-from ai.backend.common.dto.manager.image.response import SearchImagesResponse
+from ai.backend.common.dto.manager.image.response import GetImageResponse, SearchImagesResponse
 from ai.backend.common.dto.manager.image.types import ImageOrderField, OrderDirection
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.manager.data.image.types import ImageStatus
@@ -238,3 +241,36 @@ class TestImageSearchPagination:
         assert isinstance(result, SearchImagesResponse)
         names = [item.name for item in result.items]
         assert names == sorted(names)
+
+
+class TestImageGet:
+    """Get image detail by ID."""
+
+    async def test_get_by_id_returns_full_image_data(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
+    ) -> None:
+        """S-12: Get by ID returns complete ImageDTO with expected fields."""
+        image_id, _ = image_fixture
+        result = await admin_registry.image.get(image_id)
+        assert isinstance(result, GetImageResponse)
+        assert result.item.id == image_id
+        assert result.item.architecture == "x86_64"
+        assert result.item.status == "ALIVE"
+        assert result.item.registry == "registry.test.local"
+        assert result.item.project == "testproject"
+        assert result.item.tag == "latest"
+        assert result.item.size_bytes == 1024000
+        assert result.item.type == "COMPUTE"
+        assert result.item.is_local is False
+        assert result.item.name.startswith("registry.test.local/testproject/test-image-")
+
+    async def test_get_nonexistent_id_returns_not_found(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
+    ) -> None:
+        """S-13: Get with random UUID raises NotFoundError (404)."""
+        with pytest.raises(NotFoundError):
+            await admin_registry.image.get(uuid.uuid4())
