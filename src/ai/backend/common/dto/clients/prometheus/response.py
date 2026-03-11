@@ -44,6 +44,29 @@ class PrometheusQueryRangeResponse(BaseModel):
     data: PrometheusQueryData
 
 
+class MetricInstantResponse(BaseModel):
+    """Single metric result from Prometheus instant query."""
+
+    metric: MetricResponseInfo
+    value: MetricResponseValue
+
+
+class PrometheusQueryInstantData(BaseModel):
+    """Data field from Prometheus instant query response."""
+
+    result_type: str = Field(validation_alias="resultType")
+    result: list[MetricInstantResponse]
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class PrometheusQueryInstantResponse(BaseModel):
+    """Response from Prometheus instant query API."""
+
+    status: str
+    data: PrometheusQueryInstantData
+
+
 class LabelValueResponse(BaseModel):
     """Response from Prometheus label values API."""
 
