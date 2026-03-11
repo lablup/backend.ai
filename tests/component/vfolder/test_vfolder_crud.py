@@ -30,7 +30,7 @@ class TestVFolderCreateViaSDK:
     All require a live storage-proxy (marked xfail).
     """
 
-    @pytest.mark.xfail(strict=True, reason="Requires live storage-proxy")
+    @pytest.mark.xfail(strict=False, reason="Requires live storage-proxy")
     async def test_admin_creates_user_owned_vfolder(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -41,7 +41,7 @@ class TestVFolderCreateViaSDK:
             VFolderCreateReq(name="crud-s1-user-owned", folder_host="local"),
         )
 
-    @pytest.mark.xfail(strict=True, reason="Requires live storage-proxy")
+    @pytest.mark.xfail(strict=False, reason="Requires live storage-proxy")
     async def test_admin_creates_group_owned_vfolder(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -57,7 +57,7 @@ class TestVFolderCreateViaSDK:
             ),
         )
 
-    @pytest.mark.xfail(strict=True, reason="Requires live storage-proxy")
+    @pytest.mark.xfail(strict=False, reason="Requires live storage-proxy")
     async def test_admin_creates_unmanaged_vfolder(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -72,7 +72,7 @@ class TestVFolderCreateViaSDK:
             ),
         )
 
-    @pytest.mark.xfail(strict=True, reason="Requires live storage-proxy")
+    @pytest.mark.xfail(strict=False, reason="Requires live storage-proxy")
     async def test_user_creates_local_special_vfolder(
         self,
         user_registry: BackendAIClientRegistry,
@@ -83,7 +83,7 @@ class TestVFolderCreateViaSDK:
             VFolderCreateReq(name=".local", folder_host="local"),
         )
 
-    @pytest.mark.xfail(strict=True, reason="Requires live storage-proxy")
+    @pytest.mark.xfail(strict=False, reason="Requires live storage-proxy")
     async def test_user_creates_cloneable_vfolder(
         self,
         user_registry: BackendAIClientRegistry,
@@ -107,17 +107,18 @@ class TestVFolderCreateErrors:
         admin_registry: BackendAIClientRegistry,
     ) -> None:
         """F-INPUT-1: Omitting folder_host with no configured default raises an error."""
-        with pytest.raises(BackendAPIError):
+        with pytest.raises(BackendAPIError) as exc_info:
             await admin_registry.vfolder.create(
                 VFolderCreateReq(name="crud-finput1-nohost"),
             )
+        assert exc_info.value.status == 400
 
     async def test_non_admin_cannot_create_unmanaged_vfolder(
         self,
         user_registry: BackendAIClientRegistry,
     ) -> None:
         """F-BIZ-3: Regular user specifying unmanaged_path gets Forbidden."""
-        with pytest.raises(BackendAPIError):
+        with pytest.raises(BackendAPIError) as exc_info:
             await user_registry.vfolder.create(
                 VFolderCreateReq(
                     name="crud-fbiz3-unmanaged",
@@ -125,6 +126,7 @@ class TestVFolderCreateErrors:
                     unmanaged_path="/mnt/forbidden",
                 ),
             )
+        assert exc_info.value.status == 403
 
     async def test_dot_prefix_name_for_group_vfolder_raises_error(
         self,
@@ -132,7 +134,7 @@ class TestVFolderCreateErrors:
         group_fixture: uuid.UUID,
     ) -> None:
         """F-BIZ-4: Dot-prefixed name (except '.local') for a group vfolder is rejected."""
-        with pytest.raises(BackendAPIError):
+        with pytest.raises(BackendAPIError) as exc_info:
             await admin_registry.vfolder.create(
                 VFolderCreateReq(
                     name=".hidden-data",
@@ -140,6 +142,7 @@ class TestVFolderCreateErrors:
                     group_id=group_fixture,
                 ),
             )
+        assert exc_info.value.status == 400
 
     async def test_non_admin_cannot_create_group_vfolder_in_regular_project(
         self,
@@ -147,7 +150,7 @@ class TestVFolderCreateErrors:
         group_fixture: uuid.UUID,
     ) -> None:
         """F-BIZ-6: Regular user creating a group vfolder in a non-model-store project is Forbidden."""
-        with pytest.raises(BackendAPIError):
+        with pytest.raises(BackendAPIError) as exc_info:
             await user_registry.vfolder.create(
                 VFolderCreateReq(
                     name="crud-fbiz6-group",
@@ -155,6 +158,7 @@ class TestVFolderCreateErrors:
                     group_id=group_fixture,
                 ),
             )
+        assert exc_info.value.status == 403
 
     async def test_duplicate_name_raises_conflict(
         self,
@@ -164,13 +168,14 @@ class TestVFolderCreateErrors:
     ) -> None:
         """F-BIZ-1: Creating a vfolder with a name that already exists raises HTTP 409."""
         existing = await vfolder_factory(name="crud-fbiz1-dup")
-        with pytest.raises(BackendAPIError):
+        with pytest.raises(BackendAPIError) as exc_info:
             await admin_registry.vfolder.create(
                 VFolderCreateReq(
                     name=existing["name"],
                     folder_host="local",
                 ),
             )
+        assert exc_info.value.status == 409
 
     async def test_exceeding_max_vfolder_count_raises_error(
         self,
@@ -192,13 +197,14 @@ class TestVFolderCreateErrors:
             # Pre-seed 1 vfolder to hit the limit
             await vfolder_factory(name="crud-fbiz2-limit-1")
             # Attempting to create one more should fail
-            with pytest.raises(BackendAPIError):
+            with pytest.raises(BackendAPIError) as exc_info:
                 await admin_registry.vfolder.create(
                     VFolderCreateReq(
                         name="crud-fbiz2-over-limit",
                         folder_host="local",
                     ),
                 )
+            assert exc_info.value.status == 400
         finally:
             # Always restore the policy to unlimited
             async with db_engine.begin() as conn:
@@ -283,8 +289,9 @@ class TestVFolderGetInfo:
         admin_registry: BackendAIClientRegistry,
     ) -> None:
         """F-BIZ-1: Querying a non-existent vfolder name raises an error (HTTP 404)."""
-        with pytest.raises(BackendAPIError):
+        with pytest.raises(BackendAPIError) as exc_info:
             await admin_registry.vfolder.get_info("crud-nonexistent-vfolder-xyz-99999")
+        assert exc_info.value.status == 404
 
     async def test_user_cannot_get_info_of_inaccessible_vfolder(
         self,
@@ -293,8 +300,9 @@ class TestVFolderGetInfo:
     ) -> None:
         """F-BIZ-2: Regular user querying a vfolder they cannot access gets not-found."""
         # target_vfolder is owned by the admin user; user_registry is a regular user
-        with pytest.raises(BackendAPIError):
+        with pytest.raises(BackendAPIError) as exc_info:
             await user_registry.vfolder.get_info(target_vfolder["name"])
+        assert exc_info.value.status == 404
 
 
 class TestVFolderGetID:
