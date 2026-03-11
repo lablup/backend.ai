@@ -337,7 +337,7 @@ class DeploymentCoordinator:
 
         # Success transitions (None = stay in current state)
         if transitions.success is not None and result.successes:
-            t = self._build_success_transition(
+            success_transition = self._build_success_transition(
                 handler_name=handler_name,
                 deployments=result.successes,
                 lifecycle_status=transitions.success,
@@ -345,14 +345,14 @@ class DeploymentCoordinator:
                 records=records,
                 timestamp_now=timestamp_now,
             )
-            batch_updaters.append(t.updater)
-            all_history_specs.extend(t.history_specs)
-            notification_events.extend(t.notification_events)
+            batch_updaters.append(success_transition.updater)
+            all_history_specs.extend(success_transition.history_specs)
+            notification_events.extend(success_transition.notification_events)
 
         # Failure transitions
         failure_lifecycle_status = transitions.failure
         if failure_lifecycle_status is not None and result.errors:
-            t = self._build_failure_transition(
+            failure_transition = self._build_failure_transition(
                 handler_name=handler_name,
                 errors=result.errors,
                 lifecycle_status=failure_lifecycle_status,
@@ -362,9 +362,9 @@ class DeploymentCoordinator:
                 timestamp_now=timestamp_now,
                 transition_label="failure",
             )
-            batch_updaters.append(t.updater)
-            all_history_specs.extend(t.history_specs)
-            notification_events.extend(t.notification_events)
+            batch_updaters.append(failure_transition.updater)
+            all_history_specs.extend(failure_transition.history_specs)
+            notification_events.extend(failure_transition.notification_events)
 
         # Execute all updates in a single transaction
         if batch_updaters:
