@@ -59,11 +59,12 @@ class DestroyingDeploymentHandler(DeploymentHandler):
         - success: Deployment → DESTROYED
         - failure (all): Deployment → DESTROYED (always proceed to destroyed)
         """
+        destroyed = DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED)
         return DeploymentStatusTransitions(
-            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
-            need_retry=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
-            expired=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
-            give_up=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
+            success=destroyed,
+            need_retry=destroyed,
+            expired=destroyed,
+            give_up=destroyed,
         )
 
     async def execute(
