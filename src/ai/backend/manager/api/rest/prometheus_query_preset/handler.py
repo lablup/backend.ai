@@ -169,14 +169,15 @@ class PrometheusQueryPresetHandler:
         )
 
         prom_response = action_result.response
+        query_data = prom_response.query_data
         result_items = [
             self._adapter.convert_metric_response(metric_response)
-            for metric_response in prom_response.data.result
+            for metric_response in query_data.metric_results
         ]
         resp = ExecuteQueryDefinitionResponse(
             status=prom_response.status,
             data=QueryDefinitionExecuteData(
-                result_type=prom_response.data.result_type,
+                result_type=query_data.result_type,
                 result=result_items,
             ),
         )

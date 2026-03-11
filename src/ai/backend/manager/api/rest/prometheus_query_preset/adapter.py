@@ -5,10 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
-from ai.backend.common.dto.clients.prometheus.response import (
-    MetricInstantResponse,
-    MetricResponse,
-)
+from ai.backend.common.dto.clients.prometheus.response import BaseMetricResponse
 from ai.backend.common.dto.manager.prometheus_query_preset import (
     MetricLabelEntryDTO,
     MetricValueDTO,
@@ -61,18 +58,13 @@ class PrometheusQueryPresetAdapter(BaseFilterAdapter):
             updated_at=data.updated_at,
         )
 
-    def convert_metric_response(
-        self, response: MetricResponse | MetricInstantResponse
-    ) -> QueryDefinitionMetricResult:
+    def convert_metric_response(self, response: BaseMetricResponse) -> QueryDefinitionMetricResult:
         """Convert a Prometheus MetricResponse to a QueryDefinitionMetricResult DTO."""
         metric_labels = [
             MetricLabelEntryDTO(key=key, value=str(val))
             for key, val in response.metric.model_dump(exclude_none=True).items()
         ]
-        if isinstance(response, MetricInstantResponse):
-            values = [MetricValueDTO(timestamp=response.value[0], value=response.value[1])]
-        else:
-            values = [MetricValueDTO(timestamp=ts, value=v) for ts, v in response.values]
+        values = [MetricValueDTO(timestamp=ts, value=v) for ts, v in response.metric_values]
         return QueryDefinitionMetricResult(metric=metric_labels, values=values)
 
     def build_updater(
