@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -244,6 +245,44 @@ class ResourceSlotDBSource:
             key=lambda sq: rank_map.get(sq.slot_name, 9999),
         )
         return ResourceOccupancy(used_slots=used_slots, session_count=session_count)
+
+    async def compute_actual_agent_resource_usage(
+        self,
+    ) -> dict[tuple[str, str], Decimal]:
+        """Compute actual per-agent per-slot resource usage from resource_allocations.
+
+        Joins resource_allocations → kernels, filtering by:
+        - free_at IS NULL (allocation still active)
+        - kernel status in resource-occupying or resource-requesting statuses
+
+        Groups by (agent_id, slot_name) and sums COALESCE(used, requested).
+
+        Returns:
+            Mapping of (agent_id, slot_name) → actual used amount.
+        """
+        ra = ResourceAllocationRow.__table__
+        k = KernelRow.__table__
+        all_resource_statuses = (
+            KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
+        )
+        effective_amount = sa.func.coalesce(ra.c.used, ra.c.requested)
+        stmt = (
+            sa.select(
+                k.c.agent,
+                ra.c.slot_name,
+                sa.func.sum(effective_amount).label("total_amount"),
+            )
+            .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
+            .where(
+                k.c.agent.is_not(None),
+                k.c.status.in_(all_resource_statuses),
+                ra.c.free_at.is_(None),
+            )
+            .group_by(k.c.agent, ra.c.slot_name)
+        )
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            rows = (await db_sess.execute(stmt)).all()
+        return {(row.agent, row.slot_name): row.total_amount for row in rows}
 
     async def aggregate_occupied_by_project(self, project_id: uuid.UUID) -> ResourceOccupancy:
         """Aggregate active resource occupancy for a project (group).
