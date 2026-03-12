@@ -971,6 +971,15 @@ class ScheduleDBSource:
 
         # Mark kernels as TERMINATED directly
         if force_terminated_sessions:
+            # Fetch kernel_id and agent_id before updating status
+            kernel_agent_query = sa.select(KernelRow.id, KernelRow.agent).where(
+                sa.and_(
+                    KernelRow.session_id.in_(force_terminated_sessions),
+                    KernelRow.status.in_(KernelStatus.terminatable_statuses()),
+                )
+            )
+            kernel_agent_rows = (await db_sess.execute(kernel_agent_query)).all()
+
             await db_sess.execute(
                 sa.update(KernelRow)
                 .values(
@@ -994,6 +1003,31 @@ class ScheduleDBSource:
                     )
                 )
             )
+
+            # Free resource allocations and decrement agent_resources for each kernel
+            ar = AgentResourceRow.__table__
+            for kernel_id, agent_id in kernel_agent_rows:
+                released = (
+                    await db_sess.execute(
+                        sa.update(ResourceAllocationRow)
+                        .where(
+                            ResourceAllocationRow.kernel_id == kernel_id,
+                            ResourceAllocationRow.free_at.is_(None),
+                        )
+                        .values(free_at=sa.func.now())
+                        .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.used)
+                    )
+                ).all()
+                if agent_id and released:
+                    for r in released:
+                        if r.used is None:
+                            continue
+                        new_used = sa.func.greatest(ar.c.used - r.used, 0)
+                        await db_sess.execute(
+                            sa.update(ar)
+                            .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
+                            .values(used=new_used)
+                        )
 
             # Record scheduling history for force-terminate transition
             history_specs = [
