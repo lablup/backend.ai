@@ -16,6 +16,62 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.3.0rc2 (2026-03-12)
+
+### Features
+* Add GraphQL API for prometheus query preset admin operations and execute query ([#9643](https://github.com/lablup/backend.ai/issues/9643))
+* Introduce DeploymentSubStep type as foundational building block for tracking deployment strategy progress. ([#9817](https://github.com/lablup/backend.ai/issues/9817))
+* Classify deployment coordinator failures as need_retry, expired, or give_up based on attempt count and timeouts ([#9871](https://github.com/lablup/backend.ai/issues/9871))
+* Add deploying lifecycle sub-step handlers (provisioning, progressing) for zero-downtime deployment support ([#9880](https://github.com/lablup/backend.ai/issues/9880))
+* Add deployment strategy evaluator and result applier for zero-downtime deployment support ([#9888](https://github.com/lablup/backend.ai/issues/9888))
+
+### Improvements
+* Add per-plugin timeout (120s) to `gather_container_measures` calls so a single hung plugin does not block stat collection from all other plugins ([#9781](https://github.com/lablup/backend.ai/issues/9781))
+* Move `KernelStatusInMatchSpec` from `api/gql/kernel/types.py` to `data/kernel/types.py` to resolve layer-violating import from `repositories/scheduler/options.py`. ([#9828](https://github.com/lablup/backend.ai/issues/9828))
+* Move SessionLifecycleManager from models layer to services layer to fix upward import dependency violation ([#9830](https://github.com/lablup/backend.ai/issues/9830))
+* Extract shared PaginationInfo DTO class and replace per-module duplicates with unified import. ([#9869](https://github.com/lablup/backend.ai/issues/9869))
+* Add agent_resources reconciliation to `recalc_resource_usage()` that detects and auto-corrects drift between `agent_resources.used` and actual resource allocations ([#9931](https://github.com/lablup/backend.ai/issues/9931))
+
+### Fixes
+* Sync `circuit.route_info` on route updates so that inference metric collection always targets the current set of routes, fixing auto-scaling scale-out failing to re-trigger after the first scale-in cycle ([#9760](https://github.com/lablup/backend.ai/issues/9760))
+* Pre-validate namespace path before `netstat_ns()` to prevent thread pool exhaustion from hung threads on stale network namespaces ([#9782](https://github.com/lablup/backend.ai/issues/9782))
+* Add per-call timeouts and error isolation to MemoryPlugin sysfs_impl stat collection to prevent permanent hangs from broken containers ([#9783](https://github.com/lablup/backend.ai/issues/9783))
+* Add missing check_admin_only() guard to 22 admin_* GraphQL resolvers across 7 files to prevent unauthorized access by non-superadmin users. ([#9827](https://github.com/lablup/backend.ai/issues/9827))
+* Fix `NotNullViolationError` when populating roles fixture by updating timestamps and skipping None values for NOT NULL + server_default columns in `populate_fixture()`. ([#9894](https://github.com/lablup/backend.ai/issues/9894))
+* Fix missing `is_preemptible` column in pending sessions query causing scheduler crash ([#9927](https://github.com/lablup/backend.ai/issues/9927))
+* Fix resource leak in force-terminate and bulk-terminate paths where `resource_allocations.free_at` was not set and `agent_resources.used` was not decremented ([#9930](https://github.com/lablup/backend.ai/issues/9930))
+* Fix Pydantic validation error in vfolder mkdir API by correcting the `MkdirResponse.results` type from `list[Any]` to a proper `ResultSet` model. ([#9933](https://github.com/lablup/backend.ai/issues/9933))
+* Fix deployment create API route returning 404 by correcting sub-app root path registration. ([#9934](https://github.com/lablup/backend.ai/issues/9934))
+* Import `AssociationScopesEntitiesRow` in the image CLI rescan path to register it with ORM metadata, preventing uninitialized mapper attributes when the table is not loaded via the normal server bootstrap ([#9946](https://github.com/lablup/backend.ai/issues/9946))
+* Fix ValueError in rbacScopeEntityCombinations query by adding missing AGENT, KERNEL, ROUTING members to RBACElementTypeGQL enum ([#9966](https://github.com/lablup/backend.ai/issues/9966))
+* Fix ghost resource usage in check-presets by adding kernel status filter to occupancy queries ([#9967](https://github.com/lablup/backend.ai/issues/9967))
+* Restore plain array response for `GET /folders/_/allowed_types` endpoint (was incorrectly returning a wrapped object). ([#9972](https://github.com/lablup/backend.ai/issues/9972))
+
+### Miscellaneous
+* Use full git clone for fork PRs to fix merge-base computation failure in CI. ([#9617](https://github.com/lablup/backend.ai/issues/9617))
+* Rename `window` field to `time_window` in Query Definition domain for consistency ([#9868](https://github.com/lablup/backend.ai/issues/9868))
+
+### Test Updates
+* Expand `check_permission_with_scope_chain()` test coverage with 15 additional edge-case scenarios ([#9742](https://github.com/lablup/backend.ai/issues/9742))
+* Add component tests for group (project) create, get, and modify operations (all xfail pending route implementation). ([#9876](https://github.com/lablup/backend.ai/issues/9876))
+* Add component tests for user modify and purge operations (role, status, password, flags, permission enforcement) ([#9877](https://github.com/lablup/backend.ai/issues/9877))
+* Add component tests for object storage (list, buckets, presigned URL) and error log (append, list, mark cleared) management. ([#9878](https://github.com/lablup/backend.ai/issues/9878))
+* Add component tests for user create, get, and delete CRUD operations. ([#9879](https://github.com/lablup/backend.ai/issues/9879))
+* Add component tests for RBAC permission CRUD, object permission CRUD, and permission checks (entity/scope/batch) covering 51 scenarios. ([#9881](https://github.com/lablup/backend.ai/issues/9881))
+* Add component tests for domain delete/purge/search covering soft-delete idempotency, purge conflict validation, and search pagination/sorting scenarios. ([#9882](https://github.com/lablup/backend.ai/issues/9882))
+* Add component tests for image registry rescan and resource limit set/clear operations. ([#9883](https://github.com/lablup/backend.ai/issues/9883))
+* Add component tests for VFolder CRUD operations (creation, listing, and get-info scenarios). ([#9884](https://github.com/lablup/backend.ai/issues/9884))
+* Add component tests for VFolder IO operations covering file uploads, downloads, listing, rename, move, delete, mkdir, and mount auth checks. ([#9885](https://github.com/lablup/backend.ai/issues/9885))
+* Add component tests for session code execution (execute/interrupt/complete) and app service management (start/shutdown service). ([#9887](https://github.com/lablup/backend.ai/issues/9887))
+* Add component tests for session log/status history, direct access info, session search, and session match scenarios. ([#9889](https://github.com/lablup/backend.ai/issues/9889))
+* Add component tests for fair share weight management across domain, project, and user scopes with access control verification ([#9907](https://github.com/lablup/backend.ai/issues/9907))
+* Add component tests for user search with username, role, compound filters, and empty result handling. ([#9909](https://github.com/lablup/backend.ai/issues/9909))
+* Add component tests for agent search operations - compound filter scenarios (status + resource_group intersection) and empty result handling for nonexistent resource groups ([#9911](https://github.com/lablup/backend.ai/issues/9911))
+* Add component tests for RBAC search operations (role, scope, entity search with filters and pagination) ([#9912](https://github.com/lablup/backend.ai/issues/9912))
+* Add fair share spec partial update (merge logic) test ([#9913](https://github.com/lablup/backend.ai/issues/9913))
+* Add component tests for image lifecycle operations (forget, purge, and permission enforcement) ([#9917](https://github.com/lablup/backend.ai/issues/9917))
+
+
 ## 26.3.0rc1 (2026-03-11)
 
 ### Features
