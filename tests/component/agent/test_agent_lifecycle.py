@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
-from ai.backend.common.types import AgentId, ResourceSlot, SlotName
+from ai.backend.common.types import AgentId, ResourceSlot, SlotName, SlotTypes
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.services.agent.actions.handle_heartbeat import HandleHeartbeatAction
@@ -48,7 +48,7 @@ def _make_agent_info(scaling_group: str) -> AgentInfo:
         public_key=None,
         public_host="127.0.0.1",
         available_resource_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
-        slot_key_and_units={SlotName("cpu"): "count", SlotName("mem"): "bytes"},
+        slot_key_and_units={SlotName("cpu"): SlotTypes.COUNT, SlotName("mem"): SlotTypes.BYTES},
         version="24.09.0",
         compute_plugins={},
         images=b"",
