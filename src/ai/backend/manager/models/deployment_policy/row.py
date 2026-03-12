@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
@@ -35,8 +35,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class RollingUpdateSpec(BaseModel):
     """Specification for rolling update deployment strategy."""
 
-    max_surge: int = 1
-    max_unavailable: int = 0
+    max_surge: int = Field(default=1, ge=0)
+    max_unavailable: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")
     def _validate_progress_is_possible(self) -> RollingUpdateSpec:
@@ -46,7 +46,7 @@ class RollingUpdateSpec(BaseModel):
         it cannot create new routes (would exceed max_total) nor terminate
         old routes (would fall below min_available), causing a deadlock.
         """
-        if self.max_surge <= 0 and self.max_unavailable <= 0:
+        if self.max_surge == 0 and self.max_unavailable == 0:
             raise ValueError(
                 "At least one of max_surge or max_unavailable must be positive; "
                 "otherwise the rolling update cannot make progress."
