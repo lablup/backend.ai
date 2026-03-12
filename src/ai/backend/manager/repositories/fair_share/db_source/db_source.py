@@ -54,13 +54,15 @@ from ai.backend.manager.repositories.base import (
     BulkUpserter,
     BulkUpserterResult,
     Creator,
-    RBACEntityCreator,
     Upserter,
     execute_batch_querier,
     execute_bulk_upserter,
     execute_creator,
-    execute_rbac_entity_creator,
     execute_upserter,
+)
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
 )
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareEntitySearchResult,
