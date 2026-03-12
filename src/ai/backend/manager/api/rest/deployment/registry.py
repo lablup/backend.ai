@@ -20,7 +20,7 @@ def register_deployment_routes(
     reg = RouteRegistry.create("deployments", route_deps.cors_options)
 
     # Deployment routes
-    reg.add("POST", "/", handler.create_deployment, middlewares=[auth_required])
+    reg.add("POST", "", handler.create_deployment, middlewares=[auth_required])
     reg.add("POST", "/search", handler.search_deployments, middlewares=[auth_required])
     reg.add("GET", "/{deployment_id}", handler.get_deployment, middlewares=[auth_required])
     reg.add(
