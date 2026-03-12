@@ -106,6 +106,39 @@ async def harbor_registry_fixture(
         )
 
 
+HARBOR_WEBHOOK_AUTH_TOKEN = "test-harbor-webhook-token"
+
+
+@pytest.fixture()
+async def harbor_webhook_registry_fixture(
+    db_engine: SAEngine,
+) -> AsyncIterator[uuid.UUID]:
+    """Insert a test HARBOR2 registry with webhook_auth_header set in extra.
+
+    URL uses 'harbor-webhook.test.local' to avoid conflict with harbor_registry_fixture.
+    Used for harbor webhook auth/event tests.
+    """
+    registry_id = uuid.uuid4()
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(ContainerRegistryRow.__table__).values(
+                id=registry_id,
+                url="https://harbor-webhook.test.local",
+                registry_name=f"harbor-webhook-{registry_id.hex[:8]}",
+                type=ContainerRegistryType.HARBOR2,
+                project="testproject",
+                extra={"webhook_auth_header": HARBOR_WEBHOOK_AUTH_TOKEN},
+            )
+        )
+    yield registry_id
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            ContainerRegistryRow.__table__.delete().where(
+                ContainerRegistryRow.__table__.c.id == registry_id
+            )
+        )
+
+
 @pytest.fixture()
 async def registry_factory(
     db_engine: SAEngine,

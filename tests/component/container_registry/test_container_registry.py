@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock
 
+import aiohttp
 import pytest
 
 from ai.backend.client.v2.exceptions import PermissionDeniedError, ServerError
@@ -20,6 +22,33 @@ from ai.backend.common.dto.manager.container_registry.request import (
 from ai.backend.common.dto.manager.container_registry.response import (
     PatchContainerRegistryResponseModel,
 )
+
+# Must match HARBOR_WEBHOOK_AUTH_TOKEN in conftest.py
+_HARBOR_WEBHOOK_AUTH_TOKEN = "test-harbor-webhook-token"
+
+
+def _build_webhook_payload(
+    event_type: str,
+    project: str = "testproject",
+    registry_host: str = "harbor-webhook.test.local",
+    image_name: str = "testimage",
+    tag: str = "latest",
+) -> dict[str, Any]:
+    return {
+        "type": event_type,
+        "event_data": {
+            "resources": [
+                {
+                    "resource_url": f"{registry_host}/{project}/{image_name}:{tag}",
+                    "tag": tag,
+                }
+            ],
+            "repository": {
+                "namespace": project,
+                "name": image_name,
+            },
+        },
+    }
 
 
 class TestContainerRegistryCRUD:
@@ -239,42 +268,66 @@ class TestContainerRegistryImageOperations:
 
 
 class TestContainerRegistryHarborWebhook:
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 automatically adds an HMAC Authorization header to every request, "
-            "but the harbor webhook endpoint validates it against "
-            "registry.extra['webhook_auth_header']. "
-            "Because the fixture does not populate that field, the header comparison always "
-            "fails and the server returns 401 (container-registry_hook_unauthorized). "
-            "This is a fundamental incompatibility between SDK auth and webhook auth; "
-            "tracked separately for resolution."
-        ),
-    )
-    async def test_handle_harbor_webhook(
+    async def test_push_artifact_with_valid_auth(
         self,
-        admin_registry: BackendAIClientRegistry,
-        harbor_registry_fixture: uuid.UUID,
+        server: Any,
+        harbor_webhook_registry_fixture: uuid.UUID,
     ) -> None:
-        """A PULL_ARTIFACT event is gracefully ignored (no actual image scan triggered)."""
-        request = HarborWebhookRequestModel(
-            type="PULL_ARTIFACT",
-            event_data=HarborWebhookRequestModel.EventData(
-                resources=[
-                    HarborWebhookRequestModel.EventData.Resource(
-                        resource_url="harbor.test.local/testproject/testimage:latest",
-                        tag="latest",
-                    )
-                ],
-                repository=HarborWebhookRequestModel.EventData.Repository(
-                    namespace="testproject",
-                    name="testimage",
-                ),
-            ),
-        )
-        await admin_registry.container_registry.handle_harbor_webhook(request)
+        """PUSH_ARTIFACT event with correct auth header → 204 (scan triggered)."""
+        payload = _build_webhook_payload("PUSH_ARTIFACT")
 
-    async def test_harbor_webhook_with_nonexistent_registry(
+        mock_scanner_cls = MagicMock()
+        mock_scanner = MagicMock()
+        mock_scanner.scan_single_ref = AsyncMock(return_value=None)
+        mock_scanner_cls.return_value = mock_scanner
+
+        with mock.patch(
+            "ai.backend.manager.services.container_registry.service.HarborRegistry_v2",
+            mock_scanner_cls,
+        ):
+            async with aiohttp.ClientSession() as session:
+                resp = await session.post(
+                    f"{server.url}/container-registries/webhook/harbor",
+                    json=payload,
+                    headers={"Authorization": _HARBOR_WEBHOOK_AUTH_TOKEN},
+                )
+            assert resp.status == 204
+
+        mock_scanner.scan_single_ref.assert_awaited_once()
+
+    async def test_push_artifact_with_invalid_auth(
+        self,
+        server: Any,
+        harbor_webhook_registry_fixture: uuid.UUID,
+    ) -> None:
+        """PUSH_ARTIFACT event with wrong auth header → 401 unauthorized."""
+        payload = _build_webhook_payload("PUSH_ARTIFACT")
+
+        async with aiohttp.ClientSession() as session:
+            resp = await session.post(
+                f"{server.url}/container-registries/webhook/harbor",
+                json=payload,
+                headers={"Authorization": "wrong-token"},
+            )
+        assert resp.status == 401
+
+    async def test_delete_artifact_event_ignored(
+        self,
+        server: Any,
+        harbor_webhook_registry_fixture: uuid.UUID,
+    ) -> None:
+        """Non-PUSH_ARTIFACT event (DELETE_ARTIFACT) is silently ignored → 204."""
+        payload = _build_webhook_payload("DELETE_ARTIFACT")
+
+        async with aiohttp.ClientSession() as session:
+            resp = await session.post(
+                f"{server.url}/container-registries/webhook/harbor",
+                json=payload,
+                headers={"Authorization": _HARBOR_WEBHOOK_AUTH_TOKEN},
+            )
+        assert resp.status == 204
+
+    async def test_webhook_for_nonexistent_registry(
         self,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
