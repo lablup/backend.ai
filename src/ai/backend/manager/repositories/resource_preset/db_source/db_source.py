@@ -314,11 +314,14 @@ class ResourcePresetDBSource:
             .join(SessionRow, KernelRow.session_id == SessionRow.id)
             .join(rst, ResourceAllocationRow.slot_name == rst.c.slot_name)
         )
+        effective_amount = sa.func.coalesce(
+            ResourceAllocationRow.used, ResourceAllocationRow.requested
+        )
         query = (
             sa.select(
                 SessionRow.scaling_group_name,
                 ResourceAllocationRow.slot_name,
-                sa.func.sum(ResourceAllocationRow.used).label("total"),
+                sa.func.sum(effective_amount).label("total"),
             )
             .select_from(j)
             .where(
@@ -448,10 +451,13 @@ class ResourcePresetDBSource:
         j = sa.join(
             ResourceAllocationRow, KernelRow, ResourceAllocationRow.kernel_id == KernelRow.id
         ).join(rst, ResourceAllocationRow.slot_name == rst.c.slot_name)
+        effective_amount = sa.func.coalesce(
+            ResourceAllocationRow.used, ResourceAllocationRow.requested
+        )
         query = (
             sa.select(
                 ResourceAllocationRow.slot_name,
-                sa.func.sum(ResourceAllocationRow.used).label("total"),
+                sa.func.sum(effective_amount).label("total"),
             )
             .select_from(j)
             .where(sa.and_(*conditions))
