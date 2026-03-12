@@ -4,9 +4,19 @@ All sub-step handlers are registered flat in the coordinator alongside other
 lifecycle handlers.  The coordinator dispatches by sub-step using the
 ``(lifecycle_type, sub_step)`` registry key.
 
-Each handler calls the strategy evaluator in ``execute()`` to evaluate
-the deployment FSM, then uses ``StrategyResultApplier`` to persist
-sub_step assignments and route mutations.
+Each handler's ``execute()`` evaluates the strategy FSM and classifies
+deployments into successes / errors / skipped.  The coordinator then
+applies ``status_transitions()`` to move deployments to the next sub-step
+or lifecycle state.
+
+Sub-step flow::
+
+    PROVISIONING ──success──▸ PROGRESSING ──success──▸ READY
+                                  │                   (via COMPLETED marker)
+                                  │failure
+                                  ▼
+                             ROLLING_BACK ──success──▸ READY
+                                                      (via ROLLED_BACK marker)
 """
 
 from __future__ import annotations
@@ -46,8 +56,10 @@ class DeployingProvisioningHandler(DeploymentHandler):
     """Handler for DEPLOYING / PROVISIONING sub-step.
 
     New-revision routes are being created; waiting for them to become HEALTHY.
-    execute() evaluates strategy FSM and applies route mutations via applier.
-    post_process() re-schedules the DEPLOYING/PROVISIONING cycle and triggers route provisioning.
+
+    - success: Routes provisioned → transition to PROGRESSING.
+    - failure: Provisioning failed → transition to ROLLING_BACK.
+    - skipped: Still waiting for routes — no transition, re-schedule.
     """
 
     def __init__(
@@ -84,7 +96,11 @@ class DeployingProvisioningHandler(DeploymentHandler):
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.PROVISIONING,
+                sub_status=DeploymentSubStep.PROGRESSING,
+            ),
+            failure=DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_status=DeploymentSubStep.ROLLING_BACK,
             ),
         )
 
@@ -101,13 +117,13 @@ class DeployingProvisioningHandler(DeploymentHandler):
 
 
 class DeployingProgressingHandler(DeploymentHandler):
-    """Handler for DEPLOYING / PROGRESSING sub-step (including terminal states).
+    """Handler for DEPLOYING / PROGRESSING sub-step (+ COMPLETED marker).
 
-    Handles three sub-steps determined by strategy evaluation:
+    Targets PROGRESSING (active) and COMPLETED (terminal marker):
 
-    - **PROGRESSING**: Actively replacing routes — no-op, re-schedule next cycle.
-    - **COMPLETED**: All strategy conditions met — applier swaps revision → success (→ READY).
-    - **ROLLED_BACK**: All new routes failed — applier clears deploying_revision → failure (→ READY).
+    - success: Strategy conditions met (COMPLETED) → transition to READY.
+    - failure: Strategy failed → transition to ROLLING_BACK.
+    - skipped: Still progressing — no transition, re-schedule.
     """
 
     def __init__(
@@ -140,9 +156,67 @@ class DeployingProgressingHandler(DeploymentHandler):
                 lifecycle=EndpointLifecycle.DEPLOYING,
                 sub_status=DeploymentSubStep.COMPLETED,
             ),
+        ]
+
+    @classmethod
+    @override
+    def status_transitions(cls) -> DeploymentStatusTransitions:
+        return DeploymentStatusTransitions(
+            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
+            failure=DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_status=DeploymentSubStep.ROLLING_BACK,
+            ),
+        )
+
+    @override
+    async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
+        raise NotImplementedError("Strategy evaluator and applier are not yet wired — see BA-5014")
+
+    @override
+    async def post_process(self, result: DeploymentExecutionResult) -> None:
+        await self._deployment_controller.mark_lifecycle_needed(
+            DeploymentLifecycleType.DEPLOYING, sub_step=DeploymentSubStep.PROGRESSING
+        )
+        await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)
+
+
+class DeployingRollingBackHandler(DeploymentHandler):
+    """Handler for DEPLOYING / ROLLING_BACK sub-step.
+
+    Actively rolling back — terminate new-revision routes,
+    restore traffic to previous revision routes.
+
+    - success: Rollback complete → transition to READY.
+    - failure: Rollback itself failed → transition to READY (best-effort).
+    - skipped: Still rolling back — no transition, re-schedule.
+    """
+
+    def __init__(
+        self,
+        deployment_controller: DeploymentController,
+        route_controller: RouteController,
+    ) -> None:
+        self._deployment_controller = deployment_controller
+        self._route_controller = route_controller
+
+    @classmethod
+    @override
+    def name(cls) -> str:
+        return "deploying-rolling-back"
+
+    @property
+    @override
+    def lock_id(self) -> LockID | None:
+        return LockID.LOCKID_DEPLOYMENT_DEPLOYING
+
+    @classmethod
+    @override
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
+        return [
             DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.ROLLED_BACK,
+                sub_status=DeploymentSubStep.ROLLING_BACK,
             ),
         ]
 
@@ -162,6 +236,6 @@ class DeployingProgressingHandler(DeploymentHandler):
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.DEPLOYING, sub_step=DeploymentSubStep.PROGRESSING
+            DeploymentLifecycleType.DEPLOYING, sub_step=DeploymentSubStep.ROLLING_BACK
         )
         await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)

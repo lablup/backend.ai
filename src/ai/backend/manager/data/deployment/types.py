@@ -160,14 +160,19 @@ class DeploymentSubStatus(enum.StrEnum):
 class DeploymentSubStep(DeploymentSubStatus):
     """Sub-steps for the DEPLOYING lifecycle phase.
 
+    Active states:
     - PROVISIONING: New revision routes are being provisioned; waiting for readiness.
     - PROGRESSING: Actively replacing old routes with new routes.
+    - ROLLING_BACK: Actively rolling back failed new routes to previous revision.
+
+    Terminal markers (no handler execution, trigger transition only):
     - COMPLETED: All strategy conditions satisfied; ready for revision swap.
-    - ROLLED_BACK: All new routes failed; ready for rollback cleanup.
+    - ROLLED_BACK: Rollback finished; ready for cleanup and transition to READY.
     """
 
     PROVISIONING = "provisioning"
     PROGRESSING = "progressing"
+    ROLLING_BACK = "rolling_back"
     COMPLETED = "completed"
     ROLLED_BACK = "rolled_back"
 

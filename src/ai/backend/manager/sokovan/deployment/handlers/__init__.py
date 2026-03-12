@@ -6,6 +6,7 @@ from .base import DeploymentHandler
 from .deploying import (
     DeployingProgressingHandler,
     DeployingProvisioningHandler,
+    DeployingRollingBackHandler,
 )
 from .destroying import DestroyingDeploymentHandler
 from .pending import CheckPendingDeploymentHandler
@@ -18,6 +19,7 @@ __all__ = [
     "CheckReplicaDeploymentHandler",
     "DeployingProgressingHandler",
     "DeployingProvisioningHandler",
+    "DeployingRollingBackHandler",
     "DeploymentHandler",
     "DestroyingDeploymentHandler",
     "ReconcileDeploymentHandler",
