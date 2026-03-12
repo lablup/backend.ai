@@ -80,6 +80,9 @@ class RBACElementTypeGQL(StrEnum):
     # Auto-only entities used in permissions
     NOTIFICATION_RULE = "notification_rule"
 
+    # Auto sub-entities with direct GET APIs
+    IMAGE_ALIAS = "image:alias"
+
     # Entity-level scopes
     ARTIFACT_REVISION = "artifact_revision"
 
