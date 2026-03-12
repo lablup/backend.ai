@@ -115,7 +115,9 @@ class DeploymentExecutor:
         # Phase 1: Load configuration
         with DeploymentRecorderContext.shared_phase("load_configuration"):
             with DeploymentRecorderContext.shared_step("load_proxy_targets"):
-                scaling_groups = {d.deployment_info.metadata.resource_group for d in deployments}
+                scaling_groups = {
+                    dep.deployment_info.metadata.resource_group for dep in deployments
+                }
                 scaling_group_targets = (
                     await self._deployment_repo.fetch_scaling_group_proxy_targets(scaling_groups)
                 )
@@ -197,7 +199,7 @@ class DeploymentExecutor:
         # Phase 1: Load routes
         with DeploymentRecorderContext.shared_phase("load_routes"):
             with DeploymentRecorderContext.shared_step("load_active_routes"):
-                endpoint_ids = {d.deployment_info.id for d in deployments}
+                endpoint_ids = {dep.deployment_info.id for dep in deployments}
                 route_map = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(
                     endpoint_ids
                 )
@@ -236,7 +238,7 @@ class DeploymentExecutor:
         # Phase 1: Load routes
         with DeploymentRecorderContext.shared_phase("load_routes"):
             with DeploymentRecorderContext.shared_step("load_active_routes"):
-                endpoint_ids = {d.deployment_info.id for d in deployments}
+                endpoint_ids = {dep.deployment_info.id for dep in deployments}
                 route_map = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(
                     endpoint_ids
                 )
@@ -286,7 +288,7 @@ class DeploymentExecutor:
         # Phase 3: Apply scaling (only for successful deployments)
         if scale_out_creators or scale_in_updater:
             with DeploymentRecorderContext.shared_phase(
-                "apply_scaling", entity_ids={d.deployment_info.id for d in successes}
+                "apply_scaling", entity_ids={dep.deployment_info.id for dep in successes}
             ):
                 with DeploymentRecorderContext.shared_step("scale_routes"):
                     await self._deployment_repo.scale_routes(scale_out_creators, scale_in_updater)
@@ -303,7 +305,7 @@ class DeploymentExecutor:
         # Phase 1: Load autoscaling configuration
         with DeploymentRecorderContext.shared_phase("load_autoscaling_config"):
             with DeploymentRecorderContext.shared_step("load_autoscaling_rules"):
-                endpoint_ids = {d.deployment_info.id for d in deployments}
+                endpoint_ids = {dep.deployment_info.id for dep in deployments}
                 auto_scaling_rules = (
                     await self._deployment_repo.fetch_auto_scaling_rules_by_endpoint_ids(
                         endpoint_ids
@@ -312,7 +314,7 @@ class DeploymentExecutor:
 
             with DeploymentRecorderContext.shared_step("load_metrics"):
                 # Fetch all metrics data upfront
-                deployment_infos = [d.deployment_info for d in deployments]
+                deployment_infos = [dep.deployment_info for dep in deployments]
                 metrics_data = await self._deployment_repo.fetch_metrics_for_autoscaling(
                     deployment_infos, auto_scaling_rules
                 )
@@ -373,13 +375,15 @@ class DeploymentExecutor:
         # Phase 1: Load termination configuration
         with DeploymentRecorderContext.shared_phase("load_termination_config"):
             with DeploymentRecorderContext.shared_step("load_routes"):
-                endpoint_ids = {d.deployment_info.id for d in deployments}
+                endpoint_ids = {dep.deployment_info.id for dep in deployments}
                 routes = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(
                     endpoint_ids
                 )
 
             with DeploymentRecorderContext.shared_step("load_proxy_config"):
-                scaling_groups = {d.deployment_info.metadata.resource_group for d in deployments}
+                scaling_groups = {
+                    dep.deployment_info.metadata.resource_group for dep in deployments
+                }
                 proxy_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
                     scaling_groups
                 )

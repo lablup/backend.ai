@@ -194,9 +194,6 @@ class DeploymentLifecycleStatus:
 class DeploymentStatusTransitions:
     """Status transitions for deployment handlers.
 
-    Mirrors the session-side ``StatusTransitions`` pattern with failure
-    classification into need_retry / expired / give_up.
-
     Attributes:
         success: Target lifecycle when handler succeeds, None means no change
         need_retry: Target lifecycle when handler fails but can retry

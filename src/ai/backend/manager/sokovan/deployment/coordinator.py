@@ -92,9 +92,7 @@ def _is_transition_timed_out(
         else current_dbtime.replace(tzinfo=UTC)
     )
     started_utc = (
-        started_at.astimezone(UTC)
-        if started_at.tzinfo
-        else started_at.replace(tzinfo=UTC)
+        started_at.astimezone(UTC) if started_at.tzinfo else started_at.replace(tzinfo=UTC)
     )
     elapsed = (current_utc - started_utc).total_seconds()
     return elapsed > timeout
@@ -252,7 +250,7 @@ class DeploymentCoordinator:
                 return
             log.info("handler: {} - processing {} deployments", handler_name, len(deployments))
 
-            deployment_ids = [d.deployment_info.id for d in deployments]
+            deployment_ids = [deployment.deployment_info.id for deployment in deployments]
 
             with DeploymentRecorderContext.scope(handler_name, entity_ids=deployment_ids) as pool:
                 try:
@@ -262,11 +260,11 @@ class DeploymentCoordinator:
                     result = DeploymentExecutionResult(
                         errors=[
                             DeploymentExecutionError(
-                                deployment_info=d,
+                                deployment_info=deployment,
                                 reason=f"Unexpected error in {handler_name}",
                                 error_detail="handler execute() raised an unhandled exception",
                             )
-                            for d in deployments
+                            for deployment in deployments
                         ],
                     )
                 all_records = pool.build_all_records()
@@ -304,7 +302,7 @@ class DeploymentCoordinator:
 
         # Success transitions (None = stay in current state)
         if transitions.success is not None and result.successes:
-            t = self._build_success_transition(
+            transition = self._build_success_transition(
                 handler_name=handler_name,
                 deployments=result.successes,
                 lifecycle_status=transitions.success,
@@ -312,9 +310,9 @@ class DeploymentCoordinator:
                 records=records,
                 timestamp_now=timestamp_now,
             )
-            batch_updaters.append(t.updater)
-            all_history_specs.extend(t.history_specs)
-            notification_events.extend(t.notification_events)
+            batch_updaters.append(transition.updater)
+            all_history_specs.extend(transition.history_specs)
+            notification_events.extend(transition.notification_events)
 
         # Failure transitions — classify into need_retry/expired/give_up
         if result.errors:
@@ -337,7 +335,7 @@ class DeploymentCoordinator:
                 # No transition defined → stay in current state
                 if not lifecycle_status:
                     continue
-                t = self._build_failure_transition(
+                transition = self._build_failure_transition(
                     handler_name=handler_name,
                     errors=errors,
                     lifecycle_status=lifecycle_status,
@@ -347,9 +345,9 @@ class DeploymentCoordinator:
                     timestamp_now=timestamp_now,
                     transition_label=label,
                 )
-                batch_updaters.append(t.updater)
-                all_history_specs.extend(t.history_specs)
-                notification_events.extend(t.notification_events)
+                batch_updaters.append(transition.updater)
+                all_history_specs.extend(transition.history_specs)
+                notification_events.extend(transition.notification_events)
 
         # Execute all updates in a single transaction
         if batch_updaters:
