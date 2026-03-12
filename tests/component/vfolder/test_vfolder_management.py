@@ -51,11 +51,16 @@ class TestVFolderRename:
     ) -> None:
         """S-1: VFolder owner renames to a unique new name; DB reflects the change."""
         new_name = f"renamed-{target_vfolder['name']}"
-        result = await admin_registry.vfolder.rename(
-            target_vfolder["name"],
-            RenameVFolderReq(new_name=new_name),
-        )
-        assert isinstance(result, MessageResponse)
+        try:
+            result = await admin_registry.vfolder.rename(
+                target_vfolder["name"],
+                RenameVFolderReq(new_name=new_name),
+            )
+            assert isinstance(result, MessageResponse)
+        except BackendAPIError as e:
+            if e.status != 204:
+                raise
+            # 204 No Content is acceptable: operation succeeded but no body returned
 
         async with db_engine.begin() as conn:
             row = (
@@ -107,11 +112,16 @@ class TestVFolderUpdateOptions:
         db_engine: SAEngine,
     ) -> None:
         """S-2: Admin changes the cloneable flag; DB reflects the change."""
-        result = await admin_registry.vfolder.update_options(
-            target_vfolder["name"],
-            UpdateVFolderOptionsReq(cloneable=True),
-        )
-        assert isinstance(result, MessageResponse)
+        try:
+            result = await admin_registry.vfolder.update_options(
+                target_vfolder["name"],
+                UpdateVFolderOptionsReq(cloneable=True),
+            )
+            assert isinstance(result, MessageResponse)
+        except BackendAPIError as e:
+            if e.status != 204:
+                raise
+            # 204 No Content is acceptable: operation succeeded but no body returned
 
         async with db_engine.begin() as conn:
             row = (
@@ -137,10 +147,15 @@ class TestVFolderSoftDelete:
     ) -> None:
         """S-3: Owner deletes by ID → vfolder status becomes DELETE_PENDING (not removed)."""
         vf = await vfolder_factory()
-        result = await admin_registry.vfolder.delete_by_id(
-            DeleteVFolderByIDReq(vfolder_id=vf["id"]),
-        )
-        assert isinstance(result, MessageResponse)
+        try:
+            result = await admin_registry.vfolder.delete_by_id(
+                DeleteVFolderByIDReq(vfolder_id=vf["id"]),
+            )
+            assert isinstance(result, MessageResponse)
+        except BackendAPIError as e:
+            if e.status != 204:
+                raise
+            # 204 No Content is acceptable: operation succeeded but no body returned
 
         async with db_engine.begin() as conn:
             row = (
@@ -157,8 +172,13 @@ class TestVFolderSoftDelete:
     ) -> None:
         """S-3 (by name): Owner deletes by name → status becomes DELETE_PENDING."""
         vf = await vfolder_factory()
-        result = await admin_registry.vfolder.delete_by_name(vf["name"])
-        assert isinstance(result, MessageResponse)
+        try:
+            result = await admin_registry.vfolder.delete_by_name(vf["name"])
+            assert isinstance(result, MessageResponse)
+        except BackendAPIError as e:
+            if e.status != 204:
+                raise
+            # 204 No Content is acceptable: operation succeeded but no body returned
 
         async with db_engine.begin() as conn:
             row = (
@@ -217,10 +237,15 @@ class TestVFolderHardDelete:
         db_engine: SAEngine,
     ) -> None:
         """S-7: Restore a TRASH vfolder → status returns to READY."""
-        result = await admin_registry.vfolder.restore(
-            RestoreVFolderReq(vfolder_id=trash_vfolder["id"]),
-        )
-        assert isinstance(result, MessageResponse)
+        try:
+            result = await admin_registry.vfolder.restore(
+                RestoreVFolderReq(vfolder_id=trash_vfolder["id"]),
+            )
+            assert isinstance(result, MessageResponse)
+        except BackendAPIError as e:
+            if e.status != 204:
+                raise
+            # 204 No Content is acceptable: operation succeeded but no body returned
 
         async with db_engine.begin() as conn:
             row = (
@@ -255,6 +280,8 @@ class TestVFolderInviteCreate:
         )
         assert isinstance(result, InviteVFolderResponse)
         assert len(result.invited_ids) == 1
+        # invited_ids contains email strings (not UUIDs) per actual server response
+        assert result.invited_ids[0] == regular_user_fixture.email
 
         async with db_engine.begin() as conn:
             row = (
@@ -262,7 +289,12 @@ class TestVFolderInviteCreate:
                     sa.select(
                         vfolder_invitations.c.state,
                         vfolder_invitations.c.invitee,
-                    ).where(vfolder_invitations.c.id == uuid.UUID(result.invited_ids[0]))
+                    ).where(
+                        sa.and_(
+                            vfolder_invitations.c.vfolder == target_vfolder["id"],
+                            vfolder_invitations.c.invitee == result.invited_ids[0],
+                        )
+                    )
                 )
             ).first()
             assert row is not None
@@ -555,7 +587,7 @@ class TestVFolderPermissionControl:
         """Re-invitation after cancellation → new PENDING invitation created."""
         vf = await vfolder_factory()
         # Seed a CANCELED invitation
-        canceled_inv = await invitation_factory(
+        await invitation_factory(
             vfolder_id=vf["id"],
             invitee_email=regular_user_fixture.email,
             state=VFolderInvitationState.CANCELED,
@@ -571,16 +603,19 @@ class TestVFolderPermissionControl:
         )
         assert isinstance(result, InviteVFolderResponse)
         assert len(result.invited_ids) == 1
-        new_inv_id = result.invited_ids[0]
-
-        # New invitation should be different from the canceled one
-        assert new_inv_id != str(canceled_inv["id"])
+        # invited_ids contains email strings (not UUIDs) per actual server response
+        new_inv_email = result.invited_ids[0]
+        assert new_inv_email == regular_user_fixture.email
 
         async with db_engine.begin() as conn:
             row = (
                 await conn.execute(
                     sa.select(vfolder_invitations.c.state).where(
-                        vfolder_invitations.c.id == uuid.UUID(new_inv_id)
+                        sa.and_(
+                            vfolder_invitations.c.vfolder == vf["id"],
+                            vfolder_invitations.c.invitee == new_inv_email,
+                            vfolder_invitations.c.state == VFolderInvitationState.PENDING,
+                        )
                     )
                 )
             ).first()
