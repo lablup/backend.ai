@@ -135,6 +135,7 @@ from ai.backend.manager.repositories.base.upserter import (
 from ai.backend.manager.repositories.deployment.creators import (
     DeploymentCreatorSpec,
     DeploymentPolicyCreatorSpec,
+    DeploymentRevisionCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment.creators.endpoint import LegacyEndpointCreatorSpec
 from ai.backend.manager.repositories.deployment.types import (

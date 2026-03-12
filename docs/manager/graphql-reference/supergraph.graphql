@@ -10501,6 +10501,7 @@ enum RBACElementType
   DEPLOYMENT_TOKEN @join__enumValue(graph: STRAWBERRY)
   DEPLOYMENT_POLICY @join__enumValue(graph: STRAWBERRY)
   DEPLOYMENT_REVISION @join__enumValue(graph: STRAWBERRY)
+  IMAGE_ALIAS @join__enumValue(graph: STRAWBERRY)
   ARTIFACT_REVISION @join__enumValue(graph: STRAWBERRY)
 }
 
