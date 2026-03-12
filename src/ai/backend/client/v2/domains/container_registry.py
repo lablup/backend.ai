@@ -3,6 +3,7 @@ from urllib.parse import urlencode
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.container_registry import (
     CreateContainerRegistryRequestModel,
+    ImageOperationRequestModel,
     ListContainerRegistriesResponseModel,
 )
 from ai.backend.common.dto.manager.container_registry.request import (
@@ -67,6 +68,28 @@ class ContainerRegistryClient(BaseDomainClient):
             f"/container-registries/{registry_id}",
             request=request,
             response_model=PatchContainerRegistryResponseModel,
+        )
+
+    async def rescan_images(
+        self,
+        registry_name: str,
+        project: str | None = None,
+    ) -> None:
+        await self._client.typed_request_no_content(
+            "POST",
+            "/container-registries/rescan",
+            request=ImageOperationRequestModel(registry=registry_name, project=project),
+        )
+
+    async def clear_images(
+        self,
+        registry_name: str,
+        project: str | None = None,
+    ) -> None:
+        await self._client.typed_request_no_content(
+            "POST",
+            "/container-registries/clear",
+            request=ImageOperationRequestModel(registry=registry_name, project=project),
         )
 
     async def handle_harbor_webhook(

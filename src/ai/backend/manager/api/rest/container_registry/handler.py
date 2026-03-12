@@ -23,6 +23,7 @@ from ai.backend.common.api_handlers import (
 from ai.backend.common.container_registry import (
     ContainerRegistryModel,
     CreateContainerRegistryRequestModel,
+    ImageOperationRequestModel,
     ListContainerRegistriesResponseModel,
     PatchContainerRegistryRequestModel,
     PatchContainerRegistryResponseModel,
@@ -40,6 +41,7 @@ from ai.backend.manager.repositories.container_registry.creators import (
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
 )
+from ai.backend.manager.services.container_registry.actions.clear_images import ClearImagesAction
 from ai.backend.manager.services.container_registry.actions.create_container_registry import (
     CreateContainerRegistryAction,
 )
@@ -59,6 +61,7 @@ from ai.backend.manager.services.container_registry.actions.load_container_regis
 from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
     ModifyContainerRegistryAction,
 )
+from ai.backend.manager.services.container_registry.actions.rescan_images import RescanImagesAction
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -282,6 +285,42 @@ class ContainerRegistryHandler:
             extra=result.data.extra,
         )
         return APIResponse.build(HTTPStatus.OK, resp)
+
+    # ------------------------------------------------------------------
+    # POST /container-registries/rescan
+    # ------------------------------------------------------------------
+
+    async def rescan_images(
+        self,
+        body: BodyParam[ImageOperationRequestModel],
+    ) -> APIResponse:
+        params = body.parsed
+        log.info("RESCAN_IMAGES (registry:{}, project:{})", params.registry, params.project)
+
+        await self._container_registry.rescan_images.wait_for_complete(
+            RescanImagesAction(
+                registry=params.registry,
+                project=params.project,
+                progress_reporter=None,
+            )
+        )
+        return APIResponse.no_content(HTTPStatus.NO_CONTENT)
+
+    # ------------------------------------------------------------------
+    # POST /container-registries/clear
+    # ------------------------------------------------------------------
+
+    async def clear_images(
+        self,
+        body: BodyParam[ImageOperationRequestModel],
+    ) -> APIResponse:
+        params = body.parsed
+        log.info("CLEAR_IMAGES (registry:{}, project:{})", params.registry, params.project)
+
+        await self._container_registry.clear_images.wait_for_complete(
+            ClearImagesAction(registry=params.registry, project=params.project)
+        )
+        return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
     # POST /container-registries/webhook/harbor

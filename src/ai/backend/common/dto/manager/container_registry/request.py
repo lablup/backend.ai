@@ -11,6 +11,7 @@ from ai.backend.common.container_registry import (
     AllowedGroupsModel,
     ContainerRegistryModel,
     CreateContainerRegistryRequestModel,
+    ImageOperationRequestModel,
     PatchContainerRegistryRequestModel,
 )
 from ai.backend.common.dto.manager.registry.request import HarborWebhookRequestModel
@@ -20,6 +21,7 @@ __all__ = (
     "AllowedGroupsModel",
     "ContainerRegistryModel",
     "CreateContainerRegistryRequestModel",
+    "ImageOperationRequestModel",
     "PatchContainerRegistryRequestModel",
     # Harbor webhook model (re-exported from registry.request)
     "HarborWebhookRequestModel",

@@ -62,3 +62,8 @@ class CreateContainerRegistryRequestModel(BaseRequestModel):
 
 class ListContainerRegistriesResponseModel(BaseResponseModel):
     items: list[ContainerRegistryModel]
+
+
+class ImageOperationRequestModel(BaseRequestModel):
+    registry: str
+    project: str | None = None

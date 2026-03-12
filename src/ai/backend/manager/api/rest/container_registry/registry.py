@@ -66,6 +66,24 @@ def register_container_registry_routes(
     )
     reg.add(
         "POST",
+        "/rescan",
+        handler.rescan_images,
+        middlewares=[
+            route_deps.read_status_mw,
+            superadmin_required,
+        ],
+    )
+    reg.add(
+        "POST",
+        "/clear",
+        handler.clear_images,
+        middlewares=[
+            route_deps.read_status_mw,
+            superadmin_required,
+        ],
+    )
+    reg.add(
+        "POST",
         "/webhook/harbor",
         handler.harbor_webhook,
         middlewares=[route_deps.all_status_mw],

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import uuid
+from unittest import mock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -186,6 +188,54 @@ class TestContainerRegistryPermissions:
         """Regular user (non-superadmin) gets PermissionDenied when deleting a registry."""
         with pytest.raises(PermissionDeniedError):
             await user_registry.container_registry.delete(str(container_registry_fixture))
+
+
+class TestContainerRegistryImageOperations:
+    async def test_rescan_images(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        container_registry_fixture: uuid.UUID,
+    ) -> None:
+        """Admin triggers image rescan; operation completes without error (scanner mocked)."""
+        all_registries = await admin_registry.container_registry.list_all()
+        fixture_registry = next(
+            r for r in all_registries.items if r.id == container_registry_fixture
+        )
+        registry_name = fixture_registry.registry_name
+        assert registry_name is not None
+
+        mock_scan_result = MagicMock()
+        mock_scan_result.images = []
+        mock_scan_result.errors = []
+
+        mock_scanner = MagicMock()
+        mock_scanner.rescan_single_registry = AsyncMock(return_value=mock_scan_result)
+
+        mock_scanner_cls = MagicMock(return_value=mock_scanner)
+
+        with mock.patch(
+            "ai.backend.manager.services.container_registry.service.get_container_registry_cls",
+            return_value=mock_scanner_cls,
+        ):
+            await admin_registry.container_registry.rescan_images(registry_name)
+
+        mock_scanner_cls.assert_called_once()
+        mock_scanner.rescan_single_registry.assert_awaited_once()
+
+    async def test_clear_images(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        container_registry_fixture: uuid.UUID,
+    ) -> None:
+        """Admin clears images for a registry; operation completes without error."""
+        all_registries = await admin_registry.container_registry.list_all()
+        fixture_registry = next(
+            r for r in all_registries.items if r.id == container_registry_fixture
+        )
+        registry_name = fixture_registry.registry_name
+        assert registry_name is not None
+
+        await admin_registry.container_registry.clear_images(registry_name)
 
 
 class TestContainerRegistryHarborWebhook:
