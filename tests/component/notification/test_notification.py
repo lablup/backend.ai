@@ -31,6 +31,7 @@ from ai.backend.common.dto.manager.notification import (
     ListNotificationRuleTypesResponse,
     NotificationChannelDTO,
     NotificationChannelFilter,
+    NotificationRuleDTO,
     NotificationRuleTypeSchemaResponse,
     SearchNotificationChannelsRequest,
     SearchNotificationRulesRequest,
@@ -428,7 +429,7 @@ class TestNotificationProcessing:
         self,
         notification_processors: NotificationProcessors,
         notification_center: NotificationCenter,
-        notification_rule: NotificationChannelDTO,
+        notification_rule: NotificationRuleDTO,
     ) -> None:
         """A matching rule is found and the channel is called exactly once."""
         send_result = SendResult(message="Notification delivered")
