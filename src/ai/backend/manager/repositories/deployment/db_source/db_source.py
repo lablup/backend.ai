@@ -1516,7 +1516,7 @@ class DeploymentDBSource:
             return {}
 
         # All statuses except TERMINATED
-        included_statuses = {s for s in RouteStatus if s != RouteStatus.TERMINATED}
+        included_statuses = {status for status in RouteStatus if status != RouteStatus.TERMINATED}
 
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(RoutingRow).where(

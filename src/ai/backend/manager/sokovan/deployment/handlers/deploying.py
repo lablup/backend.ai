@@ -129,25 +129,29 @@ class DeployingProvisioningHandler(DeploymentHandler):
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
-        deployment_infos = [d.deployment_info for d in deployments]
-        deployment_map = {d.deployment_info.id: d for d in deployments}
+        deployment_infos = [deployment.deployment_info for deployment in deployments]
+        deployment_map = {deployment.deployment_info.id: deployment for deployment in deployments}
 
         summary = await self._evaluator.evaluate(deployment_infos)
         await self._applier.apply(summary)
 
         # Successfully evaluated deployments → successes
         evaluated_ids = set(summary.assignments.keys())
-        successes = [d for d in deployments if d.deployment_info.id in evaluated_ids]
+        successes = [
+            deployment
+            for deployment in deployments
+            if deployment.deployment_info.id in evaluated_ids
+        ]
 
         # Evaluation errors → execution errors
         errors = [
             DeploymentExecutionError(
-                deployment_info=deployment_map[e.deployment.id],
-                reason=e.reason,
-                error_detail=e.reason,
+                deployment_info=deployment_map[evaluation_error.deployment.id],
+                reason=evaluation_error.reason,
+                error_detail=evaluation_error.reason,
             )
-            for e in summary.errors
-            if e.deployment.id in deployment_map
+            for evaluation_error in summary.errors
+            if evaluation_error.deployment.id in deployment_map
         ]
 
         return DeploymentExecutionResult(successes=successes, errors=errors)
@@ -227,8 +231,8 @@ class DeployingProgressingHandler(DeploymentHandler):
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
-        deployment_infos = [d.deployment_info for d in deployments]
-        deployment_map = {d.deployment_info.id: d for d in deployments}
+        deployment_infos = [deployment.deployment_info for deployment in deployments]
+        deployment_map = {deployment.deployment_info.id: deployment for deployment in deployments}
 
         summary = await self._evaluator.evaluate(deployment_infos)
         apply_result = await self._applier.apply(summary)
@@ -237,9 +241,9 @@ class DeployingProgressingHandler(DeploymentHandler):
         # Without this guard, a COMPLETED sub_step would swap revisions and
         # transition the deployment back to READY, resurrecting it.
         destroying_ids = {
-            d.deployment_info.id
-            for d in deployments
-            if d.deployment_info.state.lifecycle
+            deployment.deployment_info.id
+            for deployment in deployments
+            if deployment.deployment_info.state.lifecycle
             in (EndpointLifecycle.DESTROYING, EndpointLifecycle.DESTROYED)
         }
         if destroying_ids:
@@ -360,25 +364,29 @@ class DeployingRollingBackHandler(DeploymentHandler):
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
-        deployment_infos = [d.deployment_info for d in deployments]
-        deployment_map = {d.deployment_info.id: d for d in deployments}
+        deployment_infos = [deployment.deployment_info for deployment in deployments]
+        deployment_map = {deployment.deployment_info.id: deployment for deployment in deployments}
 
         summary = await self._evaluator.evaluate(deployment_infos)
         await self._applier.apply(summary)
 
         # Successfully evaluated deployments → successes (stay in ROLLING_BACK)
         evaluated_ids = set(summary.assignments.keys())
-        successes = [d for d in deployments if d.deployment_info.id in evaluated_ids]
+        successes = [
+            deployment
+            for deployment in deployments
+            if deployment.deployment_info.id in evaluated_ids
+        ]
 
         # Evaluation errors → execution errors
         errors = [
             DeploymentExecutionError(
-                deployment_info=deployment_map[e.deployment.id],
-                reason=e.reason,
-                error_detail=e.reason,
+                deployment_info=deployment_map[evaluation_error.deployment.id],
+                reason=evaluation_error.reason,
+                error_detail=evaluation_error.reason,
             )
-            for e in summary.errors
-            if e.deployment.id in deployment_map
+            for evaluation_error in summary.errors
+            if evaluation_error.deployment.id in deployment_map
         ]
 
         return DeploymentExecutionResult(successes=successes, errors=errors)

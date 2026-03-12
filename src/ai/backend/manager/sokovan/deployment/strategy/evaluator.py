@@ -67,7 +67,7 @@ class DeploymentStrategyEvaluator:
         if not deployments:
             return result
 
-        endpoint_ids = {d.id for d in deployments}
+        endpoint_ids = {deployment.id for deployment in deployments}
 
         # ── 1. Bulk-load policies and routes ──
         policy_search = await self._deployment_repo.search_deployment_policies(
@@ -76,7 +76,7 @@ class DeploymentStrategyEvaluator:
                 conditions=[DeploymentPolicyConditions.by_endpoint_ids(endpoint_ids)],
             )
         )
-        policy_map = {p.endpoint: p for p in policy_search.items}
+        policy_map = {policy.endpoint: policy for policy in policy_search.items}
         # Use deploying-aware route fetch that includes FAILED_TO_START routes.
         # Without failed routes, the strategy cannot detect rollback conditions
         # (e.g. after a coordinator crash where new routes failed but the FSM
