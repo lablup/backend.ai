@@ -110,6 +110,7 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.base.creator import (
     BulkCreator,
+    execute_bulk_creator,
 )
 from ai.backend.manager.repositories.base.purger import (
     Purger,
@@ -2484,3 +2485,101 @@ class DeploymentDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    # -------------------------------------------------------------------------
+    # Strategy Mutation Methods
+    # -------------------------------------------------------------------------
+
+    async def apply_strategy_mutations(
+        self,
+        assignments: Mapping[uuid.UUID, DeploymentSubStep],
+        rollout: BulkCreator[RoutingRow],
+        drain: BatchUpdater[RoutingRow] | None,
+        completed_ids: set[uuid.UUID],
+        rolled_back_ids: set[uuid.UUID],
+    ) -> int:
+        """Apply all DB mutations from a strategy evaluation cycle in a single transaction.
+
+        Returns:
+            Number of deployments whose revision was swapped.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            await self._update_sub_steps(db_sess, assignments)
+            await self._create_routes(db_sess, rollout)
+            await self._drain_routes(db_sess, drain)
+            swapped = await self._complete_deployment_revision_swap(db_sess, completed_ids)
+            await self._clear_deploying_revision(db_sess, rolled_back_ids)
+            return swapped
+
+    @staticmethod
+    async def _update_sub_steps(
+        db_sess: SASession,
+        assignments: Mapping[uuid.UUID, DeploymentSubStep],
+    ) -> None:
+        """Update deployment sub-step assignments."""
+        for endpoint_id, sub_step in assignments.items():
+            query = (
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == endpoint_id)
+                .values(sub_step=sub_step)
+            )
+            await db_sess.execute(query)
+
+    @staticmethod
+    async def _create_routes(
+        db_sess: SASession,
+        rollout: BulkCreator[RoutingRow],
+    ) -> None:
+        """Create new routes for rollout."""
+        if rollout.specs:
+            await execute_bulk_creator(db_sess, rollout)
+
+    @staticmethod
+    async def _drain_routes(
+        db_sess: SASession,
+        drain: BatchUpdater[RoutingRow] | None,
+    ) -> None:
+        """Drain routes by marking them for termination."""
+        if drain:
+            await execute_batch_updater(db_sess, drain)
+
+    @staticmethod
+    async def _complete_deployment_revision_swap(
+        db_sess: SASession,
+        completed_ids: set[uuid.UUID],
+    ) -> int:
+        """Swap deploying_revision → current_revision for completed deployments."""
+        if not completed_ids:
+            return 0
+        query = (
+            sa.update(EndpointRow)
+            .where(
+                EndpointRow.id.in_(completed_ids),
+                EndpointRow.deploying_revision.is_not(None),
+            )
+            .values(
+                current_revision=EndpointRow.deploying_revision,
+                deploying_revision=None,
+                sub_step=None,
+            )
+        )
+        result = await db_sess.execute(query)
+        return cast(CursorResult[Any], result).rowcount
+
+    @staticmethod
+    async def _clear_deploying_revision(
+        db_sess: SASession,
+        rolled_back_ids: set[uuid.UUID],
+    ) -> None:
+        """Clear deploying_revision for rolled-back deployments."""
+        if not rolled_back_ids:
+            return
+        query = (
+            sa.update(EndpointRow)
+            .where(EndpointRow.id.in_(rolled_back_ids))
+            .values(
+                deploying_revision=None,
+                sub_step=None,
+            )
+        )
+        await db_sess.execute(query)

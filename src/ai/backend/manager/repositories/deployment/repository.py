@@ -1414,42 +1414,15 @@ class DeploymentRepository:
         """Apply all DB mutations from a strategy evaluation cycle.
 
         Performs sub-step updates, route rollout/drain, revision swap,
-        and deploying_revision cleanup.
+        and deploying_revision cleanup in a single transaction.
 
         Returns:
             Number of deployments whose revision was swapped.
         """
-        await self._update_sub_steps(assignments)
-
-        if rollout.specs:
-            await self._create_routes(rollout)
-        if drain:
-            await self._drain_routes(drain)
-
-        swapped = 0
-        if completed_ids:
-            swapped = await self._complete_deployment_revision_swap(completed_ids)
-        if rolled_back_ids:
-            await self._clear_deploying_revision(rolled_back_ids)
-
-        return swapped
-
-    async def _update_sub_steps(self, assignments: Mapping[UUID, DeploymentSubStep]) -> None:
-        """Update deployment sub-step assignments."""
-        raise NotImplementedError
-
-    async def _create_routes(self, rollout: BulkCreator[RoutingRow]) -> None:
-        """Create new routes for rollout."""
-        raise NotImplementedError
-
-    async def _drain_routes(self, drain: BatchUpdater[RoutingRow]) -> None:
-        """Drain routes by marking them for termination."""
-        raise NotImplementedError
-
-    async def _complete_deployment_revision_swap(self, completed_ids: set[UUID]) -> int:
-        """Swap revision for completed deployments."""
-        raise NotImplementedError
-
-    async def _clear_deploying_revision(self, rolled_back_ids: set[UUID]) -> None:
-        """Clear deploying_revision for rolled-back deployments."""
-        raise NotImplementedError
+        return await self._db_source.apply_strategy_mutations(
+            assignments=assignments,
+            rollout=rollout,
+            drain=drain,
+            completed_ids=completed_ids,
+            rolled_back_ids=rolled_back_ids,
+        )
