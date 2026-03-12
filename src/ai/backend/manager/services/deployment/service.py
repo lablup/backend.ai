@@ -858,14 +858,22 @@ class DeploymentService:
             action.creator.model_deployment_id
         )
 
-        # Create the Creator with EndpointTokenCreatorSpec
+        # Create the RBACEntityCreator with EndpointTokenCreatorSpec
+        endpoint_id = action.creator.model_deployment_id
         spec = EndpointTokenCreatorSpec(
-            endpoint_id=action.creator.model_deployment_id,
+            endpoint_id=endpoint_id,
             domain=endpoint_info.metadata.domain,
             project_id=endpoint_info.metadata.project,
             session_owner_id=endpoint_info.metadata.session_owner,
         )
-        creator: Creator[EndpointTokenRow] = Creator(spec=spec)
+        creator: RBACEntityCreator[EndpointTokenRow] = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.DEPLOYMENT_TOKEN,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(endpoint_id),
+            ),
+        )
 
         # Create the token via repository
         token_row = await self._deployment_repository.create_access_token(creator)
