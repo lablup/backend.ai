@@ -1237,6 +1237,7 @@ class TestMatchSessions:
         action = MatchSessionsAction(
             id_or_name_prefix="test",
             owner_access_key=sample_access_key,
+            user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
 
@@ -1249,12 +1250,14 @@ class TestMatchSessions:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         mock_session_repository.match_sessions = AsyncMock(return_value=[])
 
         action = MatchSessionsAction(
             id_or_name_prefix="nonexistent",
             owner_access_key=sample_access_key,
+            user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
 
@@ -1265,12 +1268,14 @@ class TestMatchSessions:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         mock_session_repository.match_sessions = AsyncMock(return_value=[])
 
         action = MatchSessionsAction(
             id_or_name_prefix="test",
             owner_access_key=sample_access_key,
+            user_id=sample_user_id,
         )
         await session_service.match_sessions(action)
 
