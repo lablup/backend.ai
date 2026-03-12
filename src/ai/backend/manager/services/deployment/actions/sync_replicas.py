@@ -2,31 +2,39 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.deployment.actions.replica.base import DeploymentReplicaBaseAction
+from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.services.deployment.actions.replica.base import (
+    DeploymentReplicaSingleEntityAction,
+    DeploymentReplicaSingleEntityActionResult,
+)
 
 
 @dataclass
-class SyncReplicaAction(DeploymentReplicaBaseAction):
+class SyncReplicaAction(DeploymentReplicaSingleEntityAction):
     """Action to sync replicas for an existing deployment."""
 
     deployment_id: UUID
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.deployment_id)
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
+    @override
+    def target_entity_id(self) -> str:
+        return str(self.deployment_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.MODEL_DEPLOYMENT, str(self.deployment_id))
+
 
 @dataclass
-class SyncReplicaActionResult(BaseActionResult):
+class SyncReplicaActionResult(DeploymentReplicaSingleEntityActionResult):
     success: bool
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def target_entity_id(self) -> str:
+        return ""

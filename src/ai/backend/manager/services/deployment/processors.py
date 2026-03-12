@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
@@ -115,10 +116,16 @@ class DeploymentProcessors(AbstractProcessorPackage):
     create_legacy_deployment: ActionProcessor[
         CreateLegacyDeploymentAction, CreateLegacyDeploymentActionResult
     ]
-    update_deployment: ActionProcessor[UpdateDeploymentAction, UpdateDeploymentActionResult]
-    destroy_deployment: ActionProcessor[DestroyDeploymentAction, DestroyDeploymentActionResult]
+    update_deployment: SingleEntityActionProcessor[
+        UpdateDeploymentAction, UpdateDeploymentActionResult
+    ]
+    destroy_deployment: SingleEntityActionProcessor[
+        DestroyDeploymentAction, DestroyDeploymentActionResult
+    ]
     search_deployments: ActionProcessor[SearchDeploymentsAction, SearchDeploymentsActionResult]
-    get_deployment_by_id: ActionProcessor[GetDeploymentByIdAction, GetDeploymentByIdActionResult]
+    get_deployment_by_id: SingleEntityActionProcessor[
+        GetDeploymentByIdAction, GetDeploymentByIdActionResult
+    ]
     get_deployment_policy: ActionProcessor[
         GetDeploymentPolicyAction, GetDeploymentPolicyActionResult
     ]
@@ -136,14 +143,14 @@ class DeploymentProcessors(AbstractProcessorPackage):
     activate_revision: ActionProcessor[ActivateRevisionAction, ActivateRevisionActionResult]
 
     # Route operations
-    sync_replicas: ActionProcessor[SyncReplicaAction, SyncReplicaActionResult]
+    sync_replicas: SingleEntityActionProcessor[SyncReplicaAction, SyncReplicaActionResult]
     search_routes: ActionProcessor[SearchRoutesAction, SearchRoutesActionResult]
     update_route_traffic_status: ActionProcessor[
         UpdateRouteTrafficStatusAction, UpdateRouteTrafficStatusActionResult
     ]
 
     # Replica operations
-    get_replica_by_id: ActionProcessor[GetReplicaByIdAction, GetReplicaByIdActionResult]
+    get_replica_by_id: SingleEntityActionProcessor[GetReplicaByIdAction, GetReplicaByIdActionResult]
     search_replicas: ActionProcessor[SearchReplicasAction, SearchReplicasActionResult]
 
     # Auto-scaling rules
@@ -176,10 +183,16 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.create_legacy_deployment = ActionProcessor(
             service.create_legacy_deployment, action_monitors
         )
-        self.update_deployment = ActionProcessor(service.update_deployment, action_monitors)
-        self.destroy_deployment = ActionProcessor(service.destroy_deployment, action_monitors)
+        self.update_deployment = SingleEntityActionProcessor(
+            service.update_deployment, action_monitors
+        )
+        self.destroy_deployment = SingleEntityActionProcessor(
+            service.destroy_deployment, action_monitors
+        )
         self.search_deployments = ActionProcessor(service.search_deployments, action_monitors)
-        self.get_deployment_by_id = ActionProcessor(service.get_deployment_by_id, action_monitors)
+        self.get_deployment_by_id = SingleEntityActionProcessor(
+            service.get_deployment_by_id, action_monitors
+        )
         self.get_deployment_policy = ActionProcessor(service.get_deployment_policy, action_monitors)
         self.search_deployment_policies = ActionProcessor(
             service.search_deployment_policies, action_monitors
@@ -195,14 +208,16 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.activate_revision = ActionProcessor(service.activate_revision, action_monitors)
 
         # Route operations
-        self.sync_replicas = ActionProcessor(service.sync_replicas, action_monitors)
+        self.sync_replicas = SingleEntityActionProcessor(service.sync_replicas, action_monitors)
         self.search_routes = ActionProcessor(service.search_routes, action_monitors)
         self.update_route_traffic_status = ActionProcessor(
             service.update_route_traffic_status, action_monitors
         )
 
         # Replica operations
-        self.get_replica_by_id = ActionProcessor(service.get_replica_by_id, action_monitors)
+        self.get_replica_by_id = SingleEntityActionProcessor(
+            service.get_replica_by_id, action_monitors
+        )
         self.search_replicas = ActionProcessor(service.search_replicas, action_monitors)
 
         # Auto-scaling rules
