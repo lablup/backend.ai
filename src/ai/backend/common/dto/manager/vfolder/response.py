@@ -212,10 +212,24 @@ class VFolderCloneResponse(BaseResponseModel):
 # ============================================================
 
 
+class MkdirItemResult(BaseModel):
+    """Single item result in mkdir operation."""
+
+    msg: str | None = Field(default=None, description="Result message")
+    item: str | None = Field(default=None, description="Item path")
+
+
+class MkdirResultSet(BaseModel):
+    """Result set for mkdir operation."""
+
+    success: list[MkdirItemResult] = Field(description="Successfully created directories")
+    failed: list[MkdirItemResult] = Field(description="Failed directory creations")
+
+
 class MkdirResponse(BaseResponseModel):
     """Response for mkdir operation."""
 
-    results: list[Any] = Field(description="Results of directory creation")
+    results: MkdirResultSet = Field(description="Results of directory creation")
 
 
 class CreateDownloadSessionResponse(BaseResponseModel):
