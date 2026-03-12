@@ -315,6 +315,7 @@ class ScheduleDBSource:
                 SessionRow.domain_name,
                 SessionRow.scaling_group_name,
                 SessionRow.priority,
+                SessionRow.is_preemptible,
                 SessionRow.session_type,
                 SessionRow.cluster_mode,
                 SessionRow.designated_agent_ids,
