@@ -10,6 +10,7 @@ import aiohttp_cors
 import sqlalchemy as sa
 from aiohttp import web
 from pydantic import AnyUrl, BaseModel, Field
+from sqlalchemy.orm import attributes
 from yarl import URL
 
 from ai.backend.appproxy.common.errors import ObjectNotFound
@@ -20,6 +21,7 @@ from ai.backend.appproxy.common.types import (
     FrontendMode,
     ProxyProtocol,
     PydanticResponse,
+    RouteInfo,
     SessionConfig,
     WebMiddleware,
 )
@@ -303,6 +305,92 @@ async def generate_endpoint_api_token(
     return PydanticResponse(EndpointAPITokenResponseModel(token=encoded_jwt))
 
 
+class SyncRouteModel(BaseModel):
+    """Model for a single route in sync request."""
+
+    route_id: UUID
+    session_id: UUID
+    kernel_host: str | None = None
+    kernel_port: int
+    traffic_ratio: float = 1.0
+
+
+class SyncRoutesRequestModel(BaseModel):
+    """Request model for syncing routes to an endpoint's circuit."""
+
+    routes: list[SyncRouteModel]
+
+
+class SyncRoutesResponseModel(BaseModel):
+    """Response model for route sync."""
+
+    success: bool
+    synced_routes: int
+
+
+@auth_required("manager")
+@pydantic_api_handler(SyncRoutesRequestModel)
+async def sync_routes(
+    request: web.Request, params: SyncRoutesRequestModel
+) -> PydanticResponse[SyncRoutesResponseModel]:
+    """
+    Synchronize route information for an endpoint's circuit.
+
+    Updates the circuit's route_info with the provided routes, preserving
+    health status for existing routes. Propagates changes to workers.
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+    endpoint_id = UUID(request.match_info["endpoint_id"])
+
+    async def _sync(sess: SASession) -> int:
+        circuit = await Circuit.get_by_endpoint(
+            sess, endpoint_id, load_worker=True, load_endpoint=True
+        )
+
+        # Build map of existing routes to preserve health status
+        existing_route_map: dict[UUID, RouteInfo] = {}
+        for route in circuit.route_info:
+            if route.route_id:
+                existing_route_map[route.route_id] = route
+
+        old_routes = list(circuit.route_info)
+
+        # Build new route_info list
+        new_route_info: list[RouteInfo] = []
+        for route_data in params.routes:
+            existing = existing_route_map.get(route_data.route_id)
+            new_route_info.append(
+                RouteInfo(
+                    route_id=route_data.route_id,
+                    session_id=route_data.session_id,
+                    session_name=None,
+                    kernel_host=route_data.kernel_host,
+                    kernel_port=route_data.kernel_port,
+                    protocol=circuit.protocol,
+                    traffic_ratio=route_data.traffic_ratio,
+                    health_status=existing.health_status if existing else None,
+                    last_health_check=existing.last_health_check if existing else None,
+                    consecutive_failures=existing.consecutive_failures if existing else 0,
+                )
+            )
+
+        circuit.route_info = new_route_info
+        circuit.session_ids = [r.session_id for r in new_route_info]
+
+        attributes.flag_modified(circuit, "route_info")
+        attributes.flag_modified(circuit, "session_ids")
+
+        # Propagate route changes to workers
+        await root_ctx.circuit_manager.update_circuit_routes(circuit, old_routes)
+
+        return len(new_route_info)
+
+    async with root_ctx.db.connect() as db_conn:
+        synced_count = await execute_with_txn_retry(_sync, root_ctx.db.begin_session, db_conn)
+
+    return PydanticResponse(SyncRoutesResponseModel(success=True, synced_routes=synced_count))
+
+
 async def init(_app: web.Application) -> None:
     pass
 
@@ -323,6 +411,7 @@ def create_app(
     cors.add(app.router.add_resource(r""))
     cors.add(add_route("POST", "/{endpoint_id}", create_or_update_endpoint))
     cors.add(add_route("PUT", "/{endpoint_id}/health-check", inject_health_check_information))
+    cors.add(add_route("PUT", "/{endpoint_id}/routes", sync_routes))
     cors.add(add_route("DELETE", "/{endpoint_id}", remove_endpoint))
     cors.add(add_route("POST", "/{endpoint_id}/token", generate_endpoint_api_token))
     return app, []

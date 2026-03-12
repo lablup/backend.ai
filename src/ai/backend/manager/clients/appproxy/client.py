@@ -21,7 +21,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.appproxy import AppProxyConnectionError, AppProxyResponseError
 
-from .types import CreateEndpointRequestBody
+from .types import CreateEndpointRequestBody, SyncRoutesRequestBody
 
 log: BraceStyleAdapter = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -105,6 +105,38 @@ class AppProxyClient:
             resp.raise_for_status()
             result: dict[str, Any] = await resp.json()
             return result
+
+    @appproxy_client_resilience.apply()
+    async def sync_routes(
+        self,
+        endpoint_id: UUID,
+        body: SyncRoutesRequestBody,
+    ) -> dict[str, Any]:
+        """Sync route information for an endpoint's circuit in App Proxy.
+
+        Args:
+            endpoint_id: Endpoint UUID
+            body: Route sync request body containing route information
+
+        Returns:
+            Response from App Proxy service
+        """
+        try:
+            async with self._client_session.put(
+                f"/v2/endpoints/{endpoint_id}/routes",
+                json=body.model_dump(mode="json"),
+                headers={
+                    "X-BackendAI-Token": self._token,
+                },
+            ) as resp:
+                resp.raise_for_status()
+                result: dict[str, Any] = await resp.json()
+                return result
+        except aiohttp.ClientConnectorError as e:
+            log.error("Failed to connect to app-proxy at {}: {}", self._address, e)
+            raise AppProxyConnectionError(
+                extra_msg=f"Failed to connect to AppProxy at {self._address}"
+            ) from e
 
     @appproxy_client_resilience.apply()
     async def delete_endpoint(
