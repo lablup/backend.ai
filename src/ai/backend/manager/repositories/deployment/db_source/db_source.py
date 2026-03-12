@@ -4,7 +4,7 @@ import uuid
 from collections import Counter, defaultdict
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any, cast
 
@@ -17,6 +17,7 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
@@ -57,6 +58,7 @@ from ai.backend.manager.data.deployment.types import (
     ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
@@ -108,10 +110,7 @@ from ai.backend.manager.repositories.base import (
     execute_batch_querier,
     execute_creator,
 )
-from ai.backend.manager.repositories.base.creator import (
-    BulkCreator,
-    execute_bulk_creator,
-)
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import (
     Purger,
     PurgerResult,
@@ -120,6 +119,7 @@ from ai.backend.manager.repositories.base.purger import (
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
+    execute_rbac_entity_creators,
 )
 from ai.backend.manager.repositories.base.updater import (
     BatchUpdater,
@@ -259,9 +259,15 @@ class DeploymentDBSource:
                     strategy_spec=policy_config.strategy_spec,
                     rollback_on_failure=policy_config.rollback_on_failure,
                 )
-                policy_row = policy_spec.build_row()
-                db_sess.add(policy_row)
-                await db_sess.flush()
+                policy_creator = RBACEntityCreator(
+                    spec=policy_spec,
+                    element_type=RBACElementType.DEPLOYMENT_POLICY,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.MODEL_DEPLOYMENT,
+                        element_id=str(endpoint.id),
+                    ),
+                )
+                await execute_rbac_entity_creator(db_sess, policy_creator)
 
             stmt = (
                 sa.select(EndpointRow)
@@ -941,7 +947,7 @@ class DeploymentDBSource:
 
     async def create_route(
         self,
-        creator: Creator[RoutingRow],
+        creator: RBACEntityCreator[RoutingRow],
     ) -> uuid.UUID:
         """Create a new route using the provided creator.
 
@@ -949,7 +955,7 @@ class DeploymentDBSource:
         This method only executes the creator.
         """
         async with self._begin_session_read_committed() as db_sess:
-            result = await execute_creator(db_sess, creator)
+            result = await execute_rbac_entity_creator(db_sess, creator)
             return result.row.id
 
     async def get_routes_by_endpoint(
@@ -1503,14 +1509,14 @@ class DeploymentDBSource:
 
     async def scale_routes(
         self,
-        scale_out_creators: Sequence[Creator[RoutingRow]],
+        scale_out_creators: Sequence[RBACEntityCreator[RoutingRow]],
         scale_in_updater: BatchUpdater[RoutingRow] | None,
     ) -> None:
         """Scale out/in routes based on provided creators and updater."""
         async with self._begin_session_read_committed() as db_sess:
             # Scale out routes
             for creator in scale_out_creators:
-                await execute_creator(db_sess, creator)
+                await execute_rbac_entity_creator(db_sess, creator)
             # Scale in routes
             if scale_in_updater:
                 await execute_batch_updater(db_sess, scale_in_updater)
@@ -2025,7 +2031,7 @@ class DeploymentDBSource:
 
     async def create_revision(
         self,
-        creator: Creator[DeploymentRevisionRow],
+        creator: RBACEntityCreator[DeploymentRevisionRow],
     ) -> ModelRevisionData:
         """Create a new deployment revision for an endpoint.
 
@@ -2040,16 +2046,12 @@ class DeploymentDBSource:
         This requires adding a `revision_history_limit` column to EndpointRow.
         """
         async with self._begin_session_read_committed() as db_sess:
-            spec = cast(DeploymentRevisionCreatorSpec, creator.spec)
-
-            row = spec.build_row()
-            db_sess.add(row)
-            await db_sess.flush()
-            return row.to_data()
+            result = await execute_rbac_entity_creator(db_sess, creator)
+            return result.row.to_data()
 
     async def create_revision_with_next_number(
         self,
-        creator: Creator[DeploymentRevisionRow],
+        creator: RBACEntityCreator[DeploymentRevisionRow],
         endpoint_id: uuid.UUID,
     ) -> ModelRevisionData:
         """Atomically read the latest revision number and create a new revision.
@@ -2080,11 +2082,10 @@ class DeploymentDBSource:
             next_revision_number = (latest_revision_number or 0) + 1
 
             spec = cast(DeploymentRevisionCreatorSpec, creator.spec)
-            spec = spec.with_revision_number(next_revision_number)
-            row = spec.build_row()
-            db_sess.add(row)
-            await db_sess.flush()
-            return row.to_data()
+            updated_spec = spec.with_revision_number(next_revision_number)
+            updated_creator = replace(creator, spec=updated_spec)
+            rbac_result = await execute_rbac_entity_creator(db_sess, updated_creator)
+            return rbac_result.row.to_data()
 
     async def get_revision(
         self,
@@ -2383,7 +2384,7 @@ class DeploymentDBSource:
 
     async def create_access_token(
         self,
-        creator: Creator[EndpointTokenRow],
+        creator: RBACEntityCreator[EndpointTokenRow],
     ) -> EndpointTokenRow:
         """Create a new access token for a model deployment.
 
@@ -2394,7 +2395,7 @@ class DeploymentDBSource:
             Created EndpointTokenRow.
         """
         async with self._begin_session_read_committed() as db_sess:
-            result = await execute_creator(db_sess, creator)
+            result = await execute_rbac_entity_creator(db_sess, creator)
             return result.row
 
     # ========== Additional Search Operations ==========
@@ -2500,7 +2501,7 @@ class DeploymentDBSource:
     async def apply_strategy_mutations(
         self,
         assignments: Mapping[uuid.UUID, DeploymentSubStep],
-        rollout: BulkCreator[RoutingRow],
+        rollout: Sequence[RBACEntityCreator[RoutingRow]],
         drain: BatchUpdater[RoutingRow] | None,
         completed_ids: set[uuid.UUID],
         rolled_back_ids: set[uuid.UUID],
@@ -2535,11 +2536,11 @@ class DeploymentDBSource:
     @staticmethod
     async def _create_routes(
         db_sess: SASession,
-        rollout: BulkCreator[RoutingRow],
+        rollout: Sequence[RBACEntityCreator[RoutingRow]],
     ) -> None:
         """Create new routes for rollout."""
-        if rollout.specs:
-            await execute_bulk_creator(db_sess, rollout)
+        if rollout:
+            await execute_rbac_entity_creators(db_sess, rollout)
 
     @staticmethod
     async def _drain_routes(

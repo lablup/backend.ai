@@ -16,6 +16,7 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.exception import UnknownImageReference
@@ -31,6 +32,7 @@ from ai.backend.manager.data.image.types import (
     RescanImagesResult,
     ResourceLimitInput,
 )
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.image import (
     ImageAccessForbiddenError,
     ImageAliasNotFound,
@@ -38,7 +40,8 @@ from ai.backend.manager.errors.image import (
 )
 from ai.backend.manager.models.image import ImageStatus, ImageType
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.image.creators import ImageAliasCreatorSpec
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
@@ -992,10 +995,15 @@ class TestAliasImageById(ImageServiceBaseFixtures):
         assert result.image_alias == image_alias_data
         mock_image_repository.add_image_alias_by_id.assert_called_once()
         creator_arg = mock_image_repository.add_image_alias_by_id.call_args[0][0]
-        assert isinstance(creator_arg, Creator)
+        assert isinstance(creator_arg, RBACEntityCreator)
         assert isinstance(creator_arg.spec, ImageAliasCreatorSpec)
         assert creator_arg.spec.alias == "python"
         assert creator_arg.spec.image_id == image_id
+        assert creator_arg.element_type == RBACElementType.IMAGE_ALIAS
+        assert creator_arg.scope_ref == RBACElementRef(
+            element_type=RBACElementType.IMAGE,
+            element_id=str(image_id),
+        )
 
 
 class TestClearImageCustomResourceLimitById(ImageServiceBaseFixtures):

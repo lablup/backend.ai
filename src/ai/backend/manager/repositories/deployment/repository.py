@@ -578,7 +578,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def scale_routes(
         self,
-        scale_out_creators: Sequence[Creator[RoutingRow]],
+        scale_out_creators: Sequence[RBACEntityCreator[RoutingRow]],
         scale_in_updater: BatchUpdater[RoutingRow] | None,
     ) -> None:
         await self._db_source.scale_routes(scale_out_creators, scale_in_updater)
@@ -1057,7 +1057,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_revision(
         self,
-        creator: Creator[DeploymentRevisionRow],
+        creator: RBACEntityCreator[DeploymentRevisionRow],
     ) -> ModelRevisionData:
         """Create a new deployment revision."""
         return await self._db_source.create_revision(creator)
@@ -1065,7 +1065,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_revision_with_next_number(
         self,
-        creator: Creator[DeploymentRevisionRow],
+        creator: RBACEntityCreator[DeploymentRevisionRow],
         endpoint_id: uuid.UUID,
     ) -> ModelRevisionData:
         """Atomically read the latest revision number and create a new revision.
@@ -1269,7 +1269,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_route(
         self,
-        creator: Creator[RoutingRow],
+        creator: RBACEntityCreator[RoutingRow],
     ) -> uuid.UUID:
         """Create a new route using the provided creator.
 
@@ -1345,7 +1345,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_access_token(
         self,
-        creator: Creator[EndpointTokenRow],
+        creator: RBACEntityCreator[EndpointTokenRow],
     ) -> EndpointTokenRow:
         """Create a new access token for a model deployment.
 
@@ -1407,7 +1407,7 @@ class DeploymentRepository:
     async def apply_strategy_mutations(
         self,
         assignments: Mapping[UUID, DeploymentSubStep],
-        rollout: BulkCreator[RoutingRow],
+        rollout: Sequence[RBACEntityCreator[RoutingRow]],
         drain: BatchUpdater[RoutingRow] | None,
         completed_ids: set[UUID],
         rolled_back_ids: set[UUID],

@@ -1200,6 +1200,7 @@ class TestDeploymentRevisionOperations:
                 EntityFieldRow,  # DeploymentRevisionRow relationship dependency
                 DeploymentRevisionRow,
                 DeploymentPolicyRow,
+                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection
@@ -1455,7 +1456,15 @@ class TestDeploymentRevisionOperations:
             runtime_variant=RuntimeVariant.CUSTOM,
             extra_mounts=[],
         )
-        return await deployment_repository.create_revision(Creator(spec=spec))
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.DEPLOYMENT_REVISION,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
+        return await deployment_repository.create_revision(creator)
 
     @pytest.fixture
     async def test_multiple_revisions(
@@ -1488,7 +1497,15 @@ class TestDeploymentRevisionOperations:
                 runtime_variant=RuntimeVariant.CUSTOM,
                 extra_mounts=[],
             )
-            revision = await deployment_repository.create_revision(Creator(spec=spec))
+            creator = RBACEntityCreator(
+                spec=spec,
+                element_type=RBACElementType.DEPLOYMENT_REVISION,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.MODEL_DEPLOYMENT,
+                    element_id=str(test_endpoint_id),
+                ),
+            )
+            revision = await deployment_repository.create_revision(creator)
             revisions.append(revision)
         return revisions
 
@@ -1523,7 +1540,15 @@ class TestDeploymentRevisionOperations:
                 runtime_variant=RuntimeVariant.CUSTOM,
                 extra_mounts=[],
             )
-            revision = await deployment_repository.create_revision(Creator(spec=spec))
+            creator = RBACEntityCreator(
+                spec=spec,
+                element_type=RBACElementType.DEPLOYMENT_REVISION,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.MODEL_DEPLOYMENT,
+                    element_id=str(test_endpoint_id),
+                ),
+            )
+            revision = await deployment_repository.create_revision(creator)
             revisions.append(revision)
         return revisions
 
@@ -1555,7 +1580,14 @@ class TestDeploymentRevisionOperations:
             runtime_variant=RuntimeVariant.CUSTOM,
             extra_mounts=[],
         )
-        creator = Creator(spec=spec)
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.DEPLOYMENT_REVISION,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
 
         result = await deployment_repository.create_revision(creator)
 
@@ -2915,6 +2947,7 @@ class TestRouteOperations:
                 VFolderRow,
                 EndpointRow,
                 RoutingRow,
+                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection
@@ -3127,7 +3160,14 @@ class TestRouteOperations:
             revision_id=None,
             traffic_status=RouteTrafficStatus.ACTIVE,
         )
-        creator = Creator(spec=spec)
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.ROUTING,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
 
         route_id = await deployment_repository.create_route(creator)
 
@@ -3151,7 +3191,15 @@ class TestRouteOperations:
             domain=test_domain_name,
             project_id=test_group_id,
         )
-        route_id = await deployment_repository.create_route(Creator(spec=spec))
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.ROUTING,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
+        route_id = await deployment_repository.create_route(creator)
 
         # Update the route status
         updater = Updater(
@@ -3190,7 +3238,15 @@ class TestRouteOperations:
             domain=test_domain_name,
             project_id=test_group_id,
         )
-        route_id = await deployment_repository.create_route(Creator(spec=spec))
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.ROUTING,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
+        route_id = await deployment_repository.create_route(creator)
 
         # Update the route using unified spec (excluding session to avoid FK constraint)
         updater = Updater(

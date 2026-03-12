@@ -389,6 +389,12 @@ class RBACElementType(enum.StrEnum):
     # === Auto-only entities used in permissions ===
     NOTIFICATION_RULE = "notification_rule"
 
+    # === Auto sub-entities with direct GET APIs ===
+    IMAGE_ALIAS = "image:alias"
+    DEPLOYMENT_TOKEN = "deployment:token"
+    DEPLOYMENT_REVISION = "deployment:revision"
+    DEPLOYMENT_POLICY = "deployment:policy"
+
     # === Entity-level scopes (for entity-scope permissions) ===
     ARTIFACT_REVISION = "artifact_revision"
 
