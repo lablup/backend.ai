@@ -384,6 +384,26 @@ class DeploymentInfo:
 
 
 @dataclass
+class DeploymentWithHistory:
+    """Bundles a deployment with its scheduling history context.
+
+    This is the primary data unit for deployment coordinator operations,
+    analogous to SessionWithKernels for session scheduling.
+
+    Attributes:
+        deployment_info: Deployment information including lifecycle data
+        phase_attempts: Number of attempts for current phase from scheduling history
+                       (used for failure classification: give_up when >= max_retries)
+        phase_started_at: When the current phase started from scheduling history
+                         (used for failure classification: expired when timeout exceeded)
+    """
+
+    deployment_info: DeploymentInfo
+    phase_attempts: int = 0
+    phase_started_at: datetime | None = None
+
+
+@dataclass
 class DeploymentSessionSpec:
     id: UUID
     metadata: DeploymentMetadata

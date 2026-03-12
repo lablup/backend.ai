@@ -26,6 +26,7 @@ from ai.backend.manager.sokovan.deployment.types import (
     DeploymentExecutionError,
     DeploymentExecutionResult,
     DeploymentLifecycleType,
+    DeploymentWithHistory,
 )
 
 if TYPE_CHECKING:
@@ -68,12 +69,20 @@ def sample_deployment_info() -> DeploymentInfo:
 
 
 @pytest.fixture
-def sample_deployment_execution_error(
+def sample_deployment_with_history(
     sample_deployment_info: DeploymentInfo,
+) -> DeploymentWithHistory:
+    """Sample DeploymentWithHistory wrapping DeploymentInfo."""
+    return DeploymentWithHistory(deployment_info=sample_deployment_info)
+
+
+@pytest.fixture
+def sample_deployment_execution_error(
+    sample_deployment_with_history: DeploymentWithHistory,
 ) -> DeploymentExecutionError:
     """Sample DeploymentExecutionError for testing."""
     return DeploymentExecutionError(
-        deployment_info=sample_deployment_info,
+        deployment_info=sample_deployment_with_history,
         reason="Test failure",
         error_detail="Detailed error message",
     )
@@ -161,7 +170,7 @@ def mock_route_controller() -> MagicMock:
 
 @pytest.fixture
 def mock_handler_with_success(
-    sample_deployment_info: DeploymentInfo,
+    sample_deployment_with_history: DeploymentWithHistory,
 ) -> MagicMock:
     """Handler that returns success result."""
     mock = MagicMock(spec=DeploymentHandler)
@@ -178,7 +187,7 @@ def mock_handler_with_success(
     )
     mock.execute = AsyncMock(
         return_value=DeploymentExecutionResult(
-            successes=[sample_deployment_info],
+            successes=[sample_deployment_with_history],
             errors=[],
         )
     )
@@ -250,11 +259,11 @@ def coordinator_with_pending_deployments(
     mock_client_pool: MagicMock,
     mock_valkey_stat: AsyncMock,
     mock_route_controller: MagicMock,
-    sample_deployment_info: DeploymentInfo,
+    sample_deployment_with_history: DeploymentWithHistory,
 ) -> Generator[DeploymentCoordinator, None, None]:
     """Coordinator with PENDING deployments available."""
-    mock_deployment_repository.get_endpoints_by_statuses = AsyncMock(
-        return_value=[sample_deployment_info]
+    mock_deployment_repository.get_deployments_for_handler = AsyncMock(
+        return_value=[sample_deployment_with_history]
     )
 
     coordinator = DeploymentCoordinator(
@@ -286,7 +295,7 @@ def coordinator_without_deployments(
     mock_route_controller: MagicMock,
 ) -> Generator[DeploymentCoordinator, None, None]:
     """Coordinator with no deployments available."""
-    mock_deployment_repository.get_endpoints_by_statuses = AsyncMock(return_value=[])
+    mock_deployment_repository.get_deployments_for_handler = AsyncMock(return_value=[])
 
     coordinator = DeploymentCoordinator(
         valkey_schedule=mock_valkey_schedule,

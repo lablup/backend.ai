@@ -46,6 +46,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
     DeploymentSubStep,
+    DeploymentWithHistory,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
@@ -486,6 +487,49 @@ class DeploymentDBSource:
         async with self._begin_readonly_session_read_committed() as db_sess:
             rows = await self._get_endpoints_by_statuses(db_sess, statuses, sub_steps)
             return [row.to_deployment_info() for row in rows]
+
+    async def fetch_deployments_for_handler(
+        self,
+        statuses: list[EndpointLifecycle],
+        handler_name: str,
+    ) -> list[DeploymentWithHistory]:
+        """Fetch deployments for handler execution with history populated.
+
+        Queries endpoints and their latest scheduling history in a single
+        transaction, then populates phase_attempts and phase_started_at on
+        each DeploymentWithHistory. History is only applied when the latest
+        record matches the given handler_name (same phase); otherwise the
+        fields stay at defaults (0, None).
+
+        Args:
+            statuses: Endpoint lifecycle statuses to include
+            handler_name: Current handler phase name for history matching
+
+        Returns:
+            List of DeploymentWithHistory with history fields populated.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            rows = await self._get_endpoints_by_statuses(db_sess, statuses)
+            if not rows:
+                return []
+
+            deployment_ids = [row.id for row in rows]
+            history_map = await self._get_last_deployment_histories_bulk(db_sess, deployment_ids)
+
+            result: list[DeploymentWithHistory] = []
+            for row in rows:
+                history = history_map.get(row.id)
+                if history and history.phase == handler_name:
+                    result.append(
+                        DeploymentWithHistory(
+                            deployment_info=row.to_deployment_info(),
+                            phase_attempts=history.attempts,
+                            phase_started_at=history.created_at,
+                        )
+                    )
+                else:
+                    result.append(DeploymentWithHistory(deployment_info=row.to_deployment_info()))
+            return result
 
     async def _get_endpoints_by_statuses(
         self,
