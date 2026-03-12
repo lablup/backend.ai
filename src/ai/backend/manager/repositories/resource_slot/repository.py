@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -13,6 +14,7 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
+from ai.backend.manager.data.resource_slot.types import AgentResourceDrift
 from ai.backend.manager.models.resource_slot import ResourceSlotTypeRow
 
 from .db_source import ResourceSlotDBSource
@@ -64,3 +66,17 @@ class ResourceSlotRepository:
     async def get_slot_type(self, slot_name: str) -> ResourceSlotTypeRow:
         """Get a specific resource slot type by name."""
         return await self._db_source.get_slot_type(slot_name)
+
+    # ==================== Reconciliation ====================
+
+    @resource_slot_repository_resilience.apply()
+    async def compute_actual_agent_resource_usage(
+        self,
+    ) -> dict[tuple[str, str], Decimal]:
+        """Compute actual per-agent per-slot resource usage from active allocations."""
+        return await self._db_source.compute_actual_agent_resource_usage()
+
+    @resource_slot_repository_resilience.apply()
+    async def reconcile_agent_resources(self) -> list[AgentResourceDrift]:
+        """Compare agent_resources.used against actual allocations and correct drift."""
+        return await self._db_source.reconcile_agent_resources()
