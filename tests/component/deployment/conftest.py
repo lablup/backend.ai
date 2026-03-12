@@ -277,7 +277,5 @@ async def deployment_seed_data(
             )
         )
         await conn.execute(
-            EndpointRow.__table__.delete().where(
-                EndpointRow.__table__.c.domain == domain_fixture
-            )
+            EndpointRow.__table__.delete().where(EndpointRow.__table__.c.domain == domain_fixture)
         )
