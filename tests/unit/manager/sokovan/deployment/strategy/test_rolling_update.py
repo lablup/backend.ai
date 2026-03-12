@@ -724,17 +724,14 @@ class TestEdgeCases:
         assert _count_rollout(result) == 1
         assert len(_drain_ids(result)) == 0
 
-    def test_deploying_rev_none_all_routes_classified_as_old(self) -> None:
-        """If deploying_revision_id is None, all routes are old (r.revision_id != None)."""
+    def test_deploying_rev_none_rejected(self) -> None:
+        """If deploying_revision_id is None, evaluate_cycle raises ValueError."""
         deployment = make_deployment(desired=1, deploying_revision_id=None)  # type: ignore[arg-type]
         spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
         routes = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY)]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
-
-        # All classified as old, no new → PROGRESSING with create
-        assert result.sub_step == DeploymentSubStep.PROGRESSING
-        assert _count_rollout(result) == 1
+        with pytest.raises(ValueError, match="deploying_revision_id must not be None"):
+            RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
 
     def test_route_without_revision_classified_as_old(self) -> None:
         """Routes with revision_id=None are classified as old."""

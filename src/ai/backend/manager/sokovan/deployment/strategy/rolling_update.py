@@ -69,7 +69,10 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
             5. Compute allowed surge/unavailable, decide create/terminate -> PROGRESSING.
         """
         desired = deployment.replica_spec.target_replica_count
-        classified = self._classify_routes(routes, deployment.deploying_revision_id)
+        deploying_revision_id = deployment.deploying_revision_id
+        if deploying_revision_id is None:
+            raise ValueError("deploying_revision_id must not be None for rolling update")
+        classified = self._classify_routes(routes, deploying_revision_id)
 
         if result := self._check_provisioning(deployment, classified):
             return result
