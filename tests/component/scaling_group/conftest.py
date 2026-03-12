@@ -16,6 +16,12 @@ from ai.backend.manager.services.scaling_group.service import ScalingGroupServic
 
 
 @pytest.fixture()
+def scaling_group_repository(database_engine: ExtendedAsyncSAEngine) -> ScalingGroupRepository:
+    """Direct repository instance for association existence checks."""
+    return ScalingGroupRepository(database_engine)
+
+
+@pytest.fixture()
 def scaling_group_processors(database_engine: ExtendedAsyncSAEngine) -> ScalingGroupProcessors:
     repo = ScalingGroupRepository(database_engine)
     service = ScalingGroupService(repo)
