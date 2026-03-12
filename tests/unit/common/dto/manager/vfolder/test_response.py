@@ -258,8 +258,8 @@ class TestFileOperationResponses:
                 "failed": [],
             },
         })
-        assert resp.results.success[0].item == "test1"
-        assert resp.results.failed == []
+        assert resp.results["success"][0]["item"] == "test1"
+        assert resp.results["failed"] == []
 
     def test_download_session_response(self) -> None:
         resp = CreateDownloadSessionResponse(token="tok-123", url="https://dl.example.com/file")

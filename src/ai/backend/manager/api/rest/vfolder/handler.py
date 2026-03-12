@@ -800,7 +800,7 @@ class VFolderHandler:
                 exist_ok=params.exist_ok,
             )
         )
-        resp = MkdirResponse.model_validate({"results": result.results})
+        resp = MkdirResponse(results=result.results)
         return APIResponse.build(result.storage_resp_status, resp)
 
     # ------------------------------------------------------------------

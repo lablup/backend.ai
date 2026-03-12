@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.field import (
     VFolderOwnershipTypeField,
     VFolderPermissionField,
 )
-from ai.backend.common.types import VFolderUsageMode
+from ai.backend.common.types import ResultSet, VFolderUsageMode
 
 __all__ = (
     # DTOs (data transfer objects)
@@ -210,24 +210,10 @@ class VFolderCloneResponse(BaseResponseModel):
 # ============================================================
 
 
-class MkdirResultItem(BaseModel):
-    """Single item result in mkdir operation."""
-
-    msg: str | None = Field(default=None, description="Result message")
-    item: str | None = Field(default=None, description="Item path")
-
-
-class MkdirResults(BaseModel):
-    """Aggregated results of a mkdir operation."""
-
-    success: list[MkdirResultItem] = Field(description="Successfully created directories")
-    failed: list[MkdirResultItem] = Field(description="Failed directory creations")
-
-
 class MkdirResponse(BaseResponseModel):
     """Response for mkdir operation."""
 
-    results: MkdirResults = Field(description="Results of directory creation")
+    results: ResultSet = Field(description="Results of directory creation")
 
 
 class CreateDownloadSessionResponse(BaseResponseModel):
