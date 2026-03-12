@@ -740,7 +740,7 @@ class DeploymentDBSource:
     async def _get_last_deployment_histories_bulk(
         self,
         db_sess: SASession,
-        deployment_ids: list[uuid.UUID],
+        deployment_ids: Sequence[uuid.UUID],
     ) -> dict[uuid.UUID, DeploymentHistoryRow]:
         """Get last history records for multiple deployments efficiently."""
         if not deployment_ids:

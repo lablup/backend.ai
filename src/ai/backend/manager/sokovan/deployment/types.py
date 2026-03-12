@@ -7,8 +7,10 @@ from uuid import UUID
 
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
-    DeploymentWithHistory,
     RouteStatus,
+)
+from ai.backend.manager.data.deployment.types import (
+    DeploymentWithHistory as DeploymentWithHistory,
 )
 
 if TYPE_CHECKING:
