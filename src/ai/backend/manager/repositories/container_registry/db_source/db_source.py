@@ -1,0 +1,297 @@
+import logging
+import uuid
+from typing import Any, cast
+
+import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+
+from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
+from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.container_registry.types import (
+    ContainerRegistryData,
+    ContainerRegistrySearchResult,
+)
+from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.errors.image import (
+    ContainerRegistryGroupsAssociationNotFound,
+    ContainerRegistryNotFound,
+)
+from ai.backend.manager.models.association_container_registries_groups import (
+    AssociationContainerRegistriesGroupsRow,
+)
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import (
+    BulkCreator,
+    Creator,
+    execute_bulk_creator,
+    execute_creator,
+)
+from ai.backend.manager.repositories.base.purger import Purger, execute_purger
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.container_registry.creators import (
+    ContainerRegistryCreatorSpec,
+    ContainerRegistryGroupCreatorSpec,
+)
+from ai.backend.manager.repositories.container_registry.updaters import (
+    ContainerRegistryUpdaterSpec,
+)
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+class ContainerRegistryDBSource:
+    """Database source for container registry-related operations."""
+
+    _db: ExtendedAsyncSAEngine
+
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+        self._db = db
+
+    async def insert_registry(
+        self,
+        creator: Creator[ContainerRegistryRow],
+    ) -> ContainerRegistryData:
+        spec = cast(ContainerRegistryCreatorSpec, creator.spec)
+        async with self._db.begin_session() as session:
+            creator_result = await execute_creator(session, creator)
+            container_registry_row: ContainerRegistryRow = creator_result.row
+
+            if spec.has_allowed_groups:
+                allowed_groups = cast(AllowedGroupsModel, spec.allowed_groups)
+                await self._handle_allowed_groups_update(
+                    session, container_registry_row.id, allowed_groups
+                )
+
+            return container_registry_row.to_dataclass()
+
+    async def update_registry(
+        self,
+        updater: Updater[ContainerRegistryRow],
+    ) -> ContainerRegistryData:
+        async with self._db.begin_session() as session:
+            updater.spec = cast(ContainerRegistryUpdaterSpec, updater.spec)
+            registry_id = cast(uuid.UUID, updater.pk_value)
+
+            stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
+            result = await session.execute(stmt)
+            reg_row = result.scalar_one_or_none()
+
+            if reg_row is None:
+                raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
+
+            is_global_value = updater.spec.is_global.optional_value()
+            if is_global_value is True:
+                await self._clear_all_allowed_groups(session, registry_id)
+            elif updater.spec.has_allowed_groups_update is True:
+                await self._handle_allowed_groups_update(
+                    session, registry_id, updater.spec.allowed_groups.value()
+                )
+
+            to_update = updater.spec.build_values()
+            if to_update == {}:  # means no fields to update or only allowed_groups updated
+                return reg_row.to_dataclass()
+
+            session.expire(reg_row)  # Expire to get updated values after update
+            update_result = await execute_updater(session, updater)
+            if update_result is None:
+                raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
+
+            return update_result.row.to_dataclass()
+
+    async def remove_registry(
+        self,
+        purger: Purger[ContainerRegistryRow],
+    ) -> ContainerRegistryData:
+        async with self._db.begin_session() as session:
+            result = await execute_purger(session, purger)
+
+            if result is None:
+                raise ContainerRegistryNotFound(
+                    f"Container registry not found (id:{purger.pk_value})"
+                )
+
+            return result.row.to_dataclass()
+
+    async def fetch_by_registry_and_project(
+        self,
+        registry_name: str,
+        project: str | None = None,
+    ) -> ContainerRegistryData:
+        async with self._db.begin_readonly_session_read_committed() as session:
+            result = await self._get_by_registry_and_project(session, registry_name, project)
+            if not result:
+                raise ContainerRegistryNotFound()
+            return result
+
+    async def fetch_by_registry_name(self, registry_name: str) -> list[ContainerRegistryData]:
+        async with self._db.begin_readonly_session_read_committed() as session:
+            stmt = sa.select(ContainerRegistryRow).where(
+                ContainerRegistryRow.registry_name == registry_name
+            )
+            result = await session.execute(stmt)
+            rows = list(result.scalars().all())
+            return [row.to_dataclass() for row in rows]
+
+    async def fetch_all(self) -> list[ContainerRegistryData]:
+        async with self._db.begin_readonly_session_read_committed() as session:
+            stmt = sa.select(ContainerRegistryRow)
+            result = await session.execute(stmt)
+            rows = list(result.scalars().all())
+            return [row.to_dataclass() for row in rows]
+
+    async def clear_registry_images(
+        self,
+        registry_name: str,
+        project: str | None = None,
+    ) -> ContainerRegistryData:
+        async with self._db.begin_session() as session:
+            update_stmt = (
+                sa
+                .update(ImageRow)
+                .where(ImageRow.registry == registry_name)
+                .where(ImageRow.status != ImageStatus.DELETED)
+                .values(status=ImageStatus.DELETED)
+            )
+            if project:
+                update_stmt = update_stmt.where(ImageRow.project == project)
+
+            await session.execute(update_stmt)
+
+            result = await self._get_by_registry_and_project(session, registry_name, project)
+            if not result:
+                raise ContainerRegistryNotFound()
+            return result
+
+    async def fetch_known_registries(self) -> dict[str, str]:
+        async with self._db.begin_readonly_session_read_committed() as session:
+            known_registries_map = await ContainerRegistryRow.get_known_container_registries(
+                session
+            )
+
+            known_registries = {}
+            for project, registries in known_registries_map.items():
+                for registry_name, url in registries.items():
+                    if project not in known_registries:
+                        known_registries[f"{project}/{registry_name}"] = url.human_repr()
+
+            return known_registries
+
+    async def fetch_registry_by_url_and_project(
+        self,
+        registry_url: str,
+        project: str,
+    ) -> ContainerRegistryRow | None:
+        """Find a Harbor2 registry row matching the given URL and project."""
+        async with self._db.begin_readonly_session_read_committed() as session:
+            stmt = sa.select(ContainerRegistryRow).where(
+                (ContainerRegistryRow.type == ContainerRegistryType.HARBOR2)
+                & (ContainerRegistryRow.url.like(f"%{registry_url}%"))
+                & (ContainerRegistryRow.project == project)
+            )
+            result = await session.execute(stmt)
+            return result.scalars().one_or_none()
+
+    async def fetch_registry_row_for_scanner(
+        self,
+        registry_name: str,
+        project: str | None = None,
+    ) -> ContainerRegistryRow:
+        """
+        Get the raw ContainerRegistryRow object needed for container registry scanner.
+        Raises ContainerRegistryNotFound if registry is not found.
+        TODO: Refactor to return ContainerRegistryData when Registry Scanner is updated
+        """
+        async with self._db.begin_readonly_session_read_committed() as session:
+            stmt = sa.select(ContainerRegistryRow).where(
+                ContainerRegistryRow.registry_name == registry_name,
+            )
+            if project:
+                stmt = stmt.where(ContainerRegistryRow.project == project)
+
+            row: ContainerRegistryRow | None = await session.scalar(stmt)
+            if not row:
+                raise ContainerRegistryNotFound()
+            return row
+
+    async def search(
+        self,
+        querier: BatchQuerier,
+    ) -> ContainerRegistrySearchResult:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(ContainerRegistryRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            return ContainerRegistrySearchResult(
+                items=[row.ContainerRegistryRow.to_dataclass() for row in result.rows],
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def _handle_allowed_groups_update(
+        self,
+        session: SASession,
+        registry_id: uuid.UUID,
+        allowed_group_updates: AllowedGroupsModel,
+    ) -> None:
+        if allowed_group_updates.add:
+            specs = [
+                ContainerRegistryGroupCreatorSpec(
+                    registry_id=registry_id,
+                    group_id=uuid.UUID(group_id),
+                )
+                for group_id in allowed_group_updates.add
+            ]
+            bulk_creator = BulkCreator(specs=specs)
+            await execute_bulk_creator(session, bulk_creator)
+
+        if allowed_group_updates.remove:
+            delete_query = (
+                sa
+                .delete(AssociationContainerRegistriesGroupsRow)
+                .where(AssociationContainerRegistriesGroupsRow.registry_id == registry_id)
+                .where(
+                    AssociationContainerRegistriesGroupsRow.group_id.in_(
+                        allowed_group_updates.remove
+                    )
+                )
+            )
+            result = await session.execute(delete_query)
+            if cast(CursorResult[Any], result).rowcount == 0:
+                raise ContainerRegistryGroupsAssociationNotFound(
+                    f"Tried to remove non-existing associations for registry_id: {registry_id}, group_ids: {allowed_group_updates.remove}"
+                )
+
+    async def _clear_all_allowed_groups(
+        self,
+        session: SASession,
+        registry_id: uuid.UUID,
+    ) -> None:
+        delete_query = sa.delete(AssociationContainerRegistriesGroupsRow).where(
+            AssociationContainerRegistriesGroupsRow.registry_id == registry_id
+        )
+        await session.execute(delete_query)
+
+    async def _get_by_registry_and_project(
+        self,
+        session: SASession,
+        registry_name: str,
+        project: str | None = None,
+    ) -> ContainerRegistryData | None:
+        stmt = sa.select(ContainerRegistryRow).where(
+            ContainerRegistryRow.registry_name == registry_name,
+        )
+        if project:
+            stmt = stmt.where(ContainerRegistryRow.project == project)
+
+        row: ContainerRegistryRow | None = await session.scalar(stmt)
+        return row.to_dataclass() if row else None
