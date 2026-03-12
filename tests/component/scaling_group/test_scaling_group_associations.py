@@ -43,6 +43,7 @@ from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupCreatorSpec,
     ScalingGroupForDomainCreatorSpec,
     ScalingGroupForKeypairsCreatorSpec,
+    ScalingGroupForProjectCreatorSpec,
 )
 from ai.backend.manager.repositories.scaling_group.purgers import (
     create_scaling_group_for_keypairs_purger,
@@ -63,6 +64,9 @@ from ai.backend.manager.services.scaling_group.actions.associate_with_domain imp
 from ai.backend.manager.services.scaling_group.actions.associate_with_keypair import (
     AssociateScalingGroupWithKeypairsAction,
 )
+from ai.backend.manager.services.scaling_group.actions.associate_with_user_group import (
+    AssociateScalingGroupWithUserGroupsAction,
+)
 from ai.backend.manager.services.scaling_group.actions.create import CreateScalingGroupAction
 from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain import (
     DisassociateScalingGroupWithDomainsAction,
@@ -77,51 +81,51 @@ from ai.backend.manager.services.scaling_group.actions.purge_scaling_group impor
 from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
+# ---------------------------------------------------------------------------
+# Module-level helpers — shared across all test classes
+# ---------------------------------------------------------------------------
+
+
+async def _create_sgroup(
+    processors: ScalingGroupProcessors,
+    name: str | None = None,
+    *,
+    driver: str = "static",
+    scheduler: str = "fifo",
+    is_public: bool = True,
+    is_active: bool = True,
+    description: str | None = None,
+) -> ScalingGroupData:
+    """Create a scaling group via the processor."""
+    if name is None:
+        name = f"test-crud-{uuid.uuid4().hex[:8]}"
+    action = CreateScalingGroupAction(
+        creator=Creator(
+            spec=ScalingGroupCreatorSpec(
+                name=name,
+                driver=driver,
+                scheduler=scheduler,
+                is_public=is_public,
+                is_active=is_active,
+                description=description or f"Test scaling group {name}",
+            )
+        )
+    )
+    result = await processors.create_scaling_group.wait_for_complete(action)
+    return result.scaling_group
+
+
+async def _purge_sgroup(
+    processors: ScalingGroupProcessors,
+    name: str,
+) -> None:
+    """Purge a scaling group via the processor."""
+    action = PurgeScalingGroupAction(purger=Purger(row_class=ScalingGroupRow, pk_value=name))
+    await processors.purge_scaling_group.wait_for_complete(action)
+
 
 class TestScalingGroupCRUD:
     """Full CRUD lifecycle for scaling groups via the processor layer + real DB."""
-
-    # ------------------------------------------------------------------
-    # helpers
-    # ------------------------------------------------------------------
-
-    async def _create_sgroup(
-        self,
-        processors: ScalingGroupProcessors,
-        *,
-        name: str | None = None,
-        driver: str = "static",
-        scheduler: str = "fifo",
-        is_public: bool = True,
-        is_active: bool = True,
-        description: str | None = None,
-    ) -> ScalingGroupData:
-        """Create a scaling group via the processor."""
-        if name is None:
-            name = f"test-crud-{uuid.uuid4().hex[:8]}"
-        action = CreateScalingGroupAction(
-            creator=Creator(
-                spec=ScalingGroupCreatorSpec(
-                    name=name,
-                    driver=driver,
-                    scheduler=scheduler,
-                    is_public=is_public,
-                    is_active=is_active,
-                    description=description or f"Test scaling group {name}",
-                )
-            )
-        )
-        result = await processors.create_scaling_group.wait_for_complete(action)
-        return result.scaling_group
-
-    async def _purge_sgroup(
-        self,
-        processors: ScalingGroupProcessors,
-        name: str,
-    ) -> None:
-        """Purge a scaling group via the processor."""
-        action = PurgeScalingGroupAction(purger=Purger(row_class=ScalingGroupRow, pk_value=name))
-        await processors.purge_scaling_group.wait_for_complete(action)
 
     # ------------------------------------------------------------------
     # CREATE
@@ -134,9 +138,9 @@ class TestScalingGroupCRUD:
     ) -> None:
         """S-CREATE-1: superadmin creates a scaling group; result has correct name/driver/scheduler."""
         name = f"crud-create-{uuid.uuid4().hex[:8]}"
-        sg = await self._create_sgroup(
+        sg = await _create_sgroup(
             scaling_group_processors,
-            name=name,
+            name,
             driver="static",
             scheduler="fifo",
         )
@@ -148,7 +152,7 @@ class TestScalingGroupCRUD:
             assert sg.status.is_active is True
             assert sg.status.is_public is True
         finally:
-            await self._purge_sgroup(scaling_group_processors, name)
+            await _purge_sgroup(scaling_group_processors, name)
 
     async def test_s_create_3_private_scaling_group(
         self,
@@ -157,15 +161,15 @@ class TestScalingGroupCRUD:
     ) -> None:
         """S-CREATE-3: private scaling group (is_public=False) is created correctly."""
         name = f"crud-private-{uuid.uuid4().hex[:8]}"
-        sg = await self._create_sgroup(
+        sg = await _create_sgroup(
             scaling_group_processors,
-            name=name,
+            name,
             is_public=False,
         )
         try:
             assert sg.status.is_public is False
         finally:
-            await self._purge_sgroup(scaling_group_processors, name)
+            await _purge_sgroup(scaling_group_processors, name)
 
     # ------------------------------------------------------------------
     # MODIFY
@@ -178,7 +182,7 @@ class TestScalingGroupCRUD:
     ) -> None:
         """S-MOD-1: Modify description → updated value returned."""
         name = f"crud-mod-{uuid.uuid4().hex[:8]}"
-        await self._create_sgroup(scaling_group_processors, name=name)
+        await _create_sgroup(scaling_group_processors, name)
         try:
             action = ModifyScalingGroupAction(
                 updater=Updater(
@@ -193,7 +197,7 @@ class TestScalingGroupCRUD:
             result = await scaling_group_processors.modify_scaling_group.wait_for_complete(action)
             assert result.scaling_group.metadata.description == "Updated description"
         finally:
-            await self._purge_sgroup(scaling_group_processors, name)
+            await _purge_sgroup(scaling_group_processors, name)
 
     async def test_s_mod_2_toggle_public_to_private(
         self,
@@ -202,7 +206,7 @@ class TestScalingGroupCRUD:
     ) -> None:
         """S-MOD-2: Toggle is_public from True to False."""
         name = f"crud-mod2-{uuid.uuid4().hex[:8]}"
-        sg = await self._create_sgroup(scaling_group_processors, name=name, is_public=True)
+        sg = await _create_sgroup(scaling_group_processors, name, is_public=True)
         assert sg.status.is_public is True
         try:
             action = ModifyScalingGroupAction(
@@ -218,7 +222,7 @@ class TestScalingGroupCRUD:
             result = await scaling_group_processors.modify_scaling_group.wait_for_complete(action)
             assert result.scaling_group.status.is_public is False
         finally:
-            await self._purge_sgroup(scaling_group_processors, name)
+            await _purge_sgroup(scaling_group_processors, name)
 
     async def test_s_mod_3_deactivate_scaling_group(
         self,
@@ -227,7 +231,7 @@ class TestScalingGroupCRUD:
     ) -> None:
         """S-MOD-3: Deactivate scaling group (is_active=False)."""
         name = f"crud-mod3-{uuid.uuid4().hex[:8]}"
-        await self._create_sgroup(scaling_group_processors, name=name, is_active=True)
+        await _create_sgroup(scaling_group_processors, name, is_active=True)
         try:
             action = ModifyScalingGroupAction(
                 updater=Updater(
@@ -242,7 +246,7 @@ class TestScalingGroupCRUD:
             result = await scaling_group_processors.modify_scaling_group.wait_for_complete(action)
             assert result.scaling_group.status.is_active is False
         finally:
-            await self._purge_sgroup(scaling_group_processors, name)
+            await _purge_sgroup(scaling_group_processors, name)
 
     async def test_s_mod_4_change_driver(
         self,
@@ -251,7 +255,7 @@ class TestScalingGroupCRUD:
     ) -> None:
         """S-MOD-4: Update driver config."""
         name = f"crud-mod4-{uuid.uuid4().hex[:8]}"
-        await self._create_sgroup(scaling_group_processors, name=name, driver="static")
+        await _create_sgroup(scaling_group_processors, name, driver="static")
         try:
             action = ModifyScalingGroupAction(
                 updater=Updater(
@@ -267,7 +271,7 @@ class TestScalingGroupCRUD:
             result = await scaling_group_processors.modify_scaling_group.wait_for_complete(action)
             assert result.scaling_group.driver.name == "static"
         finally:
-            await self._purge_sgroup(scaling_group_processors, name)
+            await _purge_sgroup(scaling_group_processors, name)
 
     # ------------------------------------------------------------------
     # PURGE
@@ -281,7 +285,7 @@ class TestScalingGroupCRUD:
     ) -> None:
         """S-PURGE-1: Purge a scaling group; it is no longer findable."""
         name = f"crud-purge-{uuid.uuid4().hex[:8]}"
-        await self._create_sgroup(scaling_group_processors, name=name)
+        await _create_sgroup(scaling_group_processors, name)
 
         action = PurgeScalingGroupAction(purger=Purger(row_class=ScalingGroupRow, pk_value=name))
         result = await scaling_group_processors.purge_scaling_group.wait_for_complete(action)
@@ -335,10 +339,10 @@ class TestScalingGroupCRUD:
         """
         # Create a private sgroup and associate it with the domain + group
         name = f"private-vis-{uuid.uuid4().hex[:8]}"
-        await self._create_sgroup(scaling_group_processors, name=name, is_public=False)
+        await _create_sgroup(scaling_group_processors, name, is_public=False)
         try:
             # Associate with domain so it's eligible for listing
-            binder = RBACScopeBinder(
+            domain_binder = RBACScopeBinder(
                 pairs=[
                     RBACScopeBindingPair(
                         spec=ScalingGroupForDomainCreatorSpec(
@@ -351,7 +355,26 @@ class TestScalingGroupCRUD:
                 ]
             )
             await scaling_group_processors.associate_scaling_group_with_domains.wait_for_complete(
-                AssociateScalingGroupWithDomainsAction(binder=binder)
+                AssociateScalingGroupWithDomainsAction(binder=domain_binder)
+            )
+
+            # Associate with the user group (project) so it appears in list results
+            group_binder = RBACScopeBinder(
+                pairs=[
+                    RBACScopeBindingPair(
+                        spec=ScalingGroupForProjectCreatorSpec(
+                            scaling_group=name,
+                            project=group_fixture,
+                        ),
+                        entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, name),
+                        scope_ref=RBACElementRef(RBACElementType.PROJECT, str(group_fixture)),
+                    )
+                ]
+            )
+            await (
+                scaling_group_processors.associate_scaling_group_with_user_groups.wait_for_complete(
+                    AssociateScalingGroupWithUserGroupsAction(binder=group_binder)
+                )
             )
 
             # Regular user should NOT see the private sgroup
@@ -368,37 +391,11 @@ class TestScalingGroupCRUD:
             assert isinstance(admin_result, ListScalingGroupsResponse)
             assert any(sg.name == name for sg in admin_result.scaling_groups)
         finally:
-            await self._purge_sgroup(scaling_group_processors, name)
+            await _purge_sgroup(scaling_group_processors, name)
 
 
 class TestScalingGroupDomainAssociation:
     """Domain association add/remove/check via the processor layer."""
-
-    async def _create_sgroup(
-        self,
-        processors: ScalingGroupProcessors,
-        name: str,
-    ) -> ScalingGroupData:
-        action = CreateScalingGroupAction(
-            creator=Creator(
-                spec=ScalingGroupCreatorSpec(
-                    name=name,
-                    driver="static",
-                    scheduler="fifo",
-                    description=f"Test sgroup {name}",
-                )
-            )
-        )
-        result = await processors.create_scaling_group.wait_for_complete(action)
-        return result.scaling_group
-
-    async def _purge_sgroup(
-        self,
-        processors: ScalingGroupProcessors,
-        name: str,
-    ) -> None:
-        action = PurgeScalingGroupAction(purger=Purger(row_class=ScalingGroupRow, pk_value=name))
-        await processors.purge_scaling_group.wait_for_complete(action)
 
     # ------------------------------------------------------------------
     # S-1: Associate single domain
@@ -413,7 +410,7 @@ class TestScalingGroupDomainAssociation:
     ) -> None:
         """S-1: Associate a scaling group with a single domain; association exists in DB."""
         name = f"assoc-dom-{uuid.uuid4().hex[:8]}"
-        await self._create_sgroup(scaling_group_processors, name)
+        await _create_sgroup(scaling_group_processors, name)
         try:
             binder = RBACScopeBinder(
                 pairs=[
@@ -437,7 +434,7 @@ class TestScalingGroupDomainAssociation:
             )
             assert exists is True
         finally:
-            await self._purge_sgroup(scaling_group_processors, name)
+            await _purge_sgroup(scaling_group_processors, name)
 
     # ------------------------------------------------------------------
     # S-3: Disassociate domain
@@ -452,7 +449,7 @@ class TestScalingGroupDomainAssociation:
     ) -> None:
         """S-3: Disassociate domain; check_exists returns False afterwards."""
         name = f"disassoc-dom-{uuid.uuid4().hex[:8]}"
-        await self._create_sgroup(scaling_group_processors, name)
+        await _create_sgroup(scaling_group_processors, name)
         try:
             # First associate
             binder = RBACScopeBinder(
@@ -497,7 +494,7 @@ class TestScalingGroupDomainAssociation:
             )
             assert exists is False
         finally:
-            await self._purge_sgroup(scaling_group_processors, name)
+            await _purge_sgroup(scaling_group_processors, name)
 
     # ------------------------------------------------------------------
     # S-4: Disassociate then absent from list
@@ -513,10 +510,10 @@ class TestScalingGroupDomainAssociation:
     ) -> None:
         """S-4: After disassociation, sgroup no longer appears in list_scaling_groups."""
         name = f"disassoc-list-{uuid.uuid4().hex[:8]}"
-        await self._create_sgroup(scaling_group_processors, name)
+        await _create_sgroup(scaling_group_processors, name)
         try:
-            # Associate with domain + keypair so it appears in listings
-            binder = RBACScopeBinder(
+            # Associate with domain
+            domain_binder = RBACScopeBinder(
                 pairs=[
                     RBACScopeBindingPair(
                         spec=ScalingGroupForDomainCreatorSpec(
@@ -529,18 +526,38 @@ class TestScalingGroupDomainAssociation:
                 ]
             )
             await scaling_group_processors.associate_scaling_group_with_domains.wait_for_complete(
-                AssociateScalingGroupWithDomainsAction(binder=binder)
+                AssociateScalingGroupWithDomainsAction(binder=domain_binder)
             )
 
-            # Should appear in list
-            result = await admin_registry.scaling_group.list_scaling_groups(
+            # Associate with the user group (project) so it appears in list results
+            group_binder = RBACScopeBinder(
+                pairs=[
+                    RBACScopeBindingPair(
+                        spec=ScalingGroupForProjectCreatorSpec(
+                            scaling_group=name,
+                            project=group_fixture,
+                        ),
+                        entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, name),
+                        scope_ref=RBACElementRef(RBACElementType.PROJECT, str(group_fixture)),
+                    )
+                ]
+            )
+            await (
+                scaling_group_processors.associate_scaling_group_with_user_groups.wait_for_complete(
+                    AssociateScalingGroupWithUserGroupsAction(binder=group_binder)
+                )
+            )
+
+            # Pre-condition: sgroup must appear in list before disassociation
+            result_before = await admin_registry.scaling_group.list_scaling_groups(
                 group=str(group_fixture),
             )
-            assert isinstance(result, ListScalingGroupsResponse)
-            # Note: list_allowed_sgroups filters by domain association AND group association
-            # We've only added domain association here, so it may not appear unless group is also added
+            assert isinstance(result_before, ListScalingGroupsResponse)
+            assert any(sg.name == name for sg in result_before.scaling_groups), (
+                f"Expected {name!r} to appear in list before disassociation"
+            )
 
-            # Disassociate
+            # Disassociate from domain
             unbinder = ResourceGroupDomainEntityUnbinder(
                 scaling_groups=[name],
                 domain=domain_fixture,
@@ -558,7 +575,7 @@ class TestScalingGroupDomainAssociation:
             assert isinstance(result_after, ListScalingGroupsResponse)
             assert not any(sg.name == name for sg in result_after.scaling_groups)
         finally:
-            await self._purge_sgroup(scaling_group_processors, name)
+            await _purge_sgroup(scaling_group_processors, name)
 
     # ------------------------------------------------------------------
     # S-5: Check association existence
@@ -573,7 +590,7 @@ class TestScalingGroupDomainAssociation:
     ) -> None:
         """S-5: check_scaling_group_domain_association_exists returns True/False correctly."""
         name = f"check-assoc-{uuid.uuid4().hex[:8]}"
-        await self._create_sgroup(scaling_group_processors, name)
+        await _create_sgroup(scaling_group_processors, name)
         try:
             # Before association: False
             assert (
@@ -606,37 +623,11 @@ class TestScalingGroupDomainAssociation:
                 )
             ) is True
         finally:
-            await self._purge_sgroup(scaling_group_processors, name)
+            await _purge_sgroup(scaling_group_processors, name)
 
 
 class TestScalingGroupKeypairAssociation:
     """Keypair association add/remove/check via the processor layer."""
-
-    async def _create_sgroup(
-        self,
-        processors: ScalingGroupProcessors,
-        name: str,
-    ) -> ScalingGroupData:
-        action = CreateScalingGroupAction(
-            creator=Creator(
-                spec=ScalingGroupCreatorSpec(
-                    name=name,
-                    driver="static",
-                    scheduler="fifo",
-                    description=f"Test sgroup {name}",
-                )
-            )
-        )
-        result = await processors.create_scaling_group.wait_for_complete(action)
-        return result.scaling_group
-
-    async def _purge_sgroup(
-        self,
-        processors: ScalingGroupProcessors,
-        name: str,
-    ) -> None:
-        action = PurgeScalingGroupAction(purger=Purger(row_class=ScalingGroupRow, pk_value=name))
-        await processors.purge_scaling_group.wait_for_complete(action)
 
     # ------------------------------------------------------------------
     # S-1: Associate single keypair
@@ -651,7 +642,7 @@ class TestScalingGroupKeypairAssociation:
     ) -> None:
         """S-1: Associate a scaling group with a single keypair; association exists in DB."""
         name = f"kp-assoc-{uuid.uuid4().hex[:8]}"
-        await self._create_sgroup(scaling_group_processors, name)
+        await _create_sgroup(scaling_group_processors, name)
         access_key = AccessKey(admin_user_fixture.keypair.access_key)
         try:
             bulk_creator = BulkCreator(
@@ -672,7 +663,7 @@ class TestScalingGroupKeypairAssociation:
             )
             assert exists is True
         finally:
-            await self._purge_sgroup(scaling_group_processors, name)
+            await _purge_sgroup(scaling_group_processors, name)
 
     # ------------------------------------------------------------------
     # S-3: Disassociate keypair
@@ -687,7 +678,7 @@ class TestScalingGroupKeypairAssociation:
     ) -> None:
         """S-3: Disassociate keypair; check_exists returns False afterwards."""
         name = f"kp-disassoc-{uuid.uuid4().hex[:8]}"
-        await self._create_sgroup(scaling_group_processors, name)
+        await _create_sgroup(scaling_group_processors, name)
         access_key = AccessKey(admin_user_fixture.keypair.access_key)
         try:
             # First associate
@@ -729,7 +720,7 @@ class TestScalingGroupKeypairAssociation:
             )
             assert exists is False
         finally:
-            await self._purge_sgroup(scaling_group_processors, name)
+            await _purge_sgroup(scaling_group_processors, name)
 
     # ------------------------------------------------------------------
     # S-2: Associate multiple keypairs
@@ -745,7 +736,7 @@ class TestScalingGroupKeypairAssociation:
     ) -> None:
         """S-2: Associate a scaling group with multiple keypairs via BulkCreator."""
         name = f"kp-multi-{uuid.uuid4().hex[:8]}"
-        await self._create_sgroup(scaling_group_processors, name)
+        await _create_sgroup(scaling_group_processors, name)
         admin_key = AccessKey(admin_user_fixture.keypair.access_key)
         user_key = AccessKey(regular_user_fixture.keypair.access_key)
         try:
@@ -778,7 +769,7 @@ class TestScalingGroupKeypairAssociation:
                 )
             ) is True
         finally:
-            await self._purge_sgroup(scaling_group_processors, name)
+            await _purge_sgroup(scaling_group_processors, name)
 
     # ------------------------------------------------------------------
     # S-5: Check association existence
@@ -793,7 +784,7 @@ class TestScalingGroupKeypairAssociation:
     ) -> None:
         """S-5: check_scaling_group_keypair_association_exists returns True/False correctly."""
         name = f"kp-check-{uuid.uuid4().hex[:8]}"
-        await self._create_sgroup(scaling_group_processors, name)
+        await _create_sgroup(scaling_group_processors, name)
         access_key = AccessKey(admin_user_fixture.keypair.access_key)
         try:
             # Before association: False
@@ -823,7 +814,7 @@ class TestScalingGroupKeypairAssociation:
                 )
             ) is True
         finally:
-            await self._purge_sgroup(scaling_group_processors, name)
+            await _purge_sgroup(scaling_group_processors, name)
 
 
 class TestScalingGroupPermissions:
