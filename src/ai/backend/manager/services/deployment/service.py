@@ -21,6 +21,7 @@ from ai.backend.manager.data.deployment.creator import ModelRevisionCreator
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     DeploymentInfo,
+    DeploymentSubStep,
     ExtraVFolderMountData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
@@ -150,6 +151,10 @@ from ai.backend.manager.services.deployment.actions.update_deployment import (
     UpdateDeploymentActionResult,
 )
 from ai.backend.manager.sokovan.deployment import DeploymentController
+from ai.backend.manager.sokovan.deployment.exceptions import (
+    DeploymentAlreadyInProgress,
+    InvalidEndpointState,
+)
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
 )
@@ -645,7 +650,11 @@ class DeploymentService:
     async def activate_revision(
         self, action: ActivateRevisionAction
     ) -> ActivateRevisionActionResult:
-        """Activate a specific revision to be the current revision.
+        """Activate a specific revision by initiating the deployment strategy.
+
+        Sets deploying_revision and transitions the deployment to DEPLOYING state.
+        The coordinator will execute the configured deployment strategy (rolling update,
+        blue-green, etc.) and swap deploying_revision → current_revision on completion.
 
         Args:
             action: Action containing deployment and revision IDs
@@ -656,24 +665,44 @@ class DeploymentService:
         # 1. Validate revision exists (raises exception if not found)
         _revision = await self._deployment_repository.get_revision(action.revision_id)
 
-        # 2. Update endpoint.current_revision and get previous revision
-        previous_revision_id = await self._deployment_repository.set_deploying_revision(
+        # 2. Validate deployment state
+        deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
+        if deployment_info.deploying_revision_id is not None:
+            raise DeploymentAlreadyInProgress(
+                f"Deployment {action.deployment_id} already has deploying_revision "
+                f"{deployment_info.deploying_revision_id} in progress."
+            )
+        if deployment_info.current_revision_id == action.revision_id:
+            raise InvalidEndpointState(
+                f"Revision {action.revision_id} is already the current revision "
+                f"of deployment {action.deployment_id}."
+            )
+
+        # 3. Set deploying_revision and transition to DEPLOYING lifecycle.
+        # The DB WHERE clause includes ``deploying_revision IS NULL`` to guard
+        # against concurrent activations; updated=False means the guard fired.
+        previous_revision_id, updated = await self._deployment_repository.set_deploying_revision(
             action.deployment_id, action.revision_id
         )
+        if not updated:
+            raise DeploymentAlreadyInProgress(
+                f"Deployment {action.deployment_id} already has a deploying revision in progress "
+                f"(concurrent activation detected)."
+            )
 
-        # 3. Trigger lifecycle check to update routes with new revision
+        # 4. Trigger DEPLOYING lifecycle to start strategy execution
         await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.CHECK_REPLICA
+            DeploymentLifecycleType.DEPLOYING, sub_step=DeploymentSubStep.PROVISIONING
         )
 
         log.info(
-            "Activated revision {} for deployment {} (previous: {})",
+            "Started deploying revision {} for deployment {} (current: {})",
             action.revision_id,
             action.deployment_id,
             previous_revision_id,
         )
 
-        # 4. Get updated deployment info
+        # 5. Get updated deployment info
         deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
 
         return ActivateRevisionActionResult(

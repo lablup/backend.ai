@@ -2222,14 +2222,17 @@ class DeploymentDBSource:
         self,
         endpoint_id: uuid.UUID,
         revision_id: uuid.UUID,
-    ) -> uuid.UUID | None:
+    ) -> tuple[uuid.UUID | None, bool]:
         """Set deploying_revision and transition lifecycle to DEPLOYING.
 
-        Returns the previous current_revision id (may be None for first deployment).
+        Uses ``deploying_revision IS NULL`` as an atomic guard against
+        concurrent activations.
+
+        Returns:
+            Tuple of (previous_current_revision_id, updated).
+            ``updated=False`` means the guard fired (another deployment in progress).
         """
         async with self._begin_session_read_committed() as db_sess:
-            # Single UPDATE ... RETURNING to atomically set deploying_revision
-            # and retrieve current_revision without TOCTOU race.
             update_query = (
                 sa.update(EndpointRow)
                 .where(
@@ -2245,8 +2248,8 @@ class DeploymentDBSource:
             result = await db_sess.execute(update_query)
             row = result.one_or_none()
             if row is None:
-                return None
-            return cast(uuid.UUID | None, row[0])
+                return None, False
+            return cast(uuid.UUID | None, row[0]), True
 
     # -------------------------------------------------------------------------
     # Auto-Scaling Policy Methods (DeploymentAutoScalingPolicyRow)

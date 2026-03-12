@@ -1157,11 +1157,12 @@ class DeploymentRepository:
         self,
         endpoint_id: uuid.UUID,
         revision_id: uuid.UUID,
-    ) -> uuid.UUID | None:
+    ) -> tuple[uuid.UUID | None, bool]:
         """Set deploying_revision and transition lifecycle to DEPLOYING.
 
         Returns:
-            The previous current_revision id (may be None for first deployment).
+            Tuple of (previous_current_revision_id, updated).
+            ``updated=False`` means a concurrent activation guard fired.
         """
         return await self._db_source.set_deploying_revision(endpoint_id, revision_id)
 
