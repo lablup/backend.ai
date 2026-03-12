@@ -766,6 +766,42 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                             raise
                         host_key_path.chmod(0o600)
                     paths_to_chown.append(host_key_path)
+                elif sys.platform == "darwin":
+                    # On macOS, the bundled dropbearmulti binary is a Linux ELF and cannot
+                    # be executed natively. Use the system-installed dropbearkey instead.
+                    dropbearkey_bin = shutil.which("dropbearkey")
+                    if dropbearkey_bin is None:
+                        log.warning(
+                            "dropbearkey not found on macOS host (install via `brew install dropbear`);"
+                            " skipping SSH host key generation — kernel-side fallback will handle it"
+                        )
+                    elif not host_key_path.is_file():
+                        try:
+                            subprocess_run(
+                                [
+                                    dropbearkey_bin,
+                                    "-t",
+                                    "rsa",
+                                    "-s",
+                                    "2048",
+                                    "-f",
+                                    str(host_key_path),
+                                ],
+                                check=True,
+                                capture_output=True,
+                            )
+                        except CalledProcessError as e:
+                            stderr = e.stderr.decode("utf-8", "replace") if e.stderr else ""
+                            stdout = e.stdout.decode("utf-8", "replace") if e.stdout else ""
+                            log.error(
+                                "dropbearkey failed with return code {code}, stdout: {stdout}, stderr: {stderr}",
+                                code=e.returncode,
+                                stdout=stdout,
+                                stderr=stderr,
+                            )
+                            raise
+                        host_key_path.chmod(0o600)
+                        paths_to_chown.append(host_key_path)
                 else:
                     log.warning(
                         "Skipping dropbearmulti host key generation on non-Linux"
