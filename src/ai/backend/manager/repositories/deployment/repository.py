@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, DecimalException
 from typing import Any, cast
+from uuid import UUID
 
 import tomli
 from pydantic import HttpUrl
@@ -1401,3 +1402,27 @@ class DeploymentRepository:
             DeploymentPolicySearchResult with items, total_count, and pagination info.
         """
         return await self._db_source.search_deployment_policies(querier)
+
+    async def apply_strategy_mutations(
+        self,
+        assignments: Mapping[UUID, DeploymentSubStep],
+        rollout: BulkCreator[RoutingRow],
+        drain: BatchUpdater[RoutingRow] | None,
+        completed_ids: set[UUID],
+        rolled_back_ids: set[UUID],
+    ) -> int:
+        """Apply all DB mutations from a strategy evaluation cycle.
+
+        Performs sub-step updates, route rollout/drain, revision swap,
+        and deploying_revision cleanup in a single transaction.
+
+        Returns:
+            Number of deployments whose revision was swapped.
+        """
+        return await self._db_source.apply_strategy_mutations(
+            assignments=assignments,
+            rollout=rollout,
+            drain=drain,
+            completed_ids=completed_ids,
+            rolled_back_ids=rolled_back_ids,
+        )
