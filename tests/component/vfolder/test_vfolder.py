@@ -264,7 +264,7 @@ class TestVFolderHosts:
         """List allowed vfolder types."""
         result = await admin_registry.vfolder.list_allowed_types()
         assert isinstance(result, ListAllowedTypesResponse)
-        assert isinstance(result.allowed_types, list)
+        assert isinstance(result.root, list)
 
 
 class TestVFolderInvitation:

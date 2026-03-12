@@ -311,10 +311,8 @@ class ListAllHostsResponse(BaseResponseModel):
     allowed: list[str] = Field(description="Allowed folder hosts")
 
 
-class ListAllowedTypesResponse(BaseResponseModel):
-    """Response for listing allowed vfolder types."""
-
-    allowed_types: list[str] = Field(description="Allowed vfolder types")
+class ListAllowedTypesResponse(BaseRootResponseModel[list[str]]):
+    """Response for listing allowed vfolder types (plain array for backward compatibility)."""
 
 
 class GetVolumePerfMetricResponse(BaseResponseModel):

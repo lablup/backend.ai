@@ -300,8 +300,8 @@ class TestAdminResponses:
         assert len(resp.allowed) == 2
 
     def test_allowed_types_response(self) -> None:
-        resp = ListAllowedTypesResponse(allowed_types=["user", "group"])
-        assert "user" in resp.allowed_types
+        resp = ListAllowedTypesResponse(["user", "group"])
+        assert "user" in resp.root
 
     def test_update_quota_response(self) -> None:
         resp = UpdateQuotaResponse(size_bytes=1024)
