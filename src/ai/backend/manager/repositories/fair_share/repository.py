@@ -35,7 +35,7 @@ from ai.backend.manager.repositories.base import (
     Creator,
     Upserter,
 )
-from ai.backend.manager.repositories.base.rbac import RBACEntityCreator
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 
 from .db_source import FairShareDBSource
 from .types import (

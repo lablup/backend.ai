@@ -60,7 +60,7 @@ from ai.backend.manager.repositories.base import (
     execute_creator,
     execute_upserter,
 )
-from ai.backend.manager.repositories.base.rbac import (
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
