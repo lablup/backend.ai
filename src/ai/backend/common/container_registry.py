@@ -45,3 +45,20 @@ class PatchContainerRegistryRequestModel(ContainerRegistryModel, BaseRequestMode
 
 class PatchContainerRegistryResponseModel(ContainerRegistryModel, BaseResponseModel):
     pass
+
+
+class CreateContainerRegistryRequestModel(BaseRequestModel):
+    url: str
+    registry_name: str
+    type: ContainerRegistryType
+    project: str | None = None
+    username: str | None = None
+    password: str | None = None
+    ssl_verify: bool | None = None
+    is_global: bool | None = None
+    extra: dict[str, Any] | None = None
+    allowed_groups: AllowedGroupsModel | None = None
+
+
+class ListContainerRegistriesResponseModel(BaseResponseModel):
+    items: list[ContainerRegistryModel]

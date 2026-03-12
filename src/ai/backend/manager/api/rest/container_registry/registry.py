@@ -20,9 +20,45 @@ def register_container_registry_routes(
     reg = RouteRegistry.create("container-registries", route_deps.cors_options)
 
     reg.add(
+        "POST",
+        "/",
+        handler.create,
+        middlewares=[
+            route_deps.read_status_mw,
+            superadmin_required,
+        ],
+    )
+    reg.add(
+        "GET",
+        "/",
+        handler.list_all,
+        middlewares=[
+            route_deps.read_status_mw,
+            superadmin_required,
+        ],
+    )
+    reg.add(
+        "GET",
+        "/load",
+        handler.load,
+        middlewares=[
+            route_deps.read_status_mw,
+            superadmin_required,
+        ],
+    )
+    reg.add(
         "PATCH",
         "/{registry_id}",
         handler.patch,
+        middlewares=[
+            route_deps.read_status_mw,
+            superadmin_required,
+        ],
+    )
+    reg.add(
+        "DELETE",
+        "/{registry_id}",
+        handler.delete,
         middlewares=[
             route_deps.read_status_mw,
             superadmin_required,

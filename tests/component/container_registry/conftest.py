@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -103,3 +104,44 @@ async def harbor_registry_fixture(
                 ContainerRegistryRow.__table__.c.id == registry_id
             )
         )
+
+
+@pytest.fixture()
+async def registry_factory(
+    db_engine: SAEngine,
+) -> AsyncIterator[Callable[..., Any]]:
+    """Factory that inserts test container registries and tracks them for cleanup.
+
+    Yields a callable that accepts keyword arguments matching ContainerRegistryRow columns.
+    Required fields: url, registry_name, type.
+    """
+    created_ids: list[uuid.UUID] = []
+
+    async def _create(**kwargs: Any) -> dict[str, Any]:
+        registry_id = uuid.uuid4()
+        defaults: dict[str, Any] = {
+            "id": registry_id,
+            "url": "https://registry.test.local",
+            "registry_name": f"test-{registry_id.hex[:8]}",
+            "type": ContainerRegistryType.DOCKER,
+        }
+        defaults.update(kwargs)
+        if "id" not in kwargs:
+            defaults["id"] = registry_id
+            registry_id_to_track = registry_id
+        else:
+            registry_id_to_track = defaults["id"]
+        async with db_engine.begin() as conn:
+            await conn.execute(sa.insert(ContainerRegistryRow.__table__).values(**defaults))
+        created_ids.append(registry_id_to_track)
+        return defaults
+
+    yield _create
+
+    async with db_engine.begin() as conn:
+        for rid in created_ids:
+            await conn.execute(
+                ContainerRegistryRow.__table__.delete().where(
+                    ContainerRegistryRow.__table__.c.id == rid
+                )
+            )
