@@ -31,18 +31,3 @@ class ContainerRegistryGroupPurgerSpec(
                 AssociationContainerRegistriesGroupsRow.group_id == self.group_id,
             )
         )
-
-
-@dataclass
-class AllContainerRegistryGroupsPurgerSpec(
-    BatchPurgerSpec[AssociationContainerRegistriesGroupsRow],
-):
-    """PurgerSpec for removing all group associations for a container registry."""
-
-    registry_id: uuid.UUID
-
-    @override
-    def build_subquery(self) -> sa.sql.Select[tuple[AssociationContainerRegistriesGroupsRow]]:
-        return sa.select(AssociationContainerRegistriesGroupsRow).where(
-            AssociationContainerRegistriesGroupsRow.registry_id == self.registry_id,
-        )
