@@ -392,6 +392,7 @@ class RBACElementType(enum.StrEnum):
     DEPLOYMENT_TOKEN = "deployment:token"
     DEPLOYMENT_POLICY = "deployment:policy"
     DEPLOYMENT_REVISION = "deployment:revision"
+    IMAGE_ALIAS = "image:alias"
 
     # === Entity-level scopes (for entity-scope permissions) ===
     ARTIFACT_REVISION = "artifact_revision"
