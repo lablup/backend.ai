@@ -51,6 +51,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
     DeploymentSubStep,
+    DeploymentWithHistory,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
@@ -290,6 +291,27 @@ class DeploymentRepository:
     ) -> list[DeploymentInfo]:
         """Get endpoints by lifecycle statuses, optionally filtered by sub_steps."""
         return await self._db_source.get_endpoints_by_statuses(statuses, sub_steps=sub_steps)
+
+    @deployment_repository_resilience.apply()
+    async def get_deployments_for_handler(
+        self,
+        statuses: list[EndpointLifecycle],
+        handler_name: str,
+    ) -> list[DeploymentWithHistory]:
+        """Get deployments for handler execution with history populated.
+
+        Queries endpoints and their latest scheduling history in a single
+        transaction. History fields (phase_attempts, phase_started_at) are
+        populated when the latest record matches the handler_name.
+
+        Args:
+            statuses: Endpoint lifecycle statuses to include
+            handler_name: Current handler phase name for history matching
+
+        Returns:
+            List of DeploymentWithHistory with history fields populated.
+        """
+        return await self._db_source.fetch_deployments_for_handler(statuses, handler_name)
 
     @deployment_repository_resilience.apply()
     async def get_endpoint_info(

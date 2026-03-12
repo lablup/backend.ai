@@ -16,10 +16,10 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
+from ai.backend.manager.sokovan.deployment.types import DeploymentWithHistory
 
 # =============================================================================
 # TestCheckPendingDeployments (CD-001 ~ CD-003)
@@ -36,7 +36,7 @@ class TestCheckPendingDeployments:
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
-        pending_deployment: DeploymentInfo,
+        pending_deployment: DeploymentWithHistory,
         proxy_targets_by_scaling_group: dict[str, ScalingGroupProxyTarget],
     ) -> None:
         """CD-001: Successful endpoint registration for new deployment.
@@ -55,7 +55,7 @@ class TestCheckPendingDeployments:
         with patch.object(
             deployment_executor, "_register_endpoint", return_value=expected_url
         ) as mock_register:
-            entity_ids = [pending_deployment.id]
+            entity_ids = [pending_deployment.deployment_info.id]
             with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
                 # Act
                 result = await deployment_executor.check_pending_deployments([pending_deployment])
@@ -69,14 +69,14 @@ class TestCheckPendingDeployments:
         # Verify URL update contains the deployment id and expected URL
         call_args = mock_deployment_repo.update_endpoint_urls_bulk.call_args
         url_updates = call_args[0][0]
-        assert pending_deployment.id in url_updates
-        assert url_updates[pending_deployment.id] == expected_url
+        assert pending_deployment.deployment_info.id in url_updates
+        assert url_updates[pending_deployment.deployment_info.id] == expected_url
 
     async def test_deployment_without_revision_skipped(
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
-        pending_deployment_no_revision: DeploymentInfo,
+        pending_deployment_no_revision: DeploymentWithHistory,
         proxy_targets_by_scaling_group: dict[str, ScalingGroupProxyTarget],
     ) -> None:
         """CD-002: Deployment without target revision is skipped.
@@ -90,7 +90,7 @@ class TestCheckPendingDeployments:
             proxy_targets_by_scaling_group
         )
 
-        entity_ids = [pending_deployment_no_revision.id]
+        entity_ids = [pending_deployment_no_revision.deployment_info.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
             # Act
             result = await deployment_executor.check_pending_deployments([
@@ -106,7 +106,7 @@ class TestCheckPendingDeployments:
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
-        pending_deployment: DeploymentInfo,
+        pending_deployment: DeploymentWithHistory,
     ) -> None:
         """CD-003: Deployment with no proxy target is skipped.
 
@@ -119,7 +119,7 @@ class TestCheckPendingDeployments:
             "default": None,
         }
 
-        entity_ids = [pending_deployment.id]
+        entity_ids = [pending_deployment.deployment_info.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
             # Act
             result = await deployment_executor.check_pending_deployments([pending_deployment])
@@ -132,7 +132,7 @@ class TestCheckPendingDeployments:
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
-        pending_deployment: DeploymentInfo,
+        pending_deployment: DeploymentWithHistory,
         proxy_targets_by_scaling_group: dict[str, ScalingGroupProxyTarget],
     ) -> None:
         """CD-003 (alt): Endpoint registration failure is captured as error.
@@ -151,7 +151,7 @@ class TestCheckPendingDeployments:
             "_register_endpoint",
             side_effect=RuntimeError("Registration failed"),
         ):
-            entity_ids = [pending_deployment.id]
+            entity_ids = [pending_deployment.deployment_info.id]
             with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
                 # Act
                 result = await deployment_executor.check_pending_deployments([pending_deployment])
@@ -177,7 +177,7 @@ class TestCheckReadyDeployments:
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
-        ready_deployment: DeploymentInfo,
+        ready_deployment: DeploymentWithHistory,
     ) -> None:
         """CR-001: Replica count matches target.
 
@@ -188,10 +188,10 @@ class TestCheckReadyDeployments:
         # Arrange - Routes matching replica count
         mock_route = MagicMock()
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
-            ready_deployment.id: [mock_route, mock_route]  # 2 routes = 2 target
+            ready_deployment.deployment_info.id: [mock_route, mock_route]  # 2 routes = 2 target
         }
 
-        entity_ids = [ready_deployment.id]
+        entity_ids = [ready_deployment.deployment_info.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
             # Act
             result = await deployment_executor.check_ready_deployments_that_need_scaling([
@@ -206,7 +206,7 @@ class TestCheckReadyDeployments:
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
-        ready_deployment: DeploymentInfo,
+        ready_deployment: DeploymentWithHistory,
     ) -> None:
         """CR-002: Replica count mismatch is captured as error.
 
@@ -217,10 +217,10 @@ class TestCheckReadyDeployments:
         # Arrange - Fewer routes than target
         mock_route = MagicMock()
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
-            ready_deployment.id: [mock_route]  # 1 route != 2 target
+            ready_deployment.deployment_info.id: [mock_route]  # 1 route != 2 target
         }
 
-        entity_ids = [ready_deployment.id]
+        entity_ids = [ready_deployment.deployment_info.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
             # Act
             result = await deployment_executor.check_ready_deployments_that_need_scaling([
@@ -267,7 +267,7 @@ class TestScaleDeployment:
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
-        ready_deployment_needs_scale_up: DeploymentInfo,
+        ready_deployment_needs_scale_up: DeploymentWithHistory,
     ) -> None:
         """SC-001: Scale out creates new routes.
 
@@ -278,10 +278,10 @@ class TestScaleDeployment:
         # Arrange - 1 route exists, target is 3, so need 2 new routes
         mock_route = MagicMock()
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
-            ready_deployment_needs_scale_up.id: [mock_route]
+            ready_deployment_needs_scale_up.deployment_info.id: [mock_route]
         }
 
-        entity_ids = [ready_deployment_needs_scale_up.id]
+        entity_ids = [ready_deployment_needs_scale_up.deployment_info.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
             # Act
             result = await deployment_executor.scale_deployment([ready_deployment_needs_scale_up])
@@ -299,7 +299,7 @@ class TestScaleDeployment:
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
-        ready_deployment_needs_scale_down: DeploymentInfo,
+        ready_deployment_needs_scale_down: DeploymentWithHistory,
     ) -> None:
         """SC-002: Scale in terminates excess routes.
 
@@ -322,10 +322,14 @@ class TestScaleDeployment:
         mock_route3.status.termination_priority = MagicMock(return_value=3)
 
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
-            ready_deployment_needs_scale_down.id: [mock_route1, mock_route2, mock_route3]
+            ready_deployment_needs_scale_down.deployment_info.id: [
+                mock_route1,
+                mock_route2,
+                mock_route3,
+            ]
         }
 
-        entity_ids = [ready_deployment_needs_scale_down.id]
+        entity_ids = [ready_deployment_needs_scale_down.deployment_info.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
             # Act
             result = await deployment_executor.scale_deployment([ready_deployment_needs_scale_down])
@@ -344,7 +348,7 @@ class TestScaleDeployment:
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
-        ready_deployment: DeploymentInfo,
+        ready_deployment: DeploymentWithHistory,
     ) -> None:
         """SC-003: No scaling needed returns skipped.
 
@@ -356,10 +360,10 @@ class TestScaleDeployment:
         mock_route1 = MagicMock()
         mock_route2 = MagicMock()
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
-            ready_deployment.id: [mock_route1, mock_route2]
+            ready_deployment.deployment_info.id: [mock_route1, mock_route2]
         }
 
-        entity_ids = [ready_deployment.id]
+        entity_ids = [ready_deployment.deployment_info.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
             # Act
             result = await deployment_executor.scale_deployment([ready_deployment])
@@ -372,7 +376,7 @@ class TestScaleDeployment:
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
-        ready_deployment_needs_scale_up: DeploymentInfo,
+        ready_deployment_needs_scale_up: DeploymentWithHistory,
     ) -> None:
         """SC-004: Scaling failure is captured.
 
@@ -383,7 +387,7 @@ class TestScaleDeployment:
         # Arrange - Route fetch raises exception
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {}
 
-        entity_ids = [ready_deployment_needs_scale_up.id]
+        entity_ids = [ready_deployment_needs_scale_up.deployment_info.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
             # Act
             result = await deployment_executor.scale_deployment([ready_deployment_needs_scale_up])
@@ -407,7 +411,7 @@ class TestDestroyDeployment:
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
-        destroying_deployment: DeploymentInfo,
+        destroying_deployment: DeploymentWithHistory,
         proxy_targets_by_scaling_group: dict[str, ScalingGroupProxyTarget],
     ) -> None:
         """DD-001: Successful deployment destruction.
@@ -420,7 +424,7 @@ class TestDestroyDeployment:
         mock_route = MagicMock()
         mock_route.route_id = uuid4()
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
-            destroying_deployment.id: [mock_route]
+            destroying_deployment.deployment_info.id: [mock_route]
         }
         mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
             proxy_targets_by_scaling_group
@@ -429,7 +433,7 @@ class TestDestroyDeployment:
         with patch.object(
             deployment_executor, "_unregister_endpoint", return_value=None
         ) as mock_unregister:
-            entity_ids = [destroying_deployment.id]
+            entity_ids = [destroying_deployment.deployment_info.id]
             with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
                 # Act
                 result = await deployment_executor.destroy_deployment([destroying_deployment])
@@ -450,7 +454,7 @@ class TestDestroyDeployment:
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
-        destroying_deployments_multiple: list[DeploymentInfo],
+        destroying_deployments_multiple: list[DeploymentWithHistory],
         proxy_targets_by_scaling_group: dict[str, ScalingGroupProxyTarget],
     ) -> None:
         """DD-002: Multiple deployments destroyed in parallel.
@@ -464,7 +468,7 @@ class TestDestroyDeployment:
         for deployment in destroying_deployments_multiple:
             mock_route = MagicMock()
             mock_route.route_id = uuid4()
-            routes_map[deployment.id] = [mock_route]
+            routes_map[deployment.deployment_info.id] = [mock_route]
 
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = routes_map
         mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
@@ -472,7 +476,7 @@ class TestDestroyDeployment:
         )
 
         with patch.object(deployment_executor, "_unregister_endpoint", return_value=None):
-            entity_ids = [d.id for d in destroying_deployments_multiple]
+            entity_ids = [dep.deployment_info.id for dep in destroying_deployments_multiple]
             with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
                 # Act
                 result = await deployment_executor.destroy_deployment(
@@ -487,7 +491,7 @@ class TestDestroyDeployment:
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
-        destroying_deployment: DeploymentInfo,
+        destroying_deployment: DeploymentWithHistory,
         proxy_targets_by_scaling_group: dict[str, ScalingGroupProxyTarget],
     ) -> None:
         """DD-003: Unregister failure is captured.
@@ -498,7 +502,7 @@ class TestDestroyDeployment:
         """
         # Arrange
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
-            destroying_deployment.id: []
+            destroying_deployment.deployment_info.id: []
         }
         mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
             proxy_targets_by_scaling_group
@@ -509,7 +513,7 @@ class TestDestroyDeployment:
             "_unregister_endpoint",
             side_effect=RuntimeError("Unregister failed"),
         ):
-            entity_ids = [destroying_deployment.id]
+            entity_ids = [destroying_deployment.deployment_info.id]
             with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
                 # Act
                 result = await deployment_executor.destroy_deployment([destroying_deployment])
@@ -535,7 +539,7 @@ class TestCalculateDesiredReplicas:
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
-        ready_deployment: DeploymentInfo,
+        ready_deployment: DeploymentWithHistory,
     ) -> None:
         """Autoscaling: Manual scaling applied when no rules.
 
@@ -546,10 +550,10 @@ class TestCalculateDesiredReplicas:
         # Arrange - No autoscaling rules, routes don't match
         mock_deployment_repo.fetch_auto_scaling_rules_by_endpoint_ids.return_value = {}
         mock_metrics = MagicMock()
-        mock_metrics.routes_by_endpoint = {ready_deployment.id: []}  # 0 routes
+        mock_metrics.routes_by_endpoint = {ready_deployment.deployment_info.id: []}  # 0 routes
         mock_deployment_repo.fetch_metrics_for_autoscaling.return_value = mock_metrics
 
-        entity_ids = [ready_deployment.id]
+        entity_ids = [ready_deployment.deployment_info.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
             # Act
             result = await deployment_executor.calculate_desired_replicas([ready_deployment])
@@ -561,13 +565,13 @@ class TestCalculateDesiredReplicas:
         # Verify replica update contains the deployment id
         call_args = mock_deployment_repo.update_desired_replicas_bulk.call_args
         replica_updates = call_args[0][0]
-        assert ready_deployment.id in replica_updates
+        assert ready_deployment.deployment_info.id in replica_updates
 
     async def test_no_change_needed_returns_skipped(
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
-        ready_deployment: DeploymentInfo,
+        ready_deployment: DeploymentWithHistory,
     ) -> None:
         """Autoscaling: No change returns skipped.
 
@@ -579,11 +583,11 @@ class TestCalculateDesiredReplicas:
         mock_deployment_repo.fetch_auto_scaling_rules_by_endpoint_ids.return_value = {}
         mock_metrics = MagicMock()
         mock_metrics.routes_by_endpoint = {
-            ready_deployment.id: [MagicMock(), MagicMock()]
+            ready_deployment.deployment_info.id: [MagicMock(), MagicMock()]
         }  # 2 routes = 2 replicas
         mock_deployment_repo.fetch_metrics_for_autoscaling.return_value = mock_metrics
 
-        entity_ids = [ready_deployment.id]
+        entity_ids = [ready_deployment.deployment_info.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
             # Act
             result = await deployment_executor.calculate_desired_replicas([ready_deployment])
@@ -596,7 +600,7 @@ class TestCalculateDesiredReplicas:
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
-        ready_deployment: DeploymentInfo,
+        ready_deployment: DeploymentWithHistory,
     ) -> None:
         """Autoscaling: Calculation failure is captured.
 
@@ -610,7 +614,7 @@ class TestCalculateDesiredReplicas:
             "Metrics fetch failed"
         )
 
-        entity_ids = [ready_deployment.id]
+        entity_ids = [ready_deployment.deployment_info.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
             # Act / Assert - Should handle exception
             with pytest.raises(RuntimeError):
