@@ -2,30 +2,38 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import ArtifactData
-from ai.backend.manager.services.artifact.actions.base import ArtifactAction
+from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.services.artifact.actions.base import (
+    ArtifactSingleEntityAction,
+    ArtifactSingleEntityActionResult,
+)
 
 
 @dataclass
-class GetArtifactAction(ArtifactAction):
+class GetArtifactAction(ArtifactSingleEntityAction):
     artifact_id: uuid.UUID
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.artifact_id)
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
+    @override
+    def target_entity_id(self) -> str:
+        return str(self.artifact_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.ARTIFACT, str(self.artifact_id))
+
 
 @dataclass
-class GetArtifactActionResult(BaseActionResult):
+class GetArtifactActionResult(ArtifactSingleEntityActionResult):
     result: ArtifactData
 
     @override
-    def entity_id(self) -> str | None:
+    def target_entity_id(self) -> str:
         return str(self.result.id)
