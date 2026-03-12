@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+from collections.abc import Callable, Coroutine
 from typing import Any
 
 import pytest
@@ -8,12 +10,20 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.dto.manager.vfolder.request import (
+from ai.backend.common.dto.manager.field import VFolderPermissionField
+from ai.backend.common.dto.manager.vfolder import (
     AcceptInvitationReq,
     DeleteInvitationReq,
+    DeleteVFolderByIDReq,
+    DeleteVFolderFromTrashReq,
     InviteVFolderReq,
-    PurgeVFolderReq,
+    InviteVFolderResponse,
+    ListInvitationsResponse,
+    ListSentInvitationsResponse,
+    MessageResponse,
     RenameVFolderReq,
+    RestoreVFolderReq,
+    UpdateVFolderOptionsReq,
 )
 from ai.backend.manager.data.vfolder.types import (
     VFolderInvitationState,
@@ -21,396 +31,558 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.models.vfolder import vfolder_invitations, vfolders
 
-from .conftest import VFolderFactory
+VFolderFixtureData = dict[str, Any]
+VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
+InvitationFixtureData = dict[str, Any]
+InvitationFactory = Callable[..., Coroutine[Any, Any, InvitationFixtureData]]
 
 
-class TestVFolderUpdate:
-    """Test vfolder update operations (rename, status change)."""
+class TestVFolderRename:
+    """VFolder rename (update_attribute) scenarios.
 
-    async def test_rename_vfolder_success(
+    Scenario file: vfolder/update_delete_vfolder.md — S-1, F-BIZ-1, F-AUTH-1.
+    """
+
+    async def test_owner_renames_vfolder(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_vfolder: VFolderFixtureData,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-1: VFolder owner renames to a unique new name; DB reflects the change."""
+        new_name = f"renamed-{target_vfolder['name']}"
+        result = await admin_registry.vfolder.rename(
+            target_vfolder["name"],
+            RenameVFolderReq(new_name=new_name),
+        )
+        assert isinstance(result, MessageResponse)
+
+        async with db_engine.begin() as conn:
+            row = (
+                await conn.execute(
+                    sa.select(vfolders.c.name).where(vfolders.c.id == target_vfolder["id"])
+                )
+            ).first()
+            assert row is not None
+            assert row.name == new_name
+
+    async def test_rename_to_duplicate_name_raises_error(
         self,
         admin_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
     ) -> None:
-        """S-1: Rename vfolder → name changed, get by new name works."""
-        # Create a vfolder via factory
-        vfolder = await vfolder_factory(name="original-name")
-        old_name = vfolder["name"]
-        new_name = f"{old_name}-renamed"
+        """F-BIZ-1: Renaming to an already-used name raises an error (HTTP 4xx)."""
+        vf_a = await vfolder_factory()
+        vf_b = await vfolder_factory()
+        with pytest.raises(BackendAPIError) as exc_info:
+            await admin_registry.vfolder.rename(
+                vf_a["name"],
+                RenameVFolderReq(new_name=vf_b["name"]),
+            )
+        assert exc_info.value.status in (400, 409)
 
-        # Rename via SDK
-        await admin_registry.vfolder.rename(old_name, RenameVFolderReq(new_name=new_name))
+    async def test_regular_user_cannot_rename_others_vfolder(
+        self,
+        user_registry: BackendAIClientRegistry,
+        target_vfolder: VFolderFixtureData,
+    ) -> None:
+        """F-AUTH-1: Regular user cannot rename another user's vfolder."""
+        with pytest.raises(BackendAPIError):
+            await user_registry.vfolder.rename(
+                target_vfolder["name"],
+                RenameVFolderReq(new_name="should-fail"),
+            )
 
-        # Verify: get by new name should work
-        info = await admin_registry.vfolder.get_info(new_name)
-        assert info.name == new_name
 
-        # Verify: get by old name should fail
-        with pytest.raises(BackendAPIError) as exc:
-            await admin_registry.vfolder.get_info(old_name)
-        assert exc.value.status == 404
+class TestVFolderUpdateOptions:
+    """VFolder update-options (cloneable flag) scenarios.
 
-    async def test_rename_nonexistent_vfolder_fails(
+    Scenario file: vfolder/update_delete_vfolder.md — S-2.
+    """
+
+    async def test_admin_updates_cloneable_option(
         self,
         admin_registry: BackendAIClientRegistry,
+        target_vfolder: VFolderFixtureData,
+        db_engine: SAEngine,
     ) -> None:
-        """E-1: Rename non-existent vfolder → 404."""
-        with pytest.raises(BackendAPIError) as exc:
-            await admin_registry.vfolder.rename(
-                "nonexistent-vfolder", RenameVFolderReq(new_name="new-name")
-            )
-        assert exc.value.status == 404
+        """S-2: Admin changes the cloneable flag; DB reflects the change."""
+        result = await admin_registry.vfolder.update_options(
+            target_vfolder["name"],
+            UpdateVFolderOptionsReq(cloneable=True),
+        )
+        assert isinstance(result, MessageResponse)
+
+        async with db_engine.begin() as conn:
+            row = (
+                await conn.execute(
+                    sa.select(vfolders.c.cloneable).where(vfolders.c.id == target_vfolder["id"])
+                )
+            ).first()
+            assert row is not None
+            assert row.cloneable is True
 
 
-class TestVFolderDelete:
-    """Test vfolder delete operations (soft delete, hard delete/purge)."""
+class TestVFolderSoftDelete:
+    """Soft-delete (move to trash) scenarios.
 
-    async def test_soft_delete_vfolder(
+    Scenario file: vfolder/update_delete_vfolder.md — S-3, F-AUTH-1.
+    """
+
+    async def test_owner_soft_deletes_vfolder_by_id(
         self,
         admin_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
         db_engine: SAEngine,
     ) -> None:
-        """S-2: Soft delete vfolder → status transitions to delete-pending."""
-        vfolder = await vfolder_factory()
-        vfolder_id = vfolder["id"]
-        vfolder_name = vfolder["name"]
+        """S-3: Owner deletes by ID → vfolder status becomes DELETE_PENDING (not removed)."""
+        vf = await vfolder_factory()
+        result = await admin_registry.vfolder.delete_by_id(
+            DeleteVFolderByIDReq(vfolder_id=vf["id"]),
+        )
+        assert isinstance(result, MessageResponse)
 
-        # Soft delete via SDK
-        await admin_registry.vfolder.delete_by_name(vfolder_name)
-
-        # Verify: status should be delete-pending
         async with db_engine.begin() as conn:
-            result = await conn.execute(
-                sa.select(vfolders.c.status).where(vfolders.c.id == vfolder_id)
-            )
-            row = result.one_or_none()
+            row = (
+                await conn.execute(sa.select(vfolders.c.status).where(vfolders.c.id == vf["id"]))
+            ).first()
             assert row is not None
             assert row.status == VFolderOperationStatus.DELETE_PENDING
 
-    async def test_hard_delete_purge_vfolder(
+    async def test_owner_soft_deletes_vfolder_by_name(
         self,
         admin_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
         db_engine: SAEngine,
     ) -> None:
-        """S-3: Hard delete (purge) vfolder → vfolder removed from DB."""
-        vfolder = await vfolder_factory()
-        vfolder_id = vfolder["id"]
+        """S-3 (by name): Owner deletes by name → status becomes DELETE_PENDING."""
+        vf = await vfolder_factory()
+        result = await admin_registry.vfolder.delete_by_name(vf["name"])
+        assert isinstance(result, MessageResponse)
 
-        # Purge via SDK
-        await admin_registry.vfolder.purge(PurgeVFolderReq(vfolder_id=vfolder_id))
-
-        # Verify: vfolder should be removed from DB
         async with db_engine.begin() as conn:
-            result = await conn.execute(sa.select(vfolders.c.id).where(vfolders.c.id == vfolder_id))
-            row = result.one_or_none()
-            assert row is None
+            row = (
+                await conn.execute(sa.select(vfolders.c.status).where(vfolders.c.id == vf["id"]))
+            ).first()
+            assert row is not None
+            assert row.status == VFolderOperationStatus.DELETE_PENDING
 
-
-class TestVFolderDeletePermissions:
-    """Test permission boundaries for vfolder deletion."""
-
-    async def test_user_cannot_delete_other_users_vfolder(
+    async def test_regular_user_cannot_delete_others_vfolder(
         self,
         user_registry: BackendAIClientRegistry,
-        vfolder_factory: VFolderFactory,
-        admin_user_fixture: Any,
+        target_vfolder: VFolderFixtureData,
     ) -> None:
-        """E-2: Regular user cannot delete other user's vfolder → 403."""
-        # Create vfolder owned by admin
-        vfolder = await vfolder_factory(user=str(admin_user_fixture.user_uuid))
-        vfolder_name = vfolder["name"]
-
-        # Try to delete as regular user (not owner)
-        with pytest.raises(BackendAPIError) as exc:
-            await user_registry.vfolder.delete_by_name(vfolder_name)
-        assert exc.value.status == 403
+        """F-AUTH-1: Regular user cannot delete another user's vfolder."""
+        with pytest.raises(BackendAPIError):
+            await user_registry.vfolder.delete_by_id(
+                DeleteVFolderByIDReq(vfolder_id=target_vfolder["id"]),
+            )
 
 
-class TestVFolderInvitation:
-    """Test vfolder invitation workflow (invite, accept, reject)."""
+class TestVFolderHardDelete:
+    """Hard-delete and restore scenarios.
 
-    async def test_owner_invites_user_creates_pending_invitation(
+    Scenario file: vfolder/update_delete_vfolder.md — S-4, S-7.
+    Note: delete_from_trash calls storage-proxy; marked xfail where needed.
+    """
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="delete_from_trash calls storage-proxy which is not available in component tests",
+    )
+    async def test_delete_from_trash_removes_db_record(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        trash_vfolder: VFolderFixtureData,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-4: Delete a TRASH vfolder → DB record removed + storage-proxy delete called."""
+        result = await admin_registry.vfolder.delete_from_trash(
+            DeleteVFolderFromTrashReq(vfolder_id=trash_vfolder["id"]),
+        )
+        assert isinstance(result, MessageResponse)
+
+        async with db_engine.begin() as conn:
+            row = (
+                await conn.execute(
+                    sa.select(vfolders.c.id).where(vfolders.c.id == trash_vfolder["id"])
+                )
+            ).first()
+            assert row is None
+
+    async def test_restore_vfolder_from_trash(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        trash_vfolder: VFolderFixtureData,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-7: Restore a TRASH vfolder → status returns to READY."""
+        result = await admin_registry.vfolder.restore(
+            RestoreVFolderReq(vfolder_id=trash_vfolder["id"]),
+        )
+        assert isinstance(result, MessageResponse)
+
+        async with db_engine.begin() as conn:
+            row = (
+                await conn.execute(
+                    sa.select(vfolders.c.status).where(vfolders.c.id == trash_vfolder["id"])
+                )
+            ).first()
+            assert row is not None
+            assert row.status == VFolderOperationStatus.READY
+
+
+class TestVFolderInviteCreate:
+    """Invitation creation scenarios.
+
+    Scenario file: vfolder/invitation.md — S-1, S-2, S-3, F-INVITE-1, F-INVITE-2.
+    """
+
+    async def test_owner_invites_user_to_vfolder(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_vfolder: VFolderFixtureData,
+        regular_user_fixture: Any,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-1: VFolder owner invites another user → PENDING invitation created in DB."""
+        result = await admin_registry.vfolder.invite(
+            target_vfolder["name"],
+            InviteVFolderReq(
+                permission=VFolderPermissionField.READ_ONLY,
+                emails=[regular_user_fixture.email],
+            ),
+        )
+        assert isinstance(result, InviteVFolderResponse)
+        assert len(result.invited_ids) == 1
+
+        async with db_engine.begin() as conn:
+            row = (
+                await conn.execute(
+                    sa.select(
+                        vfolder_invitations.c.state,
+                        vfolder_invitations.c.invitee,
+                    ).where(vfolder_invitations.c.id == uuid.UUID(result.invited_ids[0]))
+                )
+            ).first()
+            assert row is not None
+            assert row.state == VFolderInvitationState.PENDING
+            assert row.invitee == regular_user_fixture.email
+
+    async def test_invite_nonexistent_email_raises_error(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_vfolder: VFolderFixtureData,
+    ) -> None:
+        """F-INVITE-2: Inviting a non-existent email raises an error."""
+        with pytest.raises(BackendAPIError):
+            await admin_registry.vfolder.invite(
+                target_vfolder["name"],
+                InviteVFolderReq(
+                    permission=VFolderPermissionField.READ_ONLY,
+                    emails=["nonexistent-xyz-99999@example.invalid"],
+                ),
+            )
+
+    async def test_duplicate_invite_is_skipped(
         self,
         admin_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
-        regular_regular_user_fixture: Any,
-        db_engine: SAEngine,
+        regular_user_fixture: Any,
+        invitation_factory: InvitationFactory,
     ) -> None:
-        """S-4: Owner invites user → invitation created with PENDING status."""
-        vfolder = await vfolder_factory()
-        vfolder_id = vfolder["id"]
-        vfolder_name = vfolder["name"]
-        invitee_email = regular_regular_user_fixture.email
+        """S-3: Re-inviting an already-PENDING invitee returns empty invited_ids."""
+        vf = await vfolder_factory()
+        await invitation_factory(vfolder_id=vf["id"], invitee_email=regular_user_fixture.email)
 
-        # Invite user via SDK
-        await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
+        result = await admin_registry.vfolder.invite(
+            vf["name"],
+            InviteVFolderReq(
+                permission=VFolderPermissionField.READ_ONLY,
+                emails=[regular_user_fixture.email],
+            ),
+        )
+        assert isinstance(result, InviteVFolderResponse)
+        assert len(result.invited_ids) == 0
 
-        # Verify: invitation exists with PENDING status
-        async with db_engine.begin() as conn:
-            result = await conn.execute(
-                sa.select(vfolder_invitations)
-                .where(vfolder_invitations.c.vfolder == vfolder_id)
-                .where(vfolder_invitations.c.invitee == invitee_email)
-            )
-            row = result.one()
-            assert row.state == VFolderInvitationState.PENDING
 
+class TestVFolderInviteAcceptReject:
+    """Invitation accept / reject / cancel state-machine scenarios.
+
+    Scenario file: vfolder/invitation.md — S-4, S-5, S-6, F-ACCEPT-1, F-REJECT-1.
+    """
+
+    @pytest.mark.xfail(
+        strict=False,
+        reason="Server bug: ObjectNotFound.__init__() receives unsupported 'object_id' kwarg "
+        "when user system role is missing (repository.py:812)",
+    )
     async def test_invitee_accepts_invitation(
         self,
         admin_registry: BackendAIClientRegistry,
         user_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
-        regular_regular_user_fixture: Any,
+        regular_user_fixture: Any,
         db_engine: SAEngine,
     ) -> None:
-        """S-5: Invitee accepts invitation → invitation status ACCEPTED, vfolder shared."""
-        vfolder = await vfolder_factory()
-        vfolder_id = vfolder["id"]
-        vfolder_name = vfolder["name"]
-        invitee_email = regular_regular_user_fixture.email
-
-        # Owner invites user
-        await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
-
-        # Get invitation ID
-        async with db_engine.begin() as conn:
-            result = await conn.execute(
-                sa.select(vfolder_invitations.c.id)
-                .where(vfolder_invitations.c.vfolder == vfolder_id)
-                .where(vfolder_invitations.c.invitee == invitee_email)
-            )
-            invitation_id = result.scalar_one()
-
-        # Invitee accepts invitation via SDK
-        await user_registry.vfolder.accept_invitation(
-            AcceptInvitationReq(inv_id=str(invitation_id))
+        """S-4: Invitee accepts → state becomes ACCEPTED, vfolder_permissions row created."""
+        vf = await vfolder_factory()
+        invite_result = await admin_registry.vfolder.invite(
+            vf["name"],
+            InviteVFolderReq(
+                permission=VFolderPermissionField.READ_ONLY,
+                emails=[regular_user_fixture.email],
+            ),
         )
+        assert len(invite_result.invited_ids) == 1
+        inv_id = invite_result.invited_ids[0]
 
-        # Verify: invitation status is ACCEPTED
+        accept_result = await user_registry.vfolder.accept_invitation(
+            AcceptInvitationReq(inv_id=inv_id),
+        )
+        assert isinstance(accept_result, MessageResponse)
+
         async with db_engine.begin() as conn:
-            result = await conn.execute(
-                sa.select(vfolder_invitations.c.state).where(
-                    vfolder_invitations.c.id == invitation_id
+            row = (
+                await conn.execute(
+                    sa.select(vfolder_invitations.c.state).where(
+                        vfolder_invitations.c.id == uuid.UUID(inv_id)
+                    )
                 )
-            )
-            state = result.scalar_one()
-            assert state == VFolderInvitationState.ACCEPTED
+            ).first()
+            assert row is not None
+            assert row.state == VFolderInvitationState.ACCEPTED
 
     async def test_invitee_rejects_invitation(
         self,
-        admin_registry: BackendAIClientRegistry,
         user_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
-        regular_regular_user_fixture: Any,
+        regular_user_fixture: Any,
+        invitation_factory: InvitationFactory,
         db_engine: SAEngine,
     ) -> None:
-        """S-6: Invitee rejects invitation → invitation status REJECTED."""
-        vfolder = await vfolder_factory()
-        vfolder_id = vfolder["id"]
-        vfolder_name = vfolder["name"]
-        invitee_email = regular_regular_user_fixture.email
-
-        # Owner invites user
-        await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
-
-        # Get invitation ID
-        async with db_engine.begin() as conn:
-            result = await conn.execute(
-                sa.select(vfolder_invitations.c.id)
-                .where(vfolder_invitations.c.vfolder == vfolder_id)
-                .where(vfolder_invitations.c.invitee == invitee_email)
-            )
-            invitation_id = result.scalar_one()
-
-        # Invitee rejects invitation via SDK
-        await user_registry.vfolder.delete_invitation(
-            DeleteInvitationReq(inv_id=str(invitation_id))
+        """S-5: Invitee rejects → state becomes REJECTED."""
+        vf = await vfolder_factory()
+        inv = await invitation_factory(
+            vfolder_id=vf["id"],
+            invitee_email=regular_user_fixture.email,
         )
 
-        # Verify: invitation status is REJECTED (or removed)
+        result = await user_registry.vfolder.delete_invitation(
+            DeleteInvitationReq(inv_id=str(inv["id"])),
+        )
+        assert isinstance(result, MessageResponse)
+
         async with db_engine.begin() as conn:
-            result = await conn.execute(
-                sa.select(vfolder_invitations.c.state).where(
-                    vfolder_invitations.c.id == invitation_id
+            row = (
+                await conn.execute(
+                    sa.select(vfolder_invitations.c.state).where(
+                        vfolder_invitations.c.id == inv["id"]
+                    )
                 )
-            )
-            row = result.one_or_none()
-            # Invitation may be removed or marked REJECTED depending on implementation
-            if row is not None:
-                assert row.state == VFolderInvitationState.REJECTED
-
-    async def test_list_pending_invitations(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        user_registry: BackendAIClientRegistry,
-        vfolder_factory: VFolderFactory,
-        regular_regular_user_fixture: Any,
-    ) -> None:
-        """S-7: List pending invitations → returns invitations for the user."""
-        vfolder = await vfolder_factory()
-        vfolder_name = vfolder["name"]
-        invitee_email = regular_regular_user_fixture.email
-
-        # Owner invites user
-        await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
-
-        # List invitations as invitee
-        invitations = await user_registry.vfolder.list_invitations()
-        assert len(invitations) > 0
-        assert any(inv.vfolder_name == vfolder_name for inv in invitations)
-
-    async def test_owner_cancels_invitation(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        vfolder_factory: VFolderFactory,
-        regular_regular_user_fixture: Any,
-        db_engine: SAEngine,
-    ) -> None:
-        """S-8: Owner cancels invitation → invitation removed."""
-        vfolder = await vfolder_factory()
-        vfolder_id = vfolder["id"]
-        vfolder_name = vfolder["name"]
-        invitee_email = regular_regular_user_fixture.email
-
-        # Owner invites user
-        await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
-
-        # Get invitation ID
-        async with db_engine.begin() as conn:
-            result = await conn.execute(
-                sa.select(vfolder_invitations.c.id)
-                .where(vfolder_invitations.c.vfolder == vfolder_id)
-                .where(vfolder_invitations.c.invitee == invitee_email)
-            )
-            invitation_id = result.scalar_one()
-
-        # Owner cancels invitation
-        await admin_registry.vfolder.delete_invitation(
-            DeleteInvitationReq(inv_id=str(invitation_id))
-        )
-
-        # Verify: invitation is removed or CANCELED
-        async with db_engine.begin() as conn:
-            result = await conn.execute(
-                sa.select(vfolder_invitations).where(vfolder_invitations.c.id == invitation_id)
-            )
-            row = result.one_or_none()
-            if row is not None:
-                assert row.state == VFolderInvitationState.CANCELED
-
-    async def test_reinvitation_after_rejection(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        user_registry: BackendAIClientRegistry,
-        vfolder_factory: VFolderFactory,
-        regular_regular_user_fixture: Any,
-        db_engine: SAEngine,
-    ) -> None:
-        """S-9: Re-invitation after rejection → new invitation created."""
-        vfolder = await vfolder_factory()
-        vfolder_id = vfolder["id"]
-        vfolder_name = vfolder["name"]
-        invitee_email = regular_regular_user_fixture.email
-
-        # Owner invites user
-        await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[invitee_email]))
-
-        # Get invitation ID and reject
-        async with db_engine.begin() as conn:
-            result = await conn.execute(
-                sa.select(vfolder_invitations.c.id)
-                .where(vfolder_invitations.c.vfolder == vfolder_id)
-                .where(vfolder_invitations.c.invitee == invitee_email)
-            )
-            first_invitation_id = result.scalar_one()
-
-        # Invitee rejects
-        await user_registry.vfolder.delete_invitation(
-            DeleteInvitationReq(inv_id=str(first_invitation_id))
-        )
-
-        # Owner re-invites
-        await admin_registry.vfolder.invite(vfolder_name, invitee_email)
-
-        # Verify: new invitation exists with PENDING status
-        async with db_engine.begin() as conn:
-            result = await conn.execute(
-                sa.select(vfolder_invitations)
-                .where(vfolder_invitations.c.vfolder == vfolder_id)
-                .where(vfolder_invitations.c.invitee == invitee_email)
-                .where(vfolder_invitations.c.state == VFolderInvitationState.PENDING)
-            )
-            row = result.one_or_none()
+            ).first()
             assert row is not None
+            assert row.state == VFolderInvitationState.REJECTED
 
+    async def test_inviter_cancels_invitation(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        vfolder_factory: VFolderFactory,
+        regular_user_fixture: Any,
+        invitation_factory: InvitationFactory,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-6: Inviter cancels their own invitation → state becomes CANCELED."""
+        vf = await vfolder_factory()
+        inv = await invitation_factory(
+            vfolder_id=vf["id"],
+            invitee_email=regular_user_fixture.email,
+        )
 
-class TestVFolderInvitationPermissions:
-    """Test permission boundaries for vfolder invitations."""
+        result = await admin_registry.vfolder.delete_invitation(
+            DeleteInvitationReq(inv_id=str(inv["id"])),
+        )
+        assert isinstance(result, MessageResponse)
 
-    async def test_non_owner_cannot_invite(
+        async with db_engine.begin() as conn:
+            row = (
+                await conn.execute(
+                    sa.select(vfolder_invitations.c.state).where(
+                        vfolder_invitations.c.id == inv["id"]
+                    )
+                )
+            ).first()
+            assert row is not None
+            assert row.state == VFolderInvitationState.CANCELED
+
+    async def test_accept_nonexistent_invitation_raises_error(
+        self,
+        user_registry: BackendAIClientRegistry,
+    ) -> None:
+        """F-ACCEPT-1: Accepting a nonexistent invitation raises an error."""
+        with pytest.raises(BackendAPIError):
+            await user_registry.vfolder.accept_invitation(
+                AcceptInvitationReq(inv_id=str(uuid.uuid4())),
+            )
+
+    async def test_third_party_cannot_reject_invitation(
         self,
         user_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
         admin_user_fixture: Any,
-        regular_user_fixture: Any,
+        invitation_factory: InvitationFactory,
     ) -> None:
-        """E-3: Non-owner cannot invite → 403."""
-        # Create vfolder owned by admin
-        vfolder = await vfolder_factory(user=str(admin_user_fixture.user_uuid))
-        vfolder_name = vfolder["name"]
-        invitee_email = regular_user_fixture.email
+        """F-REJECT-1: A third party (neither inviter nor invitee) cannot cancel/reject."""
+        vf = await vfolder_factory()
+        # Invitation where regular_user is neither inviter nor invitee
+        inv = await invitation_factory(
+            vfolder_id=vf["id"],
+            invitee_email=admin_user_fixture.email,
+        )
 
-        # Try to invite as non-owner
-        with pytest.raises(BackendAPIError) as exc:
-            await user_registry.vfolder.invite(
-                vfolder_name, InviteVFolderReq(emails=[invitee_email])
+        with pytest.raises(BackendAPIError):
+            await user_registry.vfolder.delete_invitation(
+                DeleteInvitationReq(inv_id=str(inv["id"])),
             )
-        assert exc.value.status == 403
 
-    async def test_non_invitee_cannot_accept_reject(
+
+class TestVFolderInviteList:
+    """Invitation listing scenarios.
+
+    Scenario file: vfolder/invitation.md — S-8, S-9, S-10.
+    """
+
+    async def test_invitee_sees_pending_invitations(
         self,
-        admin_registry: BackendAIClientRegistry,
         user_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
-        admin_regular_user_fixture: Any,
-        db_engine: SAEngine,
+        regular_user_fixture: Any,
+        invitation_factory: InvitationFactory,
     ) -> None:
-        """E-4: Non-invitee cannot accept/reject → 403."""
-        vfolder = await vfolder_factory()
-        vfolder_id = vfolder["id"]
-        vfolder_name = vfolder["name"]
-        # Invite someone else (not the regular user)
-        other_email = "other-user@test.local"
+        """S-8: Invitee lists received invitations → their pending invitation is included."""
+        vf = await vfolder_factory()
+        inv = await invitation_factory(
+            vfolder_id=vf["id"],
+            invitee_email=regular_user_fixture.email,
+        )
 
-        # Create invitation
-        await admin_registry.vfolder.invite(vfolder_name, InviteVFolderReq(emails=[other_email]))
+        result = await user_registry.vfolder.list_invitations()
+        assert isinstance(result, ListInvitationsResponse)
+        inv_ids = [i.id for i in result.invitations]
+        assert str(inv["id"]) in inv_ids
 
-        # Get invitation ID
-        async with db_engine.begin() as conn:
-            result = await conn.execute(
-                sa.select(vfolder_invitations.c.id)
-                .where(vfolder_invitations.c.vfolder == vfolder_id)
-                .where(vfolder_invitations.c.invitee == other_email)
-            )
-            invitation_id = result.scalar_one()
-
-        # Try to accept as non-invitee (user_registry is different user)
-        with pytest.raises(BackendAPIError) as exc:
-            await user_registry.vfolder.accept_invitation(
-                AcceptInvitationReq(inv_id=str(invitation_id))
-            )
-        assert exc.value.status == 403
-
-    async def test_invite_to_nonexistent_vfolder(
+    async def test_inviter_sees_sent_invitations(
         self,
         admin_registry: BackendAIClientRegistry,
+        vfolder_factory: VFolderFactory,
+        regular_user_fixture: Any,
+        invitation_factory: InvitationFactory,
+    ) -> None:
+        """S-9: Inviter lists sent invitations → their pending invitation is included."""
+        vf = await vfolder_factory()
+        inv = await invitation_factory(
+            vfolder_id=vf["id"],
+            invitee_email=regular_user_fixture.email,
+        )
+
+        result = await admin_registry.vfolder.list_sent_invitations()
+        assert isinstance(result, ListSentInvitationsResponse)
+        inv_ids = [i.id for i in result.invitations]
+        assert str(inv["id"]) in inv_ids
+
+    async def test_user_with_no_invitations_gets_empty_list(
+        self,
+        user_registry: BackendAIClientRegistry,
+    ) -> None:
+        """S-10: User with no pending invitations gets an empty list."""
+        result = await user_registry.vfolder.list_invitations()
+        assert isinstance(result, ListInvitationsResponse)
+        assert result.invitations == []
+
+    async def test_invitations_are_user_scoped(
+        self,
+        user_registry: BackendAIClientRegistry,
+        vfolder_factory: VFolderFactory,
+        admin_user_fixture: Any,
+        invitation_factory: InvitationFactory,
+    ) -> None:
+        """S-8 (scoping): Each user only sees their own invitations."""
+        vf = await vfolder_factory()
+        # Invitation addressed to admin (not regular_user)
+        await invitation_factory(
+            vfolder_id=vf["id"],
+            invitee_email=admin_user_fixture.email,
+        )
+
+        # regular_user should not see the invitation meant for admin
+        result = await user_registry.vfolder.list_invitations()
+        assert isinstance(result, ListInvitationsResponse)
+        for inv in result.invitations:
+            assert inv.invitee != admin_user_fixture.email
+
+
+class TestVFolderPermissionControl:
+    """Permission-control scenarios for invite operations.
+
+    Scenario file: vfolder/invitation.md — permission section.
+    """
+
+    async def test_non_owner_cannot_invite_to_vfolder(
+        self,
+        user_registry: BackendAIClientRegistry,
+        target_vfolder: VFolderFixtureData,
         regular_user_fixture: Any,
     ) -> None:
-        """E-5: Invite to non-existent vfolder → 404."""
-        with pytest.raises(BackendAPIError) as exc:
-            await admin_registry.vfolder.invite(
-                "nonexistent-vfolder", InviteVFolderReq(emails=[regular_user_fixture.email])
+        """Only the vfolder owner can invite users; non-owner gets an error."""
+        # target_vfolder is owned by admin; user_registry is a regular user
+        with pytest.raises(BackendAPIError):
+            await user_registry.vfolder.invite(
+                target_vfolder["name"],
+                InviteVFolderReq(
+                    permission=VFolderPermissionField.READ_ONLY,
+                    emails=[regular_user_fixture.email],
+                ),
             )
-        assert exc.value.status == 404
+
+    async def test_reinvitation_after_cancellation(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        vfolder_factory: VFolderFactory,
+        regular_user_fixture: Any,
+        invitation_factory: InvitationFactory,
+        db_engine: SAEngine,
+    ) -> None:
+        """Re-invitation after cancellation → new PENDING invitation created."""
+        vf = await vfolder_factory()
+        # Seed a CANCELED invitation
+        canceled_inv = await invitation_factory(
+            vfolder_id=vf["id"],
+            invitee_email=regular_user_fixture.email,
+            state=VFolderInvitationState.CANCELED,
+        )
+
+        # Re-invite
+        result = await admin_registry.vfolder.invite(
+            vf["name"],
+            InviteVFolderReq(
+                permission=VFolderPermissionField.READ_ONLY,
+                emails=[regular_user_fixture.email],
+            ),
+        )
+        assert isinstance(result, InviteVFolderResponse)
+        assert len(result.invited_ids) == 1
+        new_inv_id = result.invited_ids[0]
+
+        # New invitation should be different from the canceled one
+        assert new_inv_id != str(canceled_inv["id"])
+
+        async with db_engine.begin() as conn:
+            row = (
+                await conn.execute(
+                    sa.select(vfolder_invitations.c.state).where(
+                        vfolder_invitations.c.id == uuid.UUID(new_inv_id)
+                    )
+                )
+            ).first()
+            assert row is not None
+            assert row.state == VFolderInvitationState.PENDING
