@@ -124,7 +124,7 @@ class EntityType(enum.StrEnum):
 
     # === Parent:child sub-entity types (`:` separator) ===
     # Domain/Project/User sub-resources
-    DOMAIN_FAIR_SHARE = "domain:fair_share"
+    DOMAIN_FAIR_SHARE = "domain_fair_share"
     PROJECT_FAIR_SHARE = "project:fair_share"
     USER_FAIR_SHARE = "user:fair_share"
     DOMAIN_USAGE_BUCKET = "domain:usage_bucket"
