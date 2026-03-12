@@ -368,6 +368,10 @@ class KernelV2GQL(Node):
     startup_command: str | None = strawberry.field(
         description="Startup command executed when the kernel starts."
     )
+    persistent_mount_paths: list[str] = strawberry.field(
+        description="List of persistent vfolder mount paths inside the container. "
+        "Files outside these paths are ephemeral and will be lost on session termination.",
+    )
 
     # Sub-info types
     session_info: KernelV2SessionInfoGQL = strawberry.field(
@@ -547,6 +551,11 @@ class KernelV2GQL(Node):
         return cls(
             id=ID(str(kernel_info.id)),
             startup_command=kernel_info.runtime.startup_command,
+            persistent_mount_paths=[
+                m["kernel_path"] for m in kernel_info.runtime.vfolder_mounts
+            ]
+            if kernel_info.runtime.vfolder_mounts
+            else [],
             session_info=KernelV2SessionInfoGQL(
                 session_id=UUID(kernel_info.session.session_id),
                 creation_id=kernel_info.session.creation_id,
