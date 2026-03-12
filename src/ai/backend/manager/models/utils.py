@@ -404,9 +404,7 @@ async def connect_database(
     db_config: DatabaseConfig,
     isolation_level: str = "SERIALIZABLE",
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
-    from .base import ensure_all_tables_registered, pgsql_connect_opts
-
-    ensure_all_tables_registered()
+    from .base import pgsql_connect_opts
 
     db_url = (
         URL(f"postgresql+asyncpg://{db_config.addr.host}/{db_config.name}")
