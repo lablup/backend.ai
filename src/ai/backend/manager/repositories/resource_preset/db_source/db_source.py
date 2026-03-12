@@ -20,6 +20,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
@@ -323,6 +324,12 @@ class ResourcePresetDBSource:
             .where(
                 (KernelRow.user_uuid == user_id)
                 & (ResourceAllocationRow.free_at.is_(None))
+                & (
+                    KernelRow.status.in_(
+                        KernelStatus.resource_occupied_statuses()
+                        | KernelStatus.resource_requested_statuses()
+                    )
+                )
                 & (SessionRow.scaling_group_name.in_(sgroup_names))
             )
             .group_by(SessionRow.scaling_group_name, ResourceAllocationRow.slot_name, rst.c.rank)
@@ -425,7 +432,13 @@ class ResourcePresetDBSource:
         :param filters: List of filter objects to apply
         :return: Total occupied resources, rank-ordered
         """
-        conditions: list[Any] = [ResourceAllocationRow.free_at.is_(None)]
+        all_resource_statuses = (
+            KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
+        )
+        conditions: list[Any] = [
+            ResourceAllocationRow.free_at.is_(None),
+            KernelRow.status.in_(all_resource_statuses),
+        ]
 
         if filters:
             for filter_obj in filters:
