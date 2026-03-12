@@ -11,7 +11,9 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
@@ -25,6 +27,9 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -49,6 +54,7 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, Upserter
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.fair_share import (
     DomainFairShareConditions,
     DomainFairShareCreatorSpec,
@@ -96,6 +102,8 @@ class TestFairShareRepository:
                 ResourcePresetRow,
                 ResourceSlotTypeRow,
                 AgentResourceRow,
+                # RBAC association table
+                AssociationScopesEntitiesRow,
                 # Fair Share rows (no FK constraints but need mapper registration)
                 DomainFairShareRow,
                 ProjectFairShareRow,
@@ -266,12 +274,14 @@ class TestFairShareRepository:
         test_domain_name: str,
     ) -> None:
         """Test creating domain fair share"""
-        creator = Creator(
+        creator = RBACEntityCreator(
             spec=DomainFairShareCreatorSpec(
                 resource_group=test_scaling_group,
                 domain_name=test_domain_name,
                 weight=Decimal("2.0"),
-            )
+            ),
+            element_type=RBACElementType.DOMAIN_FAIR_SHARE,
+            scope_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, test_scaling_group),
         )
 
         result = await fair_share_repository.create_domain_fair_share(creator)
@@ -352,12 +362,14 @@ class TestFairShareRepository:
     ) -> None:
         """Test getting domain fair share by scaling group and domain"""
         # Create first
-        creator = Creator(
+        creator = RBACEntityCreator(
             spec=DomainFairShareCreatorSpec(
                 resource_group=test_scaling_group,
                 domain_name=test_domain_name,
                 weight=Decimal("1.5"),
-            )
+            ),
+            element_type=RBACElementType.DOMAIN_FAIR_SHARE,
+            scope_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, test_scaling_group),
         )
         await fair_share_repository.create_domain_fair_share(creator)
 
@@ -406,11 +418,13 @@ class TestFairShareRepository:
             await db_sess.commit()
 
         for name in domain_names:
-            creator = Creator(
+            creator = RBACEntityCreator(
                 spec=DomainFairShareCreatorSpec(
                     resource_group=test_scaling_group,
                     domain_name=name,
-                )
+                ),
+                element_type=RBACElementType.DOMAIN_FAIR_SHARE,
+                scope_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, test_scaling_group),
             )
             await fair_share_repository.create_domain_fair_share(creator)
 
