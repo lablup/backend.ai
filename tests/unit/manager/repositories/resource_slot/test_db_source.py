@@ -20,10 +20,9 @@ from ai.backend.manager.errors.resource_slot import (
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.resource_slot import (
-    AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
