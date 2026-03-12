@@ -20,7 +20,9 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
@@ -54,6 +56,7 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, Creator
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.fair_share import (
     DomainFairShareCreatorSpec,
     FairShareRepository,
@@ -726,13 +729,15 @@ class TestSearchProjectFairSharesEntityBased:
             await db_sess.commit()
 
         await fair_share_repository.create_project_fair_share(
-            Creator(
+            RBACEntityCreator(
                 spec=ProjectFairShareCreatorSpec(
                     resource_group=scaling_group,
                     project_id=project_id,
                     domain_name=domain_name,
                     weight=Decimal("2.0"),  # Explicit weight for use_default=False
-                )
+                ),
+                element_type=RBACElementType.PROJECT_FAIR_SHARE,
+                scope_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, scaling_group),
             )
         )
         return project_id
