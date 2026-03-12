@@ -98,10 +98,7 @@ class DeployingProvisioningHandler(DeploymentHandler):
                 lifecycle=EndpointLifecycle.DEPLOYING,
                 sub_status=DeploymentSubStep.PROGRESSING,
             ),
-            need_retry=DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.ROLLING_BACK,
-            ),
+            need_retry=None,
             expired=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
                 sub_status=DeploymentSubStep.ROLLING_BACK,
@@ -132,7 +129,7 @@ class DeployingProgressingHandler(DeploymentHandler):
     Targets PROGRESSING (active) and COMPLETED (terminal marker):
 
     - success: Strategy conditions met (COMPLETED) → transition to READY.
-    - failure: Strategy failed → transition to ROLLING_BACK.
+    - expired/give_up: Strategy failed → transition to ROLLING_BACK.
     - skipped: Still progressing — no transition, re-schedule.
     """
 
@@ -173,10 +170,7 @@ class DeployingProgressingHandler(DeploymentHandler):
     def status_transitions(cls) -> DeploymentStatusTransitions:
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
-            need_retry=DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.ROLLING_BACK,
-            ),
+            need_retry=None,
             expired=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
                 sub_status=DeploymentSubStep.ROLLING_BACK,
@@ -245,7 +239,8 @@ class DeployingRollingBackHandler(DeploymentHandler):
     def status_transitions(cls) -> DeploymentStatusTransitions:
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
-            need_retry=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
+            need_retry=None,
+            # TODO: How can we handle this?
             expired=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
             give_up=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
         )
