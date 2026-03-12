@@ -288,6 +288,8 @@ async def gather_inference_measures(
                     )
                 )
             return measures
+        case RuntimeVariant.CUSTOM:
+            return await gather_prometheus_inference_measures(client_pool, circuit.route_info)
         case _:
             return None
 
