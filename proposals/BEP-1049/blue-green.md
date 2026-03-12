@@ -77,15 +77,15 @@ The `DeploymentStrategyEvaluator` periodically evaluates each Blue-Green deploym
 
 ### Sub-Step Variants
 
-Each cycle evaluation directly returns one of the shared sub-step variants:
+Each cycle evaluation directly returns one of the shared sub-step variants. Completion is not a sub-step but a signal on `CycleEvaluationResult(sub_step=PROGRESSING, completed=True)` — the coordinator handles revision swap and READY transition directly.
 
 | Sub-Step | Condition | Handler Action |
 |----------|-----------|----------------|
-| **provisioning** | No Green routes → created all as INACTIVE | DeployingInProgressHandler → DEPLOYING→DEPLOYING, reschedule |
-| **provisioning** | Green routes are PROVISIONING | DeployingInProgressHandler → DEPLOYING→DEPLOYING, reschedule |
-| **progressing** | Not all Green healthy (mixed state, no PROVISIONING) | DeployingInProgressHandler → DEPLOYING→DEPLOYING, reschedule |
-| **progressing** | All Green healthy, waiting for promotion trigger (manual or delay) | DeployingInProgressHandler → DEPLOYING→DEPLOYING, reschedule |
-| **completed** | Promotion executed (Green→ACTIVE, Blue→TERMINATING) | DeployingCompletedHandler → DEPLOYING→READY, revision swap |
+| **provisioning** | No Green routes → created all as INACTIVE | DeployingProvisioningHandler → DEPLOYING→DEPLOYING, reschedule |
+| **provisioning** | Green routes are PROVISIONING | DeployingProvisioningHandler → DEPLOYING→DEPLOYING, reschedule |
+| **progressing** | Not all Green healthy (mixed state, no PROVISIONING) | DeployingProgressingHandler → DEPLOYING→DEPLOYING, reschedule |
+| **progressing** | All Green healthy, waiting for promotion trigger (manual or delay) | DeployingProgressingHandler → DEPLOYING→DEPLOYING, reschedule |
+| **progressing** (`completed=True`) | Promotion executed (Green→ACTIVE, Blue→TERMINATING) | Coordinator → atomic revision swap + DEPLOYING→READY |
 | **rolled_back** | All Green failed → terminate Green | DeployingRolledBackHandler → DEPLOYING→READY, deploying_revision=NULL |
 
 ## promote_delay_seconds Handling
@@ -220,8 +220,8 @@ With `auto_promote=False`:
   │         strategy = policy.strategy                           │
   │    3. Dispatch by strategy:                                  │
   │         BLUE_GREEN → blue_green_evaluate(...)                │
-  │    4. Group by sub_step and return                           │
-  │    5. Apply route changes (scale_out + scale_in)             │
+  │    4. Aggregate route changes + group by sub_step            │
+  │  Coordinator applies route changes after evaluation          │
   └──────────────────────────┬───────────────────────────────────┘
                              │
                              ▼
@@ -240,27 +240,23 @@ With `auto_promote=False`:
   │  │  blue_active:        blue + is_active()            │      │
   │  └────────────────────────────────────────────────────┘      │
   │                                                              │
-  │  Actions applied:                                            │
+  │  Route changes returned (applied by coordinator):            │
   │  ┌────────────────────────────────────────────────────┐      │
-  │  │  ● Green creation:                                 │      │
+  │  │  ● Green creation (rollout_specs):                 │      │
   │  │    RouteCreatorSpec(                               │      │
   │  │      revision_id = deploying_revision,             │      │
   │  │      traffic_status = INACTIVE  ← differs from RU  │      │
   │  │    ) × target_count                                │      │
   │  │                                                    │      │
   │  │  ● Promotion (traffic switch):                     │      │
-  │  │    Green: RouteBatchUpdaterSpec(                   │      │
-  │  │      traffic_status = ACTIVE                       │      │
-  │  │    )                                               │      │
-  │  │    Blue: RouteBatchUpdaterSpec(                    │      │
-  │  │      status = TERMINATING,                         │      │
-  │  │      traffic_status = INACTIVE                     │      │
-  │  │    )                                               │      │
+  │  │    promote_route_ids: Green route IDs              │      │
+  │  │      → traffic_status = ACTIVE                     │      │
+  │  │    drain_route_ids: Blue route IDs                 │      │
+  │  │      → status = TERMINATING                        │      │
   │  │                                                    │      │
   │  │  ● Rollback:                                       │      │
-  │  │    Green: RouteBatchUpdaterSpec(                   │      │
-  │  │      status = TERMINATING                          │      │
-  │  │    )                                               │      │
+  │  │    drain_route_ids: Green route IDs                │      │
+  │  │      → status = TERMINATING                        │      │
   │  └────────────────────────────────────────────────────┘      │
   └──────────────────────────────────────────────────────────────┘
                              │
@@ -268,11 +264,12 @@ With `auto_promote=False`:
   ┌──────────────────────────────────────────────────────────────┐
   │  Per-Sub-Step Handlers (coordinator generic path)            │
   │                                                              │
-  │  PROVISIONING/PROGRESSING → DeployingInProgressHandler       │
+  │  PROVISIONING → DeployingProvisioningHandler                  │
   │    next_status: DEPLOYING → coordinator records history      │
   │                                                              │
-  │  COMPLETED → DeployingCompletedHandler                       │
-  │    next_status: READY → revision swap + coordinator transit  │
+  │  PROGRESSING → DeployingProgressingHandler                   │
+  │    next_status: DEPLOYING → coordinator records history      │
+  │    completed=True → coordinator atomic revision swap + READY │
   │                                                              │
   │  ROLLED_BACK → DeployingRolledBackHandler                    │
   │    next_status: READY → clear dep_rev + coordinator transit  │
@@ -287,14 +284,13 @@ When all Green routes become ACTIVE and Blue routes are terminated:
   completed determination (evaluator)
        │
        ▼
-  DeployingCompletedHandler.execute()
-    → complete_deployment_revision_swap(ids)
-      current_revision = deploying_revision
-      deploying_revision = NULL
-       │
-       ▼
-  Coordinator generic path
-    → DEPLOYING → READY history recording + lifecycle transition
+  Coordinator._transition_completed_deployments()
+    → Atomic transaction:
+      1. complete_deployment_revision_swap(ids)
+         current_revision = deploying_revision
+         deploying_revision = NULL
+      2. DEPLOYING → READY lifecycle transition
+      3. History recording
 ```
 
 ## Comparison with Rolling Update
