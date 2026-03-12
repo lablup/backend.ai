@@ -2543,6 +2543,33 @@ input CreateProjectResourcePolicyInput
   max_network_count: Int
 }
 
+"""Added in 26.3.0. Input for creating a new query definition."""
+input CreateQueryDefinitionInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Human-readable identifier (must be unique)."""
+  name: String!
+
+  """Prometheus metric name."""
+  metricName: String!
+
+  """PromQL template with {labels}, {window}, {group_by} placeholders."""
+  queryTemplate: String!
+
+  """Default time window."""
+  timeWindow: String = null
+
+  """Query definition options including filter and group labels."""
+  options: QueryDefinitionOptionsInput!
+}
+
+"""Added in 26.3.0. Payload returned after creating a query definition."""
+type CreateQueryDefinitionPayload
+  @join__type(graph: STRAWBERRY)
+{
+  preset: QueryDefinition!
+}
+
 """Added in 25.14.0"""
 input CreateReservoirRegistryInput
   @join__type(graph: STRAWBERRY)
@@ -3108,6 +3135,14 @@ type DeleteProjectResourcePolicy
 {
   ok: Boolean
   msg: String
+}
+
+"""Added in 26.3.0. Payload returned after deleting a query definition."""
+type DeleteQueryDefinitionPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the deleted query definition."""
+  id: ID!
 }
 
 """Added in 25.14.0"""
@@ -4423,6 +4458,17 @@ input EnvironmentVariablesInput
 {
   """List of environment variable entries."""
   entries: [EnvironmentVariableEntryInput!]!
+}
+
+"""Added in 26.3.0. Options for executing a query definition."""
+input ExecuteQueryDefinitionOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Label key-value pairs to filter by."""
+  filterLabels: [MetricLabelEntryInput!] = null
+
+  """Label keys to group results by."""
+  groupLabels: [String!] = null
 }
 
 """Added in 24.03.4."""
@@ -5932,6 +5978,17 @@ enum LivenessStatus
   DEGRADED @join__enumValue(graph: STRAWBERRY)
 }
 
+"""Added in 26.3.0. Key-value label entry for queries."""
+input MetricLabelEntryInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Label key."""
+  key: String!
+
+  """Label value."""
+  value: String!
+}
+
 """Added in 25.6.0. A pair of timestamp and value."""
 type MetricResultValue
   @join__type(graph: GRAPHENE)
@@ -6629,6 +6686,33 @@ input ModifyProjectResourcePolicyInput
   Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks.
   """
   max_network_count: Int
+}
+
+"""Added in 26.3.0. Input for modifying an existing query definition."""
+input ModifyQueryDefinitionInput
+  @join__type(graph: STRAWBERRY)
+{
+  """New name."""
+  name: String
+
+  """New metric name."""
+  metricName: String
+
+  """New PromQL template."""
+  queryTemplate: String
+
+  """New default time window."""
+  timeWindow: String
+
+  """New query definition options."""
+  options: QueryDefinitionOptionsInput
+}
+
+"""Added in 26.3.0. Payload returned after modifying a query definition."""
+type ModifyQueryDefinitionPayload
+  @join__type(graph: STRAWBERRY)
+{
+  preset: QueryDefinition!
 }
 
 type ModifyResourcePreset
@@ -7564,6 +7648,15 @@ type Mutation
   Added in 26.3.0. Permanently delete multiple users in bulk (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted.
   """
   adminBulkPurgeUsersV2(input: BulkPurgeUsersV2Input!): BulkPurgeUsersV2Payload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.3.0. Create a new query definition (admin only)."""
+  adminCreatePrometheusQueryPreset(input: CreateQueryDefinitionInput!): CreateQueryDefinitionPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.3.0. Modify an existing query definition (admin only)."""
+  adminModifyPrometheusQueryPreset(id: ID!, input: ModifyQueryDefinitionInput!): ModifyQueryDefinitionPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.3.0. Delete a query definition (admin only)."""
+  adminDeletePrometheusQueryPreset(id: ID!): DeleteQueryDefinitionPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. Create a new role (admin only)."""
   adminCreateRole(input: CreateRoleInput!): Role! @join__field(graph: STRAWBERRY)
@@ -9478,6 +9571,19 @@ type Query
   """
   adminImageAliases(filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection @join__field(graph: STRAWBERRY)
 
+  """Added in 26.3.0. Get a single query definition by ID (admin only)."""
+  adminPrometheusQueryPreset(id: ID!): QueryDefinition @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.3.0. List query definitions with filtering and pagination (admin only).
+  """
+  adminPrometheusQueryPresets(filter: QueryDefinitionFilter = null, orderBy: [QueryDefinitionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): QueryDefinitionConnection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.3.0. Execute a query definition by ID and return the result (admin only).
+  """
+  adminPrometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult! @join__field(graph: STRAWBERRY)
+
   """Added in 26.3.0. Get a single role by ID (admin only)."""
   adminRole(id: UUID!): Role @join__field(graph: STRAWBERRY)
 
@@ -9717,6 +9823,179 @@ type Query
   Added in 26.2.0. Get the domain that a project belongs to. Returns an error if project or domain is not found.
   """
   projectDomainV2(projectId: UUID!): DomainV2 @join__field(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.3.0. Prometheus query definition entity implementing Relay Node pattern.
+"""
+type QueryDefinition implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Human-readable query definition identifier."""
+  name: String!
+
+  """Prometheus metric name."""
+  metricName: String!
+
+  """PromQL template with placeholders."""
+  queryTemplate: String!
+
+  """Default time window. Falls back to server config if null."""
+  timeWindow: String
+
+  """Query definition options including filter and group labels."""
+  options: QueryDefinitionOptions!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime!
+}
+
+"""Added in 26.3.0. Paginated connection for query definition records."""
+type QueryDefinitionConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [QueryDefinitionEdge!]!
+
+  """Total number of query definition records matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type QueryDefinitionEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: QueryDefinition!
+}
+
+"""Added in 26.3.0. Result from executing a query definition."""
+type QueryDefinitionExecuteResult
+  @join__type(graph: STRAWBERRY)
+{
+  """Prometheus response status."""
+  status: String!
+
+  """Result type (e.g., matrix)."""
+  resultType: String!
+
+  """Metric result entries."""
+  result: [QueryDefinitionMetricResult!]!
+}
+
+"""Added in 26.3.0. Filter input for querying query definitions."""
+input QueryDefinitionFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by name."""
+  name: StringFilter = null
+
+  """Combine multiple filters with AND logic."""
+  AND: [QueryDefinitionFilter!] = null
+
+  """Combine multiple filters with OR logic."""
+  OR: [QueryDefinitionFilter!] = null
+
+  """Negate the specified filters."""
+  NOT: [QueryDefinitionFilter!] = null
+}
+
+"""Added in 26.3.0. Key-value label entry from Prometheus result."""
+type QueryDefinitionMetricLabelEntry
+  @join__type(graph: STRAWBERRY)
+{
+  key: String!
+  value: String!
+}
+
+"""Added in 26.3.0. Single metric result from Prometheus query."""
+type QueryDefinitionMetricResult
+  @join__type(graph: STRAWBERRY)
+{
+  """Metric labels as key-value entries."""
+  metric: [QueryDefinitionMetricLabelEntry!]!
+
+  """Time-series values."""
+  values: [QueryDefinitionMetricResultValue!]!
+}
+
+"""Added in 26.3.0. Single timestamp-value pair from Prometheus."""
+type QueryDefinitionMetricResultValue
+  @join__type(graph: STRAWBERRY)
+{
+  timestamp: Float!
+  value: String!
+}
+
+"""Added in 26.3.0. Options for query definition label governance."""
+type QueryDefinitionOptions
+  @join__type(graph: STRAWBERRY)
+{
+  """Allowed filter label keys."""
+  filterLabels: [String!]!
+
+  """Allowed group-by label keys."""
+  groupLabels: [String!]!
+}
+
+"""Added in 26.3.0. Options for query definition labels."""
+input QueryDefinitionOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Allowed filter label keys."""
+  filterLabels: [String!]!
+
+  """Allowed group-by label keys."""
+  groupLabels: [String!]!
+}
+
+"""Added in 26.3.0. Specifies ordering for query definition results."""
+input QueryDefinitionOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """The field to order by."""
+  field: QueryDefinitionOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.3.0. Fields available for ordering query definition results.
+"""
+enum QueryDefinitionOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+  NAME @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.3.0. Time range for Prometheus query."""
+input QueryTimeRangeInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Start of the time range."""
+  start: DateTime!
+
+  """End of the time range."""
+  end: DateTime!
+
+  """Query resolution step (e.g., '60s')."""
+  step: String!
 }
 
 type QuotaDetails
