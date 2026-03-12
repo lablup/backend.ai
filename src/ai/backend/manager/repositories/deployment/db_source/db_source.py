@@ -1,5 +1,6 @@
 """Database source implementation for deployment repository."""
 
+import dataclasses
 import uuid
 from collections import Counter, defaultdict
 from collections.abc import AsyncIterator, Mapping, Sequence
@@ -134,7 +135,6 @@ from ai.backend.manager.repositories.base.upserter import (
 from ai.backend.manager.repositories.deployment.creators import (
     DeploymentCreatorSpec,
     DeploymentPolicyCreatorSpec,
-    DeploymentRevisionCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment.creators.endpoint import LegacyEndpointCreatorSpec
 from ai.backend.manager.repositories.deployment.types import (
@@ -2025,7 +2025,7 @@ class DeploymentDBSource:
 
     async def create_revision(
         self,
-        creator: Creator[DeploymentRevisionRow],
+        creator: RBACEntityCreator[DeploymentRevisionRow],
     ) -> ModelRevisionData:
         """Create a new deployment revision for an endpoint.
 
@@ -2040,16 +2040,12 @@ class DeploymentDBSource:
         This requires adding a `revision_history_limit` column to EndpointRow.
         """
         async with self._begin_session_read_committed() as db_sess:
-            spec = cast(DeploymentRevisionCreatorSpec, creator.spec)
-
-            row = spec.build_row()
-            db_sess.add(row)
-            await db_sess.flush()
-            return row.to_data()
+            rbac_result = await execute_rbac_entity_creator(db_sess, creator)
+            return rbac_result.row.to_data()
 
     async def create_revision_with_next_number(
         self,
-        creator: Creator[DeploymentRevisionRow],
+        creator: RBACEntityCreator[DeploymentRevisionRow],
         endpoint_id: uuid.UUID,
     ) -> ModelRevisionData:
         """Atomically read the latest revision number and create a new revision.
@@ -2077,14 +2073,13 @@ class DeploymentDBSource:
             )
             result = await db_sess.execute(max_query)
             latest_revision_number = result.scalar()
-            next_revision_number = (latest_revision_number or 0) + 1
+            next_number = (latest_revision_number or 0) + 1
 
-            spec = cast(DeploymentRevisionCreatorSpec, creator.spec)
-            spec = spec.with_revision_number(next_revision_number)
-            row = spec.build_row()
-            db_sess.add(row)
-            await db_sess.flush()
-            return row.to_data()
+            updated_creator = dataclasses.replace(
+                creator, spec=creator.spec.with_revision_number(next_number)
+            )
+            rbac_result = await execute_rbac_entity_creator(db_sess, updated_creator)
+            return rbac_result.row.to_data()
 
     async def get_revision(
         self,
