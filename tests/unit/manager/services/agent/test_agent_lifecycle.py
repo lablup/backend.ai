@@ -1,4 +1,4 @@
-"""Component tests for agent lifecycle, heartbeat, and watcher operations.
+"""Unit tests for agent lifecycle, heartbeat, and watcher operations.
 
 Tests the AgentService layer with real DB and Valkey, validating:
 - Agent status transitions (ALIVE / LOST / TERMINATED / RESTARTING)
