@@ -109,15 +109,14 @@ class DeploymentStrategyEvaluator:
             changes = cycle_result.route_changes
             result.route_changes.rollout_specs.extend(changes.rollout_specs)
             result.route_changes.drain_route_ids.extend(changes.drain_route_ids)
-            DeploymentStrategyEvaluator._record_route_changes(deployment, changes)
+            self._record_route_changes(deployment, changes)
 
             # Classify into assignments
             result.assignments[deployment.id] = cycle_result.sub_step
 
         return result
 
-    @staticmethod
-    def _record_route_changes(deployment: DeploymentInfo, changes: RouteChanges) -> None:
+    def _record_route_changes(self, deployment: DeploymentInfo, changes: RouteChanges) -> None:
         """Record rollout/drain operations as sub-steps for observability."""
         if not changes.rollout_specs and not changes.drain_route_ids:
             return
