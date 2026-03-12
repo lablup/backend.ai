@@ -5,6 +5,10 @@
     "$schema": {
       "type": "string"
     },
+    "fontFamily": {
+      "type": "string",
+      "description": "The font family applied to both light and dark themes."
+    },
     "light": {
       "$ref": "./antdThemeConfig.schema.json"
     },

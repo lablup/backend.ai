@@ -6,7 +6,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["config", "meta", "endpoint", "endpoint_id"],
+        "required": ["config", "meta"],
         "properties": {
           "id": {
             "type": "string",
@@ -18,7 +18,7 @@
             "properties": {
               "avatar": {
                 "type": "string",
-                "description": "URL of the agent's avatar image"
+                "description": "The agent's avatar (emoji character)"
               },
               "background": {
                 "oneOf": [
@@ -53,6 +53,15 @@
             "type": "string",
             "description": "The endpoint identifier"
           },
+          "endpoint_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The external endpoint URL for the agent"
+          },
+          "endpoint_token": {
+            "type": "string",
+            "description": "The token (API key) for the external endpoint"
+          },
           "config": {
             "type": "object",
             "required": ["system_prompt"],
@@ -60,6 +69,10 @@
               "system_prompt": {
                 "type": "string",
                 "description": "The system prompt for the agent"
+              },
+              "default_model": {
+                "type": "string",
+                "description": "The default model name for the agent"
               }
             },
             "additionalProperties": true
