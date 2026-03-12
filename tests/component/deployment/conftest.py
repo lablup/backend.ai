@@ -4,19 +4,23 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.deployment.handler import DeploymentAPIHandler
 from ai.backend.manager.api.rest.deployment.registry import register_deployment_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
@@ -28,9 +32,23 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
+from ai.backend.manager.sokovan.deployment.deployment_controller import (
+    DeploymentController,
+    DeploymentControllerArgs,
+)
+from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
+    RevisionGeneratorRegistry,
+    RevisionGeneratorRegistryArgs,
+)
+from ai.backend.manager.sokovan.scheduling_controller import (
+    SchedulingController,
+    SchedulingControllerArgs,
+)
 
 # Type aliases for fixture factories
 ImageFactoryFunc = Callable[[], Coroutine[Any, Any, uuid.UUID]]
@@ -40,8 +58,12 @@ VFolderFactoryFunc = Callable[[], Coroutine[Any, Any, uuid.UUID]]
 @pytest.fixture()
 def deployment_processors(
     database_engine: ExtendedAsyncSAEngine,
-    storage_manager: AsyncMock,
+    storage_manager: StorageSessionManager,
     valkey_clients: ValkeyClients,
+    config_provider: ManagerConfigProvider,
+    event_producer: EventProducer,
+    network_plugin_ctx: NetworkPluginContext,
+    hook_plugin_ctx: HookPluginContext,
 ) -> DeploymentProcessors:
     """Real DeploymentProcessors with real DeploymentService and DeploymentRepository."""
     repo = DeploymentRepository(
@@ -51,8 +73,36 @@ def deployment_processors(
         valkey_clients.live,
         valkey_clients.schedule,
     )
-    deployment_controller = AsyncMock()
-    revision_generator_registry = MagicMock()
+    scheduler_repository = SchedulerRepository(
+        database_engine,
+        valkey_clients.stat,
+        config_provider,
+    )
+    scheduling_controller = SchedulingController(
+        SchedulingControllerArgs(
+            repository=scheduler_repository,
+            config_provider=config_provider,
+            storage_manager=storage_manager,
+            event_producer=event_producer,
+            valkey_schedule=valkey_clients.schedule,
+            network_plugin_ctx=network_plugin_ctx,
+            hook_plugin_ctx=hook_plugin_ctx,
+        )
+    )
+    revision_generator_registry = RevisionGeneratorRegistry(
+        RevisionGeneratorRegistryArgs(deployment_repository=repo)
+    )
+    deployment_controller = DeploymentController(
+        DeploymentControllerArgs(
+            scheduling_controller=scheduling_controller,
+            deployment_repository=repo,
+            config_provider=config_provider,
+            storage_manager=storage_manager,
+            event_producer=event_producer,
+            valkey_schedule=valkey_clients.schedule,
+            revision_generator_registry=revision_generator_registry,
+        )
+    )
     service = DeploymentService(deployment_controller, repo, revision_generator_registry)
     return DeploymentProcessors(
         service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
