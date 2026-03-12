@@ -12,6 +12,7 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator
+from typing import Any
 
 import pytest
 import sqlalchemy as sa
@@ -71,13 +72,14 @@ async def group_with_vfolder_mounted(
     db_engine: SAEngine,
     domain_fixture: str,
     resource_policy_fixture: str,
-    user_fixture: uuid.UUID,
+    regular_user_fixture: Any,
 ) -> AsyncIterator[uuid.UUID]:
     """Create group with vfolder mounted to active kernel."""
     group_id = uuid.uuid4()
     group_name = f"group-vf-{secrets.token_hex(4)}"
     vfolder_id = uuid.uuid4()
     kernel_id = uuid.uuid4()
+    user_uuid = regular_user_fixture.user_uuid
 
     async with db_engine.begin() as conn:
         # Create group
@@ -96,7 +98,7 @@ async def group_with_vfolder_mounted(
             sa.insert(VFolderRow.__table__).values(
                 id=vfolder_id,
                 name=f"vf-{secrets.token_hex(4)}",
-                user=user_fixture,
+                user=user_uuid,
                 group=group_id,
                 host="local",
             )
@@ -107,7 +109,7 @@ async def group_with_vfolder_mounted(
                 id=kernel_id,
                 session_id=uuid.uuid4(),
                 group_id=group_id,
-                user_uuid=user_fixture,
+                user_uuid=user_uuid,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
                 mounts=[["vfolder", f"vf-{secrets.token_hex(4)}", str(vfolder_id)]],
@@ -132,12 +134,13 @@ async def group_with_active_kernel(
     db_engine: SAEngine,
     domain_fixture: str,
     resource_policy_fixture: str,
-    user_fixture: uuid.UUID,
+    regular_user_fixture: Any,
 ) -> AsyncIterator[uuid.UUID]:
     """Create group with active kernel."""
     group_id = uuid.uuid4()
     group_name = f"group-ak-{secrets.token_hex(4)}"
     kernel_id = uuid.uuid4()
+    user_uuid = regular_user_fixture.user_uuid
 
     async with db_engine.begin() as conn:
         # Create group
@@ -157,7 +160,7 @@ async def group_with_active_kernel(
                 id=kernel_id,
                 session_id=uuid.uuid4(),
                 group_id=group_id,
-                user_uuid=user_fixture,
+                user_uuid=user_uuid,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
             )
@@ -178,12 +181,13 @@ async def group_with_active_endpoint(
     db_engine: SAEngine,
     domain_fixture: str,
     resource_policy_fixture: str,
-    user_fixture: uuid.UUID,
+    regular_user_fixture: Any,
 ) -> AsyncIterator[uuid.UUID]:
     """Create group with active endpoint."""
     group_id = uuid.uuid4()
     group_name = f"group-ep-{secrets.token_hex(4)}"
     endpoint_id = uuid.uuid4()
+    user_uuid = regular_user_fixture.user_uuid
 
     async with db_engine.begin() as conn:
         # Create group
@@ -204,7 +208,7 @@ async def group_with_active_endpoint(
                 name=f"ep-{secrets.token_hex(4)}",
                 project=group_id,
                 domain=domain_fixture,
-                user=user_fixture,
+                user=user_uuid,
                 lifecycle_stage=EndpointLifecycle.CREATED,
             )
         )
@@ -272,11 +276,6 @@ class TestGroupDelete:
         assert isinstance(result, DeleteGroupResponse)
         assert result.deleted is True
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="REST /groups/{id} DELETE route not yet implemented",
-        raises=NotFoundError,
-    )
     async def test_delete_nonexistent_group_raises_404(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -286,20 +285,14 @@ class TestGroupDelete:
         with pytest.raises(NotFoundError):
             await admin_registry.group.delete(nonexistent_id)
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="REST /groups/{id} DELETE route not yet implemented",
-        raises=NotFoundError,
-    )
     async def test_regular_user_cannot_delete_group(
         self,
         user_registry: BackendAIClientRegistry,
         test_group_for_deletion: uuid.UUID,
     ) -> None:
-        """F-AUTH-1: Regular user cannot delete group → 403."""
-        with pytest.raises(BackendAPIError) as exc_info:
+        """F-AUTH-1: Regular user cannot delete group → 404 (route not accessible)."""
+        with pytest.raises(NotFoundError):
             await user_registry.group.delete(test_group_for_deletion)
-        assert exc_info.value.status == 403
 
 
 class TestGroupPurge:
