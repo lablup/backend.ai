@@ -176,14 +176,47 @@ class TestImageForget:
         admin_registry: BackendAIClientRegistry,
         image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
     ) -> None:
-        """Forget image, verify returned item.status == 'DELETED'."""
+        """Forget image, verify status transition to DELETED and image becomes non-retrievable."""
         image_id, _ = image_fixture
+
+        before = await admin_registry.image.get(image_id)
+        assert isinstance(before, GetImageResponse)
+        assert before.item.status == "ALIVE"
+
         result = await admin_registry.image.forget(
             ForgetImageRequest(image_id=image_id),
         )
         assert isinstance(result, ForgetImageResponse)
         assert result.item.id == image_id
         assert result.item.status == "DELETED"
+
+        with pytest.raises(NotFoundError):
+            await admin_registry.image.get(image_id)
+
+    async def test_forget_nonexistent_image(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        """Forget non-existent image raises NotFoundError."""
+        with pytest.raises(NotFoundError):
+            await admin_registry.image.forget(
+                ForgetImageRequest(image_id=uuid.uuid4()),
+            )
+
+    async def test_forget_already_forgotten_image(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
+    ) -> None:
+        """Forget already forgotten image raises NotFoundError."""
+        image_id, _ = image_fixture
+        await admin_registry.image.forget(
+            ForgetImageRequest(image_id=image_id),
+        )
+        with pytest.raises(NotFoundError):
+            await admin_registry.image.forget(
+                ForgetImageRequest(image_id=image_id),
+            )
 
 
 class TestImagePurge:
@@ -199,9 +232,18 @@ class TestImagePurge:
         )
         assert isinstance(result, PurgeImageResponse)
         assert result.item.id == image_id
-        # Verify the image is actually gone
         with pytest.raises(NotFoundError):
             await admin_registry.image.get(image_id)
+
+    async def test_purge_nonexistent_image(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        """Purge non-existent image raises NotFoundError."""
+        with pytest.raises(NotFoundError):
+            await admin_registry.image.purge(
+                PurgeImageRequest(image_id=uuid.uuid4()),
+            )
 
 
 class TestImagePermissions:
@@ -231,3 +273,27 @@ class TestImagePermissions:
         image_id, _ = image_fixture
         with pytest.raises(PermissionDeniedError):
             await user_registry.image.get(image_id)
+
+    async def test_regular_user_cannot_forget_image(
+        self,
+        user_registry: BackendAIClientRegistry,
+        image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
+    ) -> None:
+        """Regular user forget raises PermissionDeniedError (403)."""
+        image_id, _ = image_fixture
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.image.forget(
+                ForgetImageRequest(image_id=image_id),
+            )
+
+    async def test_regular_user_cannot_purge_image(
+        self,
+        user_registry: BackendAIClientRegistry,
+        image_fixture: tuple[uuid.UUID, ImageFactoryHelper],
+    ) -> None:
+        """Regular user purge raises PermissionDeniedError (403)."""
+        image_id, _ = image_fixture
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.image.purge(
+                PurgeImageRequest(image_id=image_id),
+            )
