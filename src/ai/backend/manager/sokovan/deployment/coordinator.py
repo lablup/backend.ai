@@ -15,6 +15,7 @@ from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.notification import NotificationRuleType
 from ai.backend.common.data.notification.messages import EndpointLifecycleChangedMessage
 from ai.backend.common.events.dispatcher import EventProducer
@@ -34,6 +35,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
+from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
@@ -59,11 +61,19 @@ from .executor import DeploymentExecutor
 from .handlers import (
     CheckPendingDeploymentHandler,
     CheckReplicaDeploymentHandler,
+    DeployingProgressingHandler,
+    DeployingProvisioningHandler,
+    DeployingRollingBackHandler,
     DeploymentHandler,
     DestroyingDeploymentHandler,
     ReconcileDeploymentHandler,
     ScalingDeploymentHandler,
 )
+from .strategy.applier import StrategyResultApplier
+from .strategy.blue_green import BlueGreenStrategy
+from .strategy.evaluator import DeploymentStrategyEvaluator
+from .strategy.rolling_update import RollingUpdateStrategy
+from .strategy.types import DeploymentStrategyRegistry
 from .types import (
     DeploymentExecutionError,
     DeploymentExecutionResult,
@@ -242,14 +252,36 @@ class DeploymentCoordinator:
             client_pool=client_pool,
             valkey_stat=valkey_stat,
         )
-        self._registry = self._init_handlers(executor)
 
-    def _init_handlers(self, executor: DeploymentExecutor) -> HandlerRegistry:
+        # Create strategy components for deploying handlers
+        strategy_registry = DeploymentStrategyRegistry()
+        strategy_registry.register(
+            DeploymentStrategy.ROLLING, RollingUpdateStrategy, RollingUpdateSpec
+        )
+        strategy_registry.register(DeploymentStrategy.BLUE_GREEN, BlueGreenStrategy, BlueGreenSpec)
+        evaluator = DeploymentStrategyEvaluator(
+            deployment_repo=self._deployment_repository,
+            strategy_registry=strategy_registry,
+        )
+        applier = StrategyResultApplier(deployment_repo=self._deployment_repository)
+
+        self._registry = self._init_handlers(executor, evaluator, applier)
+
+    def _init_handlers(
+        self,
+        executor: DeploymentExecutor,
+        evaluator: DeploymentStrategyEvaluator,
+        applier: StrategyResultApplier,
+    ) -> HandlerRegistry:
         """Initialize the flat handler registry.
 
         Registry keys are derived from each handler's ``target_statuses()``.
+        Deploying handlers use sub-step keys for dispatching.
         """
-        handler_list: list[tuple[DeploymentLifecycleType, DeploymentHandler]] = [
+        handlers: dict[HandlerKey, DeploymentHandler] = {}
+
+        # Simple lifecycle handlers (sub_step=None)
+        simple_handlers: list[tuple[DeploymentLifecycleType, DeploymentHandler]] = [
             (
                 DeploymentLifecycleType.CHECK_PENDING,
                 CheckPendingDeploymentHandler(
@@ -288,25 +320,43 @@ class DeploymentCoordinator:
                 ),
             ),
         ]
+        for lifecycle_type, handler in simple_handlers:
+            handlers[(lifecycle_type, None)] = handler
 
-        handlers: dict[HandlerKey, DeploymentHandler] = {}
-        for lifecycle_type, handler in handler_list:
-            key = self._derive_handler_key(lifecycle_type)
-            handlers[key] = handler
+        # Deploying sub-step handlers
+        deploying_handlers: list[tuple[DeploymentSubStep, DeploymentHandler]] = [
+            (
+                DeploymentSubStep.PROVISIONING,
+                DeployingProvisioningHandler(
+                    deployment_controller=self._deployment_controller,
+                    route_controller=self._route_controller,
+                    evaluator=evaluator,
+                    applier=applier,
+                ),
+            ),
+            (
+                DeploymentSubStep.PROGRESSING,
+                DeployingProgressingHandler(
+                    deployment_controller=self._deployment_controller,
+                    route_controller=self._route_controller,
+                    evaluator=evaluator,
+                    applier=applier,
+                ),
+            ),
+            (
+                DeploymentSubStep.ROLLING_BACK,
+                DeployingRollingBackHandler(
+                    deployment_controller=self._deployment_controller,
+                    route_controller=self._route_controller,
+                    evaluator=evaluator,
+                    applier=applier,
+                ),
+            ),
+        ]
+        for sub_step, handler in deploying_handlers:
+            handlers[(DeploymentLifecycleType.DEPLOYING, sub_step)] = handler
 
         return HandlerRegistry(handlers=handlers)
-
-    @staticmethod
-    def _derive_handler_key(
-        lifecycle_type: DeploymentLifecycleType,
-    ) -> HandlerKey:
-        """Derive a registry key from the handler's lifecycle type.
-
-        Currently all handlers use sub_step=None.  When deploying handlers
-        with sub-step filtering are added, this will be extended to inspect
-        the handler's target_statuses for sub-step information.
-        """
-        return (lifecycle_type, None)
 
     async def process_deployment_lifecycle(
         self,
@@ -469,6 +519,7 @@ class DeploymentCoordinator:
         return BatchUpdater(
             spec=EndpointLifecycleBatchUpdaterSpec(
                 lifecycle_stage=lifecycle_status.lifecycle,
+                sub_step=lifecycle_status.sub_status,
             ),
             conditions=[
                 DeploymentConditions.by_ids(endpoint_ids),
@@ -487,7 +538,6 @@ class DeploymentCoordinator:
         timestamp_now: str,
     ) -> _TransitionResult:
         next_lifecycle = lifecycle_status.lifecycle
-        from_status = target_lifecycles[0].lifecycle if target_lifecycles else None
         target_lifecycle_stages = [status.lifecycle for status in target_lifecycles]
         endpoint_ids = [deployment.deployment_info.id for deployment in deployments]
         history_specs = [
@@ -496,7 +546,7 @@ class DeploymentCoordinator:
                 phase=handler_name,
                 result=SchedulingResult.SUCCESS,
                 message=f"{handler_name} completed successfully",
-                from_status=from_status,
+                from_status=deployment.deployment_info.state.lifecycle,
                 to_status=next_lifecycle,
                 sub_steps=self._build_history_sub_steps(
                     deployment.deployment_info.id,
@@ -510,7 +560,7 @@ class DeploymentCoordinator:
         events = [
             self._build_lifecycle_notification_event(
                 deployment=deployment.deployment_info,
-                from_status=from_status,
+                from_status=deployment.deployment_info.state.lifecycle,
                 to_status=next_lifecycle,
                 transition_result="success",
                 timestamp=timestamp_now,
@@ -539,7 +589,6 @@ class DeploymentCoordinator:
         transition_label: str,
     ) -> _TransitionResult:
         next_lifecycle = lifecycle_status.lifecycle
-        from_status = target_lifecycles[0].lifecycle if target_lifecycles else None
         target_lifecycle_stages = [status.lifecycle for status in target_lifecycles]
         endpoint_ids = [error.deployment_info.deployment_info.id for error in errors]
         history_specs = [
@@ -548,7 +597,7 @@ class DeploymentCoordinator:
                 phase=handler_name,
                 result=scheduling_result,
                 message=error.reason,
-                from_status=from_status,
+                from_status=error.deployment_info.deployment_info.state.lifecycle,
                 to_status=next_lifecycle,
                 error_code=error.error_code,
                 sub_steps=self._build_history_sub_steps(
@@ -563,7 +612,7 @@ class DeploymentCoordinator:
         events = [
             self._build_lifecycle_notification_event(
                 deployment=error.deployment_info.deployment_info,
-                from_status=from_status,
+                from_status=error.deployment_info.deployment_info.state.lifecycle,
                 to_status=next_lifecycle,
                 transition_result=transition_label,
                 timestamp=timestamp_now,
@@ -645,7 +694,7 @@ class DeploymentCoordinator:
     @staticmethod
     def _build_lifecycle_notification_event(
         deployment: DeploymentInfo,
-        from_status: EndpointLifecycle | None,
+        from_status: EndpointLifecycle,
         to_status: EndpointLifecycle,
         transition_result: str,
         timestamp: str,
@@ -657,7 +706,7 @@ class DeploymentCoordinator:
             domain=deployment.metadata.domain,
             project_id=str(deployment.metadata.project),
             resource_group=deployment.metadata.resource_group,
-            from_status=from_status.value if from_status else None,
+            from_status=from_status.value,
             to_status=to_status.value,
             transition_result=transition_result,
             event_timestamp=timestamp,
