@@ -3,7 +3,6 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -22,6 +21,7 @@ from ai.backend.common.dto.manager.session.request import (
     TransitSessionStatusRequest,
 )
 from ai.backend.common.dto.manager.session.response import (
+    DestroySessionResponse,
     GetSessionInfoResponse,
     GetStatusHistoryResponse,
     TransitSessionStatusResponse,
@@ -35,18 +35,6 @@ from ai.backend.manager.models.session import SessionRow
 from .conftest import SessionSeedData
 
 
-@dataclass
-class _UserSessionSeedData:
-    """Session seed data for a session owned by a regular (non-admin) user."""
-
-    session_id: SessionId
-    session_name: str
-    kernel_id: uuid.UUID
-    access_key: str
-    domain_name: str
-    user_uuid: uuid.UUID
-
-
 @pytest.fixture()
 async def user_session_seed(
     db_engine: SAEngine,
@@ -54,7 +42,7 @@ async def user_session_seed(
     group_fixture: uuid.UUID,
     regular_user_fixture: Any,
     scaling_group_fixture: str,
-) -> AsyncIterator[_UserSessionSeedData]:
+) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session owned by the regular user."""
     unique = secrets.token_hex(4)
     session_id = SessionId(uuid.uuid4())
@@ -118,7 +106,7 @@ async def user_session_seed(
             )
         )
 
-    yield _UserSessionSeedData(
+    yield SessionSeedData(
         session_id=session_id,
         session_name=session_name,
         kernel_id=kernel_id,
@@ -269,7 +257,7 @@ class TestSessionRenameLifecycle:
     async def test_user_renames_own_session(
         self,
         user_registry: BackendAIClientRegistry,
-        user_session_seed: _UserSessionSeedData,
+        user_session_seed: SessionSeedData,
     ) -> None:
         """Regular user can rename their own session."""
         new_name = f"{user_session_seed.session_name}-renamed"
@@ -285,20 +273,10 @@ class TestSessionRenameLifecycle:
 class TestSessionPermissions:
     """Test role-based access control for session operations."""
 
-    async def test_admin_gets_own_session_info(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        session_seed: SessionSeedData,
-    ) -> None:
-        """Admin can access their own session."""
-        result = await admin_registry.session.get_info(session_seed.session_name)
-        assert isinstance(result, GetSessionInfoResponse)
-        assert result.root["status"] == "RUNNING"
-
     async def test_user_gets_own_session_info(
         self,
         user_registry: BackendAIClientRegistry,
-        user_session_seed: _UserSessionSeedData,
+        user_session_seed: SessionSeedData,
     ) -> None:
         """Regular user can access their own session."""
         result = await user_registry.session.get_info(user_session_seed.session_name)
@@ -317,12 +295,13 @@ class TestSessionPermissions:
     async def test_admin_cannot_access_user_session_without_ownership(
         self,
         admin_registry: BackendAIClientRegistry,
-        user_session_seed: _UserSessionSeedData,
+        user_session_seed: SessionSeedData,
     ) -> None:
         """Admin cannot access user sessions via get_info without matching access key.
 
-        The get_info handler resolves scope using the requester's own access key,
-        so sessions owned by other access keys are not found.
+        This is a known limitation of the current implementation: the get_info handler
+        resolves scope using the requester's own access key, so sessions owned by
+        other access keys are not found. This behavior may change in future refactoring.
         """
         with pytest.raises(NotFoundError):
             await admin_registry.session.get_info(user_session_seed.session_name)
@@ -389,7 +368,7 @@ class TestSessionStatusHistory:
     async def test_user_gets_own_session_status_history(
         self,
         user_registry: BackendAIClientRegistry,
-        user_session_seed: _UserSessionSeedData,
+        user_session_seed: SessionSeedData,
     ) -> None:
         """Regular user can access status history of their own session."""
         result = await user_registry.session.get_status_history(
@@ -425,19 +404,16 @@ class TestSessionDestroyLifecycle:
             terminated_session_seed.session_name,
             DestroySessionRequest(forced=True),
         )
-        assert result is not None
+        assert isinstance(result, DestroySessionResponse)
 
     async def test_user_destroys_own_session(
         self,
         user_registry: BackendAIClientRegistry,
-        user_session_seed: _UserSessionSeedData,
+        user_session_seed: SessionSeedData,
     ) -> None:
         """Regular user can destroy their own session."""
-        # This calls the destroy endpoint which goes through agent mock
-        # The forced=True flag bypasses the agent graceful-shutdown path
         result = await user_registry.session.destroy(
             user_session_seed.session_name,
             DestroySessionRequest(forced=True),
         )
-        # Verify the session status changed
-        assert result is not None
+        assert isinstance(result, DestroySessionResponse)

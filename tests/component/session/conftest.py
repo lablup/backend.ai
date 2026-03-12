@@ -59,6 +59,7 @@ class SessionSeedData:
     kernel_id: uuid.UUID
     access_key: str
     domain_name: str
+    user_uuid: uuid.UUID | None = None
 
 
 @pytest.fixture()
@@ -223,6 +224,7 @@ async def session_seed(
         kernel_id=kernel_id,
         access_key=admin_user_fixture.keypair.access_key,
         domain_name=domain_fixture,
+        user_uuid=admin_user_fixture.user_uuid,
     )
 
     async with db_engine.begin() as conn:
@@ -317,6 +319,7 @@ async def terminated_session_seed(
         kernel_id=kernel_id,
         access_key=admin_user_fixture.keypair.access_key,
         domain_name=domain_fixture,
+        user_uuid=admin_user_fixture.user_uuid,
     )
 
     async with db_engine.begin() as conn:
