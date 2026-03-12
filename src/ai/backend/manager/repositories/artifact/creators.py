@@ -60,7 +60,7 @@ class ArtifactRevisionCreatorSpec(CreatorSpec[ArtifactRevisionRow]):
     created_at: datetime | None = None
     updated_at: datetime | None = None
     digest: str | None = None
-    verification_result: dict | None = None
+    verification_result: dict[str, Any] | None = None
     id: uuid.UUID | None = None
 
     @override
