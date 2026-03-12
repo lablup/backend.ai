@@ -5,6 +5,7 @@ import uuid
 from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
+from unittest.mock import AsyncMock
 
 import pytest
 import sqlalchemy as sa
@@ -22,7 +23,6 @@ from ai.backend.common.dto.manager.session.request import (
 )
 from ai.backend.common.dto.manager.session.response import (
     DestroySessionResponse,
-    GetSessionInfoResponse,
     GetStatusHistoryResponse,
     TransitSessionStatusResponse,
 )
@@ -31,6 +31,7 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.repositories.scheduler.types.session import MarkTerminatingResult
 
 from .conftest import SessionSeedData
 
@@ -134,9 +135,9 @@ class TestSessionRestart:
             session_seed.session_name,
             RestartSessionRequest(),
         )
-        # After restart, session should still be accessible
+        # After restart, session should still be accessible and remain RUNNING
         result = await admin_registry.session.get_info(session_seed.session_name)
-        assert isinstance(result, GetSessionInfoResponse)
+        assert result.root["status"] == "RUNNING"
 
     async def test_restart_terminated_session_fails(
         self,
@@ -229,9 +230,12 @@ class TestSessionRenameLifecycle:
             original_name,
             RenameSessionRequest(session_name=new_name),
         )
+        # New name should be accessible
         result = await admin_registry.session.get_info(new_name)
-        assert isinstance(result, GetSessionInfoResponse)
         assert result.root["status"] == "RUNNING"
+        # Old name should no longer resolve
+        with pytest.raises(NotFoundError):
+            await admin_registry.session.get_info(original_name)
 
         # Rename back to original name
         await admin_registry.session.rename(
@@ -239,8 +243,9 @@ class TestSessionRenameLifecycle:
             RenameSessionRequest(session_name=original_name),
         )
         result = await admin_registry.session.get_info(original_name)
-        assert isinstance(result, GetSessionInfoResponse)
         assert result.root["status"] == "RUNNING"
+        with pytest.raises(NotFoundError):
+            await admin_registry.session.get_info(new_name)
 
     async def test_rename_to_same_name_is_rejected(
         self,
@@ -260,14 +265,18 @@ class TestSessionRenameLifecycle:
         user_session_seed: SessionSeedData,
     ) -> None:
         """Regular user can rename their own session."""
-        new_name = f"{user_session_seed.session_name}-renamed"
+        original_name = user_session_seed.session_name
+        new_name = f"{original_name}-renamed"
         await user_registry.session.rename(
-            user_session_seed.session_name,
+            original_name,
             RenameSessionRequest(session_name=new_name),
         )
+        # New name should be accessible
         result = await user_registry.session.get_info(new_name)
-        assert isinstance(result, GetSessionInfoResponse)
         assert result.root["status"] == "RUNNING"
+        # Old name should no longer resolve
+        with pytest.raises(NotFoundError):
+            await user_registry.session.get_info(original_name)
 
 
 class TestSessionPermissions:
@@ -280,8 +289,8 @@ class TestSessionPermissions:
     ) -> None:
         """Regular user can access their own session."""
         result = await user_registry.session.get_info(user_session_seed.session_name)
-        assert isinstance(result, GetSessionInfoResponse)
         assert result.root["status"] == "RUNNING"
+        assert result.root["domainName"] == user_session_seed.domain_name
 
     async def test_user_cannot_access_admin_session(
         self,
@@ -398,22 +407,45 @@ class TestSessionDestroyLifecycle:
         self,
         admin_registry: BackendAIClientRegistry,
         terminated_session_seed: SessionSeedData,
+        scheduling_controller_mock: AsyncMock,
     ) -> None:
         """Destroying an already-terminated session succeeds (forced destroy is idempotent)."""
+        scheduling_controller_mock.mark_sessions_for_termination.return_value = (
+            MarkTerminatingResult(
+                cancelled_sessions=[],
+                terminating_sessions=[],
+                force_terminated_sessions=[terminated_session_seed.session_id],
+                skipped_sessions=[],
+            )
+        )
         result = await admin_registry.session.destroy(
             terminated_session_seed.session_name,
             DestroySessionRequest(forced=True),
         )
         assert isinstance(result, DestroySessionResponse)
+        assert result.root["stats"]["status"] == "terminated"
 
     async def test_user_destroys_own_session(
         self,
         user_registry: BackendAIClientRegistry,
         user_session_seed: SessionSeedData,
+        scheduling_controller_mock: AsyncMock,
     ) -> None:
         """Regular user can destroy their own session."""
+        scheduling_controller_mock.mark_sessions_for_termination.return_value = (
+            MarkTerminatingResult(
+                cancelled_sessions=[],
+                terminating_sessions=[],
+                force_terminated_sessions=[user_session_seed.session_id],
+                skipped_sessions=[],
+            )
+        )
         result = await user_registry.session.destroy(
             user_session_seed.session_name,
             DestroySessionRequest(forced=True),
         )
         assert isinstance(result, DestroySessionResponse)
+        assert result.root["stats"]["status"] == "terminated"
+        # Verify mark_sessions_for_termination was called with the correct session ID
+        call_args = scheduling_controller_mock.mark_sessions_for_termination.call_args
+        assert user_session_seed.session_id in call_args.args[0]
