@@ -71,7 +71,7 @@ def _configure_storage_mock(storage_manager: StorageSessionManager) -> AsyncMock
     mock_client.rename_file.return_value = None
     mock_client.move_file.return_value = None
     mock_client.delete_files.return_value = None
-    mock_client.mkdir.return_value = {"results": []}
+    mock_client.mkdir.return_value = {"results": {"success": [], "failed": []}}
 
     # delete_files_async needs a response with bgtask_id
     async_response = MagicMock()

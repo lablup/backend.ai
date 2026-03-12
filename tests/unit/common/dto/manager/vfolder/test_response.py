@@ -63,9 +63,9 @@ class TestVFolderCreateResponse:
             max_files=0,
             cur_size=0,
         )
-        resp = VFolderCreateResponse(item=item)
-        assert resp.item.name == "test-folder"
-        assert resp.item.id == "abc123"
+        resp = VFolderCreateResponse(item)
+        assert resp.root.name == "test-folder"
+        assert resp.root.id == "abc123"
 
 
 class TestVFolderListResponse:
@@ -252,8 +252,14 @@ class TestVFolderCloneResponse:
 
 class TestFileOperationResponses:
     def test_mkdir_response(self) -> None:
-        resp = MkdirResponse(results=["ok", "ok"])
-        assert len(resp.results) == 2
+        resp = MkdirResponse.model_validate({
+            "results": {
+                "success": [{"msg": None, "item": "test1"}],
+                "failed": [],
+            },
+        })
+        assert resp.results["success"][0]["item"] == "test1"
+        assert resp.results["failed"] == []
 
     def test_download_session_response(self) -> None:
         resp = CreateDownloadSessionResponse(token="tok-123", url="https://dl.example.com/file")
