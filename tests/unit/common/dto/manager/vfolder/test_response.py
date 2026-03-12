@@ -252,8 +252,14 @@ class TestVFolderCloneResponse:
 
 class TestFileOperationResponses:
     def test_mkdir_response(self) -> None:
-        resp = MkdirResponse(results=["ok", "ok"])
-        assert len(resp.results) == 2
+        resp = MkdirResponse.model_validate({
+            "results": {
+                "success": [{"msg": None, "item": "test1"}],
+                "failed": [],
+            },
+        })
+        assert resp.results.success[0].item == "test1"
+        assert resp.results.failed == []
 
     def test_download_session_response(self) -> None:
         resp = CreateDownloadSessionResponse(token="tok-123", url="https://dl.example.com/file")
