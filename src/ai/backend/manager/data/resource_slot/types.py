@@ -69,3 +69,11 @@ class ResourceAllocationSearchResult:
 class ResourceOccupancy:
     used_slots: list[SlotQuantity]
     session_count: int
+
+
+@dataclass(frozen=True)
+class AgentResourceDrift:
+    agent_id: str
+    slot_name: str
+    tracked: Decimal
+    actual: Decimal
