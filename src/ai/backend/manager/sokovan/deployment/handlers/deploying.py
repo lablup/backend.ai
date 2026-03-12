@@ -27,7 +27,6 @@ from typing import override
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
-    DeploymentInfo,
     DeploymentLifecycleStatus,
     DeploymentStatusTransitions,
     DeploymentSubStep,
@@ -40,6 +39,7 @@ from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.manager.sokovan.deployment.types import (
     DeploymentExecutionResult,
     DeploymentLifecycleType,
+    DeploymentWithHistory,
 )
 
 from .base import DeploymentHandler
@@ -98,14 +98,22 @@ class DeployingProvisioningHandler(DeploymentHandler):
                 lifecycle=EndpointLifecycle.DEPLOYING,
                 sub_status=DeploymentSubStep.PROGRESSING,
             ),
-            failure=DeploymentLifecycleStatus(
+            need_retry=DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_status=DeploymentSubStep.ROLLING_BACK,
+            ),
+            expired=DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_status=DeploymentSubStep.ROLLING_BACK,
+            ),
+            give_up=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
                 sub_status=DeploymentSubStep.ROLLING_BACK,
             ),
         )
 
     @override
-    async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
+    async def execute(self, deployments: Sequence[DeploymentWithHistory]) -> DeploymentExecutionResult:
         raise NotImplementedError("Strategy evaluator and applier are not yet wired — see BA-5014")
 
     @override
@@ -163,14 +171,22 @@ class DeployingProgressingHandler(DeploymentHandler):
     def status_transitions(cls) -> DeploymentStatusTransitions:
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
-            failure=DeploymentLifecycleStatus(
+            need_retry=DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_status=DeploymentSubStep.ROLLING_BACK,
+            ),
+            expired=DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_status=DeploymentSubStep.ROLLING_BACK,
+            ),
+            give_up=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
                 sub_status=DeploymentSubStep.ROLLING_BACK,
             ),
         )
 
     @override
-    async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
+    async def execute(self, deployments: Sequence[DeploymentWithHistory]) -> DeploymentExecutionResult:
         raise NotImplementedError("Strategy evaluator and applier are not yet wired — see BA-5014")
 
     @override
@@ -223,14 +239,15 @@ class DeployingRollingBackHandler(DeploymentHandler):
     @classmethod
     @override
     def status_transitions(cls) -> DeploymentStatusTransitions:
-        ready = DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY)
         return DeploymentStatusTransitions(
-            success=ready,
-            failure=ready,
+            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
+            need_retry=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
+            expired=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
+            give_up=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
         )
 
     @override
-    async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
+    async def execute(self, deployments: Sequence[DeploymentWithHistory]) -> DeploymentExecutionResult:
         raise NotImplementedError("Strategy evaluator and applier are not yet wired — see BA-5014")
 
     @override
