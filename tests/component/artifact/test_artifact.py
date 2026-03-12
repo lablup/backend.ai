@@ -20,11 +20,13 @@ from ai.backend.common.dto.manager.artifact.response import (
     UpdateArtifactResponse,
 )
 from ai.backend.common.dto.manager.artifact_registry import (
+    ArtifactFilterInput,
     OffsetPaginationInput,
     PaginationInput,
     SearchArtifactsRequest,
     SearchArtifactsResponse,
 )
+from ai.backend.common.dto.manager.query import StringFilter
 
 from .conftest import ArtifactFixtureData
 
@@ -167,7 +169,7 @@ class TestGetRevisionDownloadProgress:
 
 
 class TestSearchArtifacts:
-    async def test_search_artifacts_returns_seeded(
+    async def test_search_artifacts_finds_existing_artifact(
         self,
         admin_registry: BackendAIClientRegistry,
         target_artifact: ArtifactFixtureData,
@@ -189,13 +191,18 @@ class TestSearchArtifacts:
         self,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        """Search artifacts with impossible filter → empty list."""
+        """Search artifacts with non-matching filter → empty list."""
         result = await admin_registry.artifact_registry.search_artifacts(
             SearchArtifactsRequest(
                 pagination=PaginationInput(
                     offset=OffsetPaginationInput(offset=0, limit=20),
                 ),
+                filters=ArtifactFilterInput(
+                    name_filter=StringFilter(
+                        equals="nonexistent-artifact-name-that-will-never-match"
+                    ),
+                ),
             ),
         )
         assert isinstance(result, SearchArtifactsResponse)
-        assert isinstance(result.artifacts, list)
+        assert result.artifacts == []
