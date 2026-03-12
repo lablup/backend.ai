@@ -12,6 +12,7 @@ from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.resource_slot.types import (
     AgentResourceData,
+    AgentResourceDrift,
     AgentResourceSearchResult,
     NumberFormatData,
     ResourceAllocationData,
@@ -246,6 +247,29 @@ class ResourceSlotDBSource:
         )
         return ResourceOccupancy(used_slots=used_slots, session_count=session_count)
 
+    def _build_actual_usage_query(self) -> sa.Select[tuple[str, str, Decimal]]:
+        """Build the query to compute actual per-agent per-slot resource usage."""
+        ra = ResourceAllocationRow.__table__
+        k = KernelRow.__table__
+        all_resource_statuses = (
+            KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
+        )
+        effective_amount = sa.func.coalesce(ra.c.used, ra.c.requested)
+        return (
+            sa.select(
+                k.c.agent,
+                ra.c.slot_name,
+                sa.func.sum(effective_amount).label("total_amount"),
+            )
+            .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
+            .where(
+                k.c.agent.is_not(None),
+                k.c.status.in_(all_resource_statuses),
+                ra.c.free_at.is_(None),
+            )
+            .group_by(k.c.agent, ra.c.slot_name)
+        )
+
     async def compute_actual_agent_resource_usage(
         self,
     ) -> dict[tuple[str, str], Decimal]:
@@ -260,29 +284,67 @@ class ResourceSlotDBSource:
         Returns:
             Mapping of (agent_id, slot_name) → actual used amount.
         """
-        ra = ResourceAllocationRow.__table__
-        k = KernelRow.__table__
-        all_resource_statuses = (
-            KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
-        )
-        effective_amount = sa.func.coalesce(ra.c.used, ra.c.requested)
-        stmt = (
-            sa.select(
-                k.c.agent,
-                ra.c.slot_name,
-                sa.func.sum(effective_amount).label("total_amount"),
-            )
-            .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
-            .where(
-                k.c.agent.is_not(None),
-                k.c.status.in_(all_resource_statuses),
-                ra.c.free_at.is_(None),
-            )
-            .group_by(k.c.agent, ra.c.slot_name)
-        )
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            rows = (await db_sess.execute(stmt)).all()
+            rows = (await db_sess.execute(self._build_actual_usage_query())).all()
         return {(row.agent, row.slot_name): row.total_amount for row in rows}
+
+    async def reconcile_agent_resources(self) -> list[AgentResourceDrift]:
+        """Compare agent_resources.used against actual resource_allocations and correct drift.
+
+        Computes actual per-agent per-slot usage from active allocations (free_at IS NULL),
+        compares with tracked agent_resources.used, and UPDATEs any mismatches.
+        All reads and writes happen within a single transaction.
+
+        Returns:
+            List of drift entries that were detected and corrected.
+        """
+        ar = AgentResourceRow.__table__
+        drifts: list[AgentResourceDrift] = []
+
+        async with self._db.begin_session() as db_sess:
+            # Compute actual usage within the same transaction
+            actual_rows = (await db_sess.execute(self._build_actual_usage_query())).all()
+            actual_usage: dict[tuple[str, str], Decimal] = {
+                (row.agent, row.slot_name): row.total_amount for row in actual_rows
+            }
+
+            # Fetch tracked values and compare
+            tracked_rows = (
+                await db_sess.execute(sa.select(ar.c.agent_id, ar.c.slot_name, ar.c.used))
+            ).all()
+
+            for row in tracked_rows:
+                agent_id = row.agent_id
+                slot_name = row.slot_name
+                tracked = row.used
+                actual = actual_usage.pop((agent_id, slot_name), Decimal(0))
+                if tracked != actual:
+                    drifts.append(
+                        AgentResourceDrift(
+                            agent_id=agent_id,
+                            slot_name=slot_name,
+                            tracked=tracked,
+                            actual=actual,
+                        )
+                    )
+                    await db_sess.execute(
+                        sa.update(ar)
+                        .where(ar.c.agent_id == agent_id, ar.c.slot_name == slot_name)
+                        .values(used=actual)
+                    )
+
+            # Remaining entries: allocations exist but no agent_resources row (orphaned)
+            for (agent_id, slot_name), actual in actual_usage.items():
+                drifts.append(
+                    AgentResourceDrift(
+                        agent_id=agent_id,
+                        slot_name=slot_name,
+                        tracked=Decimal(0),
+                        actual=actual,
+                    )
+                )
+
+        return drifts
 
     async def aggregate_occupied_by_project(self, project_id: uuid.UUID) -> ResourceOccupancy:
         """Aggregate active resource occupancy for a project (group).
