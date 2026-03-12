@@ -1257,6 +1257,77 @@ class AgentRegistry:
 
         access_key_to_concurrency_used = await execute_with_retry(_recalc)
         await self._update_concurrency(access_key_to_concurrency_used, do_fullscan)
+        await self._reconcile_agent_resources()
+
+    async def _reconcile_agent_resources(self) -> None:
+        """Reconcile agent_resources.used against actual resource_allocations.
+
+        Computes the actual per-agent per-slot usage from active allocations
+        (free_at IS NULL) and corrects any drift in agent_resources.used.
+        """
+        ar = AgentResourceRow.__table__
+        ra = ResourceAllocationRow.__table__
+        k = KernelRow.__table__
+        all_resource_statuses = (
+            KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
+        )
+        effective_amount = sa.func.coalesce(ra.c.used, ra.c.requested)
+
+        async with self.db.begin_session() as db_sess:
+            # Step 1: Compute actual usage per (agent_id, slot_name)
+            actual_query = (
+                sa.select(
+                    k.c.agent,
+                    ra.c.slot_name,
+                    sa.func.sum(effective_amount).label("total_amount"),
+                )
+                .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
+                .where(
+                    k.c.agent.is_not(None),
+                    k.c.status.in_(all_resource_statuses),
+                    ra.c.free_at.is_(None),
+                )
+                .group_by(k.c.agent, ra.c.slot_name)
+            )
+            actual_rows = (await db_sess.execute(actual_query)).all()
+            actual_usage: dict[tuple[str, str], Decimal] = {
+                (row.agent, row.slot_name): row.total_amount for row in actual_rows
+            }
+
+            # Step 2: Fetch current agent_resources.used values
+            tracked_query = sa.select(ar.c.agent_id, ar.c.slot_name, ar.c.used)
+            tracked_rows = (await db_sess.execute(tracked_query)).all()
+
+            # Step 3: Compare and correct drift
+            for row in tracked_rows:
+                agent_id = row.agent_id
+                slot_name = row.slot_name
+                tracked = row.used
+                actual = actual_usage.pop((agent_id, slot_name), Decimal(0))
+                if tracked != actual:
+                    log.warning(
+                        "agent_resources drift detected for {}:{}: tracked={}, actual={}",
+                        agent_id,
+                        slot_name,
+                        tracked,
+                        actual,
+                    )
+                    await db_sess.execute(
+                        sa.update(ar)
+                        .where(ar.c.agent_id == agent_id, ar.c.slot_name == slot_name)
+                        .values(used=actual)
+                    )
+
+            # Step 4: Handle allocations for agent/slot pairs not in agent_resources
+            # (these are orphaned; just log a warning)
+            for (agent_id, slot_name), actual in actual_usage.items():
+                log.warning(
+                    "agent_resources drift detected for {}:{}: tracked={}, actual={}",
+                    agent_id,
+                    slot_name,
+                    Decimal(0),
+                    actual,
+                )
 
     async def _update_concurrency(
         self,
