@@ -175,6 +175,7 @@ class EntityRefGQL(Node):
                 | RBACElementType.DEPLOYMENT_TOKEN
                 | RBACElementType.DEPLOYMENT_POLICY
                 | RBACElementType.DEPLOYMENT_REVISION
+                | RBACElementType.IMAGE_ALIAS
             ):
                 return None
 
