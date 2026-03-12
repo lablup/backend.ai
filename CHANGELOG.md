@@ -16,6 +16,29 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.2.5 (2026-03-12)
+
+### Improvements
+* Add agent_resources reconciliation to `recalc_resource_usage()` that detects and auto-corrects drift between `agent_resources.used` and actual resource allocations ([#9931](https://github.com/lablup/backend.ai/issues/9931))
+
+### Fixes
+* `ModifyContainerRegistryNode` fails with duplicate association error after global toggle ([#9468](https://github.com/lablup/backend.ai/issues/9468))
+* Share a single Docker client instance across all containers during stats collection. Previously each container created its own Docker() instance, causing file descriptor exhaustion at scale. ([#9469](https://github.com/lablup/backend.ai/issues/9469))
+* Validate that inference sessions have at least one model-type virtual folder mounted before dispatching RPC to the agent. ([#9557](https://github.com/lablup/backend.ai/issues/9557))
+* Fix incorrect default group gid in AccountManagerConfig (use st_gid instead of st_uid). ([#9571](https://github.com/lablup/backend.ai/issues/9571))
+* Fix `status_info` not being cleared when a session transitions to RUNNING status. ([#9600](https://github.com/lablup/backend.ai/issues/9600))
+* Allow superadmin to bypass hide_agents restriction in agent_summary GraphQL resolvers ([#9623](https://github.com/lablup/backend.ai/issues/9623))
+* Strip `GPU-` prefix from DeviceId keys at the GQL resolver level when resolving the `gpu_alloc_map` field, fixing UUIDFloatMap validation errors. ([#9642](https://github.com/lablup/backend.ai/issues/9642))
+* Validate cloud detection IMDS responses and harden metadata JSON parsing to prevent false positives on non-major cloud providers ([#9653](https://github.com/lablup/backend.ai/issues/9653))
+* Fix container net_rx/net_tx stats reading host namespace counters due to unchecked setns() return value ([#9681](https://github.com/lablup/backend.ai/issues/9681))
+* Fix service name lookup in CLI by replacing deprecated REST API with GraphQL-based paginated_list ([#9745](https://github.com/lablup/backend.ai/issues/9745))
+* Sync `circuit.route_info` on route updates so that inference metric collection always targets the current set of routes, fixing auto-scaling scale-out failing to re-trigger after the first scale-in cycle ([#9760](https://github.com/lablup/backend.ai/issues/9760))
+* Pre-validate namespace path before `netstat_ns()` to prevent thread pool exhaustion from hung threads on stale network namespaces ([#9782](https://github.com/lablup/backend.ai/issues/9782))
+* Fix kernel container_id attribute shadowed by UserDict data dict causing container stats collection to fail after agent restarts ([#9790](https://github.com/lablup/backend.ai/issues/9790))
+* Fix resource leak in force-terminate and bulk-terminate paths where `resource_allocations.free_at` was not set and `agent_resources.used` was not decremented ([#9930](https://github.com/lablup/backend.ai/issues/9930))
+* Fix ghost resource usage in check-presets by adding kernel status filter to occupancy queries ([#9967](https://github.com/lablup/backend.ai/issues/9967))
+
+
 ## 26.2.4 (2026-02-27)
 
 ### Fixes
