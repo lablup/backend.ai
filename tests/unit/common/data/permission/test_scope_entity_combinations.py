@@ -51,6 +51,7 @@ class TestValidScopeEntityCombinations:
         entities = VALID_SCOPE_ENTITY_COMBINATIONS[RBACElementType.RESOURCE_GROUP]
         assert entities == {
             RBACElementType.AGENT,
+            RBACElementType.PROJECT_FAIR_SHARE,
         }
 
     def test_agent_scope_entities(self) -> None:
