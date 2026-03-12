@@ -70,3 +70,5 @@ class RouteServiceDiscoveryInfo:
     runtime_variant: str
     kernel_host: str
     kernel_port: int
+    session_owner: uuid.UUID
+    project: uuid.UUID

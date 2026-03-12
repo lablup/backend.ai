@@ -289,6 +289,8 @@ class RouteExecutor:
                 labels={
                     "runtime_variant": data.runtime_variant,
                     "endpoint_id": str(data.endpoint_id),
+                    "session_owner": str(data.session_owner),
+                    "project": str(data.project),
                 },
             )
             metadata_list.append(metadata)

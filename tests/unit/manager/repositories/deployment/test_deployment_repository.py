@@ -628,6 +628,8 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_route_id: uuid.UUID,
         test_endpoint_id: uuid.UUID,
         test_kernel_with_inference_port: tuple[uuid.UUID, str, int],
+        test_user_uuid: uuid.UUID,
+        test_group_id: uuid.UUID,
     ) -> None:
         """Test fetching service discovery info for a single route with inference port."""
         kernel_id, kernel_host, inference_port = test_kernel_with_inference_port
@@ -642,6 +644,8 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         assert info.kernel_port == inference_port
         assert info.runtime_variant == "vllm"
         assert "test-endpoint" in info.endpoint_name
+        assert info.session_owner == test_user_uuid
+        assert info.project == test_group_id
 
     async def test_fetch_route_without_inference_port(
         self,
