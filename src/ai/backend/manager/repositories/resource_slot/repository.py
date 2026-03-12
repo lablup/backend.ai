@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -107,6 +108,13 @@ class ResourceSlotRepository:
         return await self._db_source.search_resource_allocations(querier)
 
     # ==================== Aggregation ====================
+
+    @resource_slot_repository_resilience.apply()
+    async def compute_actual_agent_resource_usage(
+        self,
+    ) -> dict[tuple[str, str], Decimal]:
+        """Compute actual per-agent per-slot resource usage from active allocations."""
+        return await self._db_source.compute_actual_agent_resource_usage()
 
     @resource_slot_repository_resilience.apply()
     async def get_domain_resource_overview(self, domain_name: str) -> ResourceOccupancy:
