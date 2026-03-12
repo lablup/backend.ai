@@ -33,6 +33,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.resource_slot import ResourceSlotTypeRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -452,3 +453,31 @@ async def agent_row_factory(
     async with db_engine.begin() as conn:
         for aid in reversed(created_ids):
             await conn.execute(AgentRow.__table__.delete().where(AgentRow.__table__.c.id == aid))
+
+
+_HEARTBEAT_SLOT_TYPES = [
+    {"slot_name": "cpu", "slot_type": "count", "rank": 40},
+    {"slot_name": "mem", "slot_type": "bytes", "rank": 50},
+]
+
+
+@pytest.fixture
+async def resource_slot_types_seeded(
+    db_engine: SAEngine,
+) -> AsyncIterator[None]:
+    """Seed resource_slot_types with cpu/mem for tests that call handle_heartbeat.
+
+    These are infrastructure rows that should persist across tests; they are not
+    deleted on teardown to avoid FK conflicts with agent_resources.
+    """
+    async with db_engine.begin() as conn:
+        for row in _HEARTBEAT_SLOT_TYPES:
+            result = await conn.execute(
+                sa.select(sa.func.count()).where(
+                    ResourceSlotTypeRow.__table__.c.slot_name == row["slot_name"]
+                )
+            )
+            if result.scalar_one() == 0:
+                await conn.execute(sa.insert(ResourceSlotTypeRow.__table__).values(**row))
+
+    yield

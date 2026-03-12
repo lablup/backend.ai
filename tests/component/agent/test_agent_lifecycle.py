@@ -161,6 +161,7 @@ class TestHeartbeatProcessing:
         agent_row_factory: Callable[..., Coroutine[Any, Any, AgentId]],
         db_engine: SAEngine,
         scaling_group_fixture: str,
+        resource_slot_types_seeded: None,
     ) -> None:
         service, mock_event_producer, _, _ = lifecycle_agent_service
         agent_id = await agent_row_factory(status=AgentStatus.ALIVE)
@@ -179,6 +180,7 @@ class TestHeartbeatProcessing:
         agent_row_factory: Callable[..., Coroutine[Any, Any, AgentId]],
         db_engine: SAEngine,
         scaling_group_fixture: str,
+        resource_slot_types_seeded: None,
     ) -> None:
         service, mock_event_producer, _, _ = lifecycle_agent_service
         agent_id = await agent_row_factory(status=AgentStatus.LOST)
@@ -198,6 +200,7 @@ class TestHeartbeatProcessing:
         lifecycle_agent_service: tuple[AgentService, AsyncMock, AsyncMock, MagicMock],
         db_engine: SAEngine,
         scaling_group_fixture: str,
+        resource_slot_types_seeded: None,
     ) -> None:
         service, _, _, _ = lifecycle_agent_service
         agent_id = AgentId(f"i-new-{secrets.token_hex(4)}")
@@ -356,6 +359,7 @@ class TestValkeySuppression:
         agent_row_factory: Callable[..., Coroutine[Any, Any, AgentId]],
         db_engine: SAEngine,
         scaling_group_fixture: str,
+        resource_slot_types_seeded: None,
     ) -> None:
         """update_agent_last_seen failure in heartbeat is suppressed via suppress_with_log."""
         service, _, _, _ = lifecycle_agent_service
