@@ -1198,6 +1198,7 @@ class TestDeploymentRevisionOperations:
                 ImageRow,
                 EndpointRow,
                 EntityFieldRow,  # DeploymentRevisionRow relationship dependency
+                AssociationScopesEntitiesRow,  # RBACEntityCreator dependency
                 DeploymentRevisionRow,
                 DeploymentPolicyRow,
             ],
@@ -1455,7 +1456,16 @@ class TestDeploymentRevisionOperations:
             runtime_variant=RuntimeVariant.CUSTOM,
             extra_mounts=[],
         )
-        return await deployment_repository.create_revision(Creator(spec=spec))
+        return await deployment_repository.create_revision(
+            RBACEntityCreator(
+                spec=spec,
+                element_type=RBACElementType.DEPLOYMENT_REVISION,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.MODEL_DEPLOYMENT,
+                    element_id=str(test_endpoint_id),
+                ),
+            )
+        )
 
     @pytest.fixture
     async def test_multiple_revisions(
@@ -1488,7 +1498,16 @@ class TestDeploymentRevisionOperations:
                 runtime_variant=RuntimeVariant.CUSTOM,
                 extra_mounts=[],
             )
-            revision = await deployment_repository.create_revision(Creator(spec=spec))
+            revision = await deployment_repository.create_revision(
+                RBACEntityCreator(
+                    spec=spec,
+                    element_type=RBACElementType.DEPLOYMENT_REVISION,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.MODEL_DEPLOYMENT,
+                        element_id=str(test_endpoint_id),
+                    ),
+                )
+            )
             revisions.append(revision)
         return revisions
 
@@ -1523,7 +1542,16 @@ class TestDeploymentRevisionOperations:
                 runtime_variant=RuntimeVariant.CUSTOM,
                 extra_mounts=[],
             )
-            revision = await deployment_repository.create_revision(Creator(spec=spec))
+            revision = await deployment_repository.create_revision(
+                RBACEntityCreator(
+                    spec=spec,
+                    element_type=RBACElementType.DEPLOYMENT_REVISION,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.MODEL_DEPLOYMENT,
+                        element_id=str(test_endpoint_id),
+                    ),
+                )
+            )
             revisions.append(revision)
         return revisions
 
@@ -1534,7 +1562,7 @@ class TestDeploymentRevisionOperations:
         test_image_id: uuid.UUID,
         test_scaling_group_name: str,
     ) -> None:
-        """Test creating a deployment revision using Creator."""
+        """Test creating a deployment revision using RBACEntityCreator."""
         spec = DeploymentRevisionCreatorSpec(
             endpoint_id=test_endpoint_id,
             revision_number=1,
@@ -1555,7 +1583,14 @@ class TestDeploymentRevisionOperations:
             runtime_variant=RuntimeVariant.CUSTOM,
             extra_mounts=[],
         )
-        creator = Creator(spec=spec)
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.DEPLOYMENT_REVISION,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
 
         result = await deployment_repository.create_revision(creator)
 

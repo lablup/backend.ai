@@ -1057,7 +1057,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_revision(
         self,
-        creator: Creator[DeploymentRevisionRow],
+        creator: RBACEntityCreator[DeploymentRevisionRow],
     ) -> ModelRevisionData:
         """Create a new deployment revision."""
         return await self._db_source.create_revision(creator)
@@ -1065,7 +1065,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_revision_with_next_number(
         self,
-        creator: Creator[DeploymentRevisionRow],
+        creator: RBACEntityCreator[DeploymentRevisionRow],
         endpoint_id: uuid.UUID,
     ) -> ModelRevisionData:
         """Atomically read the latest revision number and create a new revision.
