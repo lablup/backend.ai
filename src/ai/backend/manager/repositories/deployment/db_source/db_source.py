@@ -137,6 +137,7 @@ from ai.backend.manager.repositories.base.upserter import (
 from ai.backend.manager.repositories.deployment.creators import (
     DeploymentCreatorSpec,
     DeploymentPolicyCreatorSpec,
+    DeploymentRevisionCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment.creators.endpoint import LegacyEndpointCreatorSpec
 from ai.backend.manager.repositories.deployment.types import (
@@ -2089,8 +2090,9 @@ class DeploymentDBSource:
             latest_revision_number = result.scalar()
             next_number = (latest_revision_number or 0) + 1
 
+            spec = cast(DeploymentRevisionCreatorSpec, creator.spec)
             updated_creator = dataclasses.replace(
-                creator, spec=creator.spec.with_revision_number(next_number)
+                creator, spec=spec.with_revision_number(next_number)
             )
             rbac_result = await execute_rbac_entity_creator(db_sess, updated_creator)
             return rbac_result.row.to_data()
