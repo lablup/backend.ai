@@ -469,7 +469,7 @@ class VFolderHandler:
             ctx.access_key,
         )
         result = await self._vfolder.list_allowed_types.wait_for_complete(ListAllowedTypesAction())
-        resp = ListAllowedTypesResponse(allowed_types=result.allowed_types)
+        resp = ListAllowedTypesResponse(result.allowed_types)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------

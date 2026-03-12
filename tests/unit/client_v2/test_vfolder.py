@@ -671,14 +671,14 @@ class TestVFolderAdmin:
         assert "/folders/_/all-hosts" in call_args[0][1]
 
     async def test_list_allowed_types(self) -> None:
-        response_data = {"allowed_types": ["user", "group"]}
+        response_data = ["user", "group"]
         mock_session = _make_request_session(_mock_json_response(response_data))
         vfolder = _make_vfolder_client(mock_session)
 
         result = await vfolder.list_allowed_types()
 
         assert isinstance(result, ListAllowedTypesResponse)
-        assert result.allowed_types == ["user", "group"]
+        assert result.root == ["user", "group"]
 
     async def test_get_quota(self) -> None:
         quota_id = uuid.uuid4()
