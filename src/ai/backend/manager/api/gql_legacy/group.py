@@ -595,6 +595,7 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
                     container_registry=container_registry_val,
                 )
             ),
+            _domain_name=self.domain_name,
         )
 
 
