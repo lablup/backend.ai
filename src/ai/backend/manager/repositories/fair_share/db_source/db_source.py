@@ -60,6 +60,10 @@ from ai.backend.manager.repositories.base import (
     execute_creator,
     execute_upserter,
 )
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareEntitySearchResult,
     DomainFairShareSearchScope,
@@ -91,11 +95,11 @@ class FairShareDBSource:
 
     async def create_domain_fair_share(
         self,
-        creator: Creator[DomainFairShareRow],
+        creator: RBACEntityCreator[DomainFairShareRow],
     ) -> DomainFairShareData:
         """Create a new domain fair share record."""
         async with self._db.begin_session_read_committed() as db_sess:
-            result = await execute_creator(db_sess, creator)
+            result = await execute_rbac_entity_creator(db_sess, creator)
             sg_row = await self._fetch_scaling_group_row(db_sess, result.row.resource_group)
             fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
             available_slots = await self._fetch_available_slots(db_sess, result.row.resource_group)
