@@ -32,9 +32,6 @@ from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidatorArgs,
 )
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import (
     Creator,
@@ -358,22 +355,17 @@ class ContainerRegistryRepository:
         session: SASession,
         registry_id: uuid.UUID,
     ) -> None:
-        delete_query = sa.delete(AssociationContainerRegistriesGroupsRow).where(
+        stmt = sa.select(AssociationContainerRegistriesGroupsRow.group_id).where(
             AssociationContainerRegistriesGroupsRow.registry_id == registry_id
         )
-        await session.execute(delete_query)
-        rbac_delete_query = (
-            sa.delete(AssociationScopesEntitiesRow)
-            .where(
-                AssociationScopesEntitiesRow.entity_type
-                == RBACElementType.CONTAINER_REGISTRY.to_entity_type()
+        result = await session.execute(stmt)
+        group_ids = list(result.scalars().all())
+        for group_id in group_ids:
+            unbinder = ContainerRegistryProjectEntityUnbinder(
+                registry_id=registry_id,
+                group_id=group_id,
             )
-            .where(AssociationScopesEntitiesRow.entity_id == str(registry_id))
-            .where(
-                AssociationScopesEntitiesRow.scope_type == RBACElementType.PROJECT.to_scope_type()
-            )
-        )
-        await session.execute(rbac_delete_query)
+            await execute_rbac_scope_entity_unbinder(session, unbinder)
 
     async def _get_by_registry_and_project(
         self,
