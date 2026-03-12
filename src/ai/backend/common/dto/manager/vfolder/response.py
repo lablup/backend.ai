@@ -179,10 +179,8 @@ class MountResultDTO(BaseModel):
 # ============================================================
 
 
-class VFolderCreateResponse(BaseResponseModel):
-    """Response for vfolder creation."""
-
-    item: VFolderItemField
+class VFolderCreateResponse(BaseRootResponseModel[VFolderItemField]):
+    """Response for vfolder creation (flat object for backward compatibility)."""
 
 
 class VFolderListResponse(BaseRootResponseModel[list[VFolderItemField]]):

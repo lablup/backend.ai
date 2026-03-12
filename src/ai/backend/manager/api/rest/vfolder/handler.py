@@ -305,7 +305,7 @@ class VFolderHandler:
             is_owner=True,
             created_at="",
         )
-        resp = VFolderCreateResponse(item=item)
+        resp = VFolderCreateResponse(item)
         return APIResponse.build(HTTPStatus.CREATED, resp)
 
     # ------------------------------------------------------------------

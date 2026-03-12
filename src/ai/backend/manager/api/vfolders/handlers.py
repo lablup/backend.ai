@@ -88,7 +88,7 @@ class VFolderHandler:
 
         return APIResponse.build(
             status_code=HTTPStatus.OK,
-            response_model=VFolderCreateResponse(item=created_vfolder.to_field()),
+            response_model=VFolderCreateResponse(created_vfolder.to_field()),
         )
 
     @api_handler

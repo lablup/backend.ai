@@ -63,9 +63,9 @@ class TestVFolderCreateResponse:
             max_files=0,
             cur_size=0,
         )
-        resp = VFolderCreateResponse(item=item)
-        assert resp.item.name == "test-folder"
-        assert resp.item.id == "abc123"
+        resp = VFolderCreateResponse(item)
+        assert resp.root.name == "test-folder"
+        assert resp.root.id == "abc123"
 
 
 class TestVFolderListResponse:
