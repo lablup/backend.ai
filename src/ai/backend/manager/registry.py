@@ -115,6 +115,7 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.endpoint import ModelServiceHelper
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
@@ -1257,6 +1258,23 @@ class AgentRegistry:
 
         access_key_to_concurrency_used = await execute_with_retry(_recalc)
         await self._update_concurrency(access_key_to_concurrency_used, do_fullscan)
+        await self._reconcile_agent_resources()
+
+    async def _reconcile_agent_resources(self) -> None:
+        """Reconcile agent_resources.used against actual resource_allocations.
+
+        Delegates to ResourceSlotRepository for DB operations and logs any drift found.
+        """
+        repo = ResourceSlotRepository(self.db)
+        drifts = await repo.reconcile_agent_resources()
+        for d in drifts:
+            log.warning(
+                "agent_resources drift detected for {}:{}: tracked={}, actual={}",
+                d.agent_id,
+                d.slot_name,
+                d.tracked,
+                d.actual,
+            )
 
     async def _update_concurrency(
         self,

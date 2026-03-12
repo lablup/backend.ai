@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -15,6 +16,7 @@ from ai.backend.common.resilience import (
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.resource_slot.types import (
+    AgentResourceDrift,
     AgentResourceSearchResult,
     ResourceAllocationSearchResult,
     ResourceOccupancy,
@@ -107,6 +109,18 @@ class ResourceSlotRepository:
         return await self._db_source.search_resource_allocations(querier)
 
     # ==================== Aggregation ====================
+
+    @resource_slot_repository_resilience.apply()
+    async def compute_actual_agent_resource_usage(
+        self,
+    ) -> dict[tuple[str, str], Decimal]:
+        """Compute actual per-agent per-slot resource usage from active allocations."""
+        return await self._db_source.compute_actual_agent_resource_usage()
+
+    @resource_slot_repository_resilience.apply()
+    async def reconcile_agent_resources(self) -> list[AgentResourceDrift]:
+        """Compare agent_resources.used against actual allocations and correct drift."""
+        return await self._db_source.reconcile_agent_resources()
 
     @resource_slot_repository_resilience.apply()
     async def get_domain_resource_overview(self, domain_name: str) -> ResourceOccupancy:
