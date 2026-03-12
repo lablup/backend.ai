@@ -250,6 +250,7 @@ class PermissionGQL(Node):
                 | RBACElementType.AGENT
                 | RBACElementType.KERNEL
                 | RBACElementType.ROUTING
+                | RBACElementType.IMAGE_ALIAS
             ):
                 return None
 
