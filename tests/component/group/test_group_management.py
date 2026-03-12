@@ -101,6 +101,7 @@ async def group_with_vfolder_mounted(
                 user=user_uuid,
                 group=group_id,
                 host="local",
+                domain_name=domain_fixture,
             )
         )
         # Create active kernel with mount
@@ -110,6 +111,7 @@ async def group_with_vfolder_mounted(
                 session_id=uuid.uuid4(),
                 group_id=group_id,
                 user_uuid=user_uuid,
+                domain_name=domain_fixture,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
                 mounts=[["vfolder", f"vf-{secrets.token_hex(4)}", str(vfolder_id)]],
@@ -161,6 +163,7 @@ async def group_with_active_kernel(
                 session_id=uuid.uuid4(),
                 group_id=group_id,
                 user_uuid=user_uuid,
+                domain_name=domain_fixture,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
             )
@@ -208,7 +211,8 @@ async def group_with_active_endpoint(
                 name=f"ep-{secrets.token_hex(4)}",
                 project=group_id,
                 domain=domain_fixture,
-                user=user_uuid,
+                created_user=user_uuid,
+                session_owner=user_uuid,
                 lifecycle_stage=EndpointLifecycle.CREATED,
             )
         )
