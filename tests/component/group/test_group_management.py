@@ -17,8 +17,8 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.exceptions import (
-    BackendAPIError,
     InvalidRequestError,
     NotFoundError,
 )
@@ -33,6 +33,7 @@ from ai.backend.common.dto.manager.group.response import (
 from ai.backend.common.dto.manager.group.types import GroupOrder, GroupOrderField
 from ai.backend.common.dto.manager.infra.request import UsagePerPeriodRequest
 from ai.backend.common.dto.manager.infra.response import UsagePerPeriodResponse
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
@@ -403,7 +404,7 @@ class TestGroupSearch:
         )
         assert isinstance(result, SearchGroupsResponse)
         assert len(result.groups) > 0
-        assert result.pagination.total_count >= len(multiple_test_groups)
+        assert result.pagination.total >= len(multiple_test_groups)
 
     @pytest.mark.xfail(
         strict=True,
@@ -428,7 +429,7 @@ class TestGroupSearch:
 
         result = await admin_registry.group.search(
             SearchGroupsRequest(
-                filter=GroupFilter(name={"contains": group_name[:10]}),
+                filter=GroupFilter(name=StringFilter(contains=group_name[:10])),
                 limit=10,
             ),
         )
@@ -450,7 +451,7 @@ class TestGroupSearch:
         """S-3: Search with domain filter → groups in domain."""
         result = await admin_registry.group.search(
             SearchGroupsRequest(
-                filter=GroupFilter(domain_name={"eq": domain_fixture}),
+                filter=GroupFilter(domain_name=StringFilter(equals=domain_fixture)),
                 limit=10,
             ),
         )
@@ -531,11 +532,13 @@ class TestGroupSearch:
         """S-6: Empty result → total=0, empty items."""
         result = await admin_registry.group.search(
             SearchGroupsRequest(
-                filter=GroupFilter(name={"eq": f"nonexistent-group-{secrets.token_hex(16)}"}),
+                filter=GroupFilter(
+                    name=StringFilter(equals=f"nonexistent-group-{secrets.token_hex(16)}")
+                ),
             ),
         )
         assert isinstance(result, SearchGroupsResponse)
-        assert result.pagination.total_count == 0
+        assert result.pagination.total == 0
         assert len(result.groups) == 0
 
 
