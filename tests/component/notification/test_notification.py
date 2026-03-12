@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
-from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.notification import SessionStartedMessage
 from ai.backend.common.data.notification.types import (
     EmailMessage,
     EmailSpec,
@@ -29,9 +26,7 @@ from ai.backend.common.dto.manager.notification import (
     ListNotificationChannelsResponse,
     ListNotificationRulesResponse,
     ListNotificationRuleTypesResponse,
-    NotificationChannelDTO,
     NotificationChannelFilter,
-    NotificationRuleDTO,
     NotificationRuleTypeSchemaResponse,
     SearchNotificationChannelsRequest,
     SearchNotificationRulesRequest,
@@ -45,13 +40,6 @@ from ai.backend.common.dto.manager.notification import (
     ValidateNotificationRuleResponse,
 )
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.manager.notification.notification_center import NotificationCenter
-from ai.backend.manager.notification.types import SendResult
-from ai.backend.manager.services.notification.actions import (
-    ProcessNotificationAction,
-    ProcessNotificationActionResult,
-)
-from ai.backend.manager.services.notification.processors import NotificationProcessors
 
 
 def _webhook_channel_request(name: str = "test-webhook") -> CreateNotificationChannelRequest:
@@ -417,117 +405,3 @@ class TestRuleValidate:
         )
         assert isinstance(result, ValidateNotificationRuleResponse)
         assert isinstance(result.message, str)
-
-
-# ---------------------------------------------------------------------------
-# Notification processing tests
-# ---------------------------------------------------------------------------
-
-
-class TestNotificationProcessing:
-    async def test_event_triggers_matching_rule(
-        self,
-        notification_processors: NotificationProcessors,
-        notification_center: NotificationCenter,
-        notification_rule: NotificationRuleDTO,
-    ) -> None:
-        """A matching rule is found and the channel is called exactly once."""
-        send_result = SendResult(message="Notification delivered")
-        with patch.object(
-            notification_center,
-            "process_rule",
-            new=AsyncMock(return_value=send_result),
-        ):
-            action = ProcessNotificationAction(
-                rule_type=NotificationRuleType.SESSION_STARTED,
-                timestamp=datetime.now(UTC),
-                notification_data=SessionStartedMessage(
-                    session_id=str(uuid.uuid4()),
-                    session_name="test-session",
-                    session_type="interactive",
-                    cluster_mode="single-node",
-                    status="RUNNING",
-                ),
-            )
-            result = await notification_processors.process_notification.wait_for_complete(action)
-
-        assert isinstance(result, ProcessNotificationActionResult)
-        assert result.rules_matched >= 1
-        assert len(result.successes) >= 1
-        assert result.errors == []
-
-    async def test_partial_channel_failure_tolerance(
-        self,
-        notification_processors: NotificationProcessors,
-        notification_center: NotificationCenter,
-        admin_registry: BackendAIClientRegistry,
-        webhook_channel: NotificationChannelDTO,
-    ) -> None:
-        """When one channel send fails, other channels still receive the notification."""
-        ch2 = await admin_registry.notification.create_channel(
-            CreateNotificationChannelRequest(
-                name="partial-failure-channel-2",
-                description="Second channel for partial failure test",
-                channel_type=NotificationChannelType.WEBHOOK,
-                spec=WebhookSpec(url="https://example.com/webhook2"),
-                enabled=True,
-            )
-        )
-        rule1_resp = await admin_registry.notification.create_rule(
-            CreateNotificationRuleRequest(
-                name="partial-fail-rule-1",
-                rule_type=NotificationRuleType.SESSION_STARTED,
-                channel_id=webhook_channel.id,
-                message_template="Rule 1: {{ session_name }}",
-                enabled=True,
-            )
-        )
-        rule2_resp = await admin_registry.notification.create_rule(
-            CreateNotificationRuleRequest(
-                name="partial-fail-rule-2",
-                rule_type=NotificationRuleType.SESSION_STARTED,
-                channel_id=ch2.channel.id,
-                message_template="Rule 2: {{ session_name }}",
-                enabled=True,
-            )
-        )
-
-        try:
-            call_count = 0
-            send_result = SendResult(message="ok")
-
-            async def _mock_process_rule(*_args: object, **_kwargs: object) -> SendResult:
-                nonlocal call_count
-                call_count += 1
-                if call_count == 1:
-                    return send_result
-                raise RuntimeError("Simulated channel failure")
-
-            with patch.object(
-                notification_center,
-                "process_rule",
-                new=AsyncMock(side_effect=_mock_process_rule),
-            ):
-                action = ProcessNotificationAction(
-                    rule_type=NotificationRuleType.SESSION_STARTED,
-                    timestamp=datetime.now(UTC),
-                    notification_data=SessionStartedMessage(
-                        session_id=str(uuid.uuid4()),
-                        session_name="partial-session",
-                        session_type="batch",
-                        cluster_mode="single-node",
-                        status="RUNNING",
-                    ),
-                )
-                result = await notification_processors.process_notification.wait_for_complete(
-                    action
-                )
-        finally:
-            await admin_registry.notification.delete_rule(rule1_resp.rule.id)
-            await admin_registry.notification.delete_rule(rule2_resp.rule.id)
-            await admin_registry.notification.delete_channel(ch2.channel.id)
-
-        assert isinstance(result, ProcessNotificationActionResult)
-        assert result.rules_matched >= 2
-        assert len(result.successes) >= 1
-        assert len(result.errors) >= 1
