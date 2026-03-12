@@ -163,6 +163,31 @@ class TestContainerRegistryPatch:
             )
 
 
+class TestContainerRegistryPermissions:
+    async def test_regular_user_cannot_create_registry(
+        self,
+        user_registry: BackendAIClientRegistry,
+    ) -> None:
+        """Regular user (non-superadmin) gets PermissionDenied when creating a registry."""
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.container_registry.create(
+                CreateContainerRegistryRequestModel(
+                    url="https://docker-user.test.local",
+                    registry_name="test-user-create",
+                    type=ContainerRegistryType.DOCKER,
+                )
+            )
+
+    async def test_regular_user_cannot_delete_registry(
+        self,
+        user_registry: BackendAIClientRegistry,
+        container_registry_fixture: uuid.UUID,
+    ) -> None:
+        """Regular user (non-superadmin) gets PermissionDenied when deleting a registry."""
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.container_registry.delete(str(container_registry_fixture))
+
+
 class TestContainerRegistryHarborWebhook:
     @pytest.mark.xfail(
         strict=True,
