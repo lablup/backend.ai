@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from typing import override
+from uuid import UUID
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
@@ -25,6 +27,21 @@ from ai.backend.manager.repositories.deployment.creators import RouteCreatorSpec
 from .types import AbstractDeploymentStrategy, RouteChanges, StrategyCycleResult
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
+
+
+@dataclass
+class _ClassifiedRoutes:
+    """Routes classified by revision and status."""
+
+    old_active: list[RouteInfo] = field(default_factory=list)
+    new_provisioning: list[RouteInfo] = field(default_factory=list)
+    new_healthy: list[RouteInfo] = field(default_factory=list)
+    new_unhealthy: list[RouteInfo] = field(default_factory=list)
+    new_failed: list[RouteInfo] = field(default_factory=list)
+
+    @property
+    def total_new_live(self) -> int:
+        return len(self.new_provisioning) + len(self.new_healthy) + len(self.new_unhealthy)
 
 
 class RollingUpdateStrategy(AbstractDeploymentStrategy):
@@ -48,102 +65,174 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
             1. Classify routes into old / new by revision_id.
             2. If any new route is PROVISIONING -> PROVISIONING (wait).
             3. If no old routes remain and new_healthy >= desired -> COMPLETED.
-            4. If all new routes failed -> ROLLED_BACK.
+            4. If all new routes failed or is unhealthy -> ROLLED_BACK.
             5. Compute allowed surge/unavailable, decide create/terminate -> PROGRESSING.
         """
-        deploying_rev = deployment.deploying_revision_id
         desired = deployment.replica_spec.target_replica_count
+        classified = self._classify_routes(routes, deployment.deploying_revision_id)
 
-        # -- 1. Classify routes --
-        old_active: list[RouteInfo] = []
-        new_provisioning: list[RouteInfo] = []
-        new_healthy: list[RouteInfo] = []
-        new_unhealthy: list[RouteInfo] = []
-        new_failed: list[RouteInfo] = []
+        if result := self._check_provisioning(deployment, classified):
+            return result
+        if result := self._check_completed(deployment, classified, desired):
+            return result
+        if result := self._check_rolled_back(deployment, classified):
+            return result
+        return self._compute_progressing(deployment, classified, desired)
 
-        for r in routes:
-            is_new = r.revision_id == deploying_rev
-            if not is_new:
-                if r.status.is_active():
-                    old_active.append(r)
+    def _classify_routes(
+        self,
+        routes: Sequence[RouteInfo],
+        deploying_revision_id: UUID,
+    ) -> _ClassifiedRoutes:
+        """Classify routes into old/new by revision and status."""
+        classified = _ClassifiedRoutes()
+        for route in routes:
+            if route.revision_id != deploying_revision_id:
+                if route.status.is_active():
+                    classified.old_active.append(route)
                 continue
 
-            if r.status == RouteStatus.PROVISIONING:
-                new_provisioning.append(r)
-            elif r.status == RouteStatus.HEALTHY:
-                new_healthy.append(r)
-            elif r.status in (RouteStatus.UNHEALTHY, RouteStatus.DEGRADED):
-                new_unhealthy.append(r)
-            elif r.status in (RouteStatus.FAILED_TO_START, RouteStatus.TERMINATED):
-                new_failed.append(r)
+            if route.status == RouteStatus.PROVISIONING:
+                classified.new_provisioning.append(route)
+            elif route.status == RouteStatus.HEALTHY:
+                classified.new_healthy.append(route)
+            elif route.status in (RouteStatus.UNHEALTHY, RouteStatus.DEGRADED):
+                classified.new_unhealthy.append(route)
+            elif route.status in (RouteStatus.FAILED_TO_START, RouteStatus.TERMINATED):
+                classified.new_failed.append(route)
+        return classified
 
-        total_new_live = len(new_provisioning) + len(new_healthy) + len(new_unhealthy)
+    def _check_provisioning(
+        self,
+        deployment: DeploymentInfo,
+        classified: _ClassifiedRoutes,
+    ) -> StrategyCycleResult | None:
+        """Return PROVISIONING result if any new routes are still being provisioned."""
+        if not classified.new_provisioning:
+            return None
+        log.debug(
+            "deployment {}: {} new routes still provisioning",
+            deployment.id,
+            len(classified.new_provisioning),
+        )
+        return StrategyCycleResult(sub_step=DeploymentSubStep.PROVISIONING)
 
-        # -- 2. PROVISIONING: wait for in-flight routes --
-        if new_provisioning:
-            log.debug(
-                "deployment {}: {} new routes still provisioning",
-                deployment.id,
-                len(new_provisioning),
-            )
-            return StrategyCycleResult(sub_step=DeploymentSubStep.PROVISIONING)
+    def _check_completed(
+        self,
+        deployment: DeploymentInfo,
+        classified: _ClassifiedRoutes,
+        desired: int,
+    ) -> StrategyCycleResult | None:
+        """Return COMPLETED result if all old routes are replaced and enough new are healthy."""
+        if classified.old_active or len(classified.new_healthy) < desired:
+            return None
+        log.info(
+            "deployment {}: rolling update complete ({} healthy routes)",
+            deployment.id,
+            len(classified.new_healthy),
+        )
+        return StrategyCycleResult(sub_step=DeploymentSubStep.COMPLETED)
 
-        # -- 3. Completed: all old replaced, enough new healthy --
-        if not old_active and len(new_healthy) >= desired:
-            log.info(
-                "deployment {}: rolling update complete ({} healthy routes)",
-                deployment.id,
-                len(new_healthy),
-            )
-            return StrategyCycleResult(
-                sub_step=DeploymentSubStep.COMPLETED,
-            )
-
-        # -- 4. Rolled back: every new route failed or is unhealthy --
-        if total_new_live == 0 and new_failed:
+    def _check_rolled_back(
+        self,
+        deployment: DeploymentInfo,
+        classified: _ClassifiedRoutes,
+    ) -> StrategyCycleResult | None:
+        """Return ROLLED_BACK result if all new routes have failed or are unhealthy."""
+        if classified.total_new_live == 0 and classified.new_failed:
             log.warning(
                 "deployment {}: all {} new routes failed — rolling back",
                 deployment.id,
-                len(new_failed),
+                len(classified.new_failed),
             )
             return StrategyCycleResult(sub_step=DeploymentSubStep.ROLLED_BACK)
 
-        # All new routes are unhealthy (none healthy, none provisioning)
-        if len(new_healthy) == 0 and len(new_provisioning) == 0 and new_unhealthy:
+        if (
+            not classified.new_healthy
+            and not classified.new_provisioning
+            and classified.new_unhealthy
+        ):
             log.warning(
                 "deployment {}: all {} new routes unhealthy — rolling back",
                 deployment.id,
-                len(new_unhealthy),
+                len(classified.new_unhealthy),
             )
             return StrategyCycleResult(sub_step=DeploymentSubStep.ROLLED_BACK)
 
-        # -- 5. PROGRESSING: compute surge / unavailable budget --
-        spec = self._spec
-        max_surge = spec.max_surge
-        max_unavailable = spec.max_unavailable
+        return None
 
-        # Total pods allowed at peak = desired + max_surge
+    def _compute_progressing(
+        self,
+        deployment: DeploymentInfo,
+        classified: _ClassifiedRoutes,
+        desired: int,
+    ) -> StrategyCycleResult:
+        """Compute surge/unavailable budget and return PROGRESSING with route mutations."""
+        max_surge = self._spec.max_surge
+        max_unavailable = self._spec.max_unavailable
+
         max_total = desired + max_surge
-        current_total = len(old_active) + total_new_live
-
-        # Minimum available pods = desired - max_unavailable
+        current_total = len(classified.old_active) + classified.total_new_live
         min_available = max(0, desired - max_unavailable)
 
         route_changes = RouteChanges()
 
-        # Decide how many new routes to create
-        can_create = max_total - current_total
-        still_needed = desired - total_new_live
-        to_create = max(0, min(can_create, still_needed))
-
+        to_create = self._compute_routes_to_create(desired, max_total, current_total, classified)
         if to_create > 0:
             route_changes.rollout_specs = _build_route_creators(deployment, to_create)
 
-        # Decide how many old routes to terminate.
-        # Only count truly healthy routes as available (not UNHEALTHY/DEGRADED).
-        available_count = len(new_healthy) + len(old_active)
+        to_terminate = self._compute_routes_to_terminate(classified, min_available)
+        if to_terminate > 0:
+            sorted_old = sorted(
+                classified.old_active, key=lambda route: route.status.termination_priority()
+            )
+            for route in sorted_old[:to_terminate]:
+                route_changes.drain_route_ids.append(route.route_id)
+
+        log.debug(
+            "deployment {}: PROGRESSING create={}, terminate={}, "
+            "old_active={}, new_healthy={}, new_unhealthy={}, new_prov={}",
+            deployment.id,
+            to_create,
+            to_terminate,
+            len(classified.old_active),
+            len(classified.new_healthy),
+            len(classified.new_unhealthy),
+            len(classified.new_provisioning),
+        )
+
+        return StrategyCycleResult(
+            sub_step=DeploymentSubStep.PROGRESSING,
+            route_changes=route_changes,
+        )
+
+    def _compute_routes_to_create(
+        self,
+        desired: int,
+        max_total: int,
+        current_total: int,
+        classified: _ClassifiedRoutes,
+    ) -> int:
+        """Decide how many new routes to create within surge budget."""
+        can_create = max_total - current_total
+        still_needed = desired - classified.total_new_live
+        return max(0, min(can_create, still_needed))
+
+    def _compute_routes_to_terminate(
+        self,
+        classified: _ClassifiedRoutes,
+        min_available: int,
+    ) -> int:
+        """Decide how many old routes to terminate within unavailability budget.
+
+        Only counts truly healthy routes as available (not UNHEALTHY/DEGRADED).
+        Includes a safety guard: when ``min_available > 0`` and no new routes are
+        healthy yet, at least one old route is preserved to avoid a complete
+        traffic outage.
+        """
+        available_count = len(classified.new_healthy) + len(classified.old_active)
         can_terminate = available_count - min_available
-        to_terminate = max(0, min(can_terminate, len(old_active)))
+        to_terminate = max(0, min(can_terminate, len(classified.old_active)))
 
         # Safety guard: when max_unavailable < desired the operator expects at
         # least *some* routes to stay available.  Never terminate ALL old routes
@@ -153,34 +242,13 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
         # explicitly opted into full unavailability, so we honour that.
         if (
             min_available > 0
-            and len(new_healthy) == 0
-            and to_terminate >= len(old_active)
-            and len(old_active) > 0
+            and len(classified.new_healthy) == 0
+            and to_terminate >= len(classified.old_active)
+            and len(classified.old_active) > 0
         ):
-            to_terminate = len(old_active) - 1
+            to_terminate = len(classified.old_active) - 1
 
-        if to_terminate > 0:
-            # Terminate old routes with lowest termination priority first
-            sorted_old = sorted(old_active, key=lambda r: r.status.termination_priority())
-            for r in sorted_old[:to_terminate]:
-                route_changes.drain_route_ids.append(r.route_id)
-
-        log.debug(
-            "deployment {}: PROGRESSING create={}, terminate={}, "
-            "old_active={}, new_healthy={}, new_unhealthy={}, new_prov={}",
-            deployment.id,
-            to_create,
-            to_terminate,
-            len(old_active),
-            len(new_healthy),
-            len(new_unhealthy),
-            len(new_provisioning),
-        )
-
-        return StrategyCycleResult(
-            sub_step=DeploymentSubStep.PROGRESSING,
-            route_changes=route_changes,
-        )
+        return to_terminate
 
 
 def _build_route_creators(
