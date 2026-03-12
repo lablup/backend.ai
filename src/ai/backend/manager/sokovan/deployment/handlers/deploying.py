@@ -113,7 +113,9 @@ class DeployingProvisioningHandler(DeploymentHandler):
         )
 
     @override
-    async def execute(self, deployments: Sequence[DeploymentWithHistory]) -> DeploymentExecutionResult:
+    async def execute(
+        self, deployments: Sequence[DeploymentWithHistory]
+    ) -> DeploymentExecutionResult:
         raise NotImplementedError("Strategy evaluator and applier are not yet wired — see BA-5014")
 
     @override
@@ -186,7 +188,9 @@ class DeployingProgressingHandler(DeploymentHandler):
         )
 
     @override
-    async def execute(self, deployments: Sequence[DeploymentWithHistory]) -> DeploymentExecutionResult:
+    async def execute(
+        self, deployments: Sequence[DeploymentWithHistory]
+    ) -> DeploymentExecutionResult:
         raise NotImplementedError("Strategy evaluator and applier are not yet wired — see BA-5014")
 
     @override
@@ -247,7 +251,9 @@ class DeployingRollingBackHandler(DeploymentHandler):
         )
 
     @override
-    async def execute(self, deployments: Sequence[DeploymentWithHistory]) -> DeploymentExecutionResult:
+    async def execute(
+        self, deployments: Sequence[DeploymentWithHistory]
+    ) -> DeploymentExecutionResult:
         raise NotImplementedError("Strategy evaluator and applier are not yet wired — see BA-5014")
 
     @override
