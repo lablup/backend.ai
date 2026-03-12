@@ -382,6 +382,11 @@ class DeploymentCoordinator:
         and phase_started_at from DeploymentWithHistory embedded in each error,
         then applies per-category transitions. All transitions are processed
         in a single transaction.
+
+        Args:
+            handler: The route handler that was executed
+            result: The result of the handler execution
+            records: Execution records from the recorder context
         """
         handler_name = handler.name()
         target_statuses = handler.target_statuses()
@@ -484,33 +489,33 @@ class DeploymentCoordinator:
         next_lifecycle = lifecycle_status.lifecycle
         from_status = target_lifecycles[0].lifecycle if target_lifecycles else None
         target_lifecycle_stages = [status.lifecycle for status in target_lifecycles]
-        endpoint_ids = [dwh.deployment_info.id for dwh in deployments]
+        endpoint_ids = [deployment.deployment_info.id for deployment in deployments]
         history_specs = [
             DeploymentHistoryCreatorSpec(
-                deployment_id=dwh.deployment_info.id,
+                deployment_id=deployment.deployment_info.id,
                 phase=handler_name,
                 result=SchedulingResult.SUCCESS,
                 message=f"{handler_name} completed successfully",
                 from_status=from_status,
                 to_status=next_lifecycle,
                 sub_steps=self._build_history_sub_steps(
-                    dwh.deployment_info.id,
+                    deployment.deployment_info.id,
                     records,
-                    dwh.deployment_info.sub_step,
+                    deployment.deployment_info.sub_step,
                     SchedulingResult.SUCCESS,
                 ),
             )
-            for dwh in deployments
+            for deployment in deployments
         ]
         events = [
             self._build_lifecycle_notification_event(
-                deployment=dwh.deployment_info,
+                deployment=deployment.deployment_info,
                 from_status=from_status,
                 to_status=next_lifecycle,
                 transition_result="success",
                 timestamp=timestamp_now,
             )
-            for dwh in deployments
+            for deployment in deployments
         ]
         updater = self._build_lifecycle_updater(
             endpoint_ids, lifecycle_status, target_lifecycle_stages
