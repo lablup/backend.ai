@@ -17,14 +17,14 @@ class CheckPresetsResponse(BaseResponseModel):
     """Response containing preset allocatability information."""
 
     presets: list[Any] = Field(description="List of resource presets")
-    keypair_limits: Any = Field(description="Keypair resource limits")
-    keypair_using: Any = Field(description="Keypair resource usage")
-    keypair_remaining: Any = Field(description="Keypair remaining resources")
-    group_limits: Any = Field(description="Group resource limits")
-    group_using: Any = Field(description="Group resource usage")
-    group_remaining: Any = Field(description="Group remaining resources")
-    scaling_group_remaining: Any = Field(description="Scaling group remaining resources")
-    scaling_groups: Any = Field(description="Per-scaling-group resource info")
+    keypair_limits: dict[str, Any] = Field(description="Keypair resource limits")
+    keypair_using: dict[str, Any] = Field(description="Keypair resource usage")
+    keypair_remaining: dict[str, Any] = Field(description="Keypair remaining resources")
+    group_limits: dict[str, Any] = Field(description="Group resource limits")
+    group_using: dict[str, Any] = Field(description="Group resource usage")
+    group_remaining: dict[str, Any] = Field(description="Group remaining resources")
+    scaling_group_remaining: dict[str, Any] = Field(description="Scaling group remaining resources")
+    scaling_groups: dict[str, dict[str, Any]] = Field(description="Per-scaling-group resource info")
 
 
 class EmptyResponse(BaseResponseModel):

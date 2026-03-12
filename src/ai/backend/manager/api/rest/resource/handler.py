@@ -33,7 +33,7 @@ from ai.backend.common.types import AccessKey, AgentId
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import RequestCtx, UserContext
-from ai.backend.manager.repositories.resource_slot.types import quantities_to_json
+from ai.backend.manager.repositories.resource_slot.types import quantities_to_dict
 from ai.backend.manager.services.agent.actions.get_watcher_status import GetWatcherStatusAction
 from ai.backend.manager.services.agent.actions.recalculate_usage import RecalculateUsageAction
 from ai.backend.manager.services.agent.actions.watcher_agent_restart import (
@@ -135,20 +135,20 @@ class ResourceHandler:
         scaling_groups_json: dict[str, Any] = {}
         for sgname, sg_data in result.scaling_groups.items():
             scaling_groups_json[sgname] = {
-                ResourceSlotState.OCCUPIED: quantities_to_json(sg_data[ResourceSlotState.OCCUPIED]),
-                ResourceSlotState.AVAILABLE: quantities_to_json(
+                ResourceSlotState.OCCUPIED: quantities_to_dict(sg_data[ResourceSlotState.OCCUPIED]),
+                ResourceSlotState.AVAILABLE: quantities_to_dict(
                     sg_data[ResourceSlotState.AVAILABLE]
                 ),
             }
         resp = CheckPresetsResponse(
             presets=result.presets,
-            keypair_limits=quantities_to_json(result.keypair_limits),
-            keypair_using=quantities_to_json(result.keypair_using),
-            keypair_remaining=quantities_to_json(result.keypair_remaining),
-            group_limits=quantities_to_json(result.group_limits),
-            group_using=quantities_to_json(result.group_using),
-            group_remaining=quantities_to_json(result.group_remaining),
-            scaling_group_remaining=quantities_to_json(result.scaling_group_remaining),
+            keypair_limits=quantities_to_dict(result.keypair_limits),
+            keypair_using=quantities_to_dict(result.keypair_using),
+            keypair_remaining=quantities_to_dict(result.keypair_remaining),
+            group_limits=quantities_to_dict(result.group_limits),
+            group_using=quantities_to_dict(result.group_using),
+            group_remaining=quantities_to_dict(result.group_remaining),
+            scaling_group_remaining=quantities_to_dict(result.scaling_group_remaining),
             scaling_groups=scaling_groups_json,
         )
         return APIResponse.build(HTTPStatus.OK, resp)

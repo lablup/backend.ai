@@ -9,8 +9,6 @@ from __future__ import annotations
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-import pytest
-
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.infra import (
     CheckPresetsRequest,
@@ -69,13 +67,6 @@ class TestResourcePresetList:
 class TestResourcePresetCheck:
     """Tests for checking resource presets allocatability via HTTP API."""
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "check-presets response returns double-serialized JSON strings"
-            " for resource slot fields - tracked separately"
-        ),
-    )
     async def test_admin_checks_presets_with_group(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -97,13 +88,6 @@ class TestResourcePresetCheck:
         assert isinstance(result.scaling_group_remaining, dict)
         assert isinstance(result.scaling_groups, dict)
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason=(
-            "check-presets response returns double-serialized JSON strings"
-            " for resource slot fields - tracked separately"
-        ),
-    )
     async def test_admin_checks_presets_with_scaling_group(
         self,
         admin_registry: BackendAIClientRegistry,
