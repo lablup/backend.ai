@@ -100,7 +100,7 @@ class CreateVFolderAction(VFolderScopeAction):
     cloneable: bool
 
     _scope_id: str
-    _scope_type: ScopeType
+    _scope_type: RBACElementType
 
     # User identifier
     # TODO: Distinguish between creator and owner
@@ -119,7 +119,7 @@ class CreateVFolderAction(VFolderScopeAction):
 
     @override
     def scope_type(self) -> ScopeType:
-        return self._scope_type
+        return self._scope_type.to_scope_type()
 
     @override
     def scope_id(self) -> str:
@@ -128,7 +128,7 @@ class CreateVFolderAction(VFolderScopeAction):
     @override
     def target_element(self) -> RBACElementRef:
         return RBACElementRef(
-            element_type=RBACElementType(self._scope_type.value),
+            element_type=self._scope_type,
             element_id=self._scope_id,
         )
 
@@ -155,7 +155,7 @@ class CreateVFolderActionResult(VFolderScopeActionResult):
 
     @override
     def scope_type(self) -> ScopeType:
-        return ScopeType(self.quota_scope_id.scope_type.value)
+        return RBACElementType(self.quota_scope_id.scope_type.value).to_scope_type()
 
     @override
     def scope_id(self) -> str:
@@ -247,7 +247,7 @@ class GetVFolderActionResult(VFolderSingleEntityActionResult):
 @dataclass
 class ListVFolderAction(VFolderScopeAction):
     user_uuid: uuid.UUID
-    _scope_type: ScopeType
+    _scope_type: RBACElementType
     _scope_id: str
 
     @override
@@ -261,7 +261,7 @@ class ListVFolderAction(VFolderScopeAction):
 
     @override
     def scope_type(self) -> ScopeType:
-        return self._scope_type
+        return self._scope_type.to_scope_type()
 
     @override
     def scope_id(self) -> str:
@@ -270,7 +270,7 @@ class ListVFolderAction(VFolderScopeAction):
     @override
     def target_element(self) -> RBACElementRef:
         return RBACElementRef(
-            element_type=RBACElementType(self._scope_type.value),
+            element_type=self._scope_type,
             element_id=self._scope_id,
         )
 
@@ -279,7 +279,7 @@ class ListVFolderAction(VFolderScopeAction):
 class ListVFolderActionResult(VFolderScopeActionResult):
     user_uuid: uuid.UUID
     vfolders: list[tuple[VFolderBaseInfo, VFolderOwnershipInfo]]
-    _scope_type: ScopeType
+    _scope_type: RBACElementType
     _scope_id: str
 
     @override
@@ -288,7 +288,7 @@ class ListVFolderActionResult(VFolderScopeActionResult):
 
     @override
     def scope_type(self) -> ScopeType:
-        return self._scope_type
+        return self._scope_type.to_scope_type()
 
     @override
     def scope_id(self) -> str:

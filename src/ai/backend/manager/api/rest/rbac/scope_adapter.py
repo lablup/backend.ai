@@ -5,7 +5,7 @@ Handles conversion of request DTOs to BatchQuerier objects.
 
 from __future__ import annotations
 
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.rbac.request import (
     ScopeFilter,
     ScopeOrder,
@@ -36,16 +36,22 @@ __all__ = ("ScopeAdapter",)
 class ScopeAdapter(BaseFilterAdapter):
     """Adapter for converting scope requests to BatchQuerier objects."""
 
-    def build_querier(self, scope_type: ScopeType, request: SearchScopesRequest) -> BatchQuerier:
-        """Build a BatchQuerier based on scope type."""
+    def build_querier(
+        self, scope_type: RBACElementType | None, request: SearchScopesRequest
+    ) -> BatchQuerier:
+        """Build a BatchQuerier based on scope type.
+
+        ``scope_type`` is ``None`` for the GLOBAL scope, which has no
+        ``RBACElementType`` equivalent.
+        """
+        if scope_type is None:
+            return self._build_global_scope_querier(request)
         match scope_type:
-            case ScopeType.GLOBAL:
-                return self._build_global_scope_querier(request)
-            case ScopeType.DOMAIN:
+            case RBACElementType.DOMAIN:
                 return self._build_domain_scope_querier(request)
-            case ScopeType.PROJECT:
+            case RBACElementType.PROJECT:
                 return self._build_project_scope_querier(request)
-            case ScopeType.USER:
+            case RBACElementType.USER:
                 return self._build_user_scope_querier(request)
             case _:
                 raise NotImplementedError(
@@ -177,4 +183,6 @@ class ScopeAdapter(BaseFilterAdapter):
         Returns:
             ScopeDTO for API response
         """
-        return ScopeDTO(scope_type=data.id.scope_type, scope_id=data.id.scope_id, name=data.name)
+        return ScopeDTO(
+            scope_type=data.id.scope_type.to_element(), scope_id=data.id.scope_id, name=data.name
+        )

@@ -5,7 +5,7 @@ Handles conversion of request DTOs to BatchQuerier objects.
 
 from __future__ import annotations
 
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.rbac.request import (
     SearchEntitiesRequest,
 )
@@ -28,9 +28,9 @@ class EntityAdapter(BaseFilterAdapter):
 
     def build_querier(
         self,
-        scope_type: ScopeType,
+        scope_type: RBACElementType,
         scope_id: str,
-        entity_type: EntityType,
+        entity_type: RBACElementType,
         request: SearchEntitiesRequest,
     ) -> BatchQuerier:
         """Build a BatchQuerier for entity search.
@@ -45,9 +45,9 @@ class EntityAdapter(BaseFilterAdapter):
             BatchQuerier with scope conditions and pagination settings
         """
         conditions = [
-            EntityScopeConditions.by_scope_type(scope_type),
+            EntityScopeConditions.by_scope_type(scope_type.to_scope_type()),
             EntityScopeConditions.by_scope_id(scope_id),
-            EntityScopeConditions.by_entity_type(entity_type),
+            EntityScopeConditions.by_entity_type(entity_type.to_entity_type()),
         ]
         pagination = OffsetPagination(limit=request.limit, offset=request.offset)
         return BatchQuerier(conditions=conditions, orders=[], pagination=pagination)
@@ -62,6 +62,6 @@ class EntityAdapter(BaseFilterAdapter):
             EntityDTO for API response
         """
         return EntityDTO(
-            entity_type=data.entity_type,
+            entity_type=data.entity_type.to_element(),
             entity_id=data.entity_id,
         )

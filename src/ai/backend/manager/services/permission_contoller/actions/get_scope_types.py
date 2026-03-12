@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
@@ -31,7 +31,7 @@ class GetScopeTypesAction(RoleAction):
 class GetScopeTypesActionResult(BaseActionResult):
     """Result of getting scope types."""
 
-    scope_types: list[ScopeType]
+    element_types: list[RBACElementType]
 
     @override
     def entity_id(self) -> str | None:

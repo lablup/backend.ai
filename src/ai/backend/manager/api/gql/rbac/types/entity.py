@@ -195,9 +195,7 @@ class EntityFilter(GQLFilter):
         conditions: list[QueryCondition] = []
 
         if self.entity_type is not None:
-            conditions.append(
-                EntityScopeConditions.by_entity_type(self.entity_type.to_element().to_entity_type())
-            )
+            conditions.append(EntityScopeConditions.by_entity_type(self.entity_type.to_element()))
 
         if self.entity_id is not None:
             condition = self.entity_id.build_query_condition(

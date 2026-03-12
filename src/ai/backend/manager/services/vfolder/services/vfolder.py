@@ -520,7 +520,7 @@ class VFolderService:
         return ListVFolderActionResult(
             user_uuid=action.user_uuid,
             vfolders=vfolders,
-            _scope_type=action.scope_type(),
+            _scope_type=action._scope_type,
             _scope_id=action.scope_id(),
         )
 

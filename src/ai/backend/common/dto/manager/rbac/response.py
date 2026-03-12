@@ -11,10 +11,10 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 
-from .types import EntityType, OperationType, RoleSource, RoleStatus
+from .types import OperationType, RoleSource, RoleStatus
 
 __all__ = (
     "AssignRoleResponse",
@@ -121,7 +121,7 @@ class PermissionDTO(BaseModel):
     """DTO for permission data."""
 
     id: UUID = Field(description="Permission ID")
-    entity_type: EntityType = Field(description="Entity type")
+    entity_type: RBACElementType = Field(description="Entity type")
     operation: OperationType = Field(description="Operation type")
 
 
@@ -130,7 +130,7 @@ class ObjectPermissionDTO(BaseModel):
 
     id: UUID = Field(description="Object permission ID")
     role_id: UUID = Field(description="Role ID")
-    entity_type: EntityType = Field(description="Entity type")
+    entity_type: RBACElementType = Field(description="Entity type")
     entity_id: str = Field(description="Entity ID")
     operation: OperationType = Field(description="Operation type")
 
@@ -162,13 +162,13 @@ class DeleteObjectPermissionResponse(BaseResponseModel):
 class GetScopeTypesResponse(BaseResponseModel):
     """Response for getting available scope types."""
 
-    items: list[ScopeType] = Field(description="List of available scope types")
+    items: list[RBACElementType] = Field(description="List of available scope types")
 
 
 class ScopeDTO(BaseModel):
     """DTO for scope data."""
 
-    scope_type: ScopeType = Field(description="Scope type")
+    scope_type: RBACElementType = Field(description="Scope type")
     scope_id: str = Field(description="Scope ID (domain name, project UUID, or user UUID)")
     name: str = Field(description="Scope display name")
 
@@ -183,13 +183,13 @@ class SearchScopesResponse(BaseResponseModel):
 class GetEntityTypesResponse(BaseResponseModel):
     """Response for getting available entity types."""
 
-    items: list[EntityType] = Field(description="List of available entity types")
+    items: list[RBACElementType] = Field(description="List of available entity types")
 
 
 class EntityDTO(BaseModel):
     """DTO for entity data."""
 
-    entity_type: EntityType = Field(description="Entity type")
+    entity_type: RBACElementType = Field(description="Entity type")
     entity_id: str = Field(description="Entity ID")
 
 

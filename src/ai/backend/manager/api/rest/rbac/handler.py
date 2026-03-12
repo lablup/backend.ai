@@ -298,7 +298,7 @@ class RBACHandler:
         action_result = await self._permission_controller.get_scope_types.wait_for_complete(
             GetScopeTypesAction()
         )
-        resp = GetScopeTypesResponse(items=action_result.scope_types)
+        resp = GetScopeTypesResponse(items=action_result.element_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def search_scopes(
@@ -312,8 +312,16 @@ class RBACHandler:
             raise NotEnoughPermission("Only superadmin can search scopes.")
 
         scope_type = path.parsed.scope_type
+        if scope_type is None:
+            resp = SearchScopesResponse(
+                items=[],
+                pagination=PaginationInfo(
+                    total=0, offset=body.parsed.offset, limit=body.parsed.limit
+                ),
+            )
+            return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
         querier = self._scope_adapter.build_querier(scope_type, body.parsed)
-        action = SearchScopesAction(scope_type=scope_type, querier=querier)
+        action = SearchScopesAction(element_type=scope_type, querier=querier)
         action_result = await self._permission_controller.search_scopes.wait_for_complete(action)
         resp = SearchScopesResponse(
             items=[self._scope_adapter.convert_to_dto(item) for item in action_result.result.items],
@@ -338,7 +346,7 @@ class RBACHandler:
         action_result = await self._permission_controller.get_entity_types.wait_for_complete(
             GetEntityTypesAction()
         )
-        resp = GetEntityTypesResponse(items=action_result.entity_types)
+        resp = GetEntityTypesResponse(items=action_result.element_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def search_entities(
