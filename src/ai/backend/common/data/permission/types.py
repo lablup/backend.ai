@@ -390,6 +390,7 @@ class RBACElementType(enum.StrEnum):
 
     # === Auto sub-entities with direct GET APIs ===
     DEPLOYMENT_TOKEN = "deployment:token"
+    DEPLOYMENT_POLICY = "deployment:policy"
 
     # === Entity-level scopes (for entity-scope permissions) ===
     ARTIFACT_REVISION = "artifact_revision"
