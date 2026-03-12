@@ -67,7 +67,7 @@ from .types import (
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 # Timeout thresholds for deployment lifecycle statuses (seconds).
-DEPLOYMENT_STATUS_TIMEOUT_MAP: dict[EndpointLifecycle, float] = {
+_DEPLOYMENT_STATUS_TIMEOUT_MAP: dict[EndpointLifecycle, float] = {
     EndpointLifecycle.DEPLOYING: 1800.0,  # 30 minutes
     EndpointLifecycle.SCALING: 1800.0,  # 30 minutes
 }
@@ -81,7 +81,7 @@ def _is_transition_timed_out(
     """Check if timeout exceeded for the given lifecycle status."""
     if started_at is None:
         return False
-    timeout = DEPLOYMENT_STATUS_TIMEOUT_MAP.get(lifecycle)
+    timeout = _DEPLOYMENT_STATUS_TIMEOUT_MAP.get(lifecycle)
     if not timeout:
         return False
     # Normalise both to UTC to avoid timezone-naive vs -aware
@@ -241,7 +241,7 @@ class DeploymentCoordinator:
                 await stack.enter_async_context(self._lock_factory(handler.lock_id, lock_lifetime))
             handler_name = handler.name()
             target_statuses = handler.target_statuses()
-            lifecycle_stages = [s.lifecycle for s in target_statuses]
+            lifecycle_stages = [status.lifecycle for status in target_statuses]
             deployments = await self._deployment_repository.get_deployments_for_handler(
                 lifecycle_stages, handler_name
             )
@@ -287,11 +287,14 @@ class DeploymentCoordinator:
         and phase_started_at from DeploymentWithHistory embedded in each error,
         then applies per-category transitions. All transitions are processed
         in a single transaction.
+
+        Args:
+            handler: The route handler that was executed
+            result: The result of the handler execution
+            records: Execution records from the recorder context
         """
         handler_name = handler.name()
         target_statuses = handler.target_statuses()
-        from_status = target_statuses[0].lifecycle if target_statuses else None
-        target_lifecycle_stages = [s.lifecycle for s in target_statuses]
 
         batch_updaters: list[BatchUpdater[EndpointRow]] = []
         all_history_specs: list[DeploymentHistoryCreatorSpec] = []
@@ -388,7 +391,7 @@ class DeploymentCoordinator:
     ) -> _TransitionResult:
         next_lifecycle = lifecycle_status.lifecycle
         from_status = target_lifecycles[0].lifecycle if target_lifecycles else None
-        target_lifecycle_stages = [s.lifecycle for s in target_lifecycles]
+        target_lifecycle_stages = [status.lifecycle for status in target_lifecycles]
         endpoint_ids = [deployment.deployment_info.id for deployment in deployments]
         history_specs = [
             DeploymentHistoryCreatorSpec(
@@ -435,7 +438,7 @@ class DeploymentCoordinator:
     ) -> _TransitionResult:
         next_lifecycle = lifecycle_status.lifecycle
         from_status = target_lifecycles[0].lifecycle if target_lifecycles else None
-        target_lifecycle_stages = [s.lifecycle for s in target_lifecycles]
+        target_lifecycle_stages = [status.lifecycle for status in target_lifecycles]
         endpoint_ids = [error.deployment_info.deployment_info.id for error in errors]
         history_specs = [
             DeploymentHistoryCreatorSpec(

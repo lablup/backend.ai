@@ -476,7 +476,7 @@ class TestDestroyDeployment:
         )
 
         with patch.object(deployment_executor, "_unregister_endpoint", return_value=None):
-            entity_ids = [d.deployment_info.id for d in destroying_deployments_multiple]
+            entity_ids = [dep.deployment_info.id for dep in destroying_deployments_multiple]
             with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
                 # Act
                 result = await deployment_executor.destroy_deployment(
