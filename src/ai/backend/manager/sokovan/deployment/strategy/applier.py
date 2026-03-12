@@ -49,9 +49,6 @@ class StrategyResultApplier:
     2. Route rollout (create) and drain (terminate)
     3. Revision swap for COMPLETED deployments
     4. Clear deploying_revision for ROLLED_BACK deployments
-
-    All operations run within a single ``StrategyTransaction`` to ensure
-    atomicity — either all mutations succeed together, or none are committed.
     """
 
     def __init__(self, deployment_repo: DeploymentRepository) -> None:
@@ -92,20 +89,13 @@ class StrategyResultApplier:
         if not (summary.assignments or rollout.specs or drain or completed_ids or rolled_back_ids):
             return result
 
-        # All DB mutations in a single transaction via StrategyTransaction.
-        async with self._deployment_repo.begin_strategy_transaction() as txn:
-            await txn.update_sub_steps(summary.assignments)
-
-            if rollout.specs:
-                await txn.create_routes(rollout)
-            if drain:
-                await txn.drain_routes(drain)
-
-            swapped = 0
-            if completed_ids:
-                swapped = await txn.complete_deployment_revision_swap(completed_ids)
-            if rolled_back_ids:
-                await txn.clear_deploying_revision(rolled_back_ids)
+        swapped = await self._deployment_repo.apply_strategy_mutations(
+            assignments=summary.assignments,
+            rollout=rollout,
+            drain=drain,
+            completed_ids=completed_ids,
+            rolled_back_ids=rolled_back_ids,
+        )
 
         log.debug(
             "Applied evaluation: {} assignments, {} routes created, {} routes drained",
