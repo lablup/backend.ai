@@ -108,10 +108,7 @@ from ai.backend.manager.repositories.base import (
     execute_batch_querier,
     execute_creator,
 )
-from ai.backend.manager.repositories.base.creator import (
-    BulkCreator,
-    execute_bulk_creator,
-)
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import (
     Purger,
     PurgerResult,
@@ -120,6 +117,7 @@ from ai.backend.manager.repositories.base.purger import (
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
+    execute_rbac_entity_creators,
 )
 from ai.backend.manager.repositories.base.updater import (
     BatchUpdater,
@@ -941,7 +939,7 @@ class DeploymentDBSource:
 
     async def create_route(
         self,
-        creator: Creator[RoutingRow],
+        creator: RBACEntityCreator[RoutingRow],
     ) -> uuid.UUID:
         """Create a new route using the provided creator.
 
@@ -949,7 +947,7 @@ class DeploymentDBSource:
         This method only executes the creator.
         """
         async with self._begin_session_read_committed() as db_sess:
-            result = await execute_creator(db_sess, creator)
+            result = await execute_rbac_entity_creator(db_sess, creator)
             return result.row.id
 
     async def get_routes_by_endpoint(
@@ -1503,14 +1501,14 @@ class DeploymentDBSource:
 
     async def scale_routes(
         self,
-        scale_out_creators: Sequence[Creator[RoutingRow]],
+        scale_out_creators: Sequence[RBACEntityCreator[RoutingRow]],
         scale_in_updater: BatchUpdater[RoutingRow] | None,
     ) -> None:
         """Scale out/in routes based on provided creators and updater."""
         async with self._begin_session_read_committed() as db_sess:
             # Scale out routes
             for creator in scale_out_creators:
-                await execute_creator(db_sess, creator)
+                await execute_rbac_entity_creator(db_sess, creator)
             # Scale in routes
             if scale_in_updater:
                 await execute_batch_updater(db_sess, scale_in_updater)
@@ -2500,7 +2498,7 @@ class DeploymentDBSource:
     async def apply_strategy_mutations(
         self,
         assignments: Mapping[uuid.UUID, DeploymentSubStep],
-        rollout: BulkCreator[RoutingRow],
+        rollout: Sequence[RBACEntityCreator[RoutingRow]],
         drain: BatchUpdater[RoutingRow] | None,
         completed_ids: set[uuid.UUID],
         rolled_back_ids: set[uuid.UUID],
@@ -2535,11 +2533,11 @@ class DeploymentDBSource:
     @staticmethod
     async def _create_routes(
         db_sess: SASession,
-        rollout: BulkCreator[RoutingRow],
+        rollout: Sequence[RBACEntityCreator[RoutingRow]],
     ) -> None:
         """Create new routes for rollout."""
-        if rollout.specs:
-            await execute_bulk_creator(db_sess, rollout)
+        if rollout:
+            await execute_rbac_entity_creators(db_sess, rollout)
 
     @staticmethod
     async def _drain_routes(

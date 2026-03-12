@@ -16,14 +16,14 @@ from ai.backend.manager.data.deployment.types import (
     RouteInfo,
 )
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 
 
 @dataclass
 class RouteChanges:
     """Route mutations to apply for a single deployment cycle."""
 
-    rollout_specs: list[Creator[RoutingRow]] = field(default_factory=list)
+    rollout_specs: list[RBACEntityCreator[RoutingRow]] = field(default_factory=list)
     drain_route_ids: list[UUID] = field(default_factory=list)
 
 

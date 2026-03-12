@@ -2915,6 +2915,7 @@ class TestRouteOperations:
                 VFolderRow,
                 EndpointRow,
                 RoutingRow,
+                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection
@@ -3127,7 +3128,14 @@ class TestRouteOperations:
             revision_id=None,
             traffic_status=RouteTrafficStatus.ACTIVE,
         )
-        creator = Creator(spec=spec)
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.ROUTING,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
 
         route_id = await deployment_repository.create_route(creator)
 
@@ -3151,7 +3159,15 @@ class TestRouteOperations:
             domain=test_domain_name,
             project_id=test_group_id,
         )
-        route_id = await deployment_repository.create_route(Creator(spec=spec))
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.ROUTING,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
+        route_id = await deployment_repository.create_route(creator)
 
         # Update the route status
         updater = Updater(
@@ -3190,7 +3206,15 @@ class TestRouteOperations:
             domain=test_domain_name,
             project_id=test_group_id,
         )
-        route_id = await deployment_repository.create_route(Creator(spec=spec))
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.ROUTING,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
+        route_id = await deployment_repository.create_route(creator)
 
         # Update the route using unified spec (excluding session to avoid FK constraint)
         updater = Updater(
