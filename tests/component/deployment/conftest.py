@@ -29,6 +29,9 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
@@ -243,10 +246,38 @@ async def vfolder_factory(
 
 @pytest.fixture()
 async def deployment_seed_data(
+    db_engine: SAEngine,
+    domain_fixture: str,
     image_factory: ImageFactoryFunc,
     vfolder_factory: VFolderFactoryFunc,
-) -> tuple[uuid.UUID, uuid.UUID]:
-    """Create and return (image_id, vfolder_id) for deployment tests."""
+) -> AsyncIterator[tuple[uuid.UUID, uuid.UUID]]:
+    """Create seed data and clean up endpoints created during the test.
+
+    Endpoints reference domains/groups/scaling_groups with RESTRICT FK,
+    so they must be removed before those fixture teardowns run.
+    This fixture is torn down before group/scaling_group/domain fixtures
+    because it transitively depends on them via image_factory and vfolder_factory.
+    """
     image_id = await image_factory()
     vfolder_id = await vfolder_factory()
-    return image_id, vfolder_id
+    yield image_id, vfolder_id
+    # Clean up endpoints and soft-FK children created during the test
+    async with db_engine.begin() as conn:
+        endpoint_ids_q = sa.select(EndpointRow.__table__.c.id).where(
+            EndpointRow.__table__.c.domain == domain_fixture
+        )
+        await conn.execute(
+            DeploymentRevisionRow.__table__.delete().where(
+                DeploymentRevisionRow.__table__.c.endpoint.in_(endpoint_ids_q)
+            )
+        )
+        await conn.execute(
+            DeploymentPolicyRow.__table__.delete().where(
+                DeploymentPolicyRow.__table__.c.endpoint.in_(endpoint_ids_q)
+            )
+        )
+        await conn.execute(
+            EndpointRow.__table__.delete().where(
+                EndpointRow.__table__.c.domain == domain_fixture
+            )
+        )
