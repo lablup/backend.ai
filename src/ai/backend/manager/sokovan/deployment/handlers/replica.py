@@ -5,7 +5,6 @@ from collections.abc import Sequence
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
-    DeploymentInfo,
     DeploymentLifecycleStatus,
     DeploymentStatusTransitions,
 )
@@ -16,6 +15,7 @@ from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.types import (
     DeploymentExecutionResult,
     DeploymentLifecycleType,
+    DeploymentWithHistory,
 )
 
 from .base import DeploymentHandler
@@ -54,14 +54,15 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         """Define state transitions for check replica deployment handler (BEP-1030).
 
         - success: Deployment → SCALING
-        - failure: None (stays in current state)
+        - failure: None (stays in current state for all failure categories)
         """
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
-            failure=None,
         )
 
-    async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
+    async def execute(
+        self, deployments: Sequence[DeploymentWithHistory]
+    ) -> DeploymentExecutionResult:
         """Check and manage deployment replicas."""
         log.debug("Checking deployment replicas")
 

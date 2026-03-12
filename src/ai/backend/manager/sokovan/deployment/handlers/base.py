@@ -4,12 +4,14 @@ from abc import abstractmethod
 from collections.abc import Sequence
 
 from ai.backend.manager.data.deployment.types import (
-    DeploymentInfo,
     DeploymentLifecycleStatus,
     DeploymentStatusTransitions,
 )
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.sokovan.deployment.types import DeploymentExecutionResult
+from ai.backend.manager.sokovan.deployment.types import (
+    DeploymentExecutionResult,
+    DeploymentWithHistory,
+)
 
 
 class DeploymentHandler:
@@ -69,8 +71,13 @@ class DeploymentHandler:
         raise NotImplementedError("Subclasses must implement status_transitions()")
 
     @abstractmethod
-    async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
+    async def execute(
+        self, deployments: Sequence[DeploymentWithHistory]
+    ) -> DeploymentExecutionResult:
         """Execute the scheduling operation.
+
+        Args:
+            deployments: Deployments bundled with scheduling history context
 
         Returns:
             Result of the scheduling operation
