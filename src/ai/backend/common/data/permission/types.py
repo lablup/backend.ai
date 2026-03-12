@@ -320,10 +320,12 @@ class ScopeType(enum.StrEnum):
     # === Entity-level scopes ===
     SESSION = "session"
     DEPLOYMENT = "deployment"
+    MODEL_DEPLOYMENT = "model_deployment"
     VFOLDER = "vfolder"
     IMAGE = "image"
     ARTIFACT = "artifact"
     ARTIFACT_REVISION = "artifact_revision"
+    AGENT = "agent"
     ROLE = "role"
     NOTIFICATION_CHANNEL = "notification_channel"
 

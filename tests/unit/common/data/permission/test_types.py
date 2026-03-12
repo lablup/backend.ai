@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from ai.backend.common.data.permission.types import EntityType, RBACElementType
+from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
 from ai.backend.common.exception import RBACTypeConversionError
 
 
@@ -125,3 +125,64 @@ class TestEntityTypeToRBACElementType:
             EntityType.AUTH.to_element()
 
         assert "has no corresponding RBACElementType" in str(exc_info.value)
+
+
+class TestRBACElementTypeToScopeType:
+    """Tests for RBACElementType.to_scope_type() conversion."""
+
+    @pytest.mark.parametrize(
+        "element_type",
+        [
+            RBACElementType.DOMAIN,
+            RBACElementType.PROJECT,
+            RBACElementType.USER,
+            RBACElementType.RESOURCE_GROUP,
+            RBACElementType.CONTAINER_REGISTRY,
+            RBACElementType.STORAGE_HOST,
+            RBACElementType.SESSION,
+            RBACElementType.DEPLOYMENT,
+            RBACElementType.MODEL_DEPLOYMENT,
+            RBACElementType.VFOLDER,
+            RBACElementType.IMAGE,
+            RBACElementType.ARTIFACT,
+            RBACElementType.ARTIFACT_REVISION,
+            RBACElementType.AGENT,
+            RBACElementType.ROLE,
+            RBACElementType.NOTIFICATION_CHANNEL,
+            RBACElementType.ARTIFACT_REGISTRY,
+        ],
+    )
+    def test_to_scope_type_round_trip(self, element_type: RBACElementType) -> None:
+        """Test that to_scope_type() converts successfully and round-trips back."""
+        scope_type = element_type.to_scope_type()
+        assert isinstance(scope_type, ScopeType)
+        assert scope_type.value == element_type.value
+
+        # Round-trip back to RBACElementType
+        round_trip = scope_type.to_element()
+        assert round_trip == element_type
+
+    def test_model_deployment_conversion(self) -> None:
+        """Test MODEL_DEPLOYMENT scope conversion specifically."""
+        scope_type = RBACElementType.MODEL_DEPLOYMENT.to_scope_type()
+        assert scope_type == ScopeType.MODEL_DEPLOYMENT
+        assert scope_type.value == "model_deployment"
+
+        round_trip = scope_type.to_element()
+        assert round_trip == RBACElementType.MODEL_DEPLOYMENT
+
+    def test_agent_scope_conversion(self) -> None:
+        """Test AGENT scope conversion specifically."""
+        scope_type = RBACElementType.AGENT.to_scope_type()
+        assert scope_type == ScopeType.AGENT
+        assert scope_type.value == "agent"
+
+        round_trip = scope_type.to_element()
+        assert round_trip == RBACElementType.AGENT
+
+    def test_element_without_scope_raises_error(self) -> None:
+        """Test that RBACElementType values without ScopeType counterparts raise error."""
+        with pytest.raises(RBACTypeConversionError) as exc_info:
+            RBACElementType.EVENT_LOG.to_scope_type()
+
+        assert "has no corresponding ScopeType" in str(exc_info.value)
