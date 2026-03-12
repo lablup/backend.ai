@@ -114,8 +114,8 @@ from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.endpoint import ModelServiceHelper
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
-from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
