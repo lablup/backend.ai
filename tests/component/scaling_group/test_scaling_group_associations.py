@@ -7,6 +7,14 @@ Covers scenarios from:
 - scaling_group/crud.md (S-CREATE-*, S-MOD-*, S-PURGE-*, F-AUTH-*)
 - scaling_group/domain_association.md (S-1 through S-5)
 - scaling_group/keypair_association.md (S-1 through S-5)
+
+Permission note (F-AUTH-*):
+  Scaling group CRUD (create / modify / purge) is exposed ONLY through the
+  legacy GraphQL API which enforces ``allowed_roles = (UserRole.SUPERADMIN,)``.
+  The REST API v2 has no create / modify / purge endpoints, so 403 testing for
+  those mutations is not applicable at the REST layer.  ``TestScalingGroupPermissions``
+  documents this contract and verifies the read-only endpoints that ARE available
+  to regular users.
 """
 
 from __future__ import annotations
@@ -816,3 +824,39 @@ class TestScalingGroupKeypairAssociation:
             ) is True
         finally:
             await self._purge_sgroup(scaling_group_processors, name)
+
+
+class TestScalingGroupPermissions:
+    """Permission contract tests for scaling group REST API endpoints.
+
+    Scaling group CRUD (create / modify / purge) is ONLY accessible through
+    the legacy GraphQL API, which enforces ``allowed_roles = (UserRole.SUPERADMIN,)``.
+    The REST API v2 exposes only read-only endpoints (list, wsproxy-version), both
+    guarded by ``auth_required`` (not ``superadmin_required``), so all authenticated
+    users — including regular users — can call them.
+
+    Because the REST layer has no create / modify / purge endpoints, 403 permission
+    testing for those mutations is not applicable here.  The superadmin restriction
+    is enforced at the GraphQL layer.
+    """
+
+    async def test_regular_user_can_list_scaling_groups(
+        self,
+        user_registry: BackendAIClientRegistry,
+        scaling_group_fixture: str,
+        group_fixture: uuid.UUID,
+        database_fixture: None,
+    ) -> None:
+        """F-AUTH-LIST: Regular user can list public scaling groups (auth_required, not superadmin).
+
+        The list_scaling_groups endpoint uses ``auth_required``, so non-admin
+        users get a 200 response filtered to public scaling groups.  The fixture
+        sgroup is public (is_public=True), so it should appear in the result.
+        """
+        result = await user_registry.scaling_group.list_scaling_groups(
+            group=str(group_fixture),
+        )
+        assert isinstance(result, ListScalingGroupsResponse)
+        names = [sg.name for sg in result.scaling_groups]
+        # The fixture sgroup is public — regular user should see it
+        assert scaling_group_fixture in names
