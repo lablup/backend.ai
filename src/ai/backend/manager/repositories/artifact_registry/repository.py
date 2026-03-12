@@ -10,11 +10,13 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryData,
     ArtifactRegistryListResult,
 )
+from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact_registry.db_source.db_source import (
     ArtifactRegistryDBSource,
 )
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 
 artifact_registry_repository_resilience = Resilience(
     policies=[
@@ -40,6 +42,12 @@ class ArtifactRegistryRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db_source = ArtifactRegistryDBSource(db)
+
+    @artifact_registry_repository_resilience.apply()
+    async def create_artifact_registry(
+        self, creator: RBACEntityCreator[ArtifactRegistryRow]
+    ) -> ArtifactRegistryData:
+        return await self._db_source.create_artifact_registry(creator)
 
     @artifact_registry_repository_resilience.apply()
     async def get_artifact_registry_data(self, registry_id: uuid.UUID) -> ArtifactRegistryData:
