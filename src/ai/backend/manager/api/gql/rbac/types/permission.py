@@ -79,6 +79,7 @@ class RBACElementTypeGQL(StrEnum):
 
     # Auto-only entities used in permissions
     NOTIFICATION_RULE = "notification_rule"
+    USER_FAIR_SHARE = "user_fair_share"
 
     # Entity-level scopes
     ARTIFACT_REVISION = "artifact_revision"

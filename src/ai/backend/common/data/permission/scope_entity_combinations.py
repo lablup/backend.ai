@@ -40,6 +40,7 @@ VALID_SCOPE_ENTITY_COMBINATIONS: Mapping[RBACElementType, frozenset[RBACElementT
     }),
     RBACElementType.RESOURCE_GROUP: frozenset({
         RBACElementType.AGENT,
+        RBACElementType.USER_FAIR_SHARE,
     }),
     RBACElementType.AGENT: frozenset({
         RBACElementType.KERNEL,

@@ -35,6 +35,7 @@ from ai.backend.manager.repositories.base import (
     Creator,
     Upserter,
 )
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 
 from .db_source import FairShareDBSource
 from .types import (
@@ -208,7 +209,7 @@ class FairShareRepository:
     @fair_share_repository_resilience.apply()
     async def create_user_fair_share(
         self,
-        creator: Creator[UserFairShareRow],
+        creator: RBACEntityCreator[UserFairShareRow],
     ) -> UserFairShareData:
         """Create a new user fair share record."""
         return await self._db_source.create_user_fair_share(creator)

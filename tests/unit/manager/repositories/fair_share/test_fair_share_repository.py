@@ -11,7 +11,9 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
@@ -49,6 +51,7 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, Upserter
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.fair_share import (
     DomainFairShareConditions,
     DomainFairShareCreatorSpec,
@@ -512,14 +515,16 @@ class TestFairShareRepository:
         test_user_uuid: uuid.UUID,
     ) -> None:
         """Test creating user fair share"""
-        creator = Creator(
+        creator = RBACEntityCreator(
             spec=UserFairShareCreatorSpec(
                 resource_group=test_scaling_group,
                 user_uuid=test_user_uuid,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
                 weight=Decimal("1.2"),
-            )
+            ),
+            element_type=RBACElementType.USER_FAIR_SHARE,
+            scope_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, test_scaling_group),
         )
 
         result = await fair_share_repository.create_user_fair_share(creator)
@@ -564,13 +569,15 @@ class TestFairShareRepository:
         test_user_uuid: uuid.UUID,
     ) -> None:
         """Test getting user fair share"""
-        creator = Creator(
+        creator = RBACEntityCreator(
             spec=UserFairShareCreatorSpec(
                 resource_group=test_scaling_group,
                 user_uuid=test_user_uuid,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
-            )
+            ),
+            element_type=RBACElementType.USER_FAIR_SHARE,
+            scope_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, test_scaling_group),
         )
         await fair_share_repository.create_user_fair_share(creator)
 

@@ -10057,6 +10057,7 @@ enum RBACElementType
   AUDIT_LOG @join__enumValue(graph: STRAWBERRY)
   EVENT_LOG @join__enumValue(graph: STRAWBERRY)
   NOTIFICATION_RULE @join__enumValue(graph: STRAWBERRY)
+  USER_FAIR_SHARE @join__enumValue(graph: STRAWBERRY)
   ARTIFACT_REVISION @join__enumValue(graph: STRAWBERRY)
 }
 
