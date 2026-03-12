@@ -190,6 +190,98 @@ class TestUserSearch:
         assert result.pagination.limit == 1
         assert len(result.items) <= 1
 
+    async def test_search_with_username_filter(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        user_factory: UserFactory,
+    ) -> None:
+        unique = secrets.token_hex(4)
+        target = await user_factory(username=f"unamef-{unique}")
+        await user_factory(username=f"other-{unique}")
+
+        result = await admin_registry.user.search(
+            SearchUsersRequest(
+                filter=UserFilter(username=StringFilter(equals=f"unamef-{unique}")),
+            )
+        )
+        assert result.pagination.total == 1
+        assert result.items[0].username == target.user.username
+
+    async def test_search_with_role_filter(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        user_factory: UserFactory,
+    ) -> None:
+        unique = secrets.token_hex(4)
+        user_role = await user_factory(
+            email=f"rolef-{unique}@test.local",
+            username=f"rolef-{unique}",
+            role=UserRole.USER,
+        )
+
+        result = await admin_registry.user.search(
+            SearchUsersRequest(
+                filter=UserFilter(
+                    email=StringFilter(contains=f"rolef-{unique}"),
+                    role=[UserRole.USER],
+                ),
+            )
+        )
+        assert result.pagination.total >= 1
+        found = [u for u in result.items if u.id == user_role.user.id]
+        assert len(found) == 1
+        assert found[0].role == UserRole.USER
+
+    async def test_search_with_compound_filters(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        user_factory: UserFactory,
+    ) -> None:
+        unique = secrets.token_hex(4)
+        marker = f"compf-{unique}"
+        target = await user_factory(
+            email=f"{marker}@test.local",
+            username=marker,
+            status=UserStatus.ACTIVE,
+            role=UserRole.USER,
+        )
+        await user_factory(
+            email=f"{marker}-inactive@test.local",
+            username=f"{marker}-inactive",
+            status=UserStatus.INACTIVE,
+        )
+
+        result = await admin_registry.user.search(
+            SearchUsersRequest(
+                filter=UserFilter(
+                    email=StringFilter(contains=marker),
+                    status=[UserStatus.ACTIVE],
+                    role=[UserRole.USER],
+                ),
+            )
+        )
+        assert result.pagination.total >= 1
+        user_ids = {u.id for u in result.items}
+        assert target.user.id in user_ids
+        for user in result.items:
+            assert marker in user.email
+            assert user.status == UserStatus.ACTIVE
+            assert user.role == UserRole.USER
+
+    async def test_search_with_empty_result(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        result = await admin_registry.user.search(
+            SearchUsersRequest(
+                filter=UserFilter(
+                    email=StringFilter(equals="nonexistent-xyz-999@test.local"),
+                ),
+            )
+        )
+        assert len(result.items) == 0
+        assert result.pagination.total == 0
+
     async def test_regular_user_cannot_search_users(
         self,
         user_registry: BackendAIClientRegistry,
@@ -271,3 +363,43 @@ class TestUserPurge:
     ) -> None:
         with pytest.raises(PermissionDeniedError):
             await user_registry.user.purge(PurgeUserRequest(user_id=target_user.user.id))
+
+
+class TestUserBulkOperations:
+    """Bulk operation actions/services/repositories exist but REST API v2
+    endpoints are not wired yet.  Fill in once UserClient bulk methods are added."""
+
+    @pytest.mark.xfail(reason="UserClient.bulk_create not implemented yet")
+    async def test_bulk_create_all_success(self) -> None:
+        """Bulk create all success -> all users created, correct count."""
+        pytest.fail("Not implemented")
+
+    @pytest.mark.xfail(reason="UserClient.bulk_create not implemented yet")
+    async def test_bulk_create_partial_failure_duplicate_email(self) -> None:
+        """Bulk create partial failure (duplicate email) -> success + failure lists with indices."""
+        pytest.fail("Not implemented")
+
+    @pytest.mark.xfail(reason="UserClient.bulk_create not implemented yet")
+    async def test_bulk_create_empty_list(self) -> None:
+        """Bulk create empty list -> empty result (no error)."""
+        pytest.fail("Not implemented")
+
+    @pytest.mark.xfail(reason="UserClient.bulk_modify not implemented yet")
+    async def test_bulk_modify_all_success(self) -> None:
+        """Bulk modify all success -> all users updated."""
+        pytest.fail("Not implemented")
+
+    @pytest.mark.xfail(reason="UserClient.bulk_modify not implemented yet")
+    async def test_bulk_modify_partial_failure_nonexistent_user(self) -> None:
+        """Bulk modify partial failure (non-existent user) -> success + failure with indices."""
+        pytest.fail("Not implemented")
+
+    @pytest.mark.xfail(reason="UserClient.bulk_purge not implemented yet")
+    async def test_bulk_purge_partial_failure(self) -> None:
+        """Bulk purge partial failure (vfolder mount blocking) -> success + failure with indices."""
+        pytest.fail("Not implemented")
+
+    @pytest.mark.xfail(reason="UserClient bulk operations not implemented yet")
+    async def test_failure_index_tracking(self) -> None:
+        """Failure index tracking -> each failure has correct index and error message."""
+        pytest.fail("Not implemented")
