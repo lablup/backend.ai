@@ -10033,7 +10033,6 @@ enum RBACElementType
   USER @join__enumValue(graph: STRAWBERRY)
   SESSION @join__enumValue(graph: STRAWBERRY)
   VFOLDER @join__enumValue(graph: STRAWBERRY)
-  DEPLOYMENT @join__enumValue(graph: STRAWBERRY)
   MODEL_DEPLOYMENT @join__enumValue(graph: STRAWBERRY)
   KEYPAIR @join__enumValue(graph: STRAWBERRY)
   NOTIFICATION_CHANNEL @join__enumValue(graph: STRAWBERRY)
