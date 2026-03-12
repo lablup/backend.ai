@@ -70,7 +70,6 @@ class TestSearchDeployments:
         assert result.deployments == []
         assert result.pagination.total == 0
 
-    @pytest.mark.xfail(strict=True, reason="Requires deployment controller mocking")
     async def test_search_deployments_paginated(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -133,7 +132,6 @@ class TestGetDeployment:
         with pytest.raises(NotFoundError):
             await admin_registry.deployment.get_deployment(non_existent_id)
 
-    @pytest.mark.xfail(strict=True, reason="Requires deployment controller mocking")
     async def test_get_deployment_by_id(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -245,7 +243,6 @@ class TestSearchRoutes:
         assert result.pagination.has_next_page is False
         assert result.pagination.has_previous_page is False
 
-    @pytest.mark.xfail(strict=True, reason="Requires deployment controller mocking")
     async def test_search_routes_for_deployment(
         self,
         admin_registry: BackendAIClientRegistry,

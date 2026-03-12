@@ -81,7 +81,6 @@ class TestCreateDeployment:
         with pytest.raises(Exception):
             await admin_registry.deployment.create_deployment(request)
 
-    @pytest.mark.xfail(strict=True, reason="Requires deployment controller mocking")
     async def test_create_deployment_success(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -149,7 +148,6 @@ class TestUpdateDeployment:
                 UpdateDeploymentRequest(name="new-name"),
             )
 
-    @pytest.mark.xfail(strict=True, reason="Requires deployment controller mocking")
     async def test_update_deployment_config(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -219,7 +217,7 @@ class TestDestroyDeployment:
         with pytest.raises(NotFoundError):
             await admin_registry.deployment.destroy_deployment(_RANDOM_DEPLOYMENT_ID)
 
-    @pytest.mark.xfail(strict=True, reason="Requires deployment controller mocking")
+    @pytest.mark.xfail(strict=True, reason="Destroyed deployment still accessible via GET")
     async def test_destroy_deployment(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -286,7 +284,6 @@ class TestRevisionManagement:
                 _RANDOM_REVISION_ID,
             )
 
-    @pytest.mark.xfail(strict=True, reason="Requires deployment controller mocking")
     async def test_activate_deactivate_revision(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -375,7 +372,6 @@ class TestRevisionManagement:
 
 
 class TestReplicaManagement:
-    @pytest.mark.xfail(strict=True, reason="Requires deployment controller mocking")
     async def test_change_desired_replicas(
         self,
         admin_registry: BackendAIClientRegistry,
