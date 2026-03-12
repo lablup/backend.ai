@@ -98,6 +98,7 @@ class EntityType(enum.StrEnum):
     ERROR_LOG = "error_log"
     EXPORT = "export"
     GROUP = "group"
+    KERNEL = "kernel"
     KEYPAIR = "keypair"
     MODEL_SERVICE = "model_service"
     NETWORK = "network"
@@ -113,6 +114,7 @@ class EntityType(enum.StrEnum):
     PROMETHEUS_QUERY_PRESET = "prometheus_query_preset"
     RESOURCE_PRESET = "resource_preset"
     ROLE = "role"
+    ROUTING = "routing"
     DOTFILE = "dotfile"
     ETCD_CONFIG = "etcd_config"
     MANAGER_ADMIN = "manager_admin"
@@ -318,10 +320,12 @@ class ScopeType(enum.StrEnum):
     # === Entity-level scopes ===
     SESSION = "session"
     DEPLOYMENT = "deployment"
+    MODEL_DEPLOYMENT = "model_deployment"
     VFOLDER = "vfolder"
     IMAGE = "image"
     ARTIFACT = "artifact"
     ARTIFACT_REVISION = "artifact_revision"
+    AGENT = "agent"
     ROLE = "role"
     NOTIFICATION_CHANNEL = "notification_channel"
 
