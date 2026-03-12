@@ -73,15 +73,6 @@ DEPLOYMENT_STATUS_TIMEOUT_MAP: dict[EndpointLifecycle, float] = {
 }
 
 
-@dataclass
-class _AttemptContext:
-    """Attempt context tracked from scheduling history."""
-
-    attempts: int = 0  # Used for give_up classification (max retries exceeded)
-    started_at: datetime | None = None  # Used for expired classification (timeout exceeded)
-
-
-
 def _is_transition_timed_out(
     started_at: datetime | None,
     lifecycle: EndpointLifecycle,
