@@ -6,34 +6,12 @@ body {
   --lumo-primary-text-color: var(--token-colorPrimary, #27824F);
   --lumo-primary-color-50pct: var(--token-colorPrimary, #27824F);
   background-color: var(--token-colorBgBase, rgba(247, 247, 246, 1));
-  /* background-image: url("images/loading-background-large.jpg");
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-  background-position: top left; */
 }
 
 body.dark-theme {
   background-color: #191919;
-  --theme-image-filter: brightness(0.15);
 }
 
-body::before {
-  content: "";
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  background-image: url("images/loading-background-large.jpg");
-  z-index: -1;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-  background-position: top left;
-}
-
-body.dark-theme::before {
-  filter: var(--theme-image-filter)
-}
 
 .splash {
   position: absolute;
