@@ -4,13 +4,15 @@ import secrets
 import shutil
 import subprocess
 from collections import defaultdict
-from collections.abc import AsyncIterator, Generator
+from collections.abc import AsyncIterator, Callable, Coroutine, Generator
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import aiodocker
 import pytest
+import sqlalchemy as sa
+from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.resources import ResourceAllocator
@@ -19,10 +21,22 @@ from ai.backend.common import config
 from ai.backend.common import config as common_config
 from ai.backend.common import validators as tx
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import HostPortPair
+from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.plugin.hook import HookPluginContext
+from ai.backend.common.types import AgentId, HostPortPair, ResourceSlot
 from ai.backend.logging import LocalLogger
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat, LogLevel
+from ai.backend.manager.agent_cache import AgentRPCCache
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.agent.repository import AgentRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     redis_container,
@@ -353,3 +367,88 @@ async def agent_runtime(
         yield runtime
     finally:
         await runtime.__aexit__(None, None, None)
+
+
+# ---------------------------------------------------------------------------
+# Fixtures for manager-side agent lifecycle / heartbeat component tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+async def lifecycle_agent_service(
+    database_engine: ExtendedAsyncSAEngine,
+    valkey_clients: ValkeyClients,
+    async_etcd: AsyncEtcd,
+) -> AsyncIterator[tuple[AgentService, AsyncMock, AsyncMock, MagicMock]]:
+    """AgentService wired to real DB + Valkey with mocked external dependencies.
+
+    Yields (service, mock_event_producer, mock_hook_ctx, mock_agent_cache).
+    """
+    mock_config = MagicMock(spec=ManagerConfigProvider)
+    mock_config.config.watcher.token = "test-watcher-token"
+    mock_config.legacy_etcd_config_loader.update_resource_slots = AsyncMock()
+
+    agent_repo = AgentRepository(
+        database_engine,
+        valkey_clients.image,
+        valkey_clients.live,
+        valkey_clients.stat,
+        mock_config,
+    )
+    scheduler_repo = SchedulerRepository(database_engine, valkey_clients.stat, mock_config)
+
+    mock_event_producer = AsyncMock(spec=EventProducer)
+    mock_hook_ctx = AsyncMock(spec=HookPluginContext)
+    mock_agent_cache: MagicMock = MagicMock(spec=AgentRPCCache)
+
+    service = AgentService(
+        etcd=async_etcd,
+        agent_registry=AsyncMock(),
+        config_provider=mock_config,
+        agent_repository=agent_repo,
+        scheduler_repository=scheduler_repo,
+        hook_plugin_ctx=mock_hook_ctx,
+        event_producer=mock_event_producer,
+        agent_cache=mock_agent_cache,
+    )
+    yield service, mock_event_producer, mock_hook_ctx, mock_agent_cache
+
+
+@pytest.fixture
+async def agent_row_factory(
+    db_engine: SAEngine,
+    scaling_group_fixture: str,
+) -> AsyncIterator[Callable[..., Coroutine[Any, Any, AgentId]]]:
+    """Factory that inserts AgentRow into DB and cleans up on teardown."""
+    created_ids: list[str] = []
+
+    async def _create(
+        agent_id: str | None = None,
+        status: AgentStatus = AgentStatus.ALIVE,
+    ) -> AgentId:
+        aid = agent_id or f"i-test-{secrets.token_hex(4)}"
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                sa.insert(AgentRow.__table__).values(
+                    id=aid,
+                    status=status,
+                    region="test-region",
+                    scaling_group=scaling_group_fixture,
+                    available_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
+                    occupied_slots=ResourceSlot(),
+                    addr="http://127.0.0.1:6001",
+                    public_host="127.0.0.1",
+                    version="24.09.0",
+                    architecture="x86_64",
+                    compute_plugins={},
+                    auto_terminate_abusing_kernel=False,
+                )
+            )
+        created_ids.append(aid)
+        return AgentId(aid)
+
+    yield _create
+
+    async with db_engine.begin() as conn:
+        for aid in reversed(created_ids):
+            await conn.execute(AgentRow.__table__.delete().where(AgentRow.__table__.c.id == aid))
