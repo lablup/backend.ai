@@ -110,7 +110,7 @@ class TestCreateGroup:
         creator = Creator(
             spec=GroupCreatorSpec(name="new-project", domain_name="default", description="desc")
         )
-        action = CreateGroupAction(creator=creator)
+        action = CreateGroupAction(creator=creator, _domain_name="default")
 
         result = await service.create_group(action)
 
@@ -136,7 +136,7 @@ class TestCreateGroup:
                 total_resource_slots=slots,
             )
         )
-        action = CreateGroupAction(creator=creator)
+        action = CreateGroupAction(creator=creator, _domain_name="default")
 
         result = await service.create_group(action)
 
@@ -154,7 +154,7 @@ class TestCreateGroup:
         )
 
         creator = Creator(spec=GroupCreatorSpec(name="existing", domain_name="default"))
-        action = CreateGroupAction(creator=creator)
+        action = CreateGroupAction(creator=creator, _domain_name="default")
 
         with pytest.raises(IntegrityError):
             await service.create_group(action)

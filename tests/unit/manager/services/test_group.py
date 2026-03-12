@@ -102,6 +102,7 @@ class TestCreateGroup:
                     is_active=sample_group_data.is_active,
                 )
             ),
+            _domain_name=sample_group_data.domain_name,
         )
 
         result = await service.create_group(action)
@@ -132,6 +133,7 @@ class TestCreateGroup:
                     domain_name="default",
                 )
             ),
+            _domain_name="default",
         )
 
         with pytest.raises(InvalidAPIParameters):
@@ -157,7 +159,8 @@ class TestCreateGroup:
                     total_resource_slots=ResourceSlot.from_user_input({}, None),
                     domain_name="default",
                 )
-            )
+            ),
+            _domain_name="default",
         )
 
         with pytest.raises(InvalidAPIParameters):
