@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import uuid
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Final, cast
+from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
 from ai.backend.common.dto.manager.field import (
@@ -305,7 +305,7 @@ class VFolderHandler:
             is_owner=True,
             created_at="",
         )
-        resp = VFolderCreateResponse(item=item)
+        resp = VFolderCreateResponse(item)
         return APIResponse.build(HTTPStatus.CREATED, resp)
 
     # ------------------------------------------------------------------
@@ -800,7 +800,7 @@ class VFolderHandler:
                 exist_ok=params.exist_ok,
             )
         )
-        resp = MkdirResponse(results=cast(list[Any], result.results))
+        resp = MkdirResponse(results=result.results)
         return APIResponse.build(result.storage_resp_status, resp)
 
     # ------------------------------------------------------------------

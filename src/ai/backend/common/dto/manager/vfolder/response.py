@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.field import (
     VFolderOwnershipTypeField,
     VFolderPermissionField,
 )
-from ai.backend.common.types import VFolderUsageMode
+from ai.backend.common.types import ResultSet, VFolderUsageMode
 
 __all__ = (
     # DTOs (data transfer objects)
@@ -179,10 +179,8 @@ class MountResultDTO(BaseModel):
 # ============================================================
 
 
-class VFolderCreateResponse(BaseResponseModel):
-    """Response for vfolder creation."""
-
-    item: VFolderItemField
+class VFolderCreateResponse(BaseRootResponseModel[VFolderItemField]):
+    """Response for vfolder creation (flat object for backward compatibility)."""
 
 
 class VFolderListResponse(BaseRootResponseModel[list[VFolderItemField]]):
@@ -215,7 +213,7 @@ class VFolderCloneResponse(BaseResponseModel):
 class MkdirResponse(BaseResponseModel):
     """Response for mkdir operation."""
 
-    results: list[Any] = Field(description="Results of directory creation")
+    results: ResultSet = Field(description="Results of directory creation")
 
 
 class CreateDownloadSessionResponse(BaseResponseModel):
