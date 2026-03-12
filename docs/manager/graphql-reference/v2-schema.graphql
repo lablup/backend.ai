@@ -3236,6 +3236,11 @@ type KernelV2 implements Node {
   """Startup command executed when the kernel starts."""
   startupCommand: String
 
+  """
+  List of persistent vfolder mount paths inside the container. Files outside these paths are ephemeral and will be lost on session termination.
+  """
+  persistentMountPaths: [String!]!
+
   """Information about the session this kernel belongs to."""
   sessionInfo: KernelV2SessionInfo!
 
@@ -7334,6 +7339,11 @@ type SessionV2RuntimeInfo {
   URL to call back when the session completes (e.g., for batch sessions).
   """
   callbackUrl: String
+
+  """
+  List of persistent vfolder mount paths inside the container. Files outside these paths are ephemeral and will be lost on session termination.
+  """
+  persistentMountPaths: [String!]!
 }
 
 """Added in 26.3.0. Status of a session in its lifecycle."""
