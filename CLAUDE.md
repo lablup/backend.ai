@@ -49,6 +49,16 @@ pants test --changed-since=HEAD~1
 
 **Fix all lint, type, and test errors — never suppress or skip.**
 
+## Layer Architecture
+
+API Handler → Processor → Service → Repository → DB
+
+- API handlers MUST call Processors, NEVER Services directly
+- Services accept Actions (frozen dataclasses), return ActionResults
+- Repositories handle all DB access via `begin_session()` / `begin_readonly_session()`
+- NEVER import from a lower layer to a higher layer
+- For detailed patterns, read skill files: `/repository-guide`, `/service-guide`, `/api-guide`
+
 ## Development Guidelines
 
 **README-First:** Always read component README (`src/ai/backend/{component}/README.md`) before making changes.
