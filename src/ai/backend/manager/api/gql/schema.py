@@ -172,6 +172,14 @@ from .project_v2 import (
     project_domain_v2,
     project_v2,
 )
+from .prometheus_query_preset import (
+    admin_create_prometheus_query_preset,
+    admin_delete_prometheus_query_preset,
+    admin_modify_prometheus_query_preset,
+    admin_prometheus_query_preset,
+    admin_prometheus_query_preset_result,
+    admin_prometheus_query_presets,
+)
 from .rbac import (
     admin_assign_role,
     admin_bulk_assign_role,
@@ -316,6 +324,10 @@ class Query:
     admin_kernels_v2 = admin_kernels_v2
     admin_sessions_v2 = admin_sessions_v2
     admin_image_aliases = admin_image_aliases
+    # Prometheus Query Preset Admin APIs
+    admin_prometheus_query_preset = admin_prometheus_query_preset
+    admin_prometheus_query_presets = admin_prometheus_query_presets
+    admin_prometheus_query_preset_result = admin_prometheus_query_preset_result
     # RBAC Admin APIs
     admin_role = admin_role
     admin_roles = admin_roles
@@ -482,6 +494,10 @@ class Mutation:
     admin_delete_users_v2 = admin_delete_users_v2
     admin_purge_user_v2 = admin_purge_user_v2
     admin_bulk_purge_users_v2 = admin_bulk_purge_users_v2
+    # Prometheus Query Preset - Admin APIs
+    admin_create_prometheus_query_preset = admin_create_prometheus_query_preset
+    admin_modify_prometheus_query_preset = admin_modify_prometheus_query_preset
+    admin_delete_prometheus_query_preset = admin_delete_prometheus_query_preset
     # RBAC Admin APIs
     admin_create_role = admin_create_role
     admin_update_role = admin_update_role
