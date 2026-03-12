@@ -300,14 +300,13 @@ class ResourcePresetDBSource:
         :param known_slot_types: Known slot types for initialization
         :return: Dictionary of scaling group name to occupied resources
         """
-        rst = ResourceSlotTypeRow.__table__
-        j = (
-            sa.join(
-                ResourceAllocationRow, KernelRow, ResourceAllocationRow.kernel_id == KernelRow.id
-            )
-            .join(SessionRow, KernelRow.session_id == SessionRow.id)
-            .join(rst, ResourceAllocationRow.slot_name == rst.c.slot_name)
-        )
+        per_sgroup_occupancy: dict[str, ResourceSlot] = {
+            sgname: ResourceSlot.from_known_slots(known_slot_types) for sgname in sgroup_names
+        }
+
+        j = sa.join(
+            ResourceAllocationRow, KernelRow, ResourceAllocationRow.kernel_id == KernelRow.id
+        ).join(SessionRow, KernelRow.session_id == SessionRow.id)
         effective_amount = sa.func.coalesce(
             ResourceAllocationRow.used, ResourceAllocationRow.requested
         )
@@ -441,7 +440,7 @@ class ResourcePresetDBSource:
 
         j = sa.join(
             ResourceAllocationRow, KernelRow, ResourceAllocationRow.kernel_id == KernelRow.id
-        ).join(rst, ResourceAllocationRow.slot_name == rst.c.slot_name)
+        )
         effective_amount = sa.func.coalesce(
             ResourceAllocationRow.used, ResourceAllocationRow.requested
         )
