@@ -19,7 +19,8 @@ import aiohttp
 import ifaddr
 import psutil
 
-from .utils import curl
+from .exception import CloudDetectionError
+from .networking import curl
 
 __all__ = (
     "detect_cloud",
@@ -57,7 +58,17 @@ def is_containerized() -> bool:
 async def _detect_aws(session: aiohttp.ClientSession) -> CloudProvider:
     async with session.get(
         "http://169.254.169.254/latest/meta-data/",
-    ):
+    ) as resp:
+        body = await resp.text()
+        if resp.status != 200:
+            raise CloudDetectionError(
+                f"AWS detection failed with status {resp.status}", extra_data=f"{body[:200]!r}"
+            )
+        # ref: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html
+        if "instance-id" not in body:
+            raise CloudDetectionError(
+                f"AWS detection failed with status {resp.status}", extra_data=f"{body[:200]!r}"
+            )
         return CloudProvider.AWS
 
 
@@ -66,7 +77,26 @@ async def _detect_azure(session: aiohttp.ClientSession) -> CloudProvider:
         "http://169.254.169.254/metadata/instance/compute",
         params={"api-version": "2021-02-01"},
         headers={"Metadata": "true"},
-    ):
+    ) as resp:
+        body = await resp.text()
+        if resp.status != 200:
+            raise CloudDetectionError(
+                f"Azure detection failed with status {resp.status}", extra_data=f"{body[:200]!r})"
+            )
+        try:
+            data = await resp.json()
+        except (json.JSONDecodeError, ValueError):
+            body = await resp.text()
+            raise CloudDetectionError(
+                f"Azure detection failed with status {resp.status}", extra_data=f"{body[:200]!r}"
+            ) from None
+        # ref: https://learn.microsoft.com/azure/virtual-machines/instance-metadata-service?tabs=linux
+        if not isinstance(data, dict) or "vmId" not in data:
+            body = await resp.text()
+            raise CloudDetectionError(
+                f"Azure detection failed with status {resp.status}",
+                extra_data=f"missing vmId key (body={body[:200]!r}) ",
+            ) from None
         return CloudProvider.AZURE
 
 
@@ -74,7 +104,20 @@ async def _detect_gcp(session: aiohttp.ClientSession) -> CloudProvider:
     async with session.get(
         "http://169.254.169.254/computeMetadata/v1/instance/id",
         headers={"Metadata-Flavor": "Google"},
-    ):
+    ) as resp:
+        body = await resp.text()
+        if resp.status != 200:
+            raise CloudDetectionError(
+                f"GCP detection failed with status {resp.status}", extra_data=f"{body[:64]!r})"
+            )
+        try:
+            # ref: https://docs.cloud.google.com/compute/docs/metadata/predefined-metadata-keys
+            int(body.strip())
+        except ValueError:
+            raise CloudDetectionError(
+                f"GCP detection failed with status {resp.status}",
+                extra_data=f"non-numeric body (body={body[:64]!r})",
+            ) from None
         return CloudProvider.GCP
 
 
@@ -84,8 +127,7 @@ async def detect_cloud() -> Optional[CloudProvider]:
     to get the fastest returning result from multiple metadata URL detectors.
     """
     async with aiohttp.ClientSession(
-        raise_for_status=True,
-        timeout=aiohttp.ClientTimeout(connect=0.3),
+        timeout=aiohttp.ClientTimeout(total=1.0, connect=0.3, sock_read=0.5),
     ) as session:
         detection_tasks = [
             functools.partial(_detect_aws, session),
@@ -97,7 +139,11 @@ async def detect_cloud() -> Optional[CloudProvider]:
             delay=0.001,
         )
         if winner_value is not None:
-            return winner_value
+            result: CloudProvider | None = winner_value
+            return result
+        for exc in exceptions:
+            if exc is not None:
+                log.debug(f"Cloud detection failed: {exc}")
     return None
 
 
@@ -196,9 +242,12 @@ def _define_functions():
 
             async def _get_instance_region() -> str:
                 doc = await curl(_dynamic_prefix + "instance-identity/document", None)
-                if doc is None:
+                if not doc:
                     return "amazon/unknown"
-                region = json.loads(doc)["region"]
+                try:
+                    region = json.loads(doc)["region"]
+                except (json.JSONDecodeError, KeyError):
+                    return "amazon/unknown"
                 return f"amazon/{region}"
 
         case CloudProvider.AZURE:
@@ -212,11 +261,16 @@ def _define_functions():
                     params={"api-version": "2021-02-01"},
                     headers={"Metadata": "true"},
                 )
-                if data is None:
+                if not data:
                     return f"i-{socket.gethostname()}"
-                o = json.loads(data)
-                vm_name = o["compute"]["name"]  # unique within the resource group
-                vm_id = uuid.UUID(o["compute"]["vmId"])  # prevent conflicts across resource group
+                try:
+                    o = json.loads(data)
+                    vm_name = o["compute"]["name"]  # unique within the resource group
+                    vm_id = uuid.UUID(
+                        o["compute"]["vmId"]
+                    )  # prevent conflicts across resource group
+                except (json.JSONDecodeError, KeyError, ValueError):
+                    return f"i-{socket.gethostname()}"
                 vm_id_hash = base64.b32encode(vm_id.bytes[-5:]).decode().lower()
                 return f"i-{vm_name}-{vm_id_hash}"
 
@@ -227,10 +281,16 @@ def _define_functions():
                     params={"api-version": "2021-02-01"},
                     headers={"Metadata": "true"},
                 )
-                if data is None:
+                if not data:
                     return "127.0.0.1"
-                o = json.loads(data)
-                return o["network"]["interface"][0]["ipv4"]["ipAddress"][0]["privateIpAddress"]
+                try:
+                    o = json.loads(data)
+                    result: str = o["network"]["interface"][0]["ipv4"]["ipAddress"][0][
+                        "privateIpAddress"
+                    ]
+                except (json.JSONDecodeError, KeyError, IndexError):
+                    return "127.0.0.1"
+                return result
 
             async def _get_instance_type() -> str:
                 data = await curl(
@@ -239,10 +299,14 @@ def _define_functions():
                     params={"api-version": "2021-02-01"},
                     headers={"Metadata": "true"},
                 )
-                if data is None:
+                if not data:
                     return "unknown"
-                o = json.loads(data)
-                return o["compute"]["vmSize"]
+                try:
+                    o = json.loads(data)
+                    result: str = o["compute"]["vmSize"]
+                except (json.JSONDecodeError, KeyError):
+                    return "unknown"
+                return result
 
             async def _get_instance_region() -> str:
                 data = await curl(
@@ -251,10 +315,13 @@ def _define_functions():
                     params={"api-version": "2021-02-01"},
                     headers={"Metadata": "true"},
                 )
-                if data is None:
+                if not data:
                     return "azure/unknown"
-                o = json.loads(data)
-                region = o["compute"]["location"]
+                try:
+                    o = json.loads(data)
+                    region = o["compute"]["location"]
+                except (json.JSONDecodeError, KeyError):
+                    return "azure/unknown"
                 return f"azure/{region}"
 
         case CloudProvider.GCP:
@@ -267,14 +334,18 @@ def _define_functions():
                     None,
                     headers={"Metadata-Flavor": "Google"},
                 )
-                if vm_id is None:
+                if not vm_id:
+                    return f"i-{socket.gethostname()}"
+                try:
+                    vm_id_int = int(vm_id)
+                except ValueError:
                     return f"i-{socket.gethostname()}"
                 vm_name = await curl(
                     _metadata_prefix + "instance/name",
                     None,
                     headers={"Metadata-Flavor": "Google"},
                 )
-                vm_id_hash = base64.b32encode(int(vm_id).to_bytes(8, "big")[-5:]).decode().lower()
+                vm_id_hash = base64.b32encode(vm_id_int.to_bytes(8, "big")[-5:]).decode().lower()
                 return f"i-{vm_name}-{vm_id_hash}"
 
             async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
