@@ -1,9 +1,8 @@
 import logging
 import uuid
-from typing import Any, cast
+from typing import cast
 
 import sqlalchemy as sa
-from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
@@ -48,10 +47,16 @@ from ai.backend.manager.repositories.base.rbac.scope_binder import (
     RBACScopeBindingPair,
     execute_rbac_scope_binder,
 )
+from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
+    execute_rbac_scope_entity_unbinder,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.container_registry.creators import (
     ContainerRegistryCreatorSpec,
     ContainerRegistryGroupCreatorSpec,
+)
+from ai.backend.manager.repositories.container_registry.scope_binders import (
+    ContainerRegistryProjectEntityUnbinder,
 )
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
@@ -335,38 +340,18 @@ class ContainerRegistryRepository:
             await execute_rbac_scope_binder(session, RBACScopeBinder(pairs=pairs))
 
         if allowed_group_updates.remove:
-            delete_query = (
-                sa.delete(AssociationContainerRegistriesGroupsRow)
-                .where(AssociationContainerRegistriesGroupsRow.registry_id == registry_id)
-                .where(
-                    AssociationContainerRegistriesGroupsRow.group_id.in_(
-                        allowed_group_updates.remove
-                    )
+            total_deleted = 0
+            for group_id in allowed_group_updates.remove:
+                unbinder = ContainerRegistryProjectEntityUnbinder(
+                    registry_id=registry_id,
+                    group_id=uuid.UUID(group_id),
                 )
-            )
-            result = await session.execute(delete_query)
-            if cast(CursorResult[Any], result).rowcount == 0:
+                result = await execute_rbac_scope_entity_unbinder(session, unbinder)
+                total_deleted += result.deleted_count
+            if total_deleted == 0:
                 raise ContainerRegistryGroupsAssociationNotFound(
                     f"Tried to remove non-existing associations for registry_id: {registry_id}, group_ids: {allowed_group_updates.remove}"
                 )
-            rbac_delete_query = (
-                sa.delete(AssociationScopesEntitiesRow)
-                .where(
-                    AssociationScopesEntitiesRow.entity_type
-                    == RBACElementType.CONTAINER_REGISTRY.to_entity_type()
-                )
-                .where(AssociationScopesEntitiesRow.entity_id == str(registry_id))
-                .where(
-                    AssociationScopesEntitiesRow.scope_type
-                    == RBACElementType.PROJECT.to_scope_type()
-                )
-                .where(
-                    AssociationScopesEntitiesRow.scope_id.in_([
-                        str(gid) for gid in allowed_group_updates.remove
-                    ])
-                )
-            )
-            await session.execute(rbac_delete_query)
 
     async def _clear_all_allowed_groups(
         self,
