@@ -1172,6 +1172,8 @@ class DeploymentDBSource:
                     RoutingRow.endpoint.label("endpoint_id"),
                     EndpointRow.name.label("endpoint_name"),
                     EndpointRow.runtime_variant.label("runtime_variant"),
+                    EndpointRow.session_owner.label("session_owner"),
+                    EndpointRow.project.label("project"),
                     KernelRow.kernel_host,
                     KernelRow.service_ports,
                 )
@@ -1215,6 +1217,8 @@ class DeploymentDBSource:
                         runtime_variant=row.runtime_variant.value,
                         kernel_host=row.kernel_host,
                         kernel_port=inference_port,
+                        session_owner=row.session_owner,
+                        project=row.project,
                     )
                 )
 
