@@ -251,7 +251,7 @@ class TestRoleSearch:
                 filter=RoleFilter(name=StringFilter(contains=marker)),
             )
         )
-        assert len(result.roles) >= 1
+        assert len(result.roles) == 1
         assert any(r.id == created.role.id for r in result.roles)
         assert all(marker in r.name for r in result.roles)
 
@@ -277,7 +277,7 @@ class TestRoleSearch:
             )
         )
         assert len(page1.roles) == 2
-        assert page1.pagination.total >= 3
+        assert page1.pagination.total == 3
         assert page1.pagination.offset == 0
         assert page1.pagination.limit == 2
 
@@ -290,7 +290,7 @@ class TestRoleSearch:
                 offset=2,
             )
         )
-        assert len(page2.roles) >= 1
+        assert len(page2.roles) == 1
         assert page2.pagination.offset == 2
 
         # No overlap between pages
@@ -312,7 +312,7 @@ class TestRoleSearch:
                 filter=RoleFilter(name=StringFilter(contains=marker)),
             )
         )
-        assert result.pagination.total >= 1
+        assert result.pagination.total == 1
         assert result.pagination.offset == 0
 
     async def test_search_with_ordering(
@@ -424,7 +424,7 @@ class TestRoleAssignment:
             SearchUsersAssignedToRoleRequest(),
         )
         assert isinstance(result, SearchUsersAssignedToRoleResponse)
-        assert result.pagination.total >= 1
+        assert result.pagination.total == 1
         assert any(u.user_id == admin_user_fixture.user_uuid for u in result.users)
 
         # Verify assigned user has granted_at
