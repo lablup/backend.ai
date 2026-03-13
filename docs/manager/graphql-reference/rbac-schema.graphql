@@ -1,0 +1,476 @@
+# RBAC (Role-Based Access Control) GraphQL Schema
+# Extracted from v2-schema.graphql — Added in 26.3.0
+#
+# This file contains only the RBAC-specific types, inputs, enums, queries, and mutations.
+# All RBAC operations require superadmin privileges (admin_ prefix).
+#
+# Dependencies on shared types (not included here):
+#   - Node (interface), PageInfo, OrderDirection, StringFilter, UUID, DateTime, ID
+
+# =============================================================================
+# Enums
+# =============================================================================
+
+"""
+Added in 26.3.0. Unified RBAC element type for scope-entity relationships
+"""
+enum RBACElementType {
+  # Scope hierarchy
+  DOMAIN
+  PROJECT
+  USER
+
+  # Root-query-enabled entities (scoped)
+  SESSION
+  VFOLDER
+  DEPLOYMENT
+  MODEL_DEPLOYMENT
+  KEYPAIR
+  NOTIFICATION_CHANNEL
+  NETWORK
+  RESOURCE_GROUP
+  CONTAINER_REGISTRY
+  STORAGE_HOST
+  IMAGE
+  ARTIFACT
+  ARTIFACT_REGISTRY
+  SESSION_TEMPLATE
+  APP_CONFIG
+
+  # Root-query-enabled entities (superadmin-only)
+  RESOURCE_PRESET
+  USER_RESOURCE_POLICY
+  KEYPAIR_RESOURCE_POLICY
+  PROJECT_RESOURCE_POLICY
+  ROLE
+  AUDIT_LOG
+  EVENT_LOG
+
+  # Auto-only entities used in permissions
+  NOTIFICATION_RULE
+
+  # Entity-level scopes
+  ARTIFACT_REVISION
+}
+
+"""Added in 26.3.0. RBAC operation type"""
+enum OperationType {
+  CREATE
+  READ
+  UPDATE
+  SOFT_DELETE
+  HARD_DELETE
+  GRANT_ALL
+  GRANT_READ
+  GRANT_UPDATE
+  GRANT_SOFT_DELETE
+  GRANT_HARD_DELETE
+}
+
+"""Added in 26.3.0. Role definition source"""
+enum RoleSource {
+  SYSTEM
+  CUSTOM
+}
+
+"""Added in 26.3.0. Role status"""
+enum RoleStatus {
+  ACTIVE
+  INACTIVE
+  DELETED
+}
+
+"""Added in 26.3.0. Role ordering field"""
+enum RoleOrderField {
+  NAME
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""Added in 26.3.0. Permission ordering field"""
+enum PermissionOrderField {
+  ID
+  ENTITY_TYPE
+}
+
+"""Added in 26.3.0. Entity ordering field"""
+enum EntityOrderField {
+  ENTITY_TYPE
+  REGISTERED_AT
+}
+
+# =============================================================================
+# Union Types
+# =============================================================================
+
+union EntityNode =
+    UserV2
+  | ProjectV2
+  | DomainV2
+  | VirtualFolderNode
+  | ImageV2
+  | ComputeSessionNode
+  | Artifact
+  | ArtifactRegistry
+  | AppConfig
+  | NotificationChannel
+  | NotificationRule
+  | ModelDeployment
+  | ResourceGroup
+  | ArtifactRevision
+  | Role
+
+# =============================================================================
+# Node Types (implements Relay Node interface)
+# =============================================================================
+
+"""Added in 26.3.0. RBAC role"""
+type Role implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  description: String
+  source: RoleSource!
+  status: RoleStatus!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  deletedAt: DateTime
+}
+
+"""Added in 26.3.0. RBAC role assignment (user-role association)"""
+type RoleAssignment implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The assigned user ID."""
+  userId: UUID!
+
+  """The assigned role ID."""
+  roleId: UUID!
+
+  """The user who granted this assignment."""
+  grantedBy: UUID
+  grantedAt: DateTime!
+
+  """The assigned role."""
+  role: Role
+
+  """The assigned user."""
+  user: UserV2
+}
+
+"""Added in 26.3.0. RBAC scoped permission"""
+type Permission implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  roleId: UUID!
+  scopeType: RBACElementType!
+  scopeId: String!
+  entityType: RBACElementType!
+  operation: OperationType!
+
+  """The role this permission belongs to."""
+  role: Role
+
+  """The scope this permission applies to."""
+  scope: EntityNode
+}
+
+"""
+Added in 26.3.0. Entity reference from the association_scopes_entities table
+"""
+type EntityRef implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  scopeType: RBACElementType!
+  scopeId: String!
+  entityType: RBACElementType!
+  entityId: String!
+  registeredAt: DateTime!
+
+  """The resolved entity object."""
+  entity: EntityNode
+}
+
+# =============================================================================
+# Connection Types (Relay pagination)
+# =============================================================================
+
+"""Added in 26.3.0. Role connection"""
+type RoleConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RoleEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RoleEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: Role!
+}
+
+"""Added in 26.3.0. Role assignment connection"""
+type RoleAssignmentConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RoleAssignmentEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RoleAssignmentEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RoleAssignment!
+}
+
+"""Added in 26.3.0. Permission connection"""
+type PermissionConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [PermissionEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type PermissionEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: Permission!
+}
+
+"""Added in 26.3.0. Entity connection"""
+type EntityConnection {
+  edges: [EntityEdge!]!
+  pageInfo: PageInfo!
+  count: Int!
+}
+
+"""Added in 26.3.0. Entity edge"""
+type EntityEdge {
+  node: EntityRef!
+  cursor: String!
+}
+
+# =============================================================================
+# Filter & OrderBy Inputs
+# =============================================================================
+
+"""Added in 26.3.0. Filter for roles"""
+input RoleFilter {
+  name: StringFilter = null
+  source: [RoleSource!] = null
+  status: [RoleStatus!] = null
+  AND: [RoleFilter!] = null
+  OR: [RoleFilter!] = null
+  NOT: RoleFilter = null
+}
+
+"""Added in 26.3.0. Order by specification for roles"""
+input RoleOrderBy {
+  field: RoleOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.3.0. Filter for role assignments"""
+input RoleAssignmentFilter {
+  roleId: UUID = null
+}
+
+"""Added in 26.3.0. Filter for scoped permissions"""
+input PermissionFilter {
+  roleId: UUID = null
+  scopeType: RBACElementType = null
+  entityType: RBACElementType = null
+}
+
+"""Added in 26.3.0. Order by specification for permissions"""
+input PermissionOrderBy {
+  field: PermissionOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.3.0. Filter for entity associations"""
+input EntityFilter {
+  entityType: RBACElementType = null
+  entityId: StringFilter = null
+}
+
+"""Added in 26.3.0. Order by specification for entity associations"""
+input EntityOrderBy {
+  field: EntityOrderField!
+  direction: OrderDirection! = DESC
+}
+
+# =============================================================================
+# Mutation Inputs
+# =============================================================================
+
+"""Added in 26.3.0. Input for creating a role"""
+input CreateRoleInput {
+  name: String!
+  description: String = null
+  source: RoleSource = null
+}
+
+"""Added in 26.3.0. Input for updating a role"""
+input UpdateRoleInput {
+  id: UUID!
+  name: String = null
+  description: String = null
+}
+
+"""Added in 26.3.0. Input for soft-deleting a role"""
+input DeleteRoleInput {
+  id: UUID!
+}
+
+"""Added in 26.3.0. Input for purging a role"""
+input PurgeRoleInput {
+  id: UUID!
+}
+
+"""Added in 26.3.0. Input for creating a scoped permission"""
+input CreatePermissionInput {
+  roleId: UUID!
+  scopeType: RBACElementType!
+  scopeId: String!
+  entityType: RBACElementType!
+  operation: OperationType!
+}
+
+"""Added in 26.3.0. Input for deleting a scoped permission"""
+input DeletePermissionInput {
+  id: UUID!
+}
+
+"""Added in 26.3.0. Input for assigning a role to a user"""
+input AssignRoleInput {
+  userId: UUID!
+  roleId: UUID!
+}
+
+"""Added in 26.3.0. Input for revoking a role from a user"""
+input RevokeRoleInput {
+  userId: UUID!
+  roleId: UUID!
+}
+
+# =============================================================================
+# Mutation Payloads
+# =============================================================================
+
+"""Added in 26.3.0. Payload for delete role mutation"""
+type DeleteRolePayload {
+  id: ID!
+}
+
+"""Added in 26.3.0. Payload for purge role mutation"""
+type PurgeRolePayload {
+  id: ID!
+}
+
+"""Added in 26.3.0. Payload for delete permission mutation"""
+type DeletePermissionPayload {
+  id: ID!
+}
+
+# =============================================================================
+# Query Fields (extend type Query)
+# =============================================================================
+
+extend type Query {
+  """Added in 26.3.0. Get a single role by ID (admin only)."""
+  adminRole(id: UUID!): Role
+
+  """Added in 26.3.0. List roles with filtering and pagination (admin only)."""
+  adminRoles(
+    filter: RoleFilter = null
+    orderBy: [RoleOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): RoleConnection!
+
+  """Added in 26.3.0. List scoped permissions with filtering and pagination (admin only)."""
+  adminPermissions(
+    filter: PermissionFilter = null
+    orderBy: [PermissionOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): PermissionConnection!
+
+  """Added in 26.3.0. List role assignments with filtering and pagination (admin only)."""
+  adminRoleAssignments(
+    filter: RoleAssignmentFilter = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): RoleAssignmentConnection!
+
+  """Added in 26.3.0. Search entity associations (admin only). Optionally filter by entity_type and entity_id."""
+  adminEntities(
+    filter: EntityFilter = null
+    orderBy: [EntityOrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): EntityConnection!
+}
+
+# =============================================================================
+# Mutation Fields (extend type Mutation)
+# =============================================================================
+
+extend type Mutation {
+  """Added in 26.3.0. Create a new role (admin only)."""
+  adminCreateRole(input: CreateRoleInput!): Role!
+
+  """Added in 26.3.0. Update an existing role (admin only)."""
+  adminUpdateRole(input: UpdateRoleInput!): Role!
+
+  """Added in 26.3.0. Soft-delete a role (admin only)."""
+  adminDeleteRole(input: DeleteRoleInput!): DeleteRolePayload!
+
+  """Added in 26.3.0. Permanently remove a role (admin only)."""
+  adminPurgeRole(input: PurgeRoleInput!): PurgeRolePayload!
+
+  """Added in 26.3.0. Create a scoped permission (admin only)."""
+  adminCreatePermission(input: CreatePermissionInput!): Permission!
+
+  """Added in 26.3.0. Delete a scoped permission (admin only)."""
+  adminDeletePermission(input: DeletePermissionInput!): DeletePermissionPayload!
+
+  """Added in 26.3.0. Assign a role to a user (admin only)."""
+  adminAssignRole(input: AssignRoleInput!): RoleAssignment!
+
+  """Added in 26.3.0. Revoke a role from a user (admin only)."""
+  adminRevokeRole(input: RevokeRoleInput!): RoleAssignment!
+}
