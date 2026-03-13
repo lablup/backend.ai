@@ -35,10 +35,19 @@ from ai.backend.common.dto.manager.group.types import GroupOrder, GroupOrderFiel
 from ai.backend.common.dto.manager.infra.request import UsagePerPeriodRequest
 from ai.backend.common.dto.manager.infra.response import UsagePerPeriodResponse
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot
+from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
+    ResourceSlot,
+    SessionTypes,
+)
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow, ImageType
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
+from ai.backend.manager.models.session import SessionRow, SessionStatus
 from ai.backend.manager.models.vfolder import VFolderRow
 
 
@@ -72,6 +81,7 @@ async def test_group_for_deletion(
 async def group_with_vfolder_mounted(
     db_engine: SAEngine,
     domain_fixture: str,
+    scaling_group_fixture: str,
     resource_policy_fixture: str,
     regular_user_fixture: Any,
 ) -> AsyncIterator[uuid.UUID]:
@@ -79,7 +89,9 @@ async def group_with_vfolder_mounted(
     group_id = uuid.uuid4()
     group_name = f"group-vf-{secrets.token_hex(4)}"
     vfolder_id = uuid.uuid4()
+    session_id = uuid.uuid4()
     kernel_id = uuid.uuid4()
+    unique = secrets.token_hex(4)
     user_uuid = regular_user_fixture.user_uuid
 
     async with db_engine.begin() as conn:
@@ -98,7 +110,7 @@ async def group_with_vfolder_mounted(
         await conn.execute(
             sa.insert(VFolderRow.__table__).values(
                 id=vfolder_id,
-                name=f"vf-{secrets.token_hex(4)}",
+                name=f"vf-{unique}",
                 user=user_uuid,
                 group=group_id,
                 host="local",
@@ -106,27 +118,62 @@ async def group_with_vfolder_mounted(
                 quota_scope_id=QuotaScopeID(QuotaScopeType.USER, user_uuid),
             )
         )
+        # Create session (required FK for kernel)
+        await conn.execute(
+            sa.insert(SessionRow.__table__).values(
+                id=session_id,
+                creation_id=f"cid-vf-{unique}",
+                name=f"sess-vf-{unique}",
+                session_type=SessionTypes.INTERACTIVE,
+                cluster_size=1,
+                cluster_mode="single-node",
+                domain_name=domain_fixture,
+                group_id=group_id,
+                user_uuid=user_uuid,
+                scaling_group_name=scaling_group_fixture,
+                status=SessionStatus.RUNNING,
+                occupying_slots=ResourceSlot(),
+                requested_slots=ResourceSlot(),
+            )
+        )
         # Create active kernel with mount
         await conn.execute(
             sa.insert(KernelRow.__table__).values(
                 id=kernel_id,
-                session_id=uuid.uuid4(),
+                session_id=session_id,
+                session_creation_id=f"cid-vf-{unique}",
+                session_name=f"sess-vf-{unique}",
+                session_type=SessionTypes.INTERACTIVE,
+                cluster_role="main",
+                cluster_idx=0,
+                cluster_hostname="main0",
+                cluster_mode="single-node",
+                cluster_size=1,
                 group_id=group_id,
                 user_uuid=user_uuid,
                 domain_name=domain_fixture,
+                scaling_group=scaling_group_fixture,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
                 occupied_slots=ResourceSlot({}),
-                mounts=[["vfolder", f"vf-{secrets.token_hex(4)}", str(vfolder_id)]],
+                requested_slots=ResourceSlot({}),
+                repl_in_port=0,
+                repl_out_port=0,
+                stdin_port=0,
+                stdout_port=0,
+                mounts=[["vfolder", f"vf-{unique}", str(vfolder_id)]],
             )
         )
 
     yield group_id
 
-    # Cleanup
+    # Cleanup (reverse FK order)
     async with db_engine.begin() as conn:
         await conn.execute(
             KernelRow.__table__.delete().where(KernelRow.__table__.c.id == kernel_id)
+        )
+        await conn.execute(
+            SessionRow.__table__.delete().where(SessionRow.__table__.c.id == session_id)
         )
         await conn.execute(
             VFolderRow.__table__.delete().where(VFolderRow.__table__.c.id == vfolder_id)
@@ -138,13 +185,16 @@ async def group_with_vfolder_mounted(
 async def group_with_active_kernel(
     db_engine: SAEngine,
     domain_fixture: str,
+    scaling_group_fixture: str,
     resource_policy_fixture: str,
     regular_user_fixture: Any,
 ) -> AsyncIterator[uuid.UUID]:
     """Create group with active kernel."""
     group_id = uuid.uuid4()
     group_name = f"group-ak-{secrets.token_hex(4)}"
+    session_id = uuid.uuid4()
     kernel_id = uuid.uuid4()
+    unique = secrets.token_hex(4)
     user_uuid = regular_user_fixture.user_uuid
 
     async with db_engine.begin() as conn:
@@ -159,26 +209,61 @@ async def group_with_active_kernel(
                 resource_policy=resource_policy_fixture,
             )
         )
+        # Create session (required FK for kernel)
+        await conn.execute(
+            sa.insert(SessionRow.__table__).values(
+                id=session_id,
+                creation_id=f"cid-ak-{unique}",
+                name=f"sess-ak-{unique}",
+                session_type=SessionTypes.INTERACTIVE,
+                cluster_size=1,
+                cluster_mode="single-node",
+                domain_name=domain_fixture,
+                group_id=group_id,
+                user_uuid=user_uuid,
+                scaling_group_name=scaling_group_fixture,
+                status=SessionStatus.RUNNING,
+                occupying_slots=ResourceSlot(),
+                requested_slots=ResourceSlot(),
+            )
+        )
         # Create active kernel
         await conn.execute(
             sa.insert(KernelRow.__table__).values(
                 id=kernel_id,
-                session_id=uuid.uuid4(),
+                session_id=session_id,
+                session_creation_id=f"cid-ak-{unique}",
+                session_name=f"sess-ak-{unique}",
+                session_type=SessionTypes.INTERACTIVE,
+                cluster_role="main",
+                cluster_idx=0,
+                cluster_hostname="main0",
+                cluster_mode="single-node",
+                cluster_size=1,
                 group_id=group_id,
                 user_uuid=user_uuid,
                 domain_name=domain_fixture,
+                scaling_group=scaling_group_fixture,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
                 occupied_slots=ResourceSlot({}),
+                requested_slots=ResourceSlot({}),
+                repl_in_port=0,
+                repl_out_port=0,
+                stdin_port=0,
+                stdout_port=0,
             )
         )
 
     yield group_id
 
-    # Cleanup
+    # Cleanup (reverse FK order)
     async with db_engine.begin() as conn:
         await conn.execute(
             KernelRow.__table__.delete().where(KernelRow.__table__.c.id == kernel_id)
+        )
+        await conn.execute(
+            SessionRow.__table__.delete().where(SessionRow.__table__.c.id == session_id)
         )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
 
@@ -194,6 +279,8 @@ async def group_with_active_endpoint(
     """Create group with active endpoint."""
     group_id = uuid.uuid4()
     group_name = f"group-ep-{secrets.token_hex(4)}"
+    registry_id = uuid.uuid4()
+    image_id = uuid.uuid4()
     endpoint_id = uuid.uuid4()
     user_uuid = regular_user_fixture.user_uuid
 
@@ -209,6 +296,35 @@ async def group_with_active_endpoint(
                 resource_policy=resource_policy_fixture,
             )
         )
+        # Create container registry (required by image)
+        await conn.execute(
+            sa.insert(ContainerRegistryRow.__table__).values(
+                id=registry_id,
+                url="http://test-registry.local",
+                registry_name="test-registry-ep",
+                type=ContainerRegistryType.DOCKER,
+                project=None,
+            )
+        )
+        # Create image (required by endpoint check constraint)
+        await conn.execute(
+            sa.insert(ImageRow.__table__).values(
+                id=image_id,
+                name="test-image-ep",
+                project=None,
+                image="test-image-ep:latest",
+                tag="latest",
+                registry="test-registry-ep",
+                registry_id=registry_id,
+                architecture="x86_64",
+                config_digest="sha256:" + "0" * 64,
+                size_bytes=1024,
+                is_local=False,
+                type=ImageType.COMPUTE,
+                labels={},
+                resources={"cpu": {"min": "1"}, "mem": {"min": "268435456"}},
+            )
+        )
         # Create active endpoint
         await conn.execute(
             sa.insert(EndpointRow.__table__).values(
@@ -219,17 +335,26 @@ async def group_with_active_endpoint(
                 created_user=user_uuid,
                 session_owner=user_uuid,
                 resource_group=scaling_group_fixture,
-                resource_slots=ResourceSlot({}),
+                image=image_id,
+                resource_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
                 lifecycle_stage=EndpointLifecycle.CREATED,
             )
         )
 
     yield group_id
 
-    # Cleanup
+    # Cleanup (reverse FK order)
     async with db_engine.begin() as conn:
         await conn.execute(
             EndpointRow.__table__.delete().where(EndpointRow.__table__.c.id == endpoint_id)
+        )
+        await conn.execute(
+            ImageRow.__table__.delete().where(ImageRow.__table__.c.id == image_id)
+        )
+        await conn.execute(
+            ContainerRegistryRow.__table__.delete().where(
+                ContainerRegistryRow.__table__.c.id == registry_id
+            )
         )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
 
@@ -342,8 +467,7 @@ class TestGroupPurge:
 
     @pytest.mark.xfail(
         strict=True,
-        reason="Purge action not exposed via REST API yet",
-        raises=NotFoundError,
+        reason="Purge action not exposed via REST API yet — returns 404 instead of 400/409",
     )
     async def test_purge_group_with_vfolder_mounts_blocked(
         self,
@@ -353,13 +477,12 @@ class TestGroupPurge:
         """F-BIZ-1: Purge group with vfolder mounts → blocked with error."""
         with pytest.raises(BackendAPIError) as exc_info:
             await admin_registry.group.purge(group_with_vfolder_mounted)
-        # Verify error indicates vfolder mount blocking
+        # Verify error indicates vfolder mount blocking (not 404)
         assert exc_info.value.status in (400, 409)  # Bad Request or Conflict
 
     @pytest.mark.xfail(
         strict=True,
-        reason="Purge action not exposed via REST API yet",
-        raises=NotFoundError,
+        reason="Purge action not exposed via REST API yet — returns 404 instead of 400/409",
     )
     async def test_purge_group_with_active_kernels_blocked(
         self,
@@ -369,13 +492,12 @@ class TestGroupPurge:
         """F-BIZ-2: Purge group with active kernels → blocked with error."""
         with pytest.raises(BackendAPIError) as exc_info:
             await admin_registry.group.purge(group_with_active_kernel)
-        # Verify error indicates active kernel blocking
+        # Verify error indicates active kernel blocking (not 404)
         assert exc_info.value.status in (400, 409)  # Bad Request or Conflict
 
     @pytest.mark.xfail(
         strict=True,
-        reason="Purge action not exposed via REST API yet",
-        raises=NotFoundError,
+        reason="Purge action not exposed via REST API yet — returns 404 instead of 400/409",
     )
     async def test_purge_group_with_active_endpoints_blocked(
         self,
@@ -385,7 +507,7 @@ class TestGroupPurge:
         """F-BIZ-3: Purge group with active endpoints → blocked with error."""
         with pytest.raises(BackendAPIError) as exc_info:
             await admin_registry.group.purge(group_with_active_endpoint)
-        # Verify error indicates active endpoint blocking
+        # Verify error indicates active endpoint blocking (not 404)
         assert exc_info.value.status in (400, 409)  # Bad Request or Conflict
 
 
