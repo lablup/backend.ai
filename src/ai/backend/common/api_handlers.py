@@ -204,7 +204,7 @@ class APIResponse:
 
     @property
     def to_json(self) -> JSONDict | list[Any] | None:
-        return self._data.model_dump(mode="json") if self._data else None
+        return self._data.model_dump(mode="json", by_alias=True) if self._data else None
 
     @property
     def status_code(self) -> int:

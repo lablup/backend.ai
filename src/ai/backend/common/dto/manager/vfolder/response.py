@@ -95,7 +95,7 @@ class VFolderInfoDTO(BaseModel):
     quota_scope_id: str = Field(description="Quota scope ID")
     host: str = Field(description="Host name")
     status: VFolderOperationStatusField = Field(description="Operation status")
-    numFiles: int = Field(description="Number of files")
+    num_files: int = Field(description="Number of files", serialization_alias="numFiles")
     used_bytes: int = Field(description="Used bytes")
     created_at: str = Field(description="Creation timestamp")
     last_used: str | None = Field(default=None, description="Last used timestamp")

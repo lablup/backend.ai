@@ -501,7 +501,7 @@ class VFolderHandler:
             quota_scope_id=str(result.base_info.quota_scope_id),
             host=result.base_info.host,
             status=VFolderOperationStatusField(result.base_info.status.value),
-            numFiles=result.usage_info.num_files,
+            num_files=result.usage_info.num_files,
             used_bytes=result.usage_info.used_bytes,
             created_at=str(result.base_info.created_at),
             last_used=str(result.base_info.created_at),
