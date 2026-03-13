@@ -163,3 +163,16 @@ class BulkPurgeUsersV2PayloadGQL:
     failed: list[BulkPurgeUserV2ErrorGQL] = strawberry.field(
         description="List of errors for users that failed to purge."
     )
+
+
+# IP Allowlist Payloads
+
+
+@strawberry.type(
+    name="UpdateMyAllowedClientIPPayload",
+    description="Payload for updating the current user's allowed client IP list.",
+)
+class UpdateMyAllowedClientIPPayloadGQL:
+    """Payload for updating the current user's allowed client IP list."""
+
+    success: bool = strawberry.field(description="Whether the update was successful.")

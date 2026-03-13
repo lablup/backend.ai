@@ -9,6 +9,7 @@ from .mutation import (
     admin_delete_users_v2,
     admin_purge_user_v2,
     admin_update_user_v2,
+    update_my_allowed_client_ip,
     update_user_v2,
 )
 from .query import (
@@ -32,6 +33,7 @@ __all__ = [
     "admin_bulk_update_users_v2",
     "admin_update_user_v2",
     "update_user_v2",
+    "update_my_allowed_client_ip",
     "admin_delete_user_v2",
     "admin_delete_users_v2",
     "admin_purge_user_v2",
