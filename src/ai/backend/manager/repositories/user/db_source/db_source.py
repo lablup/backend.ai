@@ -53,7 +53,12 @@ from ai.backend.manager.models.kernel import (
     RESOURCE_USAGE_KERNEL_STATUSES,
     kernels,
 )
-from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data, keypairs
+from ai.backend.manager.models.keypair import (
+    KeyPairRow,
+    generate_keypair_data,
+    keypairs,
+)
+from ai.backend.manager.data.keypair.types import GeneratedKeyPairData
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.session import (
@@ -1195,4 +1200,119 @@ class UserDBSource:
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
+            )
+
+    async def issue_my_keypair(
+        self, user_uuid: UUID, email: str
+    ) -> GeneratedKeyPairData:
+        """Issue a new keypair for the current user, inheriting settings from main keypair."""
+        async with self._db.begin_session() as db_sess:
+            session = SASession(db_sess)
+            user_row = (
+                await session.scalars(
+                    sa.select(UserRow)
+                    .where(UserRow.uuid == user_uuid)
+                    .options(load_only(UserRow.main_access_key, UserRow.email))
+                )
+            ).first()
+            if not user_row:
+                raise UserNotFound(f"User {user_uuid} not found")
+
+            main_kp_row: KeyPairRow | None = None
+            if user_row.main_access_key:
+                main_kp_row = (
+                    await session.scalars(
+                        sa.select(KeyPairRow)
+                        .where(KeyPairRow.access_key == user_row.main_access_key)
+                        .options(noload("*"))
+                    )
+                ).first()
+
+            if main_kp_row:
+                keypair_creator = KeyPairCreator(
+                    is_active=True,
+                    is_admin=main_kp_row.is_admin or False,
+                    resource_policy=main_kp_row.resource_policy,
+                    rate_limit=main_kp_row.rate_limit or DEFAULT_KEYPAIR_RATE_LIMIT,
+                )
+            else:
+                keypair_creator = KeyPairCreator(
+                    is_active=True,
+                    is_admin=False,
+                    resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
+                    rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
+                )
+
+            generated = generate_keypair_data()
+            kp_spec = KeyPairCreatorSpec(
+                creator=keypair_creator,
+                generated_data=generated,
+                user_id=user_uuid,
+                email=email,
+            )
+            kp_creator = Creator(spec=kp_spec)
+            await execute_creator(session, kp_creator)
+            return generated
+
+    async def revoke_my_keypair(
+        self, user_uuid: UUID, email: str, access_key: str
+    ) -> None:
+        """Revoke a keypair owned by the current user."""
+        async with self._db.begin_session() as db_sess:
+            session = SASession(db_sess)
+            kp_row = (
+                await session.scalars(
+                    sa.select(KeyPairRow)
+                    .where(KeyPairRow.access_key == access_key)
+                    .options(noload("*"))
+                )
+            ).first()
+            if not kp_row:
+                raise KeyPairNotFound(f"Keypair {access_key} not found")
+            if kp_row.user != user_uuid:
+                raise KeyPairForbidden("Cannot revoke another user's keypair")
+
+            user_row = (
+                await session.scalars(
+                    sa.select(UserRow)
+                    .where(UserRow.uuid == user_uuid)
+                    .options(load_only(UserRow.main_access_key))
+                )
+            ).first()
+            if user_row and user_row.main_access_key == access_key:
+                raise KeyPairForbidden(
+                    "Cannot revoke the main access key. Switch main access key first."
+                )
+
+            await db_sess.execute(
+                sa.delete(keypairs).where(keypairs.c.access_key == access_key)
+            )
+
+    async def switch_my_main_access_key(
+        self, user_uuid: UUID, email: str, access_key: str
+    ) -> None:
+        """Switch the main access key for the current user."""
+        async with self._db.begin_session() as db_sess:
+            session = SASession(db_sess)
+            kp_row = (
+                await session.scalars(
+                    sa.select(KeyPairRow)
+                    .where(KeyPairRow.access_key == access_key)
+                    .options(
+                        noload("*"),
+                        joinedload(KeyPairRow.user_row).options(load_only(UserRow.email)),
+                    )
+                )
+            ).first()
+            if not kp_row:
+                raise KeyPairNotFound("Cannot set non-existing access key as the main access key.")
+            if kp_row.user_row.email != email:
+                raise KeyPairForbidden("Cannot set another user's access key as the main access key.")
+            if not kp_row.is_active:
+                raise KeyPairForbidden("Cannot set an inactive keypair as the main access key.")
+
+            await db_sess.execute(
+                sa.update(users)
+                .where(users.c.email == email)
+                .values(main_access_key=access_key)
             )

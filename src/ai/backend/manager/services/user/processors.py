@@ -22,6 +22,14 @@ from ai.backend.manager.services.user.actions.get_user import (
     GetUserAction,
     GetUserActionResult,
 )
+from ai.backend.manager.services.user.actions.keypair_ops import (
+    IssueMyKeypairAction,
+    IssueMyKeypairActionResult,
+    RevokeMyKeypairAction,
+    RevokeMyKeypairActionResult,
+    SwitchMyMainAccessKeyAction,
+    SwitchMyMainAccessKeyActionResult,
+)
 from ai.backend.manager.services.user.actions.modify_user import (
     BulkModifyUserAction,
     BulkModifyUserActionResult,
@@ -76,6 +84,11 @@ class UserProcessors(AbstractProcessorPackage):
         SearchUsersByProjectAction, SearchUsersByProjectActionResult
     ]
     search_users_by_role: ActionProcessor[SearchUsersByRoleAction, SearchUsersByRoleActionResult]
+    issue_my_keypair: ActionProcessor[IssueMyKeypairAction, IssueMyKeypairActionResult]
+    revoke_my_keypair: ActionProcessor[RevokeMyKeypairAction, RevokeMyKeypairActionResult]
+    switch_my_main_access_key: ActionProcessor[
+        SwitchMyMainAccessKeyAction, SwitchMyMainAccessKeyActionResult
+    ]
 
     def __init__(
         self,
@@ -103,6 +116,11 @@ class UserProcessors(AbstractProcessorPackage):
         self.search_users_by_role = ActionProcessor(
             user_service.search_users_by_role, action_monitors
         )
+        self.issue_my_keypair = ActionProcessor(user_service.issue_my_keypair, action_monitors)
+        self.revoke_my_keypair = ActionProcessor(user_service.revoke_my_keypair, action_monitors)
+        self.switch_my_main_access_key = ActionProcessor(
+            user_service.switch_my_main_access_key, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -121,4 +139,7 @@ class UserProcessors(AbstractProcessorPackage):
             SearchUsersByDomainAction.spec(),
             SearchUsersByProjectAction.spec(),
             SearchUsersByRoleAction.spec(),
+            IssueMyKeypairAction.spec(),
+            RevokeMyKeypairAction.spec(),
+            SwitchMyMainAccessKeyAction.spec(),
         ]

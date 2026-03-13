@@ -47,6 +47,14 @@ from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
     PurgeUserActionResult,
 )
+from ai.backend.manager.services.user.actions.keypair_ops import (
+    IssueMyKeypairAction,
+    IssueMyKeypairActionResult,
+    RevokeMyKeypairAction,
+    RevokeMyKeypairActionResult,
+    SwitchMyMainAccessKeyAction,
+    SwitchMyMainAccessKeyActionResult,
+)
 from ai.backend.manager.services.user.actions.search_users import (
     SearchUsersAction,
     SearchUsersActionResult,
@@ -380,3 +388,27 @@ class UserService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def issue_my_keypair(
+        self, action: IssueMyKeypairAction
+    ) -> IssueMyKeypairActionResult:
+        generated = await self._user_repository.issue_my_keypair(
+            user_uuid=action.user_uuid, email=action.email
+        )
+        return IssueMyKeypairActionResult(generated_data=generated)
+
+    async def revoke_my_keypair(
+        self, action: RevokeMyKeypairAction
+    ) -> RevokeMyKeypairActionResult:
+        await self._user_repository.revoke_my_keypair(
+            user_uuid=action.user_uuid, email=action.email, access_key=action.access_key
+        )
+        return RevokeMyKeypairActionResult(success=True)
+
+    async def switch_my_main_access_key(
+        self, action: SwitchMyMainAccessKeyAction
+    ) -> SwitchMyMainAccessKeyActionResult:
+        await self._user_repository.switch_my_main_access_key(
+            user_uuid=action.user_uuid, email=action.email, access_key=action.access_key
+        )
+        return SwitchMyMainAccessKeyActionResult(success=True)
