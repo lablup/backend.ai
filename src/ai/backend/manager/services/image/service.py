@@ -185,8 +185,7 @@ class ImageService:
         images = await self._image_repository.get_all_images(status_filter=action.status_filter)
         return GetAllImagesActionResult(
             data=images,
-            _scope_type=action.scope_type(),
-            _scope_id=action.scope_id(),
+            user_uuid=action.user_uuid,
         )
 
     async def get_image_by_id(self, action: GetImageByIdAction) -> GetImageByIdActionResult:
@@ -403,8 +402,7 @@ class ImageService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
-            _scope_type=action.scope_type(),
-            _scope_id=action.scope_id(),
+            user_uuid=action.user_uuid,
         )
 
     async def alias_image_by_id(self, action: AliasImageByIdAction) -> AliasImageByIdActionResult:

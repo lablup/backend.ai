@@ -56,7 +56,11 @@ class ImageHandler:
         log.info("SEARCH (ak:{})", ctx.access_key)
         querier = self._adapter.build_querier(body.parsed)
         action_result = await self._image.search_images.wait_for_complete(
-            SearchImagesAction(querier=querier)
+            SearchImagesAction(
+                querier=querier,
+                user_uuid=str(ctx.user_uuid),
+                domain_name=ctx.user_domain,
+            )
         )
         resp = SearchImagesResponse(
             items=[self._adapter.convert_to_dto(img) for img in action_result.data],
