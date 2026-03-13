@@ -3171,6 +3171,22 @@ input IntFilter {
 }
 
 """
+Payload returned after issuing a new keypair. The secret_key is only shown once.
+"""
+type IssueMyKeypairPayload {
+  """The newly generated access key."""
+  accessKey: String!
+
+  """
+  The newly generated secret key. This value is only returned at creation time.
+  """
+  secretKey: String!
+
+  """The generated SSH public key."""
+  sshPublicKey: String!
+}
+
+"""
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
 """
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
@@ -4169,6 +4185,21 @@ type Mutation {
   Added in 26.3.0. Permanently delete multiple users in bulk (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted.
   """
   adminBulkPurgeUsersV2(input: BulkPurgeUsersV2Input!): BulkPurgeUsersV2Payload!
+
+  """
+  Issue a new keypair for the current user. Settings (resource_policy, rate_limit, is_admin) are inherited from the main keypair. The secret_key is only returned at creation time.
+  """
+  issueMyKeypair: IssueMyKeypairPayload!
+
+  """
+  Revoke a keypair owned by the current user. The main access key cannot be revoked — switch it first.
+  """
+  revokeMyKeypair(input: RevokeMyKeypairInput!): RevokeMyKeypairPayload!
+
+  """
+  Switch the main access key for the current user. The target keypair must be active and owned by the user.
+  """
+  switchMyMainAccessKey(input: SwitchMyMainAccessKeyInput!): SwitchMyMainAccessKeyPayload!
 
   """Added in 26.3.0. Create a new query definition (admin only)."""
   adminCreatePrometheusQueryPreset(input: CreateQueryDefinitionInput!): CreateQueryDefinitionPayload!
@@ -6481,6 +6512,18 @@ type RestoreArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
+"""Input for revoking a keypair owned by the current user."""
+input RevokeMyKeypairInput {
+  """Access key of the keypair to revoke. Must not be the main access key."""
+  accessKey: String!
+}
+
+"""Payload returned after revoking a keypair."""
+type RevokeMyKeypairPayload {
+  """Whether the revocation was successful."""
+  success: Boolean!
+}
+
 """Added in 26.3.0. Input for revoking a role from a user"""
 input RevokeRoleInput {
   userId: UUID!
@@ -7483,6 +7526,20 @@ type Subscription {
   Subscribe to real-time events for a specific background task. Streams progress updates and completion events (done/cancelled/failed) for the task lifecycle.
   """
   backgroundTaskEvents(taskId: ID!): BackgroundTaskEventPayload!
+}
+
+"""Input for switching the main access key of the current user."""
+input SwitchMyMainAccessKeyInput {
+  """
+  Access key to set as the new main access key. Must be active and owned by the user.
+  """
+  accessKey: String!
+}
+
+"""Payload returned after switching the main access key."""
+type SwitchMyMainAccessKeyPayload {
+  """Whether the switch was successful."""
+  success: Boolean!
 }
 
 """Added in 25.19.0"""
