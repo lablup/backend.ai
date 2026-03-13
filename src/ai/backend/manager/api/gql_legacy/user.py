@@ -956,7 +956,9 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
         description="Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.",
     )
 
-    def to_action(self, email: str, user_uuid: UUID, graph_ctx: GraphQueryContext) -> ModifyUserAction:
+    def to_action(
+        self, email: str, user_uuid: UUID, graph_ctx: GraphQueryContext
+    ) -> ModifyUserAction:
         # Create PasswordInfo if password is being changed
         password_state = OptionalState[PasswordInfo].nop()
         if self.password is not Undefined and self.password is not None:
@@ -1131,8 +1133,7 @@ class ModifyUser(graphene.Mutation):  # type: ignore[misc]
         if user_uuid is None:
             raise UserNotFound
 
-        action: ModifyUserAction = props.to_action(email, graph_ctx)
-        action.user_uuid = user_uuid
+        action: ModifyUserAction = props.to_action(email, user_uuid, graph_ctx)
         res: ModifyUserActionResult = await graph_ctx.processors.user.modify_user.wait_for_complete(
             action
         )
@@ -1232,8 +1233,7 @@ class PurgeUser(graphene.Mutation):  # type: ignore[misc]
             email=graph_ctx.user["email"],
             main_access_key=graph_ctx.user["main_access_key"],
         )
-        action = props.to_action(email, user_info_ctx)
-        action.user_uuid = user_uuid
+        action = props.to_action(email, user_uuid, user_info_ctx)
 
         await graph_ctx.processors.user.purge_user.wait_for_complete(action)
 
