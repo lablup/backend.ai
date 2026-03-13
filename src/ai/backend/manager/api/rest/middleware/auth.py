@@ -656,7 +656,8 @@ def _setup_user_context(request: web.Request) -> ExitStack:
 
     raw_client_addr: str | None = request.headers.get("X-Forwarded-For") or request.remote
     if raw_client_addr:
-        stack.enter_context(with_client_ip(raw_client_addr))
+        client_ip = raw_client_addr.split(",")[0].strip()
+        stack.enter_context(with_client_ip(client_ip))
 
     return stack
 
