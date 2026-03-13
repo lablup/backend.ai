@@ -532,9 +532,7 @@ class SessionV2GQL(Node):
                 bootstrap_script=data.bootstrap_script,
                 startup_command=data.startup_command,
                 callback_url=data.callback_url,
-                persistent_mount_paths=[
-                    str(m.kernel_path) for m in data.vfolder_mounts
-                ]
+                persistent_mount_paths=[str(m.kernel_path) for m in data.vfolder_mounts]
                 if data.vfolder_mounts
                 else [],
             ),

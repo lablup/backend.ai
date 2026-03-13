@@ -551,9 +551,7 @@ class KernelV2GQL(Node):
         return cls(
             id=ID(str(kernel_info.id)),
             startup_command=kernel_info.runtime.startup_command,
-            persistent_mount_paths=[
-                m["kernel_path"] for m in kernel_info.runtime.vfolder_mounts
-            ]
+            persistent_mount_paths=[m["kernel_path"] for m in kernel_info.runtime.vfolder_mounts]
             if kernel_info.runtime.vfolder_mounts
             else [],
             session_info=KernelV2SessionInfoGQL(
