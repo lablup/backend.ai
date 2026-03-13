@@ -724,7 +724,8 @@ class VFolderHandler:
                 ),
             )
         )
-        return APIResponse.no_content(HTTPStatus.CREATED)
+        resp = MessageResponse(msg="")
+        return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
     # 13. update_vfolder_options (POST /{name}/update-options)
@@ -768,7 +769,8 @@ class VFolderHandler:
                 ),
             )
         )
-        return APIResponse.no_content(HTTPStatus.CREATED)
+        resp = MessageResponse(msg="")
+        return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
     # 14. mkdir (POST /{name}/mkdir)

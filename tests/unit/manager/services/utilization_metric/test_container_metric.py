@@ -16,7 +16,7 @@ from ai.backend.common.dto.clients.prometheus.response import (
     MetricResponse,
     MetricResponseInfo,
     PrometheusQueryData,
-    PrometheusQueryRangeResponse,
+    PrometheusResponse,
 )
 from ai.backend.common.exception import FailedToGetMetric, PrometheusConnectionError
 from ai.backend.manager.services.metric.actions.container import (
@@ -37,9 +37,9 @@ from ai.backend.manager.services.metric.types import (
 
 def _make_query_range_response(
     metric_data: list[dict[str, Any]],
-) -> PrometheusQueryRangeResponse:
-    """Helper to build PrometheusQueryRangeResponse from raw metric dicts."""
-    return PrometheusQueryRangeResponse(
+) -> PrometheusResponse:
+    """Helper to build PrometheusResponse from raw metric dicts."""
+    return PrometheusResponse(
         status="success",
         data=PrometheusQueryData(
             result_type="matrix",

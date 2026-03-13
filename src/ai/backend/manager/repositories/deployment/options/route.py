@@ -30,6 +30,20 @@ class RouteConditions:
         return inner
 
     @staticmethod
+    def by_endpoint_ids(endpoint_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoutingRow.endpoint.in_(endpoint_ids)
+
+        return inner
+
+    @staticmethod
+    def exclude_statuses(statuses: Collection[RouteStatus]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoutingRow.status.notin_(statuses)
+
+        return inner
+
+    @staticmethod
     def by_statuses(statuses: list[RouteStatus]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RoutingRow.status.in_(statuses)
