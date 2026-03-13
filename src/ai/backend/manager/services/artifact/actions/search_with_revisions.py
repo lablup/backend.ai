@@ -1,26 +1,40 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.permission.types import OperationType
 from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions
 from ai.backend.manager.repositories.base import BatchQuerier
 
-from .base import ArtifactAction
+from .base import ArtifactScopeAction, ArtifactScopeActionResult
 
 
 @dataclass
-class SearchArtifactsWithRevisionsAction(ArtifactAction):
+class SearchArtifactsWithRevisionsAction(ArtifactScopeAction):
     """Action to search artifacts with their revisions."""
 
     querier: BatchQuerier
+    _scope_type: str = field(default="domain")
+    _scope_id: str = field(default="")
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def operation_type(cls) -> str:
+        return "search"
+
+    @override
+    @classmethod
+    def permission_operation_type(cls) -> OperationType:
+        return OperationType.READ
+
+    @override
+    def scope_type(self) -> str:
+        return self._scope_type
+
+    @override
+    def scope_id(self) -> str:
+        return self._scope_id
 
     @override
     def entity_id(self) -> str | None:
@@ -28,7 +42,7 @@ class SearchArtifactsWithRevisionsAction(ArtifactAction):
 
 
 @dataclass
-class SearchArtifactsWithRevisionsActionResult(BaseActionResult):
+class SearchArtifactsWithRevisionsActionResult(ArtifactScopeActionResult):
     """Result of searching artifacts with revisions."""
 
     data: list[ArtifactDataWithRevisions]
