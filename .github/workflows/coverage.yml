@@ -48,7 +48,7 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         verbose: true
     - name: Upload pants log
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v7
       with:
         name: pants.coverage.log
         path: .pants.d/workdir/pants.log
