@@ -2,6 +2,8 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
+from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.container_registry.actions.clear_images import (
@@ -64,6 +66,7 @@ from ai.backend.manager.services.container_registry.service import ContainerRegi
 
 
 class ContainerRegistryProcessors(AbstractProcessorPackage):
+    # Internal actions (no RBAC validators)
     rescan_images: ActionProcessor[RescanImagesAction, RescanImagesActionResult]
     clear_images: ActionProcessor[ClearImagesAction, ClearImagesActionResult]
     load_container_registries: ActionProcessor[
@@ -71,21 +74,6 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
     ]
     load_all_container_registries: ActionProcessor[
         LoadAllContainerRegistriesAction, LoadAllContainerRegistriesActionResult
-    ]
-    get_container_registries: ActionProcessor[
-        GetContainerRegistriesAction, GetContainerRegistriesActionResult
-    ]
-    create_container_registry: ActionProcessor[
-        CreateContainerRegistryAction, CreateContainerRegistryActionResult
-    ]
-    modify_container_registry: ActionProcessor[
-        ModifyContainerRegistryAction, ModifyContainerRegistryActionResult
-    ]
-    delete_container_registry: ActionProcessor[
-        DeleteContainerRegistryAction, DeleteContainerRegistryActionResult
-    ]
-    search_container_registries: ActionProcessor[
-        SearchContainerRegistriesAction, SearchContainerRegistriesActionResult
     ]
     handle_harbor_webhook: ActionProcessor[
         HandleHarborWebhookAction, HandleHarborWebhookActionResult
@@ -101,12 +89,32 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
         DeleteRegistryQuotaAction, DeleteRegistryQuotaActionResult
     ]
 
+    # Scope actions (with RBAC validators)
+    get_container_registries: ScopeActionProcessor[
+        GetContainerRegistriesAction, GetContainerRegistriesActionResult
+    ]
+    create_container_registry: ScopeActionProcessor[
+        CreateContainerRegistryAction, CreateContainerRegistryActionResult
+    ]
+    search_container_registries: ScopeActionProcessor[
+        SearchContainerRegistriesAction, SearchContainerRegistriesActionResult
+    ]
+
+    # Single-entity actions (with RBAC validators)
+    modify_container_registry: SingleEntityActionProcessor[
+        ModifyContainerRegistryAction, ModifyContainerRegistryActionResult
+    ]
+    delete_container_registry: SingleEntityActionProcessor[
+        DeleteContainerRegistryAction, DeleteContainerRegistryActionResult
+    ]
+
     def __init__(
         self,
         service: ContainerRegistryService,
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
+        # Internal actions (no RBAC validators)
         self.rescan_images = ActionProcessor(service.rescan_images, action_monitors)
         self.clear_images = ActionProcessor(service.clear_images, action_monitors)
         self.load_container_registries = ActionProcessor(
@@ -115,26 +123,34 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
         self.load_all_container_registries = ActionProcessor(
             service.load_all_container_registries, action_monitors
         )
-        self.get_container_registries = ActionProcessor(
-            service.get_container_registries, action_monitors
-        )
-        self.create_container_registry = ActionProcessor(
-            service.create_container_registry, action_monitors
-        )
-        self.modify_container_registry = ActionProcessor(
-            service.modify_container_registry, action_monitors
-        )
-        self.delete_container_registry = ActionProcessor(
-            service.delete_container_registry, action_monitors
-        )
-        self.search_container_registries = ActionProcessor(
-            service.search_container_registries, action_monitors
-        )
         self.handle_harbor_webhook = ActionProcessor(service.handle_harbor_webhook, action_monitors)
         self.create_registry_quota = ActionProcessor(service.create_registry_quota, action_monitors)
         self.read_registry_quota = ActionProcessor(service.read_registry_quota, action_monitors)
         self.update_registry_quota = ActionProcessor(service.update_registry_quota, action_monitors)
         self.delete_registry_quota = ActionProcessor(service.delete_registry_quota, action_monitors)
+
+        # Scope actions (with RBAC validators)
+        self.get_container_registries = ScopeActionProcessor(
+            service.get_container_registries, action_monitors, validators=[validators.rbac.scope]
+        )
+        self.create_container_registry = ScopeActionProcessor(
+            service.create_container_registry, action_monitors, validators=[validators.rbac.scope]
+        )
+        self.search_container_registries = ScopeActionProcessor(
+            service.search_container_registries, action_monitors, validators=[validators.rbac.scope]
+        )
+
+        # Single-entity actions (with RBAC validators)
+        self.modify_container_registry = SingleEntityActionProcessor(
+            service.modify_container_registry,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
+        self.delete_container_registry = SingleEntityActionProcessor(
+            service.delete_container_registry,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
