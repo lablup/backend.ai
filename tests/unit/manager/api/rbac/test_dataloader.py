@@ -194,10 +194,10 @@ class TestLoadRoleAssignmentsByUserIds:
     async def test_preserves_input_order(self) -> None:
         # Given
         user1_id, user2_id, user3_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
-        a1 = self.create_mock_assignment(user3_id)
-        a2 = self.create_mock_assignment(user1_id)
+        assignment1 = self.create_mock_assignment(user3_id)
+        assignment2 = self.create_mock_assignment(user1_id)
         mock_processor = self.create_mock_processor(
-            [a1, a2]  # DB returns in different order
+            [assignment1, assignment2]  # DB returns in different order
         )
 
         # When
@@ -207,6 +207,6 @@ class TestLoadRoleAssignmentsByUserIds:
 
         # Then
         assert len(result) == 3
-        assert result[0] == [a2]  # user1
+        assert result[0] == [assignment2]  # user1
         assert result[1] == []  # user2 (no assignments)
-        assert result[2] == [a1]  # user3
+        assert result[2] == [assignment1]  # user3
