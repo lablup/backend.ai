@@ -255,7 +255,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "Network",
         "Notification",
         "Permission",
-        "PrometheusQueryPreset",
+        "PrometheusQueryDefinition",
         "QuotaScope",
         "Resource",
         "ResourceUsage",
@@ -316,7 +316,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.model import Model
         from .func.network import Network
         from .func.notification import Notification
-        from .func.prometheus_query_preset import PrometheusQueryPreset
+        from .func.prometheus_query_definition import PrometheusQueryDefinition
         from .func.quota_scope import QuotaScope
         from .func.resource import Resource
         from .func.resource_usage import ResourceUsage
@@ -358,7 +358,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.Dotfile = Dotfile
         self.ServerLog = ServerLog
         self.Permission = Permission
-        self.PrometheusQueryPreset = PrometheusQueryPreset
+        self.PrometheusQueryDefinition = PrometheusQueryDefinition
         self.Service = Service
         self.ServiceAutoScalingRule = ServiceAutoScalingRule
         self.Model = Model
