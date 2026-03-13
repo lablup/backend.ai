@@ -224,8 +224,7 @@ class AuditLogConditions:
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             subquery = (
-                sa
-                .select(AuditLogRow.created_at)
+                sa.select(AuditLogRow.created_at)
                 .where(AuditLogRow.id == cursor_id)
                 .scalar_subquery()
             )
@@ -237,8 +236,7 @@ class AuditLogConditions:
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             subquery = (
-                sa
-                .select(AuditLogRow.created_at)
+                sa.select(AuditLogRow.created_at)
                 .where(AuditLogRow.id == cursor_id)
                 .scalar_subquery()
             )
