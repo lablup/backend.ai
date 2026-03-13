@@ -20,7 +20,7 @@ class UpdateRouteAction(ModelServiceSingleEntityAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.DEPLOYMENT_ROUTE
+        return EntityType.MODEL_DEPLOYMENT
 
     @override
     @classmethod
@@ -33,7 +33,7 @@ class UpdateRouteAction(ModelServiceSingleEntityAction):
 
     @override
     def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.DEPLOYMENT_ROUTE, str(self.route_id))
+        return RBACElementRef(RBACElementType.MODEL_DEPLOYMENT, str(self.service_id))
 
 
 @dataclass

@@ -35,9 +35,10 @@ class ModifyEndpointAction(ModelServiceSingleEntityAction):
 
 @dataclass
 class ModifyEndpointActionResult(ModelServiceSingleEntityActionResult):
+    endpoint_id: uuid.UUID
     success: bool
     data: EndpointData | None
 
     @override
     def target_entity_id(self) -> str:
-        return str(self.data.id) if self.data is not None else None
+        return str(self.endpoint_id)
