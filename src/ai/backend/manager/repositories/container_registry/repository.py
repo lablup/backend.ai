@@ -1,12 +1,12 @@
 import logging
 import uuid
-from typing import Any, cast
+from typing import cast
 
 import sqlalchemy as sa
-from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -18,6 +18,7 @@ from ai.backend.manager.data.container_registry.types import (
     ContainerRegistrySearchResult,
 )
 from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.image import (
     ContainerRegistryGroupsAssociationNotFound,
     ContainerRegistryNotFound,
@@ -33,17 +34,26 @@ from ai.backend.manager.models.container_registry import (
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import (
-    BulkCreator,
     Creator,
-    execute_bulk_creator,
     execute_creator,
 )
 from ai.backend.manager.repositories.base.purger import Purger, execute_purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.rbac.scope_binder import (
+    RBACScopeBinder,
+    RBACScopeBindingPair,
+    execute_rbac_scope_binder,
+)
+from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
+    execute_rbac_scope_entity_unbinder,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.container_registry.creators import (
     ContainerRegistryCreatorSpec,
     ContainerRegistryGroupCreatorSpec,
+)
+from ai.backend.manager.repositories.container_registry.scope_binders import (
+    ContainerRegistryProjectEntityUnbinder,
 )
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
@@ -307,28 +317,35 @@ class ContainerRegistryRepository:
             ContainerRegistryGroupsAssociationNotFound: If trying to remove non-existing associations
         """
         if allowed_group_updates.add:
-            specs = [
-                ContainerRegistryGroupCreatorSpec(
-                    registry_id=registry_id,
-                    group_id=uuid.UUID(group_id),
+            pairs = [
+                RBACScopeBindingPair(
+                    spec=ContainerRegistryGroupCreatorSpec(
+                        registry_id=registry_id,
+                        group_id=uuid.UUID(group_id),
+                    ),
+                    entity_ref=RBACElementRef(
+                        element_type=RBACElementType.CONTAINER_REGISTRY,
+                        element_id=str(registry_id),
+                    ),
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.PROJECT,
+                        element_id=str(group_id),
+                    ),
                 )
                 for group_id in allowed_group_updates.add
             ]
-            bulk_creator = BulkCreator(specs=specs)
-            await execute_bulk_creator(session, bulk_creator)
+            await execute_rbac_scope_binder(session, RBACScopeBinder(pairs=pairs))
 
         if allowed_group_updates.remove:
-            delete_query = (
-                sa.delete(AssociationContainerRegistriesGroupsRow)
-                .where(AssociationContainerRegistriesGroupsRow.registry_id == registry_id)
-                .where(
-                    AssociationContainerRegistriesGroupsRow.group_id.in_(
-                        allowed_group_updates.remove
-                    )
+            total_deleted = 0
+            for group_id in allowed_group_updates.remove:
+                unbinder = ContainerRegistryProjectEntityUnbinder(
+                    registry_id=registry_id,
+                    group_id=uuid.UUID(group_id),
                 )
-            )
-            result = await session.execute(delete_query)
-            if cast(CursorResult[Any], result).rowcount == 0:
+                result = await execute_rbac_scope_entity_unbinder(session, unbinder)
+                total_deleted += result.deleted_count
+            if total_deleted == 0:
                 raise ContainerRegistryGroupsAssociationNotFound(
                     f"Tried to remove non-existing associations for registry_id: {registry_id}, group_ids: {allowed_group_updates.remove}"
                 )
@@ -338,10 +355,17 @@ class ContainerRegistryRepository:
         session: SASession,
         registry_id: uuid.UUID,
     ) -> None:
-        delete_query = sa.delete(AssociationContainerRegistriesGroupsRow).where(
+        stmt = sa.select(AssociationContainerRegistriesGroupsRow.group_id).where(
             AssociationContainerRegistriesGroupsRow.registry_id == registry_id
         )
-        await session.execute(delete_query)
+        result = await session.execute(stmt)
+        group_ids = list(result.scalars().all())
+        for group_id in group_ids:
+            unbinder = ContainerRegistryProjectEntityUnbinder(
+                registry_id=registry_id,
+                group_id=group_id,
+            )
+            await execute_rbac_scope_entity_unbinder(session, unbinder)
 
     async def _get_by_registry_and_project(
         self,
