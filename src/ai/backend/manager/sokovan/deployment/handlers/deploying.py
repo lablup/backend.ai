@@ -133,8 +133,6 @@ class DeployingProvisioningHandler(DeploymentHandler):
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
-        # Update health check config in app-proxy for each deployment so that
-        # the new revision's health check settings are used from the start.
         for deployment in deployments:
             try:
                 await self._deployment_executor.update_endpoint_health_check(
@@ -208,13 +206,11 @@ class DeployingProgressingHandler(DeploymentHandler):
         route_controller: RouteController,
         evaluator: DeploymentStrategyEvaluator,
         applier: StrategyResultApplier,
-        deployment_executor: DeploymentExecutor,
     ) -> None:
         self._deployment_controller = deployment_controller
         self._route_controller = route_controller
         self._evaluator = evaluator
         self._applier = applier
-        self._deployment_executor = deployment_executor
 
     @classmethod
     @override
