@@ -112,7 +112,7 @@ class DeployingProvisioningHandler(DeploymentHandler):
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.PROVISIONING,
+                sub_status=DeploymentSubStep.PROGRESSING,
             ),
             need_retry=None,
             expired=DeploymentLifecycleStatus(
@@ -135,13 +135,22 @@ class DeployingProvisioningHandler(DeploymentHandler):
         summary = await self._evaluator.evaluate(deployment_infos)
         await self._applier.apply(summary)
 
-        # Successfully evaluated deployments → successes
-        evaluated_ids = set(summary.assignments.keys())
-        successes = [
-            deployment
-            for deployment in deployments
-            if deployment.deployment_info.id in evaluated_ids
-        ]
+        successes: list[DeploymentWithHistory] = []
+        skipped: list[DeploymentWithHistory] = []
+
+        # Classify by assigned sub_step
+        for deployment in deployments:
+            endpoint_id = deployment.deployment_info.id
+            assigned = summary.assignments.get(endpoint_id)
+            if assigned is None:
+                # Evaluation error — handled below
+                continue
+            if assigned == DeploymentSubStep.PROGRESSING:
+                # Advanced to PROGRESSING → success (coordinator transitions)
+                successes.append(deployment)
+            else:
+                # Still PROVISIONING → skip (no state transition)
+                skipped.append(deployment)
 
         # Evaluation errors → execution errors
         errors = [
@@ -154,7 +163,7 @@ class DeployingProvisioningHandler(DeploymentHandler):
             if evaluation_error.deployment.id in deployment_map
         ]
 
-        return DeploymentExecutionResult(successes=successes, errors=errors)
+        return DeploymentExecutionResult(successes=successes, errors=errors, skipped=skipped)
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
@@ -219,12 +228,19 @@ class DeployingProgressingHandler(DeploymentHandler):
     @classmethod
     @override
     def status_transitions(cls) -> DeploymentStatusTransitions:
-        ready = DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY)
+        ready = DeploymentLifecycleStatus(
+            lifecycle=EndpointLifecycle.READY,
+            sub_status=None,
+        )
+        rolling_back = DeploymentLifecycleStatus(
+            lifecycle=EndpointLifecycle.DEPLOYING,
+            sub_status=DeploymentSubStep.ROLLING_BACK,
+        )
         return DeploymentStatusTransitions(
             success=ready,
-            need_retry=ready,
-            expired=ready,
-            give_up=ready,
+            need_retry=None,
+            expired=rolling_back,
+            give_up=rolling_back,
         )
 
     @override
@@ -254,6 +270,10 @@ class DeployingProgressingHandler(DeploymentHandler):
 
         successes: list[DeploymentWithHistory] = []
         errors: list[DeploymentExecutionError] = []
+        skipped: list[DeploymentWithHistory] = []
+
+        terminal_ids = apply_result.completed_ids | apply_result.rolled_back_ids
+        evaluation_error_ids = {e.deployment.id for e in summary.errors}
 
         # COMPLETED → successes (coordinator transitions to READY)
         for endpoint_id in apply_result.completed_ids:
@@ -289,7 +309,17 @@ class DeployingProgressingHandler(DeploymentHandler):
                     )
                 )
 
-        return DeploymentExecutionResult(successes=successes, errors=errors)
+        # Still PROGRESSING → skipped (no state transition)
+        for deployment in deployments:
+            endpoint_id = deployment.deployment_info.id
+            if (
+                endpoint_id not in terminal_ids
+                and endpoint_id not in destroying_ids
+                and endpoint_id not in evaluation_error_ids
+            ):
+                skipped.append(deployment)
+
+        return DeploymentExecutionResult(successes=successes, errors=errors, skipped=skipped)
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
@@ -347,7 +377,7 @@ class DeployingRollingBackHandler(DeploymentHandler):
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.ROLLING_BACK,
+                sub_status=DeploymentSubStep.ROLLED_BACK,
             ),
             need_retry=None,
             expired=DeploymentLifecycleStatus(
