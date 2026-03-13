@@ -294,6 +294,6 @@ class ResourceHandler:
 
     async def get_container_registries(self, ctx: UserContext) -> APIResponse:
         result = await self._container_registry.get_container_registries.wait_for_complete(
-            GetContainerRegistriesAction()
+            GetContainerRegistriesAction(_domain_name=ctx.user_domain)
         )
         return APIResponse.build(HTTPStatus.OK, ContainerRegistriesResponse(root=result.registries))

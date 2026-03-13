@@ -12,7 +12,7 @@ from ai.backend.manager.services.container_registry.actions.base import (
 
 @dataclass
 class GetContainerRegistriesAction(ContainerRegistryScopeAction):
-    _domain_name: str
+    _domain_name: str = ""
 
     @override
     @classmethod
@@ -35,7 +35,7 @@ class GetContainerRegistriesAction(ContainerRegistryScopeAction):
 @dataclass
 class GetContainerRegistriesActionResult(ContainerRegistryScopeActionResult):
     registries: Any
-    _domain_name: str
+    _domain_name: str = ""
 
     @override
     def scope_type(self) -> ScopeType:

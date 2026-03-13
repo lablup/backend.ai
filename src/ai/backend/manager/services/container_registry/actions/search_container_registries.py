@@ -17,7 +17,7 @@ from ai.backend.manager.services.container_registry.actions.base import (
 @dataclass
 class SearchContainerRegistriesAction(ContainerRegistryScopeAction):
     querier: BatchQuerier
-    _domain_name: str
+    _domain_name: str = ""
 
     @override
     @classmethod
@@ -43,7 +43,7 @@ class SearchContainerRegistriesActionResult(ContainerRegistryScopeActionResult):
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-    _domain_name: str
+    _domain_name: str = ""
 
     @override
     def scope_type(self) -> ScopeType:

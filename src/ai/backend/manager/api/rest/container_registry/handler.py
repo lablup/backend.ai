@@ -97,6 +97,7 @@ class ContainerRegistryHandler:
     async def create(
         self,
         body: BodyParam[CreateContainerRegistryRequestModel],
+        ctx: RequestCtx,
     ) -> APIResponse:
         params = body.parsed
         log.info("CREATE_CONTAINER_REGISTRY (registry_name:{})", params.registry_name)
@@ -114,7 +115,10 @@ class ContainerRegistryHandler:
             allowed_groups=params.allowed_groups,
         )
         result = await self._container_registry.create_container_registry.wait_for_complete(
-            CreateContainerRegistryAction(creator=Creator(spec=creator_spec))
+            CreateContainerRegistryAction(
+                creator=Creator(spec=creator_spec),
+                _domain_name=ctx.request["user"]["domain_name"],
+            )
         )
 
         resp = PatchContainerRegistryResponseModel(

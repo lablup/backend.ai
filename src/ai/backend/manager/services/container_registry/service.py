@@ -101,7 +101,7 @@ class ContainerRegistryService:
         self, action: CreateContainerRegistryAction
     ) -> CreateContainerRegistryActionResult:
         data = await self._container_registry_repository.create_registry(action.creator)
-        return CreateContainerRegistryActionResult(data=data)
+        return CreateContainerRegistryActionResult(data=data, _domain_name=action._domain_name)
 
     async def modify_container_registry(
         self, action: ModifyContainerRegistryAction
@@ -179,13 +179,16 @@ class ContainerRegistryService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+            _domain_name=action._domain_name,
         )
 
     async def get_container_registries(
-        self, _action: GetContainerRegistriesAction
+        self, action: GetContainerRegistriesAction
     ) -> GetContainerRegistriesActionResult:
         registries = await self._container_registry_repository.get_known_registries()
-        return GetContainerRegistriesActionResult(registries=registries)
+        return GetContainerRegistriesActionResult(
+            registries=registries, _domain_name=action._domain_name
+        )
 
     async def handle_harbor_webhook(
         self, action: HandleHarborWebhookAction

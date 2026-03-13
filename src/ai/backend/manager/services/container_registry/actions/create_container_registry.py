@@ -16,7 +16,7 @@ from ai.backend.manager.services.container_registry.actions.base import (
 @dataclass
 class CreateContainerRegistryAction(ContainerRegistryScopeAction):
     creator: Creator[ContainerRegistryRow]
-    _domain_name: str
+    _domain_name: str = ""
 
     @override
     @classmethod
@@ -39,7 +39,7 @@ class CreateContainerRegistryAction(ContainerRegistryScopeAction):
 @dataclass
 class CreateContainerRegistryActionResult(ContainerRegistryScopeActionResult):
     data: ContainerRegistryData
-    _domain_name: str
+    _domain_name: str = ""
 
     @override
     def scope_type(self) -> ScopeType:
