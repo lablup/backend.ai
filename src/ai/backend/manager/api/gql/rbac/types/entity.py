@@ -136,7 +136,6 @@ class EntityRefGQL(Node):
             case (
                 RBACElementType.SESSION
                 | RBACElementType.VFOLDER
-                | RBACElementType.DEPLOYMENT
                 | RBACElementType.KEYPAIR
                 | RBACElementType.NETWORK
                 | RBACElementType.CONTAINER_REGISTRY
