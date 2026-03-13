@@ -263,6 +263,7 @@ from .user import (
     domain_users_v2,
     my_user_v2,
     project_users_v2,
+    update_my_allowed_client_ip,
     update_user_v2,
 )
 from .vfs_storage import (
@@ -498,6 +499,8 @@ class Mutation:
     admin_delete_users_v2 = admin_delete_users_v2
     admin_purge_user_v2 = admin_purge_user_v2
     admin_bulk_purge_users_v2 = admin_bulk_purge_users_v2
+    # IP allowlist self-service mutation
+    update_my_allowed_client_ip = update_my_allowed_client_ip
     # Prometheus Query Preset - Admin APIs
     admin_create_prometheus_query_preset = admin_create_prometheus_query_preset
     admin_modify_prometheus_query_preset = admin_modify_prometheus_query_preset

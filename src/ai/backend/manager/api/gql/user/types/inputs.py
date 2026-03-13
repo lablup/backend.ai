@@ -262,3 +262,32 @@ class BulkPurgeUsersV2InputGQL:
         default=None,
         description="Options for the purge operation.",
     )
+
+
+# IP Allowlist Inputs
+
+
+@strawberry.input(
+    name="UpdateMyAllowedClientIPInput",
+    description=(
+        "Input for updating the current user's allowed client IP list. "
+        "Set allowed_client_ip to null to remove all restrictions. "
+        "Use force=true to bypass the lockout safety check."
+    ),
+)
+class UpdateMyAllowedClientIPInputGQL:
+    """Input for updating the current user's allowed client IP addresses."""
+
+    allowed_client_ip: list[str] | None = strawberry.field(
+        description=(
+            "New allowed client IP addresses or CIDR ranges. "
+            "Set to null to remove all IP restrictions."
+        ),
+    )
+    force: bool = strawberry.field(
+        default=False,
+        description=(
+            "If false (default), the operation will fail if the current request IP "
+            "is not included in the new allowlist. Set to true to override this safety check."
+        ),
+    )
