@@ -39,9 +39,7 @@ def image_processors(
     mock_validators = MagicMock()
     mock_validators.rbac.scope.validate = AsyncMock()
     mock_validators.rbac.single_entity.validate = AsyncMock()
-    return ImageProcessors(
-        service=service, action_monitors=[], validators=mock_validators
-    )
+    return ImageProcessors(service=service, action_monitors=[], validators=mock_validators)
 
 
 @pytest.fixture()
