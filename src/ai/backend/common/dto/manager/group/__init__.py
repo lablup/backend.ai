@@ -24,6 +24,7 @@ from .response import (
     GroupMemberDTO,
     ListGroupMembersResponse,
     PaginationInfo,
+    PurgeGroupResponse,
     ReadRegistryQuotaResponse,
     RemoveGroupMembersResponse,
     SearchGroupsResponse,
@@ -61,6 +62,7 @@ __all__ = (
     "SearchGroupsResponse",
     "UpdateGroupResponse",
     "DeleteGroupResponse",
+    "PurgeGroupResponse",
     # Response DTOs - Member management
     "AddGroupMembersResponse",
     "RemoveGroupMembersResponse",

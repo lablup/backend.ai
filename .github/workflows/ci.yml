@@ -216,11 +216,11 @@ jobs:
     if: |
       !contains(github.event.pull_request.labels.*.name, 'skip:ci')
       && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
-    runs-on: ubuntu-latest-8-cores
+    runs-on: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && '["0/3","1/3","2/3"]' || '["0/1"]') }}
+        shard: ${{ fromJSON('["0/3","1/3","2/3"]') }}
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -272,6 +272,7 @@ jobs:
             BASE_REF="HEAD~1"
           fi
           pants test --changed-since=$BASE_REF --changed-dependents=transitive \
+            --shard='${{ matrix.shard }}' \
             --filter-address-regex='tests/unit/' -- -v
         fi
     - name: Upload pants log
@@ -286,11 +287,11 @@ jobs:
     if: |
       !contains(github.event.pull_request.labels.*.name, 'skip:ci')
       && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
-    runs-on: ubuntu-latest-8-cores
+    runs-on: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && '["0/2","1/2"]' || '["0/1"]') }}
+        shard: ${{ fromJSON('["0/2","1/2"]') }}
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -359,6 +360,7 @@ jobs:
             BASE_REF="HEAD~1"
           fi
           pants test --changed-since=$BASE_REF --changed-dependents=transitive \
+            --shard='${{ matrix.shard }}' \
             --filter-address-regex='tests/component/' -- -v
         fi
     - name: Upload pants log
@@ -373,11 +375,11 @@ jobs:
     if: |
       !contains(github.event.pull_request.labels.*.name, 'skip:ci')
       && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
-    runs-on: ubuntu-latest-8-cores
+    runs-on: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && '["0/2","1/2"]' || '["0/1"]') }}
+        shard: ${{ fromJSON('["0/2","1/2"]') }}
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -434,6 +436,7 @@ jobs:
             BASE_REF="HEAD~1"
           fi
           pants test --changed-since=$BASE_REF \
+            --shard='${{ matrix.shard }}' \
             --filter-address-regex='tests/integration/' -- -v
         fi
     - name: Upload pants log
@@ -444,8 +447,47 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
+  test-unit-gate:
+    needs: [test-unit]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+    - run: |
+        if [ "${{ needs.test-unit.result }}" = "success" ]; then
+          echo "All test-unit shards passed"
+        else
+          echo "test-unit failed: ${{ needs.test-unit.result }}"
+          exit 1
+        fi
+
+  test-component-gate:
+    needs: [test-component]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+    - run: |
+        if [ "${{ needs.test-component.result }}" = "success" ]; then
+          echo "All test-component shards passed"
+        else
+          echo "test-component failed: ${{ needs.test-component.result }}"
+          exit 1
+        fi
+
+  test-integration-gate:
+    needs: [test-integration]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+    - run: |
+        if [ "${{ needs.test-integration.result }}" = "success" ]; then
+          echo "All test-integration shards passed"
+        else
+          echo "test-integration failed: ${{ needs.test-integration.result }}"
+          exit 1
+        fi
+
   build-scies:
-    needs: [lint-and-typecheck, test-unit, test-component, test-integration, check-alembic-migrations]
+    needs: [lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     strategy:
       fail-fast: false
@@ -512,7 +554,7 @@ jobs:
 
 
   build-wheels:
-    needs: [lint-and-typecheck, test-unit, test-component, test-integration, check-alembic-migrations]
+    needs: [lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-22.04
     steps:
@@ -560,12 +602,12 @@ jobs:
 
 
   build-sbom:
-    needs: [lint-and-typecheck, test-unit, test-component, test-integration, check-alembic-migrations]
+    needs: [lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/sbom.yml
 
   build-supergraph:
-    needs: [lint-and-typecheck, test-unit, test-component, test-integration, check-alembic-migrations]
+    needs: [lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:

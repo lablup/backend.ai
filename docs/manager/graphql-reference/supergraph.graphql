@@ -10196,7 +10196,6 @@ enum RBACElementType
   USER @join__enumValue(graph: STRAWBERRY)
   SESSION @join__enumValue(graph: STRAWBERRY)
   VFOLDER @join__enumValue(graph: STRAWBERRY)
-  DEPLOYMENT @join__enumValue(graph: STRAWBERRY)
   MODEL_DEPLOYMENT @join__enumValue(graph: STRAWBERRY)
   KEYPAIR @join__enumValue(graph: STRAWBERRY)
   NOTIFICATION_CHANNEL @join__enumValue(graph: STRAWBERRY)
@@ -10220,6 +10219,8 @@ enum RBACElementType
   AUDIT_LOG @join__enumValue(graph: STRAWBERRY)
   EVENT_LOG @join__enumValue(graph: STRAWBERRY)
   NOTIFICATION_RULE @join__enumValue(graph: STRAWBERRY)
+  DEPLOYMENT_TOKEN @join__enumValue(graph: STRAWBERRY)
+  DEPLOYMENT_POLICY @join__enumValue(graph: STRAWBERRY)
   ARTIFACT_REVISION @join__enumValue(graph: STRAWBERRY)
 }
 

@@ -1345,12 +1345,12 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_access_token(
         self,
-        creator: Creator[EndpointTokenRow],
+        creator: RBACEntityCreator[EndpointTokenRow],
     ) -> EndpointTokenRow:
         """Create a new access token for a model deployment.
 
         Args:
-            creator: Creator containing the EndpointTokenCreatorSpec.
+            creator: RBACEntityCreator containing the EndpointTokenCreatorSpec.
 
         Returns:
             Created EndpointTokenRow.

@@ -12,6 +12,7 @@ from ai.backend.common.dto.manager.group import (
     GetGroupResponse,
     ListGroupMembersRequest,
     ListGroupMembersResponse,
+    PurgeGroupResponse,
     RemoveGroupMembersRequest,
     RemoveGroupMembersResponse,
     SearchGroupsRequest,
@@ -134,6 +135,16 @@ class GroupClient(BaseDomainClient):
             "DELETE",
             f"{_GROUPS_PATH}/{group_id}",
             response_model=DeleteGroupResponse,
+        )
+
+    async def purge(
+        self,
+        group_id: uuid.UUID,
+    ) -> PurgeGroupResponse:
+        return await self._client.typed_request(
+            "POST",
+            f"{_GROUPS_PATH}/{group_id}/purge",
+            response_model=PurgeGroupResponse,
         )
 
     # ---------------------------------------------------------------------------

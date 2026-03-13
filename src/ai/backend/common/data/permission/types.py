@@ -360,7 +360,6 @@ class RBACElementType(enum.StrEnum):
     # === Root-query-enabled entities (scoped) ===
     SESSION = "session"
     VFOLDER = "vfolder"
-    DEPLOYMENT = "deployment"
     MODEL_DEPLOYMENT = "model_deployment"
     KEYPAIR = "keypair"
     NOTIFICATION_CHANNEL = "notification_channel"
@@ -388,6 +387,10 @@ class RBACElementType(enum.StrEnum):
 
     # === Auto-only entities used in permissions ===
     NOTIFICATION_RULE = "notification_rule"
+
+    # === Auto sub-entities with direct GET APIs ===
+    DEPLOYMENT_TOKEN = "deployment:token"
+    DEPLOYMENT_POLICY = "deployment:policy"
 
     # === Entity-level scopes (for entity-scope permissions) ===
     ARTIFACT_REVISION = "artifact_revision"

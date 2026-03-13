@@ -55,9 +55,12 @@ def notification_processors(
     notification_center: NotificationCenter,
 ) -> NotificationProcessors:
     service = NotificationService(mock_repository, notification_center)
-    return NotificationProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
-    )
+    # Create properly structured ActionValidators mock with async validators
+    validators = MagicMock(spec=ActionValidators)
+    validators.rbac = MagicMock()
+    validators.rbac.scope = AsyncMock()
+    validators.rbac.single_entity = AsyncMock()
+    return NotificationProcessors(service=service, action_monitors=[], validators=validators)
 
 
 @pytest.fixture()

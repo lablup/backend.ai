@@ -136,7 +136,6 @@ class EntityRefGQL(Node):
             case (
                 RBACElementType.SESSION
                 | RBACElementType.VFOLDER
-                | RBACElementType.DEPLOYMENT
                 | RBACElementType.KEYPAIR
                 | RBACElementType.NETWORK
                 | RBACElementType.CONTAINER_REGISTRY
@@ -154,6 +153,8 @@ class EntityRefGQL(Node):
                 | RBACElementType.AGENT
                 | RBACElementType.KERNEL
                 | RBACElementType.ROUTING
+                | RBACElementType.DEPLOYMENT_TOKEN
+                | RBACElementType.DEPLOYMENT_POLICY
             ):
                 return None
 
