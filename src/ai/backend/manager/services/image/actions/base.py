@@ -3,7 +3,6 @@ from typing import override
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseAction, BaseBatchAction
-from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
 from ai.backend.manager.actions.action.single_entity import (
     BaseSingleEntityAction,
     BaseSingleEntityActionResult,
@@ -25,18 +24,6 @@ class ImageBatchAction(BaseBatchAction):
     @classmethod
     def entity_type(cls) -> EntityType:
         return EntityType.IMAGE
-
-
-@dataclass
-class ImageScopeAction(BaseScopeAction):
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.IMAGE
-
-
-class ImageScopeActionResult(BaseScopeActionResult):
-    pass
 
 
 @dataclass
