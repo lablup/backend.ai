@@ -96,7 +96,7 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
     create_container_registry: ScopeActionProcessor[
         CreateContainerRegistryAction, CreateContainerRegistryActionResult
     ]
-    search_container_registries: ScopeActionProcessor[
+    search_container_registries: ActionProcessor[
         SearchContainerRegistriesAction, SearchContainerRegistriesActionResult
     ]
 
@@ -136,8 +136,8 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
         self.create_container_registry = ScopeActionProcessor(
             service.create_container_registry, action_monitors, validators=[validators.rbac.scope]
         )
-        self.search_container_registries = ScopeActionProcessor(
-            service.search_container_registries, action_monitors, validators=[validators.rbac.scope]
+        self.search_container_registries = ActionProcessor(
+            service.search_container_registries, action_monitors
         )
 
         # Single-entity actions (with RBAC validators)
