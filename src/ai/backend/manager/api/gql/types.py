@@ -13,6 +13,7 @@ from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 if TYPE_CHECKING:
     from ai.backend.common.events.fetcher import EventFetcher
     from ai.backend.common.events.hub.hub import EventHub
+    from ai.backend.common.metrics.metric import GraphQLMetricObserver
     from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
     from ai.backend.manager.services.processors import Processors  # pants: no-infer-dep
 
@@ -59,6 +60,7 @@ class StrawberryGQLContext:
     event_fetcher: EventFetcher
     gql_adapter: BaseGQLAdapter
     data_loaders: DataLoaders
+    metric_observer: GraphQLMetricObserver
 
 
 # Scope input types for BEP-1041 Resource Group scoped APIs

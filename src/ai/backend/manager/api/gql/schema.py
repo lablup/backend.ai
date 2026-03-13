@@ -5,6 +5,7 @@ from strawberry.schema.config import StrawberryConfig
 from ai.backend.manager.api.gql.extensions import (
     GQLExceptionHandlerExtension,
     GQLLoggingExtension,
+    GQLMetricExtension,
     GQLValidationExtension,
 )
 
@@ -543,6 +544,7 @@ schema = CustomizedSchema(
     enable_federation_2=True,
     extensions=[
         GQLLoggingExtension,
+        GQLMetricExtension,
         GQLValidationExtension,
         GQLExceptionHandlerExtension,
     ],
