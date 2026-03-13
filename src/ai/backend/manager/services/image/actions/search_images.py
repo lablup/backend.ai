@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -33,8 +33,6 @@ class SearchImagesAction(ImageScopeAction):
     @override
     def target_element(self) -> RBACElementRef:
         # Map ScopeType to the corresponding RBACElementType
-        from ai.backend.common.data.permission.types import RBACElementType
-
         scope_element_type_map = {
             ScopeType.USER: RBACElementType.USER,
             ScopeType.PROJECT: RBACElementType.PROJECT,
