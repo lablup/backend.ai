@@ -93,7 +93,7 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
     get_container_registries: ScopeActionProcessor[
         GetContainerRegistriesAction, GetContainerRegistriesActionResult
     ]
-    create_container_registry: ScopeActionProcessor[
+    create_container_registry: ActionProcessor[
         CreateContainerRegistryAction, CreateContainerRegistryActionResult
     ]
     search_container_registries: ActionProcessor[
@@ -133,8 +133,8 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
         self.get_container_registries = ScopeActionProcessor(
             service.get_container_registries, action_monitors, validators=[validators.rbac.scope]
         )
-        self.create_container_registry = ScopeActionProcessor(
-            service.create_container_registry, action_monitors, validators=[validators.rbac.scope]
+        self.create_container_registry = ActionProcessor(
+            service.create_container_registry, action_monitors
         )
         self.search_container_registries = ActionProcessor(
             service.search_container_registries, action_monitors
