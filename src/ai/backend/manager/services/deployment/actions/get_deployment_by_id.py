@@ -2,28 +2,30 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.permission.types import PermissionOperationType
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
-from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
+from ai.backend.manager.services.deployment.actions.base import (
+    DeploymentSingleEntityAction,
+    DeploymentSingleEntityActionResult,
+)
 
 
 @dataclass
-class GetDeploymentByIdAction(DeploymentBaseAction):
+class GetDeploymentByIdAction(DeploymentSingleEntityAction):
     deployment_id: UUID
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.deployment_id)
+    def target_entity_id(self) -> UUID:
+        return self.deployment_id
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
+    def permission_operation_type(cls) -> PermissionOperationType:
+        return PermissionOperationType.READ
 
 
 @dataclass
-class GetDeploymentByIdActionResult(BaseActionResult):
+class GetDeploymentByIdActionResult(DeploymentSingleEntityActionResult):
     data: ModelDeploymentData
 
     @override

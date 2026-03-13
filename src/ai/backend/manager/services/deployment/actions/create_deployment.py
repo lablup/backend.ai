@@ -2,32 +2,39 @@
 
 from dataclasses import dataclass
 from typing import override
+from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.permission.types import PermissionOperationType, ScopeType
 from ai.backend.manager.data.deployment.creator import NewDeploymentCreator
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
-from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
+from ai.backend.manager.services.deployment.actions.base import (
+    DeploymentScopeAction,
+    DeploymentScopeActionResult,
+)
 
 
 @dataclass
-class CreateDeploymentAction(DeploymentBaseAction):
+class CreateDeploymentAction(DeploymentScopeAction):
     """Action to create a new deployment(Model Service)."""
 
     creator: NewDeploymentCreator
 
     @override
-    def entity_id(self) -> str | None:
-        return None  # New deployment doesn't have an ID yet
+    def scope_type(self) -> ScopeType:
+        return ScopeType.PROJECT
+
+    @override
+    def scope_id(self) -> UUID:
+        return self.creator.project_id
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
+    def permission_operation_type(cls) -> PermissionOperationType:
+        return PermissionOperationType.CREATE
 
 
 @dataclass
-class CreateDeploymentActionResult(BaseActionResult):
+class CreateDeploymentActionResult(DeploymentScopeActionResult):
     data: ModelDeploymentData
 
     @override
