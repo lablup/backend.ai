@@ -115,7 +115,7 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     get_reservoir_registries: ActionProcessor[
         GetReservoirRegistriesAction, GetReservoirRegistriesActionResult
     ]
-    list_reservoir_registries: ScopeActionProcessor[
+    list_reservoir_registries: ActionProcessor[
         ListReservoirRegistriesAction, ListReservoirRegistriesActionResult
     ]
     search_reservoir_registries: ActionProcessor[
@@ -150,8 +150,8 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         self.create_reservoir_registry = ActionProcessor(
             service.create_reservoir_registry, action_monitors
         )
-        self.list_reservoir_registries = ScopeActionProcessor(
-            service.list_reservoir_registries, action_monitors, validators=[validators.rbac.scope]
+        self.list_reservoir_registries = ActionProcessor(
+            service.list_reservoir_registries, action_monitors
         )
         self.search_reservoir_registries = ActionProcessor(
             service.search_reservoir_registries, action_monitors
