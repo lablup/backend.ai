@@ -38,7 +38,6 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
-from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
