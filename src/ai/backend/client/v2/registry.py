@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from .domains.notification import NotificationClient
     from .domains.object_storage import ObjectStorageClient
     from .domains.operations import OperationsClient
+    from .domains.prometheus_query_definition import PrometheusQueryDefinitionClient
     from .domains.quota_scope import QuotaScopeClient
     from .domains.rbac import RBACClient
     from .domains.resource_policy import ResourcePolicyClient
@@ -267,6 +268,12 @@ class BackendAIClientRegistry:
         from .domains.system import SystemClient
 
         return SystemClient(self._client)
+
+    @cached_property
+    def prometheus_query_definition(self) -> PrometheusQueryDefinitionClient:
+        from .domains.prometheus_query_definition import PrometheusQueryDefinitionClient
+
+        return PrometheusQueryDefinitionClient(self._client)
 
     @cached_property
     def auto_scaling_rule(self) -> AutoScalingRuleClient:
