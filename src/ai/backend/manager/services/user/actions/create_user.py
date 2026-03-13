@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast, override
+from typing import cast, override
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.action import BaseActionResult
@@ -10,14 +10,12 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import BulkUserCreateResultData, UserCreateResultData
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.services.user.actions.base import (
     UserAction,
     UserScopeAction,
     UserScopeActionResult,
 )
-
-if TYPE_CHECKING:
-    from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 
 
 @dataclass
@@ -36,22 +34,12 @@ class CreateUserAction(UserScopeAction):
 
     @override
     def scope_id(self) -> str:
-        if TYPE_CHECKING:
-            from ai.backend.manager.repositories.user.creators import UserCreatorSpec
-
-            spec = cast(UserCreatorSpec, self.creator.spec)
-        else:
-            spec = self.creator.spec
+        spec = cast(UserCreatorSpec, self.creator.spec)
         return spec.domain_name
 
     @override
     def target_element(self) -> RBACElementRef:
-        if TYPE_CHECKING:
-            from ai.backend.manager.repositories.user.creators import UserCreatorSpec
-
-            spec = cast(UserCreatorSpec, self.creator.spec)
-        else:
-            spec = self.creator.spec
+        spec = cast(UserCreatorSpec, self.creator.spec)
         return RBACElementRef(RBACElementType.DOMAIN, spec.domain_name)
 
 
