@@ -3,9 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import override
 
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.base import BatchQuerier
 
 from .base import ArtifactScopeAction, ArtifactScopeActionResult
@@ -35,6 +36,17 @@ class SearchArtifactsWithRevisionsAction(ArtifactScopeAction):
     @override
     def entity_id(self) -> str | None:
         return None
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        # Map ScopeType to RBACElementType
+        element_type_map = {
+            ScopeType.DOMAIN: RBACElementType.DOMAIN,
+            ScopeType.PROJECT: RBACElementType.PROJECT,
+            ScopeType.USER: RBACElementType.USER,
+        }
+        element_type = element_type_map[self._scope_type]
+        return RBACElementRef(element_type, self._scope_id)
 
 
 @dataclass
