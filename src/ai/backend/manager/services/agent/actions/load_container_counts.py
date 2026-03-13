@@ -17,7 +17,7 @@ class LoadContainerCountsAction(AgentScopeAction):
     """Action to load container counts."""
 
     agent_ids: Sequence[AgentId]
-    _domain_name: str
+    _domain_name: str = "*"  # "*" means all domains (superadmin scope)
 
     @override
     @classmethod
@@ -26,11 +26,11 @@ class LoadContainerCountsAction(AgentScopeAction):
 
     @override
     def scope_type(self) -> ScopeType:
-        return ScopeType.DOMAIN
+        return ScopeType.GLOBAL
 
     @override
     def scope_id(self) -> str:
-        return self._domain_name
+        return "*"
 
     @override
     def target_element(self) -> RBACElementRef:
@@ -45,12 +45,12 @@ class LoadContainerCountsActionResult(AgentScopeActionResult):
     """
 
     container_counts: Sequence[int]
-    _domain_name: str
+    _domain_name: str = "*"  # "*" means all domains (superadmin scope)
 
     @override
     def scope_type(self) -> ScopeType:
-        return ScopeType.DOMAIN
+        return ScopeType.GLOBAL
 
     @override
     def scope_id(self) -> str:
-        return self._domain_name
+        return "*"

@@ -13,7 +13,7 @@ from ai.backend.manager.services.agent.actions.base import (
 
 @dataclass
 class GetTotalResourcesAction(AgentScopeAction):
-    _domain_name: str
+    _domain_name: str = "*"  # "*" means all domains (superadmin scope)
 
     @override
     @classmethod
@@ -22,11 +22,11 @@ class GetTotalResourcesAction(AgentScopeAction):
 
     @override
     def scope_type(self) -> ScopeType:
-        return ScopeType.DOMAIN
+        return ScopeType.GLOBAL
 
     @override
     def scope_id(self) -> str:
-        return self._domain_name
+        return "*"
 
     @override
     def target_element(self) -> RBACElementRef:
@@ -36,12 +36,12 @@ class GetTotalResourcesAction(AgentScopeAction):
 @dataclass
 class GetTotalResourcesActionResult(AgentScopeActionResult):
     total_resources: TotalResourceData
-    _domain_name: str
+    _domain_name: str = "*"  # "*" means all domains (superadmin scope)
 
     @override
     def scope_type(self) -> ScopeType:
-        return ScopeType.DOMAIN
+        return ScopeType.GLOBAL
 
     @override
     def scope_id(self) -> str:
-        return self._domain_name
+        return "*"

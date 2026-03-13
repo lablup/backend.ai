@@ -15,7 +15,7 @@ from .base import AgentScopeAction, AgentScopeActionResult
 @dataclass
 class SearchAgentsAction(AgentScopeAction):
     querier: BatchQuerier
-    _domain_name: str
+    _domain_name: str = "*"  # "*" means all domains (superadmin scope)
 
     @override
     @classmethod
@@ -24,11 +24,11 @@ class SearchAgentsAction(AgentScopeAction):
 
     @override
     def scope_type(self) -> ScopeType:
-        return ScopeType.DOMAIN
+        return ScopeType.GLOBAL
 
     @override
     def scope_id(self) -> str:
-        return self._domain_name
+        return "*"
 
     @override
     def target_element(self) -> RBACElementRef:
@@ -43,12 +43,12 @@ class SearchAgentsActionResult(AgentScopeActionResult):
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-    _domain_name: str
+    _domain_name: str = "*"  # "*" means all domains (superadmin scope)
 
     @override
     def scope_type(self) -> ScopeType:
-        return ScopeType.DOMAIN
+        return ScopeType.GLOBAL
 
     @override
     def scope_id(self) -> str:
-        return self._domain_name
+        return "*"
