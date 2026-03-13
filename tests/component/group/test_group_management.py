@@ -24,6 +24,7 @@ from ai.backend.client.v2.exceptions import (
     NotFoundError,
 )
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.dto.manager.deployment.types import OrderDirection
 from ai.backend.common.dto.manager.group.request import GroupFilter, SearchGroupsRequest
 from ai.backend.common.dto.manager.group.response import (
@@ -35,7 +36,6 @@ from ai.backend.common.dto.manager.group.types import GroupOrder, GroupOrderFiel
 from ai.backend.common.dto.manager.infra.request import UsagePerPeriodRequest
 from ai.backend.common.dto.manager.infra.response import UsagePerPeriodResponse
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -348,9 +348,7 @@ async def group_with_active_endpoint(
         await conn.execute(
             EndpointRow.__table__.delete().where(EndpointRow.__table__.c.id == endpoint_id)
         )
-        await conn.execute(
-            ImageRow.__table__.delete().where(ImageRow.__table__.c.id == image_id)
-        )
+        await conn.execute(ImageRow.__table__.delete().where(ImageRow.__table__.c.id == image_id))
         await conn.execute(
             ContainerRegistryRow.__table__.delete().where(
                 ContainerRegistryRow.__table__.c.id == registry_id
