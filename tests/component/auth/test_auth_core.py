@@ -45,7 +45,7 @@ class TestAuthorize:
         assert result.data.role == "user"
         assert result.data.status == "active"
 
-    async def test_wrong_password_returns_401(
+    async def test_wrong_password_raises_authentication_error(
         self,
         admin_registry: BackendAIClientRegistry,
         auth_user_fixture: AuthUserFixtureData,
@@ -60,7 +60,7 @@ class TestAuthorize:
                 ),
             )
 
-    async def test_inactive_user_returns_401(
+    async def test_inactive_user_raises_authentication_error(
         self,
         admin_registry: BackendAIClientRegistry,
         inactive_user_fixture: AuthUserFixtureData,
@@ -75,7 +75,7 @@ class TestAuthorize:
                 ),
             )
 
-    async def test_before_verification_user_returns_401(
+    async def test_before_verification_user_raises_authentication_error(
         self,
         admin_registry: BackendAIClientRegistry,
         before_verification_user_fixture: AuthUserFixtureData,
@@ -90,7 +90,7 @@ class TestAuthorize:
                 ),
             )
 
-    async def test_expired_password_returns_401(
+    async def test_expired_password_raises_authentication_error(
         self,
         admin_registry: BackendAIClientRegistry,
         config_provider: ManagerConfigProvider,
@@ -163,8 +163,8 @@ class TestSignup:
                             association_groups_users.c.user_id == user_uuid
                         )
                     )
-                await conn.execute(keypairs.delete().where(keypairs.c.user_id == email))
-                await conn.execute(users.delete().where(users.c.email == email))
+                await conn.execute(keypairs.delete().where(keypairs.c.user == user_uuid))
+                await conn.execute(users.delete().where(users.c.uuid == user_uuid))
 
     async def test_duplicate_email_returns_400(
         self,
