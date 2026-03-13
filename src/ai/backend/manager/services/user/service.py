@@ -122,11 +122,10 @@ class UserService:
         return BulkModifyUserActionResult(data=result)
 
     async def delete_user(self, action: DeleteUserAction) -> DeleteUserActionResult:
-        user_data = await self._user_repository.get_by_email_validated(email=action.email)
         await self._user_repository.soft_delete_user_validated(
             email=action.email,
         )
-        return DeleteUserActionResult(user_uuid=user_data.uuid)
+        return DeleteUserActionResult()
 
     async def get_user(self, action: GetUserAction) -> GetUserActionResult:
         """Retrieve a single user by UUID.
