@@ -4,14 +4,15 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 
-from .base import TemplateAction
+from .base import TemplateScopeAction, TemplateScopeActionResult
 
 
 @dataclass
-class ListTaskTemplatesAction(TemplateAction):
+class ListTaskTemplatesAction(TemplateScopeAction):
     """Action to list all active task templates."""
 
     user_uuid: uuid.UUID
@@ -22,16 +23,29 @@ class ListTaskTemplatesAction(TemplateAction):
         return ActionOperationType.SEARCH
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_type(self) -> ScopeType:
+        return ScopeType.USER
+
+    @override
+    def scope_id(self) -> str:
+        return str(self.user_uuid)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.USER, str(self.user_uuid))
 
 
 @dataclass
-class ListTaskTemplatesActionResult(BaseActionResult):
+class ListTaskTemplatesActionResult(TemplateScopeActionResult):
     """Result of listing task templates."""
 
     entries: list[dict[str, Any]] = field(default_factory=list)
+    _user_uuid: str = ""
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_type(self) -> ScopeType:
+        return ScopeType.USER
+
+    @override
+    def scope_id(self) -> str:
+        return self._user_uuid

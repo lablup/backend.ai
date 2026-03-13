@@ -5,11 +5,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.user import UserRole
 
-from .base import TemplateAction
+from .base import TemplateScopeAction, TemplateScopeActionResult
 
 
 @dataclass
@@ -31,7 +32,7 @@ class CreatedTaskTemplateItem:
 
 
 @dataclass
-class CreateTaskTemplateAction(TemplateAction):
+class CreateTaskTemplateAction(TemplateScopeAction):
     """Action to create one or more task templates."""
 
     domain_name: str
@@ -49,16 +50,29 @@ class CreateTaskTemplateAction(TemplateAction):
         return ActionOperationType.CREATE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_type(self) -> ScopeType:
+        return ScopeType.DOMAIN
+
+    @override
+    def scope_id(self) -> str:
+        return self.domain_name
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.DOMAIN, self.domain_name)
 
 
 @dataclass
-class CreateTaskTemplateActionResult(BaseActionResult):
+class CreateTaskTemplateActionResult(TemplateScopeActionResult):
     """Result of creating task templates."""
 
     created: list[CreatedTaskTemplateItem] = field(default_factory=list)
+    _domain_name: str = ""
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_type(self) -> ScopeType:
+        return ScopeType.DOMAIN
+
+    @override
+    def scope_id(self) -> str:
+        return self._domain_name

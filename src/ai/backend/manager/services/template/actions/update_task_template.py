@@ -4,16 +4,17 @@ import uuid
 from dataclasses import dataclass, field
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.user import UserRole
 
-from .base import TemplateAction
+from .base import TemplateSingleEntityAction, TemplateSingleEntityActionResult
 from .create_task_template import TaskTemplateItemInput
 
 
 @dataclass
-class UpdateTaskTemplateAction(TemplateAction):
+class UpdateTaskTemplateAction(TemplateSingleEntityAction):
     """Action to update an existing task template."""
 
     template_id: str
@@ -32,14 +33,20 @@ class UpdateTaskTemplateAction(TemplateAction):
         return ActionOperationType.UPDATE
 
     @override
-    def entity_id(self) -> str | None:
+    def target_entity_id(self) -> str:
         return self.template_id
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.SESSION_TEMPLATE, self.template_id)
 
 
 @dataclass
-class UpdateTaskTemplateActionResult(BaseActionResult):
+class UpdateTaskTemplateActionResult(TemplateSingleEntityActionResult):
     """Result of updating a task template."""
 
+    _template_id: str = ""
+
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def target_entity_id(self) -> str:
+        return self._template_id
