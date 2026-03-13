@@ -501,7 +501,7 @@ class VFolderHandler:
             quota_scope_id=str(result.base_info.quota_scope_id),
             host=result.base_info.host,
             status=VFolderOperationStatusField(result.base_info.status.value),
-            num_files=result.usage_info.num_files,
+            numFiles=result.usage_info.num_files,
             used_bytes=result.usage_info.used_bytes,
             created_at=str(result.base_info.created_at),
             last_used=str(result.base_info.created_at),
@@ -517,7 +517,7 @@ class VFolderHandler:
             usage_mode=result.base_info.usage_mode,
             cloneable=result.base_info.cloneable,
         )
-        resp = VFolderGetInfoResponse(item=dto)
+        resp = VFolderGetInfoResponse(dto)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
@@ -1409,11 +1409,11 @@ class VFolderHandler:
 
     async def get_vfolder_id(
         self,
-        query: QueryParam[GetVFolderIDReq],
+        body: BodyParam[GetVFolderIDReq],
         ctx: UserContext,
         req: RequestCtx,
     ) -> APIResponse:
-        params = query.parsed
+        params = body.parsed
         folder_name = params.name
         resolved = await self._vfolder.get_accessible_vfolder.wait_for_complete(
             GetAccessibleVFolderAction(
@@ -1435,7 +1435,7 @@ class VFolderHandler:
             folder_name,
         )
         dto = CompactVFolderInfoDTO(id=row["id"], name=folder_name)
-        resp = VFolderGetIDResponse(item=dto)
+        resp = VFolderGetIDResponse(dto)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
