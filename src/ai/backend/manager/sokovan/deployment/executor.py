@@ -11,7 +11,7 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
 )
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.config import ModelDefinition, ModelHealthCheck
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     RuntimeVariant,
@@ -562,6 +562,61 @@ class DeploymentExecutor:
         """
         app_proxy_client = self._load_app_proxy_client(app_proxy_addr, app_proxy_api_token)
         await app_proxy_client.delete_endpoint(endpoint_id)
+
+    async def update_endpoint_health_check(
+        self,
+        deployment: DeploymentInfo,
+    ) -> None:
+        """Update the health check configuration in app-proxy for a deployment.
+
+        Reads the deploying revision's model definition from storage and updates
+        the app-proxy endpoint with the new health check settings.  Called during
+        PROVISIONING so that health checks use the new revision's config from
+        the very start.
+        """
+        deploying_revision_id = deployment.deploying_revision_id
+        if not deploying_revision_id:
+            return
+
+        scaling_groups = {deployment.metadata.resource_group}
+        targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(scaling_groups)
+        target = targets.get(deployment.metadata.resource_group)
+        if not target:
+            log.warning(
+                "No proxy target for scaling group {}, cannot update health check for deployment {}",
+                deployment.metadata.resource_group,
+                deployment.id,
+            )
+            return
+
+        # Fetch the deploying revision's data from DB to get the correct vfolder.
+        # DeploymentInfo.target_revision() returns the current revision's spec,
+        # not the deploying revision's, so we must query the DB directly.
+        revision_data = await self._deployment_repo.get_revision(deploying_revision_id)
+        vfolder_id = revision_data.model_mount_config.vfolder_id
+        definition_path = revision_data.model_mount_config.definition_path
+
+        if not vfolder_id:
+            log.warning(
+                "Deploying revision {} has no vfolder, cannot read model definition",
+                deploying_revision_id,
+            )
+            return
+
+        model_definition_content = await self._deployment_repo.fetch_model_definition(
+            vfolder_id=vfolder_id,
+            model_definition_path=definition_path,
+        )
+        model_definition = ModelDefinition.model_validate(model_definition_content)
+        health_check_config = model_definition.health_check_config()
+
+        app_proxy_client = self._load_app_proxy_client(target.addr, target.api_token)
+        await app_proxy_client.update_health_check(deployment.id, health_check_config)
+        log.info(
+            "Updated health check config in app-proxy for deployment {} (path={})",
+            deployment.id,
+            health_check_config.path if health_check_config else None,
+        )
 
     def _verify_deployment_replicas(
         self,

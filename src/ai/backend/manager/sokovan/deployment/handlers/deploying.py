@@ -41,6 +41,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
+from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.manager.sokovan.deployment.strategy.applier import (
@@ -81,11 +82,13 @@ class DeployingProvisioningHandler(DeploymentHandler):
         route_controller: RouteController,
         evaluator: DeploymentStrategyEvaluator,
         applier: StrategyResultApplier,
+        deployment_executor: DeploymentExecutor,
     ) -> None:
         self._deployment_controller = deployment_controller
         self._route_controller = route_controller
         self._evaluator = evaluator
         self._applier = applier
+        self._deployment_executor = deployment_executor
 
     @classmethod
     @override
@@ -130,6 +133,19 @@ class DeployingProvisioningHandler(DeploymentHandler):
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
+        # Update health check config in app-proxy for each deployment so that
+        # the new revision's health check settings are used from the start.
+        for deployment in deployments:
+            try:
+                await self._deployment_executor.update_endpoint_health_check(
+                    deployment.deployment_info,
+                )
+            except Exception:
+                log.exception(
+                    "Failed to update health check config in app-proxy for deployment {}",
+                    deployment.deployment_info.id,
+                )
+
         deployment_infos = [deployment.deployment_info for deployment in deployments]
         deployment_map = {deployment.deployment_info.id: deployment for deployment in deployments}
 
@@ -192,11 +208,13 @@ class DeployingProgressingHandler(DeploymentHandler):
         route_controller: RouteController,
         evaluator: DeploymentStrategyEvaluator,
         applier: StrategyResultApplier,
+        deployment_executor: DeploymentExecutor,
     ) -> None:
         self._deployment_controller = deployment_controller
         self._route_controller = route_controller
         self._evaluator = evaluator
         self._applier = applier
+        self._deployment_executor = deployment_executor
 
     @classmethod
     @override
