@@ -66,7 +66,29 @@ from ai.backend.manager.services.agent.service import AgentService
 
 
 class AgentProcessors(AbstractProcessorPackage):
+    # Internal/system actions (no RBAC)
     sync_agent_registry: ActionProcessor[SyncAgentRegistryAction, SyncAgentRegistryActionResult]
+    recalculate_usage: ActionProcessor[RecalculateUsageAction, RecalculateUsageActionResult]
+    handle_heartbeat: ActionProcessor[HandleHeartbeatAction, HandleHeartbeatActionResult]
+    mark_agent_exit: ActionProcessor[MarkAgentExitAction, MarkAgentExitActionResult]
+    mark_agent_running: ActionProcessor[MarkAgentRunningAction, MarkAgentRunningActionResult]
+    remove_agent_from_images_by_canonicals: ActionProcessor[
+        RemoveAgentFromImagesByCanonicalsAction, RemoveAgentFromImagesByCanonicalsActionResult
+    ]
+    remove_agent_from_images: ActionProcessor[
+        RemoveAgentFromImagesAction, RemoveAgentFromImagesActionResult
+    ]
+
+    # Scope actions (operate on agents within a domain)
+    get_total_resources: ScopeActionProcessor[
+        GetTotalResourcesAction, GetTotalResourcesActionResult
+    ]
+    search_agents: ScopeActionProcessor[SearchAgentsAction, SearchAgentsActionResult]
+    load_container_counts: ScopeActionProcessor[
+        LoadContainerCountsAction, LoadContainerCountsActionResult
+    ]
+
+    # Single-entity actions (operate on specific agents)
     get_watcher_status: SingleEntityActionProcessor[
         GetWatcherStatusAction, GetWatcherStatusActionResult
     ]
@@ -79,23 +101,6 @@ class AgentProcessors(AbstractProcessorPackage):
     watcher_agent_stop: SingleEntityActionProcessor[
         WatcherAgentStopAction, WatcherAgentStopActionResult
     ]
-    recalculate_usage: ActionProcessor[RecalculateUsageAction, RecalculateUsageActionResult]
-    get_total_resources: ScopeActionProcessor[
-        GetTotalResourcesAction, GetTotalResourcesActionResult
-    ]
-    handle_heartbeat: ActionProcessor[HandleHeartbeatAction, HandleHeartbeatActionResult]
-    mark_agent_exit: ActionProcessor[MarkAgentExitAction, MarkAgentExitActionResult]
-    mark_agent_running: ActionProcessor[MarkAgentRunningAction, MarkAgentRunningActionResult]
-    remove_agent_from_images_by_canonicals: ActionProcessor[
-        RemoveAgentFromImagesByCanonicalsAction, RemoveAgentFromImagesByCanonicalsActionResult
-    ]
-    remove_agent_from_images: ActionProcessor[
-        RemoveAgentFromImagesAction, RemoveAgentFromImagesActionResult
-    ]
-    search_agents: ScopeActionProcessor[SearchAgentsAction, SearchAgentsActionResult]
-    load_container_counts: ScopeActionProcessor[
-        LoadContainerCountsAction, LoadContainerCountsActionResult
-    ]
 
     def __init__(
         self,
@@ -103,23 +108,9 @@ class AgentProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
+        # Internal/system actions (no RBAC validators)
         self.sync_agent_registry = ActionProcessor(service.sync_agent_registry, action_monitors)
-        self.get_watcher_status = SingleEntityActionProcessor(
-            service.get_watcher_status, action_monitors
-        )
-        self.watcher_agent_start = SingleEntityActionProcessor(
-            service.watcher_agent_start, action_monitors
-        )
-        self.watcher_agent_restart = SingleEntityActionProcessor(
-            service.watcher_agent_restart, action_monitors
-        )
-        self.watcher_agent_stop = SingleEntityActionProcessor(
-            service.watcher_agent_stop, action_monitors
-        )
         self.recalculate_usage = ActionProcessor(service.recalculate_usage, action_monitors)
-        self.get_total_resources = ScopeActionProcessor(
-            service.get_total_resources, action_monitors
-        )
         self.handle_heartbeat = ActionProcessor(service.handle_heartbeat, action_monitors)
         self.mark_agent_exit = ActionProcessor(service.mark_agent_exit, action_monitors)
         self.mark_agent_running = ActionProcessor(service.mark_agent_running, action_monitors)
@@ -129,9 +120,32 @@ class AgentProcessors(AbstractProcessorPackage):
         self.remove_agent_from_images = ActionProcessor(
             service.remove_agent_from_images, action_monitors
         )
-        self.search_agents = ScopeActionProcessor(service.search_agents, action_monitors)
+
+        # Scope actions with RBAC validators
+        self.get_total_resources = ScopeActionProcessor(
+            service.get_total_resources, action_monitors, validators=[validators.rbac.scope]
+        )
+        self.search_agents = ScopeActionProcessor(
+            service.search_agents, action_monitors, validators=[validators.rbac.scope]
+        )
         self.load_container_counts = ScopeActionProcessor(
-            service.load_container_counts, action_monitors
+            service.load_container_counts, action_monitors, validators=[validators.rbac.scope]
+        )
+
+        # Single-entity actions with RBAC validators
+        self.get_watcher_status = SingleEntityActionProcessor(
+            service.get_watcher_status, action_monitors, validators=[validators.rbac.single_entity]
+        )
+        self.watcher_agent_start = SingleEntityActionProcessor(
+            service.watcher_agent_start, action_monitors, validators=[validators.rbac.single_entity]
+        )
+        self.watcher_agent_restart = SingleEntityActionProcessor(
+            service.watcher_agent_restart,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
+        self.watcher_agent_stop = SingleEntityActionProcessor(
+            service.watcher_agent_stop, action_monitors, validators=[validators.rbac.single_entity]
         )
 
     @override
