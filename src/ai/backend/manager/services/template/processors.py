@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
+from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 
@@ -55,17 +56,29 @@ __all__ = ("TemplateProcessors",)
 class TemplateProcessors(AbstractProcessorPackage):
     """Processor package for session and cluster template operations."""
 
-    create_task: ActionProcessor[CreateTaskTemplateAction, CreateTaskTemplateActionResult]
-    list_task: ActionProcessor[ListTaskTemplatesAction, ListTaskTemplatesActionResult]
-    get_task: ActionProcessor[GetTaskTemplateAction, GetTaskTemplateActionResult]
-    update_task: ActionProcessor[UpdateTaskTemplateAction, UpdateTaskTemplateActionResult]
-    delete_task: ActionProcessor[DeleteTaskTemplateAction, DeleteTaskTemplateActionResult]
+    create_task: ScopeActionProcessor[CreateTaskTemplateAction, CreateTaskTemplateActionResult]
+    list_task: ScopeActionProcessor[ListTaskTemplatesAction, ListTaskTemplatesActionResult]
+    get_task: SingleEntityActionProcessor[GetTaskTemplateAction, GetTaskTemplateActionResult]
+    update_task: SingleEntityActionProcessor[
+        UpdateTaskTemplateAction, UpdateTaskTemplateActionResult
+    ]
+    delete_task: SingleEntityActionProcessor[
+        DeleteTaskTemplateAction, DeleteTaskTemplateActionResult
+    ]
 
-    create_cluster: ActionProcessor[CreateClusterTemplateAction, CreateClusterTemplateActionResult]
-    list_cluster: ActionProcessor[ListClusterTemplatesAction, ListClusterTemplatesActionResult]
-    get_cluster: ActionProcessor[GetClusterTemplateAction, GetClusterTemplateActionResult]
-    update_cluster: ActionProcessor[UpdateClusterTemplateAction, UpdateClusterTemplateActionResult]
-    delete_cluster: ActionProcessor[DeleteClusterTemplateAction, DeleteClusterTemplateActionResult]
+    create_cluster: ScopeActionProcessor[
+        CreateClusterTemplateAction, CreateClusterTemplateActionResult
+    ]
+    list_cluster: ScopeActionProcessor[ListClusterTemplatesAction, ListClusterTemplatesActionResult]
+    get_cluster: SingleEntityActionProcessor[
+        GetClusterTemplateAction, GetClusterTemplateActionResult
+    ]
+    update_cluster: SingleEntityActionProcessor[
+        UpdateClusterTemplateAction, UpdateClusterTemplateActionResult
+    ]
+    delete_cluster: SingleEntityActionProcessor[
+        DeleteClusterTemplateAction, DeleteClusterTemplateActionResult
+    ]
 
     def __init__(
         self,
@@ -73,17 +86,49 @@ class TemplateProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        self.create_task = ActionProcessor(service.create_task_template, action_monitors)
-        self.list_task = ActionProcessor(service.list_task_templates, action_monitors)
-        self.get_task = ActionProcessor(service.get_task_template, action_monitors)
-        self.update_task = ActionProcessor(service.update_task_template, action_monitors)
-        self.delete_task = ActionProcessor(service.delete_task_template, action_monitors)
+        # Scope-based actions (create, list) with RBAC validation
+        self.create_task = ScopeActionProcessor(
+            service.create_task_template, action_monitors, validators=[validators.rbac.scope]
+        )
+        self.list_task = ScopeActionProcessor(
+            service.list_task_templates, action_monitors, validators=[validators.rbac.scope]
+        )
+        self.create_cluster = ScopeActionProcessor(
+            service.create_cluster_template, action_monitors, validators=[validators.rbac.scope]
+        )
+        self.list_cluster = ScopeActionProcessor(
+            service.list_cluster_templates, action_monitors, validators=[validators.rbac.scope]
+        )
 
-        self.create_cluster = ActionProcessor(service.create_cluster_template, action_monitors)
-        self.list_cluster = ActionProcessor(service.list_cluster_templates, action_monitors)
-        self.get_cluster = ActionProcessor(service.get_cluster_template, action_monitors)
-        self.update_cluster = ActionProcessor(service.update_cluster_template, action_monitors)
-        self.delete_cluster = ActionProcessor(service.delete_cluster_template, action_monitors)
+        # Single-entity actions (get, update, delete) with RBAC validation
+        self.get_task = SingleEntityActionProcessor(
+            service.get_task_template, action_monitors, validators=[validators.rbac.single_entity]
+        )
+        self.update_task = SingleEntityActionProcessor(
+            service.update_task_template,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
+        self.delete_task = SingleEntityActionProcessor(
+            service.delete_task_template,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
+        self.get_cluster = SingleEntityActionProcessor(
+            service.get_cluster_template,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
+        self.update_cluster = SingleEntityActionProcessor(
+            service.update_cluster_template,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
+        self.delete_cluster = SingleEntityActionProcessor(
+            service.delete_cluster_template,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
