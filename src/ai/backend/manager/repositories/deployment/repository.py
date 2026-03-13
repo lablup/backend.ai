@@ -298,6 +298,7 @@ class DeploymentRepository:
         self,
         statuses: list[EndpointLifecycle],
         handler_name: str,
+        sub_steps: list[DeploymentSubStep] | None = None,
     ) -> list[DeploymentWithHistory]:
         """Get deployments for handler execution with history populated.
 
@@ -308,11 +309,14 @@ class DeploymentRepository:
         Args:
             statuses: Endpoint lifecycle statuses to include
             handler_name: Current handler phase name for history matching
+            sub_steps: Optional sub-step filter for DEPLOYING handlers
 
         Returns:
             List of DeploymentWithHistory with history fields populated.
         """
-        return await self._db_source.fetch_deployments_for_handler(statuses, handler_name)
+        return await self._db_source.fetch_deployments_for_handler(
+            statuses, handler_name, sub_steps
+        )
 
     @deployment_repository_resilience.apply()
     async def get_endpoint_info(

@@ -1,5 +1,6 @@
 """Database source implementation for deployment repository."""
 
+import logging
 import uuid
 from collections import Counter, defaultdict
 from collections.abc import AsyncIterator, Mapping, Sequence
@@ -18,6 +19,9 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.exception import DeploymentNameAlreadyExists
+from ai.backend.logging import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger(__name__))
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -493,6 +497,7 @@ class DeploymentDBSource:
         self,
         statuses: list[EndpointLifecycle],
         handler_name: str,
+        sub_steps: list[DeploymentSubStep] | None = None,
     ) -> list[DeploymentWithHistory]:
         """Fetch deployments for handler execution with history populated.
 
@@ -505,12 +510,13 @@ class DeploymentDBSource:
         Args:
             statuses: Endpoint lifecycle statuses to include
             handler_name: Current handler phase name for history matching
+            sub_steps: Optional sub-step filter for DEPLOYING handlers
 
         Returns:
             List of DeploymentWithHistory with history fields populated.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            rows = await self._get_endpoints_by_statuses(db_sess, statuses)
+            rows = await self._get_endpoints_by_statuses(db_sess, statuses, sub_steps)
             if not rows:
                 return []
 
@@ -2246,6 +2252,7 @@ class DeploymentDBSource:
                 .values(
                     deploying_revision=revision_id,
                     lifecycle_stage=EndpointLifecycle.DEPLOYING,
+                    sub_step=DeploymentSubStep.PROVISIONING,
                 )
                 .returning(EndpointRow.current_revision)
             )
@@ -2253,6 +2260,13 @@ class DeploymentDBSource:
             row = result.one_or_none()
             if row is None:
                 return None, False
+            log.debug(
+                "set_deploying_revision: successfully set deploying_revision={} for endpoint={}, "
+                "previous_current_revision={}",
+                revision_id,
+                endpoint_id,
+                row[0],
+            )
             return cast(uuid.UUID | None, row[0]), True
 
     # -------------------------------------------------------------------------

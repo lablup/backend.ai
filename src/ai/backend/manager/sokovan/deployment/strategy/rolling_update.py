@@ -23,6 +23,7 @@ from ai.backend.manager.models.deployment_policy import RollingUpdateSpec
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.deployment.creators import RouteCreatorSpec
+from ai.backend.manager.sokovan.deployment.exceptions import InvalidEndpointState
 
 from .types import AbstractDeploymentStrategy, RouteChanges, StrategyCycleResult
 
@@ -71,7 +72,10 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
         desired = deployment.replica_spec.target_replica_count
         deploying_revision_id = deployment.deploying_revision_id
         if deploying_revision_id is None:
-            raise ValueError("deploying_revision_id must not be None for rolling update")
+            raise InvalidEndpointState(
+                f"Deployment {deployment.id} has DEPLOYING lifecycle but deploying_revision_id is None. "
+                "This indicates an inconsistent state — the deployment will be skipped."
+            )
         classified = self._classify_routes(routes, deploying_revision_id)
 
         if result := self._check_provisioning(deployment, classified):
@@ -95,11 +99,14 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
                     classified.old_active.append(route)
                 continue
 
-            if route.status == RouteStatus.PROVISIONING:
+            if route.status in (RouteStatus.PROVISIONING, RouteStatus.DEGRADED):
+                # DEGRADED routes are still warming up (health checks not yet
+                # passing) — treat them like PROVISIONING so they are not
+                # mistakenly counted as unhealthy and trigger a premature rollback.
                 classified.new_provisioning.append(route)
             elif route.status == RouteStatus.HEALTHY:
                 classified.new_healthy.append(route)
-            elif route.status in (RouteStatus.UNHEALTHY, RouteStatus.DEGRADED):
+            elif route.status == RouteStatus.UNHEALTHY:
                 classified.new_unhealthy.append(route)
             elif route.status in (RouteStatus.FAILED_TO_START, RouteStatus.TERMINATED):
                 classified.new_failed.append(route)
