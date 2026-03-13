@@ -225,6 +225,9 @@ class TestQueryInstant:
 
         assert isinstance(result, PrometheusResponse)
         mock_session.post.assert_called_once()
+        form_data = mock_session.post.call_args.kwargs["data"]
+        field_values = {field[0]["name"]: field[2] for field in form_data._fields}
+        assert field_values["time"] == "1704067200.123"
 
     @pytest.fixture
     def error_4xx_response(self, mock_session: Mock) -> AsyncMock:
