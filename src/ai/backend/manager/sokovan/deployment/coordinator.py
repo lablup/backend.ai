@@ -278,26 +278,23 @@ class DeploymentCoordinator:
         Registry keys are derived from each handler's ``target_statuses()``.
         Deploying handlers use sub-step keys for dispatching.
         """
-        handlers: dict[HandlerKey, DeploymentHandler] = {}
-
-        # Simple lifecycle handlers (sub_step=None)
-        simple_handlers: list[tuple[DeploymentLifecycleType, DeploymentHandler]] = [
+        handler_list: list[tuple[HandlerKey, DeploymentHandler]] = [
             (
-                DeploymentLifecycleType.CHECK_PENDING,
+                (DeploymentLifecycleType.CHECK_PENDING, None),
                 CheckPendingDeploymentHandler(
                     deployment_executor=executor,
                     deployment_controller=self._deployment_controller,
                 ),
             ),
             (
-                DeploymentLifecycleType.CHECK_REPLICA,
+                (DeploymentLifecycleType.CHECK_REPLICA, None),
                 CheckReplicaDeploymentHandler(
                     deployment_executor=executor,
                     deployment_controller=self._deployment_controller,
                 ),
             ),
             (
-                DeploymentLifecycleType.SCALING,
+                (DeploymentLifecycleType.SCALING, None),
                 ScalingDeploymentHandler(
                     deployment_executor=executor,
                     deployment_controller=self._deployment_controller,
@@ -305,28 +302,22 @@ class DeploymentCoordinator:
                 ),
             ),
             (
-                DeploymentLifecycleType.RECONCILE,
+                (DeploymentLifecycleType.RECONCILE, None),
                 ReconcileDeploymentHandler(
                     deployment_executor=executor,
                     deployment_controller=self._deployment_controller,
                 ),
             ),
             (
-                DeploymentLifecycleType.DESTROYING,
+                (DeploymentLifecycleType.DESTROYING, None),
                 DestroyingDeploymentHandler(
                     deployment_executor=executor,
                     deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
                 ),
             ),
-        ]
-        for lifecycle_type, handler in simple_handlers:
-            handlers[(lifecycle_type, None)] = handler
-
-        # Deploying sub-step handlers
-        deploying_handlers: list[tuple[DeploymentSubStep, DeploymentHandler]] = [
             (
-                DeploymentSubStep.PROVISIONING,
+                (DeploymentLifecycleType.DEPLOYING, DeploymentSubStep.PROVISIONING),
                 DeployingProvisioningHandler(
                     deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
@@ -335,7 +326,7 @@ class DeploymentCoordinator:
                 ),
             ),
             (
-                DeploymentSubStep.PROGRESSING,
+                (DeploymentLifecycleType.DEPLOYING, DeploymentSubStep.PROGRESSING),
                 DeployingProgressingHandler(
                     deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
@@ -344,7 +335,7 @@ class DeploymentCoordinator:
                 ),
             ),
             (
-                DeploymentSubStep.ROLLING_BACK,
+                (DeploymentLifecycleType.DEPLOYING, DeploymentSubStep.ROLLING_BACK),
                 DeployingRollingBackHandler(
                     deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
@@ -353,10 +344,8 @@ class DeploymentCoordinator:
                 ),
             ),
         ]
-        for sub_step, handler in deploying_handlers:
-            handlers[(DeploymentLifecycleType.DEPLOYING, sub_step)] = handler
 
-        return HandlerRegistry(handlers=handlers)
+        return HandlerRegistry(handlers=dict(handler_list))
 
     async def process_deployment_lifecycle(
         self,
