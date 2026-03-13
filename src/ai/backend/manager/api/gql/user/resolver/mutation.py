@@ -41,8 +41,8 @@ from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.actions.create_user import BulkCreateUserAction
 from ai.backend.manager.services.user.actions.modify_user import BulkModifyUserAction
-from ai.backend.manager.services.user.types import UserCreateSpec, UserUpdateSpec
 from ai.backend.manager.services.user.actions.purge_user import BulkPurgeUserAction
+from ai.backend.manager.services.user.types import UserCreateSpec, UserUpdateSpec
 from ai.backend.manager.types import OptionalState, TriState
 
 # Create Mutations
