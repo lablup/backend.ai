@@ -1501,37 +1501,6 @@ class DeploymentDBSource:
                 routes_by_endpoint[row.endpoint].append(row.to_route_info())
             return routes_by_endpoint
 
-    async def fetch_deploying_routes_by_endpoint_ids(
-        self,
-        endpoint_ids: set[uuid.UUID],
-    ) -> Mapping[uuid.UUID, list[RouteInfo]]:
-        """Fetch all non-terminated routes for DEPLOYING endpoints.
-
-        Unlike ``fetch_active_routes_by_endpoint_ids``, this also includes
-        ``FAILED_TO_START`` routes so the rolling update strategy can detect
-        failures and trigger rollback correctly.  ``TERMINATED`` routes are
-        excluded because they are already cleaned up.
-        """
-        if not endpoint_ids:
-            return {}
-
-        # All statuses except TERMINATED
-        included_statuses = {status for status in RouteStatus if status != RouteStatus.TERMINATED}
-
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(RoutingRow).where(
-                sa.and_(
-                    RoutingRow.endpoint.in_(endpoint_ids),
-                    RoutingRow.status.in_(included_statuses),
-                )
-            )
-            result = await db_sess.execute(query)
-            rows: Sequence[RoutingRow] = result.scalars().all()
-            routes_by_endpoint: defaultdict[uuid.UUID, list[RouteInfo]] = defaultdict(list)
-            for row in rows:
-                routes_by_endpoint[row.endpoint].append(row.to_route_info())
-            return routes_by_endpoint
-
     async def scale_routes(
         self,
         scale_out_creators: Sequence[Creator[RoutingRow]],
