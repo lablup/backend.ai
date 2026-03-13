@@ -63,12 +63,19 @@ class SessionSeedData:
 
 
 @pytest.fixture()
+def scheduling_controller_mock() -> AsyncMock:
+    """Mock SchedulingController exposed as a fixture for test-level configuration."""
+    return AsyncMock()
+
+
+@pytest.fixture()
 async def session_processors(
     database_engine: ExtendedAsyncSAEngine,
     agent_registry: AsyncMock,
     background_task_manager: BackgroundTaskManager,
     error_monitor: ErrorPluginContext,
     appproxy_client_pool: AsyncMock,
+    scheduling_controller_mock: AsyncMock,
 ) -> SessionProcessors:
     """Real SessionProcessors with real SessionService and SessionRepository."""
     session_repo = SessionRepository(database_engine)
@@ -80,7 +87,7 @@ async def session_processors(
         error_monitor=error_monitor,
         idle_checker_host=AsyncMock(),
         session_repository=session_repo,
-        scheduling_controller=AsyncMock(),
+        scheduling_controller=scheduling_controller_mock,
         appproxy_client_pool=appproxy_client_pool,
     )
     service = SessionService(args)

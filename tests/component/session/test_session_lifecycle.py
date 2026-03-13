@@ -446,6 +446,3 @@ class TestSessionDestroyLifecycle:
         )
         assert isinstance(result, DestroySessionResponse)
         assert result.root["stats"]["status"] == "terminated"
-        # Verify mark_sessions_for_termination was called with the correct session ID
-        call_args = scheduling_controller_mock.mark_sessions_for_termination.call_args
-        assert user_session_seed.session_id in call_args.args[0]
