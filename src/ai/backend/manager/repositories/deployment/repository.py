@@ -1409,12 +1409,13 @@ class DeploymentRepository:
         assignments: Mapping[UUID, DeploymentSubStep],
         rollout: BulkCreator[RoutingRow],
         drain: BatchUpdater[RoutingRow] | None,
+        promote: BatchUpdater[RoutingRow] | None,
         completed_ids: set[UUID],
         rolled_back_ids: set[UUID],
     ) -> int:
         """Apply all DB mutations from a strategy evaluation cycle.
 
-        Performs sub-step updates, route rollout/drain, revision swap,
+        Performs sub-step updates, route rollout/drain/promote, revision swap,
         and deploying_revision cleanup in a single transaction.
 
         Returns:
@@ -1424,6 +1425,7 @@ class DeploymentRepository:
             assignments=assignments,
             rollout=rollout,
             drain=drain,
+            promote=promote,
             completed_ids=completed_ids,
             rolled_back_ids=rolled_back_ids,
         )

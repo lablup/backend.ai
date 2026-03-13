@@ -40,6 +40,9 @@ class StrategyApplyResult:
     routes_drained: int = 0
     """Number of routes marked for draining."""
 
+    routes_promoted: int = 0
+    """Number of routes promoted (traffic_status -> ACTIVE)."""
+
 
 class StrategyResultApplier:
     """Applies a ``StrategyEvaluationSummary`` to the database.
@@ -69,6 +72,7 @@ class StrategyResultApplier:
             rolled_back_ids=rolled_back_ids,
             routes_created=len(changes.rollout_specs),
             routes_drained=len(changes.drain_route_ids),
+            routes_promoted=len(changes.promote_route_ids),
         )
 
         drain: BatchUpdater[RoutingRow] | None = None
@@ -82,26 +86,45 @@ class StrategyResultApplier:
                 conditions=[RouteConditions.by_ids(changes.drain_route_ids)],
             )
 
+        promote: BatchUpdater[RoutingRow] | None = None
+        if changes.promote_route_ids:
+            promote = BatchUpdater(
+                spec=RouteBatchUpdaterSpec(
+                    traffic_ratio=1.0,
+                    traffic_status=RouteTrafficStatus.ACTIVE,
+                ),
+                conditions=[RouteConditions.by_ids(changes.promote_route_ids)],
+            )
+
         rollout: BulkCreator[RoutingRow] = BulkCreator(
             specs=[c.spec for c in changes.rollout_specs],
         )
 
-        if not (summary.assignments or rollout.specs or drain or completed_ids or rolled_back_ids):
+        if not (
+            summary.assignments
+            or rollout.specs
+            or drain
+            or promote
+            or completed_ids
+            or rolled_back_ids
+        ):
             return result
 
         swapped = await self._deployment_repo.apply_strategy_mutations(
             assignments=summary.assignments,
             rollout=rollout,
             drain=drain,
+            promote=promote,
             completed_ids=completed_ids,
             rolled_back_ids=rolled_back_ids,
         )
 
         log.debug(
-            "Applied evaluation: {} assignments, {} routes created, {} routes drained",
+            "Applied evaluation: {} assignments, {} routes created, {} routes drained, {} routes promoted",
             len(summary.assignments),
             result.routes_created,
             result.routes_drained,
+            result.routes_promoted,
         )
         if completed_ids:
             log.info(
