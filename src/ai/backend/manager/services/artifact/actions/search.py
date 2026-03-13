@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import override
 
-from ai.backend.common.data.permission.types import OperationType
+from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import ArtifactData
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.artifact.actions.base import (
@@ -15,7 +16,7 @@ from ai.backend.manager.services.artifact.actions.base import (
 @dataclass
 class SearchArtifactsAction(ArtifactScopeAction):
     querier: BatchQuerier
-    _scope_type: str = field(default="domain")
+    _scope_type: ScopeType = field(default=ScopeType.DOMAIN)
     _scope_id: str = field(default="")
 
     @override
@@ -24,16 +25,11 @@ class SearchArtifactsAction(ArtifactScopeAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
     @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.READ
-
-    @override
-    def scope_type(self) -> str:
+    def scope_type(self) -> ScopeType:
         return self._scope_type
 
     @override
@@ -47,7 +43,17 @@ class SearchArtifactsActionResult(ArtifactScopeActionResult):
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+    _scope_type: ScopeType = field(default=ScopeType.DOMAIN)
+    _scope_id: str = field(default="")
 
     @override
     def entity_id(self) -> str | None:
         return None
+
+    @override
+    def scope_type(self) -> ScopeType:
+        return self._scope_type
+
+    @override
+    def scope_id(self) -> str:
+        return self._scope_id
