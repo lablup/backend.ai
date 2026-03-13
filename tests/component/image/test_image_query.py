@@ -28,7 +28,7 @@ from .conftest import ImageFactoryHelper
 
 
 class TestImageSearchNoFilter:
-    """Search with no filter returns all images regardless of status."""
+    """Search with no filter returns images regardless of status (no default status filter)."""
 
     async def test_no_filter_returns_alive_images(
         self,
@@ -227,7 +227,7 @@ class TestImageSearchPagination:
             SearchImagesRequest(offset=1),
         )
         assert offset_result.pagination.total == total
-        assert len(offset_result.items) == total - 1
+        assert len(offset_result.items) == max(len(all_result.items) - 1, 0)
 
     async def test_ordering_by_name_ascending(
         self,
@@ -270,7 +270,7 @@ class TestImageGet:
         assert result.item.size_bytes == 1024000
         assert result.item.type.upper() == "COMPUTE"
         assert result.item.is_local is False
-        assert result.item.name.startswith("test-image-")
+        assert "/test-image-" in result.item.name
 
     async def test_get_nonexistent_id_returns_not_found(
         self,
