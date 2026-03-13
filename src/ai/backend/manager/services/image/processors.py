@@ -97,9 +97,7 @@ class ImageProcessors(AbstractProcessorPackage):
     forget_image_by_id: SingleEntityActionProcessor[
         ForgetImageByIdAction, ForgetImageByIdActionResult
     ]
-    purge_image_by_id: SingleEntityActionProcessor[
-        PurgeImageByIdAction, PurgeImageByIdActionResult
-    ]
+    purge_image_by_id: SingleEntityActionProcessor[PurgeImageByIdAction, PurgeImageByIdActionResult]
     alias_image: ActionProcessor[AliasImageAction, AliasImageActionResult]
     alias_image_by_id: ActionProcessor[AliasImageByIdAction, AliasImageByIdActionResult]
     dealias_image: ActionProcessor[DealiasImageAction, DealiasImageActionResult]
