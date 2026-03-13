@@ -7787,6 +7787,11 @@ type Mutation
   """
   adminBulkPurgeUsersV2(input: BulkPurgeUsersV2Input!): BulkPurgeUsersV2Payload! @join__field(graph: STRAWBERRY)
 
+  """
+  Update the current user's allowed client IP list. Set allowed_client_ip to null to remove all IP restrictions. When force is false, the operation fails if the current request IP would be excluded by the new allowlist (lockout prevention).
+  """
+  updateMyAllowedClientIp(input: UpdateMyAllowedClientIPInput!): UpdateMyAllowedClientIPPayload! @join__field(graph: STRAWBERRY)
+
   """Added in 26.3.0. Create a new query definition (admin only)."""
   adminCreatePrometheusQueryPreset(input: CreateQueryDefinitionInput!): CreateQueryDefinitionPayload! @join__field(graph: STRAWBERRY)
 
@@ -12633,6 +12638,31 @@ type UpdateHuggingFaceRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
   huggingfaceRegistry: HuggingFaceRegistry!
+}
+
+"""
+Input for updating the current user's allowed client IP list. Set allowed_client_ip to null to remove all restrictions. Use force=true to bypass the lockout safety check.
+"""
+input UpdateMyAllowedClientIPInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  New allowed client IP addresses or CIDR ranges. Set to null to remove all IP restrictions.
+  """
+  allowedClientIp: [String!]
+
+  """
+  If false (default), the operation will fail if the current request IP is not included in the new allowlist. Set to true to override this safety check.
+  """
+  force: Boolean! = false
+}
+
+"""Payload for updating the current user's allowed client IP list."""
+type UpdateMyAllowedClientIPPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Whether the update was successful."""
+  success: Boolean!
 }
 
 """Input for updating a notification channel"""
