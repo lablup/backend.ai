@@ -221,20 +221,28 @@ class AuditLogConditions:
     # --- cursor pagination conditions ---
 
     @staticmethod
-    def by_cursor_forward(cursor_value: str) -> QueryCondition:
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AuditLogRow.created_at < sa.func.to_timestamp(
-                cursor_value, "YYYY-MM-DD HH24:MI:SS.US+TZ"
+            subquery = (
+                sa
+                .select(AuditLogRow.created_at)
+                .where(AuditLogRow.id == cursor_id)
+                .scalar_subquery()
             )
+            return AuditLogRow.created_at < subquery
 
         return inner
 
     @staticmethod
-    def by_cursor_backward(cursor_value: str) -> QueryCondition:
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AuditLogRow.created_at > sa.func.to_timestamp(
-                cursor_value, "YYYY-MM-DD HH24:MI:SS.US+TZ"
+            subquery = (
+                sa
+                .select(AuditLogRow.created_at)
+                .where(AuditLogRow.id == cursor_id)
+                .scalar_subquery()
             )
+            return AuditLogRow.created_at > subquery
 
         return inner
 

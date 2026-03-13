@@ -41,6 +41,8 @@ class AuditLogStatusGQL(StrEnum):
                 return cls.UNKNOWN
             case OperationStatus.RUNNING:
                 return cls.RUNNING
+            case _:
+                raise ValueError(f"Unhandled OperationStatus: {status!r}")
 
 
 @strawberry.type(

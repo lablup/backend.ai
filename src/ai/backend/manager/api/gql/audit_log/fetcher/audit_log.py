@@ -16,7 +16,7 @@ from ai.backend.manager.api.gql.audit_log.types import (
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.audit_log import AuditLogRow
-from ai.backend.manager.repositories.audit_log.options import AuditLogOrders
+from ai.backend.manager.repositories.audit_log.options import AuditLogConditions, AuditLogOrders
 from ai.backend.manager.services.audit_log.actions.search import SearchAuditLogsAction
 
 
@@ -25,8 +25,8 @@ def _get_audit_log_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=AuditLogOrders.created_at(ascending=False),
         backward_order=AuditLogOrders.created_at(ascending=True),
-        forward_condition_factory=lambda _: lambda: AuditLogRow.created_at.isnot(None),
-        backward_condition_factory=lambda _: lambda: AuditLogRow.created_at.isnot(None),
+        forward_condition_factory=AuditLogConditions.by_cursor_forward,
+        backward_condition_factory=AuditLogConditions.by_cursor_backward,
         tiebreaker_order=AuditLogRow.id.asc(),
     )
 
