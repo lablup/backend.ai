@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.fair_share.handler import FairShareAPIHandler
 from ai.backend.manager.api.rest.fair_share.registry import register_fair_share_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -53,7 +54,9 @@ def scaling_group_processors(database_engine: ExtendedAsyncSAEngine) -> ScalingG
     repo = ScalingGroupRepository(database_engine)
     service = ScalingGroupService(repo, appproxy_client_pool=None)
     return ScalingGroupProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service,
+        action_monitors=[],
+        validators=ActionValidators(rbac=MagicMock(spec=RBACValidators)),
     )
 
 
