@@ -1,7 +1,7 @@
 """migrate_keypair_data_to_rbac
 
 Revision ID: 21159a293dfb
-Revises: 359f0bbd936c
+Revises: 2e42a745f939
 Create Date: 2026-03-11 20:44:01.574059
 
 """
@@ -12,7 +12,7 @@ from sqlalchemy.engine import Connection
 
 # revision identifiers, used by Alembic.
 revision = "21159a293dfb"
-down_revision = "359f0bbd936c"
+down_revision = "2e42a745f939"
 branch_labels = None
 depends_on = None
 
