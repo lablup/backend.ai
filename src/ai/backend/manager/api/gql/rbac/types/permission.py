@@ -81,6 +81,7 @@ class RBACElementTypeGQL(StrEnum):
 
     # Auto sub-entities with direct GET APIs
     DEPLOYMENT_TOKEN = "deployment:token"
+    DEPLOYMENT_POLICY = "deployment:policy"
 
     # Entity-level scopes
     ARTIFACT_REVISION = "artifact_revision"
@@ -252,6 +253,7 @@ class PermissionGQL(Node):
                 | RBACElementType.KERNEL
                 | RBACElementType.ROUTING
                 | RBACElementType.DEPLOYMENT_TOKEN
+                | RBACElementType.DEPLOYMENT_POLICY
             ):
                 return None
 
