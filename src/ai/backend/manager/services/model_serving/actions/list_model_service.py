@@ -2,31 +2,49 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.types import CompactServiceInfo
-from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
+from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.services.model_serving.actions.base import (
+    ModelServiceScopeAction,
+    ModelServiceScopeActionResult,
+)
 
 
 @dataclass
-class ListModelServiceAction(ModelServiceAction):
+class ListModelServiceAction(ModelServiceScopeAction):
     session_owener_id: uuid.UUID
     name: str | None
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    _project_id: uuid.UUID
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
-
-@dataclass
-class ListModelServiceActionResult(BaseActionResult):
-    data: list[CompactServiceInfo]
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.PROJECT
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_id(self) -> str:
+        return str(self._project_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.PROJECT, str(self._project_id))
+
+
+@dataclass
+class ListModelServiceActionResult(ModelServiceScopeActionResult):
+    data: list[CompactServiceInfo]
+    _project_id: uuid.UUID
+
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.PROJECT
+
+    @override
+    def scope_id(self) -> str:
+        return str(self._project_id)
