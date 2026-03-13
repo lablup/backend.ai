@@ -18,7 +18,11 @@ from ai.backend.common.dto.clients.prometheus.response import (
     PrometheusQueryData,
     PrometheusResponse,
 )
-from ai.backend.common.exception import FailedToGetMetric, PrometheusConnectionError
+from ai.backend.common.exception import (
+    FailedToGetMetric,
+    InvalidAPIParameters,
+    PrometheusConnectionError,
+)
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
     ContainerMetricActionResult,
@@ -765,3 +769,53 @@ class TestBuildPreset:
         rendered_query = preset.render()
 
         assert rendered_query == case.expected_query
+
+
+class TestMetricResponseInfoParsing:
+    """Unit tests for MetricResponseInfo parsing behavior."""
+
+    def test_parse_general_prometheus_metric_without_value_type(self) -> None:
+        """General Prometheus metrics (e.g. up, node_cpu_seconds_total) lack value_type → None."""
+        info = MetricResponseInfo(__name__="up", instance="localhost:9090", job="prometheus")
+
+        assert info.value_type is None
+        assert info.name == "up"
+        assert info.instance == "localhost:9090"
+
+    def test_parse_backendai_metric_with_value_type(self) -> None:
+        """Backend.AI custom metrics include value_type → populated."""
+        info = MetricResponseInfo(
+            __name__="backendai_container_utilization",
+            value_type="current",
+            container_metric_name="cpu_util",
+        )
+
+        assert info.value_type == "current"
+        assert info.name == "backendai_container_utilization"
+        assert info.container_metric_name == "cpu_util"
+
+
+class TestContainerMetricResponseInfoConversion:
+    """Unit tests for ContainerMetricResponseInfo.from_metric_response_info()."""
+
+    def test_from_metric_response_info_with_value_type_succeeds(self) -> None:
+        """When value_type is present, conversion succeeds."""
+        info = MetricResponseInfo(
+            __name__="backendai_container_utilization",
+            value_type="current",
+            container_metric_name="mem",
+            agent_id="agent-1",
+        )
+
+        result = ContainerMetricResponseInfo.from_metric_response_info(info)
+
+        assert result.value_type == "current"
+        assert result.container_metric_name == "mem"
+        assert result.agent_id == "agent-1"
+
+    def test_from_metric_response_info_without_value_type_raises(self) -> None:
+        """When value_type is None, raises InvalidAPIParameters."""
+        info = MetricResponseInfo(__name__="up", instance="localhost:9090")
+
+        with pytest.raises(InvalidAPIParameters):
+            ContainerMetricResponseInfo.from_metric_response_info(info)
