@@ -428,7 +428,7 @@ class TestImageAPIHandler:
     ) -> None:
         """Search handler should call search_images processor."""
         await mock_processors.image.search_images.wait_for_complete(
-            SearchImagesAction(querier=MagicMock())
+            SearchImagesAction(querier=MagicMock(), user_uuid="test-user")
         )
         mock_processors.image.search_images.wait_for_complete.assert_called_once()
 
@@ -438,7 +438,7 @@ class TestImageAPIHandler:
     ) -> None:
         """Search result should have correct total count."""
         result = await mock_processors.image.search_images.wait_for_complete(
-            SearchImagesAction(querier=MagicMock())
+            SearchImagesAction(querier=MagicMock(), user_uuid="test-user")
         )
         assert result.total_count == 2
         assert len(result.data) == 2
@@ -449,7 +449,7 @@ class TestImageAPIHandler:
     ) -> None:
         """Search result data should be convertible to DTOs."""
         result = await mock_processors.image.search_images.wait_for_complete(
-            SearchImagesAction(querier=MagicMock())
+            SearchImagesAction(querier=MagicMock(), user_uuid="test-user")
         )
         adapter = ImageAdapter()
         items = [adapter.convert_to_dto(img) for img in result.data]
@@ -591,7 +591,7 @@ class TestImageAPIHandler:
         processors.image.search_images.wait_for_complete = AsyncMock(return_value=result)
 
         search_result = await processors.image.search_images.wait_for_complete(
-            SearchImagesAction(querier=MagicMock())
+            SearchImagesAction(querier=MagicMock(), user_uuid="test-user")
         )
         assert search_result.data == []
         assert search_result.total_count == 0

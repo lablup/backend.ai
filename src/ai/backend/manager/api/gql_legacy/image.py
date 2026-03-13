@@ -311,7 +311,6 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
             GetAllImagesAction(
                 status_filter=filter_by_statuses,
                 user_uuid=str(ctx.user["uuid"]),
-                domain_name=ctx.user["domain_name"],
             )
         )
         all_items = [cls.from_image_with_agent_install_status(img) for img in result.data.values()]

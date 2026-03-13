@@ -23,8 +23,7 @@ class GetAllImagesAction(ImageScopeAction):
     """
 
     status_filter: list[ImageStatus] | None
-    user_uuid: str = ""
-    domain_name: str = ""
+    user_uuid: str
 
     @override
     @classmethod

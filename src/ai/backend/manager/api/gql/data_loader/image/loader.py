@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.types import ImageID
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
@@ -31,8 +32,9 @@ async def load_images_by_ids(
         conditions=[ImageConditions.by_ids(image_ids)],
     )
 
+    user = current_user()
     action_result = await processor.search_images.wait_for_complete(
-        SearchImagesAction(querier=querier)
+        SearchImagesAction(querier=querier, user_uuid=str(user.user_id) if user else "")
     )
 
     image_map: dict[ImageID, ImageData] = {ImageID(image.id): image for image in action_result.data}
