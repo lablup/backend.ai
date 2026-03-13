@@ -1,8 +1,8 @@
 """Deployment strategy evaluator — orchestrates per-deployment FSM evaluation (BEP-1049).
 
-Loads policies and routes in bulk, dispatches each deployment to the appropriate
-strategy FSM, and aggregates route mutations.  The evaluate handler is responsible
-for applying the aggregated route changes and updating sub_step in DB.
+Loads policies and non-terminated routes in bulk, dispatches each deployment to
+the appropriate strategy FSM, and aggregates route mutations.  The applier is
+responsible for applying the aggregated route changes and updating sub_step in DB.
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ class DeploymentStrategyEvaluator:
         """Evaluate all DEPLOYING deployments in a single cycle.
 
         Steps:
-            1. Bulk-load policies and active routes.
+            1. Bulk-load policies and non-terminated routes.
             2. Per-deployment: dispatch to strategy FSM.
             3. Aggregate route changes and sub_step assignments.
         """

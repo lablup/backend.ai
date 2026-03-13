@@ -19,9 +19,9 @@ Sub-step flow::
        READY                                                   READY
 
 The evaluator determines sub-step assignments and route mutations;
-the applier persists them to DB atomically.  ``status_transitions().success``
-keeps the deployment in its current sub-step — actual sub-step advancement
-is handled by the applier writing to the ``sub_step`` column.
+the applier persists them to DB atomically.  Each handler classifies
+deployments into successes (transition forward), errors (failure path),
+and skipped (still in progress — no state transition).
 """
 
 from __future__ import annotations
@@ -68,10 +68,9 @@ class DeployingProvisioningHandler(DeploymentHandler):
     """Handler for DEPLOYING / PROVISIONING sub-step.
 
     New-revision routes are being created; waiting for them to become HEALTHY.
-    The evaluator assigns sub-steps (may advance to PROGRESSING); the applier
-    writes the assignments to DB.  This handler's ``status_transitions().success``
-    keeps the lifecycle at DEPLOYING/PROVISIONING — sub-step advancement is
-    handled by the applier.
+    The evaluator assigns sub-steps; when all new routes are healthy the
+    deployment advances to PROGRESSING (success), otherwise it stays in
+    PROVISIONING (skipped — no state transition).
     """
 
     def __init__(
@@ -400,7 +399,7 @@ class DeployingRollingBackHandler(DeploymentHandler):
         summary = await self._evaluator.evaluate(deployment_infos)
         await self._applier.apply(summary)
 
-        # Successfully evaluated deployments → successes (stay in ROLLING_BACK)
+        # Successfully evaluated deployments → successes (coordinator transitions to ROLLED_BACK)
         evaluated_ids = set(summary.assignments.keys())
         successes = [
             deployment

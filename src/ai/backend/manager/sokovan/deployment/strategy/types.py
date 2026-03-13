@@ -52,9 +52,9 @@ class StrategyEvaluationSummary:
     """Aggregate result of evaluating all DEPLOYING deployments.
 
     The evaluator classifies each deployment into a sub_step and records
-    the mapping so the evaluate handler can bulk-update the DB column.
+    the mapping so the applier can bulk-update the DB column.
     All outcomes — including ROLLING_BACK, COMPLETED, and ROLLED_BACK — are expressed
-    as sub_step values and persisted to the DB for their respective handlers.
+    as sub_step values and persisted to the DB by the applier.
     """
 
     # Mapping from endpoint ID to its evaluated sub_step — used to bulk-update the DB.
