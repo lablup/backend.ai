@@ -16,7 +16,6 @@ from ai.backend.manager.services.model_serving.actions.base import (
 @dataclass
 class SearchServicesAction(ModelServiceScopeAction):
     session_owner_id: uuid.UUID
-    _project_id: uuid.UUID
     conditions: list[QueryCondition] = field(default_factory=list)
     offset: int = 0
     limit: int = 20
@@ -28,15 +27,15 @@ class SearchServicesAction(ModelServiceScopeAction):
 
     @override
     def scope_type(self) -> ScopeType:
-        return ScopeType.PROJECT
+        return ScopeType.USER
 
     @override
     def scope_id(self) -> str:
-        return str(self._project_id)
+        return str(self.session_owner_id)
 
     @override
     def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.PROJECT, str(self._project_id))
+        return RBACElementRef(RBACElementType.USER, str(self.session_owner_id))
 
 
 @dataclass
@@ -45,12 +44,12 @@ class SearchServicesActionResult(ModelServiceScopeActionResult):
     total_count: int
     offset: int
     limit: int
-    _project_id: uuid.UUID
+    _user_id: uuid.UUID
 
     @override
     def scope_type(self) -> ScopeType:
-        return ScopeType.PROJECT
+        return ScopeType.USER
 
     @override
     def scope_id(self) -> str:
-        return str(self._project_id)
+        return str(self._user_id)

@@ -415,7 +415,7 @@ class ModelServingService:
                 )
                 for endpoint in endpoints
             ],
-            _project_id=action._project_id,
+            _user_id=action.session_owener_id,
         )
 
     async def search_services(self, action: SearchServicesAction) -> SearchServicesActionResult:
@@ -429,7 +429,7 @@ class ModelServingService:
             total_count=result.total_count,
             offset=action.offset,
             limit=action.limit,
-            _project_id=action._project_id,
+            _user_id=action.session_owner_id,
         )
 
     async def check_user_access(self) -> None:

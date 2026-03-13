@@ -16,7 +16,6 @@ from ai.backend.manager.services.model_serving.actions.base import (
 class ListModelServiceAction(ModelServiceScopeAction):
     session_owener_id: uuid.UUID
     name: str | None
-    _project_id: uuid.UUID
 
     @override
     @classmethod
@@ -25,26 +24,26 @@ class ListModelServiceAction(ModelServiceScopeAction):
 
     @override
     def scope_type(self) -> ScopeType:
-        return ScopeType.PROJECT
+        return ScopeType.USER
 
     @override
     def scope_id(self) -> str:
-        return str(self._project_id)
+        return str(self.session_owener_id)
 
     @override
     def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.PROJECT, str(self._project_id))
+        return RBACElementRef(RBACElementType.USER, str(self.session_owener_id))
 
 
 @dataclass
 class ListModelServiceActionResult(ModelServiceScopeActionResult):
     data: list[CompactServiceInfo]
-    _project_id: uuid.UUID
+    _user_id: uuid.UUID
 
     @override
     def scope_type(self) -> ScopeType:
-        return ScopeType.PROJECT
+        return ScopeType.USER
 
     @override
     def scope_id(self) -> str:
-        return str(self._project_id)
+        return str(self._user_id)
