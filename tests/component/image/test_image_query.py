@@ -39,7 +39,7 @@ class TestImageSearchNoFilter:
         image_id, _ = image_fixture
         result = await admin_registry.image.search(SearchImagesRequest())
         assert isinstance(result, SearchImagesResponse)
-        assert result.pagination.total >= 1
+        assert result.pagination.total == 1
         found_ids = [item.id for item in result.items]
         assert image_id in found_ids
 
@@ -129,7 +129,7 @@ class TestImageSearchByName:
         assert isinstance(result, SearchImagesResponse)
         found_ids = [item.id for item in result.items]
         assert target_id in found_ids
-        assert result.pagination.total >= 1
+        assert result.pagination.total == 1
 
     async def test_filter_name_equals(
         self,
@@ -207,8 +207,8 @@ class TestImageSearchPagination:
             SearchImagesRequest(limit=1),
         )
         assert isinstance(result, SearchImagesResponse)
-        assert len(result.items) <= 1
-        assert result.pagination.total >= 2
+        assert len(result.items) == 1
+        assert result.pagination.total == 2
 
     async def test_offset_skips_items(
         self,
@@ -221,7 +221,7 @@ class TestImageSearchPagination:
 
         all_result = await admin_registry.image.search(SearchImagesRequest())
         total = all_result.pagination.total
-        assert total >= 2
+        assert total == 2
 
         offset_result = await admin_registry.image.search(
             SearchImagesRequest(offset=1),
