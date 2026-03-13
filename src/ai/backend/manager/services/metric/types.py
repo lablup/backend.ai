@@ -42,7 +42,7 @@ class ContainerMetricResponseInfo:
     def from_metric_response_info(cls, info: MetricResponseInfo) -> Self:
         if info.value_type is None:
             raise InvalidAPIParameters(
-                "value_type must be present for container metrics (backendai_container_utilization)"
+                f"Missing required label 'value_type' for container metric (metric={info.name!r})"
             )
         return cls(
             value_type=info.value_type,

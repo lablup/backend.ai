@@ -776,7 +776,7 @@ class TestMetricResponseInfoParsing:
 
     def test_parse_general_prometheus_metric_without_value_type(self) -> None:
         """General Prometheus metrics (e.g. up, node_cpu_seconds_total) lack value_type → None."""
-        info = MetricResponseInfo(__name__="up", instance="localhost:9090", job="prometheus")
+        info = MetricResponseInfo(name="up", instance="localhost:9090", job="prometheus")
 
         assert info.value_type is None
         assert info.name == "up"
@@ -785,7 +785,7 @@ class TestMetricResponseInfoParsing:
     def test_parse_backendai_metric_with_value_type(self) -> None:
         """Backend.AI custom metrics include value_type → populated."""
         info = MetricResponseInfo(
-            __name__="backendai_container_utilization",
+            name="backendai_container_utilization",
             value_type="current",
             container_metric_name="cpu_util",
         )
@@ -801,7 +801,7 @@ class TestContainerMetricResponseInfoConversion:
     def test_from_metric_response_info_with_value_type_succeeds(self) -> None:
         """When value_type is present, conversion succeeds."""
         info = MetricResponseInfo(
-            __name__="backendai_container_utilization",
+            name="backendai_container_utilization",
             value_type="current",
             container_metric_name="mem",
             agent_id="agent-1",
@@ -815,7 +815,7 @@ class TestContainerMetricResponseInfoConversion:
 
     def test_from_metric_response_info_without_value_type_raises(self) -> None:
         """When value_type is None, raises InvalidAPIParameters."""
-        info = MetricResponseInfo(__name__="up", instance="localhost:9090")
+        info = MetricResponseInfo(name="up", instance="localhost:9090")
 
         with pytest.raises(InvalidAPIParameters):
             ContainerMetricResponseInfo.from_metric_response_info(info)
