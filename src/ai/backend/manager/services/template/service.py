@@ -208,7 +208,9 @@ class TemplateService:
             name,
             template_data,
         )
-        return CreateClusterTemplateActionResult(id=template_id, user=owner_uuid.hex)
+        return CreateClusterTemplateActionResult(
+            id=template_id, user=owner_uuid.hex, _domain_name=action.domain_name
+        )
 
     async def list_cluster_templates(
         self, action: ListClusterTemplatesAction
