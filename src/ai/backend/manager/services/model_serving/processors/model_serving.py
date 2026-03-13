@@ -73,7 +73,7 @@ class ModelServingProcessors(AbstractProcessorPackage):
         CreateModelServiceAction, CreateModelServiceActionResult
     ]
     list_model_service: ScopeActionProcessor[ListModelServiceAction, ListModelServiceActionResult]
-    search_services: ScopeActionProcessor[SearchServicesAction, SearchServicesActionResult]
+    search_services: ActionProcessor[SearchServicesAction, SearchServicesActionResult]
 
     # Single entity actions (with RBAC)
     get_model_service_info: SingleEntityActionProcessor[
@@ -109,9 +109,7 @@ class ModelServingProcessors(AbstractProcessorPackage):
         self.list_model_service = ScopeActionProcessor(
             service.list_serve, action_monitors, validators=[validators.rbac.scope]
         )
-        self.search_services = ScopeActionProcessor(
-            service.search_services, action_monitors, validators=[validators.rbac.scope]
-        )
+        self.search_services = ActionProcessor(service.search_services, action_monitors)
 
         # Single entity actions with RBAC validator
         self.get_model_service_info = SingleEntityActionProcessor(

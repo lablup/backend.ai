@@ -429,7 +429,6 @@ class ModelServingService:
             total_count=result.total_count,
             offset=action.offset,
             limit=action.limit,
-            _user_id=action.session_owner_id,
         )
 
     async def check_user_access(self) -> None:

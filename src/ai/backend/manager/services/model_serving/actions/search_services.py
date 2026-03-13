@@ -2,54 +2,37 @@ import uuid
 from dataclasses import dataclass, field
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.types import ServiceSearchItem
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.base.types import QueryCondition
-from ai.backend.manager.services.model_serving.actions.base import (
-    ModelServiceScopeAction,
-    ModelServiceScopeActionResult,
-)
+from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
 
 
 @dataclass
-class SearchServicesAction(ModelServiceScopeAction):
+class SearchServicesAction(ModelServiceAction):
     session_owner_id: uuid.UUID
     conditions: list[QueryCondition] = field(default_factory=list)
     offset: int = 0
     limit: int = 20
 
     @override
+    def entity_id(self) -> str | None:
+        return None
+
+    @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
-    @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.USER
-
-    @override
-    def scope_id(self) -> str:
-        return str(self.session_owner_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.USER, str(self.session_owner_id))
-
 
 @dataclass
-class SearchServicesActionResult(ModelServiceScopeActionResult):
+class SearchServicesActionResult(BaseActionResult):
     items: list[ServiceSearchItem]
     total_count: int
     offset: int
     limit: int
-    _user_id: uuid.UUID
 
     @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.USER
-
-    @override
-    def scope_id(self) -> str:
-        return str(self._user_id)
+    def entity_id(self) -> str | None:
+        return None
