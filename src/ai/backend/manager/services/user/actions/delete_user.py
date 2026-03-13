@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import override
+from uuid import UUID
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
@@ -12,7 +13,8 @@ from ai.backend.manager.services.user.actions.base import (
 
 @dataclass
 class DeleteUserAction(UserSingleEntityAction):
-    email: str
+    user_uuid: UUID
+    email: str  # Still needed for the service layer implementation
 
     @override
     @classmethod
@@ -21,23 +23,21 @@ class DeleteUserAction(UserSingleEntityAction):
 
     @override
     def target_entity_id(self) -> str:
-        # Email-based lookup - will be resolved in processor
-        return self.email
+        return str(self.user_uuid)
 
     @override
     def target_element(self) -> RBACElementRef:
-        # Email-based lookup requires resolution in processor
-        return RBACElementRef(RBACElementType.USER, self.email)
+        return RBACElementRef(RBACElementType.USER, str(self.user_uuid))
 
 
 @dataclass
 class DeleteUserActionResult(UserSingleEntityActionResult):
-    _user_id: str
+    user_uuid: UUID
 
     @override
     def entity_id(self) -> str | None:
-        return self._user_id
+        return str(self.user_uuid)
 
     @override
     def target_entity_id(self) -> str:
-        return self._user_id
+        return str(self.user_uuid)

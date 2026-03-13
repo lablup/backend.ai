@@ -107,8 +107,7 @@ from ai.backend.manager.repositories.user.types import (
     RoleUserSearchScope,
 )
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
-from ai.backend.manager.services.user.actions.create_user import UserCreateSpec
-from ai.backend.manager.services.user.actions.modify_user import UserUpdateSpec
+from ai.backend.manager.services.user.types import UserCreateSpec, UserUpdateSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

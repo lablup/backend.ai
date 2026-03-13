@@ -956,7 +956,7 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
         description="Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.",
     )
 
-    def to_action(self, email: str, graph_ctx: GraphQueryContext) -> ModifyUserAction:
+    def to_action(self, email: str, user_uuid: UUID, graph_ctx: GraphQueryContext) -> ModifyUserAction:
         # Create PasswordInfo if password is being changed
         password_state = OptionalState[PasswordInfo].nop()
         if self.password is not Undefined and self.password is not None:
@@ -1027,6 +1027,7 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
         )
         # Note: User update uses email for lookup, pk_value is not used
         return ModifyUserAction(
+            user_uuid=user_uuid,
             email=email,
             updater=Updater(spec=spec, pk_value=email),
         )
@@ -1043,8 +1044,11 @@ class PurgeUserInput(graphene.InputObjectType):  # type: ignore[misc]
         ),
     )
 
-    def to_action(self, email: str, user_info_ctx: UserInfoContext) -> PurgeUserAction:
+    def to_action(
+        self, email: str, user_uuid: UUID, user_info_ctx: UserInfoContext
+    ) -> PurgeUserAction:
         return PurgeUserAction(
+            user_uuid=user_uuid,
             user_info_ctx=user_info_ctx,
             email=email,
             purge_shared_vfolders=OptionalState[bool].from_graphql(
@@ -1119,7 +1123,16 @@ class ModifyUser(graphene.Mutation):  # type: ignore[misc]
 
         validate_user_mutation_props(props)
 
+        # Fetch user UUID first (needed for RBAC validation)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            user_uuid = await db_session.scalar(
+                sa.select(users.c.uuid).where(users.c.email == email)
+            )
+        if user_uuid is None:
+            raise UserNotFound
+
         action: ModifyUserAction = props.to_action(email, graph_ctx)
+        action.user_uuid = user_uuid
         res: ModifyUserActionResult = await graph_ctx.processors.user.modify_user.wait_for_complete(
             action
         )
@@ -1154,7 +1167,16 @@ class DeleteUser(graphene.Mutation):  # type: ignore[misc]
         email: str,
     ) -> DeleteUser:
         graph_ctx: GraphQueryContext = info.context
-        action = DeleteUserAction(email)
+
+        # Fetch user UUID first (needed for RBAC validation)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            user_uuid = await db_session.scalar(
+                sa.select(users.c.uuid).where(users.c.email == email)
+            )
+        if user_uuid is None:
+            raise UserNotFound
+
+        action = DeleteUserAction(user_uuid=user_uuid, email=email)
         await graph_ctx.processors.user.delete_user.wait_for_complete(action)
         return cls(
             ok=True,
@@ -1196,12 +1218,22 @@ class PurgeUser(graphene.Mutation):  # type: ignore[misc]
         props: PurgeUserInput,
     ) -> PurgeUser:
         graph_ctx: GraphQueryContext = info.context
+
+        # Fetch user UUID first (needed for RBAC validation)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            user_uuid = await db_session.scalar(
+                sa.select(users.c.uuid).where(users.c.email == email)
+            )
+        if user_uuid is None:
+            raise UserNotFound
+
         user_info_ctx = UserInfoContext(
             uuid=graph_ctx.user["uuid"],
             email=graph_ctx.user["email"],
             main_access_key=graph_ctx.user["main_access_key"],
         )
         action = props.to_action(email, user_info_ctx)
+        action.user_uuid = user_uuid
 
         await graph_ctx.processors.user.purge_user.wait_for_complete(action)
 

@@ -16,6 +16,7 @@ from ai.backend.manager.services.user.actions.base import (
     UserScopeAction,
     UserScopeActionResult,
 )
+from ai.backend.manager.services.user.types import UserCreateSpec
 
 
 @dataclass
@@ -59,14 +60,6 @@ class CreateUserActionResult(UserScopeActionResult):
     def scope_id(self) -> str:
         # UserCreateResultData always has domain_name set (from creator.spec.domain_name)
         return self.data.user.domain_name or ""
-
-
-@dataclass
-class UserCreateSpec:
-    """Specification for creating a single user, including group assignments."""
-
-    creator: Creator[UserRow]
-    group_ids: list[str] | None = None
 
 
 @dataclass
