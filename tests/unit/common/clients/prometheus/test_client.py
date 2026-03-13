@@ -10,8 +10,7 @@ from ai.backend.common.clients.prometheus import (
 )
 from ai.backend.common.dto.clients.prometheus import (
     LabelValueResponse,
-    PrometheusQueryInstantResponse,
-    PrometheusQueryRangeResponse,
+    PrometheusResponse,
     QueryTimeRange,
 )
 from ai.backend.common.exception import FailedToGetMetric, PrometheusConnectionError
@@ -109,7 +108,7 @@ class TestQueryRange:
     ) -> None:
         result = await prometheus_client.query_range(sample_preset, sample_time_range)
 
-        assert isinstance(result, PrometheusQueryRangeResponse)
+        assert isinstance(result, PrometheusResponse)
         assert result.status == "success"
         assert result.data.result_type == "matrix"
         assert len(result.data.result) == 1
@@ -209,11 +208,11 @@ class TestQueryInstant:
     ) -> None:
         result = await prometheus_client.query_instant(sample_preset)
 
-        assert isinstance(result, PrometheusQueryInstantResponse)
+        assert isinstance(result, PrometheusResponse)
         assert result.status == "success"
         assert result.data.result_type == "vector"
         assert len(result.data.result) == 1
-        assert result.data.result[0].value == (1704067200.0, "10.5")
+        assert result.data.result[0].values == [(1704067200.0, "10.5")]
 
     async def test_with_time_parameter(
         self,
@@ -224,7 +223,7 @@ class TestQueryInstant:
     ) -> None:
         result = await prometheus_client.query_instant(sample_preset, time="1704067200.123")
 
-        assert isinstance(result, PrometheusQueryInstantResponse)
+        assert isinstance(result, PrometheusResponse)
         mock_session.post.assert_called_once()
 
     @pytest.fixture

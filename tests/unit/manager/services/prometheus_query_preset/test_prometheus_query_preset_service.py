@@ -16,9 +16,7 @@ from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import (
     PrometheusQueryData,
-    PrometheusQueryInstantData,
-    PrometheusQueryInstantResponse,
-    PrometheusQueryRangeResponse,
+    PrometheusResponse,
 )
 from ai.backend.common.exception import (
     PrometheusQueryPresetInvalidLabel,
@@ -233,7 +231,7 @@ class TestPrometheusQueryPresetService:
     ) -> None:
         mock_repository.get_by_id = AsyncMock(return_value=preset_data)
 
-        prometheus_response = PrometheusQueryRangeResponse(
+        prometheus_response = PrometheusResponse(
             status="success",
             data=PrometheusQueryData(result_type="matrix", result=[]),
         )
@@ -310,7 +308,7 @@ class TestPrometheusQueryPresetService:
         preset_data = replace(preset_data, time_window="10m")
         mock_repository.get_by_id = AsyncMock(return_value=preset_data)
 
-        prometheus_response = PrometheusQueryRangeResponse(
+        prometheus_response = PrometheusResponse(
             status="success",
             data=PrometheusQueryData(result_type="matrix", result=[]),
         )
@@ -344,7 +342,7 @@ class TestPrometheusQueryPresetService:
         preset_data = replace(preset_data, time_window=None)
         mock_repository.get_by_id = AsyncMock(return_value=preset_data)
 
-        prometheus_response = PrometheusQueryRangeResponse(
+        prometheus_response = PrometheusResponse(
             status="success",
             data=PrometheusQueryData(result_type="matrix", result=[]),
         )
@@ -383,7 +381,7 @@ class TestPrometheusQueryPresetService:
         preset_data = replace(preset_data, filter_labels=[], group_labels=[])
         mock_repository.get_by_id = AsyncMock(return_value=preset_data)
 
-        prometheus_response = PrometheusQueryRangeResponse(
+        prometheus_response = PrometheusResponse(
             status="success",
             data=PrometheusQueryData(result_type="matrix", result=[]),
         )
@@ -412,9 +410,9 @@ class TestPrometheusQueryPresetService:
         """When time_range is None, calls query_instant() instead of query_range()."""
         mock_repository.get_by_id = AsyncMock(return_value=preset_data)
 
-        prometheus_response = PrometheusQueryInstantResponse(
+        prometheus_response = PrometheusResponse(
             status="success",
-            data=PrometheusQueryInstantData(result_type="vector", result=[]),
+            data=PrometheusQueryData(result_type="vector", result=[]),
         )
         mock_prometheus_client.query_instant = AsyncMock(return_value=prometheus_response)
 
@@ -443,7 +441,7 @@ class TestPrometheusQueryPresetService:
         """When time_range is provided, calls query_range() and not query_instant()."""
         mock_repository.get_by_id = AsyncMock(return_value=preset_data)
 
-        prometheus_response = PrometheusQueryRangeResponse(
+        prometheus_response = PrometheusResponse(
             status="success",
             data=PrometheusQueryData(result_type="matrix", result=[]),
         )

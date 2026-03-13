@@ -1,6 +1,6 @@
-from abc import ABC, abstractmethod
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class MetricResponseInfo(BaseModel):
@@ -23,38 +23,26 @@ class MetricResponseInfo(BaseModel):
 type MetricResponseValue = tuple[float, str]  # (timestamp, value)
 
 
-class BaseMetricResponse(BaseModel, ABC):
-    """Base class for Prometheus metric results."""
+class MetricResponse(BaseModel):
+    """Single metric result from a Prometheus query.
+
+    Handles both instant queries (single ``value``) and range queries
+    (list of ``values``) by normalizing the instant form into a one-element list.
+    """
 
     metric: MetricResponseInfo
-
-    @property
-    @abstractmethod
-    def metric_values(self) -> list[MetricResponseValue]: ...
-
-
-class MetricResponse(BaseMetricResponse):
-    """Single metric result from Prometheus range query."""
-
     values: list[MetricResponseValue]
 
-    @property
-    def metric_values(self) -> list[MetricResponseValue]:
-        return self.values
-
-
-class MetricInstantResponse(BaseMetricResponse):
-    """Single metric result from Prometheus instant query."""
-
-    value: MetricResponseValue
-
-    @property
-    def metric_values(self) -> list[MetricResponseValue]:
-        return [self.value]
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_values(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "value" in data and "values" not in data:
+            data["values"] = [data.pop("value")]
+        return data
 
 
 class PrometheusQueryData(BaseModel):
-    """Data field from Prometheus query_range response."""
+    """Data field from a Prometheus query response."""
 
     result_type: str = Field(validation_alias="resultType")
     result: list[MetricResponse]
@@ -62,27 +50,11 @@ class PrometheusQueryData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
-class PrometheusQueryRangeResponse(BaseModel):
-    """Response from Prometheus query_range API."""
+class PrometheusResponse(BaseModel):
+    """Response from Prometheus query API (instant or range)."""
 
     status: str
     data: PrometheusQueryData
-
-
-class PrometheusQueryInstantData(BaseModel):
-    """Data field from Prometheus instant query response."""
-
-    result_type: str = Field(validation_alias="resultType")
-    result: list[MetricInstantResponse]
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class PrometheusQueryInstantResponse(BaseModel):
-    """Response from Prometheus instant query API."""
-
-    status: str
-    data: PrometheusQueryInstantData
 
 
 class LabelValueResponse(BaseModel):
