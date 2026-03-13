@@ -6,17 +6,19 @@ Each handler calls the strategy evaluator and applier directly in ``execute()``.
 
 Sub-step flow::
 
-    PROVISIONING ──(evaluator assigns PROGRESSING)──▸ PROGRESSING
-         │                                                │
-         │ (expired/give_up)                       ┌──────┴──────┐
-         ▼                                         ▼              ▼
-    ROLLING_BACK ────────────────────────▸    COMPLETED      ROLLING_BACK
-         │                                        │              │
-         ▼                                        ▼              ▼
-    ROLLED_BACK                                 READY       ROLLED_BACK
-         │                                                       │
-         ▼                                                       ▼
-       READY                                                   READY
+    PROVISIONING ──(success)──▸ PROGRESSING
+         │                           │
+         │ (expired/give_up)  ┌──────┴──────┐
+         ▼                    ▼              ▼
+    ROLLING_BACK         COMPLETED      ROLLING_BACK
+         │                    │              │
+         │ (success)          │ (success)    │ (success)
+         ▼                    ▼              ▼
+    ROLLED_BACK             READY       ROLLED_BACK
+         │                                   │
+         │ (success, via Progressing)         │ (success, via Progressing)
+         ▼                                   ▼
+       READY                               READY
 
 The evaluator determines sub-step assignments and route mutations;
 the applier persists them to DB atomically.  Each handler classifies
