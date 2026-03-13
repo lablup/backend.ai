@@ -3,11 +3,13 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.services.user.actions.base import UserSingleEntityAction
+from ai.backend.manager.services.user.actions.base import (
+    UserSingleEntityAction,
+    UserSingleEntityActionResult,
+)
 
 
 @dataclass
@@ -31,7 +33,7 @@ class GetUserAction(UserSingleEntityAction):
 
 
 @dataclass
-class GetUserActionResult(BaseActionResult):
+class GetUserActionResult(UserSingleEntityActionResult):
     """Result of GetUserAction containing user data."""
 
     user: UserData
@@ -40,5 +42,6 @@ class GetUserActionResult(BaseActionResult):
     def entity_id(self) -> str | None:
         return str(self.user.uuid)
 
+    @override
     def target_entity_id(self) -> str:
         return str(self.user.uuid)

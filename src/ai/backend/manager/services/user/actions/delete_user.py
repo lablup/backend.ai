@@ -2,10 +2,12 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.services.user.actions.base import UserSingleEntityAction
+from ai.backend.manager.services.user.actions.base import (
+    UserSingleEntityAction,
+    UserSingleEntityActionResult,
+)
 
 
 @dataclass
@@ -29,7 +31,13 @@ class DeleteUserAction(UserSingleEntityAction):
 
 
 @dataclass
-class DeleteUserActionResult(BaseActionResult):
+class DeleteUserActionResult(UserSingleEntityActionResult):
+    _user_id: str
+
     @override
     def entity_id(self) -> str | None:
-        return None
+        return self._user_id
+
+    @override
+    def target_entity_id(self) -> str:
+        return self._user_id

@@ -45,13 +45,12 @@ class SearchUsersByRoleActionResult(UserScopeActionResult):
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-    _scope_type: ScopeType
-    _scope_id: str
+    _role_id: str
 
     @override
     def scope_type(self) -> ScopeType:
-        return self._scope_type
+        return ScopeType.ROLE
 
     @override
     def scope_id(self) -> str:
-        return self._scope_id
+        return self._role_id

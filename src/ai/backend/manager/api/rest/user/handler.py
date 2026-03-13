@@ -102,7 +102,11 @@ class UserHandler:
         )
 
         action_result = await self._user.create_user.wait_for_complete(
-            CreateUserAction(creator=creator, group_ids=body.parsed.group_ids)
+            CreateUserAction(
+                creator=creator,
+                _domain_name=body.parsed.domain_name,
+                group_ids=body.parsed.group_ids,
+            )
         )
 
         resp = CreateUserResponse(user=self._adapter.convert_to_dto(action_result.data.user))
