@@ -386,8 +386,7 @@ class CreateContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
                     extra=value_or_none(extra),
                     allowed_groups=None,  # allowed groups are not supported in v1 mutation
                 )
-            ),
-            _domain_name=ctx.user["domain_name"],
+            )
         )
 
         result = (

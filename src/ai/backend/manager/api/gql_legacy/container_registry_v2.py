@@ -66,7 +66,7 @@ class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ign
     extra = graphene.JSONString(description="Added in 25.3.0.")
     allowed_groups = AllowedGroups(description="Added in 25.3.0.")
 
-    def to_action(self, domain_name: str) -> CreateContainerRegistryAction:
+    def to_action(self) -> CreateContainerRegistryAction:
         def value_or_none(val: Any) -> None | Any:
             return None if val is Undefined else val
 
@@ -88,8 +88,7 @@ class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ign
                     if sanitized_allowed_groups is not None
                     else None,
                 )
-            ),
-            _domain_name=domain_name,
+            )
         )
 
 
@@ -124,7 +123,7 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
 
         result = (
             await ctx.processors.container_registry.create_container_registry.wait_for_complete(
-                props.to_action(ctx.user["domain_name"])
+                props.to_action()
             )
         )
 
