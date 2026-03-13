@@ -5537,6 +5537,24 @@ input IntFilter
   lessThanOrEqual: Int = null
 }
 
+"""
+Payload returned after issuing a new keypair. The secret_key is only shown once.
+"""
+type IssueMyKeypairPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The newly generated access key."""
+  accessKey: String!
+
+  """
+  The newly generated secret key. This value is only returned at creation time.
+  """
+  secretKey: String!
+
+  """The generated SSH public key."""
+  sshPublicKey: String!
+}
+
 interface Item
   @join__type(graph: GRAPHENE)
 {
@@ -7786,6 +7804,21 @@ type Mutation
   Added in 26.3.0. Permanently delete multiple users in bulk (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted.
   """
   adminBulkPurgeUsersV2(input: BulkPurgeUsersV2Input!): BulkPurgeUsersV2Payload! @join__field(graph: STRAWBERRY)
+
+  """
+  Issue a new keypair for the current user. Settings (resource_policy, rate_limit, is_admin) are inherited from the main keypair. The secret_key is only returned at creation time.
+  """
+  issueMyKeypair: IssueMyKeypairPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Revoke a keypair owned by the current user. The main access key cannot be revoked — switch it first.
+  """
+  revokeMyKeypair(input: RevokeMyKeypairInput!): RevokeMyKeypairPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Switch the main access key for the current user. The target keypair must be active and owned by the user.
+  """
+  switchMyMainAccessKey(input: SwitchMyMainAccessKeyInput!): SwitchMyMainAccessKeyPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. Create a new query definition (admin only)."""
   adminCreatePrometheusQueryPreset(input: CreateQueryDefinitionInput!): CreateQueryDefinitionPayload! @join__field(graph: STRAWBERRY)
@@ -10942,6 +10975,22 @@ type RestoreArtifactsPayload
   artifacts: [Artifact!]!
 }
 
+"""Input for revoking a keypair owned by the current user."""
+input RevokeMyKeypairInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Access key of the keypair to revoke. Must not be the main access key."""
+  accessKey: String!
+}
+
+"""Payload returned after revoking a keypair."""
+type RevokeMyKeypairPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Whether the revocation was successful."""
+  success: Boolean!
+}
+
 """Added in 26.3.0. Input for revoking a role from a user"""
 input RevokeRoleInput
   @join__type(graph: STRAWBERRY)
@@ -12446,6 +12495,24 @@ type SubStepResultGQL
   message: String
   startedAt: DateTime
   endedAt: DateTime
+}
+
+"""Input for switching the main access key of the current user."""
+input SwitchMyMainAccessKeyInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Access key to set as the new main access key. Must be active and owned by the user.
+  """
+  accessKey: String!
+}
+
+"""Payload returned after switching the main access key."""
+type SwitchMyMainAccessKeyPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Whether the switch was successful."""
+  success: Boolean!
 }
 
 """Added in 25.19.0"""

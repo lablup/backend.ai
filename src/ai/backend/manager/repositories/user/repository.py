@@ -19,6 +19,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.keypair.types import GeneratedKeyPairData
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
     BulkUserUpdateResultData,
@@ -270,6 +271,21 @@ class UserRepository:
     ) -> UserSearchResult:
         """Search users assigned to a role."""
         return await self._db_source.search_users_by_role(scope, querier)
+
+    @user_repository_resilience.apply()
+    async def issue_my_keypair(self, user_uuid: UUID, email: str) -> GeneratedKeyPairData:
+        """Issue a new keypair for the current user."""
+        return await self._db_source.issue_my_keypair(user_uuid, email)
+
+    @user_repository_resilience.apply()
+    async def revoke_my_keypair(self, user_uuid: UUID, email: str, access_key: str) -> None:
+        """Revoke a keypair owned by the current user."""
+        await self._db_source.revoke_my_keypair(user_uuid, email, access_key)
+
+    @user_repository_resilience.apply()
+    async def switch_my_main_access_key(self, user_uuid: UUID, email: str, access_key: str) -> None:
+        """Switch the main access key for the current user."""
+        await self._db_source.switch_my_main_access_key(user_uuid, email, access_key)
 
     async def _get_time_binned_monthly_stats(
         self,
