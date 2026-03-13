@@ -233,10 +233,13 @@ class AgentService:
         return RecalculateUsageActionResult()
 
     async def get_total_resources(
-        self, _action: GetTotalResourcesAction
+        self, action: GetTotalResourcesAction
     ) -> GetTotalResourcesActionResult:
         total_resources = await self._scheduler_repository.get_total_resource_slots()
-        return GetTotalResourcesActionResult(total_resources=total_resources)
+        return GetTotalResourcesActionResult(
+            total_resources=total_resources,
+            _domain_name=action._domain_name,
+        )
 
     async def search_agents(self, action: SearchAgentsAction) -> SearchAgentsActionResult:
         """Searches agents. It is used by superadmin only."""
@@ -249,6 +252,7 @@ class AgentService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+            _domain_name=action._domain_name,
         )
 
     async def handle_heartbeat(self, action: HandleHeartbeatAction) -> HandleHeartbeatActionResult:
@@ -334,4 +338,7 @@ class AgentService:
         container_counts = await self._agent_repository.load_agent_container_counts(
             agent_ids=action.agent_ids
         )
-        return LoadContainerCountsActionResult(container_counts=container_counts)
+        return LoadContainerCountsActionResult(
+            container_counts=container_counts,
+            _domain_name=action._domain_name,
+        )
