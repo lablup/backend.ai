@@ -752,13 +752,17 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     except CalledProcessError as e:
                         stderr = e.stderr.decode("utf-8", "replace") if e.stderr else ""
                         stdout = e.stdout.decode("utf-8", "replace") if e.stdout else ""
-                        log.error(
-                            "dropbearkey failed with return code {code}, stdout: {stdout}, stderr: {stderr}",
+                        log.warning(
+                            "dropbearkey failed. Host key will regenerate on container startup. Return code {code}, stdout: {stdout}, stderr: {stderr}",
                             code=e.returncode,
                             stdout=stdout,
                             stderr=stderr,
                         )
-                        raise
+                    except OSError as e:
+                        log.warning(
+                            "failed to execute dropbearmulti for host key generation. Host key will regenerate on container startup: {}",
+                            repr(e),
+                        )
                     host_key_path.chmod(0o600)
                 paths_to_chown.append(host_key_path)
 
