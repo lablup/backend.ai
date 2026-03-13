@@ -30,7 +30,12 @@ class DestroyDeploymentAction(DeploymentSingleEntityAction):
 @dataclass
 class DestroyDeploymentActionResult(DeploymentSingleEntityActionResult):
     success: bool
+    _endpoint_id: UUID
 
     @override
     def entity_id(self) -> str | None:
-        return None
+        return str(self._endpoint_id)
+
+    @override
+    def target_entity_id(self) -> str:
+        return str(self._endpoint_id)

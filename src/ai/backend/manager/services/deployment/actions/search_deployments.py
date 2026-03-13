@@ -35,7 +35,17 @@ class SearchDeploymentsActionResult(DeploymentScopeActionResult):
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+    _scope_type: ScopeType
+    _scope_id: UUID
 
     @override
     def entity_id(self) -> str | None:
         return None
+
+    @override
+    def scope_type(self) -> ScopeType:
+        return self._scope_type
+
+    @override
+    def scope_id(self) -> str:
+        return str(self._scope_id)

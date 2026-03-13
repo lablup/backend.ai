@@ -40,3 +40,11 @@ class CreateLegacyDeploymentActionResult(DeploymentScopeActionResult):
     @override
     def entity_id(self) -> str | None:
         return str(self.data.id)
+
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.PROJECT
+
+    @override
+    def scope_id(self) -> str:
+        return str(self.data.project_id)

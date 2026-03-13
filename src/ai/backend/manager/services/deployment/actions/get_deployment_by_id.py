@@ -31,3 +31,7 @@ class GetDeploymentByIdActionResult(DeploymentSingleEntityActionResult):
     @override
     def entity_id(self) -> str | None:
         return str(self.data.id)
+
+    @override
+    def target_entity_id(self) -> str:
+        return str(self.data.id)

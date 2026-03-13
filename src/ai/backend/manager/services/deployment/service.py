@@ -432,7 +432,7 @@ class DeploymentService:
         await self._deployment_repository.get_endpoint_info(action.endpoint_id)
         success = await self._deployment_controller.destroy_deployment(action.endpoint_id)
         await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.DESTROYING)
-        return DestroyDeploymentActionResult(success=success)
+        return DestroyDeploymentActionResult(success=success, _endpoint_id=action.endpoint_id)
 
     async def search_deployments(
         self, action: SearchDeploymentsAction
@@ -452,6 +452,8 @@ class DeploymentService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+            _scope_type=action.scope_type(),
+            _scope_id=action.scope_id(),
         )
 
     async def get_deployment_by_id(
