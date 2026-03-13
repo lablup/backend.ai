@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -19,9 +19,11 @@ from ai.backend.manager.services.scaling_group.service import ScalingGroupServic
 def scaling_group_processors(database_engine: ExtendedAsyncSAEngine) -> ScalingGroupProcessors:
     repo = ScalingGroupRepository(database_engine)
     service = ScalingGroupService(repo)
-    return ScalingGroupProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
-    )
+    validators_mock = MagicMock(spec=ActionValidators)
+    validators_mock.rbac = MagicMock()
+    validators_mock.rbac.scope = AsyncMock()
+    validators_mock.rbac.single_entity = AsyncMock()
+    return ScalingGroupProcessors(service=service, action_monitors=[], validators=validators_mock)
 
 
 @pytest.fixture()
