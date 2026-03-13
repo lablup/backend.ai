@@ -83,7 +83,7 @@ class AgentProcessors(AbstractProcessorPackage):
     get_total_resources: ScopeActionProcessor[
         GetTotalResourcesAction, GetTotalResourcesActionResult
     ]
-    search_agents: ScopeActionProcessor[SearchAgentsAction, SearchAgentsActionResult]
+    search_agents: ActionProcessor[SearchAgentsAction, SearchAgentsActionResult]
     load_container_counts: ScopeActionProcessor[
         LoadContainerCountsAction, LoadContainerCountsActionResult
     ]
@@ -125,9 +125,7 @@ class AgentProcessors(AbstractProcessorPackage):
         self.get_total_resources = ScopeActionProcessor(
             service.get_total_resources, action_monitors, validators=[validators.rbac.scope]
         )
-        self.search_agents = ScopeActionProcessor(
-            service.search_agents, action_monitors, validators=[validators.rbac.scope]
-        )
+        self.search_agents = ActionProcessor(service.search_agents, action_monitors)
         self.load_container_counts = ScopeActionProcessor(
             service.load_container_counts, action_monitors, validators=[validators.rbac.scope]
         )
