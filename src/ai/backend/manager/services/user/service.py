@@ -360,7 +360,6 @@ class UserService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
-            _domain_name=action.scope_id(),
         )
 
     async def search_users_by_project(
@@ -375,7 +374,6 @@ class UserService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
-            _project_id=action.scope_id(),
         )
 
     async def search_users_by_role(
@@ -390,7 +388,6 @@ class UserService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
-            _role_id=action.scope_id(),
         )
 
     async def issue_my_keypair(self, action: IssueMyKeypairAction) -> IssueMyKeypairActionResult:
