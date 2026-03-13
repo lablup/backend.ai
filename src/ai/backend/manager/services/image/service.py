@@ -402,7 +402,6 @@ class ImageService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
-            user_uuid=action.user_uuid,
         )
 
     async def alias_image_by_id(self, action: AliasImageByIdAction) -> AliasImageByIdActionResult:

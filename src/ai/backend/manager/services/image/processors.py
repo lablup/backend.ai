@@ -132,7 +132,7 @@ class ImageProcessors(AbstractProcessorPackage):
         GetImageInstalledAgentsAction, GetImageInstalledAgentsActionResult
     ]
     get_all_images: ScopeActionProcessor[GetAllImagesAction, GetAllImagesActionResult]
-    search_images: ScopeActionProcessor[SearchImagesAction, SearchImagesActionResult]
+    search_images: ActionProcessor[SearchImagesAction, SearchImagesActionResult]
     search_aliases: ActionProcessor[SearchAliasesAction, SearchAliasesActionResult]
     load_image_last_used: ActionProcessor[LoadImageLastUsedAction, LoadImageLastUsedActionResult]
 
@@ -159,9 +159,7 @@ class ImageProcessors(AbstractProcessorPackage):
         self.get_all_images = ScopeActionProcessor(
             service.get_all_images, action_monitors, validators=[validators.rbac.scope]
         )
-        self.search_images = ScopeActionProcessor(
-            service.search_images, action_monitors, validators=[validators.rbac.scope]
-        )
+        self.search_images = ActionProcessor(service.search_images, action_monitors)
 
         # Single entity actions with RBAC validation
         self.forget_image_by_id = SingleEntityActionProcessor(

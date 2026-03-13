@@ -12,7 +12,6 @@ from functools import lru_cache
 import strawberry
 from strawberry import Info
 
-from ai.backend.common.contexts.user import current_user
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
@@ -85,9 +84,8 @@ async def fetch_images(
         base_conditions=base_conditions,
     )
 
-    user = current_user()
     action_result = await info.context.processors.image.search_images.wait_for_complete(
-        SearchImagesAction(querier=querier, user_uuid=str(user.user_id) if user else "")
+        SearchImagesAction(querier=querier)
     )
 
     edges = []
