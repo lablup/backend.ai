@@ -18,9 +18,10 @@ from ai.backend.manager.types import OptionalState
 @dataclass
 class PurgeUserAction(UserSingleEntityAction):
     user_info_ctx: UserInfoContext
-    email: str
+    email: str  # Still needed for the service layer implementation
     purge_shared_vfolders: OptionalState[bool] = field(default_factory=OptionalState.nop)
     delegate_endpoint_ownership: OptionalState[bool] = field(default_factory=OptionalState.nop)
+    user_uuid: UUID | None = None  # Set by API layer for RBAC validation
 
     @override
     @classmethod
@@ -29,26 +30,28 @@ class PurgeUserAction(UserSingleEntityAction):
 
     @override
     def target_entity_id(self) -> str:
-        # Email-based lookup - will be resolved in processor
-        return self.email
+        if self.user_uuid is None:
+            raise ValueError("user_uuid must be set for RBAC validation")
+        return str(self.user_uuid)
 
     @override
     def target_element(self) -> RBACElementRef:
-        # Email-based lookup requires resolution in processor
-        return RBACElementRef(RBACElementType.USER, self.email)
+        if self.user_uuid is None:
+            raise ValueError("user_uuid must be set for RBAC validation")
+        return RBACElementRef(RBACElementType.USER, str(self.user_uuid))
 
 
 @dataclass
 class PurgeUserActionResult(UserSingleEntityActionResult):
-    _user_id: str
+    user_uuid: UUID
 
     @override
     def entity_id(self) -> str | None:
-        return self._user_id
+        return str(self.user_uuid)
 
     @override
     def target_entity_id(self) -> str:
-        return self._user_id
+        return str(self.user_uuid)
 
 
 @dataclass

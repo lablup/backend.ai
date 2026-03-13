@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.permission.types import RBACElementType
@@ -16,15 +16,14 @@ from ai.backend.manager.services.user.actions.base import (
     UserSingleEntityAction,
     UserSingleEntityActionResult,
 )
-
-if TYPE_CHECKING:
-    from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
+from ai.backend.manager.services.user.types import UserUpdateSpec
 
 
 @dataclass
 class ModifyUserAction(UserSingleEntityAction):
-    email: str
+    email: str  # Still needed for the service layer implementation
     updater: Updater[UserRow]
+    user_uuid: UUID | None = None  # Set by API layer for RBAC validation
 
     @override
     @classmethod
@@ -33,16 +32,15 @@ class ModifyUserAction(UserSingleEntityAction):
 
     @override
     def target_entity_id(self) -> str:
-        # The email is used to identify the user for modification
-        # However, we need the UUID for RBAC. This will be resolved in the processor
-        # For now, return email as placeholder - processor will populate actual UUID
-        return self.email
+        if self.user_uuid is None:
+            raise ValueError("user_uuid must be set for RBAC validation")
+        return str(self.user_uuid)
 
     @override
     def target_element(self) -> RBACElementRef:
-        # Email-based lookup requires resolution in processor
-        # This is a limitation of the current design
-        return RBACElementRef(RBACElementType.USER, self.email)
+        if self.user_uuid is None:
+            raise ValueError("user_uuid must be set for RBAC validation")
+        return RBACElementRef(RBACElementType.USER, str(self.user_uuid))
 
 
 @dataclass
@@ -56,14 +54,6 @@ class ModifyUserActionResult(UserSingleEntityActionResult):
     @override
     def target_entity_id(self) -> str:
         return str(self.data.id)
-
-
-@dataclass
-class UserUpdateSpec:
-    """Specification for updating a single user, including the target user ID."""
-
-    user_id: UUID
-    updater_spec: UserUpdaterSpec
 
 
 @dataclass

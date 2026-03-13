@@ -126,7 +126,7 @@ class UserService:
         await self._user_repository.soft_delete_user_validated(
             email=action.email,
         )
-        return DeleteUserActionResult(_user_id=str(user_data.uuid))
+        return DeleteUserActionResult(user_uuid=user_data.uuid)
 
     async def get_user(self, action: GetUserAction) -> GetUserActionResult:
         """Retrieve a single user by UUID.
@@ -213,7 +213,7 @@ class UserService:
         # Finally purge the user completely
         await self._user_repository.purge_user(email)
 
-        return PurgeUserActionResult(_user_id=str(user_uuid))
+        return PurgeUserActionResult(user_uuid=user_uuid)
 
     async def _purge_single_user(
         self,
