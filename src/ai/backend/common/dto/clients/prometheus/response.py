@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class MetricResponseInfo(BaseModel):
     """Metric information from Prometheus response."""
 
-    value_type: str
+    value_type: str | None = Field(default=None)
     name: str | None = Field(default=None, validation_alias="__name__")
     agent_id: str | None = Field(default=None)
     container_metric_name: str | None = Field(default=None)
