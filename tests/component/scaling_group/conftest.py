@@ -29,7 +29,7 @@ def server_module_registries(
     route_deps: RouteDeps,
     scaling_group_processors: ScalingGroupProcessors,
 ) -> list[RouteRegistry]:
-    """Load only the modules required for scaling-group-domain tests."""
+    """Load only the modules required for scaling-group tests."""
     return [
         register_scaling_group_routes(
             ScalingGroupHandler(scaling_group=scaling_group_processors), route_deps
