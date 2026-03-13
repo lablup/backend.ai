@@ -11,6 +11,7 @@ from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.agent.types import AgentDetailData
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRevisionData
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
+from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryData,
@@ -51,6 +52,7 @@ from .agent import load_agents_by_ids, load_container_counts
 from .artifact import load_artifacts_by_ids
 from .artifact_registry import load_artifact_registries_by_ids
 from .artifact_revision import load_artifact_revisions_by_ids
+from .audit_log import load_audit_logs_by_ids
 from .container_registry import load_container_registries_by_ids
 from .deployment import (
     load_access_tokens_by_ids,
@@ -104,6 +106,12 @@ class DataLoaders:
 
     def __init__(self, processors: Processors) -> None:
         self._processors = processors
+
+    @cached_property
+    def audit_log_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, AuditLogData | None]:
+        return DataLoader(load_fn=partial(load_audit_logs_by_ids, self._processors.audit_log))
 
     @cached_property
     def resource_group_loader(
