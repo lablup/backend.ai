@@ -105,7 +105,7 @@ class EtcdHandler:
             " Use /resource/container-registries API instead."
         )
         result = await self._container_registry.get_container_registries.wait_for_complete(
-            GetContainerRegistriesAction(_domain_name=ctx.user_domain)
+            GetContainerRegistriesAction()
         )
         return APIResponse.build(HTTPStatus.OK, ContainerRegistriesResponse(root=result.registries))
 
