@@ -12,7 +12,6 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.common.contexts.user import current_user
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.common.types import (
@@ -42,7 +41,6 @@ from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
-from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
@@ -442,17 +440,13 @@ class SessionV2GQL(Node):
         description="Added in 26.3.0. The kernels belonging to this session."
     )
     async def kernels(self, info: Info[StrawberryGQLContext]) -> KernelV2ConnectionGQL:
-        user = current_user()
-        if user is None:
-            raise UserNotFound("User not found in context")
-
         session_id = SessionId(UUID(str(self.id)))
         querier = BatchQuerier(
             pagination=NoPagination(),
             conditions=[KernelConditions.by_session_ids([session_id])],
         )
         action_result = await info.context.processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=querier, user_id=user.user_id)
+            SearchKernelsAction(querier=querier)
         )
         nodes = [KernelV2GQL.from_kernel_info(kernel) for kernel in action_result.data]
         edges = [KernelV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]

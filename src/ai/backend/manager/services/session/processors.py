@@ -224,14 +224,8 @@ class SessionProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=[cast(ActionValidator, scope_validator)],
         )
-        self.search_kernels = ActionProcessor(
-            service.search_kernels,
-            action_monitors,
-            validators=[cast(ActionValidator, scope_validator)],
-        )
-        self.search_sessions = ActionProcessor(
-            service.search, action_monitors, validators=[cast(ActionValidator, scope_validator)]
-        )
+        self.search_kernels = ActionProcessor(service.search_kernels, action_monitors)
+        self.search_sessions = ActionProcessor(service.search, action_monitors)
 
         # Single entity actions with RBAC validation
         self.destroy_session = ActionProcessor(
