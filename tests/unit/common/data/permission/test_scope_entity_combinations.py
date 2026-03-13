@@ -31,7 +31,7 @@ class TestValidScopeEntityCombinations:
             RBACElementType.CONTAINER_REGISTRY,
             RBACElementType.SESSION,
             RBACElementType.VFOLDER,
-            RBACElementType.DEPLOYMENT,
+            RBACElementType.MODEL_DEPLOYMENT,
             RBACElementType.NETWORK,
             RBACElementType.USER,
             RBACElementType.STORAGE_HOST,
@@ -43,7 +43,7 @@ class TestValidScopeEntityCombinations:
             RBACElementType.RESOURCE_GROUP,
             RBACElementType.SESSION,
             RBACElementType.VFOLDER,
-            RBACElementType.DEPLOYMENT,
+            RBACElementType.MODEL_DEPLOYMENT,
             RBACElementType.KEYPAIR,
         }
 

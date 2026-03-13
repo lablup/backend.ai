@@ -51,7 +51,6 @@ class RBACElementTypeGQL(StrEnum):
     # Root-query-enabled entities (scoped)
     SESSION = "session"
     VFOLDER = "vfolder"
-    DEPLOYMENT = "deployment"
     MODEL_DEPLOYMENT = "model_deployment"
     KEYPAIR = "keypair"
     NOTIFICATION_CHANNEL = "notification_channel"
@@ -229,7 +228,6 @@ class PermissionGQL(Node):
             case (
                 RBACElementType.SESSION
                 | RBACElementType.VFOLDER
-                | RBACElementType.DEPLOYMENT
                 | RBACElementType.KEYPAIR
                 | RBACElementType.NOTIFICATION_CHANNEL
                 | RBACElementType.NETWORK

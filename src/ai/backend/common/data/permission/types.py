@@ -360,7 +360,6 @@ class RBACElementType(enum.StrEnum):
     # === Root-query-enabled entities (scoped) ===
     SESSION = "session"
     VFOLDER = "vfolder"
-    DEPLOYMENT = "deployment"
     MODEL_DEPLOYMENT = "model_deployment"
     KEYPAIR = "keypair"
     NOTIFICATION_CHANNEL = "notification_channel"
