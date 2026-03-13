@@ -14,6 +14,8 @@ from ai.backend.manager.services.image.actions.base import ImageScopeAction, Ima
 @dataclass
 class SearchImagesAction(ImageScopeAction):
     querier: BatchQuerier
+    _scope_type: ScopeType
+    _scope_id: str
 
     @override
     @classmethod
@@ -22,15 +24,23 @@ class SearchImagesAction(ImageScopeAction):
 
     @override
     def scope_type(self) -> ScopeType:
-        return self.querier.scope_type
+        return self._scope_type
 
     @override
     def scope_id(self) -> str:
-        return self.querier.scope_id
+        return self._scope_id
 
     @override
     def target_element(self) -> RBACElementRef:
-        return RBACElementRef(self.querier.scope_element_type, self.querier.scope_id)
+        # Map ScopeType to the corresponding RBACElementType
+        from ai.backend.common.data.permission.types import RBACElementType
+
+        scope_element_type_map = {
+            ScopeType.USER: RBACElementType.USER,
+            ScopeType.PROJECT: RBACElementType.PROJECT,
+            ScopeType.DOMAIN: RBACElementType.DOMAIN,
+        }
+        return RBACElementRef(scope_element_type_map[self._scope_type], self._scope_id)
 
 
 @dataclass
