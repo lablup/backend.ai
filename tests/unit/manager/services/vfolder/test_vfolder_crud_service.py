@@ -25,6 +25,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import Forbidden
 from ai.backend.manager.errors.storage import (
     TooManyVFoldersFound,
@@ -967,6 +968,7 @@ class TestCloneVFolderAction:
             source_vfolder_uuid=vfolder_uuid,
             target_name="cloned-vfolder",
             target_host=None,
+            target_quota_scope_id=None,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
             mount_permission=VFolderPermission.READ_WRITE,
@@ -1004,6 +1006,7 @@ class TestCloneVFolderAction:
             source_vfolder_uuid=vfolder_uuid,
             target_name="cloned-vfolder",
             target_host=None,
+            target_quota_scope_id=None,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
             mount_permission=VFolderPermission.READ_WRITE,
@@ -1043,6 +1046,7 @@ class TestCloneVFolderAction:
             source_vfolder_uuid=vfolder_uuid,
             target_name="existing-name",
             target_host=None,
+            target_quota_scope_id=None,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
             mount_permission=VFolderPermission.READ_WRITE,
@@ -1084,12 +1088,175 @@ class TestCloneVFolderAction:
             source_vfolder_uuid=vfolder_uuid,
             target_name="clone-target",
             target_host=None,
+            target_quota_scope_id=None,
             cloneable=True,
             usage_mode=VFolderUsageMode.GENERAL,
             mount_permission=VFolderPermission.READ_WRITE,
         )
 
         with pytest.raises(VFolderInvalidParameter, match="cannot create more"):
+            await vfolder_service.clone(action)
+
+    async def test_clone_with_explicit_target_quota_scope_id(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        user_uuid: uuid.UUID,
+        vfolder_uuid: uuid.UUID,
+    ) -> None:
+        source_data = _make_vfolder_data(vfolder_uuid, user_uuid, cloneable=True)
+        task_id = uuid.uuid4()
+        target_id = uuid.uuid4()
+        target_quota_scope_id = QuotaScopeID(QuotaScopeType.USER, user_uuid)
+
+        mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
+        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
+            return_value=VFolderListResult(
+                vfolders=[
+                    VFolderAccessInfo(
+                        vfolder_data=source_data,
+                        is_owner=True,
+                        effective_permission=None,
+                    )
+                ]
+            )
+        )
+        mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=False)
+        mock_vfolder_repository.get_allowed_vfolder_hosts = AsyncMock(
+            return_value={"local:volume1": set()}
+        )
+        mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
+        mock_vfolder_repository.get_max_vfolder_count = AsyncMock(return_value=0)
+        mock_vfolder_repository.get_user_email_by_id = AsyncMock(return_value="test@example.com")
+        mock_vfolder_repository.validate_quota_scope_access = AsyncMock()
+        mock_vfolder_repository.initiate_vfolder_clone = AsyncMock(
+            return_value=(task_id, target_id)
+        )
+
+        action = CloneVFolderAction(
+            requester_user_uuid=user_uuid,
+            source_vfolder_uuid=vfolder_uuid,
+            target_name="cloned-vfolder",
+            target_host=None,
+            target_quota_scope_id=target_quota_scope_id,
+            cloneable=True,
+            usage_mode=VFolderUsageMode.GENERAL,
+            mount_permission=VFolderPermission.READ_WRITE,
+        )
+
+        result = await vfolder_service.clone(action)
+
+        assert isinstance(result, CloneVFolderActionResult)
+        assert result.bgtask_id == task_id
+        assert result.target_vfolder_id == target_id
+        mock_vfolder_repository.validate_quota_scope_access.assert_called_once_with(
+            target_quota_scope_id,
+            user_uuid,
+            UserRole.USER,
+            "default",
+        )
+
+    async def test_clone_with_none_target_quota_scope_defaults_to_user_scope(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        user_uuid: uuid.UUID,
+        vfolder_uuid: uuid.UUID,
+    ) -> None:
+        source_data = _make_vfolder_data(vfolder_uuid, user_uuid, cloneable=True)
+        task_id = uuid.uuid4()
+        target_id = uuid.uuid4()
+
+        mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
+        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
+            return_value=VFolderListResult(
+                vfolders=[
+                    VFolderAccessInfo(
+                        vfolder_data=source_data,
+                        is_owner=True,
+                        effective_permission=None,
+                    )
+                ]
+            )
+        )
+        mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=False)
+        mock_vfolder_repository.get_allowed_vfolder_hosts = AsyncMock(
+            return_value={"local:volume1": set()}
+        )
+        mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
+        mock_vfolder_repository.get_max_vfolder_count = AsyncMock(return_value=0)
+        mock_vfolder_repository.get_user_email_by_id = AsyncMock(return_value="test@example.com")
+        mock_vfolder_repository.initiate_vfolder_clone = AsyncMock(
+            return_value=(task_id, target_id)
+        )
+
+        action = CloneVFolderAction(
+            requester_user_uuid=user_uuid,
+            source_vfolder_uuid=vfolder_uuid,
+            target_name="cloned-vfolder",
+            target_host=None,
+            target_quota_scope_id=None,
+            cloneable=True,
+            usage_mode=VFolderUsageMode.GENERAL,
+            mount_permission=VFolderPermission.READ_WRITE,
+        )
+
+        result = await vfolder_service.clone(action)
+
+        assert isinstance(result, CloneVFolderActionResult)
+        # When target_quota_scope_id is None, validate_quota_scope_access should not be called
+        mock_vfolder_repository.validate_quota_scope_access.assert_not_called()
+        # The clone info passed to initiate_vfolder_clone should use the requester's user scope
+        clone_call_args = mock_vfolder_repository.initiate_vfolder_clone.call_args
+        clone_info = clone_call_args[0][0]
+        assert clone_info.target_quota_scope_id == QuotaScopeID(QuotaScopeType.USER, user_uuid)
+
+    async def test_clone_with_unauthorized_quota_scope_raises_error(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        user_uuid: uuid.UUID,
+        vfolder_uuid: uuid.UUID,
+    ) -> None:
+        source_data = _make_vfolder_data(vfolder_uuid, user_uuid, cloneable=True)
+        other_user_uuid = uuid.uuid4()
+        unauthorized_scope = QuotaScopeID(QuotaScopeType.USER, other_user_uuid)
+
+        mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
+        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
+            return_value=VFolderListResult(
+                vfolders=[
+                    VFolderAccessInfo(
+                        vfolder_data=source_data,
+                        is_owner=True,
+                        effective_permission=None,
+                    )
+                ]
+            )
+        )
+        mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=False)
+        mock_vfolder_repository.get_allowed_vfolder_hosts = AsyncMock(
+            return_value={"local:volume1": set()}
+        )
+        mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
+        mock_vfolder_repository.get_max_vfolder_count = AsyncMock(return_value=0)
+        mock_vfolder_repository.get_user_email_by_id = AsyncMock(return_value="test@example.com")
+        mock_vfolder_repository.validate_quota_scope_access = AsyncMock(
+            side_effect=InvalidAPIParameters
+        )
+
+        action = CloneVFolderAction(
+            requester_user_uuid=user_uuid,
+            source_vfolder_uuid=vfolder_uuid,
+            target_name="cloned-vfolder",
+            target_host=None,
+            target_quota_scope_id=unauthorized_scope,
+            cloneable=True,
+            usage_mode=VFolderUsageMode.GENERAL,
+            mount_permission=VFolderPermission.READ_WRITE,
+        )
+
+        with pytest.raises(InvalidAPIParameters):
             await vfolder_service.clone(action)
 
 

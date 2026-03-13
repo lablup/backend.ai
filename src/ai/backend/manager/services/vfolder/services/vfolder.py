@@ -708,7 +708,18 @@ class VFolderService:
 
         # Create source and target VFolderID
         source_folder_id = VFolderID(source_vfolder_data.quota_scope_id, source_vfolder_data.id)
-        target_quota_scope_id = "..."  # TODO: implement
+
+        # Resolve target quota scope: use the provided one or default to requester's user scope
+        if action.target_quota_scope_id is not None:
+            target_quota_scope_id = action.target_quota_scope_id
+            await self._vfolder_repository.validate_quota_scope_access(
+                target_quota_scope_id,
+                action.requester_user_uuid,
+                user_role,
+                user_domain_name,
+            )
+        else:
+            target_quota_scope_id = QuotaScopeID(QuotaScopeType.USER, action.requester_user_uuid)
 
         # Create VFolderCloneInfo for the cloning operation
         vfolder_clone_info = VFolderCloneInfo(

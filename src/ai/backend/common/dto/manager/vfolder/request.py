@@ -143,6 +143,14 @@ class CloneVFolderReq(BaseRequestModel):
         validation_alias=AliasChoices("target_host", "folder_host"),
         description="Target host for the clone",
     )
+    target_quota_scope_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("target_quota_scope_id", "targetQuotaScopeId"),
+        description=(
+            "Target quota scope ID for the clone (e.g. 'user:<uuid>'). "
+            "If not specified, defaults to the requester's user quota scope."
+        ),
+    )
     cloneable: bool = Field(default=False, description="Whether the cloned vfolder is cloneable")
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
     permission: VFolderPermissionField = Field(default=VFolderPermissionField.READ_WRITE)

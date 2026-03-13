@@ -505,6 +505,7 @@ class CloneVFolderAction(VFolderSingleEntityAction):
     source_vfolder_uuid: uuid.UUID
     target_name: str
     target_host: str | None
+    target_quota_scope_id: QuotaScopeID | None
     cloneable: bool
     usage_mode: VFolderUsageMode
     mount_permission: VFolderPermission

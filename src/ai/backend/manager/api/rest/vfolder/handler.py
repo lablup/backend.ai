@@ -98,6 +98,7 @@ from ai.backend.common.dto.manager.vfolder.response import (
 )
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
+    QuotaScopeID,
     VFolderID,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -1623,12 +1624,18 @@ class VFolderHandler:
             params.permission.value,
         )
 
+        target_quota_scope_id = (
+            QuotaScopeID.parse(params.target_quota_scope_id)
+            if params.target_quota_scope_id
+            else None
+        )
         result = await self._vfolder.clone_vfolder.wait_for_complete(
             CloneVFolderAction(
                 requester_user_uuid=vfctx.user_uuid,
                 source_vfolder_uuid=row["id"],
                 target_name=params.target_name,
                 target_host=params.target_host,
+                target_quota_scope_id=target_quota_scope_id,
                 cloneable=params.cloneable,
                 usage_mode=params.usage_mode,
                 mount_permission=VFolderPermission(params.permission.value),
