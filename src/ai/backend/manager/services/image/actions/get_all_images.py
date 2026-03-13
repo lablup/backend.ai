@@ -23,8 +23,8 @@ class GetAllImagesAction(ImageScopeAction):
     """
 
     status_filter: list[ImageStatus] | None
-    _scope_type: ScopeType
-    _scope_id: str
+    user_uuid: str = ""
+    domain_name: str = ""
 
     @override
     @classmethod
@@ -33,33 +33,27 @@ class GetAllImagesAction(ImageScopeAction):
 
     @override
     def scope_type(self) -> ScopeType:
-        return self._scope_type
+        # Images are scoped to the user
+        return ScopeType.USER
 
     @override
     def scope_id(self) -> str:
-        return self._scope_id
+        return self.user_uuid
 
     @override
     def target_element(self) -> RBACElementRef:
-        # Map ScopeType to the corresponding RBACElementType
-        scope_element_type_map = {
-            ScopeType.USER: RBACElementType.USER,
-            ScopeType.PROJECT: RBACElementType.PROJECT,
-            ScopeType.DOMAIN: RBACElementType.DOMAIN,
-        }
-        return RBACElementRef(scope_element_type_map[self._scope_type], self._scope_id)
+        return RBACElementRef(RBACElementType.USER, self.user_uuid)
 
 
 @dataclass
 class GetAllImagesActionResult(ImageScopeActionResult):
     data: Mapping[ImageID, ImageWithAgentInstallStatus]
-    _scope_type: ScopeType
-    _scope_id: str
+    user_uuid: str = ""
 
     @override
     def scope_type(self) -> ScopeType:
-        return self._scope_type
+        return ScopeType.USER
 
     @override
     def scope_id(self) -> str:
-        return self._scope_id
+        return self.user_uuid

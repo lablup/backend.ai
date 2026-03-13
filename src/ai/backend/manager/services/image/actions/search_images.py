@@ -14,8 +14,8 @@ from ai.backend.manager.services.image.actions.base import ImageScopeAction, Ima
 @dataclass
 class SearchImagesAction(ImageScopeAction):
     querier: BatchQuerier
-    _scope_type: ScopeType
-    _scope_id: str
+    user_uuid: str = ""
+    domain_name: str = ""
 
     @override
     @classmethod
@@ -24,21 +24,16 @@ class SearchImagesAction(ImageScopeAction):
 
     @override
     def scope_type(self) -> ScopeType:
-        return self._scope_type
+        # Images are scoped to the user
+        return ScopeType.USER
 
     @override
     def scope_id(self) -> str:
-        return self._scope_id
+        return self.user_uuid
 
     @override
     def target_element(self) -> RBACElementRef:
-        # Map ScopeType to the corresponding RBACElementType
-        scope_element_type_map = {
-            ScopeType.USER: RBACElementType.USER,
-            ScopeType.PROJECT: RBACElementType.PROJECT,
-            ScopeType.DOMAIN: RBACElementType.DOMAIN,
-        }
-        return RBACElementRef(scope_element_type_map[self._scope_type], self._scope_id)
+        return RBACElementRef(RBACElementType.USER, self.user_uuid)
 
 
 @dataclass
@@ -47,13 +42,12 @@ class SearchImagesActionResult(ImageScopeActionResult):
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-    _scope_type: ScopeType
-    _scope_id: str
+    user_uuid: str = ""
 
     @override
     def scope_type(self) -> ScopeType:
-        return self._scope_type
+        return ScopeType.USER
 
     @override
     def scope_id(self) -> str:
-        return self._scope_id
+        return self.user_uuid
