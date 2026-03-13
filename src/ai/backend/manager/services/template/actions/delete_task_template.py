@@ -3,14 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 
-from .base import TemplateAction
+from .base import TemplateSingleEntityAction, TemplateSingleEntityActionResult
 
 
 @dataclass
-class DeleteTaskTemplateAction(TemplateAction):
+class DeleteTaskTemplateAction(TemplateSingleEntityAction):
     """Action to soft-delete a task template."""
 
     template_id: str
@@ -21,14 +22,20 @@ class DeleteTaskTemplateAction(TemplateAction):
         return ActionOperationType.DELETE
 
     @override
-    def entity_id(self) -> str | None:
+    def target_entity_id(self) -> str:
         return self.template_id
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.SESSION_TEMPLATE, self.template_id)
 
 
 @dataclass
-class DeleteTaskTemplateActionResult(BaseActionResult):
+class DeleteTaskTemplateActionResult(TemplateSingleEntityActionResult):
     """Result of deleting a task template."""
 
+    _template_id: str = ""
+
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def target_entity_id(self) -> str:
+        return self._template_id

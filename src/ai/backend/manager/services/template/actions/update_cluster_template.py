@@ -4,14 +4,15 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 
-from .base import TemplateAction
+from .base import TemplateSingleEntityAction, TemplateSingleEntityActionResult
 
 
 @dataclass
-class UpdateClusterTemplateAction(TemplateAction):
+class UpdateClusterTemplateAction(TemplateSingleEntityAction):
     """Action to update an existing cluster template."""
 
     template_id: str
@@ -23,14 +24,20 @@ class UpdateClusterTemplateAction(TemplateAction):
         return ActionOperationType.UPDATE
 
     @override
-    def entity_id(self) -> str | None:
+    def target_entity_id(self) -> str:
         return self.template_id
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.SESSION_TEMPLATE, self.template_id)
 
 
 @dataclass
-class UpdateClusterTemplateActionResult(BaseActionResult):
+class UpdateClusterTemplateActionResult(TemplateSingleEntityActionResult):
     """Result of updating a cluster template."""
 
+    _template_id: str = ""
+
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def target_entity_id(self) -> str:
+        return self._template_id

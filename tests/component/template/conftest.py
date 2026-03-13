@@ -8,6 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.cluster_template.handler import ClusterTemplateHandler
 from ai.backend.manager.api.rest.cluster_template.registry import register_cluster_template_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -27,7 +28,9 @@ def template_processors(database_engine: ExtendedAsyncSAEngine) -> TemplateProce
     repo = TemplateRepository(database_engine)
     service = TemplateService(repository=repo)
     return TemplateProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service,
+        action_monitors=[],
+        validators=ActionValidators(rbac=MagicMock(spec=RBACValidators)),
     )
 
 
