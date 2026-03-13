@@ -20,6 +20,11 @@ if TYPE_CHECKING:
         KernelV2FilterGQL,
         KernelV2OrderByGQL,
     )
+    from ai.backend.manager.api.gql.resource_slot.types import (
+        AgentResourceConnectionGQL,
+        AgentResourceSlotFilterGQL,
+        AgentResourceSlotOrderByGQL,
+    )
     from ai.backend.manager.api.gql.session.types import (
         SessionV2ConnectionGQL,
         SessionV2FilterGQL,
@@ -487,6 +492,50 @@ class AgentV2GQL(Node):
             limit=limit,
             offset=offset,
             base_conditions=[SessionConditions.by_agent_id(self._agent_id)],
+        )
+
+    @strawberry.field(  # type: ignore[misc]
+        description="Added in 26.3.0. Per-slot resource capacity and usage for this agent."
+    )
+    async def resource_slots(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            AgentResourceSlotFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                AgentResourceSlotOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
+            ]
+        ]
+        | None = None,
+        first: int | None = None,
+        after: str | None = None,
+        last: int | None = None,
+        before: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Annotated[
+        AgentResourceConnectionGQL,
+        strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
+    ]:
+        """Fetch per-slot resource capacity and usage for this agent."""
+        from ai.backend.manager.api.gql.resource_slot.fetcher import fetch_agent_resources
+
+        return await fetch_agent_resources(
+            info=info,
+            agent_id=str(self._agent_id),
+            filter=filter,
+            order_by=order_by,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
         )
 
     @classmethod

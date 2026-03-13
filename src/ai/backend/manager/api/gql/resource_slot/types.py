@@ -1,0 +1,477 @@
+"""GraphQL types for resource slot management.
+
+Covers:
+- ResourceSlotTypeGQL: Registry node for a known resource slot type (resource_slot_types table)
+- AgentResourceSlotGQL: Per-slot capacity/usage on an agent (agent_resources table)
+- KernelResourceAllocationGQL: Per-slot allocation for a kernel (resource_allocations table)
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterable
+from decimal import Decimal
+from enum import StrEnum
+from typing import Any, Self
+
+import strawberry
+from strawberry import ID, Info
+from strawberry.relay import Connection, Edge, Node, NodeID
+
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import dedent_strip
+from ai.backend.manager.data.resource_slot.types import (
+    AgentResourceData,
+    NumberFormatData,
+    ResourceAllocationData,
+    ResourceSlotTypeData,
+)
+from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.resource_slot.query import (
+    AgentResourceQueryConditions,
+    AgentResourceQueryOrders,
+    QueryConditions,
+    QueryOrders,
+    ResourceAllocationQueryConditions,
+    ResourceAllocationQueryOrders,
+)
+
+# ========== NumberFormat ==========
+
+
+@strawberry.type(
+    name="NumberFormat",
+    description="Added in 26.3.0. Display number format configuration for a resource slot type.",
+)
+class NumberFormatGQL:
+    binary: bool = strawberry.field(
+        description="Whether to use binary (1024-based) prefix instead of decimal (1000-based)."
+    )
+    round_length: int = strawberry.field(description="Number of decimal places to display.")
+
+    @classmethod
+    def from_data(cls, data: NumberFormatData) -> Self:
+        return cls(binary=data.binary, round_length=data.round_length)
+
+
+# ========== ResourceSlotTypeGQL (Node) ==========
+
+
+@strawberry.type(
+    name="ResourceSlotType",
+    description=dedent_strip("""
+        Added in 26.3.0. A registered resource slot type describing display metadata
+        and formatting rules for a specific resource (e.g., cpu, mem, cuda.device).
+    """),
+)
+class ResourceSlotTypeGQL(Node):
+    id: NodeID[str]
+    slot_name: str = strawberry.field(
+        description="Unique identifier for the resource slot (e.g., 'cpu', 'mem', 'cuda.device')."
+    )
+    slot_type: str = strawberry.field(
+        description="Category of the slot type (e.g., 'count', 'bytes', 'unique-count')."
+    )
+    display_name: str = strawberry.field(description="Human-readable name for display in UIs.")
+    description: str = strawberry.field(
+        description="Longer description of what this resource slot represents."
+    )
+    display_unit: str = strawberry.field(
+        description="Unit label used when displaying resource amounts (e.g., 'GiB', 'cores')."
+    )
+    display_icon: str = strawberry.field(
+        description="Icon identifier for UI rendering (e.g., 'cpu', 'memory', 'gpu')."
+    )
+    number_format: NumberFormatGQL = strawberry.field(
+        description="Number formatting rules (binary vs decimal prefix, rounding)."
+    )
+    rank: int = strawberry.field(description="Display ordering rank. Lower values appear first.")
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        from ai.backend.manager.api.gql.resource_slot.fetcher import load_resource_slot_type_data
+        from ai.backend.manager.errors.resource_slot import ResourceSlotTypeNotFound
+
+        results: list[Self | None] = []
+        for slot_name in node_ids:
+            try:
+                data = await load_resource_slot_type_data(info, slot_name)
+            except ResourceSlotTypeNotFound:
+                if required:
+                    raise
+                results.append(None)
+            else:
+                results.append(cls.from_data(data))
+        return results
+
+    @classmethod
+    def from_data(cls, data: ResourceSlotTypeData) -> Self:
+        return cls(
+            id=ID(data.slot_name),
+            slot_name=data.slot_name,
+            slot_type=data.slot_type,
+            display_name=data.display_name,
+            description=data.description,
+            display_unit=data.display_unit,
+            display_icon=data.display_icon,
+            number_format=NumberFormatGQL.from_data(data.number_format),
+            rank=data.rank,
+        )
+
+
+ResourceSlotTypeEdgeGQL = Edge[ResourceSlotTypeGQL]
+
+
+@strawberry.type(
+    name="ResourceSlotTypeConnection",
+    description="Added in 26.3.0. Relay-style connection for paginated resource slot types.",
+)
+class ResourceSlotTypeConnectionGQL(Connection[ResourceSlotTypeGQL]):
+    count: int
+
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.count = count
+
+
+# ========== ResourceSlotType Filter/OrderBy ==========
+
+
+@strawberry.enum(
+    name="ResourceSlotTypeOrderField",
+    description="Added in 26.3.0. Fields available for ordering resource slot types.",
+)
+class ResourceSlotTypeOrderFieldGQL(StrEnum):
+    SLOT_NAME = "slot_name"
+    RANK = "rank"
+    DISPLAY_NAME = "display_name"
+
+
+@strawberry.input(
+    name="ResourceSlotTypeFilter",
+    description="Added in 26.3.0. Filter criteria for querying resource slot types.",
+)
+class ResourceSlotTypeFilterGQL(GQLFilter):
+    slot_name: StringFilter | None = None
+    slot_type: StringFilter | None = None
+    display_name: StringFilter | None = None
+
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if self.slot_name:
+            condition = self.slot_name.build_query_condition(
+                contains_factory=QueryConditions.by_slot_name_contains,
+                equals_factory=QueryConditions.by_slot_name_equals,
+                starts_with_factory=QueryConditions.by_slot_name_starts_with,
+                ends_with_factory=QueryConditions.by_slot_name_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+        if self.slot_type:
+            condition = self.slot_type.build_query_condition(
+                contains_factory=QueryConditions.by_slot_type_contains,
+                equals_factory=QueryConditions.by_slot_type_equals,
+                starts_with_factory=QueryConditions.by_slot_type_starts_with,
+                ends_with_factory=QueryConditions.by_slot_type_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+        if self.display_name:
+            condition = self.display_name.build_query_condition(
+                contains_factory=QueryConditions.by_display_name_contains,
+                equals_factory=QueryConditions.by_display_name_equals,
+                starts_with_factory=QueryConditions.by_display_name_starts_with,
+                ends_with_factory=QueryConditions.by_display_name_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+        return conditions
+
+
+@strawberry.input(
+    name="ResourceSlotTypeOrderBy",
+    description="Added in 26.3.0. Ordering specification for resource slot types.",
+)
+class ResourceSlotTypeOrderByGQL(GQLOrderBy):
+    field: ResourceSlotTypeOrderFieldGQL
+    direction: OrderDirection = OrderDirection.ASC
+
+    def to_query_order(self) -> QueryOrder:
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case ResourceSlotTypeOrderFieldGQL.SLOT_NAME:
+                return QueryOrders.slot_name(ascending)
+            case ResourceSlotTypeOrderFieldGQL.RANK:
+                return QueryOrders.rank(ascending)
+            case ResourceSlotTypeOrderFieldGQL.DISPLAY_NAME:
+                return QueryOrders.display_name(ascending)
+            case _:
+                raise ValueError(f"Unhandled ResourceSlotTypeOrderFieldGQL value: {self.field!r}")
+
+
+# ========== AgentResourceSlotGQL (Node) ==========
+
+
+@strawberry.type(
+    name="AgentResourceSlot",
+    description=dedent_strip("""
+        Added in 26.3.0. Per-slot resource capacity and usage entry for an agent.
+        Represents one row from the agent_resources table.
+    """),
+)
+class AgentResourceSlotGQL(Node):
+    """Per-agent, per-slot resource capacity and usage."""
+
+    id: NodeID[str]
+    slot_name: str = strawberry.field(
+        description="Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."
+    )
+    capacity: Decimal = strawberry.field(
+        description="Total hardware resource capacity for this slot on the agent."
+    )
+    used: Decimal = strawberry.field(
+        description="Amount of this slot currently consumed by running and scheduled sessions."
+    )
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        # Node ID format: "{agent_id}:{slot_name}"
+        from ai.backend.manager.api.gql.resource_slot.fetcher import load_agent_resource_data
+        from ai.backend.manager.errors.resource_slot import AgentResourceNotFound
+
+        results: list[Self | None] = []
+        for node_id in node_ids:
+            agent_id, _, slot_name = node_id.partition(":")
+            try:
+                data = await load_agent_resource_data(info, agent_id, slot_name)
+            except AgentResourceNotFound:
+                if required:
+                    raise
+                results.append(None)
+            else:
+                results.append(cls.from_data(data))
+        return results
+
+    @classmethod
+    def from_data(cls, data: AgentResourceData) -> Self:
+        node_id = f"{data.agent_id}:{data.slot_name}"
+        return cls(
+            id=ID(node_id),
+            slot_name=data.slot_name,
+            capacity=data.capacity,
+            used=data.used,
+        )
+
+
+AgentResourceSlotEdgeGQL = Edge[AgentResourceSlotGQL]
+
+
+@strawberry.type(
+    name="AgentResourceConnection",
+    description="Added in 26.3.0. Relay-style connection for per-slot agent resources.",
+)
+class AgentResourceConnectionGQL(Connection[AgentResourceSlotGQL]):
+    count: int
+
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.count = count
+
+
+# ========== AgentResourceSlot Filter/OrderBy ==========
+
+
+@strawberry.enum(
+    name="AgentResourceSlotOrderField",
+    description="Added in 26.3.0. Fields available for ordering agent resource slots.",
+)
+class AgentResourceSlotOrderFieldGQL(StrEnum):
+    SLOT_NAME = "slot_name"
+    CAPACITY = "capacity"
+    USED = "used"
+
+
+@strawberry.input(
+    name="AgentResourceSlotFilter",
+    description="Added in 26.3.0. Filter criteria for querying agent resource slots.",
+)
+class AgentResourceSlotFilterGQL(GQLFilter):
+    slot_name: StringFilter | None = None
+
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if self.slot_name:
+            condition = self.slot_name.build_query_condition(
+                contains_factory=AgentResourceQueryConditions.by_slot_name_contains,
+                equals_factory=AgentResourceQueryConditions.by_slot_name_equals,
+                starts_with_factory=AgentResourceQueryConditions.by_slot_name_starts_with,
+                ends_with_factory=AgentResourceQueryConditions.by_slot_name_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+        return conditions
+
+
+@strawberry.input(
+    name="AgentResourceSlotOrderBy",
+    description="Added in 26.3.0. Ordering specification for agent resource slots.",
+)
+class AgentResourceSlotOrderByGQL(GQLOrderBy):
+    field: AgentResourceSlotOrderFieldGQL
+    direction: OrderDirection = OrderDirection.ASC
+
+    def to_query_order(self) -> QueryOrder:
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case AgentResourceSlotOrderFieldGQL.SLOT_NAME:
+                return AgentResourceQueryOrders.slot_name(ascending)
+            case AgentResourceSlotOrderFieldGQL.CAPACITY:
+                return AgentResourceQueryOrders.capacity(ascending)
+            case AgentResourceSlotOrderFieldGQL.USED:
+                return AgentResourceQueryOrders.used(ascending)
+            case _:
+                raise ValueError(f"Unhandled AgentResourceSlotOrderFieldGQL value: {self.field!r}")
+
+
+# ========== KernelResourceAllocationGQL (Node) ==========
+
+
+@strawberry.type(
+    name="KernelResourceAllocation",
+    description=dedent_strip("""
+        Added in 26.3.0. Per-slot resource allocation entry for a kernel.
+        Represents one row from the resource_allocations table.
+    """),
+)
+class KernelResourceAllocationGQL(Node):
+    """Per-kernel, per-slot resource allocation."""
+
+    id: NodeID[str]
+    slot_name: str = strawberry.field(
+        description="Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."
+    )
+    requested: Decimal = strawberry.field(
+        description="Amount of this resource slot originally requested for the kernel."
+    )
+    used: Decimal | None = strawberry.field(
+        description="Amount currently used. May be null if not yet measured."
+    )
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        # Node ID format: "{kernel_id}:{slot_name}"
+        from ai.backend.manager.api.gql.resource_slot.fetcher import load_kernel_allocation_data
+        from ai.backend.manager.errors.resource_slot import ResourceAllocationNotFound
+
+        results: list[Self | None] = []
+        for node_id in node_ids:
+            kernel_id_str, _, slot_name = node_id.partition(":")
+            try:
+                data = await load_kernel_allocation_data(info, kernel_id_str, slot_name)
+            except ResourceAllocationNotFound:
+                if required:
+                    raise
+                results.append(None)
+            else:
+                results.append(cls.from_data(data))
+        return results
+
+    @classmethod
+    def from_data(cls, data: ResourceAllocationData) -> Self:
+        node_id = f"{data.kernel_id}:{data.slot_name}"
+        return cls(
+            id=ID(node_id),
+            slot_name=data.slot_name,
+            requested=data.requested,
+            used=data.used,
+        )
+
+
+# ========== KernelResourceAllocation Filter/OrderBy ==========
+
+
+@strawberry.enum(
+    name="KernelResourceAllocationOrderField",
+    description="Added in 26.3.0. Fields available for ordering kernel resource allocations.",
+)
+class KernelResourceAllocationOrderFieldGQL(StrEnum):
+    SLOT_NAME = "slot_name"
+    REQUESTED = "requested"
+    USED = "used"
+
+
+@strawberry.input(
+    name="KernelResourceAllocationFilter",
+    description="Added in 26.3.0. Filter criteria for querying kernel resource allocations.",
+)
+class KernelResourceAllocationFilterGQL(GQLFilter):
+    slot_name: StringFilter | None = None
+
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if self.slot_name:
+            condition = self.slot_name.build_query_condition(
+                contains_factory=ResourceAllocationQueryConditions.by_slot_name_contains,
+                equals_factory=ResourceAllocationQueryConditions.by_slot_name_equals,
+                starts_with_factory=ResourceAllocationQueryConditions.by_slot_name_starts_with,
+                ends_with_factory=ResourceAllocationQueryConditions.by_slot_name_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+        return conditions
+
+
+@strawberry.input(
+    name="KernelResourceAllocationOrderBy",
+    description="Added in 26.3.0. Ordering specification for kernel resource allocations.",
+)
+class KernelResourceAllocationOrderByGQL(GQLOrderBy):
+    field: KernelResourceAllocationOrderFieldGQL
+    direction: OrderDirection = OrderDirection.ASC
+
+    def to_query_order(self) -> QueryOrder:
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case KernelResourceAllocationOrderFieldGQL.SLOT_NAME:
+                return ResourceAllocationQueryOrders.slot_name(ascending)
+            case KernelResourceAllocationOrderFieldGQL.REQUESTED:
+                return ResourceAllocationQueryOrders.requested(ascending)
+            case KernelResourceAllocationOrderFieldGQL.USED:
+                return ResourceAllocationQueryOrders.used(ascending)
+            case _:
+                raise ValueError(
+                    f"Unhandled KernelResourceAllocationOrderFieldGQL value: {self.field!r}"
+                )
+
+
+KernelResourceAllocationEdgeGQL = Edge[KernelResourceAllocationGQL]
+
+
+@strawberry.type(
+    name="ResourceAllocationConnection",
+    description="Added in 26.3.0. Relay-style connection for per-slot kernel resource allocations.",
+)
+class ResourceAllocationConnectionGQL(Connection[KernelResourceAllocationGQL]):
+    count: int
+
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.count = count
