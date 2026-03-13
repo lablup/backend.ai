@@ -51,7 +51,6 @@ class RBACElementTypeGQL(StrEnum):
     # Root-query-enabled entities (scoped)
     SESSION = "session"
     VFOLDER = "vfolder"
-    DEPLOYMENT = "deployment"
     MODEL_DEPLOYMENT = "model_deployment"
     KEYPAIR = "keypair"
     NOTIFICATION_CHANNEL = "notification_channel"
@@ -79,6 +78,10 @@ class RBACElementTypeGQL(StrEnum):
 
     # Auto-only entities used in permissions
     NOTIFICATION_RULE = "notification_rule"
+
+    # Auto sub-entities with direct GET APIs
+    DEPLOYMENT_TOKEN = "deployment:token"
+    DEPLOYMENT_POLICY = "deployment:policy"
 
     # Entity-level scopes
     ARTIFACT_REVISION = "artifact_revision"
@@ -229,7 +232,6 @@ class PermissionGQL(Node):
             case (
                 RBACElementType.SESSION
                 | RBACElementType.VFOLDER
-                | RBACElementType.DEPLOYMENT
                 | RBACElementType.KEYPAIR
                 | RBACElementType.NOTIFICATION_CHANNEL
                 | RBACElementType.NETWORK
@@ -250,6 +252,8 @@ class PermissionGQL(Node):
                 | RBACElementType.AGENT
                 | RBACElementType.KERNEL
                 | RBACElementType.ROUTING
+                | RBACElementType.DEPLOYMENT_TOKEN
+                | RBACElementType.DEPLOYMENT_POLICY
             ):
                 return None
 

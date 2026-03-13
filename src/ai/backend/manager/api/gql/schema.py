@@ -5,6 +5,7 @@ from strawberry.schema.config import StrawberryConfig
 from ai.backend.manager.api.gql.extensions import (
     GQLExceptionHandlerExtension,
     GQLLoggingExtension,
+    GQLMetricExtension,
     GQLValidationExtension,
 )
 
@@ -214,6 +215,7 @@ from .resource_group import (
     resource_groups,
     update_resource_group_fair_share_spec,
 )
+from .resource_slot.resolver import resource_slot_type, resource_slot_types
 from .resource_usage import (
     admin_domain_usage_buckets,
     admin_project_usage_buckets,
@@ -323,6 +325,8 @@ class Query:
     admin_images_v2 = admin_images_v2
     admin_kernels_v2 = admin_kernels_v2
     admin_sessions_v2 = admin_sessions_v2
+    resource_slot_type = resource_slot_type
+    resource_slot_types = resource_slot_types
     admin_image_aliases = admin_image_aliases
     # Prometheus Query Preset Admin APIs
     admin_prometheus_query_preset = admin_prometheus_query_preset
@@ -540,6 +544,7 @@ schema = CustomizedSchema(
     enable_federation_2=True,
     extensions=[
         GQLLoggingExtension,
+        GQLMetricExtension,
         GQLValidationExtension,
         GQLExceptionHandlerExtension,
     ],

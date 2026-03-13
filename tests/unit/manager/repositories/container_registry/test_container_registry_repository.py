@@ -35,6 +35,9 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -132,6 +135,7 @@ class TestContainerRegistryRepository:
                 ResourcePresetRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
+                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection
@@ -1330,6 +1334,7 @@ class TestSearchContainerRegistries:
                 ResourcePresetRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
+                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection

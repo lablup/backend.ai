@@ -1,53 +1,60 @@
 """Domain-level app configuration actions."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config.types import AppConfigData
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
-
-from .base import AppConfigAction
+from ai.backend.manager.services.app_config.actions.base import (
+    AppConfigScopeAction,
+    AppConfigScopeActionResult,
+)
 
 
 @dataclass
-class GetDomainConfigAction(AppConfigAction):
+class GetDomainConfigAction(AppConfigScopeAction):
     """Action to get domain-level app configuration."""
 
     domain_name: str
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.APP_CONFIG_DOMAIN
-
-    @override
-    def entity_id(self) -> str | None:
-        return self.domain_name
-
-    @override
-    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.DOMAIN
+
+    @override
+    def scope_id(self) -> str:
+        return self.domain_name
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.DOMAIN, self.domain_name)
+
 
 @dataclass
-class GetDomainConfigActionResult(BaseActionResult):
+class GetDomainConfigActionResult(AppConfigScopeActionResult):
     """Result of get domain config action."""
 
     result: AppConfigData | None
 
     @override
-    def entity_id(self) -> str | None:
-        return self.result.scope_id if self.result else None
+    def scope_type(self) -> ScopeType:
+        return ScopeType.DOMAIN
+
+    @override
+    def scope_id(self) -> str:
+        return self.result.scope_id if self.result else ""
 
 
 @dataclass
-class UpsertDomainConfigAction(AppConfigAction):
+class UpsertDomainConfigAction(AppConfigScopeAction):
     """Action to create or update domain-level app configuration."""
 
     domain_name: str
@@ -55,58 +62,72 @@ class UpsertDomainConfigAction(AppConfigAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.APP_CONFIG_DOMAIN
-
-    @override
-    def entity_id(self) -> str | None:
-        return self.domain_name
-
-    @override
-    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.DOMAIN
+
+    @override
+    def scope_id(self) -> str:
+        return self.domain_name
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.DOMAIN, self.domain_name)
+
 
 @dataclass
-class UpsertDomainConfigActionResult(BaseActionResult):
+class UpsertDomainConfigActionResult(AppConfigScopeActionResult):
     """Result of upsert domain config action."""
 
     result: AppConfigData
 
     @override
-    def entity_id(self) -> str | None:
+    def scope_type(self) -> ScopeType:
+        return ScopeType.DOMAIN
+
+    @override
+    def scope_id(self) -> str:
         return self.result.scope_id
 
 
 @dataclass
-class DeleteDomainConfigAction(AppConfigAction):
+class DeleteDomainConfigAction(AppConfigScopeAction):
     """Action to delete domain-level app configuration."""
 
     domain_name: str
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.APP_CONFIG_DOMAIN
-
-    @override
-    def entity_id(self) -> str | None:
-        return self.domain_name
-
-    @override
-    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.DELETE
 
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.DOMAIN
+
+    @override
+    def scope_id(self) -> str:
+        return self.domain_name
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.DOMAIN, self.domain_name)
+
 
 @dataclass
-class DeleteDomainConfigActionResult(BaseActionResult):
+class DeleteDomainConfigActionResult(AppConfigScopeActionResult):
     """Result of delete domain config action."""
 
     deleted: bool
     domain_name: str
 
     @override
-    def entity_id(self) -> str | None:
-        return self.domain_name if self.deleted else None
+    def scope_type(self) -> ScopeType:
+        return ScopeType.DOMAIN
+
+    @override
+    def scope_id(self) -> str:
+        return self.domain_name

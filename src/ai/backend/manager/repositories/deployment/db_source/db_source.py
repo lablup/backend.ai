@@ -17,6 +17,7 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
@@ -57,6 +58,7 @@ from ai.backend.manager.data.deployment.types import (
     ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
@@ -259,9 +261,15 @@ class DeploymentDBSource:
                     strategy_spec=policy_config.strategy_spec,
                     rollback_on_failure=policy_config.rollback_on_failure,
                 )
-                policy_row = policy_spec.build_row()
-                db_sess.add(policy_row)
-                await db_sess.flush()
+                policy_creator = RBACEntityCreator(
+                    spec=policy_spec,
+                    element_type=RBACElementType.DEPLOYMENT_POLICY,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.MODEL_DEPLOYMENT,
+                        element_id=str(endpoint.id),
+                    ),
+                )
+                await execute_rbac_entity_creator(db_sess, policy_creator)
 
             stmt = (
                 sa.select(EndpointRow)
@@ -301,9 +309,15 @@ class DeploymentDBSource:
 
             # Create deployment policy if provided
             if spec.policy is not None:
-                policy_row = spec.policy.build_row()
-                db_sess.add(policy_row)
-                await db_sess.flush()
+                policy_creator = RBACEntityCreator(
+                    spec=spec.policy,
+                    element_type=RBACElementType.DEPLOYMENT_POLICY,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.MODEL_DEPLOYMENT,
+                        element_id=str(endpoint.id),
+                    ),
+                )
+                await execute_rbac_entity_creator(db_sess, policy_creator)
 
             stmt = (
                 sa.select(EndpointRow)
@@ -2383,18 +2397,18 @@ class DeploymentDBSource:
 
     async def create_access_token(
         self,
-        creator: Creator[EndpointTokenRow],
+        creator: RBACEntityCreator[EndpointTokenRow],
     ) -> EndpointTokenRow:
         """Create a new access token for a model deployment.
 
         Args:
-            creator: Creator containing the EndpointTokenCreatorSpec.
+            creator: RBACEntityCreator containing the EndpointTokenCreatorSpec.
 
         Returns:
             Created EndpointTokenRow.
         """
         async with self._begin_session_read_committed() as db_sess:
-            result = await execute_creator(db_sess, creator)
+            result = await execute_rbac_entity_creator(db_sess, creator)
             return result.row
 
     # ========== Additional Search Operations ==========

@@ -8,10 +8,14 @@ from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpe
 from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
+    GetAgentResourceBySlotAction,
+    GetAgentResourceBySlotResult,
     GetAgentResourcesAction,
     GetAgentResourcesResult,
     GetDomainResourceOverviewAction,
     GetDomainResourceOverviewResult,
+    GetKernelAllocationBySlotAction,
+    GetKernelAllocationBySlotResult,
     GetKernelAllocationsAction,
     GetKernelAllocationsResult,
     GetProjectResourceOverviewAction,
@@ -29,7 +33,13 @@ from .service import ResourceSlotService
 
 
 class ResourceSlotProcessors(AbstractProcessorPackage):
+    get_agent_resource_by_slot: ActionProcessor[
+        GetAgentResourceBySlotAction, GetAgentResourceBySlotResult
+    ]
     get_agent_resources: ActionProcessor[GetAgentResourcesAction, GetAgentResourcesResult]
+    get_kernel_allocation_by_slot: ActionProcessor[
+        GetKernelAllocationBySlotAction, GetKernelAllocationBySlotResult
+    ]
     search_agent_resources: ActionProcessor[SearchAgentResourcesAction, SearchAgentResourcesResult]
     get_kernel_allocations: ActionProcessor[GetKernelAllocationsAction, GetKernelAllocationsResult]
     search_resource_allocations: ActionProcessor[
@@ -52,7 +62,13 @@ class ResourceSlotProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
+        self.get_agent_resource_by_slot = ActionProcessor(
+            service.get_agent_resource_by_slot, action_monitors
+        )
         self.get_agent_resources = ActionProcessor(service.get_agent_resources, action_monitors)
+        self.get_kernel_allocation_by_slot = ActionProcessor(
+            service.get_kernel_allocation_by_slot, action_monitors
+        )
         self.search_agent_resources = ActionProcessor(
             service.search_agent_resources, action_monitors
         )
@@ -78,7 +94,9 @@ class ResourceSlotProcessors(AbstractProcessorPackage):
     @override
     def supported_actions(self) -> list[ActionSpec]:
         return [
+            GetAgentResourceBySlotAction.spec(),
             GetAgentResourcesAction.spec(),
+            GetKernelAllocationBySlotAction.spec(),
             SearchAgentResourcesAction.spec(),
             GetKernelAllocationsAction.spec(),
             SearchResourceAllocationsAction.spec(),
