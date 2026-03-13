@@ -495,21 +495,23 @@ async def update_my_allowed_client_ip(
                     client_addr: ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] = (
                         ReadableCIDR(client_ip, is_network=False)
                     )
-                except (InvalidIpAddressValue, ValueError):
-                    pass  # Cannot validate, skip lockout check
-                else:
-                    allowed_networks: list[
-                        ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]
-                    ] = [ReadableCIDR(ip_str) for ip_str in new_allowlist]
-                    if not any(
-                        client_addr.address in network.address
-                        for network in allowed_networks
-                        if network.address is not None
-                    ):
-                        raise InvalidAPIParameters(
-                            f"Current IP ({client_ip}) is not in the new allowlist. "
-                            "Use force=true to override this safety check."
-                        )
+                except (InvalidIpAddressValue, ValueError) as e:
+                    raise InvalidAPIParameters(
+                        "Cannot verify current client IP for lockout prevention. "
+                        "Use force=true to override this safety check."
+                    ) from e
+                allowed_networks: list[
+                    ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]
+                ] = [ReadableCIDR(ip_str) for ip_str in new_allowlist]
+                if not any(
+                    client_addr.address in network.address
+                    for network in allowed_networks
+                    if network.address is not None
+                ):
+                    raise InvalidAPIParameters(
+                        f"Current IP ({client_ip}) is not in the new allowlist. "
+                        "Use force=true to override this safety check."
+                    )
 
         allowed_client_ip = TriState.update(new_allowlist)
     else:
