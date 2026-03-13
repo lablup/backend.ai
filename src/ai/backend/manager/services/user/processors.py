@@ -62,15 +62,13 @@ from ai.backend.manager.services.user.service import UserService
 class UserProcessors(AbstractProcessorPackage):
     # Scope actions with RBAC
     create_user: ScopeActionProcessor[CreateUserAction, CreateUserActionResult]
-    search_users_by_domain: ScopeActionProcessor[
+    search_users_by_domain: ActionProcessor[
         SearchUsersByDomainAction, SearchUsersByDomainActionResult
     ]
-    search_users_by_project: ScopeActionProcessor[
+    search_users_by_project: ActionProcessor[
         SearchUsersByProjectAction, SearchUsersByProjectActionResult
     ]
-    search_users_by_role: ScopeActionProcessor[
-        SearchUsersByRoleAction, SearchUsersByRoleActionResult
-    ]
+    search_users_by_role: ActionProcessor[SearchUsersByRoleAction, SearchUsersByRoleActionResult]
     # Single entity actions with RBAC
     get_user: SingleEntityActionProcessor[GetUserAction, GetUserActionResult]
     modify_user: SingleEntityActionProcessor[ModifyUserAction, ModifyUserActionResult]
@@ -95,16 +93,14 @@ class UserProcessors(AbstractProcessorPackage):
         self.create_user = ScopeActionProcessor(
             user_service.create_user, action_monitors, validators=[validators.rbac.scope]
         )
-        self.search_users_by_domain = ScopeActionProcessor(
-            user_service.search_users_by_domain, action_monitors, validators=[validators.rbac.scope]
+        self.search_users_by_domain = ActionProcessor(
+            user_service.search_users_by_domain, action_monitors
         )
-        self.search_users_by_project = ScopeActionProcessor(
-            user_service.search_users_by_project,
-            action_monitors,
-            validators=[validators.rbac.scope],
+        self.search_users_by_project = ActionProcessor(
+            user_service.search_users_by_project, action_monitors
         )
-        self.search_users_by_role = ScopeActionProcessor(
-            user_service.search_users_by_role, action_monitors, validators=[validators.rbac.scope]
+        self.search_users_by_role = ActionProcessor(
+            user_service.search_users_by_role, action_monitors
         )
         # Single entity actions with RBAC
         self.get_user = SingleEntityActionProcessor(
