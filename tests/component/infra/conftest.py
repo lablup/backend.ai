@@ -13,6 +13,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.etcd.handler import EtcdHandler
 from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
@@ -124,7 +125,7 @@ def agent_processors(
         agent_cache=AsyncMock(),
     )
     return AgentProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service, action_monitors=[], validators=ActionValidators(rbac=MagicMock(spec=RBACValidators))
     )
 
 
