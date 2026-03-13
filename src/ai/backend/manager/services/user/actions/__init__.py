@@ -7,6 +7,13 @@ from .admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
 )
+from .base import (
+    UserAction,
+    UserScopeAction,
+    UserScopeActionResult,
+    UserSingleEntityAction,
+    UserSingleEntityActionResult,
+)
 from .create_user import (
     CreateUserAction,
     CreateUserActionResult,
@@ -41,6 +48,10 @@ from .search_users_by_project import (
     SearchUsersByProjectAction,
     SearchUsersByProjectActionResult,
 )
+from .search_users_by_role import (
+    SearchUsersByRoleAction,
+    SearchUsersByRoleActionResult,
+)
 from .user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
@@ -67,6 +78,13 @@ __all__ = (
     "SearchUsersByDomainActionResult",
     "SearchUsersByProjectAction",
     "SearchUsersByProjectActionResult",
+    "SearchUsersByRoleAction",
+    "SearchUsersByRoleActionResult",
+    "UserAction",
     "UserMonthStatsAction",
     "UserMonthStatsActionResult",
+    "UserScopeAction",
+    "UserScopeActionResult",
+    "UserSingleEntityAction",
+    "UserSingleEntityActionResult",
 )
