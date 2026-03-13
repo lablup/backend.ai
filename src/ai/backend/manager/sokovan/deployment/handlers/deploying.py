@@ -41,6 +41,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
+from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.manager.sokovan.deployment.strategy.applier import (
@@ -81,11 +82,13 @@ class DeployingProvisioningHandler(DeploymentHandler):
         route_controller: RouteController,
         evaluator: DeploymentStrategyEvaluator,
         applier: StrategyResultApplier,
+        deployment_executor: DeploymentExecutor,
     ) -> None:
         self._deployment_controller = deployment_controller
         self._route_controller = route_controller
         self._evaluator = evaluator
         self._applier = applier
+        self._deployment_executor = deployment_executor
 
     @classmethod
     @override
@@ -110,26 +113,43 @@ class DeployingProvisioningHandler(DeploymentHandler):
     @classmethod
     @override
     def status_transitions(cls) -> DeploymentStatusTransitions:
+        rolling_back = DeploymentLifecycleStatus(
+            lifecycle=EndpointLifecycle.DEPLOYING,
+            sub_status=DeploymentSubStep.ROLLING_BACK,
+        )
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
                 sub_status=DeploymentSubStep.PROGRESSING,
             ),
-            need_retry=None,
-            expired=DeploymentLifecycleStatus(
+            # Stay in PROVISIONING on retry so that history is recorded and
+            # phase_attempts increments.  After SERVICE_MAX_RETRIES the
+            # classifier promotes the error to give_up → ROLLING_BACK.
+            need_retry=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.ROLLING_BACK,
+                sub_status=DeploymentSubStep.PROVISIONING,
             ),
-            give_up=DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.ROLLING_BACK,
-            ),
+            expired=rolling_back,
+            give_up=rolling_back,
         )
 
     @override
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
+        # Update health check config in app-proxy for each deployment so that
+        # the new revision's health check settings are used from the start.
+        for deployment in deployments:
+            try:
+                await self._deployment_executor.update_endpoint_health_check(
+                    deployment.deployment_info,
+                )
+            except Exception:
+                log.exception(
+                    "Failed to update health check config in app-proxy for deployment {}",
+                    deployment.deployment_info.id,
+                )
+
         deployment_infos = [deployment.deployment_info for deployment in deployments]
         deployment_map = {deployment.deployment_info.id: deployment for deployment in deployments}
 
@@ -137,6 +157,7 @@ class DeployingProvisioningHandler(DeploymentHandler):
         await self._applier.apply(summary)
 
         successes: list[DeploymentWithHistory] = []
+        errors: list[DeploymentExecutionError] = []
         skipped: list[DeploymentWithHistory] = []
 
         # Classify by assigned sub_step
@@ -149,20 +170,29 @@ class DeployingProvisioningHandler(DeploymentHandler):
             if assigned == DeploymentSubStep.PROGRESSING:
                 # Advanced to PROGRESSING → success (coordinator transitions)
                 successes.append(deployment)
+            elif assigned == DeploymentSubStep.ROLLED_BACK:
+                # All new routes failed → error (coordinator transitions to ROLLING_BACK)
+                errors.append(
+                    DeploymentExecutionError(
+                        deployment_info=deployment,
+                        reason="All new routes failed during provisioning — rolling back",
+                        error_detail="Strategy FSM determined rollback",
+                    )
+                )
             else:
                 # Still PROVISIONING → skip (no state transition)
                 skipped.append(deployment)
 
         # Evaluation errors → execution errors
-        errors = [
-            DeploymentExecutionError(
-                deployment_info=deployment_map[evaluation_error.deployment.id],
-                reason=evaluation_error.reason,
-                error_detail=evaluation_error.reason,
-            )
-            for evaluation_error in summary.errors
-            if evaluation_error.deployment.id in deployment_map
-        ]
+        for evaluation_error in summary.errors:
+            if evaluation_error.deployment.id in deployment_map:
+                errors.append(
+                    DeploymentExecutionError(
+                        deployment_info=deployment_map[evaluation_error.deployment.id],
+                        reason=evaluation_error.reason,
+                        error_detail=evaluation_error.reason,
+                    )
+                )
 
         return DeploymentExecutionResult(successes=successes, errors=errors, skipped=skipped)
 
@@ -182,8 +212,8 @@ class DeployingProgressingHandler(DeploymentHandler):
     - **PROGRESSING**: Still replacing routes — re-evaluate next cycle.
     - **COMPLETED**: Applier has swapped revision → returned as success
       → coordinator transitions to READY.
-    - **ROLLED_BACK**: Applier has cleared deploying_revision → returned
-      as error → coordinator transitions to READY.
+    - **ROLLED_BACK**: deploying_revision already cleared by RollingBackHandler
+      → returned as success → coordinator transitions to READY.
     """
 
     def __init__(
@@ -192,11 +222,13 @@ class DeployingProgressingHandler(DeploymentHandler):
         route_controller: RouteController,
         evaluator: DeploymentStrategyEvaluator,
         applier: StrategyResultApplier,
+        deployment_executor: DeploymentExecutor,
     ) -> None:
         self._deployment_controller = deployment_controller
         self._route_controller = route_controller
         self._evaluator = evaluator
         self._applier = applier
+        self._deployment_executor = deployment_executor
 
     @classmethod
     @override
@@ -248,8 +280,31 @@ class DeployingProgressingHandler(DeploymentHandler):
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
-        deployment_infos = [deployment.deployment_info for deployment in deployments]
-        deployment_map = {deployment.deployment_info.id: deployment for deployment in deployments}
+        # ROLLED_BACK sub_step deployments have had their deploying_revision
+        # cleared by RollingBackHandler.  Transition them to READY directly
+        # without re-evaluating through the strategy evaluator.
+        already_rolled_back = [
+            deployment
+            for deployment in deployments
+            if deployment.deployment_info.sub_step == DeploymentSubStep.ROLLED_BACK
+        ]
+        remaining = [
+            deployment
+            for deployment in deployments
+            if deployment.deployment_info.sub_step != DeploymentSubStep.ROLLED_BACK
+        ]
+
+        if already_rolled_back:
+            log.info(
+                "{} deployments already rolled back — transitioning to READY",
+                len(already_rolled_back),
+            )
+
+        if not remaining:
+            return DeploymentExecutionResult(successes=already_rolled_back)
+
+        deployment_infos = [deployment.deployment_info for deployment in remaining]
+        deployment_map = {deployment.deployment_info.id: deployment for deployment in remaining}
 
         summary = await self._evaluator.evaluate(deployment_infos)
         apply_result = await self._applier.apply(summary)
@@ -259,7 +314,7 @@ class DeployingProgressingHandler(DeploymentHandler):
         # transition the deployment back to READY, resurrecting it.
         destroying_ids = {
             deployment.deployment_info.id
-            for deployment in deployments
+            for deployment in remaining
             if deployment.deployment_info.state.lifecycle
             in (EndpointLifecycle.DESTROYING, EndpointLifecycle.DESTROYED)
         }
@@ -269,7 +324,7 @@ class DeployingProgressingHandler(DeploymentHandler):
                 len(destroying_ids),
             )
 
-        successes: list[DeploymentWithHistory] = []
+        successes: list[DeploymentWithHistory] = list(already_rolled_back)
         errors: list[DeploymentExecutionError] = []
         skipped: list[DeploymentWithHistory] = []
 
@@ -284,19 +339,13 @@ class DeployingProgressingHandler(DeploymentHandler):
             if deployment is not None:
                 successes.append(deployment)
 
-        # ROLLED_BACK → errors (coordinator transitions to READY)
+        # ROLLED_BACK → successes (coordinator transitions to READY)
         for endpoint_id in apply_result.rolled_back_ids:
             if endpoint_id in destroying_ids:
                 continue
             deployment = deployment_map.get(endpoint_id)
             if deployment is not None:
-                errors.append(
-                    DeploymentExecutionError(
-                        deployment_info=deployment,
-                        reason="Deployment rolled back — all new routes failed",
-                        error_detail="Strategy FSM determined rollback",
-                    )
-                )
+                successes.append(deployment)
 
         # Evaluation errors → execution errors
         for error_data in summary.errors:
@@ -311,7 +360,7 @@ class DeployingProgressingHandler(DeploymentHandler):
                 )
 
         # Still PROGRESSING → skipped (no state transition)
-        for deployment in deployments:
+        for deployment in remaining:
             endpoint_id = deployment.deployment_info.id
             if (
                 endpoint_id not in terminal_ids
@@ -399,7 +448,17 @@ class DeployingRollingBackHandler(DeploymentHandler):
         deployment_map = {deployment.deployment_info.id: deployment for deployment in deployments}
 
         summary = await self._evaluator.evaluate(deployment_infos)
-        await self._applier.apply(summary)
+        apply_result = await self._applier.apply(summary)
+
+        # Explicitly clear deploying_revision for rolled-back deployments.
+        # This is the ONLY place where deploying_revision is cleared after
+        # rollback — the applier does NOT do this automatically.
+        if apply_result.rolled_back_ids:
+            await self._applier.clear_deploying_revision(apply_result.rolled_back_ids)
+            log.info(
+                "Cleared deploying_revision for {} rolled-back deployments",
+                len(apply_result.rolled_back_ids),
+            )
 
         # Successfully evaluated deployments → successes (coordinator transitions to ROLLED_BACK)
         evaluated_ids = set(summary.assignments.keys())

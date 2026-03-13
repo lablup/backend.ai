@@ -77,6 +77,18 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
                 "This indicates an inconsistent state — the deployment will be skipped."
             )
         classified = self._classify_routes(routes, deploying_revision_id)
+        log.info(
+            "deployment {}: sub_step={}, routes total={}, "
+            "old_active={}, new_prov={}, new_healthy={}, new_unhealthy={}, new_failed={}",
+            deployment.id,
+            deployment.sub_step,
+            len(routes),
+            len(classified.old_active),
+            len(classified.new_provisioning),
+            len(classified.new_healthy),
+            len(classified.new_unhealthy),
+            len(classified.new_failed),
+        )
 
         if result := self._check_provisioning(deployment, classified):
             return result
