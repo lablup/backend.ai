@@ -1,32 +1,50 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.container_registry.actions.base import ContainerRegistryAction
+from ai.backend.manager.services.container_registry.actions.base import (
+    ContainerRegistryScopeAction,
+    ContainerRegistryScopeActionResult,
+)
 
 
 @dataclass
-class CreateContainerRegistryAction(ContainerRegistryAction):
+class CreateContainerRegistryAction(ContainerRegistryScopeAction):
     creator: Creator[ContainerRegistryRow]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    _domain_name: str
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
-
-@dataclass
-class CreateContainerRegistryActionResult(BaseActionResult):
-    data: ContainerRegistryData
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.DOMAIN
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id)
+    def scope_id(self) -> str:
+        return self._domain_name
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.DOMAIN, self._domain_name)
+
+
+@dataclass
+class CreateContainerRegistryActionResult(ContainerRegistryScopeActionResult):
+    data: ContainerRegistryData
+    _domain_name: str
+
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.DOMAIN
+
+    @override
+    def scope_id(self) -> str:
+        return self._domain_name
