@@ -75,7 +75,7 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
     modify_scaling_group: SingleEntityActionProcessor[
         ModifyScalingGroupAction, ModifyScalingGroupActionResult
     ]
-    search_scaling_groups: ScopeActionProcessor[
+    search_scaling_groups: ActionProcessor[
         SearchScalingGroupsAction, SearchScalingGroupsActionResult
     ]
     list_allowed_sgroups: ActionProcessor[
@@ -123,9 +123,7 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=[validators.rbac.single_entity],
         )
-        self.search_scaling_groups = ScopeActionProcessor(
-            service.search_scaling_groups, action_monitors, validators=[validators.rbac.scope]
-        )
+        self.search_scaling_groups = ActionProcessor(service.search_scaling_groups, action_monitors)
         self.list_allowed_sgroups = ActionProcessor(service.list_allowed_sgroups, action_monitors)
         self.get_wsproxy_version = ActionProcessor(service.get_wsproxy_version, action_monitors)
         self.get_resource_info = ActionProcessor(service.get_resource_info, action_monitors)
