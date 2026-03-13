@@ -59,7 +59,6 @@ class ImageHandler:
             SearchImagesAction(
                 querier=querier,
                 user_uuid=str(ctx.user_uuid),
-                domain_name=ctx.user_domain,
             )
         )
         resp = SearchImagesResponse(

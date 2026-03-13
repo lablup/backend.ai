@@ -14,8 +14,7 @@ from ai.backend.manager.services.image.actions.base import ImageScopeAction, Ima
 @dataclass
 class SearchImagesAction(ImageScopeAction):
     querier: BatchQuerier
-    user_uuid: str = ""
-    domain_name: str = ""
+    user_uuid: str
 
     @override
     @classmethod

@@ -903,7 +903,7 @@ class TestSearchImages(ImageServiceBaseFixtures):
             conditions=[],
             orders=[],
         )
-        action = SearchImagesAction(querier=querier)
+        action = SearchImagesAction(querier=querier, user_uuid="test-user")
 
         result = await processors.search_images.wait_for_complete(action)
 
@@ -933,7 +933,7 @@ class TestSearchImages(ImageServiceBaseFixtures):
             conditions=[],
             orders=[],
         )
-        action = SearchImagesAction(querier=querier)
+        action = SearchImagesAction(querier=querier, user_uuid="test-user")
 
         result = await processors.search_images.wait_for_complete(action)
 
@@ -961,7 +961,7 @@ class TestSearchImages(ImageServiceBaseFixtures):
             conditions=[],
             orders=[],
         )
-        action = SearchImagesAction(querier=querier)
+        action = SearchImagesAction(querier=querier, user_uuid="test-user")
 
         result = await processors.search_images.wait_for_complete(action)
 
