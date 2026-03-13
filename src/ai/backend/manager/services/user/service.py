@@ -102,6 +102,7 @@ class UserService:
         )
         return CreateUserActionResult(
             data=user_data_result,
+            _domain_name=action.scope_id(),
         )
 
     async def bulk_create_users(self, action: BulkCreateUserAction) -> BulkCreateUserActionResult:
@@ -122,10 +123,11 @@ class UserService:
         return BulkModifyUserActionResult(data=result)
 
     async def delete_user(self, action: DeleteUserAction) -> DeleteUserActionResult:
+        user_data = await self._user_repository.get_by_email_validated(email=action.email)
         await self._user_repository.soft_delete_user_validated(
             email=action.email,
         )
-        return DeleteUserActionResult()
+        return DeleteUserActionResult(_user_id=str(user_data.uuid))
 
     async def get_user(self, action: GetUserAction) -> GetUserActionResult:
         """Retrieve a single user by UUID.
@@ -212,7 +214,7 @@ class UserService:
         # Finally purge the user completely
         await self._user_repository.purge_user(email)
 
-        return PurgeUserActionResult()
+        return PurgeUserActionResult(_user_id=str(user_uuid))
 
     async def _purge_single_user(
         self,
@@ -351,6 +353,7 @@ class UserService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+            _domain_name=action.scope_id(),
         )
 
     async def search_users_by_project(
@@ -365,6 +368,7 @@ class UserService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+            _project_id=action.scope_id(),
         )
 
     async def search_users_by_role(
@@ -379,4 +383,5 @@ class UserService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+            _role_id=action.scope_id(),
         )

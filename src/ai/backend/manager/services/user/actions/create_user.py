@@ -8,12 +8,17 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import BulkUserCreateResultData, UserCreateResultData
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.user.actions.base import UserAction, UserScopeAction
+from ai.backend.manager.services.user.actions.base import (
+    UserAction,
+    UserScopeAction,
+    UserScopeActionResult,
+)
 
 
 @dataclass
 class CreateUserAction(UserScopeAction):
     creator: Creator[UserRow]
+    _domain_name: str
     group_ids: list[str] | None = None
 
     @override
@@ -23,28 +28,33 @@ class CreateUserAction(UserScopeAction):
 
     @override
     def scope_type(self) -> ScopeType:
-        # User creation happens within the domain scope
-        # Domain is extracted from creator.values['domain_name']
         return ScopeType.DOMAIN
 
     @override
     def scope_id(self) -> str:
-        return self.creator.values.get("domain_name", "")
+        return self._domain_name
 
     @override
     def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.DOMAIN, self.scope_id())
+        return RBACElementRef(RBACElementType.DOMAIN, self._domain_name)
 
 
 @dataclass
-class CreateUserActionResult(BaseActionResult):
+class CreateUserActionResult(UserScopeActionResult):
     data: UserCreateResultData
-    _scope_type: ScopeType
-    _scope_id: str
+    _domain_name: str
 
     @override
     def entity_id(self) -> str | None:
         return str(self.data.user.id)
+
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.DOMAIN
+
+    @override
+    def scope_id(self) -> str:
+        return self._domain_name
 
 
 @dataclass

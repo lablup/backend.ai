@@ -11,7 +11,11 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import BulkUserUpdateResultData, UserData
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.services.user.actions.base import UserAction, UserSingleEntityAction
+from ai.backend.manager.services.user.actions.base import (
+    UserAction,
+    UserSingleEntityAction,
+    UserSingleEntityActionResult,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
@@ -42,13 +46,14 @@ class ModifyUserAction(UserSingleEntityAction):
 
 
 @dataclass
-class ModifyUserActionResult(BaseActionResult):
+class ModifyUserActionResult(UserSingleEntityActionResult):
     data: UserData
 
     @override
     def entity_id(self) -> str | None:
         return str(self.data.id)
 
+    @override
     def target_entity_id(self) -> str:
         return str(self.data.id)
 

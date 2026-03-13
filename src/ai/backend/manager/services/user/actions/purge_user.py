@@ -7,7 +7,11 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import BulkUserPurgeResultData, UserInfoContext
-from ai.backend.manager.services.user.actions.base import UserAction, UserSingleEntityAction
+from ai.backend.manager.services.user.actions.base import (
+    UserAction,
+    UserSingleEntityAction,
+    UserSingleEntityActionResult,
+)
 from ai.backend.manager.types import OptionalState
 
 
@@ -35,9 +39,16 @@ class PurgeUserAction(UserSingleEntityAction):
 
 
 @dataclass
-class PurgeUserActionResult(BaseActionResult):
+class PurgeUserActionResult(UserSingleEntityActionResult):
+    _user_id: str
+
+    @override
     def entity_id(self) -> str | None:
-        return None
+        return self._user_id
+
+    @override
+    def target_entity_id(self) -> str:
+        return self._user_id
 
 
 @dataclass
