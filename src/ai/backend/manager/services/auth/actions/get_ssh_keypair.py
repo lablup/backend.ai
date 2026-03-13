@@ -19,7 +19,7 @@ class GetSSHKeypairAction(KeypairSingleEntityAction):
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.READ
+        return ActionOperationType.GET
 
     @override
     def target_entity_id(self) -> str:
