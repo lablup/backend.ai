@@ -447,8 +447,47 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
+  test-unit-gate:
+    needs: [test-unit]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+    - run: |
+        if [ "${{ needs.test-unit.result }}" = "success" ]; then
+          echo "All test-unit shards passed"
+        else
+          echo "test-unit failed: ${{ needs.test-unit.result }}"
+          exit 1
+        fi
+
+  test-component-gate:
+    needs: [test-component]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+    - run: |
+        if [ "${{ needs.test-component.result }}" = "success" ]; then
+          echo "All test-component shards passed"
+        else
+          echo "test-component failed: ${{ needs.test-component.result }}"
+          exit 1
+        fi
+
+  test-integration-gate:
+    needs: [test-integration]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+    - run: |
+        if [ "${{ needs.test-integration.result }}" = "success" ]; then
+          echo "All test-integration shards passed"
+        else
+          echo "test-integration failed: ${{ needs.test-integration.result }}"
+          exit 1
+        fi
+
   build-scies:
-    needs: [lint-and-typecheck, test-unit, test-component, test-integration, check-alembic-migrations]
+    needs: [lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     strategy:
       fail-fast: false
@@ -515,7 +554,7 @@ jobs:
 
 
   build-wheels:
-    needs: [lint-and-typecheck, test-unit, test-component, test-integration, check-alembic-migrations]
+    needs: [lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-22.04
     steps:
@@ -563,12 +602,12 @@ jobs:
 
 
   build-sbom:
-    needs: [lint-and-typecheck, test-unit, test-component, test-integration, check-alembic-migrations]
+    needs: [lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/sbom.yml
 
   build-supergraph:
-    needs: [lint-and-typecheck, test-unit, test-component, test-integration, check-alembic-migrations]
+    needs: [lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
