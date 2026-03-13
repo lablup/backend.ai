@@ -180,15 +180,15 @@ class MountResultDTO(BaseModel):
 
 
 class VFolderCreateResponse(BaseRootResponseModel[VFolderItemField]):
-    """Response for vfolder creation (flat object for backward compatibility)."""
+    """Response for vfolder creation."""
 
 
 class VFolderListResponse(BaseRootResponseModel[list[VFolderItemField]]):
-    """Response for listing vfolders (plain array for backward compatibility)."""
+    """Response for listing vfolders."""
 
 
 class VFolderGetInfoResponse(BaseRootResponseModel[VFolderInfoDTO]):
-    """Response for getting vfolder info (flat object for backward compatibility)."""
+    """Response for getting vfolder info."""
 
 
 class VFolderGetIDResponse(BaseRootResponseModel[CompactVFolderInfoDTO]):
