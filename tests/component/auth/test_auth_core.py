@@ -95,24 +95,23 @@ class TestAuthorize:
         admin_registry: BackendAIClientRegistry,
         config_provider: ManagerConfigProvider,
         expired_password_user_fixture: AuthUserFixtureData,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         original_config = config_provider._config
         new_auth = original_config.auth.model_copy(
             update={"max_password_age": timedelta(seconds=0)},
         )
-        config_provider._config = original_config.model_copy(update={"auth": new_auth})
-        try:
-            with pytest.raises(AuthenticationError):
-                await admin_registry.auth.authorize(
-                    AuthorizeRequest(
-                        type=AuthTokenType.KEYPAIR,
-                        domain=expired_password_user_fixture.domain_name,
-                        username=expired_password_user_fixture.email,
-                        password=expired_password_user_fixture.password,
-                    ),
-                )
-        finally:
-            config_provider._config = original_config
+        new_config = original_config.model_copy(update={"auth": new_auth})
+        monkeypatch.setattr(config_provider, "_config", new_config)
+        with pytest.raises(AuthenticationError):
+            await admin_registry.auth.authorize(
+                AuthorizeRequest(
+                    type=AuthTokenType.KEYPAIR,
+                    domain=expired_password_user_fixture.domain_name,
+                    username=expired_password_user_fixture.email,
+                    password=expired_password_user_fixture.password,
+                ),
+            )
 
     async def test_unsupported_auth_type_returns_error(
         self,
