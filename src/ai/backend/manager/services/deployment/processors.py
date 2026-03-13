@@ -123,7 +123,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
     destroy_deployment: SingleEntityActionProcessor[
         DestroyDeploymentAction, DestroyDeploymentActionResult
     ]
-    search_deployments: ScopeActionProcessor[SearchDeploymentsAction, SearchDeploymentsActionResult]
+    search_deployments: ActionProcessor[SearchDeploymentsAction, SearchDeploymentsActionResult]
     get_deployment_by_id: SingleEntityActionProcessor[
         GetDeploymentByIdAction, GetDeploymentByIdActionResult
     ]
@@ -192,9 +192,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.destroy_deployment = SingleEntityActionProcessor(
             service.destroy_deployment, action_monitors, validators=[validators.rbac.single_entity]
         )
-        self.search_deployments = ScopeActionProcessor(
-            service.search_deployments, action_monitors, validators=[validators.rbac.scope]
-        )
+        self.search_deployments = ActionProcessor(service.search_deployments, action_monitors)
         self.get_deployment_by_id = SingleEntityActionProcessor(
             service.get_deployment_by_id,
             action_monitors,
