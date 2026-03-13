@@ -97,7 +97,7 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     list_huggingface_registries: ScopeActionProcessor[
         ListHuggingFaceRegistryAction, ListHuggingFaceRegistryActionResult
     ]
-    search_huggingface_registries: ScopeActionProcessor[
+    search_huggingface_registries: ActionProcessor[
         SearchHuggingFaceRegistriesAction, SearchHuggingFaceRegistriesActionResult
     ]
     create_reservoir_registry: ScopeActionProcessor[
@@ -118,7 +118,7 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     list_reservoir_registries: ScopeActionProcessor[
         ListReservoirRegistriesAction, ListReservoirRegistriesActionResult
     ]
-    search_reservoir_registries: ScopeActionProcessor[
+    search_reservoir_registries: ActionProcessor[
         SearchReservoirRegistriesAction, SearchReservoirRegistriesActionResult
     ]
     get_registry_meta: ActionProcessor[
@@ -127,7 +127,7 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     get_registry_metas: ActionProcessor[
         GetArtifactRegistryMetasAction, GetArtifactRegistryMetasActionResult
     ]
-    search_artifact_registries: ScopeActionProcessor[
+    search_artifact_registries: ActionProcessor[
         SearchArtifactRegistriesAction, SearchArtifactRegistriesActionResult
     ]
 
@@ -144,10 +144,8 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         self.list_huggingface_registries = ScopeActionProcessor(
             service.list_huggingface_registry, action_monitors, validators=[validators.rbac.scope]
         )
-        self.search_huggingface_registries = ScopeActionProcessor(
-            service.search_huggingface_registries,
-            action_monitors,
-            validators=[validators.rbac.scope],
+        self.search_huggingface_registries = ActionProcessor(
+            service.search_huggingface_registries, action_monitors
         )
         self.create_reservoir_registry = ScopeActionProcessor(
             service.create_reservoir_registry, action_monitors, validators=[validators.rbac.scope]
@@ -155,11 +153,11 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         self.list_reservoir_registries = ScopeActionProcessor(
             service.list_reservoir_registries, action_monitors, validators=[validators.rbac.scope]
         )
-        self.search_reservoir_registries = ScopeActionProcessor(
-            service.search_reservoir_registries, action_monitors, validators=[validators.rbac.scope]
+        self.search_reservoir_registries = ActionProcessor(
+            service.search_reservoir_registries, action_monitors
         )
-        self.search_artifact_registries = ScopeActionProcessor(
-            service.search_artifact_registries, action_monitors, validators=[validators.rbac.scope]
+        self.search_artifact_registries = ActionProcessor(
+            service.search_artifact_registries, action_monitors
         )
 
         # Single entity actions with RBAC validator
