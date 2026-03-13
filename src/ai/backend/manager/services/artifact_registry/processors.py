@@ -79,7 +79,7 @@ from .service import ArtifactRegistryService
 
 
 class ArtifactRegistryProcessors(AbstractProcessorPackage):
-    create_huggingface_registry: ScopeActionProcessor[
+    create_huggingface_registry: ActionProcessor[
         CreateHuggingFaceRegistryAction, CreateHuggingFaceRegistryActionResult
     ]
     update_huggingface_registry: SingleEntityActionProcessor[
@@ -100,7 +100,7 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     search_huggingface_registries: ActionProcessor[
         SearchHuggingFaceRegistriesAction, SearchHuggingFaceRegistriesActionResult
     ]
-    create_reservoir_registry: ScopeActionProcessor[
+    create_reservoir_registry: ActionProcessor[
         CreateReservoirRegistryAction, CreateReservoirActionResult
     ]
     update_reservoir_registry: SingleEntityActionProcessor[
@@ -138,8 +138,8 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         validators: ActionValidators,
     ) -> None:
         # Scope actions with RBAC validator
-        self.create_huggingface_registry = ScopeActionProcessor(
-            service.create_huggingface_registry, action_monitors, validators=[validators.rbac.scope]
+        self.create_huggingface_registry = ActionProcessor(
+            service.create_huggingface_registry, action_monitors
         )
         self.list_huggingface_registries = ScopeActionProcessor(
             service.list_huggingface_registry, action_monitors, validators=[validators.rbac.scope]
@@ -147,8 +147,8 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         self.search_huggingface_registries = ActionProcessor(
             service.search_huggingface_registries, action_monitors
         )
-        self.create_reservoir_registry = ScopeActionProcessor(
-            service.create_reservoir_registry, action_monitors, validators=[validators.rbac.scope]
+        self.create_reservoir_registry = ActionProcessor(
+            service.create_reservoir_registry, action_monitors
         )
         self.list_reservoir_registries = ScopeActionProcessor(
             service.list_reservoir_registries, action_monitors, validators=[validators.rbac.scope]
