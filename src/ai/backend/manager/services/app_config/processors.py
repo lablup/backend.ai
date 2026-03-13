@@ -55,21 +55,31 @@ class AppConfigProcessors(AbstractProcessorPackage):
         validators: ActionValidators,
     ) -> None:
         # Domain config processors
-        self.get_domain_config = ScopeActionProcessor(service.get_domain_config, action_monitors)
+        self.get_domain_config = ScopeActionProcessor(
+            service.get_domain_config, action_monitors, validators=[validators.rbac.scope]
+        )
         self.upsert_domain_config = ScopeActionProcessor(
-            service.upsert_domain_config, action_monitors
+            service.upsert_domain_config, action_monitors, validators=[validators.rbac.scope]
         )
         self.delete_domain_config = ScopeActionProcessor(
-            service.delete_domain_config, action_monitors
+            service.delete_domain_config, action_monitors, validators=[validators.rbac.scope]
         )
 
         # User config processors
-        self.get_user_config = ScopeActionProcessor(service.get_user_config, action_monitors)
-        self.upsert_user_config = ScopeActionProcessor(service.upsert_user_config, action_monitors)
-        self.delete_user_config = ScopeActionProcessor(service.delete_user_config, action_monitors)
+        self.get_user_config = ScopeActionProcessor(
+            service.get_user_config, action_monitors, validators=[validators.rbac.scope]
+        )
+        self.upsert_user_config = ScopeActionProcessor(
+            service.upsert_user_config, action_monitors, validators=[validators.rbac.scope]
+        )
+        self.delete_user_config = ScopeActionProcessor(
+            service.delete_user_config, action_monitors, validators=[validators.rbac.scope]
+        )
 
         # Merged config processor
-        self.get_merged_config = ScopeActionProcessor(service.get_merged_config, action_monitors)
+        self.get_merged_config = ScopeActionProcessor(
+            service.get_merged_config, action_monitors, validators=[validators.rbac.scope]
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
