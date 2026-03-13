@@ -308,10 +308,7 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
         if types is None:
             types = set()
         result = await ctx.processors.image.get_all_images.wait_for_complete(
-            GetAllImagesAction(
-                status_filter=filter_by_statuses,
-                user_uuid=str(ctx.user["uuid"]),
-            )
+            GetAllImagesAction(status_filter=filter_by_statuses)
         )
         all_items = [cls.from_image_with_agent_install_status(img) for img in result.data.values()]
         return [item for item in all_items if item.matches_filter(ctx, types)]

@@ -183,10 +183,7 @@ class ImageService:
 
     async def get_all_images(self, action: GetAllImagesAction) -> GetAllImagesActionResult:
         images = await self._image_repository.get_all_images(status_filter=action.status_filter)
-        return GetAllImagesActionResult(
-            data=images,
-            user_uuid=action.user_uuid,
-        )
+        return GetAllImagesActionResult(data=images)
 
     async def get_image_by_id(self, action: GetImageByIdAction) -> GetImageByIdActionResult:
         user = current_user()

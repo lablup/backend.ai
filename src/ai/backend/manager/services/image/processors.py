@@ -2,7 +2,6 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
@@ -131,7 +130,7 @@ class ImageProcessors(AbstractProcessorPackage):
     get_image_installed_agents: ActionProcessor[
         GetImageInstalledAgentsAction, GetImageInstalledAgentsActionResult
     ]
-    get_all_images: ScopeActionProcessor[GetAllImagesAction, GetAllImagesActionResult]
+    get_all_images: ActionProcessor[GetAllImagesAction, GetAllImagesActionResult]
     search_images: ActionProcessor[SearchImagesAction, SearchImagesActionResult]
     search_aliases: ActionProcessor[SearchAliasesAction, SearchAliasesActionResult]
     load_image_last_used: ActionProcessor[LoadImageLastUsedAction, LoadImageLastUsedActionResult]
@@ -155,10 +154,7 @@ class ImageProcessors(AbstractProcessorPackage):
         self.get_image_by_id = ActionProcessor(service.get_image_by_id, action_monitors)
         self.forget_image = ActionProcessor(service.forget_image, action_monitors)
 
-        # Scope actions with RBAC validation
-        self.get_all_images = ScopeActionProcessor(
-            service.get_all_images, action_monitors, validators=[validators.rbac.scope]
-        )
+        self.get_all_images = ActionProcessor(service.get_all_images, action_monitors)
         self.search_images = ActionProcessor(service.search_images, action_monitors)
 
         # Single entity actions with RBAC validation
