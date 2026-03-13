@@ -35,6 +35,7 @@ from ai.backend.common.dto.manager.group.types import GroupOrder, GroupOrderFiel
 from ai.backend.common.dto.manager.infra.request import UsagePerPeriodRequest
 from ai.backend.common.dto.manager.infra.response import UsagePerPeriodResponse
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
@@ -102,6 +103,7 @@ async def group_with_vfolder_mounted(
                 group=group_id,
                 host="local",
                 domain_name=domain_fixture,
+                quota_scope_id=QuotaScopeID(QuotaScopeType.USER, user_uuid),
             )
         )
         # Create active kernel with mount
@@ -114,6 +116,7 @@ async def group_with_vfolder_mounted(
                 domain_name=domain_fixture,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
+                occupied_slots=ResourceSlot({}),
                 mounts=[["vfolder", f"vf-{secrets.token_hex(4)}", str(vfolder_id)]],
             )
         )
@@ -166,6 +169,7 @@ async def group_with_active_kernel(
                 domain_name=domain_fixture,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
+                occupied_slots=ResourceSlot({}),
             )
         )
 
@@ -185,6 +189,7 @@ async def group_with_active_endpoint(
     domain_fixture: str,
     resource_policy_fixture: str,
     regular_user_fixture: Any,
+    scaling_group_fixture: str,
 ) -> AsyncIterator[uuid.UUID]:
     """Create group with active endpoint."""
     group_id = uuid.uuid4()
@@ -213,6 +218,8 @@ async def group_with_active_endpoint(
                 domain=domain_fixture,
                 created_user=user_uuid,
                 session_owner=user_uuid,
+                resource_group=scaling_group_fixture,
+                resource_slots=ResourceSlot({}),
                 lifecycle_stage=EndpointLifecycle.CREATED,
             )
         )
