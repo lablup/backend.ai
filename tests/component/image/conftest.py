@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator, Callable
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.image.handler import ImageHandler
@@ -37,8 +36,11 @@ def image_processors(
 ) -> ImageProcessors:
     repo = ImageRepository(database_engine, valkey_clients.image, config_provider)
     service = ImageService(agent_registry, repo, config_provider)
+    mock_validators = MagicMock()
+    mock_validators.rbac.scope.validate = AsyncMock()
+    mock_validators.rbac.single_entity.validate = AsyncMock()
     return ImageProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service, action_monitors=[], validators=mock_validators
     )
 
 
