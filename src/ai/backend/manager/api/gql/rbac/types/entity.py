@@ -153,6 +153,7 @@ class EntityRefGQL(Node):
                 | RBACElementType.AGENT
                 | RBACElementType.KERNEL
                 | RBACElementType.ROUTING
+                | RBACElementType.DEPLOYMENT_TOKEN
             ):
                 return None
 
