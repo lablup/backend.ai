@@ -351,8 +351,6 @@ class ArtifactService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
-            _scope_type=action.scope_type(),
-            _scope_id=action.scope_id(),
         )
 
     async def search_with_revisions(
@@ -367,8 +365,6 @@ class ArtifactService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
-            _scope_type=action.scope_type(),
-            _scope_id=action.scope_id(),
         )
 
     async def get_revisions(

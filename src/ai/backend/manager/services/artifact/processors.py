@@ -2,7 +2,6 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
@@ -61,8 +60,8 @@ from .service import ArtifactService
 class ArtifactProcessors(AbstractProcessorPackage):
     scan: ActionProcessor[ScanArtifactsAction, ScanArtifactsActionResult]
     get: SingleEntityActionProcessor[GetArtifactAction, GetArtifactActionResult]
-    search_artifacts: ScopeActionProcessor[SearchArtifactsAction, SearchArtifactsActionResult]
-    search_artifacts_with_revisions: ScopeActionProcessor[
+    search_artifacts: ActionProcessor[SearchArtifactsAction, SearchArtifactsActionResult]
+    search_artifacts_with_revisions: ActionProcessor[
         SearchArtifactsWithRevisionsAction, SearchArtifactsWithRevisionsActionResult
     ]
     get_revisions: ActionProcessor[GetArtifactRevisionsAction, GetArtifactRevisionsActionResult]
@@ -88,11 +87,9 @@ class ArtifactProcessors(AbstractProcessorPackage):
         self.get = SingleEntityActionProcessor(
             service.get, action_monitors, validators=[validators.rbac.single_entity]
         )
-        self.search_artifacts = ScopeActionProcessor(
-            service.search, action_monitors, validators=[validators.rbac.scope]
-        )
-        self.search_artifacts_with_revisions = ScopeActionProcessor(
-            service.search_with_revisions, action_monitors, validators=[validators.rbac.scope]
+        self.search_artifacts = ActionProcessor(service.search, action_monitors)
+        self.search_artifacts_with_revisions = ActionProcessor(
+            service.search_with_revisions, action_monitors
         )
         self.get_revisions = ActionProcessor(service.get_revisions, action_monitors)
         self.update = SingleEntityActionProcessor(
