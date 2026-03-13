@@ -29,11 +29,11 @@ class SearchChannelsAction(NotificationChannelScopeAction):
 
     @override
     def scope_id(self) -> str:
-        return "*"
+        return ""
 
     @override
     def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.GLOBAL, "*")
+        return RBACElementRef(RBACElementType.NOTIFICATION_CHANNEL, "")
 
 
 @dataclass
@@ -51,4 +51,4 @@ class SearchChannelsActionResult(NotificationChannelScopeActionResult):
 
     @override
     def scope_id(self) -> str:
-        return "*"
+        return ""
