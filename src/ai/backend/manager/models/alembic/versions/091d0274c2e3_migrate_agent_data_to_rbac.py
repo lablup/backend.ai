@@ -1,7 +1,7 @@
 """migrate_agent_data_to_rbac
 
 Revision ID: 091d0274c2e3
-Revises: 359f0bbd936c
+Revises: 21159a293dfb
 Create Date: 2026-03-11 00:00:00.000000
 
 """
@@ -12,7 +12,7 @@ from sqlalchemy.engine import Connection
 
 # revision identifiers, used by Alembic.
 revision = "091d0274c2e3"
-down_revision = "359f0bbd936c"
+down_revision = "21159a293dfb"
 branch_labels = None
 depends_on = None
 
