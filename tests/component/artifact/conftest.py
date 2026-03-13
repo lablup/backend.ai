@@ -79,9 +79,11 @@ def artifact_processors(
         config_provider=config_provider,
     )
     return ArtifactProcessors(
-        service=service, action_monitors=[], validators=ActionValidators(
+        service=service,
+        action_monitors=[],
+        validators=ActionValidators(
             rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock()),
-        )
+        ),
     )
 
 
@@ -116,9 +118,11 @@ def artifact_revision_processors(
         background_task_manager=background_task_manager,
     )
     return ArtifactRevisionProcessors(
-        service=service, action_monitors=[], validators=ActionValidators(
+        service=service,
+        action_monitors=[],
+        validators=ActionValidators(
             rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock()),
-        )
+        ),
     )
 
 
