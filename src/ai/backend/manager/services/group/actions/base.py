@@ -41,3 +41,29 @@ class GroupSingleEntityAction(BaseSingleEntityAction):
 
 class GroupSingleEntityActionResult(BaseSingleEntityActionResult):
     pass
+
+
+class ProjectScopeAction(BaseScopeAction):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.PROJECT
+
+
+class ProjectScopeActionResult(BaseScopeActionResult):
+    pass
+
+
+class ProjectSingleEntityAction(BaseSingleEntityAction):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.PROJECT
+
+    @override
+    def field_data(self) -> FieldData | None:
+        return None
+
+
+class ProjectSingleEntityActionResult(BaseSingleEntityActionResult):
+    pass
