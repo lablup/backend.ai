@@ -2,6 +2,8 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
+from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.scaling_group.actions.associate_with_domain import (
@@ -64,10 +66,16 @@ from ai.backend.manager.services.scaling_group.service import ScalingGroupServic
 
 
 class ScalingGroupProcessors(AbstractProcessorPackage):
-    create_scaling_group: ActionProcessor[CreateScalingGroupAction, CreateScalingGroupActionResult]
-    purge_scaling_group: ActionProcessor[PurgeScalingGroupAction, PurgeScalingGroupActionResult]
-    modify_scaling_group: ActionProcessor[ModifyScalingGroupAction, ModifyScalingGroupActionResult]
-    search_scaling_groups: ActionProcessor[
+    create_scaling_group: ScopeActionProcessor[
+        CreateScalingGroupAction, CreateScalingGroupActionResult
+    ]
+    purge_scaling_group: SingleEntityActionProcessor[
+        PurgeScalingGroupAction, PurgeScalingGroupActionResult
+    ]
+    modify_scaling_group: SingleEntityActionProcessor[
+        ModifyScalingGroupAction, ModifyScalingGroupActionResult
+    ]
+    search_scaling_groups: ScopeActionProcessor[
         SearchScalingGroupsAction, SearchScalingGroupsActionResult
     ]
     list_allowed_sgroups: ActionProcessor[
@@ -104,10 +112,20 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        self.create_scaling_group = ActionProcessor(service.create_scaling_group, action_monitors)
-        self.purge_scaling_group = ActionProcessor(service.purge_scaling_group, action_monitors)
-        self.modify_scaling_group = ActionProcessor(service.modify_scaling_group, action_monitors)
-        self.search_scaling_groups = ActionProcessor(service.search_scaling_groups, action_monitors)
+        self.create_scaling_group = ScopeActionProcessor(
+            service.create_scaling_group, action_monitors, validators=[validators.rbac.scope]
+        )
+        self.purge_scaling_group = SingleEntityActionProcessor(
+            service.purge_scaling_group, action_monitors, validators=[validators.rbac.single_entity]
+        )
+        self.modify_scaling_group = SingleEntityActionProcessor(
+            service.modify_scaling_group,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
+        self.search_scaling_groups = ScopeActionProcessor(
+            service.search_scaling_groups, action_monitors, validators=[validators.rbac.scope]
+        )
         self.list_allowed_sgroups = ActionProcessor(service.list_allowed_sgroups, action_monitors)
         self.get_wsproxy_version = ActionProcessor(service.get_wsproxy_version, action_monitors)
         self.get_resource_info = ActionProcessor(service.get_resource_info, action_monitors)
