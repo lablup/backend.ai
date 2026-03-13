@@ -1,7 +1,7 @@
 """migrate_container_registry_data_to_rbac
 
 Revision ID: 2e42a745f939
-Revises: 359f0bbd936c
+Revises: 82e817b74ae4
 Create Date: 2026-03-11 00:00:00.000000
 
 """
@@ -14,7 +14,7 @@ from sqlalchemy.engine import Connection
 
 # revision identifiers, used by Alembic.
 revision = "2e42a745f939"
-down_revision = "359f0bbd936c"
+down_revision = "82e817b74ae4"
 branch_labels = None
 depends_on = None
 
